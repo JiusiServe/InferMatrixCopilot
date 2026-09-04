@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6311", "PR #6339", "PR #6343", "PR #6468", "PR #6523", "PR #6613", "PR #6555", "PR #6650", .buildkite/common/scripts/run_cov_split.sh, pyproject.toml, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py, .buildkite/common/scripts/upload_pipeline.py, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/clean.py, tests/helpers/client.py, tests/helpers/mark.py, tests/helpers/runtime.py, tests/helpers/stage_config.py, tests/buildkite/test_upload_pipeline.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/dfx/stability/, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/nightly/run_nightly_jobs.sh, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py, .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, "PR #6704", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", "PR #6696", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/benchmarks/patch/patch.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, "PR #6674", docker/Dockerfile.npu, docker/Dockerfile.npu.a3, docker/Dockerfile.npu.ci, docker/Dockerfile.npu.ci.a3, "PR #6818"]
+sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6311", "PR #6339", "PR #6343", "PR #6468", "PR #6523", "PR #6613", "PR #6555", "PR #6650", .buildkite/common/scripts/run_cov_split.sh, pyproject.toml, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py, .buildkite/common/scripts/upload_pipeline.py, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/clean.py, tests/helpers/client.py, tests/helpers/mark.py, tests/helpers/runtime.py, tests/helpers/stage_config.py, tests/buildkite/test_upload_pipeline.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/dfx/stability/, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/nightly/run_nightly_jobs.sh, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py, .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, "PR #6704", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", "PR #6696", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/benchmarks/patch/patch.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, "PR #6674", docker/Dockerfile.npu, docker/Dockerfile.npu.a3, docker/Dockerfile.npu.ci, docker/Dockerfile.npu.ci.a3, "PR #6818", "PR #6830", tests/diffusion/conftest.py, tests/diffusion/attention/test_flash_attn.py]
 confidence: high
 ---
 
@@ -119,7 +119,8 @@ PR 报告的 collection=1 和 local two-card B300 184.97 s 是该精确 workload
 
 ## OMNI-CI-2b — 并行测试基础设施隔离任务失败和共享状态
 
-- 触发：xdist、共享下载 fixture、长寿命 judge/transcriber worker、进程池 retry，或 spawned `torch.distributed` process group。
+- 触发：xdist、共享下载 fixture、长寿命 judge/transcriber worker、进程池 retry、spawned
+  `torch.distributed` process group，或测试修改 PyTorch process-global default state。
 - 强制：任务级异常后丢弃污染 worker；submit/result 串行，只有进程崩溃可 retry-once；传给
   xdist 的参数可序列化，依赖固定兼容 major；共享文件在读锁前显式检查存在，写入保持锁语义。spawned `torch.distributed` 必须为每个 group 传入新鲜 `file://` rendezvous URL，不能先释放 TCP port 再把其数字交给子进程；`get_open_port` 只用于真实 TCP service。
 - 共享 helper 的边界必须清晰：请求 client 从 `tests/helpers/client.py`、环境/设备清理由
@@ -128,10 +129,16 @@ PR 报告的 collection=1 和 local two-card B300 184.97 s 是该精确 workload
   不会调用 `__exit__`，所以必须立即回滚已启动的 stage 子进程、关闭已打开的日志 FD 并清除临时
   日志；只有显式 `VLLM_OMNI_KEEP_LOG` 调试选择可保留日志文件。测试 deploy helper 只接受新
   schema 的顶层 `stages`；不得静默回退 `stage_args`，缺失时 consumer error 必须指出配置文件。
+  `tests/diffusion/` 的 autouse fixture 还必须在每个 test 前 snapshot `torch.get_default_dtype()`，
+  并在 `finally` 恢复，使失败、skip 和正常返回采用同一 cleanup。
 - 禁止：普通 task error 复用同一进程；为 pytest 生命周期不可达的竞态堆测试；把并行参数或
-  活对象隐式跨进程传递；把 file rendezvous 套用于 Mooncake/RDMA 等真实监听服务。
+  活对象隐式跨进程传递；把 file rendezvous 套用于 Mooncake/RDMA 等真实监听服务；依赖 collection
+  order 掩盖 `torch.set_default_dtype` 泄漏，或把 diffusion-tree fixture 称为树外测试的保护。
 - 验收：OOM、普通异常和 BrokenProcessPool 分别验证隔离/重试；online/offline xdist 均通过，
-  并发 cache miss 只产生一个完整文件；spawned Gloo/NCCL group 使用独立 file rendezvous，真实 TCP service 仍使用 port helper。 ^[PR #6208] ^[PR #6339] ^[PR #6468] ^[PR #6523]
+  并发 cache miss 只产生一个完整文件；spawned Gloo/NCCL group 使用独立 file rendezvous，真实 TCP
+  service 仍使用 port helper。另以 dtype-mutating predecessor + default-sensitive F32 test 覆盖正常与
+  exception cleanup。该 fixture 只覆盖 `tests/diffusion/`；Ovis 的原始 leak 若在树外运行，仍须在
+  source 修复。^[PR #6208] ^[PR #6339] ^[PR #6468] ^[PR #6523] ^[PR #6830]
 
 ## OMNI-CI-2c — 昂贵 engine fixture 复用必须恢复状态并隔离拓扑
 
@@ -212,6 +219,16 @@ PR 报告的 collection=1 和 local two-card B300 184.97 s 是该精确 workload
   have explicit timeouts and the unresolved TTS case is non-blocking. On ROCm, check the selected test's per-run
   baseline/steady-state sampling and cleanup command separately from the model assertion; a local or different
   machine threshold result is not a CI-wide performance verdict. ^[PR #6704]
+- 强制：MI300 blocking layerwise-offload step 只 deselect exact
+  `stabilityai/stable-audio-open-1.0` parameter；同一 case 在独立 `mi300_1`、依赖 `amd-build` 的
+  `NonBlocking` step 运行，其余 test parameters、spawn/log env 保持。ROCm BF16 AITER
+  FlashAttention-vs-SDPA cross-attention 可用 elementwise `assert_close(rtol=1e-2, atol=1.5e-2)`；
+  CUDA/XPU 仍保留各自 strict checks。
+- 禁止：用邻近 shard 或绿色 NonBlocking case 宣称 Stable Audio memory-savings issue 已解决；不得把
+  ROCm tolerance 推广到其他平台、attention path、输出质量或 runtime parity。
+- 验收：render exact deselection node ID、quarantine command、dependency 与 `NonBlocking` wiring，且
+  blocking test file 保留其他 parameters。ROCm test 保留 masked/unpadded cross-attention coverage，并
+  以超出 rtol/atol 的 mutation 证明仍会失败。^[PR #6830]
 
 ## OMNI-CI-3a — DFX baseline artifact 与性能回归 gate 是两个合同
 

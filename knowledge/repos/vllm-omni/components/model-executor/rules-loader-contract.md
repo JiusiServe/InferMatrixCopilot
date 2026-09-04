@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/, "PR #5910", "PR #6119", "PR #5791", "vllm_omni/model_executor/models/common/qwen3_code_predictor.py", "vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py", "PR #6138", "PR #6640", vllm_omni/engine/stage_init_utils.py, tests/engine/test_async_omni_engine_stage_init.py, tests/engine/test_stage_engine_args.py]
+sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/, "PR #5910", "PR #6119", "PR #5791", "vllm_omni/model_executor/models/common/qwen3_code_predictor.py", "vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py", "PR #6138", "PR #6640", vllm_omni/engine/stage_init_utils.py, tests/engine/test_async_omni_engine_stage_init.py, tests/engine/test_stage_engine_args.py, "PR #6830", vllm_omni/engine/arg_utils.py, tests/engine/test_arg_utils.py]
 confidence: high
 ---
 
@@ -86,12 +86,15 @@ confidence: high
   weight artifact 与 index 引用的全部 shards 完整时，才可改写为本地 subdir；partial cache 必须按同一
   repo/revision/download_dir 请求精确 subset 并复验。仅当 `tokenizer_subdir is not None` 且
   `tokenizer_revision != revision` 时单独解析 tokenizer snapshot；空 tokenizer subdir 表示 snapshot
-  root，仍须验证 vocabulary artifact。`is_runai_obj_uri` 命中时保留 URI 与 joined subpath，跳过
+  root，仍须验证 vocabulary artifact。remote tokenizer subfolder 成功解析为本地目录后，success
+  logging 与 `self.tokenizer` assignment 都必须使用同一个 resolved `tokenizer_subfolder`。`is_runai_obj_uri` 命中时保留 URI 与 joined subpath，跳过
   local/HF snapshot 推断，交给 upstream streamer。
 - 禁止：以 `isdir`、config/index 文件存在或单 shard 证明 stage 完整；partial snapshot 静默变成本地
   model path；把显式 tokenizer revision 改回 model revision；把 Run:AI URI 当作本地/HF cache，或把
-  generic stage resolver 描述成会补齐模型专有的全部 composite root components。
+  generic stage resolver 描述成会补齐模型专有的全部 composite root components；不得因 success-path
+  log 引用未定义变量，把已下载 subfolder 捕获为 warning/failure。
 - 验收：覆盖 cold/partial/warm offline stage snapshot、index 缺 referenced shard、root tokenizer、
-  split tokenizer revision、download failure fail-closed 和 Run:AI URI passthrough；模型专有 root
+  split tokenizer revision、download failure fail-closed 和 Run:AI URI passthrough；mocked CosyVoice3
+  success 还须断言 resolved tokenizer path 被赋值且 warning logger 未调用。模型专有 root
   completeness 另由 owner 验证。unit fixture 不证明真实 checkpoint load、音质、GPU E2E 或跨平台支持。
-  ^[PR #6640]
+  ^[PR #6640] ^[PR #6830]
