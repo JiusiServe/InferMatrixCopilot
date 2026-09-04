@@ -1,10 +1,10 @@
 ---
 title: "Distributed 传输规则"
 created: 2026-08-05
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", "PR #5976", "PR #6089", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406"]
+sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406"]
 confidence: high
 ---
 
@@ -34,6 +34,12 @@ confidence: high
   connector 没有新数据时无限占用 active window 或静默丢掉 terminal update。
 - 验收：覆盖非空→空→非空、upstream exhaustion、stage completion、重复 terminal
   update 和窗口恢复；首批测试看 `test_chunk_transfer_adapter.py`。
+
+## DIST-1b1 — per-segment adaptive controller 不得越过 connector lifecycle
+
+- 触发：Qwen3-TTS adaptive chunk、resumable segment finish，或 transfer adapter/local runner cleanup 修改。
+- 强制：controller 可按 request 持有，但 `is_segment_finished` 与 request cleanup 均必须清除；下一段从 chunk 0 重新建立 EWMA、emitted ledger、playback cursor 与 telemetry。request-global connector continuity key 不能延长 controller 生命周期。
+- 验收：normal finish、segment finish、abort cleanup 与 empty terminal payload 都断言 state 不残留；覆盖 `OmniChunkTransferAdapter` 和 `OmniConnectorModelRunnerMixin`。^[PR #6001]
 
 ## DIST-1c — payload connector 按 edge 所有权创建且不与 KV manager 捆绑
 

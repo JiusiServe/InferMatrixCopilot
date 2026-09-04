@@ -1,7 +1,7 @@
 ---
 title: "Async chunk（跨 stage 分块流式）"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-09-05
 type: guide
 tags: [vllm-omni, components, distributed]
 sources: [docs/design/feature/async_chunk.md, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py]
@@ -22,7 +22,10 @@ sources: [docs/design/feature/async_chunk.md, vllm_omni/distributed/omni_connect
   Thinker→Talker 逐 decode step（通常 1）；Talker→Code2Wav 积累到
   `codec_chunk_frames`（默认 25）再发——初始阶段按服务负载动态选初始 chunk（IC）
   以降 TTFP，可用逐请求 API 字段 `initial_codec_chunk_frames` 覆盖；Code2Wav 流式
-  解码（支持批推理）。
+  解码（支持批推理）。Qwen3-TTS 可 opt-in `codec_chunk_adaptive`：chunk 0 仍使用
+  dynamic IC，chunk 1+ 由 host-side、每 request/segment 的 EWMA buffer-feedback 控制；
+  fixed `codec_chunk_ramp` 在此模式不生效。segment finish 与 request cleanup 都必须丢弃
+  controller state，不能把上一段的 buffer/telemetry 继承到下一段。^[PR #6001]
 - 配置：deploy 顶层 `async_chunk`（默认 true）；端到端跑完的 pipeline 应 pin
   `false`——单 stage diffusion 必须 `async_chunk: false` 的事故见
   [ci-gotchas](../../ci/guides/ci-gotchas.md) 第 2 条。

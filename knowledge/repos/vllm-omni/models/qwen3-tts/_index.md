@@ -1,10 +1,10 @@
 ---
 title: "Qwen3-TTS"
 created: 2026-07-20
-updated: 2026-09-02
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, serving, qwen-omni]
-sources: ["PR #5157", "PR #5202", "PR #5608", vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, vllm_omni/platforms/npu/models/qwen3_tts_tokenizer_v2.py, vllm_omni/platforms/npu/layers/rotary_embedding.py]
+sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/platforms/npu/models/qwen3_tts_tokenizer_v2.py, vllm_omni/platforms/npu/layers/rotary_embedding.py]
 confidence: high
 ---
 
@@ -13,7 +13,7 @@ confidence: high
 ## 名称与范围
 
 - 正式 owner：Qwen3-TTS serving、ref audio、artifact cache、async Code2Wav
-  增量解码/状态生命周期与模型专有 NPU patch。事实在 `main @ 4f9b6507`
+  增量解码/状态生命周期、adaptive chunk ramp 与模型专有 NPU patch。事实在 `main @ 4ad455e6`
   复核。
 - serving 入口：`vllm_omni/entrypoints/openai/serving_speech.py`。
 - NPU tokenizer patch：`vllm_omni/platforms/npu/models/qwen3_tts_tokenizer_v2.py`；共享

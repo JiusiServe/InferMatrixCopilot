@@ -1,10 +1,10 @@
 ---
 title: "Qwen3-TTS 规则"
 created: 2026-07-20
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, serving, qwen-omni]
-sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6523", vllm_omni/deploy/aura_omni.yaml, vllm_omni/deploy/qwen3_tts.yaml, vllm_omni/deploy/qwen3_tts_high_concurrency.yaml, vllm_omni/model_executor/models/aura_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, tests/e2e/online_serving/test_qwen3_tts_base_expansion.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_code2wav.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_incremental_decode.py, tests/model_executor/stage_input_processors/test_qwen3_tts_async_chunk.py, "PR #5048"]
+sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", "PR #6523", vllm_omni/deploy/aura_omni.yaml, vllm_omni/deploy/qwen3_tts.yaml, vllm_omni/deploy/qwen3_tts_high_concurrency.yaml, vllm_omni/model_executor/models/aura_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, tests/e2e/online_serving/test_qwen3_tts_base_expansion.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_code2wav.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_incremental_decode.py, tests/model_executor/stage_input_processors/test_qwen3_tts_async_chunk.py, "PR #5048"]
 confidence: high
 ---
 
@@ -18,7 +18,7 @@ confidence: high
 |---|---|---|
 | Qwen3-TTS、`qwen3_tts` pipeline | Q3TTS-1a/1b | `config/pipeline_registry.py::OMNI_PIPELINES["qwen3_tts"]`；`model_executor/models/qwen3_tts/pipeline.py` |
 | `ref_audio`、x-vector、ICL、artifact-only reuse | Q3TTS-1a/1b/1c | `entrypoints/openai/serving_speech.py::_qwen3_tts_can_use_ref_audio_artifact_only`、`_track_ref_audio_artifact_warmup`、`_mark_ref_audio_artifact_ready_for_request` |
-| talker/code2wav、delta frame、request cache、segmented graph | Q3TTS-3a/3b/3c/3d + Model Executor | `stage_input_processors/qwen3_tts.py::talker2code2wav_async_chunk` → `qwen3_tts_code2wav.py::Qwen3TTSCode2Wav` → `segmented_graph_wrapper.py` |
+| talker/code2wav、adaptive chunk、delta frame、request cache、segmented graph | Q3TTS-3a/3b/3c/3d/3e + Model Executor | `stage_input_processors/qwen3_tts.py::talker2code2wav_async_chunk` → `stage_input_processors/chunk_size_utils.py` → `qwen3_tts_code2wav.py::Qwen3TTSCode2Wav` → `segmented_graph_wrapper.py` |
 | OpenAI speech adapter | Q3TTS-1a/1b + Serving | `entrypoints/openai/tts_adapters/qwen3_tts.py::Qwen3TTSAdapter` → `serving_speech.py` |
 | NPU、RoPE、BNSD/BSND、`codec_chunk_ramp` | Q3TTS-2a | `platforms/npu/models/qwen3_tts_tokenizer_v2.py::_apply_rotary_pos_emb_npu` → `platforms/npu/layers/rotary_embedding.py::npu_rotary_mul_with_bsnd_fallback` |
 
@@ -139,6 +139,19 @@ confidence: high
   失败。^[PR #5202]
   最终 pin 没有 PR body 早期描述的 `_last_output_audio_length`；真实合同是
   exact-length `list[Tensor]` 加 Code2Wav 的 stateless leading-context trim。
+
+## Q3TTS-3e — adaptive ramp 是 host-side、每段 opt-in 控制器，不是 CUDA graph 计划
+
+- 触发：`codec_chunk_adaptive`、Talker→Code2Wav async chunk、动态 IC、buffer/underrun telemetry，或 Qwen3-TTS deploy 的 chunk key。
+- 强制：默认关闭；启用后优先于 fixed `codec_chunk_ramp`。chunk 0 保持 dynamic IC（即使配置了 fixed initial IC），chunk 1+ 才逐 emit 从本段 controller 决定 target。controller 以 80 ms/frame 的 emitted audio 减去 first-emit 后 wall time 得 buffer；以 EWMA（alpha 0.3）估算 frame time。greedy target、无条件 ramp floor `last_target + max(ramp_delta_min, int(ewma/ramp_divisor))` 和 `codec_chunk_min_frames..codec_chunk_frames` clamp 合并；buffer 达到 `codec_chunk_frames * ewma + safety_margin` 后 hysteresis lock 在 max。floor 在负 buffer 下也不能关闭：即使 W5 streaming decoder state 已在基线，per-chunk transport/padding/graph overhead 与 overload death-spiral 仍使向下缩块不是本 PR 的策略；downward adaptation 明确 deferred。
+- 强制：非终止也发送所有已积累的 new frames；finished flush 全部余帧，无余帧仍发 empty-finished sentinel。recorded `last_target` 必须是本次 intended target，不能用实际 overshoot emitted frames，否则 spike 会把 floor 错误 ratchet 到 max。controller state 在 segment boundary/request cleanup 清除；每段 INFO telemetry 记录 chunk trajectory、每块 gap 与 total gap。
+- 配置：`codec_chunk_adaptive=false`、`codec_chunk_min_frames=2`、`codec_chunk_safety_margin_ms=50.0`、`codec_chunk_ramp_divisor=15`、`codec_chunk_ramp_delta_min=2`；min/divisor/delta-min 小于 1 clamp 为 1，最大值固定是 `codec_chunk_frames`（没有单独 adaptive max key）。两份 Qwen3-TTS deploy 只注释示例，未默认开启。
+- CUDA 边界（未解决、非阻塞）：CUDA 的 Code2Wav graph capture grid 从 fixed IC/ramp 建，而 controller runtime cumulative boundaries 通常不在该 grid；adaptive ramp（含 dynamic-IC chunk 0）因此可 eager，910B NPU 不受该 CUDA graph path 影响。已匹配 source 的 nonterminal partial replay 还可能不 advance decoder cache。这两点尚无 merged fix，不得声称 adaptive 与 fixed ramp 同等 graph replay 或 cache continuity；在 CUDA 上以 graph stats/hit rate 实测。^[PR #6001]
+
+### PR #6001 性能证据边界
+
+- 这不是通用吞吐/RTF 改善承诺。合并前 A/B 是 Ascend 910B、vLLM 0.27.1 + vLLM-Ascend PR #14027、Qwen3-TTS voice-clone、40 requests、concurrency 8；adaptive 为 opt-in 唯一变量：mean RTF 0.746（default 0.757 / fixed 0.789）、mean underrun 0.14 s（1.18 / 0.27），continuity OK 35%（0% / 22.5%）。另一 910B c=2 观测 RTF 0.56、underrun 0.02 s；c=8 per-stream RTF>1 仍会饱和。作者听音验证质量，但未给跨硬件或 CI unit suite 证据。
+- 更准确的主张是 portability：约 11 ms/frame 的 CUDA hardware 不重调 Ascend 手选 `[4,4,8,16,25]` 即自适应出 `[2,4,25,25,3]`；CUDA graph miss 可解释相对 fixed ramp 的损失。上述数字、模型、负载和软件栈以外不得外推。^[PR #6001]
 
 ## PR #5202 性能证据边界
 
