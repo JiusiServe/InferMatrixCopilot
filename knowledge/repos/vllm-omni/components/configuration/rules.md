@@ -28,6 +28,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | multi-stage HF sub-config、stage quantization view、`hf_config_name` | `stage-model-config`：`VOMNI-CFG-1i` | pipeline stage declaration → `OmniModelConfig::{draw_hf_text_config,get_model_arch_config}` → vLLM quantization selection |
 | pipeline `sampling_constraints`、`StageConfig.to_omegaconf()`、runtime stage config | `stage-config-propagation`：`VOMNI-CFG-1o` | `merge_pipeline_deploy` → `StageConfig.to_omegaconf()` → `engine.stage_configs` |
 | stage transport、`requires_full_payload_input`、topology projection 或 override rejection | `stage-transport`：`VOMNI-CFG-1p` | `stage_config.py::{StagePipelineConfig,_build_engine_args}` → `omni_config.py::_build_model_config` → `engine/arg_utils.py::OmniEngineArgs` |
+| SymmMem Ulysses transport | [VOMNI-CFG-1q](rules-diffusion-parallel-transport.md) + `DIFF-4x` | deploy → parallel config → Ulysses |
 | HF cache snapshot path、空 `config.json`、name-based pipeline fallback | [`model-reference-routing`](rules-model-reference-routing.md#conf-7a-模型引用解析必须物化对象存储配置并只从受控名称组件匹配)：`CONF-7a` | `config_factory.py::{_name_match_candidate,StageConfigFactory._try_infer_model_type}` → `pipeline_registry.py::OMNI_PIPELINES` → `tests/config/test_config_factory.py::TestNameMatchCandidateSnapshotPaths` |
 | Qwen3-TTS adaptive codec chunk keys、fixed-ramp precedence | [Qwen3-TTS `Q3TTS-3e`](../../models/qwen3-tts/rules.md#q3tts-3e-adaptive-ramp-是-host-side每段-opt-in-控制器不是-cuda-graph-计划) | `deploy/qwen3_tts{,_high_concurrency}.yaml` connector `extra` → `stage_input_processors/chunk_size_utils.py::parse_adaptive_config` |
 
@@ -41,6 +42,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | `stage-model-config` | HF nested config、stage-specific quantization/text config | `VOMNI-CFG-1i` |
 | `stage-config-propagation` | pipeline sampling constraints、StageConfig serialization/runtime config | `VOMNI-CFG-1o` |
 | `stage-transport` | full-payload transport capability、topology projection、deploy/CLI override | `VOMNI-CFG-1p`，见 [stage transport capability](rules-stage-transport.md) |
+| `diffusion-parallel-transport` | SymmMem Ulysses flag | [VOMNI-CFG-1q](rules-diffusion-parallel-transport.md) + `DIFF-4x` |
 | `model-reference-routing` | object-storage materialization、HF cache snapshot、name fallback | `CONF-7a`，见 [模型引用路由规则](rules-model-reference-routing.md) |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `VOMNI-CFG-0a`, `VOMNI-CFG-0b` |
 
@@ -132,6 +134,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：每个 stage 的 resolved `sampling_constraints` 必须从 `merge_pipeline_deploy()` 复制到 `StageConfig`，并由 `to_omegaconf()` 导出为可在 `engine.stage_configs` 读取的原生 mapping；不得与默认 sampling params 混为唯一保存位置。
 - 禁止：只在 dataclass 或默认 params 上保留约束、让 OmegaConf runtime config 静默丢字段，或以测试直接注入 constraints list 代替真实序列化路径。
 - 验收：从 pipeline/deploy 合并走到 `StageConfig.to_omegaconf()` 和 runtime extraction，断言每 stage 的非默认 constraint 可读回；再由 serving 侧验证它到最终 sampling consumer 的效果。^[PR #6182]
+
 
 ### CONF-1a — 多 stage 共卡时 diffusion stage 必须显式设 gpu_memory_utilization
 

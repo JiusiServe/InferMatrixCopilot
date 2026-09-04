@@ -32,7 +32,7 @@ confidence: high
 | loader-owned offload plan、backend enable/prefetch failure、fresh canonical retry | `checkpoint-distributed`：`DIFF-12a` | `offloader/startup.py` → `offloader/__init__.py::enable_offload_backend` → runner |
 | LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
 | Wan VAE spatial shard、gather/trim/reshard、empty tail、attention extent | `distributed-vae`：`DIFF-3b` | `distributed/autoencoders/wan_spatial_shard.py` → patched decoder attention/conv → gather final frame |
-| paged KV/cache、backend/platform、GQA/layout、Ring/Ulysses、FlashInfer quant、masked cross-attention、预算与 admission | `system-runtime`：`DIFF-4a`–`4j`, `DIFF-4v` | engine init → metadata/config → attention parallel/backend → platform hook → scheduler/serving |
+| paged KV/cache、backend/platform、GQA/layout、Ring/Ulysses、SymmMem A2A、FlashInfer quant、masked cross-attention、预算与 admission | `system-runtime`：`DIFF-4a`–`4j`, `DIFF-4v`, `DIFF-4x` | engine init → metadata/config → attention parallel/backend → platform hook → scheduler/serving |
 | worker/RPC 异常、rank-status、traceback/device cache 清理 | `system-runtime`：`DIFF-4d` | `diffusion_worker.py::{_execute_rpc,_worker_busy_loop}` 的 raise/reply/status 路径 |
 | worker title、log prefix、DP/PP/SP/CFG/TP/FS/RP/EP local rank | [worker observability](rules-worker-observability.md)：`DIFF-4w` | `diffusion_worker.py::_setup_diffusion_worker_proc_title_and_log_prefix` → `distributed/parallel_state.py` group getters |
 | image/diffusion service time、forward time、missing-versus-zero、per-step metric | [`metrics-evidence`](rules-metrics.md)：`DIFF-5a`, `DIFF-5b` | output formatter/sampling metadata → stage stats aggregation → serving Prometheus emission |
@@ -46,7 +46,7 @@ confidence: high
 | `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT/cache lifecycle | `DIFF-2a`–`2e`, `2p`, `2q`, `2s`, `2y`, `2z` 见 [checkpoint 与加载合同](rules-checkpoint-loading.md)；`2f`–`2j`, `2r`, `2w`, `12a` 见 [component lifecycle](rules-component-lifecycle.md)；`2k` 见 [output/runtime](rules-output-lifecycle.md)；`2l`–`2o`, `2x` 见 [LoRA](rules-lora.md) |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
 | `distributed-vae` | Wan VAE spatial height/width shard、rank context、extent/padding | `DIFF-3b` |
-| `system-runtime` | cache/预算、native/backend/platform、attention layout、能力 metadata、异常与并发 | `DIFF-4a`–`4j`、`4v`（`4a`–`4i` 见 [paged cache 与系统运行时规则](rules-system-runtime.md)，`4v` 见 [attention rules](rules-attention.md)） |
+| `system-runtime` | cache/预算、native/backend/platform、attention layout、SymmMem A2A、能力 metadata、异常与并发 | `DIFF-4a`–`4j`、`4v`、`4x`（`4a`–`4i`、`4x` 见 [paged cache 与系统运行时规则](rules-system-runtime.md)，`4v` 见 [attention rules](rules-attention.md)） |
 | [`metrics-evidence`](rules-metrics.md) | diffusion timing、step normalization、missing-versus-zero、benchmark interpretation | `DIFF-5a`, `DIFF-5b` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
 

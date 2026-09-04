@@ -1,10 +1,10 @@
 ---
 title: "Diffusion paged cache 与系统运行时规则"
 created: 2026-09-03
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
+sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/distributed/a2a_permute.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/distributed/test_a2a_permute.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
 confidence: high
 ---
 
@@ -79,6 +79,13 @@ confidence: high
   backend 或把 KV heads 扩成 Q heads。
 - 验收：32Q/8KV、异构 prefix、单 token/单 head、非对称等维 LSE 和 batch compaction 精确
   对照 dense/reference 输出。 ^[PR #5543] ^[PR #6102]
+
+## DIFF-4x — SymmMem Ulysses A2A 只能显式启用并保持 workspace 生命周期闭合
+
+- 触发：修改 `ulysses_a2a_permute`、strict Ulysses all-to-all、NCCL SymmetricMemory JIT extension、CUDA graph capture 或 diffusion worker shutdown。
+- 强制：默认关闭；只在 `ulysses_degree > 1`、strict Ulysses 的正向 `(scatter,gather)=(2,1)` 与反向 `(1,2)` layout 启用，并在 worker/model 初始化时 JIT build/capability failure 直接 fail-at-init。advanced-UAA 保持其 `_ulysses_all_to_all_any_*` path；AllGather 不选择 Ulysses；strict Ulysses+Ring 的 Ulysses leg 仍可使用该 path。每个 `(device, process-group)` 只有一个单 CUDA stream 的 grow-only byte workspace；首次分配及增长必须是 collective、在增长前同步，容量内按 typed view 复用；graph capture 中禁止增长，须先 warm up 最大 shape；worker shutdown 同步并释放 workspace。
+- 禁止：把 flag 当作默认 transport、静默 fallback；按历史 shape/dtype 无界缓存 allocation；跨 stream 重用 staging buffer；capture 中隐式分配/扩容；把 CPU/mock workspace 测试或 PR benchmark 写成数学/输出 parity、普遍速度或跨硬件收益。
+- 验收：覆盖 CLI/deploy/default-stage 的显式 flag 透传与默认 false、eligible strict path 的 init build、UAA/AllGather/noneligible layout 不调用该 path、strict Ulysses+Ring 的 eligible Ulysses leg、peak workspace 复用/collective growth、capture growth fail、single-stream reject 与 shutdown release；真实多 rank hardware 仍须对 regular Ulysses 做 Q/K/V 与 reverse-output parity，再单独记录精确 shape/stack/预热后的性能。^[PR #6340]
 
 ## DIFF-4g — Ring GQA 只在通信后扩展，Hybrid Ulysses 不把 padding 当真 head
 
@@ -183,4 +190,3 @@ confidence: high
 - 强制：Scheduler 只拥有 logical block allocation、generation 和 `DiffusionKVMetadata`；每个 Worker rank 消费自己的 `KVCacheConfig`，拥有物理 KV tensors、native `BlockTables` 和 request/sequence/context rows。安装 metadata 前必须校验 group/count/range/capacity，并以 staged append、apply 和失败 rollback 原子发布；重复 generation 幂等，冲突或过期快照拒绝，BlockTables 变更使已准备的 attention batch 失效，终止时先清 Worker rows 而不释放 Scheduler blocks。
 - 禁止：Worker 自行分配或释放 Scheduler-owned logical blocks；把部分 row 安装、native append/apply 异常或 stale snapshot 当作成功；从 padding 猜异构 prefix 的逻辑布局；在清理或 wake refresh 后继续复用旧的 native metadata/buffer view。
 - 验收：CPU/mock 覆盖 rank-local config、请求/上下文 row mapping、重复/过期/冲突 generation、非法 block 与容量、append/apply rollback、幂等清理和 wake refresh；GPU 另验证非连续 BlockTables、GQA、异构 prefix 与 piecewise attention。该 PR 不证明跨 stage KV transport、W2 prefix-cache 或真实 HunyuanImage3 E2E。^[PR #6102]
-
