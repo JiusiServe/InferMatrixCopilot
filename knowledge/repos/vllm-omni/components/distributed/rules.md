@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626", "PR #6529"]
+sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", "PR #6834", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626", "PR #6529"]
 confidence: high
 ---
 
@@ -79,7 +79,7 @@ confidence: high
 ## DIST-1g — 异步 processor 任务必须在入队时冻结边界状态
 
 - 触发：`OmniChunkTransferAdapter.save_async` 向 custom next-stage processor 入队，且 producer request 会在 worker 发送前继续被 streaming update 原地修改。
-- 强制：只为 custom processor shallow-copy request，并递归复制其可变容器输入（additional information、prompt/token lists）；tensor leaves 保持共享。每个 queued segment boundary 在入队时移除 sender dedup watermark，使下一个 segment 能从零建立自己的 watermark；后台发送旧 task 不得清除新 segment 的 watermark。
+- 强制：只为 custom processor shallow-copy request，并递归复制其可变容器输入（additional information、prompt/token lists）；tensor leaves 保持共享。每个 queued segment boundary 在入队时移除 `requests_num_chunks_sent` chunk-progress watermark，使下一个 segment 能从 chunk 0 建立自己的 watermark；这不重置 `_segment_generation` gate，后台发送旧 task 也不得清除新 segment 的 watermark。^[PR #6834]
 - 禁止：给无 hook 的直通路径增加 request snapshot/copy；让 queued task 读取后来 mutation 的 token、metadata 或 output history；在后台 terminal cleanup 无条件删除可能已属于下一 segment 的 watermark。
 - 验收：old/new segment 在 background flush 前交错时，新 watermark 保持；连续入队后各 processor 观察各自 admission-time request snapshot；无 custom processor 时 task 仍引用原 request。^[PR #6021]
 
@@ -109,15 +109,15 @@ confidence: high
 - 触发：async-chunk sender dedup、segment terminal task、background cleanup 或同 request ID 的
   streaming segment replacement。
 - 强制：`save_async` 将 request 的 segment generation 冻结进 queued task；小于当前 generation 的
-  late save 必须拒绝。terminal task 在后台 sender 执行前先把 generation 推进到下一段并清空旧
-  chunk watermark，非 terminal preemption 才用 confirmed-token watermark 去重。request 最终 cleanup
-  同时回收 generation 和 chunk state。
+  late save 必须拒绝。terminal 必须清除 chunk-progress counter；仅当 request
+  `._omni_segment_generation is not None` 才把 expected generation 推进 `+1`，否则保持 current
+  generation，使 counter-less follow-up 仍以 current/0 enqueue。chunk watermark 只负责同段 progress
+  dedup，generation gate 负责跨段 stale fencing；request 最终 cleanup 同时回收 generation 和 chunk state。
 - 禁止：只按裸 request ID 判断 late task 有效；让旧 terminal boundary 因旧 chunk count 被误拒；
   background completion 无条件删除下一段 watermark；把未 ACK 的 serving response snapshot描述成
   此 sender generation 已给出有界 retention。
-- 验收：覆盖 old terminal 排队后 new segment 先开始、late old save、boundary 在 chunk counter reset
-  后仍入队，以及普通 dedup/preemption；断言 old payload 不复活且 new generation/watermark 保留。
-  ^[PR #6529]
+- 验收：覆盖 counter-bearing terminal `+1` fencing 与 counter-less terminal hold/current-0 follow-up、
+  counter clear、late old save 和普通 dedup/preemption。该变更不修复已有 stuck ID 或 abort 行为。^[PR #6529] ^[PR #6834]
 
 ## DIST-2a — diffusion EP group 必须满足运行中 MoE backend 的 communicator 合同
 
