@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5508", "PR #5861", "PR #6953", vllm_omni/diffusion/models/sana_video/, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/model_extras/sana_video.py, tests/entrypoints/openai_api/test_video_pipeline_capability.py]
+sources: ["PR #5508", "PR #5861", "PR #5882", "PR #6953", vllm_omni/diffusion/models/sana_video/, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/model_extras/sana_video.py, tests/diffusion/models/sana_video/test_cache_offload.py, tests/entrypoints/openai_api/test_video_pipeline_capability.py]
 confidence: high
 ---
 
@@ -76,4 +76,4 @@ confidence: high
 | 遇到什么 | 查看哪里 |
 |---|---|
 | T2V/I2V、checkpoint、VAE、adapter 或验证边界 | [architecture](architecture.md) |
-| native TP/CFG topology、GLUMB/RMSNorm layout 或 I2V parallel invariant | [SANA rules](rules.md) |
+| native TP/CFG topology、GLUMB/RMSNorm layout、I2V parallel invariant、Cache-DiT/offload admission 或 SANA 50-step refresh | [SANA rules](rules.md) |

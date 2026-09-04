@@ -1,10 +1,10 @@
 ---
 title: "Diffusion component lifecycle 规则"
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5720", "PR #5853", "PR #5884", "PR #6486", "PR #6591", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/offloader/startup.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072"]
+sources: ["PR #5720", "PR #5853", "PR #5882", "PR #5884", "PR #6486", "PR #6591", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/offloader/startup.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/models/sana_video/test_cache_offload.py, tests/diffusion/test_diffusion_model_runner.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072"]
 confidence: high
 ---
 
@@ -12,6 +12,13 @@ confidence: high
 
 本页承载共享 diffusion owner 的 multi-DiT component discovery 合同；模型专有 component 名和
 residency 留在模型 owner。规则入口与其他共享机制仍见 [Diffusion 共享规则](rules.md)。
+
+### DIFF-2ac — bare-transformer Cache-DiT adapter 与 request refresh 不得携带旧 engine 状态
+
+- 触发：Cache-DiT `BlockAdapter` construction/enable、serial worker 中第二个 engine，或 runner cache refresh step resolution 变更。
+- 强制：bare-transformer adapter 每次 enable 前清除其 wrapper pipe class 的陈旧 `_is_cached` marker，再安装新的 cache context；该 marker 是 adapter wrapper class 的 process-wide 副作用，不是可跨 engine 复用的 installation state。每 request refresh 以显式 `num_inference_steps`、`len(timesteps)`、`len(sigmas)`、pipeline `default_num_inference_steps` 的顺序求步数；显式数值优先于 custom schedule 是当前合并源码的有意语义。
+- 禁止：因前一个 engine 未 disable 而跳过第二个 bare-transformer adapter 的 context installation；不得让 class marker 或 cache refresh 在 process/request 间 carry over，也不得把 schedule-first 的旧 review 建议当成已合并行为。
+- 验收：SANA CPU regression `test_second_engine_enables_cache_dit_after_undisabled_first` 覆盖 serial second-engine red→green；runner CPU test 覆盖 explicit/timesteps/sigmas/default 四段 refresh chain。现有证据不证明所有 declarative adapter 或跨进程 lifecycle 的同等行为。^[PR #5882]
 
 ### DIFF-2f — 多 DiT pipeline 的 component list 是所有共享 lifecycle 的唯一集合
 

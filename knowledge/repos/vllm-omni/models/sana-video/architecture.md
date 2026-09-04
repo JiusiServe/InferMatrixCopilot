@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5508", "PR #5861", "PR #6953", vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/sana_video/pipeline_sana_video.py, vllm_omni/diffusion/models/sana_video/pipeline_sana_video_i2v.py, vllm_omni/diffusion/models/sana_video/transformer_sana_video.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, vllm_omni/diffusion/request.py, tests/entrypoints/openai_api/test_video_pipeline_capability.py]
+sources: ["PR #5508", "PR #5861", "PR #5882", "PR #6953", vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/sana_video/pipeline_sana_video.py, vllm_omni/diffusion/models/sana_video/pipeline_sana_video_i2v.py, vllm_omni/diffusion/models/sana_video/transformer_sana_video.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, vllm_omni/diffusion/request.py, tests/diffusion/models/sana_video/test_cache_offload.py, tests/entrypoints/openai_api/test_video_pipeline_capability.py]
 confidence: high
 ---
 
@@ -32,8 +32,12 @@ Diffusers-adapter 并非 native pipeline 的替代实现：它由 model class �
 特别是 checkpoint 声明的 T2V Diffusers class 在请求 I2V 时必须改装为 Diffusers I2V class，且
 shared `num_frames` 要翻译为 Diffusers 的 `frames`。native pipeline 的 TP/CFG 各仅支持 `{1,2}`，
 包括 TP2×CFG2；SP、text-encoder TP、PP、HSDP 在加载前拒绝，精确 layout/CFG/I2V invariant 见
-[SANA-1a](rules.md#sana-1a-native-sana-video-只支持-tpcfg-的-12-矩阵)。Cache-DiT、TeaCache 和
-step execution 仍未验证，adapter 也不提供 native continuous batching 或并行能力。
+[SANA-1a](rules.md#sana-1a-native-sana-video-只支持-tpcfg-的-12-矩阵)。native T2V/I2V 的
+Cache-DiT 与 CPU/layerwise offload 另限 TP=CFG=SP=1，且只允许 `cache_dit`（与 distributed
+layerwise offload 不可组合）；Cache-DiT、TeaCache 和 step execution 不应混为同一能力，后两者仍
+未验证。加载在 default-device context 完成，offloader 拥有 runtime residency；精确 admission、
+hook lifecycle 与 refresh 规则见 [SANA-1b/1c](rules.md)。adapter 也不提供 native continuous
+batching 或并行能力。
 
 ## 从输入到输出的主要流程
 
