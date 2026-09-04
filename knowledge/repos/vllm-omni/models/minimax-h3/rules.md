@@ -25,6 +25,7 @@ confidence: high
 | text encoder、missing q/k/v 或 gate/up、eager load bookkeeping | [MMH3-1f](rules-loading.md#mmh3-1f-text-encoder-eager-load-必须证明每个-source-shard-完整) | `encoder.py::_load_weights` → `pipeline_minimax_h3.py::load_weights` strict report |
 | NPU packed varlen、quadratic mask、LaserAttention、prefix K/V | `MMH3-1g` | H3 packed producer → backend capability/metadata → NPU FlashAttention fallback |
 | Qwen3-VL encoder、NPU causal GQA、AddRMSNorm residual | `MMH3-1k` | encoder SDPA helper/residual call → NPU model patch → `torch_npu` op |
+| Qwen3-VL encoder、cuDNN SDPA、process-global backend state、encoder TP | [MMH3-1n](rules-encoder-state.md#mmh3-1n-qwen3-vl-encoder-的-cudnn-sdpa-override-必须恢复原状态) | `encode_ids` state capture/restore → encoder-rank call → VAE boundary |
 | VAE decoder、Triton exact ops、FP16 materialization、SM90/100/103、compile/SP fallback | [MMH3-4c](rules-vae-ops.md#mmh3-4c-h3-vae-eager-ops-必须以完整远程模型合同和-reference-fallback-安装) | `vae.py::MiniMaxH3VideoVAE.__init__` → `ops/vae::{dispatch,install}` → target tests |
 | FL2VA keyframe、Ref2VA mixed reference/时域限界、shape/output matrix | [MMH3-2a](rules-media.md#mmh3-2a-taskreferenceshape-与多输出必须作为一个输入矩阵维护) | `pipeline_minimax_h3.py` → `reference_video.py` |
 | media limit、typed/multipart reference、HTTP 400、temp source | [MMH3-2b](rules-media.md#mmh3-2b-media-ingress-在解码前限界request-错误保持-http-400) | `api_server.py` → `serving_video.py` → `reference_video.py` |

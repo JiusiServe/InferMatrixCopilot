@@ -142,3 +142,5 @@ text-encoder fused-source 完整性正文见 [loading rules](rules-loading.md)�
 
 H3 VAE decoder 的 model-local eager dispatch、remote-code eligibility、exactness guards、selective
 FP16 materialization 与 compile/spatial-parallel fallback 见 [VAE eager-ops rules](rules-vae-ops.md)。
+Qwen3-VL text encoder 的 cuDNN SDPA process-global-state restore、encoder-rank/VAE boundary 和
+CPU-only validation limit 见 [encoder state rules](rules-encoder-state.md)。
