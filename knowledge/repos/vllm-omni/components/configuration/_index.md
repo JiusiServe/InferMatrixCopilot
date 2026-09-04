@@ -15,7 +15,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
   `tests/diffusion/test_diffusion_config_propagation.py`，以及各公开入口附近的配置测试
 - 部署配置：`vllm_omni/deploy/*.yaml`，以及 `pipeline_registry.py`、
   `endpoint_policy.py`、`server_settings.py`、`yaml_util.py`、`composable_parallel/`
-- 源码校验：以上路径在 `main @ 0288c3f5` 验证存在；机器基线见
+- 源码校验：以上路径在 `main @ 3cddda97` 验证存在；机器基线见
   `adapters/vllm_omni/release_baseline.yaml`
 
 ## 什么时候查这里
@@ -40,6 +40,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 | stage full-payload transport capability、topology-owned projection 或 deploy/CLI override rejection | [stage transport capability](rules-stage-transport.md) |
 | diffusion Ulysses SymmMem transport flag 的 deploy/CLI/default-stage projection | [diffusion parallel transport rules](rules-diffusion-parallel-transport.md) |
 | diffusion attention shorthand、structured config 与 global override 的优先级和最终规范表示 | [diffusion attention precedence](rules-diffusion-attention-precedence.md) |
+| legacy stage engine args 的 copy boundary、connector/default injection 或 repeated build mutation | [legacy engine-args isolation](rules-legacy-engine-args.md) |
 | 审计配置来源和多层加工 | [config audit](config-audit-plain-language.md) |
 | 设计配置归一化与 parity 验证 | [config normalization parity](config-normalization-parity.md) |
 | 查询 `Omni()` 初始化参数 | [Omni init args](omni-init-args.md) |
