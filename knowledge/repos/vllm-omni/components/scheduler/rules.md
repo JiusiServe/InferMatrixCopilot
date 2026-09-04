@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6149", "PR #6360", "PR #6406", "PR #6150"]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619"]
 ---
 
 # Scheduler 规则
@@ -27,6 +27,7 @@ PR 描述先命中下表，再打开对应规则组和首批源码；changed fil
 | sampled-token logprobs、spec decode trim、request-local output error | SCHED-5a | `core/sched/omni_ar_scheduler.py::_slice_sampled_logprobs`、`update_from_output` |
 | stateful async chunk、full-payload input、KV cleanup | SCHED-5b/5c | `core/sched/omni_generation_scheduler.py`、`omni_scheduling_coordinator.py`、`omni_ar_scheduler.py::_free_request` |
 | KV extraction wait、connector acknowledgement、partial interval cleanup | SCHED-5h | `core/sched/omni_ar_scheduler.py::{_free_request,update_from_output}` → scheduler stats → orchestrator metrics |
+| async stop、streaming update、stale token fence、next duplex unit 被吞 | SCHED-6a | `core/sched/omni_ar_scheduler.py::{_handle_stopped_request,update_from_output}` → `test_omni_ar_scheduler_streaming.py` |
 
 若描述只写模型症状，先从模型 owner 找到 payload producer/consumer；只有实际断点落在调度、
 prefix cache 或 copy lifetime 时才把 Scheduler 加为 owner。
@@ -263,13 +264,17 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 ## SCHED-6a — async discard 的计数单位必须与 stale drain 一致
 
 - 触发：上游 scheduler 改动异步占位、stale output 或 streaming segment replacement。
-- 强制：每个 discard site 用 `num_in_flight_tokens`（scheduled-token 单位）累加
-  `num_stale_output_tokens`；每个迟到 frame 先按本次 `num_tokens_scheduled` 结算 in-flight 与 stale
-  两个同单位 counter，再在 append/emit 前丢弃。placeholder rollback 与 stale drain 分开记账。
-- 禁止：用 `num_output_placeholders` 初始化 stale counter；清零 placeholder 后仍让迟到输出进入
-  placeholder/computed-token 的正常结果更新；把 scheduler 修复宣称为音频 WER 修复。
-- 验收：AR 与 generation 路径覆盖多 token frame、prefill 无 placeholder、连续旧/新 segment，
-  断言 stale counter 恰好归零且首个新 segment 输出不被吞；真实质量指标必须另行验证。^[PR #5976]
+- 强制：每个 discard site 用 `num_in_flight_tokens`（scheduled-token 单位）建立
+  `num_stale_output_tokens`；同一 in-flight decode 若已由 queued streaming update fence，stop/replacement
+  site 必须赋值而非累加，避免残留吞掉下一 duplex unit。每个迟到 frame 先按本次
+  `num_tokens_scheduled` 结算 in-flight 与 stale 两个同单位 counter，再在 append/emit 前丢弃。
+  placeholder rollback 与 stale drain 分开记账。
+- 禁止：用 `num_output_placeholders` 初始化 stale counter；对已由同次 streaming update fenced 的
+  in-flight token 再累加；清零 placeholder 后仍让迟到输出进入 placeholder/computed-token 的正常
+  结果更新；把 scheduler 修复宣称为音频 WER 修复。
+- 验收：AR 与 generation 路径覆盖多 token frame、prefill 无 placeholder、连续旧/新 segment 和
+  queued update 后的 async stop，断言 stale counter 恰好归零且首个新 segment 输出不被吞；真实质量
+  指标必须另行验证。^[PR #5976] ^[PR #6619]
 
 ## 相关
 

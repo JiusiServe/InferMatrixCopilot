@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082", "PR #5604", "PR #6274", "PR #6346", "PR #6397", "PR #6406", "PR #6458"]
+sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082", "PR #5604", "PR #6274", "PR #6346", "PR #6397", "PR #6406", "PR #6458", "PR #6619"]
 confidence: high
 ---
 
@@ -27,6 +27,8 @@ confidence: high
 | Talker codec sampling、repetition penalty、request RNG/compaction | MCPMO-3c | `minicpmo_4_5_omni_tts.py::{make_omni_output,_sample_audio_codes,_apply_batched_repetition_penalty}` → `test_talker_batching.py` |
 | native duplex、Stage0 resume、LISTEN/SPEAK、server VAD | MCPMO-4a | `experimental/fullduplex/{minicpmo45,openai}/` → stage input processor |
 | instructions/persona/voice/mode update、prefill slots、context lock | MCPMO-4b | `experimental/fullduplex/minicpmo45/session.py` → runtime adapter/session runner |
+| duplex Talker chunk、runtime `min_tokens`、chat sampling isolation | [`MCPMO-4c`](rules-duplex.md#mcpmo-4c-native-duplex-talker-必须按-generate_chunk-预算终止) | `experimental/fullduplex/minicpmo45/adapter.py` → stage 1 sampling → Talker `generate_chunk` |
+| shipping YAML、duplex/chat 共服、session capacity、async scheduler | [`MCPMO-4e`](rules-duplex.md#mcpmo-4e-shipping-profile-必须共服-chat-与-native-duplex) | `deploy/minicpmo_4_5*.yaml` → config merge → realtime/chat entrypoints |
 | Daily-Omni/Seed-TTS accuracy、simplex/duplex perf、TTFT/TTFP/RTF | MCPMO-5a | `tests/e2e/accuracy/minicpmo_4_5/`、`tests/dfx/perf/tests/test_minicpmo_4_5*.json` → `run_benchmark.py` |
 | online serving CI、async/sync chunk matrix、duplex fixture、local ref audio | MCPMO-5b | `tests/e2e/online_serving/test_minicpmo_4_5*.py` → `helpers/minicpmo_4_5_duplex.py` |
 
@@ -248,13 +250,6 @@ confidence: high
   true→false 绕过 native context lock。
 - 验收：成功更新同时改变派生状态；资源不足时无部分 mutation；buffer/defer/reject 均不锁，
   append 成功才锁，mode flip 明确拒绝。 ^[PR #6318]
-
-## MCPMO-4c — native duplex Talker 必须按 generate_chunk 预算终止
-
-- 触发：修改 MiniCPM-o native duplex Talker 的 `generate_chunk`、codec EOS 或请求级音频状态。
-- 强制：每个 native duplex 请求按一次 chunk 的 26 个采样管理状态；turn 边界 `min_tokens=0`，中间 chunk `min_tokens=max_tokens=26`，已转发 25 帧后强制下一个采样为 EOS，仅把非 EOS code 交给 Code2Wav。
-- 禁止：只依赖 YAML `max_tokens` 维持 turn 边界；在中间 chunk 永久屏蔽 EOS；把终止采样再次作为普通 codec frame 输出。
-- 验收：覆盖 prefill 边界元数据、step 24/25 的 mask/force EOS、simplex 不误触发以及多请求 delta/finished 对齐。 ^[PR #6346]
 
 ## MCPMO-4d — async chunk 快照替换必须清理旧音频
 

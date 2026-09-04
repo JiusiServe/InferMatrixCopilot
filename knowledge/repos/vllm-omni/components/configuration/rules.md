@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182", "PR #4820"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182", "PR #4820", "PR #6619"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -22,6 +22,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 |---|---|---|
 | strict schema、unknown field、alias、flat→nested、structured/legacy/direct parity、typed projection | `strict-normalization`：`VOMNI-CFG-1a`–`1h` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,strip_parent_engine_args}` → `vllm_omni/config/omni_config.py::{_build_diffusion_config_projection,VllmOmniConfig.from_pipeline_config}` → `vllm_omni/engine/stage_init_utils.py::{build_engine_args_dict,build_engine_args_dict_from_omni_stage_config}` |
 | deploy YAML、`base_config`、pipeline/stage overlay、headless/offline parity、最终逐 stage config | `deploy-topology`：`CONF-3a`, `CONF-4b`, `CONF-5a` | `vllm_omni/config/stage_config.py::{resolve_deploy_yaml,load_deploy_config,merge_pipeline_deploy,build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/config_factory.py::{StageConfigFactory.create_from_model,StageConfigFactory._merge_cli_overrides}` |
+| MiniCPM-o shipping profile、duplex/chat 共服、Talker sampling floor | model-specific [`MCPMO-4e`](../../models/minicpm-o-4-5/rules-duplex.md#mcpmo-4e-shipping-profile-必须共服-chat-与-native-duplex) | `deploy/minicpmo_4_5*.yaml` → `merge_pipeline_deploy`；duplex adapter runtime sampling override |
 | composable strategy、axis、routing、load balancing、`strategy-config` | `composable-strategy`：`CONF-4a` | `vllm_omni/config/composable_parallel/strategy_loader.py::{parse_strategy_specs,load_strategy_specs}` → `translator.py::translate_strategy_stack` → `apply.py::apply_strategy_specs` → `config_factory.py::{StageConfigFactory._apply_strategy_specs,StageConfigFactory._reconcile_strategy_with_cli}` |
 | `gpu_memory_utilization`、`kv_cache_memory_bytes`、多 stage 共卡、小显存 OOM | `deploy-memory`：`CONF-1a`, `CONF-2a` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/omni_config.py::{_build_runtime_config,_build_parallel_config,VllmOmniConfig.from_pipeline_config}` |
 | multi-stage HF sub-config、stage quantization view、`hf_config_name` | `stage-model-config`：`VOMNI-CFG-1i` | pipeline stage declaration → `OmniModelConfig::{draw_hf_text_config,get_model_arch_config}` → vLLM quantization selection |
@@ -33,7 +34,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | `core` | 每次配置审查 | `VOMNI-CFG-1b`, `VOMNI-CFG-1c` |
 | `strict-normalization` | schema、alias、unknown field、structured/legacy/direct 路径 | `VOMNI-CFG-1a`, `VOMNI-CFG-1b`, `VOMNI-CFG-1c`, `VOMNI-CFG-1d`, `VOMNI-CFG-1e`, `VOMNI-CFG-1f`, `VOMNI-CFG-1g`, `VOMNI-CFG-1h` |
 | `deploy-memory` | 显存预算、KV pin、多 stage 共卡 | `CONF-1a`, `CONF-2a` |
-| `deploy-topology` | deploy、overlay、headless、topology wiring | `CONF-3a`–`3d`；`CONF-4b` 见 [并行拓扑合同](rules-parallel-topology.md)；`CONF-5a`–`5g` 见 [topology 与部署 profile](rules-topology-profiles.md) |
+| `deploy-topology` | deploy、overlay、headless、topology wiring | `CONF-3a`–`3d`；`CONF-4b` 见 [并行拓扑合同](rules-parallel-topology.md)；`CONF-5a`–`5g` 见 [topology 与部署 profile](rules-topology-profiles.md)；MiniCPM-o profile 见 `MCPMO-4e` |
 | `composable-strategy` | strategy axis、routing、load balancing | `CONF-4a`, `CONF-4c`–`4d`，见 [并行拓扑合同](rules-parallel-topology.md) |
 | `stage-model-config` | HF nested config、stage-specific quantization/text config | `VOMNI-CFG-1i` |
 | `stage-config-propagation` | pipeline sampling constraints、StageConfig serialization/runtime config | `VOMNI-CFG-1o` |
@@ -196,13 +197,6 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：让 model registry、pipeline registry、`model_arch`、`default_deploy_config_name` 与 deploy stage 的 `hf_overrides.architectures` 闭合指向同一模型；保留 backbone 的 `model_type`，并让无显式配置的入口解析打包的 deploy YAML。
 - 禁止：只注册 pipeline 或放置 YAML 就依赖 `model_type` 推断；用 `hf_overrides.model_type` 替代 stage architecture 路由；要求离线入口额外传参来弥补默认配置未接通。
 - 验收：真实无显式 deploy 配置的初始化能读回最终 pipeline 与 architecture，backbone `get_text_config()` 仍解析为原模型类型，并覆盖 registry、默认 YAML 与最终 stage config 的一致性。 ^[PR #5666]
-
-### CONF-3e — MiniCPM-o 4.5 Stage 1 默认采样参数必须与模型语义一致
-
-- 触发：修改 `minicpmo_4_5.yaml`、`minicpmo_4_5_2gpu.yaml`、`minicpmo_4_5_3gpu.yaml` 或 `minicpmo_4_5_8x4090.yaml` 的 Stage 1 Talker 默认采样参数。
-- 强制：四份 profile 的 Stage 1 默认值保持一致：`temperature=0.8`、`top_p=0.85`、`top_k=25`、`repetition_penalty=1.05`、`min_tokens=50`、`max_tokens=4096`；duplex overlay 可按 `generate_chunk` 合同将 `min_tokens` 设为 `0`，而 Talker 离线逻辑仍独立限制为 2048 或剩余上下文。
-- 禁止：只更新一个 profile；把旧的 whole-stream penalty 值 `1.02` 沿用到 16-frame frequency penalty；将 Sampler ceiling `4096` 解释为离线 Talker 的实际生成预算；把 `min_p`、`win_size` 或 `tau_r` 当作已由上游 `gen_logits()` 消费的必需字段。
-- 验收：展开四份 MiniCPM-o 4.5 deploy 配置，逐一断言 Stage 1 的采样字段与上游默认一致，并单独验证 duplex overlay 的 `min_tokens=0` 不改变其余继承值；真实 Talker 测试还需确认最终配置到达 Sampler 与模型预算逻辑。^[PR #6458]
 
 ### CONF-6a — MOSS-TTS-Local 部署必须采用官方采样参数
 
