@@ -1,7 +1,7 @@
 ---
 title: "Serving engine 生命周期规则"
 created: 2026-09-03
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5221", "Issue #4855", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, tests/engine/test_orchestrator_event_driven.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py, "PR #6564", tests/engine/test_orchestrator.py, tests/entrypoints/openai_api/test_qwen3_omni_realtime_websocket.py, "PR #6189", tests/entrypoints/test_async_omni_diffusion_config.py]
@@ -10,7 +10,7 @@ confidence: high
 
 # Serving engine 生命周期规则
 
-本页收纳 `SERV-5a`–`SERV-5e`、`SERV-5g`–`SERV-5q`、`SERV-6a`–`SERV-6f`、
+本页收纳 `SERV-5a`–`SERV-5e`、`SERV-5g`–`SERV-5r`、`SERV-6a`–`SERV-6f`、
 `SERV-8a` 与 `SERV-9a`。触发条件与其余审查组见
 [Serving 共享规则](rules.md) 的 Direct 代码快速入口；请求输入侧的合同留在该页，
 故障隔离见 [fault isolation 规则](rules-fault-isolation.md)。
