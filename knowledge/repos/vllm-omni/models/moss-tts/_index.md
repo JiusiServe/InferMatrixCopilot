@@ -4,12 +4,12 @@ created: 2026-07-21
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, models]
-sources: ["PR #5635", "PR #6664", vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts/audio_tokenizer_v2.py, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/]
+sources: ["PR #5635", "PR #6664", "PR #6543", vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts/audio_tokenizer_v2.py, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/]
 ---
 
 # MOSS-TTS 家族
 
-以下事实在 `main @ be335a86` 复核。
+以下事实在 `main @ f66f0563` 复核。
 
 ## 名称与范围
 
@@ -42,6 +42,13 @@ sources: ["PR #5635", "PR #6664", vllm_omni/model_executor/models/registry.py, v
 - 依赖共享模块：[Config 组件](../../components/configuration/architecture.md)、
   `utils/speaker_cache`、serving 适配
   `entrypoints/openai/tts_adapters/moss_tts.py`。
+- shared speech path 在把 `request.seed` 应用到 `SamplingParams` 前调用 adapter `build()`，
+  因此 MOSS adapter 必须自行优先使用显式 request seed（包括 `0`），仅在请求省略时回退
+  stage-0 默认 seed。这个共享
+  adapter contract 同时覆盖 full 与 Nano；端到端效果不是全族可复现性：Nano 消费该字段，
+  Local 早已经由 `tts_local_seed` 和逐请求 generator 接收 request seed，Delay/Realtime 仍缺
+  request-scoped RNG plumbing。Nano 仍使用 global torch RNG，shipping `max_num_seqs: 4` 下
+  并发异 seed 请求并不隔离。^[PR #6543]
 
 ## 目录内容
 
@@ -49,6 +56,7 @@ sources: ["PR #5635", "PR #6664", vllm_omni/model_executor/models/registry.py, v
 |---|---|---|
 | delay 生命周期、伪文本 logits、双代 tokenizer | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
 | codec v1/v2 选择、projection/checkpoint topology | [rules](rules.md#direct-代码快速入口) | loader 门禁与测试缺口 |
+| online request `seed`、Nano/Local/Delay/Realtime 的可复现性或并发 | 同页 `MOSSTTS-3a` | adapter precedence 与各变体 RNG 边界 |
 
 ## 配置与 checkpoint 差异（8 份 deploy 速查）
 

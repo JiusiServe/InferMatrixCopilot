@@ -1,10 +1,10 @@
 ---
 title: "MOSS-TTS 规则"
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #5635", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, "PR #6241", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local_depth.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py"]
+sources: ["PR #5635", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, "PR #6241", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local_depth.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py", "PR #6543", vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, tests/entrypoints/openai_api/test_tts_adapter.py]
 confidence: high
 ---
 
@@ -18,6 +18,7 @@ confidence: high
 |---|---|---|
 | codec v1/v2、`number_channels`、missing weights | `MOSSTTS-1a` | `modeling_moss_tts_codec.py::MossTTSCodecDecoder._build_codec` → Stage-1 weight loader |
 | `_ProjectedTransformer`、`in_proj`/`out_proj`、Identity | `MOSSTTS-1a` | `audio_tokenizer.py::_ProjectedTransformer` → codec checkpoint parameter names |
+| online request `seed`、adapter additional information、Nano/Local/Delay/Realtime reproducibility | `MOSSTTS-3a` | `tts_adapters/moss_tts.py::_MossTTSAdapterBase.build` → variant model seed/RNG consumer |
 
 ## MOSSTTS-1a — codec 代际与 module topology 必须由 checkpoint 原始结构决定
 
@@ -55,3 +56,19 @@ confidence: high
 - 禁止：在每个 depth step 内重复执行 `arange`/`einsum`/`cos`/`sin`，在 captured body 中构造或替换 cache，或用环境变量把这些直接实现伪装成可选路径；不得声称 compact sampler 与宽度 1024 的 multinomial 在 seed 或 bit 上等价，也不得忽略 top-k 边界 ties 的有限精度差异。
 - 验收：RoPE 测试与参考公式数值一致，较短 slice 保持 cache storage；capture 前确认完整 cache 已物化且执行体只使用切片。采样测试断言结果属于 retained top-k、极小 `top_p` 选择 argmax，并在无 ties 时核对分布语义；质量或回归记录必须明确 compact width 改变 RNG 映射后的非 seed/bit-equivalence 边界。 ^[PR #6241]
 
+## MOSSTTS-3a — 请求 seed 先在 adapter 构造 additional information，再判定模型 consumer
+
+- 触发：修改 MOSS-TTS OpenAI adapter、speech request seed propagation、`additional_information`，
+  或宣称任一 MOSS 变体的 request-seed 可复现性。
+- 强制：`_MossTTSAdapterBase.build()` 在 shared speech path 将 request seed 写入
+  `SamplingParams` 之前，优先把显式 `request.seed`（包括 `0`）写为 `tts_params["seed"]`；
+  request 未提供 seed 时才回退 stage-0 sampling default。分别追踪 consumer：Nano 从该
+  additional information 读取 seed；Local 经 `tts_local_seed` 和逐请求 generator；Delay 和
+  Realtime 需要各自的 request-scoped RNG/generator plumbing 才能获得模型侧效果。
+- 禁止：用 truthiness 丢弃 `seed=0`；把 adapter 的 shared contract test 当作 full-family
+  end-to-end reproducibility 证据；把 Local 的既有路径说成此 adapter 修复；或忽略 Nano 以
+  global torch RNG 在并发请求间互相重置的限制。
+- 验收：对 `MossTTSAdapter` 与 `MossTTSNanoAdapter` 都覆盖 `seed=0`、非零 request seed
+  覆盖 stage default，且 request 缺省时回退 default；模型级结论分别验证 consumer。Nano 的
+  并发异 seed 隔离需要在 shipping `max_num_seqs=4` 下单独以 per-request generator 验证，不能
+  由 adapter CPU contract 或单请求结果推出。^[PR #6543]
