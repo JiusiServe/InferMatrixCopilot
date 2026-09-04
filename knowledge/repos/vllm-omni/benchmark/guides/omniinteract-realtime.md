@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: guide
 tags: [vllm-omni, benchmark]
-sources: ["PR #6522", "PR #6696", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/experimental/fullduplex/openai/protocol.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, docs/cli/bench/serve.md, vllm_omni/benchmarks/data_modules/omniinteract_dataset.py, vllm_omni/benchmarks/omniinteract.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/entrypoints/cli/benchmark/cli_args.py]
+sources: ["PR #6522", "PR #6696", "PR #6818", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/experimental/fullduplex/openai/protocol.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, docs/cli/bench/serve.md, vllm_omni/benchmarks/data_modules/omniinteract_dataset.py, vllm_omni/benchmarks/omniinteract.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/entrypoints/cli/benchmark/cli_args.py]
 confidence: high
 ---
 
@@ -51,11 +51,14 @@ production deployment contract. ^[PR #6522]
   timing; ITL is reported only when all required intervals exist. Missing
   measurements remain missing rather than becoming zero, so request goodput
   cannot pair metrics from different responses.
-- TPOT 样本必须 finite 且严格大于零：优先使用长度完整的 exact ITL；否则只有各 Stage-0
-  `output_token_count` 合计与最终 token 数完全一致、且每段 `tpot_ms` 都是正有限值时，才按 decode
-  interval 数加权恢复 TPOT。native duplex 的逐段 metrics 是增量，需累加；chat fallback 发出的是
-  cumulative snapshot，需按 stage 替换最新值。上述来源都不可用时，仅当 client 观察到 finite
-  `text_latency > ttft > 0` 才可按总 token 数回退计算，否则 TPOT 保持 unavailable。^[PR #6696]
+- TPOT 样本必须 finite 且严格大于零。native duplex 的逐段 Stage-0 metrics 是增量，需累加；只有
+  token count 完整时使用 exact ITL，否则全部 segment 都有正有限 `tpot_ms` 时才按 interval 加权；
+  最后仅在 client 观察到 `text_latency > ttft > 0` 时按总 token 数回退。^[PR #6696]
+- `openai-chat-omni` 使用不同的 source precedence：client receive interval 只要有正有限 sample 就是
+  authoritative；只有没有正 client ITL 且最终 token 数大于一，才读取 latest cumulative Stage-0
+  snapshot。其正 `num_tokens_out` 必须与最终累计 usage 完全相等；完整 finite/nonnegative exact ITL
+  且总和为正优先，否则用正有限 Stage-0 TPOT 按 interval 投影。不得由 server 覆盖正 client timing，
+  也不得混合 snapshot 或把 mismatch/zero/NaN 变成样本；无有效来源时保持 unavailable。^[PR #6818]
 
 ## Artifact and evidence contract
 
