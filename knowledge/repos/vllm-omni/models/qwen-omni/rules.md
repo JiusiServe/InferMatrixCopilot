@@ -1,10 +1,10 @@
 ---
 title: "Qwen-Omni 规则"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5687", "PR #6284", "PR #6449", vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py]
+sources: ["PR #5687", "PR #6284", "PR #6449", "PR #4322", vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py]
 confidence: high
 ---
 
@@ -47,3 +47,10 @@ confidence: high
   断言同一 `qwen3_omni_moe_thinker_only` pipeline、仅一个 Thinker stage 和 text output；同时
   直接解析该 key，断言其对象身份为 registry 的静态 `PipelineConfig` 而非 resolver 结果。PR
   只有这类配置单元测试，未提供真实 `vllm serve`、质量、性能或资源证据。^[PR #6284]
+
+## QOMNI-1d — audio encoder TP 必须按 head divisibility 局部回退
+
+- 触发：修改 Qwen3-Omni audio encoder 的 attention/FFN parallel linear、`encoder_attention_heads`，或其 global tensor-parallel 初始化。
+- 强制：以 `encoder_attention_heads % global_tp_size` 判定该 audio-encoder layer 是否可分片。可整除时保持 global TP；不可整除时仅该 encoder layer 的 attention QKV、attention output projection、FC1 和 FC2 都以 `disable_tp=True` 构造，且 local attention head count 按 effective TP=1 计算。
+- 禁止：仅关闭 QKV 或仅修正 `num_local_heads` 而让 output/FFN 仍分片；把这项 fallback 扩大为整个 Qwen3-Omni 模型关闭 TP；或把 PR 的 TP1/2/4/8 手工音频请求、MI350x full-workload throughput 数字归因于该 fallback。
+- 验收：分别覆盖 heads 可被和不可被 global TP 整除的构造，断言四个 linear 的 `disable_tp` 一致、attention local-head count 正确，且 encoder 外的 Thinker/Talker TP 配置未被此条件改写。PR 仅报告手工请求与整体 workload 测量，未给出该局部回退的独立性能或质量证明。^[PR #4322]
