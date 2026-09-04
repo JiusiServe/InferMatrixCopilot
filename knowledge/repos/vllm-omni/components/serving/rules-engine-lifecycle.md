@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5221", "Issue #4855", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, tests/engine/test_orchestrator_event_driven.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py, "PR #6564", tests/engine/test_orchestrator.py, tests/entrypoints/openai_api/test_qwen3_omni_realtime_websocket.py, "PR #6189", tests/entrypoints/test_async_omni_diffusion_config.py]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5221", "Issue #4855", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, tests/engine/test_orchestrator_event_driven.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py, "PR #6564", tests/engine/test_orchestrator.py, tests/entrypoints/openai_api/test_qwen3_omni_realtime_websocket.py, "PR #6189", tests/entrypoints/test_async_omni_diffusion_config.py, "PR #6367", vllm_omni/outputs/output_processor.py, tests/engine/test_async_omni_engine_abort_ack.py, tests/entrypoints/test_async_omni_pause_sleep_routing.py]
 confidence: high
 ---
 
@@ -160,6 +160,12 @@ confidence: high
   timeout；其余 RPC 仍走 collective path。需要 frontend cleanup 的 abort 必须关联 result，等待
   orchestrator 完成 stage abort、binding release 和 request cleanup 后才移除 frontend state，失败或
   timeout 必须保留 state 并传播。
+- 强制：sleep 先关闭 admission，再等待所有 in-flight `_admitting` submissions drained 后才 offload；P0
+  先 reset MM cache，stage tag 保留 per-stage scope。wake 不重新开启 AR admission，仍只由
+  `resume_generation()` 解除。AR abort 必须把 cumulative terminal-prefix token 由 output processor
+  传至 stage pool/orchestrator 并 ACK 回 async queue；先物理 abort，再 commit output/request state，且
+  state 延迟到 generator 消费后清理。只移除最后一个 child，只有最后 terminal output 收敛；control RPC
+  exceptions 必须传播。diffusion abort 路径未因本 PR 改写。
 - 禁止：以单一 frontend flag 代替 AR scheduler 控制；在 sleep RPC 后才阻止 `generate()`；让
   wake 隐式 resume；因已 paused 跳过不同 stage scope 或 cache reset；将任意同名 `*_async` helper
   绕过 collective timeout；在 abort ack 前 pop request state，或将 abort failure 当成功。
@@ -168,7 +174,7 @@ confidence: high
   `generate()` 前显式调用 `resume_generation()`，而 diffusion-only sleep → wake 可恢复 admission；重复/定向
   pause 仍调用 scheduler 与 cache clear，非法 stage ID 产生明确错误，fast path 仅命中四个方法且
   timeout 生效；abort success 后才清理 frontend state，orchestrator error 与 timeout 时 state 保留。
-  ^[PR #6084] ^[PR #6581]
+  本 PR 的测试/PR body 没有独立 GPU performance 或全量 diffusion-abort evidence。^[PR #6084] ^[PR #6581] ^[PR #6367]
 
 ### SERV-5n — remote replica attach/detach 必须按本次 membership generation 判定
 
