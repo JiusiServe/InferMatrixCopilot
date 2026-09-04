@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #6701", docs/models/supported_models.md, recipes/Boogu/Boogu-Image.md, vllm_omni/diffusion/models/boogu_image/, vllm_omni/entrypoints/utils.py]
+sources: ["PR #6701", "PR #6571", docs/models/supported_models.md, recipes/Boogu/Boogu-Image.md, vllm_omni/diffusion/models/boogu_image/, vllm_omni/entrypoints/utils.py]
 confidence: high
 ---
 
@@ -20,7 +20,7 @@ confidence: high
 共 5 个文件：
 
 - `vllm_omni/diffusion/models/boogu_image/`
-- revision/component loader、Edit-Turbo checkpoint boundary：[rules](rules.md)
+- revision/component loader、Edit-Turbo checkpoint boundary：见本页目录中的 Boogu rules。
 
 ## 依赖的共享代码模块
 
@@ -51,4 +51,4 @@ confidence: high
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 该模型的硬门禁规则 | 尚未沉淀；由逐 commit 同步命中该 owner 时在 `rules.md` 建立 |
+| revision/component loader、Edit-Turbo checkpoint 或 real RoPE/platform selection | [Boogu rules](rules.md) |
