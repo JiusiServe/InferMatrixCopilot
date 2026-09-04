@@ -47,3 +47,4 @@ sources: ["PR #5073", "PR #5671", "PR #5976", vllm_omni/model_executor/models/qw
 | 遇到什么 | 查看哪里 |
 |---|---|
 | stage 拓扑、代际差异与官方性能优化结论 | [architecture](architecture.md) |
+| Qwen3-Omni Thinker MRoPE、CUDA compilation custom-op boundary 或固定种子音频回归 | [Qwen-Omni rules](rules.md) |
