@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/, "PR #5910", "PR #6119"]
+sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/, "PR #5910", "PR #6119", "PR #5791", "vllm_omni/model_executor/models/common/qwen3_code_predictor.py", "vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py"]
 confidence: high
 ---
 
@@ -63,4 +63,11 @@ confidence: high
 - 强制：本地目录必须直接返回；`allow_download=True` 必须经 `download_weights_from_hf_specific` 并转发 `allow_patterns`、`cache_dir`、`require_all=True`；缓存模式必须使用 Hugging Face `snapshot_download(..., local_files_only=True)`。解析失败必须向上抛出，由调用方决定是否降级；需要兼容 ModelScope 时应传入 `allow_download=True` 或先使用已解析的本地目录。
 - 禁止：在调用方重新实现相反失败语义，绕过带锁和 ModelScope 支持的下载 helper，缓存未命中时静默返回原始 repo id，或为了单个辅助文件下载整个仓库。
 - 验收：覆盖本地目录短路、缓存命中、缓存未命中抛错、下载 helper 路由、`allow_patterns`/`cache_dir` 转发及 ModelScope 解析路径；调用方测试必须证明其选择的失败和下载策略。 ^[PR #6119]
+
+## EXEC-2f — fused code predictor 必须保持 source shard、wrapper 前缀与平台路径闭环
+
+- 触发：共享 code predictor 将 q/k/v、gate/up 改为 plain `nn.Linear` fused projection，或修改 Qwen3-TTS、Qwen3-Omni、MOSS consumer、checkpoint loader、TP plan 或 NPU override。
+- 强制：fused layout 必须分别保持 `[q,k,v]` 与 `[gate,up]` 行拼接；`CodePredictorBaseModel.load_weights` 按 layer、weight/bias 和 source shard 缓存后再拼装，并对部分或整组缺失硬失败。wrapper 必须归一化 `model.*`、`layers.*`、`codec_embedding.*`、`norm.*`、`rotary_emb.*` 以及 nested `talker.code_predictor.` 前缀后委托共享 loader，并恢复 returned loaded-name 前缀；MOSS local、Qwen3-Omni 与 NPU override 必须使用共享 loader、`qkv_proj` 和 `_split_qkv`。plain packed `nn.Linear` 在具备 TP-aware packing/loading/split 前保持 TP=1 与空 `base_model_tp_plan`。
+- 禁止：用逐 tensor `default_weight_loader` 绕过 fused assembler；以命中一个 source shard 或 target name 代表整组完整；保留已删除的 `q_proj`/`k_proj`/`v_proj` 属性、让 body-direct 或 nested shards 绕过 wrapper 归一化，或对 packed `[q,k,v]`/`[gate,up]` layout 宣告泛化 colwise TP。
+- 验收：用非等 q/KV width 数值核对 `cat([q,k,v])`、`cat([gate,up])` 及 bias，覆盖部分/整组缺 shard；覆盖 current、body-direct、nested 前缀和跨 shard incremental loading；断言 MOSS returned names、Qwen wrapper consumer、NPU mocked `prepare_qkv_weights`/forward 均走 fused 属性，并确认无 TP plan。 ^[PR #5791]
 
