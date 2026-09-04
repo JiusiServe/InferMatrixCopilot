@@ -10,7 +10,7 @@ sources: ["PR #6606", "vllm-omni-rebase-agent@122a9468:agent/config.py", "vllm-o
 # Rebase 工作流：分支、波次与失败路由
 
 运营事实来自 rebase-agent 配置快照（@122a9468，**可能漂移**）；仓库侧事实在
-`main @ 651b0322` 复核。运营系统以 rebase-agent 仓库为准，本页是知识树快照；
+`main @ 19da2382` 复核。运营系统以 rebase-agent 仓库为准，本页是知识树快照；
 upstream release baseline 为 `v0.28.0 @ 2cf0a6915ce5`。^[PR #6606]
 
 ## 分支与管线

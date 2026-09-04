@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, ci]
-sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6303", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json]
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6303", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054"]
 ---
 
 # vLLM-Omni CI
@@ -55,6 +55,14 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
   FLUX.2-klein. PR evidence reports local loading/registration recovery, while the
   L4 full-model run was deferred to Buildkite, so do not record a full test pass from
   this change alone. ^[PR #6303 / issue #6022]
+
+## NPU diffusion-attention selector regression boundary
+
+- `tests/platforms/npu/test_diffusion_attn_backend_selector.py` is CPU-marked and loads the
+  NPU platform module with fake vLLM/vLLM-Ascend dependencies. It isolates eager `mindiesd`
+  import selection for FLASH, hub FLASH fallbacks, RAINFUSION, and SDPA plus missing-package
+  fallback behavior. It is selector regression coverage only: it neither requires an NPU or
+  MindIE-SD install nor establishes CANN registration or real Ascend-kernel execution. ^[PR #6054]
 
 ## Qwen-Image nightly coverage and step-execution perf sharing
 

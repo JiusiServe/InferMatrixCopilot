@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102"]
+sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102", "PR #6054", "vllm_omni/platforms/npu/platform.py", tests/platforms/npu/test_diffusion_attn_backend_selector.py]
 confidence: high
 ---
 
@@ -84,3 +84,9 @@ confidence: high
 - 禁止：在 common adapter 直接导入 `vllm_ascend` 或硬编码 CUDA `BlockTables`/metadata 假设；把 platform capability 延迟到首次 attention dispatch；平台未提供 native contract 时静默回退 dense 或继续占用 paged KV。
 - 验收：default 与 NPU hook 的 class、metadata 参数和 backend selection 通过 mock/contract 测试，unsupported hook/backend 在物理 cache allocation 前 fail fast；CUDA 与 NPU lane 分别验证 native metadata construction，未运行真实 NPU 硬件时不得宣称 Ascend 生产 parity。^[PR #6102]
 
+## EXEC-13f — NPU diffusion attention 必须只为会触达 MindIE-SD 的后端提前导入
+
+- 触发：修改 `NPUOmniPlatform.get_diffusion_attn_backend_cls()` 的 diffusion attention backend 选择、NPU FlashAttention/RAINFUSION fallback，或 MindIE-SD custom-op 环境初始化。
+- 强制：显式 `FLASH_ATTN`（包括在 NPU 上回退到本地 FlashAttention 的 `FLASH_ATTN_HUB` / `FLASH_ATTN_3_HUB`）和 `RAINFUSION_ATTN` 在 `mindiesd` 可发现时必须在 backend path 返回前导入它；后者的 dense FlashAttention fallback 会在 `start_step` 前或没有可稀疏化 video segment 的 layer 触达 MindIE-SD。该导入须早于任何会让 CANN 固化 custom-op registry 的 regInfo lookup，使 `mindiesd.env` 能先把 vendor dirs 写入 `ASCEND_CUSTOM_OPP_PATH`。
+- 禁止：为 `TORCH_SDPA` 或其他不会到达 MindIE-SD kernel 的显式 backend 导入可选 `mindiesd`；不得把 optional-package 损坏扩散成这些 backend 的选择失败，也不得假定所有 RAINFUSION layer 都走 sparse path。
+- 验收：CPU/mock selector test 应分别断言 FLASH、两个 hub FLASH fallback 与 RAINFUSION 触发 eager import，TORCH_SDPA 不触发；同时覆盖 `mindiesd` 缺失时显式 FLASH 仍解析、未选择 backend 时才在可用条件下默认 FLASH，否则回退 SDPA。该测试不运行 NPU/CANN，不证明 custom-op 注册、真实 kernel 或 Ascend 生产可用性。^[PR #6054]

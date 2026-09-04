@@ -10,7 +10,7 @@ sources: ["PR #6606", ".buildkite/cuda/rebase-pipeline.yml", "vllm-omni-rebase-a
 # Rebase（对齐 upstream vLLM）
 
 把 vllm-omni 对齐到新版 upstream vLLM 的周期性工作：专用分支 `dev/vllm-align`、
-专用管线 `.buildkite/cuda/rebase-pipeline.yml`（仓库 `main @ 651b0322`、upstream vLLM
+专用管线 `.buildkite/cuda/rebase-pipeline.yml`（仓库 `main @ 19da2382`、upstream vLLM
 `v0.28.0 @ 2cf0a6915ce5` 验证）、专职
 自动化（rebase-agent 仓库——运营系统在那里，本主题只沉淀领域知识）。
 
