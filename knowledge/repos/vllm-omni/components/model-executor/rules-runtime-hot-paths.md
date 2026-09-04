@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048"]
+sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048", "PR #6454", "vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py"]
 confidence: high
 ---
 
@@ -62,4 +62,11 @@ confidence: high
 - 强制：启用行为时请求并保留 `output_token_ids`；decode step 必须取每个 request 的 live history 长度，窗口严格使用 `step < N`，并按同一 batch 顺序结合 request mode；history 不得由独立 counter 代替，以保证 preemption/resume 不会重新触发窗口。metadata 或 req_id 长度不匹配、未分类 mode 和无法建立一行一请求映射时必须 warning 并 fail closed；没有早期目标行时跳过 device mask 分配。
 - 禁止：把 mask 应用于整个 batch、假定普通采样总会填充 history、用本地 counter 在恢复后重启 ban，或在 spec decode 的多行映射下按位置读取 mode；不得静默吞掉形状不一致而继续按错误 request masking。
 - 验收：覆盖默认关闭、step `0..N-1`、`step >= N`、mixed-step/mixed-mode batch、ICL/未记录 mode、缺失或空 `output_token_ids`、history/req_id mismatch、warning 去重与 preemption history 保留；确认无早期目标时不产生热路径 device allocation。^[PR #5048]
+
+## EXEC-11f — 音频 STFT 运行时窗口必须随模块迁移
+
+- 触发：模型的声码器或 HiFT 等 STFT 路径在 module `.to(...)`、多设备 stage 或 CUDA 推理中使用由 `__init__` 创建的运行时 tensor，尤其是子类绕过基类初始化时。
+- 强制：将不属于 checkpoint 的运行时 tensor 通过 `register_buffer(..., persistent=False)` 注册到实际消费它的 module，使 device/dtype 迁移覆盖所有初始化路径，并保持其与 STFT 输入同设备。
+- 禁止：把设备敏感 tensor 留作普通 attribute，依赖每次调用临时 `.to(device)` 兜底，或只修基类初始化而遗漏 causal/subclass 路径；不得把派生 window 写入 checkpoint state dict。
+- 验收：构造 CosyVoice3 `CausalHiFTGenerator`，执行 `.to(cuda)` 后断言 `stft_window.device` 与 STFT 输入一致并完成 causal inference；CPU 路径仍可运行，`persistent=False` buffer 不出现在 checkpoint state dict，并覆盖 subclass constructor。 ^[PR #6454]
 
