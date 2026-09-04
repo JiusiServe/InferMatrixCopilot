@@ -1,10 +1,10 @@
 ---
 title: "HunyuanImage3 开发规则"
 created: 2026-07-13
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
-sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py", "PR #6306", "PR #6102", "PR #6563", vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, tests/diffusion/models/hunyuan_image3/test_hunyuan_image3_step_execution.py, tests/diffusion/models/hunyuan_image3/test_image_kv_cache_manager.py]
+sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py", "PR #6306", "PR #6102", "PR #6563", "PR #4048", vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_tokenizer.py, vllm_omni/diffusion/models/hunyuan_image3/request_layout.py, tests/diffusion/models/hunyuan_image3/test_hunyuan_image3_step_execution.py, tests/diffusion/models/hunyuan_image3/test_image_kv_cache_manager.py]
 ---
 
 # HunyuanImage3 开发规则
@@ -142,6 +142,13 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
   - 强制：由 `current_omni_platform.is_cuda()` 选择 `nvidia` 实现，其他后端保留 `native` 实现；两套 block 必须保持相同的公开构造与 checkpoint `state_dict` key 布局，NVIDIA 版本只能通过共享融合算子获得加速；高分辨率 VAE 必须由统一 VAE tiling 管理，任何允许 tiling 关闭的入口都要显式定义容量、回退或拒绝策略；`torch.backends.cudnn` 这类进程级标志应在 worker 边界配置，若保留 block 内临时设置则必须证明 forward 不会并发。
   - 禁止：在非 CUDA 平台导入或强制执行 NVIDIA block；把 Triton 可导入等同于所有平台支持；改变 `in_layers`/`out_layers` 等 checkpoint-facing module key；移除逐卷积内存保护后仍让 tiling-disabled 的高分辨率请求无条件执行；或在可能重叠的 forward 中修改进程级 cuDNN 标志。
   - 验收：分别以 native/eager 与 CUDA/NVIDIA 实现覆盖 VAE、DiT 的真实 shape、dtype 和输出误差；验证旧 checkpoint 的 `state_dict` 加载与 key parity；对启用 tiling、关闭 tiling及直接 VAE 入口执行高分辨率容量/失败行为测试，并在并发 worker 或明确串行证明下验证 cuDNN 配置与恢复；性能数字只在固定模型、硬件、并行拓扑和 workload 下复测。^[PR #6306]
+
+- **HY3-8d — Distil CFG 与 MeanFlow 是独立的 HunyuanImage3 diffusion 合同**
+  - 触发：修改 `cfg_distilled`、`use_meanflow`、Hunyuan image layout/tokenizer、denoise/step execution、CFG、AR KV reuse，或相关 checkpoint loader。
+  - 强制：两个 flag 独立决定 `<guidance>`、`<timestep_r>` placeholder 和对应 embedding；layout 的序列化、tokenizer output、prepared/step kwargs、CFG-parallel split 与 AR-KV truncate 必须完整携带并重基 scatter index。special-prefix 数量由 `num_special_tokens` 统一计算，decode final layer 从该数量之后取 latent，不能假定只有 timestep token。`guidance_emb` 与 `timestep_r_emb` 由外层 `HunyuanImage3Pipeline` 创建、放到 execution device 并加载权重，不由 transformer-core loader 静默跳过。
+  - 强制：`cfg_distilled=True` 时 `cfg_factor=1`，guidance 以 `guidance_scale * 1000` 写入 embedding；不得构造 negative prompt/prefill、外部 CFG combine 或 CFG parallel。`use_meanflow=True` 时每个 denoise step 注入 scheduler 的下一 timestep `r`；最后一个 step 的 `r` 必须为零。两项 flag 可以单独开启，不能把 MeanFlow-only 路径误当成 CFG-distil。
+  - 禁止：用 `x[:, 1:, :]` 或固定 special-token 个数切 latent；只在 normal loop 而漏掉 step execution；AR prefix 截断后保留绝对 guidance/timestep-r index；漏传任一 embedding/scatter field；把 transformer 的 non-model skip list 当作外层 embedding 的加载路径。
+  - 验收：CPU 测试覆盖 guidance/timestep-r 四个 kwargs、1/2/3 special-prefix decode、AR-KV rebasing、MeanFlow-only CFG-parallel split，以及 step execution 的 single-row CFG-distil 和每-step `r`。准确性证据固定模型 artifact、BF16/硬件拓扑、seed、steps、guidance、prompt/reference 和各项 threshold；只报告实际运行的 online/offline/quant case，未运行的 quant 不得外推为通过。^[PR #4048]
 
 - **HY3-5h — paged GQA 必须保留压缩 K/V，dense 路径保持扩展**
   - 触发：修改 HunyuanImage3 的 `ImageKVCacheManager`、Q/K/V head layout，或在 dense 与 Scheduler-managed paged attention 之间切换 GQA 处理。

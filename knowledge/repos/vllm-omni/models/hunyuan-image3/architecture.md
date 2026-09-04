@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models, hunyuan-image3]
-sources: ["PR #6563", vllm_omni/model_executor/models/hunyuan_image3/hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py]
+sources: ["PR #6563", "PR #4048", vllm_omni/model_executor/models/hunyuan_image3/hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py, vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_tokenizer.py, vllm_omni/diffusion/models/hunyuan_image3/request_layout.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py]
 ---
 
 # vLLM-Omni 核心架构
@@ -49,6 +49,9 @@ sources: ["PR #6563", vllm_omni/model_executor/models/hunyuan_image3/hunyuan_ima
   和 metadata。模型只交 32Q/8KV 与 `full_attn_spans`，runner 激活 request-mode prefill/denoise rows：首步
   覆盖整 allocation，之后只更新 prefix-offset target；dense prompt KV 在 paged forward 前清除。此范围不含
   `denoise_step`、AR KV、negative CFG、Ring、AllGather 或 cross-request reuse。^[PR #6563]
+- Distil conditioning：`cfg_distilled` 和 `use_meanflow` 分别追加 guidance / next-timestep-r special token；外层
+  pipeline 加载对应 embedding。embedded CFG 固定单 row，MeanFlow 最后一步 `r=0`；layout、step execution 与
+  AR-KV reuse 以 `num_special_tokens` 和 rebased scatter indices 保持同一 token contract。^[PR #4048]
 - Tokenizer：`vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_tokenizer.py`
 - VAE wrapper：`vllm_omni/diffusion/models/hunyuan_image3/autoencoder.py`
 - MoE dispatch：`vllm_omni/diffusion/models/hunyuan_image3/hunyuan_fused_moe.py`
