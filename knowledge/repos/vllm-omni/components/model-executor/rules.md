@@ -23,6 +23,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | `runtime_info`、request RNG、batch compaction、跨 stage bridge/串线 | `bridge-batch`：`EXEC-1a`–`1c` | shared runner request state → stage input processor → model consumer |
 | cross-stage embedding width、pre-projection buffer | `bridge-batch`：`EXEC-1d` | stage HF config → `get_inputs_embeds_size()` → `GPUARModelRunner.inputs_embeds` → model projection |
 | loader dtype、只取 checkpoint config、避免整仓权重下载 | `loader-contract`：`EXEC-2a` | `vllm_omni/model_executor/model_loader/weight_utils.py::download_weights_from_hf_specific` → `vllm_omni/model_executor/models/<命中模型>` loader |
+| stage `model_subdir`/`tokenizer_subdir`、partial snapshot、revision/cache repair | `loader-contract`：`EXEC-2h` | `engine/stage_init_utils.py` → stage engine args → model-specific root resolver |
 | fused projection、HF source shard 完整性、consumer 委托、packed TP | `loader-contract`：`EXEC-2b` | H3 text encoder fused owner；其他模型先确认目标 main 是否已有 fused parameter |
 | async Omni output、background builder、D2H snapshot、connector drain/fallback | `async-output`：`EXEC-5a` | `worker/gpu_ar_model_runner.py::{_should_use_async_omni_output,OmniAsyncGPUModelRunnerOutput}` → platform runner → connector output |
 | upstream runner/output API drift、`num_nans`、sample-budget 或 quant loader helper moved | `async-output` + output-contract | live upstream runner/output dataclasses → `gpu_{ar,generation}_model_runner.py` / `outputs/output_processor.py` → diffusion quant configs；moved symbol 必须用目标 release 的 canonical import，而非保留旧 fallback ^[PR #6606] |
@@ -38,7 +39,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | `strict-stage-config` | stage schema、projection、known fields | `EXEC-3a` |
 | `connector-capability` | full-payload/connector stage 的 worker runner validation | `EXEC-3c` |
 | `bridge-batch` | runtime info、跨 stage payload、batch、request RNG | `EXEC-1a`–`EXEC-1i`，见 [跨 stage bridge 与 batch 合同](rules-bridge-batch.md) |
-| `loader-contract` | dtype、checkpoint config 获取、loader、fused shard 拼装 | `EXEC-2a`–`EXEC-2c`，见 [loader 合同](rules-loader-contract.md) |
+| `loader-contract` | dtype、checkpoint config 获取、loader、fused shard 拼装、stage snapshot/subdir | `EXEC-2a`–`EXEC-2h`，见 [loader 合同](rules-loader-contract.md) |
 | `async-output` | AR async output、snapshot/live state、平台与 guard/fallback | `EXEC-5a`, `EXEC-5b` |
 | `mtp-graph` | Talker-MTP FULL graph、平台能力与 tri-state fallback | `EXEC-4c` |
 | `image-task-envelope` | shared image/video task example、video output consumer 或 `model_extras` prompt builder | `EXEC-6a`–`EXEC-6d`，见 [image task envelope 合同](rules-image-task-envelope.md) |

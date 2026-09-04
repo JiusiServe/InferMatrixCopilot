@@ -1,10 +1,10 @@
 ---
 title: "loader 合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/, "PR #5910", "PR #6119", "PR #5791", "vllm_omni/model_executor/models/common/qwen3_code_predictor.py", "vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py", "PR #6138"]
+sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/, "PR #5910", "PR #6119", "PR #5791", "vllm_omni/model_executor/models/common/qwen3_code_predictor.py", "vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py", "PR #6138", "PR #6640", vllm_omni/engine/stage_init_utils.py, tests/engine/test_async_omni_engine_stage_init.py, tests/engine/test_stage_engine_args.py]
 confidence: high
 ---
 
@@ -78,3 +78,20 @@ confidence: high
 - 禁止：在共享 helper 内按 model type 分支选择校验、恢复可选的模型专属尺寸参数，或让未通过模型校验的 profile 进入 capability 列表和 prompt 路径。
 - 验收：分别用 Qwen3-TTS 与 VoxCPM2 的合法、错误尺寸、错误元数据和错误 tensor profile 测试回调结果；确认 adapter 载入与模型运行时载入只保留通过校验的 profile，并覆盖 validator 错误时的跳过行为。^[PR #6138]
 
+## EXEC-2h — stage subdir 必须从完整且同 revision 的 snapshot 解析
+
+- 触发：stage `model_subdir`/`tokenizer_subdir`、Hub cache repair、`revision`/
+  `tokenizer_revision`、`download_dir` 或 Run:AI object URI model reference。
+- 强制：本地目录缺少声明的 subdir 时立即失败；Hub candidate 只有该 stage 所需的 config、loadable
+  weight artifact 与 index 引用的全部 shards 完整时，才可改写为本地 subdir；partial cache 必须按同一
+  repo/revision/download_dir 请求精确 subset 并复验。仅当 `tokenizer_subdir is not None` 且
+  `tokenizer_revision != revision` 时单独解析 tokenizer snapshot；空 tokenizer subdir 表示 snapshot
+  root，仍须验证 vocabulary artifact。`is_runai_obj_uri` 命中时保留 URI 与 joined subpath，跳过
+  local/HF snapshot 推断，交给 upstream streamer。
+- 禁止：以 `isdir`、config/index 文件存在或单 shard 证明 stage 完整；partial snapshot 静默变成本地
+  model path；把显式 tokenizer revision 改回 model revision；把 Run:AI URI 当作本地/HF cache，或把
+  generic stage resolver 描述成会补齐模型专有的全部 composite root components。
+- 验收：覆盖 cold/partial/warm offline stage snapshot、index 缺 referenced shard、root tokenizer、
+  split tokenizer revision、download failure fail-closed 和 Run:AI URI passthrough；模型专有 root
+  completeness 另由 owner 验证。unit fixture 不证明真实 checkpoint load、音质、GPU E2E 或跨平台支持。
+  ^[PR #6640]

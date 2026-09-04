@@ -1,10 +1,10 @@
 ---
 title: "MiniMax Music3"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, serving]
-sources: [vllm_omni/model_executor/models/minimax_music3/, vllm_omni/deploy/minimax_music3.yaml, vllm_omni/deploy/minimax_music3_2gpu.yaml, vllm_omni/entrypoints/openai/tts_adapters/minimax_music3.py, vllm_omni/model_executor/stage_input_processors/minimax_music3.py, vllm_omni/transformers_utils/configs/minimax_music3.py]
+sources: ["PR #6640", vllm_omni/model_executor/models/minimax_music3/, vllm_omni/deploy/minimax_music3.yaml, vllm_omni/deploy/minimax_music3_2gpu.yaml, vllm_omni/entrypoints/openai/tts_adapters/minimax_music3.py, vllm_omni/model_executor/stage_input_processors/minimax_music3.py, vllm_omni/transformers_utils/configs/minimax_music3.py]
 confidence: high
 ---
 
@@ -50,4 +50,4 @@ confidence: high
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 该模型的硬门禁规则 | 尚未沉淀；由逐 commit 同步命中该 owner 时在 `rules.md` 建立 |
+| composite checkpoint、stage subdir、snapshot revision/root | [rules](rules.md) |
