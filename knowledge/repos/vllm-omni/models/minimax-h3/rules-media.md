@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5752", "PR #5829", "PR #5978", "PR #6555", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6064"]
+sources: ["PR #5752", "PR #5829", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6064"]
 confidence: high
 ---
 
@@ -80,6 +80,12 @@ confidence: high
   nightly 声明 4×H100；PR 的 I2VA 0.975190/35.981286、Ref2VA 0.980577/
   42.650204 来自 4×B300 外部运行，不是 checked-in 结果。T2VA 因严格 gate
   未达标被删除，仅表示无 retained pixel-level gate，不表示功能不支持。^[PR #5978]
+  两个 official-reference request 都是 fixed-shape：测试 shared server args 必须以
+  `--no-diffusion-compile-dynamic` 保持 regional compile static，避免 cold dynamic
+  Inductor codegen 在 CI 节点间造成 precision drift；cache 状态是此前 bisect 缺失的变量。
+  这仍覆盖 compiled production path，但仅是这两个 retained accuracy case 的 test
+  configuration，不能推广为 production 默认。它不改 SSIM/PSNR gate、attention backend、
+  cuDNN settings 或 model implementation。^[PR #6688]
 
 ## MMH3-2i — 参考视频解码必须按需求索引并闭合 RGB 字节合同
 
