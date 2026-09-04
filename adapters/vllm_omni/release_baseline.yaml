@@ -2,9 +2,9 @@ schema_version: 1
 
 upstream:
   repository: vllm-project/vllm-omni
-  previous_audited_sha: 19da23824637e76bdbb2e8131ec50eaf68903097
+  previous_audited_sha: 94b1546ce3a04a0b0f7c0a685e1db2af05d5be7a
   audited_ref: main
-  audited_sha: 94b1546ce3a04a0b0f7c0a685e1db2af05d5be7a
+  audited_sha: c6df39e9f7ad8a12fd61bc2c5007103c6a62076a
 
 # These fingerprints are generated from sorted registry/deploy inventories.
 # They make the baseline exact without duplicating hundreds of entries here.
@@ -135,8 +135,6 @@ ignored_paths:
   reason: legal metadata
 - pattern: README.md
   reason: repository overview
-- pattern: realtime_video_prompt_interaction_protocol.md
-  reason: deleted upstream documentation artifact
 - pattern: SECURITY.md
   reason: community metadata
 - pattern: setup.py

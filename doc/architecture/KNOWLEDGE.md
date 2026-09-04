@@ -42,7 +42,7 @@ extensions merely because they are absent from the common source.
   history was removed — used for page frontmatter).
 - **Code-mirror pin:** the `knowledge/repos/vllm-omni/components/` source maps
   are verified against vllm-omni `main @
-94b1546ce3a04a0b0f7c0a685e1db2af05d5be7a`. The canonical machine baseline
+c6df39e9f7ad8a12fd61bc2c5007103c6a62076a`. The canonical machine baseline
   is `adapters/vllm_omni/release_baseline.yaml`.
 - **AFD code-mirror pin:** the `knowledge/repos/afd-plugin/components/` owner
   maps and architecture summaries are verified against

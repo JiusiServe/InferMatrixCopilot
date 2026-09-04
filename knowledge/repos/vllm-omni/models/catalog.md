@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 94b1546c`（2026-08-27）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ c6df39e9`（2026-08-27）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -44,6 +44,10 @@ PR #6089 新增 `nemotron_labs_voicechat_duplex.yaml`，因此只增加 deploy p
 增加 AR/diffusion registry architecture 或 `OMNI_PIPELINES` key。该 profile 是原生全双工
 Nemotron VoiceChat 的单会话 eager fp32 配置，不能从 YAML 或 PR 的作者测试外推 wall-clock
 realtime、确定性 barge-in 或一般硬件支持。^[PR #6089]
+
+PR #6634 adds Omni-DuplexEval benchmark support without changing the AR registry, diffusion
+registry, `OMNI_PIPELINES`, or deploy-YAML inventory. Its MiniCPM-o duplex endpoint is an
+evaluation consumer, not a new model registration or deploy profile. ^[PR #6634]
 
 对比上一审计快照（`39c16d75`）：AR 架构 88→81，diffusion pipeline 65→64，
 OMNI_PIPELINES 57→55，deploy 86→84。PR #6353 删除 AudioX 的 diffusion registry、
@@ -113,8 +117,8 @@ step_audio_2_asr、voxcpm2、voxtral_tts、wan2_2_ti2v
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 39c16d75 \
-  --to a94b2580 \
+  --from 94b1546c \
+  --to c6df39e9 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

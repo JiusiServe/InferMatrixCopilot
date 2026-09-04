@@ -163,6 +163,11 @@ modules:
     test_paths: [tests/benchmarks/test_serve_cli.py]
     import_check: "from vllm_omni.benchmarks.serve import main; from vllm_omni.entrypoints.cli.benchmark.serve import OmniBenchmarkServingSubcommand; print('Benchmarks imports OK')"
     wave: 2
+  fullduplex:
+    local_paths: [vllm_omni/experimental/fullduplex/]
+    test_paths: [tests/benchmarks/duplex/, tests/e2e/features/fullduplex/]
+    import_check: "from vllm_omni.experimental.fullduplex.client import RealtimeDuplexClient; print('Full-duplex client imports OK')"
+    wave: 2
 
 review_routes:
 - prefix: vllm_omni/patch.py

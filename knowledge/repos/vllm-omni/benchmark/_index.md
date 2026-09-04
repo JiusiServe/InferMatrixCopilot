@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, benchmark]
-sources: [benchmarks/tts/bench_tts.py, benchmarks/tts/model_configs.yaml, "PR #6522", vllm_omni/benchmarks/data_modules/omniinteract_dataset.py, vllm_omni/benchmarks/omniinteract.py, vllm_omni/benchmarks/patch/patch.py]
+sources: [benchmarks/tts/bench_tts.py, benchmarks/tts/model_configs.yaml, "PR #6522", "PR #6634", vllm_omni/benchmarks/data_modules/omniinteract_dataset.py, vllm_omni/benchmarks/omniinteract.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/benchmarks/duplex/, vllm_omni/entrypoints/cli/benchmark/omni_duplex_eval.py, vllm_omni/experimental/fullduplex/client.py]
 ---
 
 # vLLM-Omni 性能与 Profiling
@@ -22,7 +22,7 @@ sources: [benchmarks/tts/bench_tts.py, benchmarks/tts/model_configs.yaml, "PR #6
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 查看旧 benchmark 总览 | [overview](overview.md) |
-| 运行 AR graph 或 Hunyuan benchmark | [benchmark guides](guides/_index.md) |
+| 运行 AR graph、Hunyuan 或 MiniCPM-o Omni-DuplexEval benchmark | [benchmark guides](guides/_index.md) |
 | 调查 profiling、模型加载和性能验证错误 | [benchmark incidents](incidents/_index.md) |
 | 查询历史结果 | [results](results/_index.md) |
 | 运行/审查 OmniInteract native-duplex serving benchmark | [OmniInteract realtime guide](guides/omniinteract-realtime.md) |
