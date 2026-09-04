@@ -1,10 +1,10 @@
 ---
 title: "运行时热路径合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048", "PR #6424", "PR #6454", vllm_omni/data_entry_keys.py, "vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py", "vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py", "vllm_omni/model_executor/stage_input_processors/cosyvoice3.py", "PR #6458"]
+sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048", "PR #6424", "PR #6454", vllm_omni/data_entry_keys.py, "vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py", "vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py", "vllm_omni/model_executor/stage_input_processors/cosyvoice3.py", "PR #6458", "PR #6317"]
 confidence: high
 ---
 
@@ -22,9 +22,9 @@ confidence: high
 ## EXEC-9a — OmniVoice 热路径的固定输入缓存与掩码/精度边界
 
 - 触发：修改 OmniVoice 离散扩散生成循环中的 D2H 同步、attention mask、RoPE、文本/音频 embedding、CFG、CUDA graph/eager 路径或 TF32 配置。
-- 强制：将循环不变的文本 embedding、`audio_mask_3d`、RoPE 和 additive attention mask 在循环外缓存；批量取得 `c_lens` 并只在实际消费的 logits slice 上转为 fp32；CUDA graph 与 eager 使用相同的 float mask 语义，bool mask 必须将 True 映射为 `0.0`、False 映射为 `-inf`，已有 float mask 必须原样保留；TF32 只能通过显式配置 opt-in，并在 graph capture 前启用。
-- 禁止：每步重复计算固定输入或执行逐请求 D2H `.item()`；对 float mask 使用布尔反转或把 bool 直接隐式转换进 float buffer；让 graph capture 与 replay 使用不同 mask dtype；默认开启或宣称 TF32 路径 bit-identical；只更新 conditional 或 unconditional 一侧的迭代 token。
-- 验收：覆盖 eager 与 CUDA graph、bool 与 additive float mask、CFG/non-CFG 及不同 batch/concurrency，断言 masked 位置仍为 `-inf`、float mask 数值保留、graph/eager 输出满足既定精度合同、每步无固定输入重算和逐请求同步；单独验证 `enable_tf32` 默认关闭且显式开启前后性能/非 bit-identical 语义有记录。 ^[PR #5174]
+- 强制：将循环不变的文本 embedding、`audio_mask_3d`、RoPE 和 additive attention mask 在循环外缓存；批量取得 `c_lens` 并只在实际消费的 logits slice 上转为 fp32；普通缓存的 additive mask、CUDA graph capture buffer 与 replay 前 normalization 都使用 `OmniVoiceGenerator.model_dtype`。CUDA graph 与 eager 使用相同的 float mask 语义：bool mask 必须将 True 映射为 `0.0`、False 映射为 `-inf`，已有 float mask 必须原样保留；TF32 只能通过显式配置 opt-in，并在 graph capture 前启用。
+- 禁止：每步重复计算固定输入或执行逐请求 D2H `.item()`；为 additive mask 恢复 fp32 默认值、对 float mask 使用布尔反转，或把 bool 直接隐式转换进 float buffer；让 graph capture 与 replay 使用不同 mask dtype；默认开启或宣称 TF32 路径 bit-identical；只更新 conditional 或 unconditional 一侧的迭代 token。
+- 验收：覆盖 eager 与 CUDA graph、bool 与 additive float mask、CFG/non-CFG 及不同 batch/concurrency，断言 masked 位置仍为 `-inf`、float mask 数值保留，三处 mask dtype 都等于 `model_dtype`，graph/eager 输出满足既定精度合同、每步无固定输入重算和逐请求同步；单独验证 `enable_tf32` 默认关闭且显式开启前后性能/非 bit-identical 语义有记录。 ^[PR #5174] ^[PR #6317]
 
 ## EXEC-11a — 连续 AR 音频侧路必须保持 fp32、上下文与正常终止
 
