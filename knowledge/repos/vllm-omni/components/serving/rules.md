@@ -35,14 +35,14 @@ confidence: high
 | SSE/streaming speech、audio format、PCM/WAV、speed、首 chunk 前校验 | `streaming-format`：`SERV-1a`, `SERV-1b` | `vllm_omni/entrypoints/openai/protocol/audio.py::{OpenAICreateSpeechRequest.validate_streaming_constraints,StreamingSpeechSessionConfig.validate_streaming_constraints}` → `serving_speech.py::{OmniOpenAIServingSpeech._validate_speech_streaming_request,OmniOpenAIServingSpeech.create_speech}` |
 | video reference 解码、mixed media、frame conversion/mux、bounded memory | `media-ingress`：`SERV-1c`–`1e`, `1k` | `entrypoints/openai/video_api_utils.py` decode/coerce/encode helpers → video server callers |
 | `ref_audio`、x-vector/ICL、content identity、artifact cache/readiness | `artifact-readiness`：`SERV-3a`–`3c` | `serving_speech.py` reference resolve/decode/cache → adapter speaker cache → prefix salt |
-| Prometheus、waiting/running gauge、replica stats、throttle、collector lifecycle、image/diffusion metric emission | `metrics-lifecycle`：`SERV-2a`, `SERV-2b`, `SERV-2e` | `vllm_omni/entrypoints/omni_base.py::{OmniBase._log_summary_and_cleanup,OmniBase._process_stage_metrics_message}` → `vllm_omni/metrics/prometheus.py::{OmniPrometheusMetrics.__init__,set_running,set_waiting}` |
+| Prometheus、waiting/running gauge、replica stats、throttle、collector lifecycle、pipeline request gauge 或 image/diffusion metric emission | [metrics-lifecycle rules](rules-metrics.md)：`SERV-2a`, `SERV-2b`, `SERV-2e`, `SERV-2f` | `vllm_omni/entrypoints/omni_base.py::{OmniBase._log_summary_and_cleanup,OmniBase._process_stage_metrics_message,_publish_request_gauges}` → `vllm_omni/metrics/prometheus.py::{OmniPrometheusMetrics.__init__,set_running,set_waiting}` |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
 | `core` | 每次 serving 审查 | `SERV-4c`，见 [请求输入合同](rules-request-input.md) |
 | `streaming-format` | SSE、audio streaming、format/default/capability | `SERV-1a`, `SERV-1b` |
 | `media-ingress` | video reference、decoder registry/backend、mixed capability、bounded upload/conversion | `SERV-1c`–`1e` |
-| `metrics-lifecycle` | metrics、gauge、replica、collector、image/diffusion measurement boundary | `SERV-2a`, `SERV-2b`, `SERV-2e` |
+| `metrics-lifecycle` | metrics、gauge、replica、collector、pipeline request gauge 或 image/diffusion measurement boundary | [SERV-2a–2f](rules-metrics.md) |
 | `artifact-readiness` | artifact/content cache、capability、ready/mark/discard | `SERV-3a`, `SERV-3b`, `SERV-3c` |
 | `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c`（见 [请求输入合同](rules-request-input.md)）+ 命中模型规则 |
 | `endpoint-capability` | endpoint restriction、route/app-state guard、公开 400 | `SERV-4c`, `SERV-4d` 见 [请求输入合同](rules-request-input.md)；`SERV-5d` 见 engine lifecycle；`SERV-5s` 见 [app assembly](rules-app-assembly.md) |
@@ -158,31 +158,6 @@ confidence: high
 - 强制：converter 的 scratch 是每个 worker thread 的实例本地存储；`iter_frames()` 按 FIFO 产生帧，并且一次调用最多保留 `2 * min(frame_count, max_workers)` 个 pending futures。无论 mux 成功还是抛错，调用方都必须关闭 iterator 以 cancel remaining futures；server `finally` 关闭 video handler，handler shutdown 必须幂等并以 `wait=True, cancel_futures=True` 关闭 executor。日志报告 effective frame-conversion workers（legacy 为 0）。
 - 禁止：为能力探测再次 normalize/copy 视频；在 direct mux 开始后因异常重试 legacy；把 interleaved、非法形状或不支持 dtype 静默送入 planar path；不得把 async route 仍同步执行 mux/base64 或单请求 pending 上限说成全请求 nonblocking 或所有并发请求的全局 pending 上限。共享 pool 只在一个 API process 内限制 conversion threads；多 process 仍各自拥有 pool，且性能证据仍限单请求。
 - 验收：覆盖 channel-first-backed direct path、interleaved/unsupported shape/dtype fallback、RGB contiguity、GBR plane 与 padded stride、serial/parallel exact output、FIFO 与单调用 future bound、iterator close 后 cancel、reused executor 的幂等 shutdown、direct failure 不重试；音频存在时 serving resolver 才以 24 kHz 为缺省，显式采样率和 video-only 日志保持正确。固定输入下有无音频的 direct/legacy MP4 必须 byte-identical 并通过 ffprobe/完整 FFmpeg decode，raw/base64 传同一 persistent converter，streaming 行为不变。^[PR #6288] ^[PR #6499]
-
-## SERV-2a — 指标节流和 gauge 按 scheduler/stage/replica owner 隔离
-
-- 触发：orchestrator 聚合多 stage/replica stats，或新增全局 throttle/gauge。
-- 强制：节流状态按实际 producer owner 隔离；request 状态 cleanup 后再计算 waiting 等
-  gauge。
-- 禁止：用一个全局时间戳让先上报的 replica 抑制其他 replica；在 pop/cleanup 前发布
-  最终 gauge。
-- 验收：同一窗口内两个 replica 都能上报；单请求完成并清理后 waiting=0。 ^[PR #3576]
-
-## SERV-2b — collector 重建只保护本项目 family
-
-- 触发：同进程重建 engine、注册 Prometheus collectors 或调整 unregister 行为。
-- 强制：只保护需要跨实例保留的 `vllm:omni_*` family，并保留 upstream collector 的
-  正常 unregister/cleanup。
-- 禁止：把 upstream unregister 整体置空，导致重复 timeseries 注册。
-- 验收：同进程连续创建/销毁两次 engine，无 duplicate-timeseries 错误且 Omni family
-  仍可采集。 ^[PR #3576]
-
-## SERV-2c — stage metrics 只能在 result message 首次消费时累计
-
-- 触发：修改 `OmniBase` 的 result message 去重、`accumulate_diffusion_metrics`、`on_stage_metrics` 或重试/流式结果处理。
-- 强制：以每个请求的 `msg_id = id(result)` consumed 集合作为唯一门禁；仅在消息首次未消费时累计 diffusion metrics、处理 stage metrics，完成两项操作后再记录该消息已消费。
-- 禁止：在轮询重试、重复回调或消息标记后再次累计同一 result；把同一消息误当作新的 denoising step，或绕过现有 consumed 生命周期清理。
-- 验收：同一 result 重复处理只产生一次累计，两个 distinct result 各自产生一次；覆盖异常、重试与请求清理，确认 consumed 状态不会导致重复累计或遗留。^[PR #4755]
 
 ## SERV-2e — 指标发射必须保持测量边界、缺失语义与请求唯一性
 
