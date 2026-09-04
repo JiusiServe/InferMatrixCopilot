@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #6318", "PR #6346", "PR #6404", "PR #6458", "PR #6619", "PR #6630", "PR #6678", "PR #6626", "PR #6767", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, vllm_omni/model_executor/stage_input_processors/minicpmo_4_5_omni.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/deploy/minicpmo_4_5_2gpu.yaml, vllm_omni/deploy/minicpmo_4_5_3gpu.yaml, vllm_omni/deploy/minicpmo_4_5_8x4090.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/experimental/fullduplex/minicpmo45/session.py, vllm_omni/experimental/fullduplex/minicpmo45/stage0.py, vllm_omni/experimental/fullduplex/openai/realtime_input.py, vllm_omni/experimental/fullduplex/openai/runtime_adapter.py, vllm_omni/experimental/fullduplex/openai/runtime_bridge.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, vllm_omni/experimental/fullduplex/video_stacking.py, tests/config/test_config_factory.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py, "PR #6529", vllm_omni/experimental/fullduplex/openai/protocol.py, vllm_omni/experimental/fullduplex/openai/realtime_state.py, tests/entrypoints/openai/test_duplex_protocol.py]
+sources: ["PR #6318", "PR #6346", "PR #6404", "PR #6458", "PR #6619", "PR #6630", "PR #6678", "PR #6626", "PR #6767", "PR #6821", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, vllm_omni/model_executor/stage_input_processors/minicpmo_4_5_omni.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/deploy/minicpmo_4_5_2gpu.yaml, vllm_omni/deploy/minicpmo_4_5_3gpu.yaml, vllm_omni/deploy/minicpmo_4_5_8x4090.yaml, examples/online_serving/minicpmo/realtime_duplex_demo.py, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/experimental/fullduplex/minicpmo45/session.py, vllm_omni/experimental/fullduplex/minicpmo45/stage0.py, vllm_omni/experimental/fullduplex/openai/realtime_input.py, vllm_omni/experimental/fullduplex/openai/runtime_adapter.py, vllm_omni/experimental/fullduplex/openai/runtime_bridge.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, vllm_omni/experimental/fullduplex/video_stacking.py, tests/config/test_config_factory.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py, tests/examples/test_minicpmo_realtime_duplex_simple_demo.py, "PR #6529", vllm_omni/experimental/fullduplex/openai/protocol.py, vllm_omni/experimental/fullduplex/openai/realtime_state.py, tests/entrypoints/openai/test_duplex_protocol.py]
 confidence: high
 ---
 
@@ -96,16 +96,13 @@ confidence: high
 
 - 触发：native duplex response create/end、input commit、playback ACK、conversation item
   register/delete/truncate 或 auto-response terminal closure。
-- 强制：active response 绑定它回答的 input commit sequence；如果 response 在 user-speaking 阶段创建，
-  则绑定紧随其后的真实 commit。response-scoped snapshot 以 response ID 保存 assistant text、audio
-  text marks 与该 commit sequence。ACK 的 item 必须精确为 `item_<response_id>`、确实属于已知
-  assistant response，且不能晚于后续 input commit；mismatch/not-found/too-late 分别返回 typed error。
-  register/delete/truncate 只消费并清理 matching response snapshot、pending marks/commit metadata。
-  auto-response safety close 即使已没有 active response，也必须完成对应 model turn。
-- 禁止：用全局 last-assistant buffer 让晚到 ACK/truncate 绑定到另一 response；把前一 response history
-  提交到下一 input；用 nonmatching item 清理 snapshot；把未 ACK/delete 的 snapshot 宣称已有有界
-  retention。
-- 验收：覆盖 response-before/after-input commit、ACK identity/existence/late ordering、两个 response
-  交错的 register/delete/truncate、pending audio marks、no-active auto close 与下一 fenced append；断言
-  typed error 无副作用且只释放目标 snapshot。当前实现的 snapshots 在 ACK/delete 前仍可能无界。
-  ^[PR #6529]
+- 强制：pre-commit 对精确 `item_<response_id>` 的 ACK 预留当前 history position；active zero-audio ACK
+  也创建不可见 placeholder。response 完成后的 ACK 在该 slot upsert/extend，未预留 stale ACK 仍返回 typed
+  too-late error。partial snapshot 保留到 response inactive 且 playback fully committed；delete 清理
+  placeholder、snapshot、marks/truncation state。explicit truncate 与 ACK truncate 施加 monotonic minimum
+  cap，later ACK 不得恢复 text/audio。client final input commit 前 checkpoint ACK，commit 后再 ACK draining
+  response-local playback；范围仅 MiniCPM native-duplex `ack_only`。
+- 禁止：用 global last-assistant buffer 或在新 user item 后 append old assistant；让 later ACK 越过 hard cap；
+  把此 ordering fix 外推为通用 realtime/reliability guarantee。
+- 验收：zero-audio reserve、partial ACK→commit→response-end→later ACK 原位扩展、unreserved stale reject、
+  delete cleanup、两种 truncate cap 与 checkpoint-before-commit 顺序均须覆盖。^[PR #6529] ^[PR #6821]
