@@ -1,10 +1,10 @@
 ---
 title: "Diffusion LoRA 规则"
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/lora/layers/base_linear.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/diffusion/lora/test_lora_manager.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/lora.py]
+sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/lora/layers/base_linear.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/diffusion/lora/test_lora_manager.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/lora.py, "PR #6268", benchmarks/kernels/benchmark_diffusion_lora_expand.py, tests/diffusion/lora/test_base_linear.py]
 confidence: high
 ---
 
@@ -20,6 +20,7 @@ confidence: high
 | `--lora-backend`、startup path/scale、deploy/CLI projection | `DIFF-2l` | `entrypoints/cli/serve.py` → `async_omni_engine.py`/stage config → `OmniDiffusionConfig` → `DiffusionWorker.init_lora_manager` |
 | distilled merge、key conversion、packed QKV、alpha、unload | `DIFF-2m` | `diffusion/lora/loader.py` → pipeline mixin → transformer parameter |
 | Wan dual transformer、high/low-noise file order、partial load | `DIFF-2n` | `WanLoraLoaderMixin` → `get_transformer_from_pipeline(name)` → `transformer`/`transformer_2` |
+| LoRA linear active output slices、inference expand accumulation、autograd/dtype fallback | `DIFF-2ab` | `diffusion/lora/layers/base_linear.py::DiffusionBaseLinearLayerWithLoRA.apply` |
 | legacy dynamic adapter hook、packed/stacked binding、DLO sidecar residency、activation rollback | `DIFF-2x` | `DiffusionLoRAManager::{_load_adapter,_bind_adapter_weights,_activate_adapter}` → model pipeline hook |
 
 | 审查组 | 什么时候触发 | 规则 ID |
@@ -94,6 +95,29 @@ confidence: high
 - 强制：以 recipe 的 `adapter_slot` 作为唯一 phase switch；普通两阶段使用 `None → ltx_distilled`，full-distilled 两阶段不得加载 LoRA。Sidecar 先查 model root，再按 profile 的官方文件名和仓库回退到 Hub；parser 必须逐一校验 A/B 配对、映射结果、重复目标和 shape。Adapter wrapper 要在 base 权重加载前安装并 remap 到 `base_layer`，保留 Row/Column/QKV 的 rank-local TP slice；未量化 BF16 使用 adapter dtype 中的 layer-fused `B@A`，量化 base 使用 dynamic LoRA。
 - 禁止：为 phase adapter 增加第二个 resident Transformer 或 LTX 专用环境变量；允许 request/static LoRA 与内部 phase adapter 组合；在非 BF16 或量化 base 上声称 layer-fused 可用；对缺失配对、未映射模块或不匹配 shard 静默跳过。
 - 验收：覆盖官方 key mapping、缺失 A/B、unmapped/duplicate target、dynamic 与 fused 精确算术、Row/Column/QKV 本地切片、base 权重不变、phase 进入/退出和 finalize 时机；同时验证 generic `model_paths` sidecar 覆盖与 model-root/Hub fallback。^[PR #5500]
+
+## DIFF-2ab — LoRA linear expand 只能在原输出 slice 上作受限的 inference 累加
+
+- 触发：修改 `DiffusionBaseLinearLayerWithLoRA.apply()` 的 stacked/packed LoRA shrink-then-expand
+  路径、其 active-slice 跳过、输出 slice，或为该路径做 kernel/temporary-allocation 优化。
+- 强制：保留 fully-sharded LoRA 与 `tp_size > 1` 的 `NotImplementedError`，直到 shrink 与 expand
+  之间实现所需 all-gather。将 `x`/base output 展平后，按 `output_slices` 的累计 `offset` 处理每一
+  slice；inactive 或空 A/B slice 也必须推进 offset，且 slice metadata 与 A/B stacks 长度不一致必须
+  失败。对 active nonempty slice 先算 `buffer = x_flat @ A.t()`，再以
+  `torch.addmm(y_slice, buffer, B.t(), out=y_slice)` 直接累加 expand，**仅当** grad mode disabled 且
+  `y_slice`、`buffer`、`B` 三者 dtype 完全相同。
+- 强制：grad mode enabled 或任一上述 dtype 不同，必须保留 functional
+  `y_slice[:] = y_slice + buffer @ B.t()`，以维持 autograd 和 output dtype 语义；最终返回的 shape
+  必须恢复为 base output 的原 shape。
+- 禁止：用 `out=` 路径绕过 autograd/dtype fallback，漏掉 inactive/empty slice 的 offset，或把目前的
+  fully-sharded+TP rejection 伪称为支持。不要新增 stride/contiguity predicate 来选择该 fast path，也
+  不要把此处的 synthetic microbenchmark 扩大为任意 strided output、完整 diffusion model 或 server
+  throughput 的性能承诺。
+- 验收：CPU regression 覆盖 packed multi-slice 的数值结果与每个 active slice 的 in-place `addmm`、
+  inactive/empty slice 后的 offset、fully-sharded+TP rejection、autograd backward 时不调用 `out=`，
+  以及 mixed output/LoRA dtype 的 functional fallback。性能证据仅可用固定 shape/dtype/rank、warmup
+  与 iteration 的 CUDA microbenchmark；PR evidence 是 H100 上 BF16 packed synthetic expand 的
+  latency/extra-allocation 和 numerical-parity 测量，不替代上述 correctness cases。^[PR #6268]
 
 ## DIFF-2x — legacy dynamic manager 的模型专用 loader 与 activation 必须 fail-closed 且事务化
 
