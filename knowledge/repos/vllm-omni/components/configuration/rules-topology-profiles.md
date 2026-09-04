@@ -4,13 +4,13 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_runtime.py, tests/engine/test_async_omni_engine_stage_init.py, vllm_omni/deploy/, "PR #6186", "PR #6813"]
+sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_runtime.py, tests/engine/test_async_omni_engine_stage_init.py, vllm_omni/deploy/, "PR #6186", "PR #6813", "PR #6291", tests/config/test_config_factory.py, tests/config/test_pipeline_registry.py]
 confidence: high
 ---
 
 # topology 与部署 profile 合同
 
-`CONF-5a`–`CONF-5i`：冻结 topology 的单一来源、可选辅助 stage 注入、缺少 model_type 的多 stage checkpoint 路由，以及模型专用 deploy profile 的一致传递。触发条件与其余审查组见 [Configuration 规则](rules.md) 的 Direct 代码快速入口。
+`CONF-5a`–`CONF-5j`：冻结 topology 的单一来源、可选辅助 stage 注入、缺少 model_type 的多 stage checkpoint 路由，以及模型专用 deploy profile 的一致传递。触发条件与其余审查组见 [Configuration 规则](rules.md) 的 Direct 代码快速入口。
 
 ## CONF-5a — 冻结 topology 只保留一份，部署开关决定 wiring
 
@@ -83,3 +83,16 @@ confidence: high
 - 强制：alias 由 `PipelineConfig.stage_cli_aliases` 唯一声明并在 structured/legacy factory 进入 stage merge 前归一；canonical `stage_<id>_<target>` 与 alias 同时出现时，canonical 值优先并告警，alias 出现在其他 stage 必须拒绝。`prompt_transform_func`、`model_path_resolver` 与 `inline_diffusion` 由 `StagePipelineConfig` 投影到唯一 consumer；resolver 必须在构造 backend engine args 前消费并移除。所有 inline path 都要求 `plan.num_replicas == 1`；whole pipeline 只有一个 stage 时默认 inline，多 stage 只允许 `inline_diffusion=true` 或已有 `custom_pipeline_args` in-process owner opt in，其余均 subprocess。
 - 禁止：在 CLI、factory 或 stage startup 为模型名硬编码 alias/resolver；把 alias 广播到所有 stage；因 diffusion stage 只有一个 replica 就隐式改变所有多 stage pipeline 的进程隔离。
 - 验收：structured/legacy 两路覆盖 alias-only、canonical-only、相同/冲突值、错误 stage 与 unset control；用 root/partition/task path 证明 resolver 到达 stage model/tokenizer consumer，并用 single-stage、multi-stage opt-in/control 与 multi-replica veto 证明 exact inline predicate。PR #6813 只新增 default one/two-stage 参数化 test，其他组合仍须补验收。^[PR #5885] ^[PR #6813]
+
+## CONF-5j — PipelineConfig 终端 stage 必须显式声明且不依赖位置
+
+- 触发：修改 `PipelineConfig.validate()`、静态 `OMNI_PIPELINES` registry，或新增/调整
+  multi-stage pipeline 的 `final_output` 声明。
+- 强制：保留既有「没有 entry stage」校验，并要求至少一个 stage 显式
+  `final_output=True`；terminal 可以处于任意 position。静态 `PipelineConfig` registry
+  必须逐项通过该 topology guard。
+- 禁止：从最后一个 stage、stage 数、entry/input、`final_output_type` 推断 terminal；不得把
+  此静态 guard 外推为 cycle 检测、resolver 配置、运行时或 E2E 行为已经验证。
+- 验收：无 terminal 的配置返回错误；terminal-not-last 通过；有效 fixture 显式标记
+  terminal；所有静态 `PipelineConfig` 通过。resolver 生成的配置须在 materialize 后另测。
+  ^[PR #6291]
