@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/diffusion/models/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107", "PR #5614", "PR #6325", "PR #6913"]
+sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/diffusion/models/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107", "PR #5614", "PR #6325", "PR #6913", "PR #6920"]
 confidence: high
 ---
 
@@ -24,6 +24,7 @@ confidence: high
 | online/offload/HSDP/VAE parallel 支持声明 | COSMOS-3a | capability 文档/recipe → 对应公开入口与实现路径 |
 | ROCm、MI350X、AITER、latency/peak memory | COSMOS-3b | recipe 的 measurement commit/protocol → `platforms/rocm/platform.py` backend gate → 目标配置复测 |
 | formatted final prompt、`prompt_suffix`、rank-zero log level | COSMOS-6a | `diffusion/models/cosmos3/pipeline_cosmos3.py::Cosmos3OmniDiffusersPipeline` |
+| multi-chunk transfer、distributed VAE decode、overlap broadcast、rank-zero assembly | COSMOS-6b | `diffusion/models/cosmos3/pipeline_cosmos3.py::{_transfer_vae_executor,_sync_transfer_overlap,_forward_transfer}`；`tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py` |
 
 若描述只写 Cosmos3，先从 registry 的 class key 进入 pipeline；只有命中共享 RNG、graph
 或 offload 机制时再加 [Diffusion owner](../../components/diffusion/rules.md)。
@@ -137,3 +138,24 @@ confidence: high
 - 验收：rank-zero test 用含 sentinel 与 suffix 的 prompt 断言最终字符串和 generation 输入不变，且
   DEBUG 才有该条记录；non-rank control 无此 emission。target 未新增 log-level test，证据仅为作者
   报告的 CPU unit/manual check，不能外推为其它模型、日志配置或生产运行结论。^[PR #6913]
+
+## COSMOS-6b — multi-chunk transfer 必须同步分布式 VAE overlap
+
+- 触发：修改 Cosmos3 transfer 的 chunk 边界、`previous_output` 条件帧、VAE decode，或 distributed
+  VAE 的 rank 输出/collective 路径。
+- 强制：只有 `vae.distributed_executor` 存在且 `vae.is_distributed_enabled` 可调用并返回 true 时才启用
+  distributed VAE 路径。每个非最终 chunk 的 overlap 必须是
+  `min(num_conditional_frames, chunk_frames)`；overlap 小于等于零时返回 `None`，且不调用 broadcast。
+  active executor 下所有 rank 都对每个需要同步的 overlap 调用 `broadcast_tensor`：rank 0 从已 decode
+  output 尾部 slice 并 `contiguous()`，其他 rank 分配与 reference video 同 batch/channel/height/width、但
+  frame 维为 overlap 的 receive tensor，且使用 `self.device` 和 `vae.dtype`。仅 rank 0 拼接完整 video/control output；其他
+  rank 在 collective 完成后返回本地最终 decoded output 与 metadata。
+- 禁止：仅因 executor 属性存在就进入分布式路径；让任一 rank 跳过应参与的 broadcast；broadcast 整段
+  output、从非 rank-zero 的空 output slice overlap，或在非 rank-zero 拼接 full/control output。该同步
+  不得放宽 `COSMOS-2c` 的 session-state guard：flag 开启时 `diffuse_transfer()` 仍须 fail closed，即使
+  `_bde_kv_state` 非空。
+- 验收：mock executor 覆盖 enabled/callable gate、rank-zero tail slice、nonzero-rank receive shape/dtype/device、
+  每个 non-final chunk 的 collective 以及 nonpositive-overlap 的 no-broadcast；仅有界的真实回归是一次
+  4×GB300 multi-chunk transfer（Ulysses 4、VAE patch parallelism 4、tiling，1280×720、101 frames、24 FPS、
+  53-frame chunks、5 conditional frames、2 steps），确认完成且 metadata/video 为 101 frames at 24 FPS。
+  该证据不构成广泛 parity、质量或性能声明。^[PR #6920]

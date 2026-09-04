@@ -1,10 +1,10 @@
 ---
 title: "Cosmos3"
 created: 2026-07-20
-updated: 2026-09-02
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4657", "PR #5001", "PR #5634", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py]
+sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6920", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py]
 confidence: high
 ---
 
@@ -31,6 +31,14 @@ transformer 还要维护自己的 layerwise-offload block 声明。architecture 
 变体专有不变量与描述直达源码入口见 [rules](rules.md#direct-代码快速入口)。新模型通用验证见
 [model validation](../../review/guides/model-validation.md)。
 
+## Distributed VAE multi-chunk transfer
+
+当 transfer 用 distributed VAE 解码多 chunk 视频时，rank 0 是完整 video/control output 的唯一
+assembler；每个非最终 chunk 只同步下一 chunk 条件所需的 decoded tail 给所有 rank。非输出 rank
+保留自己的最终 decoded output 和 metadata，不拼接全量结果。该路径及其 executor gate、overlap shape
+和 session-state guard 由 `COSMOS-6b` 约束；不要把一次 4×GB300 回归外推为通用 multi-GPU、parity、
+质量或性能支持。
+
 ## ROCm evidence scope
 
 ROCm recipe 的 MI350X latency/显存只来自 `b3f4fbf9` 上单卡 gfx950、Nano T2I/T2V、
@@ -47,5 +55,5 @@ request 的 denoise 生命周期内使用，不提供跨请求记忆或并发安
 
 ## 什么时候查这里
 
-- 审查 Cosmos3 Edge/Distilled scheduler、RNG、guidance、offload 或 capability claim。
+- 审查 Cosmos3 Edge/Distilled scheduler、RNG、guidance、offload、distributed-VAE multi-chunk transfer 或 capability claim。
 - 同一问题影响多个 diffusion 模型时返回 [Diffusion rules](../../components/diffusion/rules.md)。
