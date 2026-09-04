@@ -4,11 +4,26 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6037", "PR #6518", "PR #6563", "PR #6724", "PR #6909", docs/design/feature/skip_softmax.md, docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/trtllm.md, docs/user_guide/diffusion/attention_backends/fastvideo_vsa.md, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/diffusion_kv/paged_attention_adapter.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_fastvideo_vsa.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/diffusion_kv/test_paged_attention_adapter.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py"]
+sources: ["PR #5543", "PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6037", "PR #6518", "PR #6563", "PR #6724", "PR #6909", docs/design/feature/skip_softmax.md, docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/trtllm.md, docs/user_guide/diffusion/attention_backends/fastvideo_vsa.md, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/diffusion_kv/paged_attention_adapter.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/cuda/platform.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_fastvideo_vsa.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/diffusion_kv/test_paged_attention_adapter.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py"]
 confidence: high
 ---
 
 # Diffusion attention 规则
+
+## DIFF-1ad — CUDA backend 选择必须区分显式承诺与自动回退
+
+- 触发：修改 CUDA platform selector、`FLASH_ATTN`/`FLASHINFER_ATTN`/`CUDNN_ATTN`/TRTLLM、SP
+  auto-pad 或 paged dispatch。
+- 强制：显式 backend 必须运行或以可操作错误失败，auto 才可回退。Blackwell 的 `FLASH_ATTN` 仅可用
+  `flash_attn.cute` FA4；显式缺 FA4 报错，auto 继续选择。cuDNN、FlashInfer、Sage、TRTLLM 都须按
+  实际 head-size/所需 symbol 验证（SM10x TRTLLM probe 真正 API），不得以 import 代替能力。
+- 强制：mask/SP pad 按已解析的 per-role `AttentionSpec` 能力判断，FlashInfer CuTe 不接受 custom
+  mask；未知 `head_size=-1` 的 capability query 不得触发大小校验。formal paged 走 native backend，
+  profiling 才可 dense/SDPA fallback。
+- 禁止：显式 backend 在不兼容时静默替换为 MATH/SDPA/native；从相等维度猜 BHS/BSH layout，或把
+  import 成功、CPU contract test、早期 B300 smoke 外推为跨硬件功能、质量或性能支持。
+- 验收：覆盖 Blackwell FA4 缺失与可用、显式失败/auto fallback、CuTe mask、per-role SP pad、未知
+  head sentinel、真实 wrapper/TRTLLM symbol 及无 FA4 的 paged path。^[PR #5543]
 
 ## DIFF-1ac — FastH3 VSA 必须保留 H3 packed document、tile 和 SP 合同
 
@@ -161,12 +176,11 @@ confidence: high
 - 禁止：以 `Q == K` 推断 self-attention，或把 key-mask indices 用于 query gather/scatter；这会丢弃 query rows，且在 batch 大于一时可能令 query 对齐到另一样本的 K/V。
 - 验收：CPU/mock 覆盖 self 与 `role="cross"` 的 masked varlen routing（包括 Q/K 等长），精确断言 cross 的 dense Q offsets 与 K/V offsets；GPU 将不同 batch valid-K lengths 的 cross output 与 SDPA 对照。^[PR #5866]
 
-## DIFF-1n — cuDNN attention 的单 token 形状必须提前走 MATH
+## DIFF-1n — cuDNN 单 token 仅限 auto MATH workaround
 
-- 触发：修改 cuDNN diffusion attention dispatch，或引入可能出现单 token 的动态 Q/K 序列长度。
-- 强制：当 query 或 key 的序列长度为 1 时，在进入 cuDNN-only context 前显式使用 `sdpa_kernel([SDPBackend.MATH])`；其他形状才使用显式 cuDNN，并保留符号 shape 被 cuDNN 拒绝时的运行时 fallback。
-- 禁止：把单 token 形状交给 cuDNN 后等待 eager exception；用包含 FLASH/MATH 的 priority list 掩盖 backend 选择；因 Q/K 长度不同而丢弃已有 attention mask。
-- 验收：CPU/mock 参数化覆盖 `(1,1)`、`(8,1)`、`(1,8)` 与 `(8,8)`，精确断言选择的 SDP backend；另覆盖 compile、masked unequal-length 与 unmasked native path，并说明真实 GPU 数值仍需独立验证。^[PR #6070]
+- 触发：修改 cuDNN dispatch 或动态 Q/K 长度。auto 的 Q/K=1 可在 cuDNN 前走 `SDPBackend.MATH`；
+  显式 `CUDNN_ATTN` 必须拒绝该形状，不能静默换 backend。覆盖 `(1,1)`、`(8,1)`、`(1,8)`、`(8,8)`
+  的 explicit/auto dispatch、compile 和 mask。^[PR #6070] ^[PR #5543]
 
 ## DIFF-1z — 混合 causal/full attention 必须经过共享 Attention 能力路径
 

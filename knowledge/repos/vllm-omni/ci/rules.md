@@ -32,6 +32,11 @@ confidence: high
 - 触发：增加模型、硬件路径、nightly/ready/merge lane，或升级运行时/镜像。
 - 强制：硬件 helper 从 `pyproject.toml` 派生 platform/SKU/`cards_N`，default 为 `cards_1`；Buildkite
   selector 按 cards count 切分，直接写 SKU marker 被 pre-commit 拒绝。^[PR #6650]
+- 强制：CUDA `MIRROR_HW` 只接受 empty/unset 或不分大小写的 `b200`，否则 upload fail；NPU 忽略它。
+  省略 preset 时从 `-m` 推导：unset 匹配 H100/L4（两者都有时取 H100），b200 只匹配显式 B200；
+  多个正 `cards_N` 取最大值，正 marker 优先于 negation，只有负 card marker 时取该 chip 最大已有
+  preset，匹配 chip 却没有任何 card marker 才 fail。显式 preset 优先；b200 跳过 H100/L4 preset，
+  不匹配 B200 marker 的 inferred step 也 omit，且 selector 不重写原 `-m`。^[PR #5543]
 - 强制：资源数、pytest marker、pipeline 路由和共享 stage registry 同步；必需依赖、模型初始化
   或 collection 失败必须让 job 失败，并证明目标测试数大于零且原失败在对应硬件消失。默认
   `prepend` import mode 下，whole-tree collection 遇到同名叶子目录时，所有中间父目录必须用

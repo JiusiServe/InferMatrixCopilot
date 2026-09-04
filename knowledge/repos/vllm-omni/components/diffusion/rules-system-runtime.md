@@ -65,7 +65,8 @@ confidence: high
 - 触发：启用 paged scheduler、增加 diffusion attention backend 或平台 override。
 - 强制：启动阶段解析并验证每层实际 backend 与当前平台；走 Omni platform hook，保留
   piecewise/SP 等能力。HunyuanImage3 paged requests 已有 GPU/NPU production caller；NPU SDPA 只可作
-  startup memory-profile 的 dense fallback，正式 paged request 必须走 native backend。
+  startup memory-profile 的 dense fallback，正式 paged request 必须走 native backend；不能因 dense
+  FA4 缺失拒绝 Blackwell formal paged path。
 - 禁止：未知平台继承 GPU 默认；分配 cache 后到首次 dispatch 才失败；静默占用 paged KV
   却继续 dense；直接换用 upstream backend 丢失 Omni 能力。
 - 验收：unsupported platform/backend fail-fast；CUDA/NPU 对应 lane 和正式模型 E2E 证明
@@ -77,7 +78,8 @@ confidence: high
 ## DIFF-4f — paged attention metadata 不从 padding 猜逻辑布局
 
 - 触发：paged adapter 修改 GQA、prefix/current-token packing、LSE layout 或二维特例。
-- 强制：显式传递 Q/KV head 数、每请求 prefix/current span 和 layout；保持压缩 GQA 与 packed
+- 强制：显式传递 Q/KV head 数、每请求 prefix/current span 和 layout；LSE producer 必须声明 `bhs`
+  或 `bsh` 后规范化，绝不按 shape（含 `sequence == heads`）推断；保持压缩 GQA 与 packed
   current-token 语义，单 token/单 head 二维输入仍使用同一合同。
 - 禁止：从 padding 长度推断逻辑跨度；在 `sequence == heads` 时猜 LSE 维度；fallback 静默换
   backend 或把 KV heads 扩成 Q heads。
@@ -124,6 +126,9 @@ confidence: high
   fp8_e4m3，wrapper 输出恢复原 query dtype。auto backend 按 compute capability 选 major>=10
   `cute-dsl`、major>=9 `fa3`、否则 `fa2`；non-CuTe 才接受 custom mask，CuTe nontrivial mask、
   causal+explicit mask 或无法 pack 的 mask 必须回退原始输入的 Torch SDPA。
+- 强制：`flashinfer_backend` 即使未设 dtype 也必须经 `AttentionSpec.backend_kwargs()` 序列化到 impl；
+  platform availability 必须 probe 实际 `prefill.BatchPrefillWithRaggedKVCacheWrapper` symbol，而非仅
+  顶层 import。每层 non-CuTe 私有 128MiB workspace 的累计 OOM 风险仍未解决，不得声称已共享/懒分配。
 - 强制：plan key 至少绑定 batch、Q/KV length、Q/KV heads、QK/K/VO head dim、Q/K/V/output
   dtype、causal、scale 与是否有 mask；shape/dtype 改变重建 indptr/plan，unmasked 同 key 可复用。
   mask shape 相同也可能内容不同，所以每次 masked call 都必须重新 plan，不能只按 pointer/shape
@@ -133,15 +138,9 @@ confidence: high
 - 禁止：把本 PR 早期 Sage/TRTLLM kernels 当成 merged scope（review 后删除并转交 TRTLLM
   backend）；把 activation 直接 cast 成 FP8 描述成带 scale 的 checkpoint quantization；用
   `supports_attention_mask=True` 推断 CuTe 支持任意 mask。
-- 验收：mixed QK/V dtype 只能在 FlashInfer >=0.6.16rc1；目标对可解析的 <=0.6.15 fail-fast，
-  但没有 dependency pin，只有 docs/code gate。该 gate 比较配置 override：两者均为 None 时立即
-  返回，即使 caller 实际传入 mixed Q/K 与 V tensor 也不拦；capability 必须最终按 plan 中真实
-  q/k/v dtype 校验。缺失/非法 `flashinfer.__version__` 也会直接放行，是未封闭 gap。须补测试覆盖
-  dtype allowlist、old/missing version、auto backend、device mismatch、plan reuse/replan、同 shape
-  不同 mask、CuTe/causal fallback、GQA 与 output dtype；本 PR 没有新增 repo test，只有外部 smoke。
-  PR 的 Cosmos3 1280×720、35 steps、seed42，B200/B300 DiT timing 与 Nano 前24帧 LPIPS=0.051496
-  只绑定 vLLM-Omni `4ce23c33` + FlashInfer `d0889c7c` 的 pre-final 环境；final config/version gate
-  commit 后无复测，且这些不是端到端 latency、稳定 speedup 或通用质量阈值。^[PR #5344]
+- 验收：mixed QK/V 仅 FlashInfer >=0.6.16rc1；按真实 plan dtype 检验可解析的旧版、缺失/非法版本
+  都 fail-fast。覆盖 allowlist、auto、device、plan/mask replan、CuTe/causal、GQA/output dtype。
+  PR #5344 的 pre-final B200/B300 smoke 不是 E2E latency、稳定 speedup 或通用质量证据。^[PR #5344]
 
 ## DIFF-4i — 模型能力 metadata 必须跨 architecture 与 pipeline 两个 key space 解析
 
