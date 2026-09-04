@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py"]
+sources: ["PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py"]
 confidence: high
 ---
 
@@ -104,6 +104,16 @@ confidence: high
 - 强制：保留完整逻辑 K/V mask，并以 `[B, 1, 1, K]` 语义传递；masked LTX attention 必须走支持该 mask 的 SDPA fallback，unmasked 请求才保留 native backend，不能修改通用 Ulysses 的 mask 语义来适配单一模型。
 - 禁止：因为 cross-attention 的 Q/K 长度不同就丢弃 mask；把只匹配 query 长度的二维 mask 交给 Flash varlen；把 backend 的 `supports_attention_mask` 能力等同于支持任意 mask layout。
 - 验收：CPU/mock 覆盖 masked self-attention、masked unequal-length cross-attention 与 unmasked path，分别断言 SDPA/native dispatch 和 mask shape；真实 SP 再以带 padding 的 LTX 输出对照未分片参考。^[PR #5500]
+
+## DIFF-4v — FLASH_ATTN masked varlen packing 必须由 attention role 选择
+
+- 触发：修改 diffusion `FLASH_ATTN` 的 masked-varlen unpad/pad 路径、`Attention` role 传递，或给 cross-attention 增加二维 key-padding mask。
+- 强制：只有 self-attention 才可用同一 2D mask unpad Q/K/V；构造参数精确为 `role="cross"`
+  时 mask 只 unpad K/V，Q 保持 dense，并按每个 batch 的完整 query length 构造
+  `cu_seqlens_q`，输出直接 reshape 回 `[B, Q, ...]`。该提交没有扩展 namespaced
+  `role_category="cross"` caller；LTX strict-SP 的 SDPA fallback 仍由 [DIFF-1k](#diff-1k-非等长-sp-attention-必须保留-kv-mask-并走-mask-safe-backend) 约束。
+- 禁止：以 `Q == K` 推断 self-attention，或把 key-mask indices 用于 query gather/scatter；这会丢弃 query rows，且在 batch 大于一时可能令 query 对齐到另一样本的 K/V。
+- 验收：CPU/mock 覆盖 self 与 `role="cross"` 的 masked varlen routing（包括 Q/K 等长），精确断言 cross 的 dense Q offsets 与 K/V offsets；GPU 将不同 batch valid-K lengths 的 cross output 与 SDPA 对照。^[PR #5866]
 
 ## DIFF-1n — cuDNN attention 的单 token 形状必须提前走 MATH
 
