@@ -10,7 +10,7 @@ sources: []
 # Diffusion
 
 - 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
-- 源码校验：以上子模块均已在 `main @ 009b992c` 验证存在；MiniMax-H3 的 VAE eager
+- 源码校验：以上子模块均已在 `main @ 13173d6b` 验证存在；MiniMax-H3 的 VAE eager
   ops 仍由模型 owner 维护，其他 shared/模型机制按各自规则审查
 - 主要职责：多个 diffusion 模型共用的 pipeline、执行循环、scheduler 接入和运行机制
 
@@ -31,6 +31,7 @@ sources: []
 | 理解共享职责和数据流 | [architecture](architecture.md) |
 | 根据 PR 描述直达 execution parity、checkpoint/artifact identity、quality evidence 或 system-runtime 异常清理规则组与第一批源码 | [rules 与代码地图](rules.md) |
 | image/diffusion timing、step normalization、missing-versus-zero 与 benchmark 解释边界 | [metrics evidence rules](rules-metrics.md) |
+| worker process title、topology rank 与日志前缀 | [worker observability rules](rules-worker-observability.md) |
 | vLLM/torch rebase、MoE/quant helper 漂移、kernel backend capability 与 matched accuracy | [upstream 兼容规则](rules-upstream-compat.md) |
 | 平台 IR-op priority、Inductor/eager 默认顺序与模型 hook 合并 | [platform runtime rules](rules-platform-runtime.md) |
 | runtime temporary 与 loader-scoped parameter dtype、shared RMSNorm accuracy | [tensor dtype rules](rules-tensor-dtype.md) |
