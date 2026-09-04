@@ -106,14 +106,15 @@ confidence: high
   uint8 buffer 及上游 device→host 分配仍存在，不能称为 O(1) memory。
 - 强制：所有 frame shape 相同；只有 rank-3 HWC 且 C=4 才去 alpha，二维 width=4 灰度不能
   截断。mixed float dtype 先用 `np.result_type` 得到 common dtype，再逐帧计算，以保持 legacy
-  stack 的 promotion/rounding/checksum；不得原地改输入。当前 uint8 fast branch 因 normalization
-  先转 float32 而实际上不可达，不能拿它作为性能或语义证明。
+  stack 的 promotion/rounding/checksum；不得原地改输入。仅当输入是 `np.ndarray`、`uint8`、rank-4
+  FHWC、last dim=3 且 C-contiguous 时，fast branch identity-return；其他输入一律回既有 conversion。^[PR #6824]
 - 验收：回归测试禁止 float path 调用 `np.stack`，并覆盖 input immutability、RGBA、width-4
   grayscale、mixed float16/float32 与 exact uint8 output。性能证据必须分开报告 conversion 和
   未改动的 MP4 encode：PR #5732 的可复现实验仅绑定 209×1344×768 float32 RGB、24 FPS、
   ultrafast、fresh process、3 次 median/RSS 10 ms；conversion 1201.15→529.47 ms、conversion+MP4
   1808.96→1235.26 ms、peak RSS 8.874→4.141 GiB、above-resident 5.393→0.660 GiB，两个 hashes
-  相同。PR body 的 362-frame 与 4×MI300X E2E 是另一组观察，不能混合或泛化。^[PR #5732]
+  相同。PR body 的 362-frame 与 4×MI300X E2E 是另一组观察，不能混合或泛化。另须断言 exact
+  eligible ndarray 返回同一对象，并以 dtype/rank/channel/contiguity controls 证明其他输入仍转换。^[PR #5732] ^[PR #6824]
 
 ## SERV-1f — TTS word timestamps 必须按 transport capability 显式门禁和传输
 

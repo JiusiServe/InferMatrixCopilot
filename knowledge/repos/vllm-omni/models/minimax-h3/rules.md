@@ -20,7 +20,7 @@ confidence: high
 | grouped QKV、fused MLP、weight loader、TP | [MMH3-1a](rules-loading.md#mmh3-1a-component-namespace-与-checkpoint-transform-必须在-active-loader-前闭合) | `minimax_h3_transformer.py::MiniMaxH3DiTModel.load_weights` → active vLLM loader |
 | FP8 quality、audio metric、layerwise offload | `MMH3-1b` | quantization quality test → recipe/support matrix → nightly lane |
 | RMSNorm、RoPE、96/128 rotary dim、fused backend | `MMH3-1c` | `MiniMaxH3Attention` → shared `RMSNorm`/`RotaryEmbedding` → platform dispatch |
-| RainFusion、block sparse、video layout、NPU INT8 | [MMH3-1d](rules-rainfusion.md#mmh3-1d-rainfusion-只在已验证的-h3-video-span-上稀疏) | packed sequence → attention metadata/backend plan；quant config → prefixed linear → loader/post-load |
+| RainFusion/NPU INT8；decoded video BCTHW→BTHWC uint8 | `MMH3-1d`, [MMH3-1o](rules-media.md#mmh3-1o-h3-decoded-video-必须在-transfer-前定型为-contiguous-uint8) | attention plan；H3 output prepare/postprocess → video uint8 consumer |
 | TRTLLM、ragged packed metadata、SAGE、Skip-Softmax、Blackwell default | `MMH3-1e` | H3 metadata/roles → TRTLLM packed trim/quant gate → platform default |
 | text encoder、missing q/k/v 或 gate/up、eager load bookkeeping | [MMH3-1f](rules-loading.md#mmh3-1f-text-encoder-eager-load-必须证明每个-source-shard-完整) | `encoder.py::_load_weights` → `pipeline_minimax_h3.py::load_weights` strict report |
 | NPU packed varlen、quadratic mask、LaserAttention、prefix K/V | `MMH3-1g` | H3 packed producer → backend capability/metadata → NPU FlashAttention fallback |

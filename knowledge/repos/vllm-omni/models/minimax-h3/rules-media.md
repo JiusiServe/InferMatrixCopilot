@@ -4,11 +4,25 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/engine/stage_runtime.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_async_omni_engine_stage_init.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6064", "PR #6813"]
+sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/engine/stage_runtime.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_async_omni_engine_stage_init.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #6064", "PR #6813", "PR #6824"]
 confidence: high
 ---
 
 # MiniMax H3 媒体输入与精度规则
+
+## MMH3-1o — H3 decoded video 必须在 transfer 前定型为 contiguous uint8
+
+- 触发：修改 H3 VAE decode output、worker→engine transfer、`post_process` 或 raw offline frame consumer。
+- 强制：`forward` 与 step-wise `post_decode` 两条路径都在 transfer 前按 detach→float→clamp
+  `[0,1]`→`*255`→round→BCTHW-to-BTHWC permute 定型为 contiguous `uint8`。单个 result 直接返回，
+  多个 result 才 `cat`；audio 保持原对象/语义。`post_process` 对 exact rank-5、last-channel=3 的
+  uint8 video 只做 detach、D2H 与 NumPy conversion，不得再次量化；其他输入保留旧 float/BCTHW path。
+- 禁止：不得继续承诺 raw offline `OmniRequestOutput.images[0]` 是 `[0,1]` float BCTHW；新 ABI 是
+  `[0,255]` uint8 BTHWC。不得把提前准备称为 direct-planar、zero-copy、byte-identical MP4 或通用性能
+  改进；#6776 下 interleaved BTHWC 的 RGB plane 仍可能选择 legacy fallback。
+- 验收：CPU contract 逐值核对 clamp/round/permute/contiguous bytes，覆盖 single/multi、两条 decode
+  path、postprocess exact predicate/fallback 与 audio identity。PR #6824 的单元测试不证明 E2E/MP4；
+  PR benchmark 使用的 candidate 也不是 exact merge target，不能据此建立性能阈值。^[PR #6824]
 
 ## MMH3-2a — task、reference、shape 与多输出必须作为一个输入矩阵维护
 
