@@ -55,22 +55,22 @@ confidence: high
 
 - 触发：`token2wav_trt` / `MINICPMO_TOKEN2WAV_TRT=1`，或修改 Code2Wav 的 DiT、
   Campplus、ONNX/TRT engine cache 与 optimization profile。
-- 强制：所有平台都先构造树内 `MiniCPMO45Token2wav`；开关只在 CUDA 同时启用 DiT
-  estimator 与 Campplus 的 TensorRT 路径，非 CUDA 忽略开关，关闭开关保留完整 torch
-  路径。DiT 只替换 `BatchedToken2Wav._estimator_step` 的逐步 estimator 调用，encoder 与
-  HiFT 仍走 torch；engine 在调用者当前 CUDA stream 上执行。
-- 强制：强类型精度来自所选 dtype 的 ONNX graph，export 深拷贝已加载 DiT 后再 cast，
-  不改变 live torch estimator 的 dtype。ONNX cache 是动态、可移植 graph；plan cache key
-  必须精确包含 depth、dtype、`token2wav_trt_max_batch`、GPU SM 与 TensorRT version。
-- 强制：ONNX/plan 首次生成使用 PID 唯一临时文件并原子替换；step 在执行前检查 profile：
-  batch 上限为配置值且包含 classifier-free guidance 展开的 `2B`，chunk 固定上限 3000，
-  attention cache 固定上限 1000，越界给出可操作错误。Campplus 合同保持 `[T,80]` →
-  `[1,192]` fp32，并从 `_resolve_model_dir()` 已解析的本地模型目录取资产。
-- 禁止：把共享 `step_audio2_dit_trt.py` 的存在解释成 Step-Audio2 用户自动获得 TRT；
-  当前开关只由 MiniCPM-o wiring 调用。也禁止把讨论中的通用 vocoder backend 当成已实现。
-- 验收：分别覆盖关闭/开启、非 CUDA 忽略、torch/TRT 数值与音频 parity、首次构建和 cache
-  复用、不同 SM 不共享 plan、CFG 后 batch 越界以及 chunk/cache 越界。PR 未新增自动化测试，
-  因而这些仍是后续改动必须补证的验证缺口。 ^[PR #5638]
+- 强制：各平台先构造树内 `MiniCPMO45Token2wav`；仅 CUDA 开关同时启用 DiT estimator 与
+  Campplus TRT，关闭/非 CUDA 保留 torch。DiT 只替换 `_estimator_step`，encoder/HiFT 仍为
+  torch 且 engine 用调用者 CUDA stream。dtype ONNX export 深拷贝再 cast、不改 live estimator；
+  plan key 含 depth、dtype、max-batch、SM、TRT version，profile 覆盖 CFG `2B`、chunk 3000、
+  cache 1000，越界报可操作错误；Campplus 是本地资产 `[T,80]` → `[1,192]` fp32。
+- 强制：共享 `_publish_atomically` 用同目录 `<dest>.tmp.<pid>.<uuidhex>` 独占 `xb`；writer
+  写入、flush/close 后 `os.replace`，并发成功完整且 last-writer-wins。collision 在 writer 前
+  失败且不删 foreign tmp；任何失败保留 destination、只删 owned tmp、重抛原异常，cleanup 仅
+  日志。ONNX path writer 在 umask 移除 owner-write 时记录 mode、补写权限并在发布前恢复；plan
+  stream 不作 `fstat`/`fchmod`。无 fsync/目录持久化、锁、内容校验或 ONNX/plan 成对事务。
+- 禁止：把 shared helper 解释成 Step-Audio2 TRT；当前显式 consumer 只有 MiniCPM-o Code2Wav，
+  也不得把讨论中的通用 vocoder backend 当作已实现。
+- 验收：覆盖开关/非 CUDA、torch/TRT parity、cache/SM/profile 边界；运行
+  `python -m pytest -q tests/model_executor/models/step_audio2/test_step_audio2_dit_trt.py` 覆盖
+  CPU 并发、collision、writer/fstat/replace/cleanup failure 与 restrictive umask。MiniCPM
+  wiring 的自动化验证仍须补证。 ^[PR #5638] ^[PR #6957]
 
 ## MCPMO-1f — Ascend Code2Wav NPUGraph 只捕获精确形状的 CFM DiT
 

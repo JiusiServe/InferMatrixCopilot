@@ -1,10 +1,10 @@
 ---
 title: "Step-Audio2 设备边界与流式性能规则"
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models]
-sources: ["PR #5067", vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vllm_omni/model_executor/models/step_audio2/step_audio2_token2wav.py, tests/model_executor/models/step_audio2/test_step_audio2_token2wav_async_chunk.py, tests/platforms/npu/test_step_audio2_token2wav.py, "PR #6467"]
+sources: ["PR #5067", vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vllm_omni/model_executor/models/step_audio2/step_audio2_token2wav.py, vllm_omni/model_executor/models/step_audio2/step_audio2_dit_trt.py, tests/model_executor/models/step_audio2/test_step_audio2_token2wav_async_chunk.py, tests/model_executor/models/step_audio2/test_step_audio2_dit_trt.py, tests/platforms/npu/test_step_audio2_token2wav.py, "PR #6467", "PR #6957"]
 ---
 
 # Step-Audio2 设备边界与流式性能规则
@@ -62,3 +62,23 @@ sources: ["PR #5067", vllm_omni/model_executor/models/step_audio2/step_audio2_th
 - 强制：音频读取统一调用 `load_audio(..., sr=None, mono=True)`，mel filter 统一调用 `mel_filter_bank`；16 kHz 的 s3tokenizer/说话人分支和 24 kHz flow-mel 分支都必须从原始 waveform 分别经 `AudioResampler` 生成，保留真实 sample rate 与单声道语义。
 - 禁止：在目标运行时重新导入 `librosa` 或 `soundfile`，通过 try/except 在两套解码实现间兜底，或把已经 16 kHz 的结果再次作为 24 kHz 重采样输入；不得据此声称 onnxruntime/s3tokenizer 等其他依赖已移除。
 - 验收：静态检查 Step-Audio2 runtime 不再依赖 `librosa`/`soundfile`；覆盖非 16/24 kHz 输入，断言两个目标采样率都由同一原始音频独立生成、mel shape/数值和 token2wav 推理结果正常，并运行 `pytest tests/e2e/online_serving/test_step_audio2_expansion.py --run-level 'advanced_model'`。 ^[PR #6467]
+
+## STEPA2-2b — DiT TRT 构建必须独占临时文件后原子发布
+
+- 触发：修改 `step_audio2_dit_trt.py` 的 ONNX export、TRT plan 序列化、缓存发布或共享
+  `Code2Wav` 的 DiT/Campplus TRT wiring。
+- 强制：共享 `_publish_atomically` 在 destination 同目录以
+  `<dest>.tmp.<pid>.<uuidhex>` 独占 `xb` 创建临时文件；writer 写完，stream flush/close 后才
+  `os.replace`。并发成功者均发布完整 artifact，最终允许 last-writer-wins。名字碰撞须在
+  writer 前抛出且不得删除 foreign tmp；writer、权限处理或 replace 任一失败必须保留已有
+  destination、只删除本调用拥有的 tmp、重抛原异常；cleanup 异常只写日志。ONNX path writer
+  在 umask 移除 owner write 时必须记录 mode、临时补 owner-write，并在发布前恢复；plan 的
+  stream writer 不做 `fstat`/`fchmod`。
+- 边界：这不是 fsync 或目录持久化合同，不提供锁、内容校验或 ONNX/plan 成对事务。共享 helper
+  位于 Step-Audio2 并不代表其 pipeline 已启用 TRT：此 pin 的显式 consumer 是 MiniCPM-o
+  Code2Wav；不得把该 wiring 或 TRT 支持归因给 Step-Audio2 用户。
+- 验收：运行 `python -m pytest -q tests/model_executor/models/step_audio2/test_step_audio2_dit_trt.py`；
+  CPU 测试必须覆盖同进程并发、foreign-name collision、writer/fstat/replace failure、cleanup
+  failure 与 restrictive umask 的 ONNX mode 恢复，并断言 plan 无 `fstat`/`fchmod`。更广的
+  Step-Audio2 测试收集在该 PR 环境因 optional `s3tokenizer` 缺失而无法完成，不能误报为完整
+  suite 已通过。 ^[PR #6957]

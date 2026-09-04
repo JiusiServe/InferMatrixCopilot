@@ -4,7 +4,7 @@ created: 2026-07-21
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, models]
-sources: ["PR #5067", "PR #5638", "PR #5869", "PR #5917", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/, vllm_omni/deploy/step_audio_2.yaml, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py, vllm_omni/platforms/npu/models/step_audio2_token2wav.py, vllm_omni/platforms/npu/models/cosyvoice2_dit_attn.py]
+sources: ["PR #5067", "PR #5638", "PR #5869", "PR #5917", "PR #6957", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/, vllm_omni/model_executor/models/step_audio2/step_audio2_dit_trt.py, vllm_omni/deploy/step_audio_2.yaml, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py, tests/model_executor/models/step_audio2/test_step_audio2_dit_trt.py, vllm_omni/platforms/npu/models/step_audio2_token2wav.py, vllm_omni/platforms/npu/models/cosyvoice2_dit_attn.py]
 ---
 
 # Step-Audio2
@@ -50,7 +50,7 @@ sources: ["PR #5067", "PR #5638", "PR #5869", "PR #5917", vllm_omni/model_execut
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | token 过滤桥、25+3 lookahead、流式状态 | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
-| 设备常驻 token、ragged 长度同步与性能证据边界 | [rules](rules.md) | Step-Audio2 专属审查规则 |
+| 设备常驻 token、ragged 长度同步、TRT 临时文件发布 | [rules](rules.md) | Step-Audio2 专属审查规则 |
 
 ## 配置与 checkpoint 差异（三变体）
 
