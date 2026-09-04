@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py]
+sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py]
 confidence: high
 ---
 
@@ -156,11 +156,12 @@ Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期�
 
 ## MMH3-2j — Turbo LoRA 只接受精确发布 artifact，并与 H3 task、sampling 和 offload lifecycle 共同门禁
 
-- 触发：MiniMax-H3 LightX2V Turbo 的 dynamic LoRA loader、artifact conversion、request task/steps/flow shift，或与 CPU/layerwise/distributed-layerwise offload 的组合。
+- 触发：MiniMax-H3 LightX2V Turbo 的 dynamic LoRA loader、artifact conversion、request task/steps/flow shift，或与 CPU、standard layerwise、distributed layerwise offload (DLO) 的组合。
 - 强制：仅识别声明文件名的 LightX2V Turbo v1.0 safetensors，且 metadata 必须为 `key_format=minimax-h3-diffusers`、rank/alpha `128/128`；任何未知 tensor、重复/不完整 A/B pair、unsupported target 或不精确的 global A/B shape 都在 binding 前失败。转换必须把 Diffusers token-refiner/main-block names 映射为 native H3 names，恢复 FC1 `[gate; up]` 行序为 model-owned packed weights，并通过 `stacked_params_mapping` 将独立 Q/K/V 接到 packed QKV。
 - 强制：Turbo 仅在非零 scale 的实际 active recognized adapter 时限制请求；只支持 FL2VA/T2VA，要求五个 sigma points（四次 denoiser evaluation）、video `flow_shift=6` 与 audio `audio_flow_shift=3`。每次真实 load 都替换该 client ID 的 Turbo classification，避免 eviction 后同 ID generic adapter 被误分类。
-- 禁止：将 exact Turbo artifact 的损坏 metadata 静默交给 generic fallback；将任意 H3 PEFT checkpoint、prefusion、multi-LoRA composition 或 Ref2VA 宣称为此功能支持；在 model-level CPU、layerwise 或 distributed-layerwise offload 下激活 Turbo，因为 legacy wrapper 的 LoRA tensors 不随 base parameter lifecycle 搬运。
-- 验收：覆盖 file/metadata/alpha/target/pair/shape rejection、QKV and FC1 packing、scale-zero/generic same-ID/Ref2VA lifecycle、steps/shifts errors 与三种 offload rejection；真实 artifact evidence 必须另绑定 exact checkpoint、task、topology、sampling 和 video/audio output。转换后的 native mixed-rank PEFT artifact 不属于本 PR 的 supported contract；其 generic fallback rank/scale mismatch 是 post-merge follow-up，不可用本页的 Turbo success 证明安全。^[PR #6476]
+- 强制：DLO + active Turbo 可用时，DLO 只 stream base blocks；manager 注入的 request-switchable A/B sidecars 必须留在 compute device，且任何因更大 LoRA rank 触发的 wrapper reallocation 后仍重放该 placement。固定 sidecar HBM 是此组合的预算，不得把它算作 base-block DLO lifecycle 或 collective payload。
+- 禁止：将 exact Turbo artifact 的损坏 metadata 静默交给 generic fallback；将任意 H3 PEFT checkpoint、prefusion、multi-LoRA composition 或 Ref2VA 宣称为此功能支持；在 model-level CPU 或 standard layerwise offload 下激活 Turbo。不得为动态 sidecar 重建 DLO host shards、随每个 block/denoise step stream A/B，或让 LoRA 进入 DLO AllGather；没有 active LoRA 的 DLO 不得进入此 loader path。现有 HWR eligibility 仍拒绝 `lora_path`，AllGather 也不走该 BF16 HWR path，不能将 DLO+Turbo evidence 扩展为 HWR support。
+- 验收：覆盖 file/metadata/alpha/target/pair/shape rejection、QKV and FC1 packing、scale-zero/generic same-ID/Ref2VA lifecycle、steps/shifts errors、CPU/standard-layerwise rejection，以及 DLO admission、resident A/B device placement 和 rank-driven reallocation 后的 placement；真实 artifact evidence 必须另绑定 exact checkpoint、task、topology、sampling 和 video/audio output。DP validation 至少以同 wave 的并发 request 覆盖所声称 DP topology；DLO no-AllGather/AllGather evidence 只证明对应 base-weight transport，sidecars 不参与 collective。PR #6550 报告的 0.911 GiB/TP2-rank 与 1.355 GiB/TP1-rank 只绑定 rank-128、312-target 的该 Turbo artifact，不是任意 adapter 的容量保证。转换后的 native mixed-rank PEFT artifact 不属于本 PR 的 supported contract；其 generic fallback rank/scale mismatch 是 post-merge follow-up，不可用本页的 Turbo success 证明安全。^[PR #6476] ^[PR #6550]
 
 ## MMH3-2k — H3 step execution 必须保持请求状态、attention 文档和 rank-0 prepare 隔离
 
