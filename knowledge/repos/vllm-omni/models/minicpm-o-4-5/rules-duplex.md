@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #6318", "PR #6346", "PR #6458", "PR #6619", "PR #6678", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/experimental/fullduplex/minicpmo45/session.py, vllm_omni/experimental/fullduplex/openai/runtime_adapter.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, tests/config/test_config_factory.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py]
+sources: ["PR #6318", "PR #6346", "PR #6458", "PR #6619", "PR #6630", "PR #6678", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/experimental/fullduplex/minicpmo45/session.py, vllm_omni/experimental/fullduplex/openai/runtime_adapter.py, vllm_omni/experimental/fullduplex/openai/runtime_bridge.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, tests/config/test_config_factory.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py]
 confidence: high
 ---
 
@@ -35,6 +35,14 @@ confidence: high
 - 强制：每个 native duplex 请求按一次 chunk 的 26 个采样管理状态；adapter 只在 duplex runtime config 将 Talker `min_tokens` 设为 0，保留 chat YAML 的 whole-utterance floor；turn 边界 `min_tokens=0`，中间 chunk `min_tokens=max_tokens=26`，已转发 25 帧后强制下一个采样为 EOS，仅把非 EOS code 交给 Code2Wav。
 - 禁止：只依赖 YAML `max_tokens` 维持 turn 边界；改变 chat 的 whole-utterance Talker floor；在中间 chunk 永久屏蔽 EOS；把终止采样再次作为普通 codec frame 输出。
 - 验收：覆盖 prefill 边界元数据、step 24/25 的 mask/force EOS、runtime Stage 1 `min_tokens=0`、chat sampling control、simplex 不误触发以及多请求 delta/finished 对齐。^[PR #6346] ^[PR #6619]
+
+## MCPMO-4d — auto-response silence continuation 必须有硬性终止与所有权 fence
+
+- 触发：修改 MiniCPM-o native duplex auto-response 的 silence continuation、`force_listen`、LISTEN 事件或 response close。
+- 强制：auto-response 以 64 个 one-second continuation unit 为上限，普通 response 保持 8 个单位上限；前 63 个 auto payload 保持既有语义，第 64 个请求 `force_listen`。边界 LISTEN 不得再走 non-terminal auto reschedule，而必须结束当前 response 并保留 resumable Stage-0 request；模型忽略提示时，下一次 continuation 尝试不得 append，而发出 `response.listen` 与恰好一个 `response.done`。fallback 在跨 `send_json` await 前后必须同时验证 epoch 和 active response owner，防止 barge-in 打开的新 response 被旧 response 的终止路径关闭。
+- 禁止：让 auto-response 因 `force_listen` 仅为 logit hint 而无限续跑；在已达边界后继续 append；清除 resumable request；或在 await 后未复核 session/response 所有权即结束 response。
+- 验收：覆盖 64 次 append、最后一次 `force_listen`、第 65 次无 append 且仅一次 terminal protocol pair、边界 model LISTEN 的 terminal path，以及 LISTEN send 期间 barge-in/new epoch 不被 stale fallback 关闭。单元覆盖证明协议与 race fence；PR 的 H800 lifecycle run 混合了其他改动且有 `audio_clipped` artifact，不作为音频质量或性能证据。^[PR #6630]
+- 已知边界：terminalization 保留 data-plane request，而 `active_response_id is None` 时不走 model-turn owner guard；同一 request/turn 的 late SPEAK 仍可能新建第二个 response。该 reviewer nit 在本提交中未修复，不能把“恰好一个 `response.done`”外推成后续迟到事件也被永久抑制；若补齐，需显式拒绝 bound 后的 late SPEAK 并覆盖回归。^[PR #6630]
 
 ## MCPMO-4e — shipping profile 必须共服 chat 与 native duplex
 
