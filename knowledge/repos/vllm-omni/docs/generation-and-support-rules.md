@@ -18,7 +18,7 @@ sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml,
   `generate_examples.py` 的扫描/生成顺序，或手改 User Guide → Examples navigation。
 - 强制：`offline_inference` 与 `online_serving` 只有固定 shared-task slug 可生成页面并进入 nav：
   `image_to_image`、`image_to_video`、`speech_to_video`、`text_to_audio`、`text_to_image`、
-  `text_to_speech`、`text_to_video`、`x_to_text`、`x_to_video_audio`。过滤必须在 page write 与 nav
+  `text_to_speech`、`text_to_video`、`x_to_text`。过滤必须在 page write 与 nav
   update 之前执行；model-specific serving source 继续留在 `examples/`，不能重新与 task 入口混排；
   若要从文档侧发现它，必须由相应 shared task page 显式链接，不能只依赖 source directory 存在。
   非 serving category 会全部通过 filter，仍按 category/stem 生成
@@ -35,7 +35,9 @@ sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml,
   serving slug 不生成/不入 nav且能从相应 shared page 到达，非 serving category 保持生成；再验证
   重复 nav rebuild、preserved string 与 source-derived URL。target test 只用 synthetic
   `text_to_image`/`qwen3_omni` 检查 predicate 两端，没有执行 page generation、nav serialization、
-  完整 whitelist、shared-page link coverage 或真实树 census。
+  完整 whitelist、shared-page link coverage 或真实树 census。`x_to_video_audio` 曾是 DreamID-Omni
+  与 MagiHuman 唯一共用的 offline task；PR #6357 同时删除其 source、generated page、nav 项和
+  whitelist entry。不得恢复该 slug，除非新的共享 task source、页面、nav 和测试一起落地。^[PR #6357]
   ^[PR #5987]
 
 ### 已知完整性缺口

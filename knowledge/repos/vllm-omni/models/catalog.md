@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 40dcfdbb`（2026-08-26）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ aeb348d8`（2026-08-26）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -36,7 +36,7 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 | 注册点 | 位置 | 计数 |
 |---|---|---|
 | AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 81 个架构名 / 31 个模型族目录 |
-| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 67 条 pipeline / 42 个模型族目录 |
+| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 65 条 pipeline / 40 个模型族目录 |
 | Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 55 个 key |
 | Deploy YAML | `vllm_omni/deploy/*.yaml` | 84 份 |
 
@@ -46,6 +46,12 @@ processor/extras/recipe/examples/tests，并删除 MammothModa2 Preview/Dev 共�
 architecture、两个 pipeline key、两个 deploy YAML 及其 tokenizer/config/AR/DiT/bridge。
 因此 active owner 与 catalog 不再声明这两个家族；diffusion text-to-audio 的 first-party
 示例只剩 Stable Audio，Audex 的 TTA 仍是独立两阶段 autoregressive 路径。^[PR #6353]
+
+PR #6357 删除 `DreamIDOmniPipeline` 和 `MagiHumanPipeline`，以及相应的模型目录、MagiHuman
+extras、测试、文档和唯一共享的 `x_to_video_audio` offline 示例；这两个家族不再是当前
+first-party 支持，下面的 registry/owner 清单不将其列为 active。两页保留为历史 tombstone，
+不得作为可运行支持或能力证据。RFC #5996 最初讨论的是 CI delist；本 PR 的合并代码和 PR
+body 明确扩大为完整 first-party 删除。^[PR #6357] ^[Issue #5996]
 
 PR #4820 将 `WanDMDPipeline` 注册为 Wan2.2 的同实现入口，因此 diffusion pipeline
 计数回升至 65；它不是新的模型族或新的 `OMNI_PIPELINES` key。^[PR #4820]
@@ -63,12 +69,12 @@ mimo_audio、ming_flash_omni、ming_tts、minicpmo_4_5、minimax_music3、moss_t
 moss_tts_nano、nemotron_voicechat、omnivoice、personaplex、qwen2_5_omni、qwen3_omni、
 qwen3_tts、step_audio2、voxcpm2、voxtral_tts
 
-## Diffusion 模型族（42）
+## Diffusion 模型族（40）
 
-bagel、boogu_image、cosmos3、diffusers_adapter（通用 diffusers 桥）、dreamid_omni、
-dreamzero、ernie_image、flux、flux2、flux2_klein、glm_image、gr00t、helios、
+bagel、boogu_image、cosmos3、diffusers_adapter（通用 diffusers 桥）、dreamzero、ernie_image、
+flux、flux2、flux2_klein、glm_image、gr00t、helios、
 hidream_image、hidream_o1_image、hunyuan_image3、hunyuan_video、internvla_a1、krea2、lance、
-lingbot_video、lingbot_world、longcat_image、longcat_video、ltx2、magi_human、ming_flash_omni、
+lingbot_video、lingbot_world、longcat_image、longcat_video、ltx2、ming_flash_omni、
 minimax_h3、nextstep_1_1、omnigen2、omnivoice、ovis_image、pi0、qwen_image、sana_video、sana_wm、sd3、
 sdxl、sensenova_u1、stable_audio、wan2_2、z_image
 
