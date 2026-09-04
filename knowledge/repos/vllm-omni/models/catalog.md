@@ -4,13 +4,13 @@ created: 2026-07-16
 updated: 2026-09-05
 type: guide
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/, "PR #5885"]
+sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/, "PR #5885", "PR #6727"]
 ---
 
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 8bfad23f`（2026-08-29）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 034af1f6`（2026-08-29）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -85,6 +85,13 @@ PR #6559 增加 `mimo_audio_5090d.yaml`，使 deploy inventory 83→84；这是 
 PR #4820 将 `WanDMDPipeline` 注册为 Wan2.2 的同实现入口，因此 diffusion pipeline
 计数回升至 65；它不是新的模型族或新的 `OMNI_PIPELINES` key。^[PR #4820]
 
+PR #6727 does not change any registry or deploy inventory, but the upstream supported-model
+table adds Intel GPU checkmarks for Qwen-Image and Qwen-Image-2512, Krea 2, Wan2.2-VACE,
+Boogu-Image, OmniVoice, VoxCPM2, Qwen3-TTS CustomVoice, Ming-omni-tts dense 0.5B,
+Dynin-Omni, and Gepard-1.0. This is table-declared Intel GPU support; it is not a claim that
+every model has a recipe, an online-serving validation, performance data, or validation on
+hardware other than the PR's XPU lane. ^[PR #6727]
+
 SANA-Video 2B 新增 native `SanaVideoPipeline`（T2V）和
 `SanaImageToVideoPipeline`（I2V），二者共用 `sana_video` 模型族目录；它没有新增
 `OMNI_PIPELINES` key 或 deploy YAML。模型专有的 checkpoint、VAE 和 adapter 边界见
@@ -130,8 +137,8 @@ step_audio_2_asr、voxcpm2、voxtral_tts、wan2_2_ti2v
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 6b9ce05f \
-  --to 8bfad23f \
+  --from 8bfad23f \
+  --to 034af1f6 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

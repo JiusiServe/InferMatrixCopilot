@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, ci]
-sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6170", "PR #6303", "PR #6390", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/run_minicpmo_realtime_duplex_server_vad.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349", .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, tests/helpers/clean.py, "PR #6704", "PR #5464", "PR #6730"]
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6170", "PR #6303", "PR #6390", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/run_minicpmo_realtime_duplex_server_vad.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349", .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, tests/helpers/clean.py, "PR #6704", "PR #5464", "PR #6730", "PR #6727"]
 ---
 
 # vLLM-Omni CI
@@ -121,6 +121,22 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
   CacheDiT/TP2/VAE-patch-parallel=2/tiling case. It uploads result JSON and logs but
   configures no threshold, so it is benchmark-report/artifact collection rather than
   a performance regression gate. ^[PR #6349]
+
+## XPU base-image resolution and support-table boundary
+
+- The Intel Buildkite XPU lane targets vLLM `v0.28.0`. Its Omni image layers on
+  `vllm/vllm-openai-xpu:${VLLM_VERSION}` and clears that image's serving entrypoint so the
+  result remains a shell/test container. The base carries the matching XPU runtime and vLLM;
+  Omni installs only its own layers. Keep the Dockerfile default and lane environment version
+  aligned.
+- Before building, CI pulls the published upstream base freshly. If that pull fails it may use
+  an existing local copy; only if neither exists does it build the same vLLM tag from upstream
+  `docker/Dockerfile.xpu`, optionally under `VLLM_BASE`. Thus a fallback is provenance-aligned,
+  but it is not evidence that an arbitrary pre-existing fallback image matches the published
+  tag. The in-container scope remains the B60-marked core/advanced/omni pytest selections plus
+  `test_mxfp8_config.py`; it is not a whole-suite or model-matrix validation. The PR author
+  reported CI passing but supplied no command output or completed test plan, and review had no
+  surviving findings, so retain those evidence limits. ^[PR #6727]
 
 ## AMD CI stabilization boundary
 
