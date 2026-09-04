@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #6049", "PR #6076", vllm_omni/model_extras/, "PR #6070", "vllm_omni/model_extras/registry.py"]
+sources: ["PR #6049", "PR #6076", vllm_omni/model_extras/, "PR #6070", "vllm_omni/model_extras/registry.py", "PR #5614"]
 confidence: high
 ---
 

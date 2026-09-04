@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py"]
+sources: ["PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614"]
 confidence: high
 ---
 
@@ -91,3 +91,9 @@ confidence: high
 - 禁止：把单 token 形状交给 cuDNN 后等待 eager exception；用包含 FLASH/MATH 的 priority list 掩盖 backend 选择；因 Q/K 长度不同而丢弃已有 attention mask。
 - 验收：CPU/mock 参数化覆盖 `(1,1)`、`(8,1)`、`(1,8)` 与 `(8,8)`，精确断言选择的 SDP backend；另覆盖 compile、masked unequal-length 与 unmasked native path，并说明真实 GPU 数值仍需独立验证。^[PR #6070]
 
+## DIFF-7a — 多控制 transfer attention 必须按控制独立计算并显式承担 Ulysses 复制成本
+
+- 触发：修改 Cosmos3 transformer 的多控制 transfer attention、控制 token packing、控制权重传递或其 Ulysses/sequence-parallel 路径。
+- 强制：多控制 attention 必须为每个 control 独立构造 `[text, control_i, target]` 的 K/V 序列；保留该 control 自己的输出，target 输出按已归一化的 control weights 加权后再拼回控制区与 target 区。control token size 与 weight 数量必须一一对应，所有 control range 必须为正且完整覆盖 packed control 区。该路径使用 `skip_sequence_parallel=True` 的专用 attention，multi-control 时不得执行 `gen_sp_prepare`/`gen_sp_gather`，以完整的 `[control_i | target]` 序列在每个 Ulysses rank 复制执行，并显式告警其不降低每-rank memory 或 latency；未提供权重时使用均匀相对权重。
+- 禁止：把多个 control 直接拼成一个共享 attention 序列后让一个 control 污染其他 control 的输出；按 control token 数对拼接序列做 Ulysses 切分；只验证 output shape 就宣称 sequence parallel 为多控制 transfer 提供 per-rank 节省，或把一个控制的局部测试外推为多控制数值/性能 parity。
+- 验收：CPU/mock 测试用至少两个 control 的不同 value 和非均匀权重断言 target 是加权结果、control 输出来自各自 pass，并覆盖 token-size/weight 长度及非法权重；带 Ulysses 的测试断言专用 attention、复制执行和 warning，真实多卡再与单卡 dense reference 对照并分别测量显存、延迟和输出质量。^[PR #5614]
