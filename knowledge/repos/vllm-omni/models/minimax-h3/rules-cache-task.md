@@ -1,10 +1,10 @@
 ---
 title: "MiniMax H3 缓存与任务生命周期规则"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py]
+sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", "PR #6666", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/npu/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_native_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py]
 confidence: high
 ---
 
@@ -169,6 +169,15 @@ Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期�
 - 强制：request 与 step path 复用 request-input、denoise-row prepare 与 unpack helper；每个 `StepRequestState` 保持一份 video rows、audio rows、audio sigma schedule、anchors、shape 和 output，只有同宽 video rows 交给 runner split。可融合时每个 request 向 `cu_seqlens` 贡献一个 real-row document 和一个独立的 64-row alignment-tail document，单 DiT forward 后按原 request rows 回拆；不同 task DiT、Ring 或任一 resolved backend 不支持 multi-document packed varlen 时逐 request forward。rank-0-only reference preparation 的异常必须在任何后续 broadcast 前由 H3-local helper 同步为同一异常。step mode 必须明确拒绝 `num_outputs_per_prompt>1`、distributed layerwise offload 和 `quality=high` request-scoped Cache-DiT；这些状态不能安全跨交错 step 或 packed forward 共享。
 - 禁止：因 backend 名称为 `FLASH_ATTN`、平台默认或容量大于 1 就假设可合批；在多 document `cu_seqlens` 不被 backend 消费时去掉 mask；将不同宽度的 audio rows 混入 video batch；让 request-scoped Cache-DiT hooks、DLO resident window 或多输出 latent 跨 state 复用。不得把 H3-local broadcast 夸大为通用 runner 防护：target 的 `_dit_any_rank_failed()` 无法取得 DiT group 而退回 local flag，且 group-device 选择仍有 backend mismatch 风险。
 - 验收：CPU contract 覆盖 request/step helper parity、two-request packed document boundaries、video/audio split/reassembly、mixed-DiT/Ring/unsupported-backend fallback、abort-after-inflight-step，及三个明确 rejection；TeaCache extractor 继续以 omitted `num_requests=1` 走 request-mode path。真实权重只可在固定 checkpoint、seed、task、backend、topology 下比较 single vs packed outputs；并发 step run 的 packing composition 会随 arrival timing 改变，PR 的 4×H100 结果已显示 step rerun 和 request-vs-step 都非 bitwise 等价。有限 CPU、H100/B300 observations 和 workload-specific throughput 都不是所有 backend、small request、确定性或 multi-rank failure synchronization 的证明。^[PR #5810]
+
+## MMH3-2m — FlashGen native LoRA 必须保持 artifact、schedule 与 legacy-manager 边界
+
+- 触发：FlashGen native artifact loading、H3 dynamic LoRA classification/binding、adapter schedule、packed QKV/FC1，或与 task、step execution、CPU/layerwise/DLO/HWR offload 的组合。
+- 强制：只接受 exact v1.0 safetensors file；metadata 必须为 `key_format=minimax-h3-native`、`qkv_layout=grouped`、rank/alpha `64/64`、`tasks=t2va` 和五个 boundary 的四-interval `base_schedule`；target set 必须完整且精确（259 个），A/B pair、matrix shape、文件名或 metadata 任一不符均 fail closed。按 native module name 映射；grouped `qkv_proj` 先复用 H3 base-loader reorder 再拆 Q/K/V，`fc1` 拆 gate/up，二者复用 full-input A、以 slice-local B 绑定 packed layers。
+- 强制：artifact format 而非 running platform 选择 native loader；loader 读取 CPU safetensors、无 `torch_npu` dispatch，但最终 binding/execution 仍由 selected runtime platform 负责。adapter 仅在 nonzero-scale active request 时覆盖 checkpoint schedule；T2VA request mode 可省略 steps 并从 adapter 取 4 intervals，explicit step 必须为 4；step execution 必须显式给 4，因为 admission 早于 adapter schedule。native adapter 不得与 checkpoint-pinned `base_schedule` 或 Ref2VA 组合；真实 reload/eviction 必须清掉 reused client ID 的 native classification/schedule。
+- 强制：保持既有 legacy `DiffusionLoRAManager`，不引入 native-only manager、prefusion 或 multi-active composition。动态 A/B tensors 不参与 model-level CPU 或 standard layerwise weight lifecycle，因此二者拒绝；request-mode DLO 仅 stream base blocks、A/B 留 compute device。step execution 仍拒绝 DLO；HWR 的 `lora_path` eligibility 与 AllGather transport 未被本 PR 改变，不能据此宣称 HWR 或 LoRA-AllGather support。
+- 禁止：把 NPU directory/训练来源解释为 NPU-only 或已验证跨平台性能；把 request-mode omission 扩展到 step execution；把 on-disk adapter size 作为 rank-local HBM bound；或以 unit/mocked binding、作者的单一硬件报告声称真实 artifact E2E、quality、throughput 或 other topology evidence。
+- 验收：mock/synthetic artifact 覆盖 metadata/file/target/pair/shape/schedule rejection、grouped QKV 与 FC1 packing、legacy manager complete binding、active vs scale-zero、same ID reload/eviction、T2VA/Ref2VA、request/step count、offload gates 与 TP slice divisibility。PR 新增 native-LoRA unit contracts，未提交真实 release artifact 的 GPU/NPU E2E 或 independent quality/performance gate。^[PR #6666]
 
 共享 component quantization、checkpoint mapping 与 quality evidence 见
 [Diffusion rules](../../components/diffusion/rules.md)。
