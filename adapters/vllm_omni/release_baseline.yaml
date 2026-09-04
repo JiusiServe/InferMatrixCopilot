@@ -2,9 +2,9 @@ schema_version: 1
 
 upstream:
   repository: vllm-project/vllm-omni
-  previous_audited_sha: 0eb47b76d06d563c5d7d59a24865cc92c0dcf08e
+  previous_audited_sha: 6639c82a171c4801895dae658a7feb8a6295f522
   audited_ref: main
-  audited_sha: 6639c82a171c4801895dae658a7feb8a6295f522
+  audited_sha: 780e8d40aa01cddb686472e3e60e5c7e6f117a09
 
 # These fingerprints are generated from sorted registry/deploy inventories.
 # They make the baseline exact without duplicating hundreds of entries here.
@@ -33,6 +33,7 @@ path_owners:
   - .github/
   - docker/
   configuration:
+  - collect_env.py
   - vllm_omni/config/
   - vllm_omni/deploy/
   diffusion:

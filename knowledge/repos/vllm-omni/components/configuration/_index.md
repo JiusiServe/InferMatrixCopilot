@@ -15,7 +15,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
   `tests/diffusion/test_diffusion_config_propagation.py`，以及各公开入口附近的配置测试
 - 部署配置：`vllm_omni/deploy/*.yaml`，以及 `pipeline_registry.py`、
   `endpoint_policy.py`、`server_settings.py`、`yaml_util.py`、`composable_parallel/`
-- 源码校验：以上路径在 `main @ 6639c82a` 验证存在；机器基线见
+- 源码校验：以上路径在 `main @ 780e8d40` 验证存在；机器基线见
   `adapters/vllm_omni/release_baseline.yaml`
 
 ## 什么时候查这里
@@ -42,6 +42,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 | 查询 `Omni()` 初始化参数 | [Omni init args](omni-init-args.md) |
 | 写或修改 deploy YAML | [deploy YAML](deploy-yaml.md) |
 | 核对 pipeline/deploy schema | [pipeline deploy schema](pipeline-deploy-schema.md) |
+| 审查或新增 process 环境变量、stage `env` 和安全诊断输出 | [environment-variable contract](environment-variable-contract.md) |
 | 计算多 stage 显存预算 | [deployment memory budget](deployment-memory-budget.md) |
 | 添加新模型和注册点 | [adding a model](adding-a-model.md) |
 | composable strategy 的 axis、并行拓扑与 load balancing owner | [并行拓扑合同](rules-parallel-topology.md) |
