@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni 文档"
 created: 2026-07-10
-updated: 2026-09-02
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, docs]
-sources: ["PR #5715", "PR #6029", .claude/skills/readme.md, README.md, docs/configuration/README.md, docs/contributing/README.md, docs/getting_started/installation/README.md, docs/getting_started/installation/gpu/cuda.inc.md, docs/getting_started/installation/npu/npu.inc.md]
+sources: ["PR #5715", "PR #6029", "PR #6858", .claude/skills/readme.md, README.md, docs/configuration/README.md, docs/contributing/README.md, docs/getting_started/installation/README.md, docs/getting_started/installation/gpu/cuda.inc.md, docs/getting_started/installation/npu/npu.inc.md]
 ---
 
 # vLLM-Omni 文档
@@ -28,11 +28,10 @@ sources: ["PR #5715", "PR #6029", .claude/skills/readme.md, README.md, docs/conf
 
 ## 发布与安装边界
 
-- stable release 从 0.14 起跟随 upstream vLLM 的偶数 minor cadence；版本兼容按 matching
-  major/minor 判断。`vLLM-Omni 0.26.x` 要求 `vLLM 0.26.x`，稳定 0.26.0 文档固定
-  vLLM `v0.26.0`，configuration 链接也必须指向 0.26 文档，不能拿旧版本示例混用。
-- CUDA 文档的 0.26 base image 是 `vllm/vllm-openai:v0.26.0`；NPU source install 另有
-  平台专属 tuple：vLLM `v0.26.0` + vLLM-Ascend `releases/v0.26.0rc`。Review 明确没有把
-  NPU 更新扩散到 MUSA/quickstart，因此各平台 pin 必须回到自己的安装页核对。
+- stable 0.28 文档将 vLLM-Omni `0.28.x` 与 vLLM `0.28.x` 对齐，configuration/env links 指向
+  v0.28；这只是 release-documentation guidance，不能从 README highlights 推出 runtime/model support。
+- NPU A2/A3 installation examples 使用 aligned vLLM-Ascend v0.28.0 images；latest-main 安装仍在该
+  aligned container 内进行。CUDA nightly `nightly` 是 rolling tag，`nightly-<commit>` 为 reproducible
+  commit tag，文档称只保留 newest 14。各 tag/image 的 live availability 仍须发布时核验。^[PR #6858]
 - README 将 full-duplex realtime serving 标为 experimental；公开说明、验收和支持承诺
   不能把它写成 stable feature。
