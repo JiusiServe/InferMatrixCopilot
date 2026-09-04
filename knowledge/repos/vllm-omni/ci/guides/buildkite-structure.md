@@ -1,10 +1,10 @@
 ---
 title: "Buildkite 管线结构"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-09-05
 type: guide
 tags: [vllm-omni, ci]
-sources: [".buildkite/cuda/pipeline.yml", ".buildkite/cuda/rebase-pipeline.yml", "vllm-omni-rebase-agent@122a9468:agent/config.py", "vllm-omni-rebase-agent@122a9468:config.sh"]
+sources: ["PR #6890", ".buildkite/cuda/pipeline.yml", ".buildkite/cuda/rebase-pipeline.yml", .buildkite/common/ci_mirror_hardwares.yml, .buildkite/cuda/test-ready.yml, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, "vllm-omni-rebase-agent@122a9468:agent/config.py", "vllm-omni-rebase-agent@122a9468:config.sh"]
 ---
 
 # Buildkite 管线结构
@@ -33,18 +33,18 @@ rebase-agent 配置快照（@122a9468），**属运营观测、可能漂移**，
   归入 `tests/e2e/features/<feature>/`；新增 component 测试放在对应
   `tests/{component}/`，不创建平行的旧顶层目录。
 - `cuda/test-ready.yml` 的 CPU fast lanes 仍按 `tests/diffusion`、
-  `tests/model_executor`、`tests/entrypoints` 和 `tests/engine` 分组；feature lane
-  使用 `tests/e2e/features/custom_pipeline/` 与 `tests/e2e/features/fullduplex/`，跑在
-  `gpu_1_queue`、CI docker 镜像内、`HF_HOME=/fsx/hf_cache`。
+  `tests/model_executor`、`tests/entrypoints` 和 `tests/engine` 分组；L4 GPU jobs 已按
+  `cards_N` 投影到 `l4_1..4` Kubernetes presets，而不是旧 `gpu_1_queue`/`gpu_4_queue` Docker lanes。
+  精确资源、retry 与 ready/nightly/weekly shard 合同见 [OMNI-CI-1e](../rules-l4-k8s.md)。
 
 ## 运营事实（rebase-agent 观测，@122a9468）
 
 - Buildkite org：`vllm`。管线：`vllm-omni-release`（CI）、`vllm-omni-rebase`
   （nightly 与 main CI）；rebase 分支 `dev/vllm-align`，wheel 变体 `cu130`，
   上次 rebase 的 vLLM 提交 pin `1acd67a795ebccdf9b9db7697ae9082058301657`。^[CFG-buildkite]
-- 队列 →（最少卡数, 硬件约束）映射：`gpu_1_queue` →（1, any）——实际为 1×L4 机器；
-  `gpu_4_queue` →（4, any）——实际为 4×L4；`mithril-h100-pool` →（N, h100）——
-  H100/H800（`can_run_ci_test` 把 H800 视同 H100）。^[CFG-queue-map]
+- 旧 rebase-agent 快照中的 `gpu_1_queue`/`gpu_4_queue` 是历史运营映射，不能描述当前仓库 L4
+  job；当前 repo-side `l4_1..4` 使用 `l4-k8s` 和 `vllm.ci/gpu-pool=l4x4`。H100/H800 的
+  `mithril-h100-pool` 仍是外部运营观测，使用前必须复核。^[CFG-queue-map] ^[PR #6890]
 
 ## 相关
 
