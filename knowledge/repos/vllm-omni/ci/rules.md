@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", "PR #6468", .buildkite/cuda/test-nightly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/runtime.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
+sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6311", "PR #6339", "PR #6343", "PR #6468", .buildkite/common/scripts/run_cov_split.sh, .buildkite/common/scripts/upload_pipeline.py, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/runtime.py, tests/buildkite/test_upload_pipeline.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
 confidence: high
 ---
 
@@ -18,6 +18,7 @@ confidence: high
 |---|---|---|
 | 新模型、nightly、CUDA/NPU、硬件 marker、镜像升级 | `OMNI-CI-1a` | `.buildkite/**` → `pyproject.toml` markers → 目标 e2e/accuracy test |
 | regression/guard、route census、middleware、mutation test | `OMNI-CI-1b` | 公开 app/handler → guard test；先证明旧实现会失败 |
+| `NIGHTLY`/`WEEKLY`/`NON_CRITICAL`、L1/L4/L5、coverage、scheduled bootstrap | `OMNI-CI-1c` | `upload_pipeline.py` → bootstrap YAML → ready/merge/nightly/weekly YAML → coverage helper |
 | pre-commit、SPDX、shellcheck、stability marker | `OMNI-CI-2a` | `.pre-commit-config.yaml`、`.buildkite/**`、`tools/**` |
 | xdist、共享 worker、下载 fixture、进程池 | `OMNI-CI-2b` | `tests/conftest.py`、`tests/helpers/**`、`tests/model_tests/**` |
 | 重模型 cold start、共享 engine/server fixture、sleep/wake | `OMNI-CI-2c` | `tests/entrypoints/test_omni_sleep_mode.py`、OmniServer fixture scope/lock |
@@ -60,6 +61,29 @@ collection 意图；没有实际 runtime 结果时，不能证明目标硬件行
   route census 覆盖应用实际暴露的 HEAD/OPTIONS 和依赖 state key。异常路径分别用 CPU mock
   证明 route propagation，并用 live assembled app 触发真实 backend condition、核对结构化
   status/body 与失败后的 state。 ^[PR #3422] ^[PR #5074] ^[PR #5670] ^[PR #5713] ^[PR #6202]
+
+## OMNI-CI-1c — scheduled lane 与 coverage owner 必须按完整 gate 矩阵验证
+
+- 触发：修改 Buildkite bootstrap 的 branch/env/PR-label 条件、L1/L4/L5 workload 归属、
+  `--e2e` 上传、coverage helper，或 docs/skip-mark-only 的 scheduled escape hatch。
+- 强制：`main + NIGHTLY=1` 只拥有 L4 nightly；`main + WEEKLY=1` 上传 L5 weekly，且为
+  CUDA ready/merge 加 `--e2e` 跑完整 L2/L3 E2E 与 per-mode coverage；
+  `main + NON_CRITICAL=1` 只上传 weekly 的 non-critical E2E group。普通 main merge 与
+  非 main PR labels 必须继续走各自 gate，NPU scheduled nightly 不隐式上传 ready。
+  docs-only/skip-mark-only diff 可以跳过默认 CI，但不能吞掉这些 main scheduled lane。
+- coverage 所有权：CUDA/AMD ready/merge 的 L1 pytest 不附带 `--cov`；weekly CPU job 对
+  `tests/ -m 'core_model and cpu'` 生成合并报告。`run_cov_split.sh` 只在
+  `WEEKLY=1 && BUILDKITE_BRANCH=main` 拆分 offline/online coverage 与 artifact；其他调用
+  必须保持一次 combined pytest、无 coverage。为 whole-tree collection 移动测试或延迟导入
+  example 时，仍须保持原 marker 与测试语义。
+- 禁止：把 `nightly-test` label 当 weekly CPU coverage gate；让 `NIGHTLY=1` 顺带占用
+  L2/L3；用 pipeline 已上传推断嵌套 group 一定执行；通过 `pytest --collect-only | grep ...`
+  枚举文件却不传播 collection 失败或不检查结果非空。PR #6311 合并时 weekly TTS 循环仍有
+  这个 fail-green 缺口，不能把该 lane 的绿色结果当作完整 TTS collection 证据。
+- 验收：对 docs-only、CI-level-only、普通 main、三种 schedule env、CUDA/NPU 与每个 PR label
+  逐项渲染 bootstrap，并断言 child upload、`--e2e` 和 group-level `if`；coverage helper 分别
+  验证 weekly-main 拆分上传与其他环境 combined/no-cov。任何动态 collection 都要让 import
+  error、零 selection 和单文件失败使 job 红。^[PR #6311]
 
 ## OMNI-CI-2a — CI 工具、schema 和 hook 是可复现供应链
 

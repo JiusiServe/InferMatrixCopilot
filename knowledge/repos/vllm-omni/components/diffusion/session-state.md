@@ -1,10 +1,10 @@
 ---
 title: "World-model session state"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: architecture
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4657", docs/features/session_state_manager.md, vllm_omni/experimental/world_models/session_state/, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, tests/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py]
+sources: ["PR #4657", docs/features/session_state_manager.md, vllm_omni/experimental/world_models/session_state/, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, tests/diffusion/models/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py]
 confidence: high
 ---
 

@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107", "PR #5614", "PR #6325"]
+sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/diffusion/models/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107", "PR #5614", "PR #6325"]
 confidence: high
 ---
 
@@ -124,4 +124,3 @@ confidence: high
 - 强制：Transfer 必须根据控制输入和选定 resolution 从 `VIDEO_RES_SIZE_INFO` 选择 canonical `(height, width, aspect_ratio)` bucket；原始请求尺寸先保存到 `COSMOS3_TRANSFER_REQUESTED_SIZE_KEY`，仅用于冲突告警，不能改变控制输入选出的几何。Transfer JSON prompt、以及 I2V/V2V 生成 canvas 的 aspect ratio 元数据必须使用 canonical ratio；若请求或 JSON prompt 的 ratio 与 canvas 冲突，所有 rank 都重写元数据，只有 rank 0 输出 warning。非 canonical canvas 必须映射到最近的受支持 ratio，而不是使用 gcd 形成新标签。
 - 禁止：把 Transfer 的任意 `size=HxW` 当作最终几何或宣称其会被采用；保留控制输入已覆盖的 stale `aspect_ratio`；将元数据重写也放在 `_is_rank_zero()` 条件内导致 rank 间 token ids 不一致；用非 canonical 的精确 gcd ratio 触发无意义的冲突告警。
 - 验收：覆盖 Transfer 请求尺寸与控制 bucket 不一致、请求/JSON ratio 冲突、rank 0 与非 rank 0 的 warning/rewrite 行为，以及 `1104x816`、`832x468` 等近似 canvas 映射到 `4,3`、`16,9` 的回归；JSON prompt 解析后必须逐 rank 得到相同 canonical `aspect_ratio`。^[PR #6325]
-
