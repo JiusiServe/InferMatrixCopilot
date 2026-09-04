@@ -1,10 +1,10 @@
 ---
 title: "PersonaPlex 规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #4771", vllm_omni/experimental/fullduplex/personaplex/DESIGN.md, vllm_omni/model_executor/stage_input_processors/personaplex.py, tests/e2e/features/fullduplex/]
+sources: ["PR #4771", "PR #6318", vllm_omni/experimental/fullduplex/personaplex/DESIGN.md, vllm_omni/experimental/fullduplex/personaplex/serving_adapter.py, vllm_omni/model_executor/stage_input_processors/personaplex.py, tests/e2e/features/fullduplex/, tests/entrypoints/openai_api/test_duplex_handler.py]
 confidence: high
 ---
 
@@ -34,6 +34,17 @@ confidence: high
   释放 slot。
 - 验收：两 session 交错产生独立非空输出，第三个在上限处拒绝；关闭一条不改变另一条，
   replacement 用不同 persona 且无 state leak；异常、timeout、abort 路径无遗留。^[PR #4771]
+
+## PPLEX-1c — persona 与 voice 在 session 创建后不可变
+
+- 触发：PersonaPlex `session.update` 修改 `instructions` 或 `voice`。
+- 强制：runtime adapter 对 changed persona/voice 分别返回 `persona_update_unsupported`/
+  `voice_update_unsupported`；相同值可保留。PersonaPlex 还必须拒绝 MiniCPM-o 专属的
+  `minicpmo45_native_duplex` client flag，不能让它改变 append path 或绕过 adapter。
+- 禁止：ACK 变更却沿用旧 `personaplex_prefill_slots`；让 MiniCPM-o 的 `ref_audio` 检查抢先产生
+  错误码；在未原子重建 persona/voice 派生 reservation 前开放更新。
+- 验收：覆盖不同长度 persona、changed/unchanged voice 和 MiniCPM-o opt-out flag，断言命中
+  PersonaPlex 专属 typed error，且并发 session、容量、reuse 与音频输出不回归。^[PR #6318]
 
 ## PPLEX-2a — standalone 单会话 lease 必须覆盖不可取消的线程调用
 

@@ -4,11 +4,30 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #6346", "PR #6458", "PR #6619", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, tests/config/test_config_factory.py, tests/entrypoints/openai_api/test_duplex_handler.py]
+sources: ["PR #6318", "PR #6346", "PR #6458", "PR #6619", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/experimental/fullduplex/minicpmo45/session.py, vllm_omni/experimental/fullduplex/openai/runtime_adapter.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, tests/config/test_config_factory.py, tests/entrypoints/openai_api/test_duplex_handler.py]
 confidence: high
 ---
 
 # MiniCPM-o 4.5 native duplex 规则
+
+## MCPMO-4b — native duplex session update 必须如实拒绝不可重建的上下文
+
+- 触发：运行中更新 MiniCPM-o native duplex 的 `instructions`/native-mode。
+- 强制：MiniCPM-o 的 changed `instructions` 由 runtime adapter 返回
+  `instructions_update_unsupported`，不能 ACK 成 `session.updated`；serving 层也在 native context
+  已锁时拒绝 changed instructions。`native_context_locked` 仅在真实 native append 成功后设置，
+  buffered、deferred 或失败 append 不锁。若创建时已给出 `minicpmo45_native_duplex`，后续改变该值
+  返回 `native_duplex_mode_update_unsupported`。共享 helper 保持“值改变即错误”的 adapter 边界一致；
+  PersonaPlex 的对应 persona/voice 合同见 [PPLEX-1c](../personaplex/rules.md#pplex-1c-persona-与-voice-在-session-创建后不可变)。
+- 若以后改为允许任何会影响 `prefill_slots` 或 first-append context-token reservation 的更新，必须先
+  重算并验证派生 reservation，再 ACK 并原子提交；资源不足时不得留下部分 mutation。这是现有拒绝
+  行为所保留的安全边界，不是本提交新增的可变配置能力。
+- 禁止：在 Stage0 已用旧 context 初始化后 ACK 变更；buffer/defer/reject append 提前锁定；用 mode
+  flip 绕过锁。
+- 验收：覆盖 post-lock changed/unchanged instructions、短 buffer 后 update 再 commit与 mode flip；
+  拒绝时不发 runtime `session.update` signal，而 commit 仍可 flush 已缓冲音频。重建
+  first-append token/prefill reservation 后允许变更是 PR body
+  提到的后续 GPU-validated 工作，非本提交已实现语义。 ^[PR #6318]
 
 ## MCPMO-4c — native duplex Talker 必须按 generate_chunk 预算终止
 

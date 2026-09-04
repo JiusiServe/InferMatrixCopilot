@@ -26,7 +26,7 @@ confidence: high
 | batch、`runtime_info`、stage handoff | MCPMO-3a/3b | `stage_input_processors/minicpmo_4_5_omni.py` → `minicpmo_4_5_omni.py::MiniCPMO45OmniForConditionalGeneration` → TTS/code2wav |
 | Talker codec sampling、repetition penalty、request RNG/compaction | MCPMO-3c | `minicpmo_4_5_omni_tts.py::{make_omni_output,_sample_audio_codes,_apply_batched_repetition_penalty}` → `test_talker_batching.py` |
 | native duplex、Stage0 resume、LISTEN/SPEAK、server VAD | MCPMO-4a | `experimental/fullduplex/{minicpmo45,openai}/` → stage input processor |
-| instructions/persona/voice/mode update、prefill slots、context lock | MCPMO-4b | `experimental/fullduplex/minicpmo45/session.py` → runtime adapter/session runner |
+| instructions/native-mode update、first-append reservation、context lock | [`MCPMO-4b`](rules-duplex.md#mcpmo-4b-native-duplex-session-update-必须如实拒绝不可重建的上下文) | `experimental/fullduplex/minicpmo45/{adapter,session}.py` → runtime adapter/session runner |
 | duplex Talker chunk、runtime `min_tokens`、chat sampling isolation | [`MCPMO-4c`](rules-duplex.md#mcpmo-4c-native-duplex-talker-必须按-generate_chunk-预算终止) | `experimental/fullduplex/minicpmo45/adapter.py` → stage 1 sampling → Talker `generate_chunk` |
 | shipping YAML、duplex/chat 共服、session capacity、async scheduler | [`MCPMO-4e`](rules-duplex.md#mcpmo-4e-shipping-profile-必须共服-chat-与-native-duplex) | `deploy/minicpmo_4_5*.yaml` → config merge → realtime/chat entrypoints |
 | Daily-Omni/Seed-TTS accuracy、simplex/duplex perf、TTFT/TTFP/RTF | MCPMO-5a | `tests/e2e/accuracy/minicpmo_4_5/`、`tests/dfx/perf/tests/test_minicpmo_4_5*.json` → `run_benchmark.py` |
@@ -240,16 +240,6 @@ confidence: high
   terminal、fence 后无 stale delta、保留打断语句且后续响应成功。response-required fixture 若要求
   每轮 SPEAK，应重放已验证的完整 active-speech window；任意较短 mid-utterance slice 合法返回
   LISTEN，不能把它当模型失败或修改生产决策阈值。 ^[PR #6056] ^[PR #6154] ^[PR #6170]
-
-## MCPMO-4b — session update 与派生 reservation 原子提交
-
-- 触发：运行中更新 instructions、persona、voice、native mode 或影响 prefill slot 的字段。
-- 强制：先重算并验证 `prefill_slots`/first-append context tokens 等派生状态，再 ACK 并原子提交；
-  `native_context_locked` 只在真实 append 成功后设置。route-defining native mode 在 session 内不可变。
-- 禁止：buffered/deferred/rejected append 提前锁定；配置已变而 reservation 保持旧值；用
-  true→false 绕过 native context lock。
-- 验收：成功更新同时改变派生状态；资源不足时无部分 mutation；buffer/defer/reject 均不锁，
-  append 成功才锁，mode flip 明确拒绝。 ^[PR #6318]
 
 ## MCPMO-4d — async chunk 快照替换必须清理旧音频
 
