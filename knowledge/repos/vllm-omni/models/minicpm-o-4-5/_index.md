@@ -49,7 +49,8 @@ Daily-Omni、Seed-TTS simplex/realtime duplex 已进入 accuracy/perf harness；
 Online serving CI 的 core suite 固定 async chunk，expansion 分开覆盖 sync/async，native duplex
 fixture 不再覆盖 eager/KV cap 并固定 active-speech turn window；验证证据边界见 MCPMO-5b。
 
-描述直达源码与模型专有门禁见 [rules](rules.md#direct-代码快速入口)；新模型语义验证见
+描述直达源码与模型专有门禁见 [rules](rules.md#direct-代码快速入口)；并发 duplex 的 ragged
+Code2Wav state、batch cap 与 NPU residual limits 见 [Code2Wav 并发批处理规则](rules-code2wav-batching.md)。新模型语义验证见
 [model validation](../../review/guides/model-validation.md)。
 
 ## 什么时候查这里

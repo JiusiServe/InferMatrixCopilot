@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6033", "PR #6360", "PR #6406"]
+sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406"]
 confidence: high
 ---
 
@@ -69,6 +69,13 @@ confidence: high
 - 强制：只有 producer 显式设置 `replace_runtime_additional_information=True` 才全量替换；Code2Wav 的空 replacement 必须同时带 `is_segment_finished=True` 以标记就绪；替换时删除旧 `codes.audio`，但保留当前 snapshot 的 `codes.ref` 等 sibling 字段。
 - 禁止：把未标记的 generation/diffusion payload 改成替换语义；把 control-only boundary 写成未就绪的空更新；跨 segment merge/replay 旧 terminal audio。
 - 验收：覆盖标记/未标记、audio+ref、空 replacement 和重复 terminal；断言新 prompt、finished/ready 状态正确，旧 audio 不会进入下一次 Code2Wav。 ^[PR #6406]
+
+## DIST-1g — 异步 processor 任务必须在入队时冻结边界状态
+
+- 触发：`OmniChunkTransferAdapter.save_async` 向 custom next-stage processor 入队，且 producer request 会在 worker 发送前继续被 streaming update 原地修改。
+- 强制：只为 custom processor shallow-copy request，并递归复制其可变容器输入（additional information、prompt/token lists）；tensor leaves 保持共享。每个 queued segment boundary 在入队时移除 sender dedup watermark，使下一个 segment 能从零建立自己的 watermark；后台发送旧 task 不得清除新 segment 的 watermark。
+- 禁止：给无 hook 的直通路径增加 request snapshot/copy；让 queued task 读取后来 mutation 的 token、metadata 或 output history；在后台 terminal cleanup 无条件删除可能已属于下一 segment 的 watermark。
+- 验收：old/new segment 在 background flush 前交错时，新 watermark 保持；连续入队后各 processor 观察各自 admission-time request snapshot；无 custom processor 时 task 仍引用原 request。^[PR #6021]
 
 ## DIST-2a — diffusion EP group 必须满足运行中 MoE backend 的 communicator 合同
 

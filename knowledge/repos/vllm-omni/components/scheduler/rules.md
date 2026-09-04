@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6033", "PR #6360", "PR #6406"]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6360", "PR #6406"]
 ---
 
 # Scheduler 规则
@@ -285,3 +285,9 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 - 禁止：只更新 prompt 而继承旧 cache/watermark；把同一 in-flight frame 在更新和 replacement 路径重复计入 stale；绕过 scheduler admission 直接恢复运行。
 - 验收：覆盖 running replacement、ready async replacement 的重复 reset 和正常重新调度；断言 KV/encoder 释放各一次、watermark 清零、stale counter 恰好可排空且首个新 segment frame 不被丢弃。 ^[PR #6406]
 
+## SCHED-6e — 流式 segment 边界必须在 request mutation 前冻结发送 watermark
+
+- 触发：`OmniARScheduler.update_from_output` 停止 resumable async-chunk request，且同一处理周期可能由 streaming update 替换或重置该 mutable `Request`。
+- 强制：在 `_handle_stopped_request` 及任何会重置 computed-token 状态的 transition 前，从 chunk adapter 取得 confirmed computed-token watermark；将该冻结值显式传给 `save_async`。后续 segment 只能建立自己的 watermark，不能让旧边界任务读取已重置 request。
+- 禁止：在 request replacement 后重新计算旧 segment 的 send watermark；以当前 `num_computed_tokens` 推断已确认旧边界；把模型专用 Code2Wav batching/wait policy 塞进通用 generation scheduler。
+- 验收：模拟 stop handler 将同一 request 重置为新 segment，断言 queued old boundary 使用 transition 前的 confirmed token 数；并验证 generation scheduler 没有新增 MiniCPM/Code2Wav-specific coalescing state。^[PR #6021]

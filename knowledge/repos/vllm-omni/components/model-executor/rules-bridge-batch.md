@@ -160,3 +160,9 @@ Direct 代码快速入口；loader 与 checkpoint 合同留在该页的 `EXEC-2x
 - 禁止：让共享 runner 默认改用全量替换；把旧 terminal payload 合并回新 snapshot；只修 scheduled-new 而遗漏 cached admission；把 runner bookkeeping 当作模型 payload。
 - 验收：覆盖 new/cached replacement、未标记增量 merge、request mirror 和 sibling request 隔离，并确认 NPU 继承路径使用同一替换实现。 ^[PR #6406]
 
+## EXEC-1q — ragged stateful batch 必须维持输入行和 request-owned cache 的一一对应
+
+- 触发：stateful generation/codec consumer 放宽 batch compatibility key，令同一 batch 可含不同当前 chunk 长度或 final flag。
+- 强制：保留 input-row 顺序，按 row 维护下一状态；短行可在一次 masked/padded compute 中执行，超出既有 encoder window 的行必须回退到已有的 safe sliced path。任何缺失 audio/state row 都 fail closed，不能 filter 后压缩结果；平台 fast path 在不支持 ragged mask/valid-length 时必须回退。
+- 禁止：按 batch 位置共享或错配 session cache；让 ragged path 绕过 RelPos/encode slicing；用过滤 `None` 的方式掩盖 hole，或把模型特有的 coalescing wait 写进 generic scheduler。
+- 验收：混合长度、final flag、长行和正常行，逐 request 对照 exact path 的 audio/cache；注入中间缺行应报错而非重排。模型专有的 Code2Wav cache/dtype contract 见 MiniCPM-o 4.5 rules。^[PR #6021]
