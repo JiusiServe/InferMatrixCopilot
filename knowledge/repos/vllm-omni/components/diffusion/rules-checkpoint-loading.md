@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6162", "PR #6234", "PR #6279", "PR #6445", "PR #6486", "PR #6591", "PR #6651", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, vllm_omni/quantization/svdquant_config.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/offloader/, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #6722", "PR #4061"]
+sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6162", "PR #6234", "PR #6279", "PR #6445", "PR #6486", "PR #6591", "PR #6651", "PR #6573", vllm_omni/diffusion/model_loader/, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/quantization/, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, vllm_omni/quantization/svdquant_config.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/offloader/, tests/diffusion/model_loader/test_diffusers_loader.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #6722", "PR #4061"]
 confidence: high
 ---
 
@@ -147,12 +147,12 @@ confidence: high
 
 相关执行流见 [Diffusion architecture](architecture.md)；component lifecycle 见 [component lifecycle 规则](rules-component-lifecycle.md)。
 
-## DIFF-2t — DLO AllGather 只允许已验证的 per-tensor online FP8 布局
+## DIFF-2t — DLO AllGather 只允许已验证的 online quant 布局
 
-- 触发：修改 DLO+AllGather 与在线量化的兼容门禁、普通 loader fallback，或 FP8 权重/scale 的分片重建。
-- 强制：仅允许 `Fp8PerTensorOnlineLinearMethod` 进入 DLO+AllGather；由于 direct checkpoint mmap 不能生成运行时量化布局，必须先由普通 loader 完成 FP8 权重和 scale，再交给 DLO 按 dtype 分片，并按记录的 shape、stride 重建转置 Cutlass 权重。每个 rank 启动时可能暂存完整 FP8 模型，运行时才保留 DLO shard。
+- 触发：修改 DLO+AllGather 与在线量化的兼容门禁、普通 loader fallback，或 FP8/INT8/MXFP8 权重与 scale 的分片重建。
+- 强制：真实 DLO weight collective（effective group size > 1）只允许 `Fp8PerTensorOnlineLinearMethod`、`Int8OnlineLinearMethod`、`NPUInt8OnlineLinearMethod`，以及模块可导入时的 `NPUMxfp8OnlineLinearMethod`/`VllmMxfp8OnlineLinearMethod`；必须先由普通 loader 完成 runtime weight/scale finalization，再按物理 storage 顺序分 dtype 打包，并按记录的 shape、stride 重建。effective group size=1 不执行 collective，因此不应用该 allowlist；direct checkpoint mmap/HWR 不生成这些 runtime layout，其他 online method 在真实 AllGather 下全部 fail closed。
 - 禁止：把该 allowlist 扩展到未经验证的在线量化方法；绕过普通 loader 直接 mmap 在线量化权重；丢失非连续权重的物理 stride；将 transient 完整模型 host memory 峰值描述为运行时常驻开销。此前 DIFF-2s 对所有 runtime-created FP8 的 AllGather 禁止由本规则收窄覆盖。
-- 验收：loader 测试必须证明 allowlist 分支确实执行、普通 loader 在 DLO 前完成权重与 scale 处理，并对未验证 method fail fast；DLO 测试必须验证 FP8 weight/scale 的 dtype、值、shape 和转置 stride 重建。另覆盖 no-AllGather 路径及至少一次真实多 rank AllGather smoke；声明质量或性能 parity 仍需固定模型、硬件和 exact workload 的独立证据。^[PR #6279]
+- 验收：loader 测试必须证明 allowlist 分支确实执行、普通 loader 在 DLO 前完成权重与 scale 处理、group=1 跳过门禁，并对未验证 method fail fast；DLO 测试逐类验证 weight/scale 的 dtype、值、shape 与 contiguous/转置 stride 重建。PR #6573 只有 mock collective/unit layout 覆盖，没有真实 multi-rank online-quant DLO E2E；补齐该 smoke 以及固定模型、硬件、checkpoint、workload 的输出质量/性能对照前，不得升级为端到端 parity 声明。PR 中 B300 H3 默认测试也未启用 DLO/online quant，不能充当该组合证据。^[PR #6279] ^[PR #6573]
 
 ## DIFF-2u — diffusion 并行状态必须保持单一拓扑所有权并原子清理
 
