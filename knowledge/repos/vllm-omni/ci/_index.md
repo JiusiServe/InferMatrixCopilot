@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, ci]
-sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6170", "PR #6303", "PR #6390", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/run_minicpmo_realtime_duplex_server_vad.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349", .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, tests/helpers/clean.py, "PR #6704", "PR #5464", "PR #6730", "PR #6727", tests/diffusion/quantization/test_quantization_quality.py, "PR #5831", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743"]
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6170", "PR #6303", "PR #6390", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/run_minicpmo_realtime_duplex_server_vad.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349", .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, tests/helpers/clean.py, "PR #6704", "PR #5464", "PR #6730", "PR #6727", tests/diffusion/quantization/test_quantization_quality.py, "PR #5831", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, "PR #6742"]
 ---
 
 # vLLM-Omni CI
@@ -32,6 +32,18 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
 - The PR reports one H100 run (LPIPS 0.0418, PSNR 33.0941 dB, MAE 0.017016) for that exact case.
   It supports this gate's threshold, not a quantization implementation change, graph-mode parity,
   other LTX variants, or a broader quality claim. ^[PR #5831]
+
+## MiniMax-H3 two-GPU FP8 quality-test initialization boundary
+
+- The full-model CUDA quality test shares one `common_kwargs` mapping between its fused BF16
+  baseline and transformer-FP8 candidate: `enforce_eager=True`, `tensor_parallel_size=2`,
+  `text_encoder_tp_size=2`, and VAE tiling. On the exact two-card H100-80GB scope, encoder TP
+  is required for the fused BF16 baseline to initialize; without it, rank 0 retains the full
+  colocated text encoder and can OOM before the FP8 comparison begins.
+- This restores a CI test topology/resource setting only. The author reported one local two-B300
+  run at the stated H100-marked selection, but no completed H100-80GB Buildkite result is
+  recorded here; therefore it does not establish an H100 pass, a result on other hardware, a
+  broader memory bound, or a runtime/quantization implementation change. ^[PR #6742 / issue #6735]
 
 ## MiniCPM native-duplex server-VAD coverage
 
