@@ -14,6 +14,8 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
 - 处理 vLLM-Omni 的 L2/L4、模型测试配置或 CI 特有问题。
 - 处理 `@hardware_test`/`hardware_marks`、SKU 与 `cards_N` 自动 marker 或按卡数切分时，先看
   [测试分级与 markers](guides/test-tiers.md)，再按 OMNI-CI-1a 审核 lane 的真实收集与执行。
+- Qwen3-TTS Base/CustomVoice 的 ready/merge oracle 与 source dependency 见
+  [TTS CI 规则](rules-tts.md)。
 
 ## MiniCPM-o 4.5 full-payload regression coverage
 

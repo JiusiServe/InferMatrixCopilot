@@ -19,6 +19,7 @@ confidence: high
 | 新模型、nightly、CUDA/NPU、硬件 marker、镜像升级 | `OMNI-CI-1a` | `.buildkite/**` → `pyproject.toml` markers → 目标 e2e/accuracy test |
 | regression/guard、route census、middleware、mutation test | `OMNI-CI-1b` | 公开 app/handler → guard test；先证明旧实现会失败 |
 | `NIGHTLY`/`WEEKLY`/`NON_CRITICAL`、L1/L4/L5、coverage、scheduled bootstrap | `OMNI-CI-1c` | `upload_pipeline.py` → bootstrap YAML → ready/merge/nightly/weekly YAML → coverage helper |
+| Qwen3-TTS Base/CustomVoice ready/merge collection 或 source dependencies | [OMNI-CI-1d](rules-tts.md#omni-ci-1d-qwen3-tts-base-的-dummy-ready-oracle-与-real-weight-merge-coverage-必须分离) | CUDA/AMD ready+merge YAML → Qwen3-TTS e2e markers |
 | pre-commit、SPDX、shellcheck、stability marker | `OMNI-CI-2a` | `.pre-commit-config.yaml`、`.buildkite/**`、`tools/**` |
 | xdist、共享 worker、helper 拆分/启动回滚、下载 fixture、进程池 | `OMNI-CI-2b` | `tests/conftest.py`、`tests/helpers/{client,clean,runtime,stage_config}.py`、`tests/model_tests/**` |
 | 重模型 cold start、共享 engine/server fixture、sleep/wake | `OMNI-CI-2c` | `tests/entrypoints/test_omni_sleep_mode.py`、OmniServer fixture scope/lock |

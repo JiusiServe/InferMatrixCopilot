@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, serving, qwen-omni]
-sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", "PR #6523", "PR #6728", vllm_omni/deploy/aura_omni.yaml, vllm_omni/deploy/qwen3_tts.yaml, vllm_omni/deploy/qwen3_tts_high_concurrency.yaml, vllm_omni/model_executor/models/aura_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_speech_stream.py, vllm_omni/entrypoints/openai/speech_usage.py, vllm_omni/entrypoints/openai/tts_adapters/qwen3_tts.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, tests/e2e/online_serving/test_qwen3_tts_base_expansion.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/entrypoints/openai_api/test_serving_speech_stream.py, tests/entrypoints/openai_api/test_tts_adapter.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_code2wav.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_incremental_decode.py, tests/model_executor/stage_input_processors/test_qwen3_tts_async_chunk.py, "PR #5048"]
+sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", "PR #6523", "PR #6728", "PR #6861", vllm_omni/deploy/aura_omni.yaml, vllm_omni/deploy/qwen3_tts.yaml, vllm_omni/deploy/qwen3_tts_high_concurrency.yaml, vllm_omni/model_executor/models/aura_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_speech_stream.py, vllm_omni/entrypoints/openai/speech_usage.py, vllm_omni/entrypoints/openai/tts_adapters/qwen3_tts.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, tests/e2e/online_serving/test_qwen3_tts_base.py, tests/e2e/online_serving/test_qwen3_tts_base_expansion.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/entrypoints/openai_api/test_serving_speech_stream.py, tests/entrypoints/openai_api/test_tts_adapter.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_code2wav.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_incremental_decode.py, tests/model_executor/stage_input_processors/test_qwen3_tts_async_chunk.py, "PR #5048"]
 confidence: high
 ---
 
@@ -198,3 +198,7 @@ Qwen 家族入口见 [Qwen-Omni](../qwen-omni/_index.md)。
   EOS/非 length 正常通过、length+recorded-cap 拒绝、非流式一次 retry 及显式 seed/max 不 retry；
   raw/SSE/WebSocket 均携带 terminal metrics，并覆盖 partial/no-partial error。目标回归证明控制流和
   丢弃语义，不证明任意 prompt 必达 EOS、音频质量或最佳 cap 比例。^[PR #6728]
+
+  Ready CI 的 dummy-weight Base 即使到 192 tokens 仍可无 EOS 并返回 500，因而不是该 guard 的
+  Ready oracle；此事实不改变 runtime、YAML、EOS 或音质合同，也没有 real-weight merge pass log。
+  ^[PR #6861] ^[issue #6855]
