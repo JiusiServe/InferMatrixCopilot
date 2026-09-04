@@ -1,10 +1,10 @@
 ---
 title: "Serving replica fault-isolation 规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4583", vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py]
+sources: ["PR #4583", "PR #6170", vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py]
 confidence: high
 ---
 
@@ -54,3 +54,8 @@ confidence: high
   计数、comprehension/diffusion metadata 查找和 PD bootstrap metadata 仍读 init-time
   `stage_clients`，动态成员语义需另行收敛。本 pin 没有新增与 readiness 分开的
   liveness endpoint 或部署文档。^[PR #4583]
+
+- duplex inter-stage `process_engine_inputs` 失败同样只能成为目标 request 的结构化 stage error：
+  发送 error 后以 abort/close-duplex-session cleanup 回收该 request；普通非-duplex 路径继续抛出，
+  不能扩大 catch 范围而吞没共享 orchestrator 的编程错误。验收要证明坏 duplex handoff 不终止
+  orchestrator，且同一 engine 的后续 request 仍可完成。^[PR #6170]

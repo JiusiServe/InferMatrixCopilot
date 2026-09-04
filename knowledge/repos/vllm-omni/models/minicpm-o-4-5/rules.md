@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5 规则"
 created: 2026-07-20
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082", "PR #5604", "PR #6274", "PR #6346", "PR #6397", "PR #6406", "PR #6458", "PR #6587", "PR #6619"]
+sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/realtime_input.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/vad.py, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, vllm_omni/model_executor/stage_input_processors/minicpmo_4_5_omni.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082", "PR #5604", "PR #6274", "PR #6346", "PR #6397", "PR #6406", "PR #6458", "PR #6587", "PR #6619"]
 confidence: high
 ---
 
@@ -207,14 +207,24 @@ confidence: high
 
 - 触发：MiniCPM-o native duplex 的连续音频、LISTEN/SPEAK handoff 或 server VAD interruption。
 - 强制：模型说话时仍把音频单元追加到同一可恢复 Stage0，保留 KV/runtime state 和上一
-  terminator；LISTEN 是成功且不需要 Talker hidden state，SPEAK 才转交 Talker。server VAD
-  hard cancellation 必须显式 opt-in，阈值不得落到使 silence branch 不可达的边界。
+  terminator；仅确认的 empty/control-only handoff 可在没有 speech conditioning 时跳过，其他
+  缺 latent/hidden-state 的 speech handoff 仍报错。LISTEN 是成功且不需要 Talker hidden state，
+  SPEAK 才转交 Talker。默认模型拥有的模式固定为 `listen_only`，不会创建/调用 Silero；只有
+  `turn_detection.type=server_vad` 且 `interrupt_response=true` 才选择 `barge_in_on_speech`，
+  并拒绝 `interrupt_response=false` 的第三模式。server VAD hard cancellation 必须显式 opt-in，
+  阈值不得落到使 silence branch 不可达的边界。
 - 禁止：用 server VAD cancellation 冒充 native interruption；每轮重建 Stage0；让 LISTEN 因
-  无 Talker payload 失败。
+  无 Talker payload 失败；将 Qwen3-Omni 的 turn-based server-VAD endpointing/auto-commit
+  合同混同为本 MiniCPM native-barge-in 行为。
 - 验收：native case 完成响应≥2、cancel/truncate=0、listen≥1；opt-in hard interrupt 恰好一次
-  terminal、fence 后无 stale delta、保留打断语句且后续响应成功。response-required fixture 若要求
+  terminal、epoch fence 后无 stale delta，且新 epoch 保留 interrupt PCM/confirming pre-roll、
+  后续响应消费该语句并成功。Realtime `session.update` 先暂存 VAD candidate，只有 matching
+  runtime ACK 才 commit，任何 rejected/failed append/config path 都必须 correlated error 后
+  discard，不能让 unrelated outbound error 提交它或让 reader 卡住。response-required fixture 若要求
   每轮 SPEAK，应重放已验证的完整 active-speech window；任意较短 mid-utterance slice 合法返回
-  LISTEN，不能把它当模型失败或修改生产决策阈值。 ^[PR #6056] ^[PR #6154] ^[PR #6170]
+  LISTEN，不能把它当模型失败或修改生产决策阈值。`threshold=0.15` 的 validator boundary assertion
+  在 merge 时缺失，是后续测试补强，不是本提交已实现的覆盖；#6821 的 playback ACK/history 修复
+  也在本精确提交之外。 ^[PR #6056] ^[PR #6154] ^[PR #6170]
 
 ## MCPMO-4d — async chunk 快照替换必须清理旧音频
 
