@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, ci]
-sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6303", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349"]
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6303", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349", .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, tests/helpers/clean.py, "PR #6704"]
 ---
 
 # vLLM-Omni CI
@@ -94,6 +94,23 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
   CacheDiT/TP2/VAE-patch-parallel=2/tiling case. It uploads result JSON and logs but
   configures no threshold, so it is benchmark-report/artifact collection rather than
   a performance regression gate. ^[PR #6349]
+
+## AMD CI stabilization boundary
+
+- AMD merge lanes may combine READY and MERGE definitions only through the bootstrap's
+  explicit `DEBUG_TEST_YAML=merge,ready` override; the merged YAML shares one build step
+  and preserves each suite as a named group. This is a maintainer debugging control, not
+  a change to the normal branch-based READY-versus-MERGE selection.
+- Long MI300 diffusion shards carry explicit Buildkite timeouts, while a known long-running
+  Qwen3-TTS CustomVoice `async_chunk` Whisper-validation case is an 80-minute,
+  `NonBlocking` quarantined step. It must return to the blocking sharded lane only after
+  the AMD failure is resolved; a passing neighboring shard does not establish that result.
+- ROCm memory assertions sample steady-state inference and report peak usage relative to
+  each run's initial device use, after cache cleanup. They therefore do not count retained
+  compiler/workspace allocations from a preceding topology as model memory, and the ROCm
+  layerwise-offload floor remains a conservative 512 MiB signal rather than a portability
+  or performance claim. Cleanup diagnostics use bounded `rocm-smi` calls because an
+  optional `amd-smi` CPER ioctl can remain uninterruptibly blocked. ^[PR #6704]
 
 ## 目录内容
 
