@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py]
 confidence: high
 ---
 
@@ -248,9 +248,9 @@ confidence: high
 - 禁止：只解析或记录 `runtime.env` 却不应用到本地 launch；把 stage 环境永久污染到父进程；用 runtime env scope 替代 diffusion device scope；将该本地 scope 推广到 remote replica 或 headless worker launcher。
 - 验收：CPU/mock 回归分别覆盖 LLM 和 diffusion launch 看到 stage 值、父环境已有值恢复、原先未设置的 key 在异常后被清理，以及 diffusion launch 同时看到 stage device 值；确认 LLM launch lock 仍覆盖进程创建。^[PR #6214]
 
-### SERV-9a — diffusion stage batch size 必须落到 engine admission capacity
+### SERV-9a — client diffusion batch width 不得覆盖 scheduler admission capacity
 
 - 触发：diffusion stage 初始化或 replica launch 接收客户端 `batch_size`，或修改其 engine config、scheduler capacity 与 stage startup 路径。
-- 强制：`initialize_diffusion_stage` 和 `launch_diffusion_stage_replica` 在 `build_diffusion_config` 之后、创建 diffusion client/proc manager 之前，都必须将 `od_config.max_num_seqs` 设置为请求的 `batch_size`；direct、parallel 和 single-stage 路径必须使用同一 capacity 语义。
-- 禁止：只把 `batch_size` 传给 client 而保留 config 默认值；只修一个 startup 路径；从 `max_num_seqs > 1` 推断具体 pipeline 已支持 request batching，或绕过 `DIFF-6a` 的条件兼容 admission。
-- 验收：分别 mock `initialize_diffusion_stage` 与 `launch_diffusion_stage_replica`，断言构造出的 `od_config.max_num_seqs` 等于客户端 batch size，并回归 single-stage 初始化；随后以 scheduler 和 Wan2.2 pipeline 测试证明该 capacity 只开放物理槽位，兼容 key、请求隔离和输出拆分仍有效。^[PR #5676]
+- 强制：`initialize_diffusion_stage` 和 `launch_diffusion_stage_replica` 只将 `batch_size` 转发给 `StageDiffusionClient`；`build_diffusion_config()` 解析出的 `od_config.max_num_seqs` 必须保持 CLI `--max-num-seqs` 或 stage YAML 的值。两条启动路径和 single-stage 路径都不得把 client `diffusion_batch_size` 映射为 scheduler capacity。
+- 禁止：在 shared init path 写入 `od_config.max_num_seqs = batch_size`，或用 `max(CLI, batch_size)` 合并两个独立旋钮；也不得从 `max_num_seqs > 1` 推断具体 pipeline 自动支持 request batching，兼容 admission 仍受 `DIFF-6a` 约束。
+- 验收：分别 mock `initialize_diffusion_stage` 和 `launch_diffusion_stage_replica`，断言 config 的 `max_num_seqs` 保留 CLI/YAML 的 `1`、`8` 或 `None`，而 client 仍收到 `batch_size`；回归 single-stage 初始化。Wan request-level batching 必须显式设置 `--max-num-seqs N` 或 YAML；Qwen-Image step-execution 的并发 scheduler capacity 不得被默认 `diffusion_batch_size=1` 降为 1。^[PR #5676] ^[PR #6525] ^[Issue #6435]

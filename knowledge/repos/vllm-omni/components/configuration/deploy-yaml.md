@@ -34,6 +34,10 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #5647", vllm_omni/deplo
   （[ci-gotchas](../../ci/guides/ci-gotchas.md) 第 2 条）。
 - KV 记账外分配的模型考虑 `kv_cache_memory_bytes` pin（[CONF-2a](rules.md)）。
 - 争议以展开后最终配置为准（[CONF-3a](rules.md)）。
+- `diffusion_batch_size` 是客户端请求 batch width，不能替代 scheduler 的
+  `max_num_seqs`。需要 Wan2.2 request-level batching 时，在 CLI 显式传
+  `--max-num-seqs N` 或在 stage YAML 设置该字段；`wan2_2_ti2v.yaml` 的默认宽度为 4。
+  不要依赖 stage init 把前者写进后者。^[PR #6525]
 
 ## 代表样例（79 份 YAML 中的三类拓扑）
 
