@@ -1,7 +1,7 @@
 ---
 title: "MiniMax H3"
 created: 2026-08-05
-updated: 2026-09-04
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5720", "PR #5723", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5824", "PR #5829", "PR #5837", "PR #5840", "PR #5850", "PR #5857", "PR #5881", "PR #5885", "PR #5891", "PR #5896", "PR #5914", "PR #5946", "PR #5972", "PR #5978", "PR #5991", "PR #5863", "PR #6476", "PR #6555", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/design/architecture_overview.md, docs/models/supported_models.md, docs/user_guide/quantization/fp8.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/model_executor/models/minimax_h3/, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/platforms/npu/platform.py, vllm_omni/platforms/rocm/platform.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, vllm_omni/entrypoints/openai/video_api_utils.py, "PR #6213"]
@@ -70,6 +70,11 @@ confidence: high
   4D batch layout，再恢复原 shape。MUSA dynamic compile 独立保留 aten RMSNorm graph 并内联
   full-dim NeoX RoPE，静态 rot width 从 config 派生；平台 fallback、共享 blast radius 与有界
   region-only 性能证据见 MMH3-1c/DIFF-1e。
+- H3 VAE decoder 的 exact eager ops 仍由 model owner 管理：只有 SM90/SM100/SM103 allowlist、
+  remote-code structure 和每个 tensor guard 都满足时才安装。仅 decoder Transformer-block
+  Linear 固化为 decode autocast 已使用的 FP16；keyframe encode 与 `proj_out` 等非 block
+  parameter 继续 FP32。compile、spatial-parallel 及任何 platform/shape/dtype/layout/gradient
+  guard 均回原 operation；完整合同见 MMH3-4c。^[PR #6607]
 - Ascend NPU 可选择 RainFusion 稀疏 video tail，并从 BF16 checkpoint 做 online INT8；两者只在
   exact T2VA/Ulysses/no-AllGather DLO 配置有完成证据，几何 fallback、TP width 与组合边界见
   MMH3-1a/1d。
@@ -134,3 +139,6 @@ H3 input matrix/media ingress，以及 text-encoder completeness、online FP8 �
 [media rules](rules-media.md) 与 [MiniMax H3 rules](rules.md#direct-代码快速入口)；checkpoint transform、quantized loader 与
 text-encoder fused-source 完整性正文见 [loading rules](rules-loading.md)；DLO、consumer/H100/ROCm
 部署和硬件证据正文见 [deployment rules](rules-deployment.md)；conditioned VAE 确定性、modular task 选择与 request 级 Cache-DiT/TeaCache/sigma schedule/Turbo LoRA 生命周期见 [缓存与任务生命周期规则](rules-cache-task.md)。
+
+H3 VAE decoder 的 model-local eager dispatch、remote-code eligibility、exactness guards、selective
+FP16 materialization 与 compile/spatial-parallel fallback 见 [VAE eager-ops rules](rules-vae-ops.md)。
