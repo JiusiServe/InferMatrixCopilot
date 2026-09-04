@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #6318", "PR #6346", "PR #6458", "PR #6619", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/experimental/fullduplex/minicpmo45/session.py, vllm_omni/experimental/fullduplex/openai/runtime_adapter.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, tests/config/test_config_factory.py, tests/entrypoints/openai_api/test_duplex_handler.py]
+sources: ["PR #6318", "PR #6346", "PR #6458", "PR #6619", "PR #6678", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/experimental/fullduplex/minicpmo45/session.py, vllm_omni/experimental/fullduplex/openai/runtime_adapter.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, tests/config/test_config_factory.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py]
 confidence: high
 ---
 
@@ -42,3 +42,10 @@ confidence: high
 - 强制：所有 shipping profile 设置 `session_mode=duplex`、`active_stream_window=1`，且 `duplex_session.max_sessions` 与 Stage 0/1 的 `max_num_seqs` 容量一致；replica overlay 从 base 继承这些字段。YAML 保留 chat 的 Stage 1 `min_tokens=50` 与既有 codec 参数，native duplex adapter 仅在该 session 的 runtime config 覆盖 `min_tokens=0`。AR stage 保留默认 async scheduler。
 - 禁止：恢复独立 `minicpmo_4_5_duplex.yaml`；在 replica overlay 重复并漂移 session 配置；为 duplex 全局关闭 async scheduling；或把 runtime-only floor 写回 YAML 而改变 chat TTS。
 - 验收：展开四份 base profile 及三个 replica overlay，断言全部 duplex-enabled、窗口与 session capacity 正确；同一 server 分别验证 `/v1/realtime?duplex=1` 和 chat，前者 Stage 1 看到 `min_tokens=0`、后者仍看到 `50`。删除旧 overlay 是部署文件名迁移，外部显式引用必须同步更新。^[PR #6458] ^[PR #6619]
+
+- admission/expiry E2E probe 必须从实际启动的 deploy YAML 经
+  `load_deploy_config(...).duplex_session.max_sessions` 取得 admission limit，不能保留
+  硬编码容量或在 test helper 重做 YAML merge/default/validation；这样 base-config overlay
+  与未声明 `duplex_session` 时的 server 语义保持一致。CPU 守卫至少覆盖 shipping base 的
+  显式容量、未声明字段的 default，及一个从 base 继承容量的 overlay；live probe 再验证在
+  该 limit 后收到 capacity error。^[PR #6678]
