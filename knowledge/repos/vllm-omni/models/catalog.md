@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 3d035bfa`（2026-08-24）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 072bfc02`（2026-08-24）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -36,7 +36,7 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 | 注册点 | 位置 | 计数 |
 |---|---|---|
 | AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 81 个架构名 / 31 个模型族目录 |
-| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 64 条 pipeline / 41 个模型族目录 |
+| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 65 条 pipeline / 41 个模型族目录 |
 | Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 55 个 key |
 | Deploy YAML | `vllm_omni/deploy/*.yaml` | 84 份 |
 
@@ -46,6 +46,9 @@ processor/extras/recipe/examples/tests，并删除 MammothModa2 Preview/Dev 共�
 architecture、两个 pipeline key、两个 deploy YAML 及其 tokenizer/config/AR/DiT/bridge。
 因此 active owner 与 catalog 不再声明这两个家族；diffusion text-to-audio 的 first-party
 示例只剩 Stable Audio，Audex 的 TTA 仍是独立两阶段 autoregressive 路径。^[PR #6353]
+
+PR #4820 将 `WanDMDPipeline` 注册为 Wan2.2 的同实现入口，因此 diffusion pipeline
+计数回升至 65；它不是新的模型族或新的 `OMNI_PIPELINES` key。^[PR #4820]
 
 ## AR/omni 模型族（31）
 
@@ -88,7 +91,7 @@ step_audio_2_asr、voxcpm2、voxtral_tts、wan2_2_ti2v
 ```bash
 python tools/audit_vllm_omni_release.py \
   --from 39c16d75 \
-  --to 3d035bfa \
+  --to 072bfc02 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

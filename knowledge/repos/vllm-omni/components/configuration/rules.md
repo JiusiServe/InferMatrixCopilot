@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182", "PR #4820"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -229,3 +229,15 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：将 registry 所需的静态 `PipelineConfig` 放入无 runtime 副作用的轻量模块；registry 只导入该模块，runtime pipeline 继续 re-export 同一对象以保持既有导入路径，并用干净子进程验证 registry 解析不加载 runtime。
 - 禁止：让 `pipeline_registry` eager import 模型 runtime、依赖已预加载模块或导入顺序掩盖循环；不得因拓扑模块轻量就改变模型 runtime 的实际加载语义。
 - 验收：隔离进程中导入并解析目标 registry key，断言对应 runtime module 不在 `sys.modules` 且返回的 `PipelineConfig` 身份与字段正确；再验证 runtime 的兼容导入路径仍 re-export 同一拓扑对象。^[PR #6322]
+
+### VOMNI-CFG-2c — backend 专用参数必须有完整 typed reachability
+
+- 触发：为 diffusion attention backend 新增 CLI、环境、deploy 或 structured config 参数。
+- 强制：参数必须在 `StageDeployConfig`、orchestrator/CLI、normalization、`AttentionSpec` 和
+  `backend_kwargs` 间保持同一 canonical 值，并验证从每个公开入口到 backend consumer；只允许
+  相应 backend 接受，且在无法实际稀疏执行的 shape/Top-K 组合显式记录或验证 fallback。
+- 禁止：只把字段加到 schema、只在 CLI 解析，或让 deploy projection 静默丢弃；不得把 backend
+  专用值作为未经类型校验的任意 dict 透传。
+- 验收：覆盖有效非默认值的 CLI、deploy/structured 和 direct attention-config 路径，断言最终
+  `backend_kwargs`；覆盖错误 backend、非正值，以及 Top-K 超过 runtime block count 的回退。
+  `WanDMDPipeline` 一类 checkpoint alias 还必须由 `model_index.json` 自动发现。^[PR #4820]

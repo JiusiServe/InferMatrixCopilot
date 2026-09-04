@@ -1,10 +1,10 @@
 ---
-title: "Wan 2.2（六架构视频家族:T2V/I2V/VACE/S2V/DMD2×2）"
+title: "Wan 2.2（七个 registry 架构名:T2V/I2V/VACE/S2V/DMD2×2/FastVideo DMD）"
 created: 2026-07-21
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #2783", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/models/wan2_2/, vllm_omni/deploy/wan2_2_ti2v.yaml, vllm_omni/diffusion/models/dmd2/mixin.py, tests/diffusion/lora/test_loader.py]
+sources: ["PR #2783", "PR #4820", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/models/wan2_2/, vllm_omni/deploy/wan2_2_ti2v.yaml, vllm_omni/diffusion/models/dmd2/mixin.py, tests/diffusion/lora/test_loader.py]
 ---
 
 # Wan 2.2
@@ -22,7 +22,8 @@ sources: ["PR #2783", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/mo
   `WanVACEPipeline`→`pipeline_wan2_2_vace.Wan22VACEPipeline`;
   `WanS2VPipeline`→`pipeline_wan2_2_s2v.Wan22S2VPipeline`;
   `WanT2VDMD2Pipeline`（同模块于 pipeline_wan2_2）与
-  `WanI2VDMD2Pipeline`（pipeline_wan2_2_i2v）——**六个都有 pre+post
+  `WanI2VDMD2Pipeline`（pipeline_wan2_2_i2v）与 `WanDMDPipeline`（映射到
+  `Wan22Pipeline`）——**七个都有 pre+post
   process 绑定**（DMD2 复用基类函数）。
 - 入口路径：registry `vllm_omni/diffusion/registry.py` 与
   `vllm_omni/config/pipeline_registry.py`;拓扑
@@ -35,7 +36,8 @@ sources: ["PR #2783", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/mo
   （Wan2.1 式 checkpoint）;VACE = 参考图/源视频/掩码条件,单或双专家形态都
   接受;S2V = 单 transformer,支持 diffusers 与原始格式 checkpoint
   （T5→UMT5 转换）;两个 DMD2 = 分别继承 T2V/I2V 行为,换 DMD2 调度并禁
-  CFG。
+  CFG；`WanDMDPipeline` 是 FastVideo checkpoint 的三步 flow path，不与 DMD2 mixin
+  混同。
 - import 期副作用：`__init__.py` 调 `patch_wan_rms_norm()` 把所有已加载
   diffusers 模块里的 `WanRMS_norm` 换成本仓 `RMSNormVAE`——**进程内任何
   diffusers Wan VAE 用户都被影响**（例如
