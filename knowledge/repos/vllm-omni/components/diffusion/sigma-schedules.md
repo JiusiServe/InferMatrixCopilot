@@ -1,10 +1,10 @@
 ---
 title: "Diffusion distilled sigma schedule 规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion, scheduler]
-sources: ["PR #5991", vllm_omni/diffusion/models/dmd2/config.py, vllm_omni/diffusion/models/dmd2/mixin.py, vllm_omni/diffusion/sched/sigma_schedule.py, tests/diffusion/sched/test_dmd2_sigma_schedule.py]
+sources: ["PR #5991", "PR #6714", vllm_omni/diffusion/models/dmd2/config.py, vllm_omni/diffusion/models/dmd2/mixin.py, vllm_omni/diffusion/sched/sigma_schedule.py, tests/diffusion/sched/test_dmd2_sigma_schedule.py]
 confidence: high
 ---
 
@@ -14,7 +14,7 @@ confidence: high
 
 - 触发：新增 distilled/DMD2 checkpoint schedule metadata、变更 sigma shift 或把
   `DMD2SigmaSchedule` 接入新 pipeline。
-- 强制：continuous `base_schedule` 至少两个有限数，严格从 1.0 递减到
+- 强制：continuous `base_schedule` 至少两个有限数，严格从有限 `(0,1]` 首点递减到
   0.0；先拒绝非有限值，再逐对验证相邻位置严格单调。区间数
   `len(boundaries)-1` 才是 request/cache/denoise step count，solver 保留全 boundary list。
 - 强制：`from_metadata()` 的 absent key 与 explicit null 都因 `metadata.get()` 返回

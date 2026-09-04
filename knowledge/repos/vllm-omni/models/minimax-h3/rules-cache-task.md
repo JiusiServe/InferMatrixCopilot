@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", "PR #6666", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/npu/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_native_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py]
+sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", "PR #6666", "PR #6714", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/fasth3.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/npu/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/entrypoints/openai/video_api_utils.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_fasth3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_native_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py, tests/entrypoints/openai_api/test_video_api_utils.py]
 confidence: high
 ---
 
@@ -132,7 +132,8 @@ Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期�
 - 强制：缺少 metadata key 或显式 null 都表示未蒸馏，保持旧
   `num_inference_steps or 50` 的 uniform-point 构造（默认 50 个点实际是 49 个 solver
   intervals）；explicit empty list 必须拒绝。调度至少两个有限点，严格
-  从 1.0 递减到 0.0，并逐对验证相邻位置。
+  从有限 `(0,1]` 首点递减到 0.0，并逐对验证相邻位置；FastH3 的首点是 `0.999`，不能被
+  旧的 exact-1.0 假设拒绝。
 - 强制：5 个 sigma boundaries 只有 4 个 denoise intervals；`num_inference_steps`、
   Cache-DiT quality policy 和请求验证均使用 `len(base_schedule)-1`，solver 仍接收
   完整 boundary list。用户省略 step 时自动采用 checkpoint 步数；显式值只有
@@ -153,6 +154,26 @@ Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期�
   H3 覆盖双 shift 精确值、combined partition 隔离、4-step 传入 solver/quality、
   matching/mismatched explicit step 和 legacy/partially-constructed fallback。仍缺真实 distilled
   checkpoint 的 CUDA/NPU E2E 与 teacher/student 质量阈值。^[PR #5991]
+
+## MMH3-2n — FastH3 只接受精确 artifact 并在启动时一次性融合
+
+- 触发：FastH3 `lora_path`、load-time fusion、four-step request 或 serving gate。
+- 强制：只 claim `fastvideo-lora-v2`、`finetuned_model` 位于 `fastvideo/` 且 identity 含 `fasth3`
+  的 exact FastH3 artifact；`base_model` 可缺省，声明时必须精确为 `MiniMaxAI/MiniMax-H3`。bundle
+  root 与 claimed variant 都必须唯一，否则 fail closed；普通 FastVideo/PEFT/多 shard 交还 legacy
+  dynamic LoRA，不可误认。
+- 强制：声明的 low-rank/diff/`set_weight` tensor count 必须 numeric 且与实物一致；任何 unmapped、
+  duplicate/unpaired factor、shape mismatch、extra/incomplete block、VSA `set_weight` 或 fused QKV/FC1
+  不支持的 full-rank delta 都失败。fusion 在 sharding 前完成：Diffusers Q/K/V 重排为 grouped native
+  QKV，FC1 value-first 重排为 gate-first，再加入 low-rank `B@A` 与 full-rank `diff`/`diff_b`。成功后
+  只保留永久 fused sentinel；不能 request-switch，dynamic manager 的 list/add/remove/pin 安全返回空/false。
+- 强制：serving 只允许 `t2va`、无 per-request `lora`、exact `num_inference_steps=4`（五 boundaries/
+  四 forwards）以及默认 video/audio shift `12/3`；拒绝 CPU/layerwise/DLO offload 与 Ref2VA。
+- 禁止：不得混同 Turbo/native dynamic adapters，支持 VSA/multi-adapter/Ref2VA/offload，或声称
+  quality parity、平台 portability 与通用性能收益；recipe/body 的旧 steps=5 不能覆盖 source 的 4。
+- 验收：synthetic artifact 覆盖 identity/base/root/variant、metadata counts、mapping/pairs、QKV/FC1
+  reorder、full/low-rank delta、block/shape 与 unapplied patch failures；request matrix 覆盖 task、steps、
+  shifts、request LoRA 和各 offload gate。CPU tests 不替代真实 artifact/hardware 质量或性能验证。^[PR #6714]
 
 ## MMH3-2j — Turbo LoRA 只接受精确发布 artifact，并与 H3 task、sampling 和 offload lifecycle 共同门禁
 

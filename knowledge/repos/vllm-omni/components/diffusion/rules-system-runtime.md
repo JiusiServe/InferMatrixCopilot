@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/distributed/a2a_permute.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/distributed/test_a2a_permute.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
+sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/distributed/a2a_permute.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/distributed/test_a2a_permute.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
 confidence: high
 ---
 
@@ -83,7 +83,7 @@ confidence: high
 ## DIFF-4x — SymmMem Ulysses A2A 只能显式启用并保持 workspace 生命周期闭合
 
 - 触发：修改 `ulysses_a2a_permute`、strict Ulysses all-to-all、NCCL SymmetricMemory JIT extension、CUDA graph capture 或 diffusion worker shutdown。
-- 强制：默认关闭；只在 `ulysses_degree > 1`、strict Ulysses 的正向 `(scatter,gather)=(2,1)` 与反向 `(1,2)` layout 启用，并在 worker/model 初始化时 JIT build/capability failure 直接 fail-at-init。advanced-UAA 保持其 `_ulysses_all_to_all_any_*` path；AllGather 不选择 Ulysses；strict Ulysses+Ring 的 Ulysses leg 仍可使用该 path。每个 `(device, process-group)` 只有一个单 CUDA stream 的 grow-only byte workspace；首次分配及增长必须是 collective、在增长前同步，容量内按 typed view 复用；graph capture 中禁止增长，须先 warm up 最大 shape；worker shutdown 同步并释放 workspace。
+- 强制：默认关闭；只在 `ulysses_degree > 1`、strict Ulysses 的正向 `(scatter,gather)=(2,1)` 与反向 `(1,2)` layout 启用，并在 worker/model 初始化时 JIT build/capability failure 直接 fail-at-init。advanced-UAA 保持其 `_ulysses_all_to_all_any_*` path；AllGather 不选择 Ulysses；strict Ulysses+Ring 的 Ulysses leg 仍可使用该 path。每个 `(device, process-group)` 只有一个单 CUDA stream 的 grow-only byte workspace；首次分配及增长必须是 collective、在增长前同步，容量内以 typed byte-slice view 复用；graph capture 中禁止增长，须先 warm up 最大 shape；worker shutdown 同步并释放 workspace。^[PR #6714]
 - 禁止：把 flag 当作默认 transport、静默 fallback；按历史 shape/dtype 无界缓存 allocation；跨 stream 重用 staging buffer；capture 中隐式分配/扩容；把 CPU/mock workspace 测试或 PR benchmark 写成数学/输出 parity、普遍速度或跨硬件收益。
 - 验收：覆盖 CLI/deploy/default-stage 的显式 flag 透传与默认 false、eligible strict path 的 init build、UAA/AllGather/noneligible layout 不调用该 path、strict Ulysses+Ring 的 eligible Ulysses leg、peak workspace 复用/collective growth、capture growth fail、single-stream reject 与 shutdown release；真实多 rank hardware 仍须对 regular Ulysses 做 Q/K/V 与 reverse-output parity，再单独记录精确 shape/stack/预热后的性能。^[PR #6340]
 
