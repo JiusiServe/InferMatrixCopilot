@@ -177,3 +177,10 @@ confidence: high
 - 禁止：把任意 `qwen3_vl` 配置归类为 HiDream-O1；给 raw index key 强加 `model.` 前缀；只增加显式 `model_class_name` 映射而让通用 text-to-image/server 自动解析仍落到未注册 architecture；缺失或格式异常的 index 不得误报命中。
 - 验收：覆盖 HiDream signature 命中、普通 Qwen3-VL、缺失/错误 `weight_map`、显式类名与 signature 不一致，以及 resolver/enrichment 两条路径；再断言 registry pipeline 和 module-level post-process 均可解析。^[PR #5194]
 
+## DIFF-4u — Worker 物理 paged KV 必须与 Scheduler 逻辑分配分层并原子安装
+
+- 触发：启用或修改 diffusion Worker 的 native paged KV data plane、请求 row registry、paged attention adapter、BlockTables 更新或唤醒/终止清理。
+- 强制：Scheduler 只拥有 logical block allocation、generation 和 `DiffusionKVMetadata`；每个 Worker rank 消费自己的 `KVCacheConfig`，拥有物理 KV tensors、native `BlockTables` 和 request/sequence/context rows。安装 metadata 前必须校验 group/count/range/capacity，并以 staged append、apply 和失败 rollback 原子发布；重复 generation 幂等，冲突或过期快照拒绝，BlockTables 变更使已准备的 attention batch 失效，终止时先清 Worker rows 而不释放 Scheduler blocks。
+- 禁止：Worker 自行分配或释放 Scheduler-owned logical blocks；把部分 row 安装、native append/apply 异常或 stale snapshot 当作成功；从 padding 猜异构 prefix 的逻辑布局；在清理或 wake refresh 后继续复用旧的 native metadata/buffer view。
+- 验收：CPU/mock 覆盖 rank-local config、请求/上下文 row mapping、重复/过期/冲突 generation、非法 block 与容量、append/apply rollback、幂等清理和 wake refresh；GPU 另验证非连续 BlockTables、GQA、异构 prefix 与 piecewise attention。该 PR 不证明跨 stage KV transport、W2 prefix-cache 或真实 HunyuanImage3 E2E。^[PR #6102]
+

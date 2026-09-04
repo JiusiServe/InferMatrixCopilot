@@ -4,7 +4,7 @@ created: 2026-07-13
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
-sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py", "PR #6306"]
+sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py", "PR #6306", "PR #6102"]
 ---
 
 # HunyuanImage3 开发规则
@@ -141,3 +141,10 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
   - 强制：由 `current_omni_platform.is_cuda()` 选择 `nvidia` 实现，其他后端保留 `native` 实现；两套 block 必须保持相同的公开构造与 checkpoint `state_dict` key 布局，NVIDIA 版本只能通过共享融合算子获得加速；高分辨率 VAE 必须由统一 VAE tiling 管理，任何允许 tiling 关闭的入口都要显式定义容量、回退或拒绝策略；`torch.backends.cudnn` 这类进程级标志应在 worker 边界配置，若保留 block 内临时设置则必须证明 forward 不会并发。
   - 禁止：在非 CUDA 平台导入或强制执行 NVIDIA block；把 Triton 可导入等同于所有平台支持；改变 `in_layers`/`out_layers` 等 checkpoint-facing module key；移除逐卷积内存保护后仍让 tiling-disabled 的高分辨率请求无条件执行；或在可能重叠的 forward 中修改进程级 cuDNN 标志。
   - 验收：分别以 native/eager 与 CUDA/NVIDIA 实现覆盖 VAE、DiT 的真实 shape、dtype 和输出误差；验证旧 checkpoint 的 `state_dict` 加载与 key parity；对启用 tiling、关闭 tiling及直接 VAE 入口执行高分辨率容量/失败行为测试，并在并发 worker 或明确串行证明下验证 cuDNN 配置与恢复；性能数字只在固定模型、硬件、并行拓扑和 workload 下复测。^[PR #6306]
+
+- **HY3-5h — paged GQA 必须保留压缩 K/V，dense 路径保持扩展**
+  - 触发：修改 HunyuanImage3 的 `ImageKVCacheManager`、Q/K/V head layout，或在 dense 与 Scheduler-managed paged attention 之间切换 GQA 处理。
+  - 强制：HunyuanImage3 的 dense 路径继续把 K/V 从 8 个 KV heads 扩展到 32 个 Q heads；paged KV active 时必须保留原生压缩的 32Q/8KV 形状，由 native adapter/backend 消费 `num_heads=32` 与 `num_kv_heads=8`。
+  - 禁止：在 paged adapter 中把已经压缩的 K/V 再扩成 Q heads，或为兼容 generic shape 在 adapter 内猜测并折叠重复 head；也不得让 paged 分支改变既有 dense 路径的输出布局。
+  - 验收：以实际 32Q/8KV geometry 覆盖 dense 与 paged 两条路径，断言 attention consumer 的 K/V shape 分别为 32 和 8，并覆盖 adapter 的 packed Q/K/V 与 native backend 调用；真实模型数值和生产 E2E 仍需独立验证。^[PR #6102]
+

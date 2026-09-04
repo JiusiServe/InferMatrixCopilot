@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350"]
+sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102"]
 confidence: high
 ---
 
@@ -76,4 +76,11 @@ confidence: high
 - 强制：在生产 `prepare_fused_moe_runtime()` 路径中幂等注册 `MoERunner` 与 `RoutedExperts`；注册前检查 `op_registry_oot`，已有名称必须保留其现有实现，并只依赖 diffusion config shim 实际提供的参数。
 - 禁止：依赖 `NPUWorker` 初始化或 import side effect 建立 diffusion 注册；无条件注册完整 `REGISTERED_ASCEND_OPS` 表；重复调用触发注册断言，或让 `PluggableLayer` 回退到不兼容的上游实现。
 - 验收：从真实 NPU diffusion runtime 覆盖首次和重复初始化，断言两个 OOT 名称均解析到可接受 `n_shared_experts` 的实现并完成 HunyuanImage3 fused-MoE accuracy/performance smoke；同时确认普通 NPU、非 NPU 和已完成 vllm-ascend 注册的路径不变。^[PR #6350]
+
+## EXEC-13e — diffusion paged KV 必须经平台 native hook 闭合
+
+- 触发：平台为 diffusion paged KV 增加或修改 BlockTables、native attention metadata builder，或 common adapter 需要支持 CUDA 与 NPU 的不同 native contract。
+- 强制：common `OmniPlatform` 通过 `get_diffusion_kv_block_tables_cls()` 与 `build_diffusion_kv_attn_metadata()` 提供默认 native 实现；NPU 必须返回 `AscendBlockTables`，把 `seq_lens_cpu` 转为 `seq_lens_np`，并使用 `AscendAttentionState.ChunkedPrefill`。common diffusion data plane 只调用 platform hooks，并在 layer registration 阶段验证 resolved backend 与 hook 能力。
+- 禁止：在 common adapter 直接导入 `vllm_ascend` 或硬编码 CUDA `BlockTables`/metadata 假设；把 platform capability 延迟到首次 attention dispatch；平台未提供 native contract 时静默回退 dense 或继续占用 paged KV。
+- 验收：default 与 NPU hook 的 class、metadata 参数和 backend selection 通过 mock/contract 测试，unsupported hook/backend 在物理 cache allocation 前 fail fast；CUDA 与 NPU lane 分别验证 native metadata construction，未运行真实 NPU 硬件时不得宣称 Ascend 生产 parity。^[PR #6102]
 

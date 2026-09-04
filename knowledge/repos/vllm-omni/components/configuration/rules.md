@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -137,6 +137,13 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：这些字段必须经同一 diffusion owner 归一化；只有 `paged_scheduler` 才能传入 native `VllmConfig` 的 cache/scheduler 配置。正值 `kv_cache_memory_bytes` 固定 KV 预算，`None` 或 `0` 使用自动 sizing；`max_model_len=-1` 必须保留 native auto-fit sentinel，同时为 Scheduler 解析出正的 admission bound。`kv_cache_memory_bytes` 不得为负，`gpu_memory_utilization` 必须在 `(0,1]`，`max_num_batched_tokens` 必须为正，`max_model_len` 必须为正或 `-1`。
 - 禁止：让 `dense_legacy` 因这些字段改变既有 pipeline parallel、cache 或 scheduler 配置；用 truthiness 把 `0` 误判为非法或显式 KV pin；在末端静默丢弃非默认值，或把文本 encoder 的长度字段未经模型语义确认当作 DiT KV 上限。
 - 验收：structured、legacy 和 direct 配置路径覆盖默认、非默认、非法值与显式 `0`；paged 路径断言字段进入 native cache/scheduler consumer，`-1` 触发 auto-fit；dense 路径断言原有并行、显存和 token budget 保持不变。 ^[PR #6094]
+
+### CONF-2c — paged_scheduler 的请求行上限必须是正整数且贯穿配置投影
+
+- 触发：启用 `paged_scheduler`，或修改 diffusion KV 的请求行容量、native metadata builder 和 BlockTables 初始化。
+- 强制：`diffusion_kv_max_rows_per_request` 必须是严格的正整数，并在 `OmniDiffusionConfig` 与 `_DiffusionConfigProjection` 中统一校验；`paged_scheduler` 必须显式设置该字段，Worker 用它把一个 public request 的 sequence/context rows 容量传入 native cache 初始化。
+- 禁止：接受缺失、`0`、负数、`bool` 或浮点行上限；用 truthiness 合并吞掉显式值；让 `dense_legacy` 因该字段创建 native paged KV，或把 CUDA 平台限制写进通用配置校验。
+- 验收：direct、structured 与 deploy/config projection 分别覆盖缺省、正值和非法值，断言 paged mode 的最终 Worker/native consumer 读取行上限，dense mode 保持原有行为，并覆盖平台无关的配置构造。^[PR #6102]
 
 ### CONF-3a — 争议以展开后的最终配置为准
 
