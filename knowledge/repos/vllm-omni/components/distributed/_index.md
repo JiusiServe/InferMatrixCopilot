@@ -14,7 +14,7 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
   `vllm_omni/distributed/omni_coordinator/`（协调器与 load balancer）
 - 知识面另覆盖跨 stage ZMQ 路由/端口分配（`vllm_omni/engine/stage_engine_startup.py::OmniMasterServer`）
   ——组件划分服务知识归属，与 manifest 运行时粒度不同
-- 源码校验：以上路径与下列锚点均已在 `main @ be335a86` 验证存在：
+- 源码校验：以上路径与下列锚点均已在 `main @ ebb3b205` 验证存在：
   `OmniConnectorBase`（connectors/base.py:12）、`OmniKVTransferManager`
   （kv_transfer_manager.py:341）、`LoadBalancer` 三实现（load_balancer.py:39/64/74/102）、
   `OmniMasterServer._allocate_route_locked`（stage_engine_startup.py:254）

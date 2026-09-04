@@ -1,10 +1,10 @@
 ---
 title: "FLUX.2 规则"
 created: 2026-07-20
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4645", "PR #5136", vllm_omni/diffusion/models/flux2/flux2_transformer.py, "PR #5910", "PR #3027"]
+sources: ["PR #4645", "PR #5136", vllm_omni/diffusion/models/flux2/flux2_transformer.py, "PR #5910", "PR #3027", "PR #6390", vllm_omni/diffusion/models/flux2/pipeline_flux2.py, tests/model_tests/diffusion/diff_model_builders.py]
 confidence: high
 ---
 
@@ -20,6 +20,7 @@ confidence: high
 | Mistral text encoder、FP8、component namespace | FLUX2-1a | `diffusion/models/mistral_encoder/` → component quantization selector/loader |
 | meta parameter、CPU offload、BF16 baseline | FLUX2-1b | FLUX.2 component loader/materialization 路径 → `Flux2Pipeline` |
 | SP auto-padding、`mask_sp_padding`、dense/varlen | [SPPAD-1a](../../components/diffusion/rules-sp-padding.md#sppad-1a-padding-mask-是显式正确性性能策略不是无损优化) | Flux2 `_sp_plan` → forward context → `hidden_states_mask` → attention |
+| text encoder hidden-state 层、`text_encoder_out_layers`、prompt embedding 宽度 | FLUX2-1d | `pipeline_flux2.py::Flux2Pipeline.__init__` → `encode_prompt` → `__call__` → Mistral encoder |
 
 FLUX.1 和 FLUX.2-Klein 不自动归到本页；必须由描述/registry key 明确命中对应 owner。
 
@@ -55,6 +56,22 @@ FLUX.1 和 FLUX.2-Klein 不自动归到本页；必须由描述/registry key 明
   历史中的早期 H20 benchmark 来自已删除实现，不得当作当前 main 的性能或质量证据。
 - 验收：用 dynamic `Fp8Config` 构造小模型，分别枚举两类 block 的 config 与 prefix，并断言
   三个 outer projection 仍是 `nn.Linear`。 ^[PR #3027]
+
+## FLUX2-1d — 选择的 Mistral hidden states 是 checkpoint 属性，不是请求参数
+
+- 触发：修改 `Flux2Pipeline` 的 prompt encoding、`text_encoder_out_layers`、Mistral config，或
+  FLUX.2 tiny-model builder 的 encoder/transformer geometry。
+- 强制：构造期从 `text_encoder.config.text_encoder_out_layers` 读取并固化为 pipeline 实例的
+  tuple；旧 checkpoint 没有该字段时只回退到 `(10, 20, 30)`。`encode_prompt` 及正/负 prompt 的
+  `__call__` 路径都必须使用同一实例值，把选出的 hidden outputs 按既有顺序拼接，并保持结果宽度与
+  transformer `joint_attention_dim` 一致。
+- 禁止：从 request `extra_args` 或 `encode_prompt`/`__call__` 参数在推理时覆盖层集合；模型是在
+  特定抽取层上训练的，Diffusers 的可传参数不改变这个 FLUX.2 checkpoint contract。也不得只缩小
+  text encoder 层数却不同时缩小选择列表或 `joint_attention_dim`。
+- 验收：tiny builder 使用 3 个 text-encoder layers、`[0, 1, 2]` 和
+  `joint_attention_dim=96`；离线 `Flux2Pipeline` 的 text-to-image、determinism 和 multi-output
+  三个子测试通过。该 PR 未运行“无 config 字段”的完整尺寸 checkpoint，故 legacy fallback 的
+  full-size 行为仍是源码合同，不应写成已完成的 full-model 验证。 ^[PR #6390]
 
 共享 component-quantization 合同见 [Diffusion rules](../../components/diffusion/rules.md)；
 加载器 upstream 边界见 [loading drift](../../rebase/upstream-api-drift-loading.md)。
