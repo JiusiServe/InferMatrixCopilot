@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-02
 type: guide
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5599", "PR #6045", docs/design/feature/diffusion_continuous_batching.md, docs/user_guide/diffusion/execution_modes.md, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/sched/step_scheduler.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_step_pipeline.py]
+sources: ["PR #5599", "PR #5810", "PR #6045", docs/design/feature/diffusion_continuous_batching.md, docs/user_guide/diffusion/execution_modes.md, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/sched/step_scheduler.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_step_pipeline.py]
 ---
 
 # Step 执行合同与 batching 模式
@@ -61,6 +61,17 @@ self-attention backend 为 `TORCH_SDPA` 时支持 grouped step；Helios 会拒�
 step mode 当前拒绝所有 diffusion cache backend，但这不等于拒绝 inter-stage KV transfer：
 runner 对新 admission 先调用 `receive_multi_kv_cache_distributed()`，再 `prepare_encode()`，且有
 顺序测试。限制描述必须区分这两个机制。
+
+## 多 document packing 是模型能力，不是 continuous batching 的默认语义
+
+通用 step contract 只要求 scheduler 能交付一组 state；是否能把它们塞进**一次** DiT forward，
+取决于所有 resolved attention consumer 是否实际支持并消费 multi-document `cu_seqlens`。不支持、
+Ring attention 或 task-specific DiT 不同都应退回逐 request forward，且不可通过 backend 名称或
+`max_num_seqs` 推断安全。MiniMax-H3 的 64-row tail、video/audio row split、Cache-DiT/DLO/multi-output
+限制和 rank-0 prepare broadcast 是其模型 owner 合同，不应泛化给其他 pipeline。target runner 的
+`_dit_any_rank_failed()` 因缺失 DiT-group accessor 而只返回 local failure，且未按 group backend
+选择 signal device；在补齐并以多 rank 负向用例证明前，通用 runner 不提供 failure synchronization
+保证。^[PR #5810]
 
 ## output stream 是统一生命周期
 

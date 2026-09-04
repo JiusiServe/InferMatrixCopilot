@@ -4,13 +4,13 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5720", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py]
+sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py]
 confidence: high
 ---
 
 # MiniMax H3 缓存与任务生命周期规则
 
-`MMH3-2c`–`MMH3-2j`：conditioned VAE 的确定性、modular task 选择，以及 request 级
+`MMH3-2c`–`MMH3-2k`：conditioned VAE 的确定性、modular task 选择，以及 request 级
 Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期。触发信号见
 [MiniMax H3 规则](rules.md) 的 Direct 代码快速入口；加载合同见
 [加载规则](rules-loading.md)，媒体输入见 [媒体规则](rules-media.md)。
@@ -161,6 +161,13 @@ Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期�
 - 强制：Turbo 仅在非零 scale 的实际 active recognized adapter 时限制请求；只支持 FL2VA/T2VA，要求五个 sigma points（四次 denoiser evaluation）、video `flow_shift=6` 与 audio `audio_flow_shift=3`。每次真实 load 都替换该 client ID 的 Turbo classification，避免 eviction 后同 ID generic adapter 被误分类。
 - 禁止：将 exact Turbo artifact 的损坏 metadata 静默交给 generic fallback；将任意 H3 PEFT checkpoint、prefusion、multi-LoRA composition 或 Ref2VA 宣称为此功能支持；在 model-level CPU、layerwise 或 distributed-layerwise offload 下激活 Turbo，因为 legacy wrapper 的 LoRA tensors 不随 base parameter lifecycle 搬运。
 - 验收：覆盖 file/metadata/alpha/target/pair/shape rejection、QKV and FC1 packing、scale-zero/generic same-ID/Ref2VA lifecycle、steps/shifts errors 与三种 offload rejection；真实 artifact evidence 必须另绑定 exact checkpoint、task、topology、sampling 和 video/audio output。转换后的 native mixed-rank PEFT artifact 不属于本 PR 的 supported contract；其 generic fallback rank/scale mismatch 是 post-merge follow-up，不可用本页的 Turbo success 证明安全。^[PR #6476]
+
+## MMH3-2k — H3 step execution 必须保持请求状态、attention 文档和 rank-0 prepare 隔离
+
+- 触发：MiniMax H3 实现或修改 `prepare_encode`、`denoise_step`、`step_scheduler`、`post_decode`、`batched_packing.py`、step-mode attention metadata，或改变与 DLO、Cache-DiT、TeaCache、task-specific DiT 的组合。
+- 强制：request 与 step path 复用 request-input、denoise-row prepare 与 unpack helper；每个 `StepRequestState` 保持一份 video rows、audio rows、audio sigma schedule、anchors、shape 和 output，只有同宽 video rows 交给 runner split。可融合时每个 request 向 `cu_seqlens` 贡献一个 real-row document 和一个独立的 64-row alignment-tail document，单 DiT forward 后按原 request rows 回拆；不同 task DiT、Ring 或任一 resolved backend 不支持 multi-document packed varlen 时逐 request forward。rank-0-only reference preparation 的异常必须在任何后续 broadcast 前由 H3-local helper 同步为同一异常。step mode 必须明确拒绝 `num_outputs_per_prompt>1`、distributed layerwise offload 和 `quality=high` request-scoped Cache-DiT；这些状态不能安全跨交错 step 或 packed forward 共享。
+- 禁止：因 backend 名称为 `FLASH_ATTN`、平台默认或容量大于 1 就假设可合批；在多 document `cu_seqlens` 不被 backend 消费时去掉 mask；将不同宽度的 audio rows 混入 video batch；让 request-scoped Cache-DiT hooks、DLO resident window 或多输出 latent 跨 state 复用。不得把 H3-local broadcast 夸大为通用 runner 防护：target 的 `_dit_any_rank_failed()` 无法取得 DiT group 而退回 local flag，且 group-device 选择仍有 backend mismatch 风险。
+- 验收：CPU contract 覆盖 request/step helper parity、two-request packed document boundaries、video/audio split/reassembly、mixed-DiT/Ring/unsupported-backend fallback、abort-after-inflight-step，及三个明确 rejection；TeaCache extractor 继续以 omitted `num_requests=1` 走 request-mode path。真实权重只可在固定 checkpoint、seed、task、backend、topology 下比较 single vs packed outputs；并发 step run 的 packing composition 会随 arrival timing 改变，PR 的 4×H100 结果已显示 step rerun 和 request-vs-step 都非 bitwise 等价。有限 CPU、H100/B300 observations 和 workload-specific throughput 都不是所有 backend、small request、确定性或 multi-rank failure synchronization 的证明。^[PR #5810]
 
 共享 component quantization、checkpoint mapping 与 quality evidence 见
 [Diffusion rules](../../components/diffusion/rules.md)。

@@ -72,6 +72,7 @@ confidence: high
   交互与单 H100 校准边界见 MMH3-2g。
 - distilled checkpoint 的 continuous RF `base_schedule`、四步语义与 partition
   隔离见 MMH3-2h；它不替换 H3 的自定义 solver。
+- step execution 是 H3 的模型专有 stateful path：只在 resolved attention backend 能隔离多个 packed documents 时合并 request；否则仍逐 request 前向。request state、rank-0 preparation、Cache-DiT/DLO/multi-output 排除与有界验证证据见 MMH3-2k，不能由 generic runner guard 推断 multi-rank failure synchronization。^[PR #5810]
 - LightX2V Turbo v1.0 仅支持 legacy dynamic LoRA；精确 artifact mapping、packed QKV/FC1
   binding、active-request sampling 合同与 offload 排除项见 MMH3-2j；转换后的 mixed-rank
   native PEFT checkpoint 不在该支持声明内。
