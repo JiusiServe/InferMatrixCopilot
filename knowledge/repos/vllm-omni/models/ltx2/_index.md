@@ -1,16 +1,16 @@
 ---
-title: "LTX-2 家族（含 LTX-2.3）"
+title: "LTX-2 家族（含 LTX-2.3/2.5）"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, models, ltx2]
-sources: [vllm_omni/diffusion/models/ltx2/, vllm_omni/diffusion/registry.py, recipes/LTX/LTX-2.md]
+sources: [vllm_omni/diffusion/models/ltx2/, vllm_omni/diffusion/registry.py, recipes/LTX/LTX-2.md, recipes/LTX/LTX-2.5.md]
 ---
 
-# LTX-2 家族（含 LTX-2.3）
+# LTX-2 家族（含 LTX-2.3/2.5）
 
-- 常见别名：`LTX-2`、`LTX-2.3`、`ltx2`（LTX-2.3 是同一源码模块下的新 checkpoint/
-  版本，按 checkpoint 别名规则共用本目录）
+- 常见别名：`LTX-2`、`LTX-2.3`、`LTX-2.5`、`ltx2`；这些 checkpoint 版本共用同一
+  源码模块，但 LTX-2.5 的视频 decode 默认使用 DiffVAE。
 - 厂商/模型：Lightricks；22B 参数文本→视频+音频生成（T2V/I2V，48kHz 同步音频，
   768x512 可达 20+ 秒）；Diffusers 格式 checkpoint `dg845/LTX-2.3-Diffusers`
 - 源码：`vllm_omni/diffusion/models/ltx2/`（纯 diffusion，无 AR stage）
@@ -24,7 +24,7 @@ sources: [vllm_omni/diffusion/models/ltx2/, vllm_omni/diffusion/registry.py, rec
 
 ## 什么时候查这里
 
-- 问题只属于 LTX-2/2.3（pipeline、分辨率/帧数语义、graph 模式、性能基线）。
+- 问题只属于 LTX-2/2.3/2.5（pipeline、decoder、分辨率/帧数语义、graph 模式、性能基线）。
 
 ## 不放什么
 
@@ -36,3 +36,4 @@ sources: [vllm_omni/diffusion/models/ltx2/, vllm_omni/diffusion/registry.py, rec
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 模型结构、serving 方式与已有性能/精度证据 | [architecture](architecture.md) |
+| LTX-2.5 DiffVAE 选择、artifact、并行或最小几何约束 | [LTX-2.5 decoder rules](rules.md) |

@@ -1,13 +1,13 @@
 ---
-title: "LTX-2/2.3 模型架构与证据索引"
+title: "LTX-2/2.3/2.5 模型架构与证据索引"
 created: 2026-07-16
 updated: 2026-09-04
 type: architecture
 tags: [vllm-omni, models, ltx2]
-sources: [recipes/LTX/LTX-2.md, vllm_omni/diffusion/registry.py, "#4381", "#4464", "PR #6342", vllm_omni/diffusion/models/ltx2/ltx2_components.py, vllm_omni/diffusion/models/ltx2/ltx2_runtime.py, tests/diffusion/models/ltx2/test_ltx2_vae.py, tests/diffusion/models/ltx2/test_ltx2_vocoder_cuda.py, tests/e2e/accuracy/ltx/test_ltx25_official_similarity.py, tests/e2e/accuracy/ltx/test_ltx_official_similarity.py]
+sources: [recipes/LTX/LTX-2.md, recipes/LTX/LTX-2.5.md, vllm_omni/diffusion/registry.py, "#4381", "#4464", "PR #6189", "PR #6342", vllm_omni/diffusion/models/ltx2/ltx2_components.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder_distributed.py, vllm_omni/diffusion/models/ltx2/ltx2_runtime.py, tests/diffusion/models/ltx2/test_ltx2_vae.py, tests/diffusion/models/ltx2/test_ltx2_vocoder_cuda.py, tests/e2e/accuracy/ltx/test_ltx25_official_similarity.py, tests/e2e/accuracy/ltx/test_ltx_official_similarity.py]
 ---
 
-# LTX-2/2.3 模型架构与证据索引
+# LTX-2/2.3/2.5 模型架构与证据索引
 
 以下事实在 `v0.26.0 @ a4ea67a2` 复核（合并后的 recipe 与 live registry）。
 
@@ -23,6 +23,11 @@ sources: [recipes/LTX/LTX-2.md, vllm_omni/diffusion/registry.py, "#4381", "#4464
   `LTX2DistilledPipeline`，DMD2 使用 `LTX2T2VDMD2Pipeline`/
   `LTX2I2VDMD2Pipeline`；T2V/I2V 通过是否提供 `image=` 选择，不再使用单独的
   `*ImageToVideoPipeline` registry names。
+- LTX-2.5 的 video decode 将 canonical Native checkpoint 中的 decoder tensors 转换到
+  Diffusers-compatible DiffVAE；full 与 distilled 的 one-/two-stage profile 默认将其作为额外
+  video decoder component。ConvVAE 保留给 I2V encoding，也可由 startup-only
+  `ltx2_use_conv_vae=true` 显式选择作视频 decoder；具体 fail-closed 约束见
+  [LTX-2.5 decoder rules](rules.md)。
 - Python `forward` 只允许 `req` 作为 positional argument，其他参数必须 keyword-only；
   这对直接调用者和显式 `--model-class-name` 覆盖是 breaking change，CLI/HTTP recipe
   已按 named fields 调用。

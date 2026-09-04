@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5221", "Issue #4855", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, tests/engine/test_orchestrator_event_driven.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py, "PR #6564", tests/engine/test_orchestrator.py, tests/entrypoints/openai_api/test_qwen3_omni_realtime_websocket.py]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5221", "Issue #4855", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, tests/engine/test_orchestrator_event_driven.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py, "PR #6564", tests/engine/test_orchestrator.py, tests/entrypoints/openai_api/test_qwen3_omni_realtime_websocket.py, "PR #6189", tests/entrypoints/test_async_omni_diffusion_config.py]
 confidence: high
 ---
 
@@ -16,6 +16,18 @@ confidence: high
 故障隔离见 [fault isolation 规则](rules-fault-isolation.md)。
 
 ## Engine 生命周期合同
+
+### SERV-5r — default diffusion stage 必须保留并按显式性合并 model extras
+
+- 触发：修改 `AsyncOmniEngine` default diffusion stage fallback、promoted top-level model option、
+  `stage_overrides` 或 local/unregistered Diffusers checkpoint 启动。
+- 强制：先保留 caller `extras`，只有 explicit non-`None` top-level promoted option 才覆盖同名 extra，
+  其余键保持 caller value 或 builtin default；stage-0 `extras` override 必须合并进 default fallback 的
+  输入。registered stage 保持既有 complete override mapping，不得因修复 fallback 改写其语义。
+- 禁止：以 builtin default 覆盖 caller-only extra；让 unregistered/local checkpoint 忽略 stage-0 extras；
+  只修 registered config 路径或只断言 helper dict 而不覆盖 fallback resolution。
+- 验收：覆盖 caller-only extras、explicit top-level precedence、stage-0 extras 在 default fallback 的
+  end-to-end resolution，以及 registered path 不回归。^[PR #6189]
 
 ### SERV-5a — sleep/wake 状态必须保留 stage 和 tag 作用域
 
