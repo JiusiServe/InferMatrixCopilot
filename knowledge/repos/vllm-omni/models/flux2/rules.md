@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4645", "PR #5136", vllm_omni/diffusion/models/flux2/flux2_transformer.py, "PR #5910"]
+sources: ["PR #4645", "PR #5136", vllm_omni/diffusion/models/flux2/flux2_transformer.py, "PR #5910", "PR #3027"]
 confidence: high
 ---
 
@@ -16,7 +16,7 @@ confidence: high
 
 | PR 描述信号 | 规则组 | 第一批源码 |
 |---|---|---|
-| FLUX.2 pipeline/transformer | FLUX2-1b | `diffusion/registry.py::_DIFFUSION_MODELS["Flux2Pipeline"]` → `diffusion/models/flux2/pipeline_flux2.py::Flux2Pipeline`、`flux2_transformer.py::Flux2Transformer2DModel` |
+| FLUX.2 pipeline/transformer | FLUX2-1b、FLUX2-1c | `diffusion/registry.py::_DIFFUSION_MODELS["Flux2Pipeline"]` → `diffusion/models/flux2/pipeline_flux2.py::Flux2Pipeline`、`flux2_transformer.py::Flux2Transformer2DModel` |
 | Mistral text encoder、FP8、component namespace | FLUX2-1a | `diffusion/models/mistral_encoder/` → component quantization selector/loader |
 | meta parameter、CPU offload、BF16 baseline | FLUX2-1b | FLUX.2 component loader/materialization 路径 → `Flux2Pipeline` |
 | SP auto-padding、`mask_sp_padding`、dense/varlen | [SPPAD-1a](../../components/diffusion/rules-sp-padding.md#sppad-1a-padding-mask-是显式正确性性能策略不是无损优化) | Flux2 `_sp_plan` → forward context → `hidden_states_mask` → attention |
@@ -42,6 +42,19 @@ FLUX.1 和 FLUX.2-Klein 不自动归到本页；必须由描述/registry key 明
 - 禁止：把 offload 当成 FP8 质量收益；用不同 step 数或加载条件验证测试阈值。
 - 验收：meta parameter 完成量化物化后再迁移；运行与测试完全一致的 10-step case，
   LPIPS 阈值由该 case 直接产生。 ^[PR #5136]
+
+## FLUX2-1c — transformer online FP8 必须到达两类 block，外层 projection 保持 BF16
+
+- 触发：修改 FLUX.2 transformer 的 online FP8 构造、`quant_config`、block prefix 或量化覆盖范围。
+- 强制：将同一 online `quant_config` 传给每个 `Flux2TransformerBlock` 与
+  `Flux2SingleTransformerBlock`，并使用稳定的 `transformer_blocks.<i>` 与
+  `single_transformer_blocks.<i>` prefix 供 component selector 匹配；`x_embedder`、
+  `context_embedder` 与 `proj_out` 保持普通 BF16 `nn.Linear`。
+- 禁止：用仅适用于 serialized/ModelOpt checkpoint 的 safety config 覆盖 double-stream
+  block，从而关闭 online FP8；或因同属 transformer 就量化上述三个 outer projection。PR
+  历史中的早期 H20 benchmark 来自已删除实现，不得当作当前 main 的性能或质量证据。
+- 验收：用 dynamic `Fp8Config` 构造小模型，分别枚举两类 block 的 config 与 prefix，并断言
+  三个 outer projection 仍是 `nn.Linear`。 ^[PR #3027]
 
 共享 component-quantization 合同见 [Diffusion rules](../../components/diffusion/rules.md)；
 加载器 upstream 边界见 [loading drift](../../rebase/upstream-api-drift-loading.md)。
