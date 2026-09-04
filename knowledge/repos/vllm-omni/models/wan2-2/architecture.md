@@ -4,7 +4,7 @@ created: 2026-07-21
 updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #2783", "PR #5969", "PR #4820", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/models/wan2_2/wan2_2_transformer.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py, vllm_omni/diffusion/models/dmd2/mixin.py]
+sources: ["PR #2783", "PR #5969", "PR #4820", "PR #6343", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/models/wan2_2/wan2_2_transformer.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py, vllm_omni/diffusion/models/dmd2/mixin.py, tests/dfx/stability/tests/test_wan22.json]
 ---
 
 # Wan 2.2 架构
@@ -81,6 +81,12 @@ e2e（t2v 离线/在线、W4A16）、**accuracy**
 （`tests/e2e/accuracy/wan22_i2v/` 视频相似度对 diffusers CP 基线）、dfx
 （perf/reliability/stability）。上列家族测试中未见 DMD2 专属测试（未做穷举
 核对）。
+
+- stability JSON 将 A14B I2V 的两卡 CUDA case 标记为 `H800`，并单列两卡 NPU
+  `A3` case（`usp=2`、VAE patch parallel=2、HSDP、VAE slicing）；nightly 必须以
+  对应硬件 pytest marker 选择，不能从同一文件的模型或 `diffusion` family marker 推断
+  可在另一后端运行。这些配置只声明收集和启动参数，不构成任何 24-hour 稳定性运行已通过的
+  证据。^[PR #6343]
 
 - 树内已无原 Wan2.2 ModelOpt FP8 exporter，也没有该模型专用的 quantization export example；
   审查与验证不得继续引用已删除的 example 路径。副本数据并行示例仍为
