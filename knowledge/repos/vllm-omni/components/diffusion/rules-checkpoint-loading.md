@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6162", "PR #6234", "PR #6279", "PR #6445", "PR #6486", "PR #6591", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, vllm_omni/quantization/svdquant_config.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #4061"]
+sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6162", "PR #6234", "PR #6279", "PR #6445", "PR #6486", "PR #6591", "PR #6651", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, vllm_omni/quantization/svdquant_config.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #4061"]
 confidence: high
 ---
 
@@ -207,7 +207,9 @@ confidence: high
   source rejection、warm path zero ordinary DiT materialization，以及 shared finalization 前后
   restored tensor byte/backing-pointer equality；验证 checkpoint mmap control path 不变。另覆盖 registration
   capability/budget/pin-memory gates、partial registration rollback、direct/staged transfer parity、没有
-  staging allocation 的成功路径，以及 teardown 前 unregister。^[PR #6486] ^[PR #6591]
+  staging allocation 的成功路径，以及 teardown 前 unregister。FLUX.2-klein 的 consumer-owned
+  validator 与范围边界见 [FLUXK-1a](../../models/flux2-klein/rules.md#fluxk-1a-final-layout-hwr-必须恢复可立即使用的-bf16-klein-transformer)；该接入复用共享 HWR/DLO 协议，
+  不扩大协议本身。^[PR #6486] ^[PR #6591] ^[PR #6651]
 
 ## DIFF-2aa — serialized SVDQuant 只能按 NVFP4 checkpoint ABI 加载
 

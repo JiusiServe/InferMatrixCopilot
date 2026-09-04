@@ -1,15 +1,15 @@
 ---
 title: "FLUX.2-Klein（Qwen3 编码的 T2I/I2I）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/flux2_klein/, vllm_omni/diffusion/registry.py]
+sources: ["PR #6651", vllm_omni/diffusion/models/flux2_klein/, vllm_omni/diffusion/registry.py]
 ---
 
 # FLUX.2-Klein
 
-以下事实在 `main @ 5d44868e` 复核（源码派生页,尚无本模型的运行经验沉淀）。
+以下事实在 `main @ da4a08b6` 复核；运行证据与支持范围以具体规则为准。
 
 ## 名称与范围
 
@@ -34,3 +34,10 @@ sources: [vllm_omni/diffusion/models/flux2_klein/, vllm_omni/diffusion/registry.
 
 - 审查 flux2_klein 的 Qwen3-LLM 编码链、图像输入或蒸馏旗标改动;文本编码
   方案与 flux2 家族不同,勿混（见该页）。
+- 审查 final-layout Host Weight Runtime (HWR) restore、BF16 checkpoint 与 no-AllGather DLO 的组合。
+
+## 目录内容
+
+| 遇到什么 | 查看哪里 |
+|---|---|
+| FLUX.2-klein final-layout HWR contract、packed QKV state、eligible/supported boundary | [Klein rules](rules.md) |

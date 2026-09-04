@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components]
-sources: ["PR #6419", "PR #6445", "PR #6486", "PR #6591", vllm_omni/host_weight_runtime/, "PR #6427"]
+sources: ["PR #6419", "PR #6427", "PR #6445", "PR #6486", "PR #6591", vllm_omni/host_weight_runtime/]
 confidence: high
 ---
 
