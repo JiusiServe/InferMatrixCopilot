@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py"]
+sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py"]
 confidence: high
 ---
 
@@ -25,6 +25,13 @@ confidence: high
 - 强制：在当前计算流上记录设备无关的 `torch.Event()`，再由通用 stream 等待该事件，使 accelerator hooks 建立计算流到侧流复制的依赖；保持与 CUDA、ROCm 平台一致。
 - 禁止：向通用 `torch.Stream.wait_event()` 传递 `torch.xpu.Event()`，或通过零散的 `xpu.synchronize()` 掩盖事件类型不兼容造成的复制竞态。
 - 验收：mock 测试断言 `torch.Event()` 被创建并记录且 `torch.xpu.Event()` 未被调用；XPU 硬件测试在计算流完成后让侧流执行 non-blocking D2H，等待侧流同步后断言 host tensor 全部保持预期值、无尾部图像损坏。 ^[PR #5571]
+
+## EXEC-10c — XPU CUDA 兼容包装必须覆盖异步运行时接口
+
+- 触发：XPU 等非 CUDA 平台复用 Omni AR 异步输出或 warm-up 路径，而共享 runner 调用了 `torch.cuda` 的 stream、event、device 或 graph 接口。
+- 强制：在 `vllm_omni/platforms/xpu/utils.py::torch_cuda_wrapper()` 中集中把 CUDA-facing API 映射到 XPU；`current_stream`、`default_stream`、`stream`、`set_stream`、`set_device` 使用 `partial`，`Stream` 映射为 `torch.xpu.Stream`，`Event` 忽略 CUDA 专属 `blocking` 参数后构造 `torch.xpu.Event`；仅在 `supports_xpu_graph()` 为真时映射 graph、`CUDAGraph`、pool 和 capture 状态接口。
+- 禁止：为适配 XPU 修改共享 `gpu_ar_model_runner.py`，或只映射 stream 而遗漏 `set_stream`、`set_device`、event 与受支持的 graph 接口；不得让通用 `torch.Stream.wait_event()` 接收不兼容的专用事件类型，也不得在不支持 XPU graph 时无条件安装 graph shim。
+- 验收：XPU 平台测试进入 wrapper 后断言异步 runner 所需的 stream、event、device 和 graph 调用均路由到对应 XPU API，且不支持 graph 时保持禁用；Qwen3-TTS 等 AR-stage warm-up 与完整异步输出 smoke 在 XPU 上成功完成，同时 CUDA 路径和共享 runner 行为保持不变。^[PR #5569]
 
 ## EXEC-12a — ROCm 分页注意力必须走 packed KV 的兼容 varlen 路径
 
