@@ -1,10 +1,10 @@
 ---
 title: "Diffusion attention 规则"
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py"]
+sources: ["PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6518", docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py"]
 confidence: high
 ---
 
@@ -81,9 +81,10 @@ confidence: high
 
 - 触发：修改 `RAINFUSION_ATTN`、`rf_v2`、`VideoTokenLayout`、block size、MindIE-SD
   依赖或 packed video shape。
-- 强制：resolver 传入真实 `prefix_len`、`latent_shape=[t,h,w]` 和
-  `used_len=prefix_len+t*h*w`；只裁掉 document-0 后的物理 padding，kernel 输出再补零回
-  query shape。video rows 不再要求 128 整除；新 MindIE-SD 在空间重排后把不规则的
+- 强制：legacy resolver 传入真实 `prefix_len`、`latent_shape=[t,h,w]` 和
+  `used_len=prefix_len+t*h*w`；Ref2VA multi-span resolver 改传 `used_len` 与按 physical start 排序的
+  `video_spans=[{start, latent_shape}]`，将 interleaved text/image/audio 与 padding 保留 dense。只裁掉
+  document-0 后的物理 padding，kernel 输出再补零回 query shape。video rows 不再要求 128 整除；新 MindIE-SD 在空间重排后把不规则的
   真实 video suffix 提升到 always-kept segment，使余下 video 按 128-row block 稀疏。
   不能用人工 padding 替代，因为 `rf_v2` 不消费 padding mask，pad key 会污染 softmax。
 - 边界：`sparsity<=0`、未到 `start_step`、skip layer、无/未声明 BSND layout、无
@@ -91,12 +92,17 @@ confidence: high
   32×128 rows 均保持 FlashAttention dense fallback；显式错 layout、causal 或 Ring>1
   仍 fail closed。非 8×8 空间网格的 residual 被 always-kept，因而 realized sparsity 低于
   nominal；潜空间 h/w 为 8 的倍数（输入高宽为 256 的倍数）仍是性能首选。
-- 禁止：只因 `mindiesd` 可 import 就断言 irregular-tail 合同可用；当前 availability
-  只检查 module 存在，没有 version/feature gate，旧 `rf_v2` 与新 planner 组合仍有风险。
+- 禁止：只因 `mindiesd` 可 import 就断言 irregular-tail 或 multi-span 合同可用；availability 必须在
+  模型构造前检查 `sparse_attention` 明确接受 `video_spans`，否则以可操作的 upgrade/FLASH_ATTN error
+  fail closed，不能成功启动后在 T2VA/FL2VA/Ref2VA dispatch 才 TypeError，也不能静默尝试 legacy
+  signature。该 feature check 不是版本 pin，仍不能据此推断任意 MindIE-SD build 的 kernel quality。
 - 验收：CPU plan 同时接受 128-aligned 与 irregular grid，并保持所有其他 fallback/
   rejection；真实 Ascend + updated MindIE-SD 用 irregular grid 对 dense reference。目标 NPU test
   仅以 `sparsity=0` 证明 protected-tail 几何下全 block 等价，不证明稀疏选择的质量、
-  realized sparsity 或加速。^[PR #6000]
+  realized sparsity 或加速。CPU tests 还应覆盖 multi-span 的 used length、geometry/role/overlap/bounds、
+  total threshold 与 clip-boundary dense-context fallback；它们只证明 plan payload。PR #6518 review 的
+  MindIE-SD `2661f83` field-name/layout check 与 4×B300 FLASH_ATTN regression 都不执行 RainFusion；
+  真实 Ref2VA same-seed sparse quality 仍未覆盖。^[PR #6000] ^[PR #6518]
 
 ## DIFF-1k — 非等长 SP attention 必须保留 K/V mask 并走 mask-safe backend
 

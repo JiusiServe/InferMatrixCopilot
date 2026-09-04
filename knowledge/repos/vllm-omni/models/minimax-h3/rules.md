@@ -20,7 +20,7 @@ confidence: high
 | grouped QKV、fused MLP、weight loader、TP | [MMH3-1a](rules-loading.md#mmh3-1a-component-namespace-与-checkpoint-transform-必须在-active-loader-前闭合) | `minimax_h3_transformer.py::MiniMaxH3DiTModel.load_weights` → active vLLM loader |
 | FP8 quality、audio metric、layerwise offload | `MMH3-1b` | quantization quality test → recipe/support matrix → nightly lane |
 | RMSNorm、RoPE、96/128 rotary dim、fused backend | `MMH3-1c` | `MiniMaxH3Attention` → shared `RMSNorm`/`RotaryEmbedding` → platform dispatch |
-| RainFusion、block sparse、video layout、NPU INT8 | `MMH3-1d` | packed sequence → attention metadata/backend plan；quant config → prefixed linear → loader/post-load |
+| RainFusion、block sparse、video layout、NPU INT8 | [MMH3-1d](rules-rainfusion.md#mmh3-1d-rainfusion-只在已验证的-h3-video-span-上稀疏) | packed sequence → attention metadata/backend plan；quant config → prefixed linear → loader/post-load |
 | TRTLLM、ragged packed metadata、SAGE、Skip-Softmax、Blackwell default | `MMH3-1e` | H3 metadata/roles → TRTLLM packed trim/quant gate → platform default |
 | text encoder、missing q/k/v 或 gate/up、eager load bookkeeping | [MMH3-1f](rules-loading.md#mmh3-1f-text-encoder-eager-load-必须证明每个-source-shard-完整) | `encoder.py::_load_weights` → `pipeline_minimax_h3.py::load_weights` strict report |
 | NPU packed varlen、quadratic mask、LaserAttention、prefix K/V | `MMH3-1g` | H3 packed producer → backend capability/metadata → NPU FlashAttention fallback |
@@ -98,31 +98,6 @@ confidence: high
   接近只覆盖该 A/B，且未给 correctness tolerance/reference、benchmark script 或 raw artifact；
   当前自动测试没有 MUSA dispatch/parity，CPU reference 只验证 96 维旋转和 32 维
   passthrough。^[PR #5881]
-
-## MMH3-1d — RainFusion 只在完整 H3 video tail 上稀疏
-
-- 触发：修改 `RAINFUSION_ATTN`、`block_sparse`、packed video geometry、attention layout、
-  denoise step/layer skip 或 NPU backend resolution。
-- 强制：显式选择时所有平台在构造模型前检查 backend platform/dependency；RainFusion 仅支持
-  Ascend NPU、要求 MindIE-SD，且不兼容 Ring（用 Ulysses）。H3 attention 显式声明 BSND，
-  `VideoTokenLayout(prefix_len, latent_grid)` 必须证明 video 是 packed document 0 的 tail。
-- 强制：只有 sparsity>0、step>=start_step、非 skip layer 且 video>=32×128 rows 时调用
-  `rf_v2`；prefix/text/reference/audio 保持 dense。无 layout、无 `max_seqlen_q`、长度不闭合、
-  短序列或未声明 layout 仍走 NPU Flash dense fallback。video rows 不被 128 整除时
-  也传给 updated MindIE-SD，由它将 irregular real-video suffix 纳入 always-kept 段；
-  vLLM 不 padding。shared planner 和 dependency 边界见 DIFF-1h。
-- 禁止：把 nominal sparsity 当 realized sparsity或质量保证；未声明 layout 时不能让 sparse path
-  假设 BSND 而 dense fallback 解释成 BNSD。INT8、RainFusion、no-AllGather DLO 可组合，但 online
-  quantization 不得与 DLO+AllGather 组合；本 PR 没有证明 HSDP 或其他 quantizer 的组合语义。
-- 验收：CPU plan tests 覆盖 aligned/irregular 均进 sparse plan、tail closure、min length、layout
-  和 skip/step；
-  NPU 条件数值测试以 `sparsity=0` 直接调用 kernel 对 dense reference，mean relative error 阈值
-  为 `2e-3`；它不证明 `sparsity=0.8` 质量 parity。PR 的 Atlas 800I A3 8×NPU、
-  CANN 9.0.1、T2VA 209-frame 三种生成仅证明这些 exact 配置能完成；视频样例不是质量阈值，
-  没有 latency/repeats，不能宣称稳定加速或 FL2VA/Ref2VA 支持。1344×768
-  H3 grid `(62,24,42)` 的 62496 video rows 只在 CPU plan test 证明会进 sparse plan；
-  updated-MindIE NPU 对照用更小的 `(4,16,10)` grid 且 `sparsity=0`，仍不证明 0.8
-  的质量或性能。^[PR #5706] ^[PR #6000]
 
 ## MMH3-1e — H3 TRTLLM 必须从 packed 结构裁掉 padding 并隔离短序列 role
 

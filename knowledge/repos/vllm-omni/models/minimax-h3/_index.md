@@ -77,7 +77,7 @@ confidence: high
   guard 均回原 operation；完整合同见 MMH3-4c。^[PR #6607]
 - Ascend NPU 可选择 RainFusion 稀疏 video tail，并从 BF16 checkpoint 做 online INT8；两者只在
   exact T2VA/Ulysses/no-AllGather DLO 配置有完成证据，几何 fallback、TP width 与组合边界见
-  MMH3-1a/1d。
+  MMH3-1a/[RainFusion rules](rules-rainfusion.md)。
 - Ascend NPU `FLASH_ATTN` 的 H3 non-Ring packed path 可 opt in mask-free varlen，Laser env 改走
   prefix K/V slice + 256 input scale；shared fallback/metadata 与 target TeaCache regression 见
   MMH3-1g/DIFF-1g，有界 kernel/E2E/HBM 证据见 MMH3-3g。
