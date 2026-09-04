@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048"]
+sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350"]
 confidence: high
 ---
 
@@ -69,4 +69,11 @@ confidence: high
 - 强制：平台构造阶段只完成轻量、全局且无 diffusion 回环的 patch；将会加载模型 encoder/pipeline 的 patch 延迟到 `init_diffusion_model_runner_runtime`，并在 diffusion pipeline 加载前、平台对象已建立后，按既有顺序显式应用所有相关 patch。注册入口仍须幂等且只作用于目标 consumer。
 - 禁止：在 NPU platform `__init__` 中导入或执行会经 `pipeline_registry` → `DiffusionOutput` 回环的模型 patch；依赖 import side effect；只移动一个 patch 而让同一模型的相关 patch 仍在过早阶段加载；把 NPU 时序修复外推为所有平台的通用行为。
 - 验收：静态或子进程测试证明平台构造不会加载 MiniMax-H3 encoder/diffusion data，runtime hook 在 pipeline 加载前调用目标 patch 且保留其他 patch；验证重复初始化不重复 patch，并用真实 NPU consumer 覆盖 patch 生效路径。^[PR #6293]
+
+## EXEC-13d — NPU diffusion fused MoE 必须在真实 runtime 注册 OOT 实现
+
+- 触发：NPU diffusion 路径调用 fused MoE，而 vllm-ascend 的 OOT MoE 注册只在其 `NPUWorker.__init__` 中执行，导致 `RoutedExperts` 未注册或无法接收 `n_shared_experts`。
+- 强制：在生产 `prepare_fused_moe_runtime()` 路径中幂等注册 `MoERunner` 与 `RoutedExperts`；注册前检查 `op_registry_oot`，已有名称必须保留其现有实现，并只依赖 diffusion config shim 实际提供的参数。
+- 禁止：依赖 `NPUWorker` 初始化或 import side effect 建立 diffusion 注册；无条件注册完整 `REGISTERED_ASCEND_OPS` 表；重复调用触发注册断言，或让 `PluggableLayer` 回退到不兼容的上游实现。
+- 验收：从真实 NPU diffusion runtime 覆盖首次和重复初始化，断言两个 OOT 名称均解析到可接受 `n_shared_experts` 的实现并完成 HunyuanImage3 fused-MoE accuracy/performance smoke；同时确认普通 NPU、非 NPU 和已完成 vllm-ascend 注册的路径不变。^[PR #6350]
 
