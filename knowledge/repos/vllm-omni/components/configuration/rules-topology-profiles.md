@@ -1,10 +1,10 @@
 ---
 title: "topology 与部署 profile 合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/deploy/, "PR #6186"]
+sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_runtime.py, tests/engine/test_async_omni_engine_stage_init.py, vllm_omni/deploy/, "PR #6186", "PR #6813"]
 confidence: high
 ---
 
@@ -80,6 +80,6 @@ confidence: high
 ## CONF-5i — pipeline 专属 alias 与 hook 必须在通用配置层声明、归一并消费
 
 - 触发：pipeline 需要把全局 CLI 字段改写到特定 stage，或声明 stage-0 prompt transform、按 task 解析 checkpoint 的 hook、显式 inline diffusion。
-- 强制：alias 由 `PipelineConfig.stage_cli_aliases` 唯一声明并在 structured/legacy factory 进入 stage merge 前归一；canonical `stage_<id>_<target>` 与 alias 同时出现时，canonical 值优先并告警，alias 出现在其他 stage 必须拒绝。`prompt_transform_func`、`model_path_resolver` 与 `inline_diffusion` 由 `StagePipelineConfig` 投影到唯一 consumer；resolver 必须在构造 backend engine args 前消费并移除。inline 只允许单 replica，且须由 `inline_diffusion=true` 显式 opt in，或沿用已有 `custom_pipeline_args` 所声明的 in-process pipeline owner；其他 stage 默认保持 subprocess isolation。
+- 强制：alias 由 `PipelineConfig.stage_cli_aliases` 唯一声明并在 structured/legacy factory 进入 stage merge 前归一；canonical `stage_<id>_<target>` 与 alias 同时出现时，canonical 值优先并告警，alias 出现在其他 stage 必须拒绝。`prompt_transform_func`、`model_path_resolver` 与 `inline_diffusion` 由 `StagePipelineConfig` 投影到唯一 consumer；resolver 必须在构造 backend engine args 前消费并移除。所有 inline path 都要求 `plan.num_replicas == 1`；whole pipeline 只有一个 stage 时默认 inline，多 stage 只允许 `inline_diffusion=true` 或已有 `custom_pipeline_args` in-process owner opt in，其余均 subprocess。
 - 禁止：在 CLI、factory 或 stage startup 为模型名硬编码 alias/resolver；把 alias 广播到所有 stage；因 diffusion stage 只有一个 replica 就隐式改变所有多 stage pipeline 的进程隔离。
-- 验收：structured/legacy 两路覆盖 alias-only、canonical-only、相同/冲突值、错误 stage 与 unset control；用 root/partition/task path 证明 resolver 到达 stage model/tokenizer consumer，并用 opt-in 与相邻未 opt-in pipeline 证明 inline 只改变声明的 stage。^[PR #5885]
+- 验收：structured/legacy 两路覆盖 alias-only、canonical-only、相同/冲突值、错误 stage 与 unset control；用 root/partition/task path 证明 resolver 到达 stage model/tokenizer consumer，并用 single-stage、multi-stage opt-in/control 与 multi-replica veto 证明 exact inline predicate。PR #6813 只新增 default one/two-stage 参数化 test，其他组合仍须补验收。^[PR #5885] ^[PR #6813]

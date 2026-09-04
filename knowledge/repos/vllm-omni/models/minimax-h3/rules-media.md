@@ -1,10 +1,10 @@
 ---
 title: "MiniMax H3 媒体输入与精度规则"
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6064"]
+sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/engine/stage_runtime.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_async_omni_engine_stage_init.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6064", "PR #6813"]
 confidence: high
 ---
 
@@ -107,8 +107,9 @@ confidence: high
 - 强制：Ref2VA 的 Stage 0 preparation 要把 serialized prepared-video descriptor 和 artifact owner
   交给 original request；Stage 1 reuse the RGB stream for VAE/audio conditions, and terminal/error paths
   must clean it. This avoids duplicate ffprobe/transcode while preserving raw media ownership at Stage 1.
-  `inline_diffusion` remains explicit pipeline opt-in; a single replica alone must not move another
-  multi-stage pipeline's diffusion engine into the orchestrator process. Encoder-free DLO must skip absent
+  split profile 是 multi-stage，不能仅因一个 replica inline Stage 1；fused/bare single-stage H3 仅在一个
+  replica 时默认 inline。显式 `inline_diffusion` 或已有 custom-pipeline owner 可让 single-replica split/custom
+  路径 opt in，但任何超过一个 replica 的 plan 都必须 subprocess。Encoder-free DLO must skip absent
   components, and final-output validation follows declared final video metadata rather than requiring every
   stage to be diffusion.
 - 禁止：把 split route 自动发现为 H3 default、把 `text_encoder_tp_size` broadcast 到 Stage 1、用
