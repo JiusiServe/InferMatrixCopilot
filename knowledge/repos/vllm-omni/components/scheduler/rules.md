@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619"]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6089", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619"]
 ---
 
 # Scheduler 规则
@@ -257,9 +257,9 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 ## SCHED-5g — resumable async-chunk 终态清理必须以 live queue 所有权为准
 
 - 触发：resumable async-chunk 请求在一个流式 segment 结束时进入 `FINISHED_STOPPED`，但仍由 `running`、`waiting`、`skipped_waiting` 或 connector 隐藏队列持有，随后 session close、取消或其他路径调用 `finish_requests`。
-- 强制：先物化可能被多层消费的 request-id iterator，并在 adapter 清理前快照 `skipped_waiting` 中承担流式等待计数的请求；只对仍有活队列所有权的目标 resumable 终态请求恢复状态，`skipped_waiting` 恢复为 `WAITING_FOR_STREAMING_REQ`，`running`/`waiting` 按实际队列对齐；running purge 必须限定本次 finish 集合，并确保 `_free_request`、coordinator 与 connector 清理恰好执行一次。
-- 禁止：把任意已完成请求重新打开；对脱离所有 live queue、可能等待 deferred block free 的终态请求调用释放；全局清空 running 中无关的 resumable segment；重复消费单遍 request-id iterator，或因非流式 skipped 请求错误减少 streaming counter。
-- 验收：AR 与 generation scheduler 均覆盖 hidden、`running`、`waiting`、`skipped_waiting`、脱离队列及无关 resumable 请求；断言状态、队列、计数、request map 和 active-stream capacity 正确，首次 finish 恰好释放、第二次无操作，并验证 generator request-id 输入。^[PR #6360]
+- 强制：先物化可能被多层消费的 request-id iterator，并在 adapter 清理前快照 `skipped_waiting` 中承担流式等待计数的请求；只对仍有活队列所有权的目标 resumable 终态请求恢复状态，`skipped_waiting` 恢复为 `WAITING_FOR_STREAMING_REQ`，`running`/`waiting` 按实际队列对齐；下游 async-chunk 的 segment stop 必须先清除该 segment 的 finished 标记，再从 `skipped_waiting` 转为 ordinary `WAITING` 并恢复 connector polling，同一 update 尾部按 stale stopped 集合清理时不得移除这个已重新入队的 request；running purge 必须限定本次 finish 集合，并确保 `_free_request`、coordinator 与 connector 清理恰好执行一次。
+- 禁止：把任意已完成请求重新打开；对脱离所有 live queue、可能等待 deferred block free 的终态请求调用释放；因 request 在本轮进入时是 `WAITING_FOR_CHUNK` 就撤销其同轮 requeue；全局清空 running 中无关的 resumable segment；重复消费单遍 request-id iterator，或因非流式 skipped 请求错误减少 streaming counter。
+- 验收：AR 与 generation scheduler 均覆盖 hidden、`running`、`waiting`、`skipped_waiting`、脱离队列及无关 resumable 请求；另覆盖下游 receiver 从 segment stop 同轮转回 `WAITING`，断言它保留在 waiting queue、离开 skipped queue、流式等待计数递减且 segment-finished 标记清除；首次 finish 恰好释放、第二次无操作，并验证 generator request-id 输入。^[PR #6089] ^[PR #6360]
 
 ## SCHED-6a — async discard 的计数单位必须与 stale drain 一致
 

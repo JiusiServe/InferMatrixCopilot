@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406"]
+sources: ["PR #5744", "PR #5976", "PR #6089", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406"]
 confidence: high
 ---
 
@@ -76,6 +76,13 @@ confidence: high
 - 强制：只为 custom processor shallow-copy request，并递归复制其可变容器输入（additional information、prompt/token lists）；tensor leaves 保持共享。每个 queued segment boundary 在入队时移除 sender dedup watermark，使下一个 segment 能从零建立自己的 watermark；后台发送旧 task 不得清除新 segment 的 watermark。
 - 禁止：给无 hook 的直通路径增加 request snapshot/copy；让 queued task 读取后来 mutation 的 token、metadata 或 output history；在后台 terminal cleanup 无条件删除可能已属于下一 segment 的 watermark。
 - 验收：old/new segment 在 background flush 前交错时，新 watermark 保持；连续入队后各 processor 观察各自 admission-time request snapshot；无 custom processor 时 task 仍引用原 request。^[PR #6021]
+
+## DIST-1h — abort 不能让旧 sender generation 复活
+
+- 触发：async-chunk sender 在 background save/connector put 期间 abort，且 external request ID 可复用。
+- 强制：queued task 与其 sender generation token 绑定；abort 取消 token，旧 task 在 put 前后均须拒绝更新 state，in-flight task 在 finally 中回收。sender-state lock 只保护 token/state transition，不能包住 payload construction 或 connector I/O。
+- 禁止：`cleanup_sender` 清空 map 后让 pending save 用默认 chunk counter 写回旧 chunk 0；让 scheduler thread 等待 connector I/O；把同一 external ID 的新 generation 误当作旧 task 的 cleanup target。
+- 验收：覆盖 pending/in-flight abort、stale put completion、ID reuse 和普通 async-chunk transport。^[PR #6089]
 
 ## DIST-2a — diffusion EP group 必须满足运行中 MoE backend 的 communicator 合同
 

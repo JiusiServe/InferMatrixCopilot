@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, models, serving]
-sources: [vllm_omni/deploy/nemotron_labs_voicechat.yaml, vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/deploy/nemotron_labs_voicechat_streaming.yaml, vllm_omni/experimental/fullduplex/nemotron_voicechat/, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/asr/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py]
+sources: ["PR #6089", vllm_omni/deploy/nemotron_labs_voicechat.yaml, vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/deploy/nemotron_labs_voicechat_streaming.yaml, vllm_omni/experimental/fullduplex/nemotron_voicechat/, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/asr/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py]
 confidence: high
 ---
 
@@ -31,7 +31,9 @@ confidence: high
 
 ## 依赖的共享代码模块
 
-- `vllm_omni/experimental/fullduplex/` → 无对应 component owner
+- `vllm_omni/experimental/fullduplex/openai/` → [serving](../../components/serving/_index.md)
+- `vllm_omni/core/sched/` → [scheduler](../../components/scheduler/_index.md)
+- `vllm_omni/distributed/omni_connectors/` → [distributed](../../components/distributed/_index.md)
 - `vllm_omni/model_executor/models/` → [model-executor](../../components/model-executor/_index.md)
 - `vllm_omni/config/stage_config/` → [configuration](../../components/configuration/_index.md)
 
@@ -53,4 +55,4 @@ confidence: high
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 该模型的硬门禁规则 | 尚未沉淀；由逐 commit 同步命中该 owner 时在 `rules.md` 建立 |
+| 原生 duplex、帧/工具合同与验证边界 | [Nemotron VoiceChat rules](rules.md) |
