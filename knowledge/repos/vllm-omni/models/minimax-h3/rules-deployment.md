@@ -1,10 +1,10 @@
 ---
 title: "MiniMax H3 部署与证据规则"
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5850", "PR #5857", "PR #5863", recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", "PR #6555", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, "PR #5910", "PR #6213", "PR #6345", "tests/diffusion/models/minimax_h3/test_minimax_h3_vae_tiling.py", "PR #6072", "PR #6526", tests/diffusion/models/minimax_h3/test_minimax_h3_dlo_lifecycle.py, tests/diffusion/offloader/test_module_residency.py]
+sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5850", "PR #5857", "PR #5863", recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", "PR #6555", "PR #6556", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, .buildkite/cuda/test-merge.yml, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/e2e/online_serving/minimax_h3/, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, "PR #5910", "PR #6213", "PR #6345", "tests/diffusion/models/minimax_h3/test_minimax_h3_vae_tiling.py", "PR #6072", "PR #6526", tests/diffusion/models/minimax_h3/test_minimax_h3_dlo_lifecycle.py, tests/diffusion/offloader/test_module_residency.py]
 confidence: high
 ---
 
@@ -253,3 +253,13 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
 - 强制：`_encode_visual_conditions` 必须在同一个 `video_vae` residency window 内完成该请求的全部 image 与 video encode；`_encode_reference_audio_conditions` 必须在同一个 `audio_vae` residency window 内完成 embedded 与 standalone audio encode。resident helper 只能在对应 scope 内调用，scope 退出时必须释放 component，异常也必须清理。
 - 禁止：按 image、video 或 audio 条目分别建立重复的 H2D/D2H lifecycle；在前一个 scope 结束后直接调用 CPU-bound VAE；把单次 image 的行为外推为混合 reference，或把 transfer-level A/B 结果写成完整模型峰值显存与通用性能保证。
 - 验收：contract tests 覆盖单/多 image、image+video、embedded+standalone audio 以及 encode exception，精确断言每个 VAE 只有一次 activate/offload；另验证 H3 model-level offload 注册所有实际 DiT 与 VAE stage，并以固定硬件和 workload 单独复核真实性能与输出质量。^[PR #6072]
+
+## MMH3-3m — H100_2 merge lane 只覆盖精确 H3 CI matrix
+
+- 触发：H3 CUDA merge CI、DLO/DP/TP/USP/HSDP/TE/VAE-PP e2e fixture。
+- 强制：一个 `h100_2` 150m job 以四个独立 35m pytest spawn processes 运行：FL2VA TP1/DP2 两并发、
+  Ref2VA image-only 同配置、Turbo FL2VA TP2+DLO/no-AllGather（五 sigma/四 eval）、FastH3 1024×576
+  四步 HSDP2/USP2/TE TP2/VAE PP2。断言仅同步 MP4 geometry/FPS/audio positive sample。
+- 禁止：把 CI collection 写成 runtime support/performance/general topology proof；final target 的 runtime
+  changes已 reverted，不得以它宣称 generic support。
+- 验收：核对四 process timeout/request 600s/spawn isolation 与上述 exact cases。^[PR #6556]

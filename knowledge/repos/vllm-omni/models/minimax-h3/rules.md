@@ -47,6 +47,7 @@ confidence: high
 | DGX Spark、GB10、unified memory、FP8、offload/OOM | [MMH3-3e](rules-deployment.md#mmh3-3e-gb10-unified-memory-容量证据不等于离散-gpu-offload-合同) | single-partition recipe → allocator/header evidence → output probe |
 | RTX PRO 6000、TP2、Ulysses、2/4/8 GPU、PCIe | [MMH3-3f](rules-deployment.md#mmh3-3f-rtx-pro-6000-scaling-只绑定单机-t2va-协议) | topology → exact warmed T2VA measurements → memory method |
 | Ascend packed varlen、LaserAttention、mask churn、E2E/HBM | [MMH3-3g](rules-deployment.md#mmh3-3g-ascend-mask-free-数字只绑定报告的-h3-packed-workload) | H3 opt-in → exact NPU topology/workload → kernel/E2E/memory evidence |
+| H100_2 merge、FL2VA/Ref2VA DP2、Turbo、FastH3 | [MMH3-3m](rules-deployment.md#mmh3-3m-h100_2-merge-lane-只覆盖精确-h3-ci-matrix) | one CI job → four isolated pytest processes → bounded media assertions |
 
 ## MMH3-1b — joint video/audio quality 与 offload 兼容性必须一起验收
 
