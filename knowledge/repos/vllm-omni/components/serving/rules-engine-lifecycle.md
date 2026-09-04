@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5221", "Issue #4855", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, tests/engine/test_orchestrator_event_driven.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py, "PR #6564", tests/engine/test_orchestrator.py, tests/entrypoints/openai_api/test_qwen3_omni_realtime_websocket.py, "PR #6189", tests/entrypoints/test_async_omni_diffusion_config.py, "PR #6367", vllm_omni/outputs/output_processor.py, tests/engine/test_async_omni_engine_abort_ack.py, tests/entrypoints/test_async_omni_pause_sleep_routing.py]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5221", "Issue #4855", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", "PR #6484", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/engine/stage_runtime.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/stage_diffusion_client.py, tests/engine/test_membership_controller.py, tests/engine/test_orchestrator_event_driven.py, tests/engine/test_async_omni_engine_stage_init.py, tests/engine/test_single_stage_mode.py, tests/entrypoints/test_omni_base_profiler.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py, "PR #6564", tests/engine/test_orchestrator.py, tests/entrypoints/openai_api/test_qwen3_omni_realtime_websocket.py, "PR #6189", tests/entrypoints/test_async_omni_diffusion_config.py, "PR #6367", vllm_omni/outputs/output_processor.py, tests/engine/test_async_omni_engine_abort_ack.py, tests/entrypoints/test_async_omni_pause_sleep_routing.py]
 confidence: high
 ---
 
@@ -290,9 +290,12 @@ confidence: high
 - 禁止：只解析或记录 `runtime.env` 却不应用到本地 launch；把 stage 环境永久污染到父进程；用 runtime env scope 替代 diffusion device scope；将该本地 scope 推广到 remote replica 或 headless worker launcher。
 - 验收：CPU/mock 回归分别覆盖 LLM 和 diffusion launch 看到 stage 值、父环境已有值恢复、原先未设置的 key 在异常后被清理，以及 diffusion launch 同时看到 stage device 值；确认 LLM launch lock 仍覆盖进程创建。^[PR #6214]
 
-### SERV-9a — client diffusion batch width 不得覆盖 scheduler admission capacity
+### SERV-9a — `max_num_seqs` 是唯一 diffusion admission width
 
-- 触发：diffusion stage 初始化或 replica launch 接收客户端 `batch_size`，或修改其 engine config、scheduler capacity 与 stage startup 路径。
-- 强制：`initialize_diffusion_stage` 和 `launch_diffusion_stage_replica` 只将 `batch_size` 转发给 `StageDiffusionClient`；`build_diffusion_config()` 解析出的 `od_config.max_num_seqs` 必须保持 CLI `--max-num-seqs` 或 stage YAML 的值。两条启动路径和 single-stage 路径都不得把 client `diffusion_batch_size` 映射为 scheduler capacity。
-- 禁止：在 shared init path 写入 `od_config.max_num_seqs = batch_size`，或用 `max(CLI, batch_size)` 合并两个独立旋钮；也不得从 `max_num_seqs > 1` 推断具体 pipeline 自动支持 request batching，兼容 admission 仍受 `DIFF-6a` 约束。
-- 验收：分别 mock `initialize_diffusion_stage` 和 `launch_diffusion_stage_replica`，断言 config 的 `max_num_seqs` 保留 CLI/YAML 的 `1`、`8` 或 `None`，而 client 仍收到 `batch_size`；回归 single-stage 初始化。Wan request-level batching 必须显式设置 `--max-num-seqs N` 或 YAML；Qwen-Image step-execution 的并发 scheduler capacity 不得被默认 `diffusion_batch_size=1` 降为 1。^[PR #5676] ^[PR #6525] ^[Issue #6435]
+- 触发：diffusion stage startup、scheduler admission width 或 legacy `diffusion_batch_size` caller。
+- 强制：`max_num_seqs` 是 CLI/YAML 到所有 startup paths 的唯一 admission width；legacy public
+  `diffusion_batch_size` kwarg 必须抛 actionable `TypeError`，不得 alias、drop 或做 precedence merge。
+- 禁止：把 width 当作 pipeline fusion/request-batch support；serial pipeline 在 width>1 时必须 init fail，
+  实际 request batching 仍由 `DIFF-6a` structural compatibility/isolation 证明。删除 YAML comment 不是行为文档。
+- 验收：覆盖 inline/multiproc/single-stage 保留 configured width、legacy kwarg loud failure、serial
+  pipeline width>1 init reject，及真正 request-batch pipeline 的 DIFF-6a admission control。^[PR #6484]
