@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3805", "PR #5374", vllm_omni/entrypoints/openai/, vllm_omni/inputs/]
+sources: ["PR #3805", "PR #5374", vllm_omni/entrypoints/openai/, vllm_omni/inputs/, "PR #5181"]
 confidence: high
 ---
 
@@ -110,3 +110,11 @@ confidence: high
 - 验收：分别验证 positional model、`--model`、`--gpu_memory_utilization` 等下划线参数和连字符参数均可解析，并断言 `args.model` 与 `args.model_tag` 一致且服务加载请求模型，不会回退到默认 LLM。^[PR #3805]
 
 engine 生命周期见 [engine 生命周期规则](rules-engine-lifecycle.md)；故障隔离见 [fault isolation 规则](rules-fault-isolation.md)。
+
+## SERV-4n — Omni Chat Completions 的 prompt token details 必须保留零值与多模态计数
+
+- 触发：修改 Omni Chat Completions 的 streaming/non-streaming usage 序列化、`prompt_tokens_details`、prefix-cache 统计或多模态 token 计数传播。
+- 强制：启用 `enable_prompt_tokens_details` 时，streaming 与 non-streaming 路径都必须复用 upstream 的 prompt-token-details helper，传递 engine prompt 的 multimodal token counts，并保留 `cached_tokens` 为 `0` 的详情对象；未启用时不得为此执行额外计数。
+- 禁止：用 truthiness 判断 `num_cached_tokens` 而丢弃零值；只在一种响应模式填充详情；丢弃 `multimodal_tokens` 或以不同逻辑分别构造两种 usage；将该响应合同混同为 Prometheus 指标合同。
+- 验收：分别覆盖 streaming 与 non-streaming、`cached_tokens=0` 及非零值、image/audio 多模态计数和详情开关关闭场景，断言响应字段一致、计数准确且关闭时不产生详情。^[PR #5181]
+
