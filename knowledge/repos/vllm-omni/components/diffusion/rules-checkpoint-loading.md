@@ -1,10 +1,10 @@
 ---
 title: "Checkpoint、加载与量化合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6162", "PR #6234", "PR #6279", "PR #6445", "PR #6486", "PR #6591", "PR #6651", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, vllm_omni/quantization/svdquant_config.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #4061"]
+sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6162", "PR #6234", "PR #6279", "PR #6445", "PR #6486", "PR #6591", "PR #6651", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, vllm_omni/quantization/svdquant_config.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/offloader/, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #6722", "PR #4061"]
 confidence: high
 ---
 
@@ -157,9 +157,9 @@ confidence: high
 ## DIFF-2u — diffusion 并行状态必须保持单一拓扑所有权并原子清理
 
 - 触发：修改 diffusion `parallel_state`、HSDP/FSDP2 `DeviceMesh`、SP/CFG/PP group、VAE patch parallel 或并行状态初始化与销毁。
-- 强制：`RankGenerator` 只表达真实正交的 TP/SP/PP/CFG/DP 轴；HSDP 不得作为额外轴，FSDP2 `DeviceMesh` 独占 replicate/shard 进程组；VAE tile parallel 直接从 WORLD 选 rank。初始化前验证 distributed 已启动且状态为空，组创建失败时必须清理本次已创建的 diffusion 与 vLLM 组；销毁时同时清空 vLLM `_PP` 等引用。
-- 禁止：重新创建冗余 `_DIT` 或 `_FS` 组；把 HSDP shard 当作 `RankGenerator` 的乘法维度；让 HSDP 继续依赖已移除的 fully-shard accessor；清理后保留已销毁的 pipeline group 或允许残留部分状态阻塞下一次初始化。
-- 验收：覆盖 HSDP standalone、HSDP+SP/CFG、VAE WORLD group、mesh 维度与实际 WORLD 不一致、初始化中途异常、重复初始化和销毁后重初始化；断言失败后无残留组，vLLM `_PP` 被置空，MiniMax H3 的 VAE/pipeline caller 使用 `get_world_group().device_group`，并以真实多 rank smoke 验证 DeviceMesh 与 collective 拓扑。^[PR #5531]
+- 强制：`RankGenerator` 只表达真实正交的 TP/SP/PP/CFG/DP 轴；HSDP 不得作为额外轴。仅当 `use_hsdp` 时，在 post-#5531 atomic initializer 中建立 fully-sharded FS（连续 rank run）与 replica RP（同 shard position）group，并公开其 local rank；先验证 shard degree 为正且整除 WORLD，再创建任一 group。VAE tile parallel 直接从 WORLD 选 rank；初始化失败必须清理本次 diffusion 与 vLLM 组，销毁时清空 FS/RP 及 vLLM `_PP` 等引用。
+- 禁止：把 HSDP shard 当作 `RankGenerator` 的乘法维度；在非 HSDP 路径创建或查询 FS/RP；用 global rank 取代 group-local rank；在校验失败前分配 communicator，或清理后保留已销毁的 pipeline/FS/RP state。
+- 验收：覆盖 HSDP standalone、HSDP+SP/CFG、非法 zero/non-divisible shard size 在任何 group 创建前失败、FS/RP construction 与 teardown、重复初始化和销毁后重初始化；断言失败后无残留组，vLLM `_PP` 被置空，并以真实 multi-rank CPU/Gloo smoke 验证 collective topology。^[PR #5531] ^[PR #6722]
 
 ## DIFF-2v — SANA-WM Stage-1 checkpoint 必须保持标准 Diffusers 布局
 
