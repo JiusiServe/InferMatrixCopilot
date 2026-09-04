@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102", "PR #6054", "vllm_omni/platforms/npu/platform.py", tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6674", vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_generation_model_runner.py, vllm_omni/platforms/npu/worker/npu_model_runner.py]
+sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102", "PR #6563", "PR #6054", vllm_omni/platforms/npu/platform.py, tests/platforms/npu/test_diffusion_platform.py, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6674", vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_generation_model_runner.py, vllm_omni/platforms/npu/worker/npu_model_runner.py]
 confidence: high
 ---
 
@@ -80,9 +80,9 @@ confidence: high
 ## EXEC-13e — diffusion paged KV 必须经平台 native hook 闭合
 
 - 触发：平台为 diffusion paged KV 增加或修改 BlockTables、native attention metadata builder，或 common adapter 需要支持 CUDA 与 NPU 的不同 native contract。
-- 强制：common `OmniPlatform` 通过 `get_diffusion_kv_block_tables_cls()` 与 `build_diffusion_kv_attn_metadata()` 提供默认 native 实现；NPU 必须返回 `AscendBlockTables`，把 `seq_lens_cpu` 转为 `seq_lens_np`，并使用 `AscendAttentionState.ChunkedPrefill`。common diffusion data plane 只调用 platform hooks，并在 layer registration 阶段验证 resolved backend 与 hook 能力。
+- 强制：common `OmniPlatform` 通过 `get_diffusion_kv_block_tables_cls()`、`build_diffusion_kv_attn_metadata()`、backend specialization 与 prewrite hook 提供默认 native 实现；NPU 必须返回 `AscendBlockTables`，把 `seq_lens_cpu` 转为 `seq_lens_np` 并使用 `AscendAttentionState.ChunkedPrefill`，在 spec discovery 前设 Ascend 支持的 block geometry，并为 FIA 在 piecewise segments 前恰好 prewrite complete K/V span。strict Ulysses 的 Ascend paged backend 必须绕开上游 PCP dispatch。common diffusion data plane 只调用 platform hooks，并在 layer registration 阶段验证 resolved backend 与 hook 能力。^[PR #6563]
 - 禁止：在 common adapter 直接导入 `vllm_ascend` 或硬编码 CUDA `BlockTables`/metadata 假设；把 platform capability 延迟到首次 attention dispatch；平台未提供 native contract 时静默回退 dense 或继续占用 paged KV。
-- 验收：default 与 NPU hook 的 class、metadata 参数和 backend selection 通过 mock/contract 测试，unsupported hook/backend 在物理 cache allocation 前 fail fast；CUDA 与 NPU lane 分别验证 native metadata construction，未运行真实 NPU 硬件时不得宣称 Ascend 生产 parity。^[PR #6102]
+- 验收：default 与 NPU hook 的 class、metadata 参数、block geometry、prewrite 与 backend selection 通过 mock/contract 测试，unsupported hook/backend 在物理 cache allocation 前 fail fast；CUDA 与 NPU lane 分别验证 native metadata construction。硬件证据限于 PR 的 H200/910B request-mode lanes，不能推出其他平台、Ring/AllGather 或性能一般化。^[PR #6102] ^[PR #6563]
 
 ## EXEC-13f — NPU diffusion attention 必须只为会触达 MindIE-SD 的后端提前导入
 

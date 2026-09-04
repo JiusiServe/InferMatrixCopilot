@@ -4,7 +4,7 @@ created: 2026-07-13
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
-sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py", "PR #6306", "PR #6102"]
+sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py", "PR #6306", "PR #6102", "PR #6563", vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, tests/diffusion/models/hunyuan_image3/test_hunyuan_image3_step_execution.py, tests/diffusion/models/hunyuan_image3/test_image_kv_cache_manager.py]
 ---
 
 # HunyuanImage3 开发规则
@@ -46,6 +46,7 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
 | `size-ratio` | size=auto、ratio、batch ratio | `HY3-4a`, `HY3-4b`, `HY3-4c`, `HY3-4d`, `HY3-6g` |
 | `randomness` | seed、RNG、复现 | `HY3-5d`, `HY3-5e`, `HY3-5f`, `HY3-6h` |
 | `alignment-residual` | prompt、token、stop 已验证后仍有真实输出差异 | `HY3-3d`, `HY3-5b`, `HY3-7a`, `HY3-7b`, `HY3-7c`, `HY3-7d`, `HY3-7e` |
+| `paged-kv` | Hunyuan scheduler-paged KV、Q/K/V layout、prefill/denoise span 或 mixed attention | `HY3-5h`, `HY3-5i` |
 
 ## 完整行为链
 
@@ -134,7 +135,7 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
   - 触发：修改 HunyuanImage3 的 `ImageKVCacheManager`、image attention 注册、paged KV role/dtype，或为 `paged_scheduler` 调整启动 memory profile 与参考图数量。
   - 强制：`ImageKVCacheManager` 必须是 `nn.Module` 并以 `forward` 暴露内部 attention，使其出现在 `named_modules()` 而不把 dense cache state 写入 `state_dict()`；内部 attention 必须显式设置 `paged_kv_cache_role="primary"` 与 `paged_kv_cache_dtype=torch.bfloat16`，该 KV dtype 独立于权重加载 dtype。paged 启动 profile 必须经过模型 owner preprocessing，使用 1024x1024、启用 CFG 和 metadata 声明的最大参考图数量，当前 HunyuanImage3 为 3 张；普通 dense warmup 仍保持独立的 512x512、无 CFG 路径。
   - 禁止：保持 cache manager 为普通对象而期待 Worker spec discovery 找到嵌套 attention；把 paged KV 标记省略为默认 dense；只用一张参考图或关闭 CFG 生成 profile 后宣称容量覆盖最大请求；把 Scheduler-only `DiffusionKVRequest` 状态发送到 profile Worker execution。
-  - 验收：模型测试断言 manager 是 `nn.Module`、attention identity 可从 `named_modules()` 读回且 `state_dict()` 为空；spec discovery 断言 layer、role、BF16 dtype 与 layout capability；profile 测试断言最大参考图数量、profile envelope 和 dense mode 的旁路行为。 ^[PR #6094]
+  - 验收：模型测试断言 manager 是 `nn.Module`、attention identity 可从 `named_modules()` 读回且 `state_dict()` 为空；spec discovery 断言 layer、role、BF16 dtype 与 layout capability；profile 后必须清除 dense `image_kv_cache_map/lens` 再 sizing/physical allocation。^[PR #6094] ^[PR #6563]
 
 - **HY3-8a — HunyuanImage3 硬件优化层必须保持平台回退、checkpoint 与 VAE 内存边界**
   - 触发：修改 HunyuanImage3 的 `layers/`、VAE/DiT `ResnetBlock`/`ResBlock`、patch embedding 相关块、平台分派、VAE 高分辨率内存策略或 cuDNN autotune。
@@ -146,5 +147,10 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
   - 触发：修改 HunyuanImage3 的 `ImageKVCacheManager`、Q/K/V head layout，或在 dense 与 Scheduler-managed paged attention 之间切换 GQA 处理。
   - 强制：HunyuanImage3 的 dense 路径继续把 K/V 从 8 个 KV heads 扩展到 32 个 Q heads；paged KV active 时必须保留原生压缩的 32Q/8KV 形状，由 native adapter/backend 消费 `num_heads=32` 与 `num_kv_heads=8`。
   - 禁止：在 paged adapter 中把已经压缩的 K/V 再扩成 Q heads，或为兼容 generic shape 在 adapter 内猜测并折叠重复 head；也不得让 paged 分支改变既有 dense 路径的输出布局。
-  - 验收：以实际 32Q/8KV geometry 覆盖 dense 与 paged 两条路径，断言 attention consumer 的 K/V shape 分别为 32 和 8，并覆盖 adapter 的 packed Q/K/V 与 native backend 调用；真实模型数值和生产 E2E 仍需独立验证。^[PR #6102]
+  - 验收：以实际 32Q/8KV geometry 覆盖 dense 与 paged 两条路径，断言 attention consumer 的 K/V shape 分别为 32 和 8，并覆盖 adapter 的 packed Q/K/V 与 native backend 调用；paged strict-Ulysses 还验证 padding restore 和 required `query_lens/image_mask/position_ids`。^[PR #6102] ^[PR #6563]
 
+- **HY3-5i — paged Hunyuan 只描述模型 layout，runner 驱动请求级 execution**
+  - 触发：修改 HunyuanImage3 `ImageKVCacheManager`、`full_attn_spans`、Scheduler-paged prefill/denoise 或 model/runner ownership。
+  - 强制：model 仅提供 32Q/8KV Q/K/V layout 与每 sequence 的 `full_attn_spans`；runner 从 Scheduler snapshot 激活 rows。first prefill 写整个 allocated sequence，后续 denoise 只从 prefix offset 写 target；paged forward 前清除 model-owned dense prompt state。
+  - 禁止：model 分配 Scheduler blocks、激活 Worker runtime、复用 cross-request prefix，或在 paged path 接受 imported AR KV/negative CFG；不得把 request-mode 覆盖外推为 `denoise_step`、Ring 或 AllGather。
+  - 验收：覆盖 full-allocation prefill、prefix-offset target update、32Q/8KV、full-attention spans 与 dense prompt-state clear；正式证据限 GPU/NPU request execution，其他 execution/parallel contracts另测。^[PR #6563]

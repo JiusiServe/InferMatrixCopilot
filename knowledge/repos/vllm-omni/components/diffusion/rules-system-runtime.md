@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", "PR #6814", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/distributed/a2a_permute.py, vllm_omni/diffusion/distributed/csrc/a2a_permute.cu, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/distributed/test_a2a_permute.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
+sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", "PR #6814", "PR #6563", vllm_omni/diffusion/attention/, vllm_omni/diffusion/diffusion_kv/, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/npu/platform.py, tests/diffusion/diffusion_kv/, tests/diffusion/attention/test_piecewise_attn.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
 confidence: high
 ---
 
@@ -64,7 +64,8 @@ confidence: high
 
 - 触发：启用 paged scheduler、增加 diffusion attention backend 或平台 override。
 - 强制：启动阶段解析并验证每层实际 backend 与当前平台；走 Omni platform hook，保留
-  piecewise/SP 等能力。尚无生产 caller 的模式必须明确告警并文档化。
+  piecewise/SP 等能力。HunyuanImage3 paged requests 已有 GPU/NPU production caller；NPU SDPA 只可作
+  startup memory-profile 的 dense fallback，正式 paged request 必须走 native backend。
 - 禁止：未知平台继承 GPU 默认；分配 cache 后到首次 dispatch 才失败；静默占用 paged KV
   却继续 dense；直接换用 upstream backend 丢失 Omni 能力。
 - 验收：unsupported platform/backend fail-fast；CUDA/NPU 对应 lane 和正式模型 E2E 证明
@@ -173,9 +174,9 @@ confidence: high
 ## DIFF-4p — Scheduler-managed Diffusion KV 必须原子分配并绑定请求生命周期
 
 - 触发：启用 `paged_scheduler`，或修改 Worker KV geometry discovery、显存 profile、Scheduler admission、CFG allocation、`NewRequestData`/DLO RPC envelope 和 request terminal cleanup。
-- 强制：模型加载后从每个 Worker 的 cache-enabled attention 生成 rank-local native `FullAttentionSpec`，以最大 per-rank profile batch 测量 KV headroom，再通过 `get_kv_cache_configs()`、`generate_scheduler_kv_cache_config()` 和 `resolve_kv_cache_block_sizes()` 构造 Worker/Scheduler 配置。Scheduler 侧只能以 native `KVCacheManager` 的薄 wrapper 为物理 owner；每个 CFG sequence 按完整首步 `seq_len` 以 `full_sequence_must_fit=True` 分配，先按空池所需 block 总数做 never-fit 检查，并在所有 sequence 成功前保持原子性。生成的 `DiffusionKVMetadata` 必须与请求绑定并随完整 `NewRequestData` envelope 传到 Worker；完成、取消、错误、pop 和 close 都必须释放整组 allocation，preemption 只保留既有 allocation。
+- 强制：模型加载后从每个 Worker 的 cache-enabled attention 生成 rank-local native `FullAttentionSpec`，以最大 per-rank profile batch 测量 KV headroom，再通过 `get_kv_cache_configs()`、`generate_scheduler_kv_cache_config()` 和 `resolve_kv_cache_block_sizes()` 构造 Worker/Scheduler 配置。Scheduler 是 logical allocation/generation owner，Worker 是 physical tensors/BlockTables/slot mappings owner；每个 CFG sequence 按完整首步 `seq_len` 以 `full_sequence_must_fit=True` 分配，先按空池所需 block 总数做 never-fit 检查，并在所有 sequence 成功前保持原子性。生成的 `DiffusionKVMetadata` 必须与请求绑定并随完整 `NewRequestData` envelope 传到 Worker；完成、取消、错误、pop 和 close 都必须释放整组 allocation，preemption 只保留既有 allocation。^[PR #6563]
 - 禁止：引入独立 block pool、KV spec、refcount 或 physical lifecycle；把部分 CFG 分配当作成功；把临时容量不足误报为永久失败，或让 never-fit 请求在 FIFO 头部无限阻塞；在 DLO DP wave 中拆开 request 与对应 metadata，或让 scheduler/busy-loop 异常逃逸而不唤醒请求流。
-- 验收：覆盖 dense 默认旁路、rank/spec/memory mismatch、profile 顺序、CFG partial rollback、临时压力返回 `None` 后 FIFO 重试、空池也放不下时只终止该请求、native allocation error、preemption metadata 保留，以及 finish/cancel/error/pop/close 全部释放；DLO 多 rank RPC 必须逐 envelope 保持 request 与 metadata 配对。 ^[PR #6094]
+- 验收：覆盖 dense 默认旁路、rank/spec/memory mismatch、profile 顺序、CFG partial rollback、临时压力返回 `None` 后 FIFO 重试、空池也放不下时只终止该请求、native allocation error、preemption metadata 保留，以及 finish/cancel/error/pop/close 全部释放；Hunyuan first prefill 覆盖整 allocation，denoise 只写 prefix-offset target。^[PR #6094] ^[PR #6563]
 
 ## DIFF-4t — HiDream-O1 checkpoint signature 必须正向门禁
 
@@ -187,6 +188,6 @@ confidence: high
 ## DIFF-4u — Worker 物理 paged KV 必须与 Scheduler 逻辑分配分层并原子安装
 
 - 触发：启用或修改 diffusion Worker 的 native paged KV data plane、请求 row registry、paged attention adapter、BlockTables 更新或唤醒/终止清理。
-- 强制：Scheduler 只拥有 logical block allocation、generation 和 `DiffusionKVMetadata`；每个 Worker rank 消费自己的 `KVCacheConfig`，拥有物理 KV tensors、native `BlockTables` 和 request/sequence/context rows。安装 metadata 前必须校验 group/count/range/capacity，并以 staged append、apply 和失败 rollback 原子发布；重复 generation 幂等，冲突或过期快照拒绝，BlockTables 变更使已准备的 attention batch 失效，终止时先清 Worker rows 而不释放 Scheduler blocks。
+- 强制：Scheduler 只拥有 logical block allocation、generation 和 `DiffusionKVMetadata`；每个 Worker rank 消费自己的 `KVCacheConfig`，拥有物理 KV tensors、native `BlockTables` 和 request/sequence/context rows。安装 metadata 前必须校验 group/count/range/capacity，并以 staged append、apply 和失败 rollback 原子发布；重复 generation 幂等，冲突或过期快照拒绝，BlockTables 变更使已准备的 attention batch 失效，终止时先清 Worker rows 而不释放 Scheduler blocks。request-mode runner 负责从 snapshot 构造并激活 prefill/denoise row metadata；model 只提供 Q/K/V layout 与 `full_attn_spans`。
 - 禁止：Worker 自行分配或释放 Scheduler-owned logical blocks；把部分 row 安装、native append/apply 异常或 stale snapshot 当作成功；从 padding 猜异构 prefix 的逻辑布局；在清理或 wake refresh 后继续复用旧的 native metadata/buffer view。
-- 验收：CPU/mock 覆盖 rank-local config、请求/上下文 row mapping、重复/过期/冲突 generation、非法 block 与容量、append/apply rollback、幂等清理和 wake refresh；GPU 另验证非连续 BlockTables、GQA、异构 prefix 与 piecewise attention。该 PR 不证明跨 stage KV transport、W2 prefix-cache 或真实 HunyuanImage3 E2E。^[PR #6102]
+- 验收：CPU/mock 覆盖 rank-local config、请求/上下文 row mapping、重复/过期/冲突 generation、非法 block 与容量、append/apply rollback、幂等清理和 wake refresh；GPU/NPU 另验证非连续 BlockTables、32Q/8KV GQA、异构 prefix 与 piecewise attention。Hunyuan paged request execution 不证明 `denoise_step`、cross-request prefix reuse、AR KV、negative CFG、Ring 或 AllGather。^[PR #6102] ^[PR #6563]
