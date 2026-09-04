@@ -1,15 +1,15 @@
 ---
 title: "MiMo-Audio（融合 thinker+talker 单 AR stage 语音模型）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/mimo_audio/, vllm_omni/deploy/mimo_audio.yaml, vllm_omni/model_executor/stage_input_processors/mimo_audio.py]
+sources: ["PR #6559", recipes/XiaomiMiMo/MiMo-Audio.md, vllm_omni/model_executor/models/mimo_audio/, vllm_omni/deploy/mimo_audio.yaml, vllm_omni/deploy/mimo_audio_5090d.yaml, vllm_omni/model_executor/stage_input_processors/mimo_audio.py]
 ---
 
 # MiMo-Audio
 
-以下事实在 `main @ 5d44868e` 复核。
+以下运行时事实在 `main @ 5d44868e` 复核；recipe/deploy 增量在 `main @ 816335cb` 复核。
 
 ## 名称与范围
 
@@ -45,9 +45,16 @@ sources: [vllm_omni/model_executor/models/mimo_audio/, vllm_omni/deploy/mimo_aud
 
 ## 配置与 checkpoint 差异
 
-- `mimo_audio.yaml`（唯一 deploy）：`async_chunk: true` 单卡侧写;头注给出
-  legacy 双卡 sync 模式的 `--stage-overrides` 用法;连接器
-  `codec_chunk_frames 30` / `codec_left_context_frames 40`。
+- 默认 `mimo_audio.yaml` 是 `async_chunk: true` 单卡侧写；头注给出 legacy 双卡
+  sync 模式的 `--stage-overrides` 用法，连接器为 `codec_chunk_frames 30` /
+  `codec_left_context_frames 40`。PR #6559 另加模型专用
+  `mimo_audio_5090d.yaml`：同一 GPU 上 stage 0/1 的 `0.78`/`0.12` 显存比例、
+  `TRITON_ATTN`、eager、无 prefix cache 与 disabled FlashInfer autotune。它是社区在
+  1× RTX 5090D 32 GB 的离线 `tts_sft` 观察，不是通用 Blackwell、在线服务或所有
+  MiMo-Audio task 的运行时支持声明。
+- 该 recipe 的 CPU tokenizer 省显存路径依赖 PR #6539（或等效 tokenizer-device
+  修复）；目标 pin 没有合入该运行时修复。因此不能把 `MIMO_AUDIO_TOKENIZER_DEVICE=cpu`
+  当作此版本无条件可用的默认能力，也不能从 recipe 的配置外推性能、音质或其他 SKU。
 - 在线 serving 必须带 MiMo 自己的 `chat_template.jinja`
   （`examples/online_serving/mimo_audio/`）。
 - 已知常量不一致（pin 上如实记录）：`MAX_CODE2WAV_TOKENS=18192` 与 stage-1

@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 59cf3add`（2026-08-26）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 816335cb`（2026-08-26）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -38,7 +38,7 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 | AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 81 个架构名 / 31 个模型族目录 |
 | Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 65 条 pipeline / 40 个模型族目录 |
 | Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 55 个 key |
-| Deploy YAML | `vllm_omni/deploy/*.yaml` | 83 份 |
+| Deploy YAML | `vllm_omni/deploy/*.yaml` | 84 份 |
 
 对比上一审计快照（`39c16d75`）：AR 架构 88→81，diffusion pipeline 65→64，
 OMNI_PIPELINES 57→55，deploy 86→84。PR #6353 删除 AudioX 的 diffusion registry、
@@ -55,6 +55,10 @@ body 明确扩大为完整 first-party 删除。^[PR #6357] ^[Issue #5996]
 
 PR #6619 删除独立的 `minicpmo_4_5_duplex.yaml`，将 duplex 配置并入全部 shipping MiniCPM-o
 profile，因此 deploy inventory 84→83；这是 profile 合并，不是 MiniCPM-o 能力删除。^[PR #6619]
+
+PR #6559 增加 `mimo_audio_5090d.yaml`，使 deploy inventory 83→84；这是 MiMo-Audio 的
+社区 1× RTX 5090/5090D 32 GB recipe profile，不增加 registry 架构或 pipeline key，且不构成
+其他 Blackwell SKU、online serving、性能或音质的支持证明。^[PR #6559]
 
 PR #4820 将 `WanDMDPipeline` 注册为 Wan2.2 的同实现入口，因此 diffusion pipeline
 计数回升至 65；它不是新的模型族或新的 `OMNI_PIPELINES` key。^[PR #4820]
