@@ -148,6 +148,14 @@ modules:
     test_paths: [tests/diffusion/test_inductor_divisibility_patch.py]
     wave: 1
     risk: high
+  # Filesystem-backed immutable host artifacts have process-wide lock, lease,
+  # durability, and fallback contracts; keep this owner explicit rather than
+  # letting generic runtime scopes silently omit it.
+  host_weight_runtime:
+    local_paths: [vllm_omni/host_weight_runtime/]
+    test_paths: [tests/host_weight_runtime/]
+    wave: 1
+    risk: high
   sampling:
     local_paths: [vllm_omni/sample/]
     wave: 1

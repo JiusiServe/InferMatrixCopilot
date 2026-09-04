@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components]
-sources: ["PR #6419", "PR #6427", "PR #6445", "PR #6486", "PR #6591", vllm_omni/host_weight_runtime/]
+sources: ["PR #6419", "PR #6427", "PR #6445", "PR #6486", "PR #6591", "PR #6692", vllm_omni/host_weight_runtime/]
 confidence: high
 ---
 
@@ -61,6 +61,29 @@ confidence: high
   把 producer 顺序提示写进 artifact identity，或让 unordered output 复用 ordered fast path。
 - 验收：覆盖 ordered write-time digest、unordered parallel readback、payload `fsync` failure、digest
   mismatch 与 publication barrier，断言失败不产生可命中的 `READY` artifact。^[PR #6591]
+
+## HWR-1e — filesystem lifecycle transition 必须 fail-closed
+
+- 触发：修改 filesystem store 的 publication、deny、cleanup、quarantine、rename、chmod 或 directory
+  `fsync` 路径。
+- 强制：每个 artifact move 均在 exclusive artifact lock 下先持久标记打开 inode 为 invalid，再临时
+  加 owner-write、atomic rename、re-harden 并同步两个 parent，最后清除 marker；新 staging artifact
+  将 marker 随 rename 带入，只有 harden + durability barrier 后才成为 ready。合作 reader 在 open 和
+  返回 lease 前检查 marker；中断 cleanup 的 `.cleanup.*` tombstone 由后续 exact-key cleanup/build
+  重试，quarantine 中带 marker 的过渡目录先 re-harden。deny marker 发布失败时，同步标记并按 inode
+  比较后 containment，绝不隔着 lock handoff quarantine 新的 replacement。
+- 强制：结构/manifest/checksum 语义错误仍是 validation invalid；暂态 read/hash/deny/lock/durability
+  I/O 是 retryable storage failure，保留未知 competing entry。rename 后、authority commit 前的任一
+  失败必须 containment；marker 与 quarantine 都不能持久化时返回 retryable、`outcome_uncertain`
+  failure，不能报告可被后续 HIT 反驳的 non-authoritative publication failure。authority commit 后的
+  lock-release 类错误只记录，不得把 ready artifact 改报失败。
+- 禁止：将 hardened artifact 直接 rename（overlayfs/tmpfs 可拒绝）；把暂态 I/O 伪装为 semantic
+  corruption；在 containment 不确定时允许 weaker lookup lease；在已提交 ready entry 上返回相反的
+  publication failure。
+- 验收：在 overlayfs/tmpfs 覆盖 hardened cleanup/quarantine/rebuild；故障注入覆盖 pre/post-rename
+  crash、chmod/rename/parent-sync/deny-write failure、marker+quarantine double failure、weaker lookup
+  race、competing manifest I/O 与 post-authority release，并断言 typed retryability、inode-safe
+  containment、tombstone repair 和无 contradictory HIT。^[PR #6692]
 
 ## HWR-2a — restore 是 validation-only plan 加一次性 commit
 

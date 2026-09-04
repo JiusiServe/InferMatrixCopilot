@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, components]
-sources: ["PR #6419", "PR #6486", "PR #6591", vllm_omni/host_weight_runtime/]
+sources: ["PR #6419", "PR #6486", "PR #6591", "PR #6692", vllm_omni/host_weight_runtime/]
 confidence: high
 ---
 
@@ -24,4 +24,4 @@ confidence: high
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| typed failure、lease/store concurrency、single-take carrier、restore transaction | [rules](rules.md) |
+| typed failure、lease/store concurrency、single-take carrier、restore transaction，以及 hardened artifact 的 cleanup/quarantine/publication、deny-marker 或 durability I/O failure | [rules](rules.md) |
