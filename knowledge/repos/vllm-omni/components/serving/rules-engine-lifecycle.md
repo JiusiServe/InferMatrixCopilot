@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py]
 confidence: high
 ---
 
@@ -164,6 +164,20 @@ confidence: high
 - 禁止：让 attach 前的 stale `UP` snapshot 立即删除刚注册 client；并发重复创建同一 replica；shutdown 后继续接受 register 或挂入 late client；把“曾在任意 generation 出现”当作当前 attachment 已确认。
 - 已知边界：`asyncio.to_thread` 中正在执行的 factory 不能随外层 task cancellation 一起停止；若 membership task 被直接取消，thread 后来返回的 client 仍可能失去 cleanup owner。该低严重度泄漏在 PR 中明确延期，现有 shutdown/late-result 回归不能证明 cancellation 路径已关闭。
 - 验收：覆盖 register storm、register 前后 stale/fresh `UP`、attach 中 watcher churn、untracked disappearance、invalid stage/address、`add_client` 异常、shutdown-before/during/after factory、detach 后重新注册和受影响 request error；另以专门用例保留或修复上述 cancellation leak。^[PR #5277]
+
+### SERV-5o — wake 的设备同步只在 device-owning worker 执行
+
+- 触发：修改 `AsyncOmni` 的 wake RPC、worker `handle_wake_task()`，或为 sleep/wake
+  增加 platform/CUDA 同步。
+- 强制：`AsyncOmni` 只 dispatch wake RPC、等待 ACK 并更新 frontend 状态；实际 device
+  同步留在执行 wake 的 worker 路径。这样 proxy 或 HTTP-server-only 的 `AsyncOmni` 不会因
+  wake bookkeeping 初始化 CUDA context。
+- 禁止：在 `AsyncOmni` 的 wake completion 路径重新导入 platform 或调用全局
+  `synchronize()`；不能以收到 ACK 代替 worker 已完成其设备同步的合同。
+- 验收：用不拥有 CUDA device 的 proxy/frontend 实例经过 diffusion wake RPC，断言
+  frontend 不创建 CUDA context；另断言 worker `handle_wake_task()` 在返回成功 ACK 前仍完成
+  同步。PR #4092 只声称既有测试通过，未提供可复现命令或该 proxy 回归；其要求 inline
+  guard/comment 的 review thread 在合并时仍未 resolve，故这条验收尚未被该 PR 证明。^[PR #4092]
 
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 
