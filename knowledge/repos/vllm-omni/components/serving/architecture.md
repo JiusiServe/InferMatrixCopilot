@@ -1,10 +1,10 @@
 ---
 title: "Serving 共享架构"
 created: 2026-07-10
-updated: 2026-09-02
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, components, serving]
-sources: ["PR #5085", vllm_omni/entrypoints/, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/engine/orchestrator.py, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #5085", "PR #6114", vllm_omni/entrypoints/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/engine/orchestrator.py, docs/serving/README.md, docs/serving/full_duplex_api.md, docs/serving/openpi_api.md, docs/serving/realtime_api.md, docs/serving/standalone_servers.md, docs/serving/streaming_video_output_api.md, tests/entrypoints/openai_api/test_video_server.py]
 ---
 
 # Serving 共享架构
@@ -37,6 +37,38 @@ PIL frames。当前 loader 调用固定 `backend="pyav"`；注册表复用不等
 - `vllm_omni/entrypoints/`：其他 online/offline 入口及 engine 边界。
 - 请求协议对象：声明字段与兼容扩展的第一层 owner。
 - engine、pipeline、prompt 和 sampling 参数：Serving 转换结果的最终 consumer。
+
+## API server 路由与协议 owner
+
+`vllm serve <model> --omni` 的 unified server 是 task route 的装配点，不是模型 capability
+registry：每个 route 是否能被当前 model/deploy 使用仍由其 pipeline/adapter 决定。HTTP core 的
+task route 是 `POST /v1/chat/completions`、`/v1/audio/speech`、`/v1/audio/generate`、
+`/v1/images/generations`、`/v1/images/edits`、`/v1/videos`，以及仅供简单脚本/测试的 blocking
+`POST /v1/videos/sync`；health/model discovery 是 `GET /health`、`GET /v1/models`。同一 server
+还 owner chat/speech batch、voice CRUD、video job list/get/delete/content 与
+`POST /v1/omni/sleep|wakeup`。`POST /v1/completions` 是 inherited vLLM route，能否用于某 task
+取决于模型，不是 Omni task endpoint 的替代承诺。
+
+六条 WebSocket path 不能混用 wire protocol：
+
+| path | owner/协议边界 |
+|---|---|
+| `WS /v1/audio/speech/stream` | incremental text → speech audio |
+| `WS /v1/video/chat/stream` | video frames → text/audio |
+| `WS /v1/realtime` | turn-based JSON events，audio 是 base64 PCM |
+| `WS /v1/duplex` | explicit duplex endpoint；缺少 eligible handler 时 unsupported |
+| `WS /v1/realtime/video` | JSON control 加 binary fragmented MP4 (`m4s`) |
+| `WS /v1/realtime/robot/openpi` | MessagePack with NumPy extension，不是 OpenAI Realtime JSON |
+
+`/v1/realtime?duplex=1` 是第三条 path 的 mode，不是第七条；只有 deployment/model 提供 eligible
+duplex handler 才切换，缺少 handler 则落回 ordinary realtime。客户端应读取 `session.created`
+capabilities，不能根据 URL 假定 duplex。PersonaPlex（`/`、`/health`、`/api/chat`、
+`/v1/audio/duplex`）和 JoyVL（`/health`、`/v1/models`、`/v1/chat/completions`、`/reset`、
+`/v1/streaming/reset`、`/v1/streaming/persona`）是各自独立 process；后者还是调用另一
+OpenAI-compatible backend 的 session orchestrator，二者都不属于 unified server route set。
+
+这份 map 的证据是 PR #6114 的 docs、route registration/static review 与 focused protocol tests；它
+不证明所有 model 的 E2E、硬件行为、吞吐，或这些实验协议的长期稳定性。^[PR #6114]
 
 ## 请求参数怎样流动
 

@@ -10,7 +10,7 @@ sources: []
 # Serving
 
 - 主要源码入口：`vllm_omni/entrypoints/`（cli、openai、openpi 及 omni/async_omni 入口）和 `vllm_omni/engine/`（orchestrator、stage engine core、stage pool/runtime、output processor）
-- 源码校验：以上路径均已在 `main @ 2298359f` 验证存在
+- 源码校验：以上路径均已在 `main @ 44c8d1c4` 验证存在
 - 主要职责：用户入口、请求解析、在线服务和 engine 边界
 
 ## 什么时候查这里
@@ -27,7 +27,7 @@ sources: []
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 理解入口到 engine 的边界 | [architecture](architecture.md) |
+| 理解入口到 engine 的边界，选择 unified HTTP/WS endpoint、区分 wire protocol，或确认 PersonaPlex/JoyVL 是否是独立 server | [architecture 与 API route owner](architecture.md) |
 | 根据 PR 描述直达 request contract、stage sampling constraints、streaming format、artifact readiness、factory lifecycle 或 metrics 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
 | Prometheus family、pipeline waiting/running gauge、stage/replica snapshot 或 collector lifecycle | [metrics 生命周期规则](rules-metrics.md) |
 | upstream launcher shutdown、renderer warmup 与多 replica compile-cache 隔离 | [upstream 兼容规则](rules-upstream-compat.md) |
