@@ -20,6 +20,10 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
   与 follow-up response。它是 protocol/lifecycle coverage，不能单凭 runner 或历史 H200 结果声称
   常规 listen-only 性能提升。 ^[PR #6170]
 
+## MiniCPM Realtime video-frame unit coverage
+
+- PR #6404 adds CPU/unit coverage for closing-append frame placement, held last/still frames, two-frame stacking, Stage 0 marker/embedding ordering, rejected early video appends, dtype conversion, and external WAV video demos. It is protocol and input-assembly coverage; its unchecked full-model video E2E and manual demo do not establish an end-to-end checkpoint pass or video quality result. ^[PR #6404]
+
 ## 不放什么
 
 - 跨仓库通用的测试方法。

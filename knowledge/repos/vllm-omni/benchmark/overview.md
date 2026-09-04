@@ -1,10 +1,10 @@
 ---
 title: "Benchmark Notes"
 created: 2026-07-10
-updated: 2026-09-04
+updated: 2026-09-05
 type: guide
 tags: [vllm-omni, benchmark]
-sources: ["PR #6634", vllm_omni/benchmarks/duplex/, vllm_omni/entrypoints/cli/benchmark/omni_duplex_eval.py, vllm_omni/experimental/fullduplex/client.py]
+sources: ["PR #6404", "PR #6634", vllm_omni/benchmarks/data_modules/daily_omni_dataset.py, vllm_omni/benchmarks/duplex/, vllm_omni/entrypoints/cli/benchmark/omni_duplex_eval.py, vllm_omni/experimental/fullduplex/client.py]
 ---
 
 # Benchmark Notes
@@ -24,3 +24,5 @@ scoring-protocol and evidence contracts are documented in the
 [Omni-DuplexEval guide](guides/omni-duplex-eval.md). ^[PR #6634]
 
 具体 PR 的临时复测、讲解稿和 PR body 数据不再作为长期 benchmark 文档保留。这里仅路由可跨 PR 复用的 workload、口径、artifact 和诊断经验。
+
+Daily-Omni 的 pack-mode 兼容测试随 PR #6404 调整，但没有新增 registry、pipeline 或 benchmark 结果；video frame-to-unit pairing 是 Realtime client/Stage 0 correctness contract，而不是新的 benchmark metric 或性能结论。^[PR #6404]

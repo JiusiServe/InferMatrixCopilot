@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5"
 created: 2026-07-20
-updated: 2026-09-04
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", "PR #6678", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/platforms/npu/models/minicpmo_4_5_code2wav.py, "PR #6082", "PR #6587"]
+sources: ["PR #3642", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", "PR #6404", "PR #6678", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/minicpmo45/stage0.py, vllm_omni/experimental/fullduplex/openai/realtime_input.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/platforms/npu/models/minicpmo_4_5_code2wav.py, "PR #6082", "PR #6587"]
 confidence: high
 ---
 
@@ -54,6 +54,8 @@ fixture 不再覆盖 eager/KV cap 并固定 active-speech turn window；验证�
 Talker chunk、shipping profile 与 chat 隔离见 [native duplex 规则](rules-duplex.md)；Code2Wav
 state、batch cap 与 NPU residual limits 见 [Code2Wav 并发批处理规则](rules-code2wav-batching.md)。新模型语义验证见
 [model validation](../../review/guides/model-validation.md)。
+
+Realtime video 不以「每 200 ms append」定义 frame cadence：首个约 1030 ms、以后每秒关闭的 Stage 0 unit 才接收对应 camera frame；双图 stacking 与外部 WAV 覆盖 soundtrack 的边界见本页已链接的 native duplex 规则 MCPMO-4f。^[PR #6404]
 
 ## 什么时候查这里
 

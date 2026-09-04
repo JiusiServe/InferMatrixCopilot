@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5 native duplex 规则"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #6318", "PR #6346", "PR #6458", "PR #6619", "PR #6630", "PR #6678", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/experimental/fullduplex/minicpmo45/session.py, vllm_omni/experimental/fullduplex/openai/runtime_adapter.py, vllm_omni/experimental/fullduplex/openai/runtime_bridge.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, tests/config/test_config_factory.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py]
+sources: ["PR #6318", "PR #6346", "PR #6404", "PR #6458", "PR #6619", "PR #6630", "PR #6678", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/experimental/fullduplex/minicpmo45/session.py, vllm_omni/experimental/fullduplex/minicpmo45/stage0.py, vllm_omni/experimental/fullduplex/openai/realtime_input.py, vllm_omni/experimental/fullduplex/openai/runtime_adapter.py, vllm_omni/experimental/fullduplex/openai/runtime_bridge.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, vllm_omni/experimental/fullduplex/video_stacking.py, tests/config/test_config_factory.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py]
 confidence: high
 ---
 
@@ -57,3 +57,11 @@ confidence: high
   与未声明 `duplex_session` 时的 server 语义保持一致。CPU 守卫至少覆盖 shipping base 的
   显式容量、未声明字段的 default，及一个从 base 继承容量的 overlay；live probe 再验证在
   该 limit 后收到 capacity error。^[PR #6678]
+
+## MCPMO-4f — omni video frame 必须随其关闭的 audio unit 原子进入 Stage 0
+
+- 触发：修改 MiniCPM-o Realtime duplex 的 camera/video append、Stage 0 streaming prefill、vision embedding，或视频 demo/client 的 audio-frame interleave。
+- 强制：client 以累计 appended PCM 的 unit boundary 绑定 frame `k`：首个 unit 在约 `1030 ms`（`first_chunk_ms=1035` 对齐 160-sample hop 后），后续每 `1000 ms`；frame 只能附在**关闭 unit `k`**的 append，不能在早期 append 暂存或跨 append carry。视频短于音频时保持最后一帧，单张 still 同样重复。`stack_frames=2` 是 previous+current 的两张图；整个 append 的 `frame_list` 都属于它关闭的一个 unit，顺序为 `<unit>`、每张各自 `<image>` + 64 vision embeddings + `</image>`、再 audio。vision hidden states 在拼入 token embedding 前转为 token-embedding dtype。
+- 拒绝：携 frame 但没有关闭 model unit 的 append 必须显式失败，且不推进 `audio_chunk_idx`；不能只丢帧后继续音频。Realtime wire 每 append 最多两张图，stacked composite 不改变一秒 audio cadence。视频 demo 同时传 `--input-wav` 和 `--input-video` 时，外部 WAV 覆盖视频 soundtrack 且决定 frame timeline/duration。
+- 验收：覆盖 frame 0 不早于约 1030 ms、每个 frame `k` 绑定其 closing append、无跨 append carry、short/still hold-last、`[f0]`/`[f0,f1]`/`[f1,f2]` stacked 序列、双图 marker/128 embedding 布局、no-unit rejection 不推进 audio index、dtype 对齐，以及 silent video + external WAV。Daily-Omni pack-mode 测试只覆盖数据包装边界，不能替代 Realtime session 或 Stage 0 验证。^[PR #6404]
+- 已知边界：Stage 0 vision encode 失败虽返回 failed prefill 且不推进 `audio_chunk_idx`，但 `preprocess()` 仍可能 fallback 到原 input ids/embeddings；保留的 scheduler span/KV 或 `num_computed_tokens` 是否推进尚未 abort/rollback 证明。另一个 fast/malformed client 的 pending-frame queue 仍未封顶。两者都是未合入 follow-up，不得写成此 frame-binding 修复已解决。此前 NPUGraph / soft-interrupt 范围已从本 PR 移除。^[PR #6404]

@@ -15,7 +15,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
   `tests/diffusion/test_diffusion_config_propagation.py`，以及各公开入口附近的配置测试
 - 部署配置：`vllm_omni/deploy/*.yaml`，以及 `pipeline_registry.py`、
   `endpoint_policy.py`、`server_settings.py`、`yaml_util.py`、`composable_parallel/`
-- 源码校验：以上路径在 `main @ 13173d6bbbd0f0ddd4f6caa2debabcf2375d911d` 验证存在；机器基线见
+- 源码校验：以上路径在 `main @ da94c3ebe15c78f5c580936f6b18a6d97d03539b` 验证存在；机器基线见
   `adapters/vllm_omni/release_baseline.yaml`
 
 ## 什么时候查这里
