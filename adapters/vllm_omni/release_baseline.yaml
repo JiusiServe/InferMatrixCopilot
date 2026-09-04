@@ -2,9 +2,9 @@ schema_version: 1
 
 upstream:
   repository: vllm-project/vllm-omni
-  previous_audited_sha: 37c11e6e4f60f9edf19e103d7278391def9caa28
+  previous_audited_sha: 5730af0a95299387c233e12dfbdbe728aace0e58
   audited_ref: main
-  audited_sha: 5730af0a95299387c233e12dfbdbe728aace0e58
+  audited_sha: 73b623f2f7db092053c1c86fe796bed89eb3dc71
 
 # These fingerprints are generated from sorted registry/deploy inventories.
 # They make the baseline exact without duplicating hundreds of entries here.
@@ -81,6 +81,8 @@ path_owners:
   - vllm_omni/patch.py
   - vllm_omni/request.py
 
+  host-weight-runtime:
+  - vllm_omni/host_weight_runtime/
 # Direct review destination for every structural owner above. The audit checks
 # that each route has a real current knowledge entrypoint.
 owner_documents:
@@ -111,6 +113,8 @@ owner_documents:
   runtime-core:
   - knowledge/repos/vllm-omni/components/model-executor/rules.md
 
+  host-weight-runtime:
+  - knowledge/repos/vllm-omni/components/host-weight-runtime/rules.md
 ignored_paths:
 - pattern: .gitignore
   reason: repository metadata
