@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, ci]
-sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6170", "PR #6303", "PR #6390", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/run_minicpmo_realtime_duplex_server_vad.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349", .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, tests/helpers/clean.py, "PR #6704"]
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6170", "PR #6303", "PR #6390", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/run_minicpmo_realtime_duplex_server_vad.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349", .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, tests/helpers/clean.py, "PR #6704", tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/stage_input_processors/test_minicpmo_4_5_async_chunk.py, "PR #5464"]
 ---
 
 # vLLM-Omni CI
@@ -12,6 +12,19 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
 ## 什么时候查这里
 
 - 处理 vLLM-Omni 的 L2/L4、模型测试配置或 CI 特有问题。
+
+## MiniCPM-o 4.5 non-async transfer regression boundary
+
+- The target-state tests add two CPU/unit regressions only: disabling `async_chunk` during
+  deploy/pipeline merging must select the Code2Wav full-payload producer, and a `None`
+  full payload must produce an empty terminal payload (`last_chunk` and `finished`) so the
+  consumer wait gate can release. The pre-existing topology test already checks that the
+  pipeline declares full-payload, async-chunk, and token-only hooks; PR prose is not evidence
+  that this commit added that hook-declaration coverage.
+- These assertions do not modify or execute the runtime implementation, offline inference,
+  online serving, connector transport, or an end-to-end MiniCPM-o checkpoint. They are scoped
+  selection/terminal-metadata regression coverage, and were reverted immediately by PR #6730;
+  retain them only for the `6d84409` target-state audit. ^[PR #5464] ^[PR #6730]
 
 ## MiniCPM native-duplex server-VAD coverage
 
