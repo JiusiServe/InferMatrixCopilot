@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["Issue #5369", "PR #3576", "PR #4583", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", .pre-commit-config.yaml, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py, "PR #4795", "PR #4755", "PR #3805", "PR #5878", "PR #6070", "PR #6122", "PR #4499", "PR #6050", "PR #6329"]
+sources: ["Issue #5369", "PR #3576", "PR #4583", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", .pre-commit-config.yaml, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py, "PR #4795", "PR #4755", "PR #3805", "PR #5878", "PR #6070", "PR #6122", "PR #4499", "PR #6050", "PR #6329", "PR #5999"]
 confidence: high
 ---
 
@@ -171,6 +171,13 @@ confidence: high
 - 强制：以每个请求的 `msg_id = id(result)` consumed 集合作为唯一门禁；仅在消息首次未消费时累计 diffusion metrics、处理 stage metrics，完成两项操作后再记录该消息已消费。
 - 禁止：在轮询重试、重复回调或消息标记后再次累计同一 result；把同一消息误当作新的 denoising step，或绕过现有 consumed 生命周期清理。
 - 验收：同一 result 重复处理只产生一次累计，两个 distinct result 各自产生一次；覆盖异常、重试与请求清理，确认 consumed 状态不会导致重复累计或遗留。^[PR #4755]
+
+## SERV-2d — 图像生成与编辑响应必须透传 diffusion 指标
+
+- 触发：修改 `/v1/images/generations` 或 `/v1/images/edits` 的 diffusion generation result 解包、指标字段或 OpenAI 响应构造。
+- 强制：单 stage 从 result 属性、multi-stage 从返回 tuple 捕获 `stage_durations` 与 `peak_memory_mb`，并在两个图像端点的响应 `metrics` 中透传；指标不可用时保留 `null`，内存值按稳定的数值类型输出。
+- 禁止：让 `edit_images()` 丢弃已生成的阶段耗时或峰值内存；只修复 generations 路径，或以 HTTP 成功代替指标字段的传播证明。
+- 验收：对 generations 和 edits 分别覆盖 single-stage 与 multi-stage stub 结果，断言响应状态为 200，且 `metrics.stage_durations`、`metrics.peak_memory_mb` 与 generation result 精确一致；同时覆盖指标缺失时的 `null` 响应。^[PR #5999]
 
 ## 缓存 readiness 与失败隔离
 
