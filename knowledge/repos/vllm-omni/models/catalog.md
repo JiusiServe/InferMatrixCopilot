@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ b57dc70e`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 53df9fe6`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `480e10ba` 本轮新增 Scheduler 与 Distributed 两条规则：约束 resumable async-chunk 终态请求的队列所有权、计数恢复、定向清理及 connector 隐藏队列回收。不可据此推断 serving API、模型行为、final-input 生命周期或部署配置发生变化。
+本次相对 `b57dc70e` 本轮将 PR #6401 的 distributed VAE 通信隔离要求沉淀到 Wan spatial-shard 规则，并补充来源；这只说明专用 WORLD communicator 与该回归路径的合同，不代表所有 VAE、硬件或并行组合都已获得数值或性能支持。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 480e10ba \
-  --to b57dc70e \
+  --from b57dc70e \
+  --to 53df9fe6 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

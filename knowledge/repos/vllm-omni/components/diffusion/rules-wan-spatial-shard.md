@@ -1,10 +1,10 @@
 ---
 title: "Wan VAE spatial-shard 规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #6062", vllm_omni/diffusion/distributed/autoencoders/wan_spatial_shard.py, tests/diffusion/distributed/test_wan_spatial_shard.py]
+sources: ["PR #6062", vllm_omni/diffusion/distributed/autoencoders/wan_spatial_shard.py, tests/diffusion/distributed/test_wan_spatial_shard.py, "PR #6401"]
 confidence: high
 ---
 
@@ -28,3 +28,11 @@ confidence: high
   拼接所有固定 local shards 并 trim 后必须逐值重建输入。另覆盖 context/group rank mismatch 与 attention
   shrink/expand。CPU slicing tests 只证明边界数学；collective/halo correctness 仍需多 GPU height/width 对
   single-process reference，生产 pipeline smoke 另验证真实 VAE patch/caller。^[PR #6062]
+
+## DIFF-3c — distributed VAE 通信必须使用专用 WORLD device group
+
+- 触发：修改 `DistributedVaeExecutor`、Wan VAE spatial-shard 的 collective/halo 通信或其 process group 选择。
+- 强制：分布式 VAE 通信必须使用 `get_world_group().device_group` 这一覆盖完整 worker WORLD 的专用 device process group，并通过该 group 获取 `world_size` 与 `rank`；不得使用默认 `group=None`。该组必须与 Wan spatial-shard 交错执行的 halo P2P/collective 通信隔离，避免共享默认 communicator 破坏 shard-boundary 数据。
+- 禁止：让 VAE tile collectives 或 P2P 复用默认 WORLD communicator；只凭单测中的 group 对象检查或 world_size=1 运行宣称 spatial-shard 已完成数值正确性验证。
+- 验收：mock/CPU 单测断言 `executor.group is get_world_group().device_group`，并覆盖通过该 group 查询 rank/world size；双 GPU 分别运行 height/width spatial-shard decode，与单进程 reference 对照并满足既有 `0.03` 最大差异容差。^[PR #6401]
+
