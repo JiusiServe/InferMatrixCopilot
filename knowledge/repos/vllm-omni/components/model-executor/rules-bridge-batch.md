@@ -1,10 +1,10 @@
 ---
 title: "跨 stage bridge 与 batch 合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py, "PR #4765", "PR #5666", "PR #5491", "PR #6186", "PR #5452", "vllm_omni/worker/output/payload_build.py", "PR #6406"]
+sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", "PR #6422", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py, tests/model_executor/models/higgs_audio_v3/test_higgs_audio_v3.py, "PR #4765", "PR #5666", "PR #5491", "PR #6186", "PR #5452", "vllm_omni/worker/output/payload_build.py", "PR #6406"]
 confidence: high
 ---
 
@@ -45,6 +45,9 @@ Direct 代码快速入口；loader 与 checkpoint 合同留在该页的 `EXEC-2x
   `batch*vocab` 临时量；global RNG 状态跨 yield 泄漏到兄弟请求。
 - 验收：同 seed 同输出、异 seed 不同输出，batch reorder/compaction 后逐请求结果稳定；全局 RNG
   前后相同，计数器证明目标分支实际消费请求参数。 ^[PR #3422] ^[PR #5074] ^[PR #5792]
+  Higgs V3 将每请求的八个 codebook rows 对齐扩展至 `SamplingMetadata.generators`，并把 GPU decode
+  delay state 以 request ID（非临时 batch row）保存；finished/replacement 同 ID 时缺失 pool entry 必须
+  触发重同步。^[PR #6422]
 
 ## EXEC-1d — cross-stage embedding buffer 必须按 ingress width 分配
 

@@ -1,10 +1,10 @@
 ---
 title: "Higgs-Audio 架构"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.py, vllm_omni/model_executor/stage_input_processors/higgs_audio_v2.py, vllm_omni/model_executor/stage_input_processors/higgs_audio_v3.py, vllm_omni/deploy/README_higgs_audio_v3.md]
+sources: ["PR #6422", vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/model_executor/stage_input_processors/higgs_audio_v2.py, vllm_omni/model_executor/stage_input_processors/higgs_audio_v3.py, vllm_omni/deploy/README_higgs_audio_v3.md]
 ---
 
 # Higgs-Audio 架构
@@ -38,9 +38,10 @@ sources: [vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.p
   `<|tts|>/<|ref_text|>/<|ref_audio|>/<|text|>/<|audio|>` 模板,参考音频用
   `-100` 占位符在 prefill 换成 delay 编码后的融合嵌入。
 - v3 config 从 checkpoint tokenizer 解析特殊 token 与 eos（缺失即 raise）。
-- 采样注意（v2 YAML 注释记载,v3 未单独佐证）：greedy 会塌缩 codebook
-  argmax——v2 必须采样（stage-0 参数 temp 1.0/top_p 0.95/top_k 50/seed 42）;
-  两谱系 talker 都无 `torch.Generator` 用法,确定性只靠 seed。
+- 采样注意：v2 YAML 注释记载 greedy 会塌缩 codebook argmax，因此 v2 profile 启用 sampling；
+  #6422 不改变也不重新证明 v2。V3 则显式消费 vLLM 的 per-request `torch.Generator`，将一个
+  request 对齐到八个 contiguous codebook rows，并以 request ID 保存/恢复 decode-delay state；
+  具体 reorder、finish 与 slot-reuse 合同见 [HIGGS-1a](rules.md)。
 
 ## 从输入到输出的主要流程
 
