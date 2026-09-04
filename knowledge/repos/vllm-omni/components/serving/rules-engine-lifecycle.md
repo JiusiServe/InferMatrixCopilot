@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346"]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py]
 confidence: high
 ---
 
@@ -151,10 +151,11 @@ confidence: high
   wake 隐式 resume；因已 paused 跳过不同 stage scope 或 cache reset；将任意同名 `*_async` helper
   绕过 collective timeout；在 abort ack 前 pop request state，或将 abort failure 当成功。
 - 验收：覆盖 AR-only、diffusion-only 和 mixed stage 路由；sleep 进行时 generation 等待，AR
-  sleep → wake 后仍需显式 resume，而 diffusion-only sleep → wake 可恢复 admission；重复/定向
+  sleep → wake 后仍需显式 resume，跨 AR+diffusion 的 sleep/wake E2E 必须在 post-wake
+  `generate()` 前显式调用 `resume_generation()`，而 diffusion-only sleep → wake 可恢复 admission；重复/定向
   pause 仍调用 scheduler 与 cache clear，非法 stage ID 产生明确错误，fast path 仅命中四个方法且
   timeout 生效；abort success 后才清理 frontend state，orchestrator error 与 timeout 时 state 保留。
-  ^[PR #6084]
+  ^[PR #6084] ^[PR #6581]
 
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 
