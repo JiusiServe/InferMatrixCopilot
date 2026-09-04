@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/sana_video/]
+sources: ["PR #5508", vllm_omni/diffusion/models/sana_video/, vllm_omni/diffusion/registry.py, vllm_omni/model_extras/sana_video.py]
 confidence: high
 ---
 
@@ -17,7 +17,7 @@ confidence: high
 
 ## 源码路径
 
-共 5 个文件：
+共 5 个文件；native T2V/I2V pipeline、Transformer 与 output 都在：
 
 - `vllm_omni/diffusion/models/sana_video/`
 
@@ -32,9 +32,29 @@ confidence: high
 - `vllm_omni/diffusion/worker/` → [diffusion](../../components/diffusion/_index.md)
 - `vllm_omni/diffusion/cache/` → [diffusion](../../components/diffusion/_index.md)
 
-## checkpoint、尺寸与量化
+## checkpoint、尺寸与兼容范围
 
-- 上游没有 deploy 预设。模块也没有 docstring，因此 checkpoint、尺寸和量化差异在上游尚无声明，不在此处臆测；命中该 owner 的同步单元应补齐。
+- 支持 `Efficient-Large-Model/SANA-Video_2B_480p_diffusers`（832×480）和
+  `Efficient-Large-Model/SANA-Video_2B_720p_diffusers`（1280×704），均为单 GPU 的
+  SANA-Video 2B T2V/I2V 范围；SANA-Video 2.0 5B/14B 不在此实现范围。
+- native pipeline 根据 checkpoint VAE class 选择共享分布式 Wan VAE 或 LTX-2 VAE wrapper；
+  480p Wan VAE decode 使用 FP32，720p LTX-2 VAE 保持 pipeline dtype。scheduler 从
+  checkpoint 加载 `DPMSolverMultistepScheduler`，不能以“native”推断零 Diffusers 依赖。
+- `--diffusion-load-format diffusers` 是兼容/reference backend。I2V 必须经
+  `SanaImageToVideoPipeline` class hook 选择 Diffusers I2V pipeline；其 `frames` 参数由共享
+  `num_frames` 映射，profile dummy run 仍允许一帧。
+
+## 专有流程与验证
+
+- T2V 用 native ReLU-kernel linear self-attention，prompt cross-attention 通过 vLLM-Omni
+  Attention；不要把 SANA-Video 2B 误归为 gated linear attention。I2V 编码输入图像、固定首个
+  latent frame，并构造 first-frame conditioning mask。
+- 请求未指定视频帧数时，image-model 的 `num_frames=1` sentinel 在真实请求边界解析为 81；
+  dummy/profile run 保留一帧以避免昂贵启动路径。公开 extras 是 `clean_caption`、`motion_score`
+  与 `use_resolution_binning`；native `clean_caption=True` 明确不支持。
+- 先运行 `tests/diffusion/models/sana_video/` 的组件回归；native/adapter、T2V/I2V、480p/720p
+  的真实权重功能覆盖在 L4 serving expansion。golden 与 stage-alignment 是按需 correctness
+  工具，不是默认 per-PR gate。
 
 ## 什么时候查这里
 
@@ -50,4 +70,4 @@ confidence: high
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 该模型的硬门禁规则 | 尚未沉淀；由逐 commit 同步命中该 owner 时在 `rules.md` 建立 |
+| T2V/I2V、checkpoint、VAE、adapter 或验证边界 | [architecture](architecture.md) |

@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 4af0ddc1`（2026-08-25）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 50b8a150`（2026-08-25）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -36,7 +36,7 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 | 注册点 | 位置 | 计数 |
 |---|---|---|
 | AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 81 个架构名 / 31 个模型族目录 |
-| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 65 条 pipeline / 41 个模型族目录 |
+| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 67 条 pipeline / 42 个模型族目录 |
 | Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 55 个 key |
 | Deploy YAML | `vllm_omni/deploy/*.yaml` | 84 份 |
 
@@ -50,6 +50,11 @@ architecture、两个 pipeline key、两个 deploy YAML 及其 tokenizer/config/
 PR #4820 将 `WanDMDPipeline` 注册为 Wan2.2 的同实现入口，因此 diffusion pipeline
 计数回升至 65；它不是新的模型族或新的 `OMNI_PIPELINES` key。^[PR #4820]
 
+SANA-Video 2B 新增 native `SanaVideoPipeline`（T2V）和
+`SanaImageToVideoPipeline`（I2V），二者共用 `sana_video` 模型族目录；它没有新增
+`OMNI_PIPELINES` key 或 deploy YAML。模型专有的 checkpoint、VAE 和 adapter 边界见
+[SANA Video](sana-video/_index.md)。^[PR #5508]
+
 ## AR/omni 模型族（31）
 
 aura_omni、audex、bagel、cosyvoice3、covo_audio、dots_tts、dynin_omni、fish_speech、
@@ -58,13 +63,13 @@ mimo_audio、ming_flash_omni、ming_tts、minicpmo_4_5、minimax_music3、moss_t
 moss_tts_nano、nemotron_voicechat、omnivoice、personaplex、qwen2_5_omni、qwen3_omni、
 qwen3_tts、step_audio2、voxcpm2、voxtral_tts
 
-## Diffusion 模型族（41）
+## Diffusion 模型族（42）
 
 bagel、boogu_image、cosmos3、diffusers_adapter（通用 diffusers 桥）、dreamid_omni、
 dreamzero、ernie_image、flux、flux2、flux2_klein、glm_image、gr00t、helios、
 hidream_image、hidream_o1_image、hunyuan_image3、hunyuan_video、internvla_a1、krea2、lance、
 lingbot_video、lingbot_world、longcat_image、longcat_video、ltx2、magi_human、ming_flash_omni、
-minimax_h3、nextstep_1_1、omnigen2、omnivoice、ovis_image、pi0、qwen_image、sana_wm、sd3、
+minimax_h3、nextstep_1_1、omnigen2、omnivoice、ovis_image、pi0、qwen_image、sana_video、sana_wm、sd3、
 sdxl、sensenova_u1、stable_audio、wan2_2、z_image
 
 ## OMNI_PIPELINES key（55）

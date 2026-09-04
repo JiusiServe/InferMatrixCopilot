@@ -10,8 +10,8 @@ sources: []
 # Diffusion
 
 - 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
-- 源码校验：以上子模块均已在 `main @ 4af0ddc1` 验证存在；本轮新增/扩展的
-  async output、distributed layerwise offload 和 MiniMax H3 仍按各自模型/机制规则审查
+- 源码校验：以上子模块均已在 `main @ 50b8a150` 验证存在；本轮新增/扩展的
+  async output、distributed layerwise offload、MiniMax H3 和 SANA-Video 仍按各自模型/机制规则审查
 - 主要职责：多个 diffusion 模型共用的 pipeline、执行循环、scheduler 接入和运行机制
 
 ## 什么时候查这里
