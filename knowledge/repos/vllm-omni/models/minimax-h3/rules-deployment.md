@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5850", "PR #5857", "PR #5863", recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py, "PR #5910", "PR #6213", "PR #6345", "tests/diffusion/models/minimax_h3/test_minimax_h3_vae_tiling.py", "PR #6072"]
+sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5850", "PR #5857", "PR #5863", recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py, "PR #5910", "PR #6213", "PR #6345", "tests/diffusion/models/minimax_h3/test_minimax_h3_vae_tiling.py", "PR #6072", "PR #6526", tests/diffusion/models/minimax_h3/test_minimax_h3_dlo_lifecycle.py, tests/diffusion/offloader/test_module_residency.py]
 confidence: high
 ---
 
@@ -21,16 +21,28 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
   H2D streaming 使用它；`_supports_mmap_loading=False` 是安全门，不能绕过。plan 将
   `token_refiner.blocks` 独立 stream，text encoder 的 vision/text block rank-local stream，
   video/audio VAE 按 encode/decode stage on-demand，leading `transformer` blocks 只在 denoise
-  stage resident 并在 decode 前释放。`dlo_resident_layers>0` 必须与 no-AllGather 配对。
+  stage resident 并在 decode 前释放。`dlo_resident_layers>0` 必须与 no-AllGather 配对。MiniMax-H3
+  的 staged encoder→DiT→VAE 边界可共用一个 component-local `BoundedAllocatorCache`：仅当
+  cached-but-unallocated 不超过设备容量 25% 且物理 free 不低于 5% 时保留；遥测缺失、任何
+  component/stager failure 或 OOM retry 都保守释放。encoder 的非 block children 必须作为一个
+  immutable pinned-CPU snapshot group，以一条 copy stream/event stage，保持 parameter/buffer
+  storage alias、shape、stride、offset 与 dtype；DiT prefetch 和两个 shared device buffer 不变。
 - 禁止：让 encoder TP shard 进入 DiT AllGather；把 DLO+CPU offload 的早期分支优先级交给
   generic CPU-offload hook；只因 component 有 `offload_to_cpu` 就推断每个 caller 都正确 staging。
   目标 pin 的 `_encode_audio_conditions(standalone_audios)` 没有进入 `_component_on_device`，
   会在前一个 embedded-audio context 已关闭后直接使用 CPU-bound audio VAE；没有外层 stage
-  context 或专属测试证明 image+standalone-audio Ref2VA 的 DLO device/performance 合同。
+  context 或专属测试证明 image+standalone-audio Ref2VA 的 DLO device/performance 合同。不得把此
+  component-local retention 变成 global `empty_cache` override，或删除 executor 的 unconditional
+  shutdown cleanup；不得由 CUDA/no-AllGather 的有界 A/B 外推 AllGather、其他平台、其他 DLO 模型
+  或吞吐/并发收益。
 - 验收：分别覆盖 text、image、video、embedded audio、standalone audio 与 decode 的
   load→use→finally-offload 次序，异常也释放；regular-loader transform sentinel 到 TP-local stream
-  后仍正确；resident layers 只围住 denoise。补齐上述 standalone-audio gap 前，不能用其他
-  component staging 单测宣称所有 Ref2VA 输入已覆盖。^[PR #5764]
+  后仍正确；resident layers 只围住 denoise。还须覆盖正常保留与两条 memory bound、遥测 fallback、
+  OOM 一次 flush/retry、load/offload/component failure 的 host-master restore/forced release，以及
+  alias-preserving non-block group 的 idempotent transitions。补齐上述 standalone-audio gap 前，不能用
+  其他 component staging 单测宣称所有 Ref2VA 输入已覆盖。PR #6526 的 L20X matched
+  single-request no-AllGather CUDA A/B 是有界 latency observation，B300 仅独立 functional smoke；
+  二者均非持续 benchmark 或跨 topology/platform performance proof。^[PR #5764] ^[PR #6526]
 
 ## MMH3-3b — consumer-GPU profile 是有边界的容量证据
 
@@ -235,4 +247,3 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
 - 强制：`_encode_visual_conditions` 必须在同一个 `video_vae` residency window 内完成该请求的全部 image 与 video encode；`_encode_reference_audio_conditions` 必须在同一个 `audio_vae` residency window 内完成 embedded 与 standalone audio encode。resident helper 只能在对应 scope 内调用，scope 退出时必须释放 component，异常也必须清理。
 - 禁止：按 image、video 或 audio 条目分别建立重复的 H2D/D2H lifecycle；在前一个 scope 结束后直接调用 CPU-bound VAE；把单次 image 的行为外推为混合 reference，或把 transfer-level A/B 结果写成完整模型峰值显存与通用性能保证。
 - 验收：contract tests 覆盖单/多 image、image+video、embedded+standalone audio 以及 encode exception，精确断言每个 VAE 只有一次 activate/offload；另验证 H3 model-level offload 注册所有实际 DiT 与 VAE stage，并以固定硬件和 workload 单独复核真实性能与输出质量。^[PR #6072]
-
