@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, ci]
-sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544"]
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6613", tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json]
 ---
 
 # vLLM-Omni CI
@@ -32,6 +32,22 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
   runs a minimal 256×256 five-frame, one-step request, and checks response success, frame
   shape, and nonzero variance. It is an offline inference smoke, not online-serving, FLUX,
   CUDA, or general backend coverage. ^[PR #5544]
+
+## Qwen-Image nightly coverage and step-execution perf sharing
+
+- The Qwen-Image online-serving expansion keeps nine feature pytest IDs, but assigns one
+  checkpoint to each case: Qwen-Image covers CPU offload, TeaCache, Ulysses degree 2,
+  CFG parallel size 2, and HSDP shard size 2; Qwen-Image-2512 covers step execution,
+  layerwise offload, Ring degree 2, and VAE patch parallel size 2. Single-card versus
+  two-card H100 marks remain attached to those cases. This is a nightly coverage matrix,
+  not evidence that either checkpoint is interchangeable for runtime behavior or numeric
+  output.
+- The Qwen-Image step-execution perf config uses one H100 server with profiler,
+  `step-execution`, and `max-num-seqs: 8` for sequential 512x512/20-step and
+  1536x1536/35-step cases plus the 512x512/20-step concurrency 1/2/4/8 sweep. Keep the
+  three `benchmark_params` under that shared server and retain their existing H100 baseline
+  artifacts; the JSON change itself does not establish a performance result or an active
+  regression threshold. ^[PR #6613]
 
 ## 目录内容
 
