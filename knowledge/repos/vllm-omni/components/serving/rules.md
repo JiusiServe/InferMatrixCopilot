@@ -44,7 +44,7 @@ confidence: high
 | `artifact-readiness` | artifact/content cache、capability、ready/mark/discard | `SERV-3a`, `SERV-3b`, `SERV-3c` |
 | `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c`（见 [请求输入合同](rules-request-input.md)）+ 命中模型规则 |
 | `endpoint-capability` | endpoint restriction、route/app-state guard、公开 400 | `SERV-4c`, `SERV-4d` 见 [请求输入合同](rules-request-input.md)；`SERV-5d` 本页 |
-| `engine-lifecycle` | pause/resume、sleep/wake、partial stage/tag、ACK、generation admission、abort cleanup、streaming raw terminal、factory 状态矩阵、TTS adapter detection、replica membership/fault isolation | `SERV-5a`–`SERV-5e`、`SERV-5g`–`SERV-5p`（见 [engine 生命周期规则](rules-engine-lifecycle.md)），`SERV-5f` |
+| `engine-lifecycle` | pause/resume、sleep/wake、partial stage/tag、ACK、generation admission、abort cleanup、streaming raw terminal、event-driven orchestration、factory 状态矩阵、TTS adapter detection、replica membership/fault isolation | `SERV-5a`–`SERV-5e`、`SERV-5g`–`SERV-5q`（见 [engine 生命周期规则](rules-engine-lifecycle.md)），`SERV-5f` |
 | `full-duplex` | duplex opt-in、stage prewarm/fence、async-chunk、CFG companion lifecycle | `SERV-6a`–`SERV-6d`（见 [engine 生命周期规则](rules-engine-lifecycle.md)） |
 | `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view、stage sampling constraints、serialization bounds | `SERV-4a`–`4h`, `SERV-4l`–`4p`，全部见 [请求输入合同](rules-request-input.md) |
 | `batch-chat-contract` | frontend fan-out、identity、choice cardinality、error/cancellation | `SERV-4i`–`4k`，见 [batch chat rules](rules-batch-chat.md) |

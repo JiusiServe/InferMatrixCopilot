@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: guide
 tags: [vllm-omni, config, environment]
-sources: ["PR #6217", "PR #6631", vllm_omni/config/environment_variable_inventory.py, tests/config/test_environment_variables.py, collect_env.py]
+sources: ["PR #6217", "PR #6631", "PR #5221", vllm_omni/config/environment_variable_inventory.py, tests/config/test_environment_variables.py, collect_env.py]
 ---
 
 # 环境变量合同与诊断边界
@@ -19,7 +19,7 @@ sources: ["PR #6217", "PR #6631", vllm_omni/config/environment_variable_inventor
 
 ## 已合并的合同
 
-- `environment_variable_inventory.py` 是**分类清单，不是值解析器**：实际 consumer 继续拥有默认值、解析、优先级和读取时机。`main @ a708ae5b` 的 `PUBLIC_OMNI` 审阅边界有 23 个名称；新公共 Omni 名称必须以 `VLLM_OMNI_` 开头，旧前缀仅为兼容保留。
+- `environment_variable_inventory.py` 是**分类清单，不是值解析器**：实际 consumer 继续拥有默认值、解析、优先级和读取时机。PR #5221 将 `VLLM_OMNI_EVENT_DRIVEN_ORCH` 加入 `PUBLIC_OMNI`（24 个名称）：只在 `Orchestrator` 构造时读取，默认 `0`；trim/lower 后仅 `1`、`true`、`yes`、`on` 开启，其他值保留 legacy loop。它同时选择 LLM orchestration 与 serving final-output drain，部署时必须在运行 orchestrator 的 stage-0 进程启动前设置；不是 request-level 开关，且不使 diffusion output 变为无轮询。新公共 Omni 名称必须以 `VLLM_OMNI_` 开头，旧前缀仅为兼容保留。^[PR #5221]
 - PR #6631 处理 #6217 合并后的 main 漂移：`VLLM_OMNI_ASYNC_OUTPUT_TIMEOUT` 是公开、实验性、仅环境变量的 float 秒数开关，默认 `600`；diffusion engine 在每次 `step_streaming` 请求路径读取它，非 float 或 `<=0` 时仅 warning-once 并回退默认值。它等待 async output，不是 `VLLM_OMNI_INPUT_WAIT_TIMEOUT_S` 的 full-payload input-coordinator 控制。`ROSVOT_SOURCE_DIR` 已随 SoulX-Singer 支持移除而从 model-specific `deprecate_remove` 清单删除。
 - 公开设置没有全局的 env-vs-CLI/YAML/request 优先级。按每个 consumer 的合同核实：请求可变行为应属于 request schema，稳定 model/stage 行为应属于 typed config，环境变量只适合启动、平台集成、诊断或兼容回退。import/startup 时读取的值必须在启动 CLI/导入前设置；启动后的父 shell 变化不会更新既有 worker。
 - stage 的 `env`（以及兼容的 `runtime.env`）仅在启动该 stage/child process 时临时应用：键和值会字符串化，child 可继承，随后恢复父进程旧环境。因此它不能追溯改变已在此前 import 缓存的值，也不应承载 request-varying 语义。日志和诊断只输出键，绝不输出 stage `env` 的值。

@@ -4,13 +4,13 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py, "PR #6564", tests/engine/test_orchestrator.py, tests/entrypoints/openai_api/test_qwen3_omni_realtime_websocket.py]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5221", "Issue #4855", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, tests/engine/test_orchestrator_event_driven.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py, "PR #6564", tests/engine/test_orchestrator.py, tests/entrypoints/openai_api/test_qwen3_omni_realtime_websocket.py]
 confidence: high
 ---
 
 # Serving engine 生命周期规则
 
-本页收纳 `SERV-5a`–`SERV-5e`、`SERV-5g`–`SERV-5p`、`SERV-6a`–`SERV-6f`、
+本页收纳 `SERV-5a`–`SERV-5e`、`SERV-5g`–`SERV-5q`、`SERV-6a`–`SERV-6f`、
 `SERV-8a` 与 `SERV-9a`。触发条件与其余审查组见
 [Serving 共享规则](rules.md) 的 Direct 代码快速入口；请求输入侧的合同留在该页，
 故障隔离见 [fault isolation 规则](rules-fault-isolation.md)。
@@ -195,6 +195,13 @@ confidence: high
 - 验收：CPU 覆盖 raw-terminal-only、data-then-raw-terminal、processed-terminal-plus-raw-terminal
   三种同 poll 形状，分别断言完成、数据先于 terminal、exactly once 和 request state 清理；Qwen3-Omni
   Realtime async-chunk 长音频 E2E 断言 `response.audio.done` 到达且音频有效。^[PR #6564]
+
+### SERV-5q — 事件驱动编排只能改变唤醒机制并保持双路径合同
+
+- 触发：修改 `VLLM_OMNI_EVENT_DRIVEN_ORCH`、orchestrator output loop、stage reader/poller、或 `AsyncOmni` final-output drain。
+- 强制：默认关闭时保留 legacy 1 ms poll loop；开启时每个 live LLM replica 的 reader 直接 await `get_output_async()`，再进入单一串行 dispatch，使 routing、output ordering、terminal cleanup、scheduler stats 与 per-replica `EngineDeadError` isolation 同 legacy path。reader 必须每 0.5 s 按 live membership 与 client object reconcile，client swap、eviction 或新注册不得遗失输出或留下 task。diffusion 维持 `get_diffusion_output_nowait()` poller，metrics-only sentinel 在 route 前吸收。final-output drain 使用同一 flag 的 queue blocking read，engine 缺少该方法时回退 legacy drain；1 s timeout 只用于 orchestrator liveness check，shutdown 必须关闭其 executor/queue 资源。
+- 禁止：把 "event-driven" 外推为所有 stage 均无 polling；从一个 loop 删除 metrics、raw-terminal 或 fault-isolation handling；在 busy queue 下只在 timeout reconcile，或让 reader failure 重启为重复 eviction；把两种 loop 的 orch-monitor iteration counts/`loop_active_pct` 直接比较。
+- 验收：以 flag guard 重跑 legacy LLM/diffusion, async-chunk, abort, shutdown, multi-replica, scheduler-stat 和 dead-replica parity scenarios；另测 accepted/unrecognized flag values、default legacy selection、client swap 后 reader reconcile、blocking drain 的 queued/late message、timeout/liveness 与 executor shutdown。性能测试另绑定同一 current-head build、硬件、workload、warmup 与多次 A/B；PR #5221 的 H20 数字在 fault-isolation rebuild 前测得，不能作为 current-head performance proof。两条文档 review 要求已进入最终代码，但对应 thread 合并时仍为 unresolved。^[PR #5221] ^[Issue #4855]
 
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 
