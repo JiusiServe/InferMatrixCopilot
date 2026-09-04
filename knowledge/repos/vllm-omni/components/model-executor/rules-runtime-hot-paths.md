@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048", "PR #6454", "vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py"]
+sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048", "PR #6454", "vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py", "PR #6458"]
 confidence: high
 ---
 
@@ -69,4 +69,11 @@ confidence: high
 - 强制：将不属于 checkpoint 的运行时 tensor 通过 `register_buffer(..., persistent=False)` 注册到实际消费它的 module，使 device/dtype 迁移覆盖所有初始化路径，并保持其与 STFT 输入同设备。
 - 禁止：把设备敏感 tensor 留作普通 attribute，依赖每次调用临时 `.to(device)` 兜底，或只修基类初始化而遗漏 causal/subclass 路径；不得把派生 window 写入 checkpoint state dict。
 - 验收：构造 CosyVoice3 `CausalHiFTGenerator`，执行 `.to(cuda)` 后断言 `stft_window.device` 与 STFT 输入一致并完成 causal inference；CPU 路径仍可运行，`persistent=False` buffer 不出现在 checkpoint state dict，并覆盖 subclass constructor。 ^[PR #6454]
+
+## EXEC-11g — MiniCPM-o Talker codec penalty 与终止预算必须在 Sampler 前后闭环
+
+- 触发：修改 MiniCPM-o 4.5 Talker 的 codec 采样、repetition penalty、EOS/min_tokens 处理或离线生成长度预算。
+- 强制：在 Stage 1 Sampler 前按请求维护最近 16 个 codec frame，使用请求级 `repetition_penalty` 执行 frequency-aware penalty，并将 Sampler 的同一 penalty 置为 `1` 避免重复计分；离线生成上限取 `min(2048, remaining Talker context)`。对 `compute_logits` 强制的 codec EOS 必须在 `MinTokensLogitsProcessor` 之后恢复到对应采样行；native duplex 仍按既有 `generate_chunk` 的 26-sample 预算执行。
+- 禁止：把 vLLM whole-stream presence penalty 当作上游 16-frame codec penalty；让 forced EOS 被 `min_tokens` 再次屏蔽后以任意 codec id 继续解码；让无 EOS 的离线请求占满剩余上下文；用本次 simplex 修复改变 native duplex chunk 语义。
+- 验收：覆盖正负 logits、空 history、超过 16 frame 的遗忘、`no_penalties`、逐请求 penalty 与单次消费；覆盖 forced/unforced EOS、`min_tokens`、2048 上限和剩余 context clamp，并用真实长文本 TTS 检查请求在预算边界释放且无静默尾部。^[PR #6458]
 
