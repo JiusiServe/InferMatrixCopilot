@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, ci]
-sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6613", tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json]
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6303", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json]
 ---
 
 # vLLM-Omni CI
@@ -32,6 +32,21 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
   runs a minimal 256×256 five-frame, one-step request, and checks response success, frame
   shape, and nonzero variance. It is an offline inference smoke, not online-serving, FLUX,
   CUDA, or general backend coverage. ^[PR #5544]
+
+## Diffusion GGUF nightly plugin compatibility
+
+- The L4 full-model diffusion-quantization nightly lane installs
+  `vllm-gguf-plugin==0.0.4`, rather than the floating `>=0.0.3`: the later resolved
+  0.0.5 imports `huggingface_hub.ResolvedRevision`, which the lane's existing
+  `huggingface_hub` does not export, so plugin loading and `gguf` registration fail
+  before the tests run. This is a temporary CI-environment reproducibility pin, not a
+  runtime support or package-dependency claim. Remove it only after a plugin release
+  is compatible with that environment or declares the required minimum hub version.
+- The scoped command is `pytest -sv tests/diffusion/quantization -m 'full_model and
+  cuda and L4' --run-level full_model`; its two GGUF cases cover Z-Image-Turbo and
+  FLUX.2-klein. PR evidence reports local loading/registration recovery, while the
+  L4 full-model run was deferred to Buildkite, so do not record a full test pass from
+  this change alone. ^[PR #6303 / issue #6022]
 
 ## Qwen-Image nightly coverage and step-execution perf sharing
 

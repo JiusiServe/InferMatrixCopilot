@@ -90,11 +90,13 @@ collection 意图；没有实际 runtime 结果时，不能证明目标硬件行
 - 触发：修改 pre-commit/Buildkite schema、下载 lint 工具、SPDX/import 检查或 stability marker。
 - 强制：固定工具版本并校验摘要；声明本地与 CI 强制 hook 矩阵；路径跨 Windows/POSIX
   归一化；源码头使用项目 SPDX 标识且覆盖 `.sh`；marker 参数 shell-quote 并有明确默认值。
+- CI 测试插件若与既有环境依赖不兼容，必须在受影响 lane 精确 pin 到已验证版本，并记录失效
+  的解析版本、冲突符号/依赖和解除条件；不能把 lane 的临时 pin 误写成运行时支持或项目依赖合同。
 - 禁止：下载浮动 `stable`；让 rebase 静默回退 hook/marker；未引用包含 `: ` 的 YAML command；
   用测试名后缀代替硬件 marker。
 - 验收：当前 main schema/pre-commit、DCO 和 marker collection 通过；篡改摘要、Windows 路径、
   shell header 或非法 stability 参数分别被对应 gate 拒绝。 ^[PR #3422] ^[PR #6273]
-  ^[PR #6293] ^[PR #6343]
+  ^[PR #6293] ^[PR #6303] ^[PR #6343]
 - pre-commit ratchet 不能把债务下降当成 hook 失败：`actual > budget` 才返回 1，
   相等静默通过，
   `actual < budget` 必须返回 0 并打印收紧上限的 reminder。passing hook 需 `verbose: true`
