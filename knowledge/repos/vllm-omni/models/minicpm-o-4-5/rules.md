@@ -25,6 +25,7 @@ confidence: high
 | HiFT CUDA Graph、chunk bucket、lazy capture、iSTFT | [`MCPMO-1d`](rules-cuda-graphs.md#mcpmo-1d-hift-graph-只捕获稳定-pre-istft-子图并限界-shape-cache) | `cuda_graph_wrapper.py::HiFTGraphWrapper` → `BatchedToken2Wav._hift_inference` → shared `HiFTGenerator` |
 | CFM DiT CUDA Graph、shape cache、generation retirement、eager fallback | [`MCPMO-1e`](rules-cuda-graphs.md#mcpmo-1e-cfm-dit-cuda-graph-必须按-shape-整代退休并保持-eager-parity) | `cuda_graph_wrapper.py::CFMGraphWrapper` → `BatchedToken2Wav._estimator_step` |
 | batch、`runtime_info`、stage handoff | MCPMO-3a/3b | `stage_input_processors/minicpmo_4_5_omni.py` → `minicpmo_4_5_omni.py::MiniCPMO45OmniForConditionalGeneration` → TTS/code2wav |
+| Seed-TTS、chat `ref_audio`、runtime-ref、Code2Wav handoff | [MCPMO-3e](rules-code2wav-batching.md#mcpmo-3e-minicpm-o-45-reference-audio-必须经过私有-prompt-到-code2wav-handoff) | serving chat MediaConnector → original prompt private key → `llm2tts` buffer → Code2Wav |
 | Talker codec sampling、repetition penalty、request RNG/compaction | MCPMO-3c | `minicpmo_4_5_omni_tts.py::{make_omni_output,_sample_audio_codes,_apply_batched_repetition_penalty}` → `test_talker_batching.py` |
 | native duplex、Stage0 resume、LISTEN/SPEAK、server VAD | MCPMO-4a | `experimental/fullduplex/{minicpmo45,openai}/` → stage input processor |
 | instructions/native-mode update、first-append reservation、context lock | [`MCPMO-4b`](rules-duplex.md#mcpmo-4b-native-duplex-session-update-必须如实拒绝不可重建的上下文) | `experimental/fullduplex/minicpmo45/{adapter,session}.py` → runtime adapter/session runner |

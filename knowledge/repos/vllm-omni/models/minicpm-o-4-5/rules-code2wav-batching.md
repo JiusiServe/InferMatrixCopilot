@@ -1,14 +1,22 @@
 ---
 title: "MiniCPM-o 4.5 Code2Wav 并发批处理规则"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #6021", vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/platforms/npu/models/minicpmo_4_5_code2wav.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/platforms/npu/test_graph_tools.py]
+sources: ["PR #6021", "PR #6628", vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/pipeline.py, vllm_omni/model_executor/stage_input_processors/minicpmo_4_5_omni.py, vllm_omni/platforms/npu/models/minicpmo_4_5_code2wav.py, tests/entrypoints/openai_api/test_serving_chat_minicpmo45_reference_audio.py, tests/model_executor/models/minicpmo_4_5/test_llm2tts.py, tests/model_executor/models/minicpmo_4_5/test_minicpmo_4_5_async_chunk.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/platforms/npu/test_graph_tools.py]
 confidence: high
 ---
 
 # MiniCPM-o 4.5 Code2Wav 并发批处理规则
+
+## MCPMO-3e — MiniCPM-o 4.5 reference audio 必须经过私有 prompt 到 Code2Wav handoff
+
+- 触发：MiniCPM-o 4.5 chat `ref_audio`、Seed-TTS、`llm2tts`、Code2Wav prompt selection 或 async chunk。
+- 强制：仅 `_has_minicpmo45_stage` 时读取 reference，优先级为 root attr → `extra_body` → `model_extra.extra_body` → `model_extra`；absent no-op，non-string `ValueError`。chat rendering/policy 后用 `MediaConnector` decode 一次，写回 original prompt private key，不复制 message。`llm2tts` 优先普通 multimodal audio，否则写 private key 至 runner-owned `model_intermediate_buffer.codes.ref` / `meta.ref_audio_sr`。
+- 强制：Code2Wav 对每个 named section 先取 legacy `additional_information`，再以 buffer 中实际提供的 field 覆盖，缺 field 仍 fallback；无 ref 保持 HT default。async 只在 first chunk/cache epoch handoff。
+- 禁止：不得为非 MiniCPM 解码、重新序列化 Seed-TTS ref、或将该 chat path 外推至 realtime、通用模型或质量结论。
+- 验收：覆盖 root/nested precedence、missing/non-string、一次 decode/serialization、ordinary audio precedence、private buffer/per-field legacy fallback、default HT、async first-chunk/cache epoch；CPU chain mock 不替代 engine E2E。单个 MI300X Seed-TTS row 只证明该 exact request 的 `runtime-ref-*` selection；AMD CI #11229 失败，且 realtime 仍 deferred。^[PR #6628]
 
 ## MCPMO-1j — Code2Wav 并发 duplex batch 必须按 request 保存 ragged state
 
