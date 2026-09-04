@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5550", "PR #5864", "PR #5885", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/io_support.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/output_formatter.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_timeout.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6255", "PR #6288", "PR #6308", "PR #6499", "PR #6749", vllm_omni/diffusion/data.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, tests/diffusion/test_diffusion_output_formatter.py, tests/diffusion/test_diffusion_plugin_hooks.py]
+sources: ["PR #5550", "PR #5864", "PR #5885", "PR #5978", "PR #6750", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/io_support.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/output_formatter.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/stage_diffusion_proc.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_timeout.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/diffusion/test_stage_diffusion_proc.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6255", "PR #6288", "PR #6308", "PR #6499", "PR #6749", vllm_omni/diffusion/data.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, tests/diffusion/test_diffusion_output_formatter.py, tests/diffusion/test_diffusion_plugin_hooks.py]
 confidence: high
 ---
 
@@ -118,6 +118,14 @@ confidence: high
 ## DIFF-1r — 共享 Future resolve 必须对取消竞态 fail-safe
 
 - 触发：修改 diffusion result pump、共享 `_rpc_futures`/`_output_futures`、`asyncio.wait_for()` 超时、请求 abort 或 shutdown future cleanup。\n- 强制：共享 Future 在 `done()` 检查后仍必须通过 `try_set_result`/`try_set_exception` 解析，并在 helper 内捕获 `concurrent.futures.InvalidStateError`，丢弃取消或已完成 Future 的晚到结果/异常，使 singleton pump 继续运行；仅 freshly-created 且尚未共享的本地 Future 可直接解析。\n- 禁止：把 `not fut.done()` 与 `set_result()`/`set_exception()` 当作原子操作；在共享 Future 上保留未保护的 resolve 调用；让取消竞态异常逃逸并杀死 result pump，随后仍以健康检查通过推断任务会完成。\n- 验收：用 `done()` 固定返回 false 但实际已取消的 racy Future 覆盖 `COMPUTE_DONE`、`OUTPUT_READY`、batch split 与 shutdown cleanup，断言 pump 不抛 `InvalidStateError`、取消 Future 保持取消、同批健康 Future 仍完成，并回归相邻并发测试。\n^[PR #5983]
+
+## DIFF-1ab — spawned StageDiffusionProc 必须在 engine 前重载通用插件
+
+- 触发：修改 `StageDiffusionProc.run_diffusion_proc`、spawned diffusion engine startup 或 general plugin loader。
+- 强制：child 先安装 parent-death signal 与 SIGTERM/SIGINT handlers，再 `load_omni_general_plugins()`，最后构造 engine/proc；spawn fresh interpreter 不继承 parent plugin side effects。
+- 禁止：在 parent import/pin 后假定 child 已注册 loader hook，或将此 ordering 外推为任意 plugin 或完整模型 startup 成功。
+- 验收：mock parent-death signal、SIGTERM/SIGINT handlers、plugin reload 与 construction 的精确顺序；
+  plugin failure 必须在 engine construction 前原样传播。GGUF child reload 仍须独立 full-model proof。^[PR #6750]
 
 ## DIFF-1s — diffusion output type 必须从模型声明闭合到 topology 与 formatter
 

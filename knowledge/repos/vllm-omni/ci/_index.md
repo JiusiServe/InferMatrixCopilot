@@ -121,7 +121,9 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
   cuda and L4' --run-level full_model`; its two GGUF cases cover Z-Image-Turbo and
   FLUX.2-klein. PR evidence reports local loading/registration recovery, while the
   L4 full-model run was deferred to Buildkite, so do not record a full test pass from
-  this change alone. ^[PR #6303 / issue #6022]
+  this change alone. A parent-side GGUF import/pin is insufficient for spawned stages: the child
+  must reload general plugins before engine construction; this is not post-change full-model proof.
+  ^[PR #6303 / issue #6022] ^[PR #6750]
 
 ## NPU diffusion-attention selector regression boundary
 
