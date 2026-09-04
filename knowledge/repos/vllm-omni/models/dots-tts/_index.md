@@ -1,10 +1,10 @@
 ---
 title: "dots.tts"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, serving]
-sources: [vllm_omni/model_executor/models/dots_tts/, vllm_omni/deploy/dots_tts.yaml, vllm_omni/transformers_utils/configs/dots_tts.py]
+sources: ["PR #6174", vllm_omni/model_executor/models/dots_tts/, vllm_omni/deploy/dots_tts.yaml, vllm_omni/transformers_utils/configs/dots_tts.py, tests/e2e/offline_inference/test_dots_tts_expansion.py]
 confidence: high
 ---
 
@@ -36,6 +36,12 @@ confidence: high
 ## 什么时候查这里
 
 只查 dots.tts 专有的行为、常量、注册入口和验证合同。
+
+## 目录内容
+
+| 遇到什么 | 查看哪里 |
+|---|---|
+| weekly offline E2E scaffold、prompt/queue/noise oracle | [rules](rules.md) |
 
 ## 不放什么
 

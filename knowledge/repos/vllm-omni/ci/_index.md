@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, ci]
-sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6170", "PR #6303", "PR #6390", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/run_minicpmo_realtime_duplex_server_vad.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349", .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, tests/helpers/clean.py, "PR #6704", tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/stage_input_processors/test_minicpmo_4_5_async_chunk.py, "PR #5464", "PR #6730", "PR #6745", "PR #6727", tests/diffusion/quantization/test_quantization_quality.py, "PR #5831", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, "PR #6742", "PR #6650", pyproject.toml, tests/helpers/mark.py, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py]
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6170", "PR #6303", "PR #6390", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/run_minicpmo_realtime_duplex_server_vad.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349", .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, tests/helpers/clean.py, "PR #6704", tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/stage_input_processors/test_minicpmo_4_5_async_chunk.py, "PR #5464", "PR #6730", "PR #6745", "PR #6727", tests/diffusion/quantization/test_quantization_quality.py, "PR #5831", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, "PR #6742", "PR #6650", pyproject.toml, tests/helpers/mark.py, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py, "PR #6174", .buildkite/cuda/test-weekly.yml, tests/e2e/offline_inference/test_dots_tts_expansion.py]
 ---
 
 # vLLM-Omni CI
@@ -25,6 +25,15 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
 - This commit modifies only those two tests. It refreshes regression coverage for existing
   behavior; it does not itself change runtime, offline-inference, online-serving, or transport
   implementation. ^[PR #5464] ^[PR #6730] ^[PR #6745]
+
+## dots.tts weekly L4 collection boundary
+
+- Weekly TTS L4 selects `slow and L4 and tts` with `--run-level full_model`; the three dots.tts
+  offline cases carry `slow`, `tts` and one-card L4 hardware markers, so collection returns three.
+  The distinct nightly selector `full_model and L4 and tts` returns zero because these cases do not
+  carry the `full_model` tier marker. PR #6174 reports collection only and explicitly did not run the
+  tests on L4; this records OMNI-CI-1a/1c wiring, not a hardware pass or runtime/model validation.
+  ^[PR #6174]
 
 ## LTX-2 FP8 quality-gate recipe boundary
 
