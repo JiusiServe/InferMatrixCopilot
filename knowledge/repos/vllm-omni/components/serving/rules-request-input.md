@@ -4,13 +4,13 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3805", "PR #5374", vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/inputs/, tests/entrypoints/test_omni_entrypoints.py, "PR #5181", "PR #6182"]
+sources: ["PR #3805", "PR #5374", "PR #6598", vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/engine/orchestrator.py, vllm_omni/inputs/, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_invalid_audio_speech.py, tests/entrypoints/openai_api/test_serving_speech.py, "PR #5181", "PR #6182"]
 confidence: high
 ---
 
 # 请求输入合同
 
-`SERV-4a`–`SERV-4o`：公开请求字段的校验、限界与 owner。触发条件与其余审查组见 [Serving 共享规则](rules.md) 的 Direct 代码快速入口。
+`SERV-4a`–`SERV-4p`：公开请求字段的校验、限界与 owner。触发条件与其余审查组见 [Serving 共享规则](rules.md) 的 Direct 代码快速入口。
 
 ## SERV-4a — 公开字段由 serving 显式拥有
 
@@ -124,3 +124,11 @@ engine 生命周期见 [engine 生命周期规则](rules-engine-lifecycle.md)；
 - 强制：从每个 runtime stage config 取得约束并与同 stage caller params 合并；pipeline-required key 覆盖 caller 冲突值，其他 caller fields 保留。对 mapping 复制合并；对 dataclass/msgspec sampling object 以合并值重建，使 constructor/post-init 重新计算 stop-token 等 derived state，且 caller/default object 保持不变。
 - 禁止：caller 提供 params 时整包替换 pipeline constraints；只从 dataclass 而不是实际 OmegaConf runtime config 读取；对已构造 `SamplingParams` setattr/copy 后跳过 derived-state 更新，或静默以 caller 值赢得 pipeline-required field。
 - 验收：真实 stage config conversion 覆盖单与多 stage、normal caller field、pipeline-required `detokenize`/stop token conflict、derived stop-token state 及 caller immutability；默认 params 与无约束 control 保持既有行为。^[PR #6182]
+
+## SERV-4p — 可序列化整数必须在协议层限界且 dispatch 保底
+
+- 触发：公开 OpenAI 请求模型新增/修改整数参数，或请求会跨 stage 以 msgpack 传输的 sampling、extra 或嵌套参数。
+- 强制：能在协议模型明确归属的整数必须以有符号 64 位范围校验；计数/尺寸/steps/token fields 保留既有正数或非负下界，seed 可使用完整 `[-2**63, 2**63-1]` 范围。协议拒绝应保留 Pydantic 的字段定位 validation 4xx。所有 stage dispatch 边界仍须将 payload 的 `OverflowError` 转为仅该 request 的非 fatal 400，并经共享 cleanup abort 全部 stage/CFG 状态，orchestrator 继续服务。
+- 禁止：只靠 protocol allowlist 防御嵌套或 extra 参数；把 overflow 作为 engine-wide fatal；捕获无关异常来掩盖程序错误；为统一范围而丢失原有业务下界。
+- 验收：覆盖明确字段的越界 validation（含 speech token/seed 边界）和 mock dispatch 序列化 overflow；后者断言 400、request state 已清理、thread 仍存活。每个修改的公开整数字段须覆盖合法边界与非法一侧。^[PR #6598]
+- 边界与未合入建议：目标只捕获 `OverflowError`，不证明其他序列化失败的可恢复性。PR merge 后仍有两个未 resolve review threads：三个 protocol 文件重复定义 int64 constants，且负 TTS seed 的用户可见放宽未写入 PR body；前者是去重建议，后者可由 merged code/tests 与提交历史确认，但两者都不是本提交新增的 shared-constant 或 release-note 合同。
