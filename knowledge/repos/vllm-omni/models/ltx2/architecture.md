@@ -1,10 +1,10 @@
 ---
 title: "LTX-2/2.3 模型架构与证据索引"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-09-04
 type: architecture
 tags: [vllm-omni, models, ltx2]
-sources: [recipes/LTX/LTX-2.md, vllm_omni/diffusion/registry.py, "#4381", "#4464"]
+sources: [recipes/LTX/LTX-2.md, vllm_omni/diffusion/registry.py, "#4381", "#4464", "PR #6342", vllm_omni/diffusion/models/ltx2/ltx2_components.py, vllm_omni/diffusion/models/ltx2/ltx2_runtime.py, tests/diffusion/models/ltx2/test_ltx2_vae.py, tests/diffusion/models/ltx2/test_ltx2_vocoder_cuda.py, tests/e2e/accuracy/ltx/test_ltx25_official_similarity.py, tests/e2e/accuracy/ltx/test_ltx_official_similarity.py]
 ---
 
 # LTX-2/2.3 模型架构与证据索引
@@ -29,6 +29,25 @@ sources: [recipes/LTX/LTX-2.md, vllm_omni/diffusion/registry.py, "#4381", "#4464
 - 单段 diffusion 模型不在 `OMNI_PIPELINES` registry（走
   `async_omni_engine.py` 的默认 diffusion stage 兜底），deploy 语义见
   [Config 组件](../../components/configuration/architecture.md)。
+
+## 音频 parity 与初始化合同
+
+- 自 `main @ d3c990dc` 起，带 `bwe_generator` 的 LTX BWE vocoder 在 CUDA 路径使用 FP32
+  输入及 FP32 autocast 执行长卷积栈，随后将波形转换回 decode 输入 dtype；不带该属性的
+  基础 vocoder 保持原生调用。MPS 路径临时将 BWE 模块转为 FP32，并在调用后恢复原参数
+  dtype。合并代码以真实 CUDA BF16 `Conv1d` 回归验证中间输出为 FP32，但关于 CUDA
+  FP32-autocast 可移植性的 P1 thread 在合并时仍未 resolve；该证据不得外推到未验证 backend。
+- `latent_upsampler` 必须在显式 CPU device context 中构造、再加载权重；这是
+  rational-resampler 的 Long-tensor 初始化合同，避免 CUDA default-device 下不支持的
+  Long `addmm`，不改变已加载权重的 dtype 或运行时 placement。
+- 官方相似度守卫对保留的 LTX-2.0/2.3/2.5 case 使用同一 profile：video SSIM mean/min
+  ≥0.99、PSNR mean ≥40 dB、audio relative-L2 ≤0.10、audio cosine ≥0.99。该 profile
+  是精度回归门，而不是跨 checkpoint、硬件或配置的泛化质量声明。Omni runner 必须通过
+  symlink overlay 暴露已经解析并 pin 的 upsampler/LoRA sidecar，防止两侧比较不同 artifact。
+- retained matrix 直接保留 LTX-2.5 Full one-stage，并以 LTX-2.0/2.3 two-stage 的 Stage 1
+  覆盖相应 denoising path；它删除了 LTX-2.0/2.3 的 direct one-stage case。关于这是否遗漏
+  `(one_stage, version)` recipe/profile dispatch 的 P2 thread 在获批合并时仍未 resolve，因此
+  不得把 retained matrix 描述成对这两个版本 one-stage entry 的直接覆盖。^[PR #6342]
 
 ## 已有证据索引（只链接，不复制正文）
 
