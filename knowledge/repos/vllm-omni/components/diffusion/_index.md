@@ -10,7 +10,7 @@ sources: []
 # Diffusion
 
 - 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
-- 源码校验：以上子模块均已在 `main @ f321cdbe` 验证存在；MiniMax-H3 的 VAE eager
+- 源码校验：以上子模块均已在 `main @ 5e06d2e7` 验证存在；MiniMax-H3 的 VAE eager
   ops 仍由模型 owner 维护，其他 shared/模型机制按各自规则审查
 - 主要职责：多个 diffusion 模型共用的 pipeline、执行循环、scheduler 接入和运行机制
 

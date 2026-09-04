@@ -1,10 +1,10 @@
 ---
 title: "Nemotron VoiceChat 规则"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, serving]
-sources: ["PR #6089", vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/experimental/fullduplex/nemotron_voicechat/, vllm_omni/experimental/fullduplex/openai/, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py, tests/e2e/features/fullduplex/nemotron_voicechat/, tests/e2e/online_serving/test_nemotron_voicechat_duplex.py]
+sources: ["PR #6089", vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/experimental/fullduplex/nemotron_voicechat/, vllm_omni/experimental/fullduplex/openai/, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py, tests/e2e/features/fullduplex/nemotron_voicechat/, tests/e2e/online_serving/test_nemotron_voicechat_duplex.py, "PR #6831"]
 confidence: high
 ---
 
@@ -35,7 +35,8 @@ confidence: high
 
 ## NVC-1d — full-model 音频证据和部署声明必须限界
 
-- 触发：修改 full-model E2E gate、Buildkite selection 或 duplex profile。
-- 强制：full-model probe 除 response/event 完成外，至少断言 PCM RMS floor、最小 audio packet 数和与 input frame 数相关的 duration/bytes；offline streaming 要比较其原有完整 audio contract。profile 的 `max_num_seqs: 1` 只证明默认 admission 配置。
-- 禁止：用非空 bytes、约 1 LSB 的 RMS 或文本成功证明音频可用；把作者在 H200 实测、generic nightly selector 或 YAML 存在写成 Buildkite pass、wall-clock realtime、确定性 barge-in 或跨硬件保证。
+- 触发：修改 full-model E2E gate、Buildkite selection、duplex profile 或 stall-diagnostic timeout ordering。
+- 强制：full-model probe 除 response/event 完成外，至少断言 PCM RMS floor、最小 audio packet 数和与 input frame 数相关的 duration/bytes；offline streaming 要比较其原有完整 audio contract。profile 的 `max_num_seqs: 1` 只证明默认 admission 配置。stall diagnostic 用 test-local server 240 秒 deadline 与 client 300 秒 wait，使 stage diagnostics 先于 client expiry；healthy run 不应触达任一 deadline。
+- 禁止：用非空 bytes、约 1 LSB 的 RMS 或文本成功证明音频可用；把作者在 H200 实测、generic nightly selector 或 YAML 存在写成 Buildkite pass、wall-clock realtime、确定性 barge-in 或跨硬件保证。不得把 240 秒写成生产模型设置、把 `FINISHED_ERROR` 称作 client error delivery，或声称 #6816 已修复。
 - 验收：PR 作者报告 targeted H200 suite 306 passed，reviewer 后续报告 399 CPU tests、offline WAV byte-identical 和 native duplex non-silent audio；这些是提交时证据，当前 KB validation 不能复现真实 checkpoint/H200 E2E。Buildkite 改动只把既有 AMD-ready 步骤的超时从 20 分钟增至 45 分钟，不新增该模型专属 pipeline。^[PR #6089]
+- stall diagnostic 的验收固定 server 240/client 300，复现 stall 时 server 先记录 full request ID 并标记 `FINISHED_ERROR`，之后 bare client `TimeoutError` 才到期；同时正常 run 仍有 audio。reviewer 已复现该 ordering，仍未证明 client error event。^[PR #6831]

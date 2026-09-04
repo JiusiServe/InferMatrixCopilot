@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/core/sched/test_omni_scheduler_mixin_timeouts.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6089", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619", "PR #6680", "PR #6626", "PR #6529", tests/core/sched/test_omni_ar_scheduler_aborted_queue_sweep.py, tests/core/sched/test_omni_scheduler_streaming_input_counter.py, tests/core/sched/test_omni_sched_deferred_free_fence.py]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/core/sched/test_omni_scheduler_mixin_timeouts.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6089", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619", "PR #6680", "PR #6626", "PR #6529", tests/core/sched/test_omni_ar_scheduler_aborted_queue_sweep.py, tests/core/sched/test_omni_scheduler_streaming_input_counter.py, tests/core/sched/test_omni_sched_deferred_free_fence.py, "PR #6831", tests/e2e/online_serving/test_nemotron_voicechat_duplex.py]
 ---
 
 # Scheduler 规则
@@ -260,10 +260,12 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 
 ## SCHED-5f — async-chunk 等待必须有可配置的截止时间
 
-- 触发：async-chunk 请求进入 `WAITING_FOR_CHUNK`，或部署配置读取 `VLLM_OMNI_INPUT_WAIT_TIMEOUT_S`。
+- 触发：async-chunk 请求进入 `WAITING_FOR_CHUNK`，或配置/测试设置 `VLLM_OMNI_INPUT_WAIT_TIMEOUT_S`。
 - 强制：统一校验超时值，拒绝负数和非有限值，`0` 仅作为显式禁用并记录 warning；chunk adapter 在请求停等时开始计时、每次收到 chunk 后重置，并由 scheduler 及时结束超时且仍在 `self.requests` 中的请求。
-- 禁止：只保护 full-payload 的 `WAITING_FOR_INPUT`；让负数、`nan` 或 `inf` 静默关闭 deadline；按 stream 总生命周期而非 chunk 间 stall 时间计时；对已离开 scheduler 的请求调用 `finish_requests`。
-- 验收：覆盖有效值、显式零值、负数和非有限值解析，覆盖 dropped terminal chunk、producer 无响应、chunk 到达后重置、请求完成/abort 清理及同批健康请求继续运行；断言超时请求为 `FINISHED_ERROR`，并确认模块 reload 不污染后续测试。^[PR #6033]
+- 强制：stall diagnostic 在 scheduler import 前设置 `0 < server wait < client wait`。
+- 禁止：只保护 full-payload 的 `WAITING_FOR_INPUT`；让负数、`nan` 或 `inf` 静默关闭 deadline；按 stream 总生命周期计时；对已离开 scheduler 的请求调用 `finish_requests`；把 server error 当 client delivery/生产预算。
+- 验收：覆盖解析、stall/reset、完成/abort 与健康同批请求；超时为 `FINISHED_ERROR`。Nemotron 固定
+  `240 < 300`，server request-ID/error 先于 client timeout，健康 control 两者皆不触达。^[PR #6033] ^[PR #6831]
 
 ## SCHED-5g — resumable async-chunk 终态清理必须以 live queue 所有权为准
 
