@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 3d1ad0c0`（2026-08-31）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ b81aeb7b`（2026-08-31）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -137,8 +137,8 @@ step_audio_2_asr、voxcpm2、voxtral_tts、wan2_2_ti2v
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from fe4a2a74 \
-  --to 3d1ad0c0 \
+  --from 3d1ad0c0 \
+  --to b81aeb7b \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
