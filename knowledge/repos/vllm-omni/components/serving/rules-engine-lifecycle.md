@@ -4,13 +4,14 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #6525", "Issue #6435", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py, "PR #4092", vllm_omni/worker/base.py, "PR #6564", tests/engine/test_orchestrator.py, tests/entrypoints/openai_api/test_qwen3_omni_realtime_websocket.py]
 confidence: high
 ---
 
 # Serving engine 生命周期规则
 
-`SERV-5a`–`SERV-5e` 与 `SERV-6a`–`SERV-6d`。触发条件与其余审查组见
+本页收纳 `SERV-5a`–`SERV-5e`、`SERV-5g`–`SERV-5p`、`SERV-6a`–`SERV-6f`、
+`SERV-8a` 与 `SERV-9a`。触发条件与其余审查组见
 [Serving 共享规则](rules.md) 的 Direct 代码快速入口；请求输入侧的合同留在该页，
 故障隔离见 [fault isolation 规则](rules-fault-isolation.md)。
 
@@ -178,6 +179,22 @@ confidence: high
   frontend 不创建 CUDA context；另断言 worker `handle_wake_task()` 在返回成功 ACK 前仍完成
   同步。PR #4092 只声称既有测试通过，未提供可复现命令或该 proxy 回归；其要求 inline
   guard/comment 的 review thread 在合并时仍未 resolve，故这条验收尚未被该 PR 证明。^[PR #4092]
+
+### SERV-5p — streaming final stage 的 raw terminal 必须闭合一次 output lifecycle
+
+- 触发：`async_chunk` streaming/realtime 的 final output stage 收到 raw `finish_reason`，或修改
+  orchestrator raw/processed poll、terminal routing、request cleanup。
+- 强制：只把非 segment 的 session-level raw terminal 计入 final-output-stage completion；同一 poll
+  必须先路由 processed outputs。若所有 final output stages 已完成、仍存在 request state、且没有
+  processed terminal 完成 cleanup，则使用既有 terminal-empty output helper 发出一个 `finished=True`
+  的最终 `OutputMessage`，然后走普通 request/CFG-parent cleanup。full-duplex session 不适用这个
+  fallback。
+- 禁止：仅记录 raw completion 而让 Realtime generator 永远等不到 terminal message；在 processed
+  data 前发送 fallback；为普通 segment stop 或非-final stage 合成 terminal；用超时伪造完成，或在
+  已 cleanup 后再发第二个 terminal。
+- 验收：CPU 覆盖 raw-terminal-only、data-then-raw-terminal、processed-terminal-plus-raw-terminal
+  三种同 poll 形状，分别断言完成、数据先于 terminal、exactly once 和 request state 清理；Qwen3-Omni
+  Realtime async-chunk 长音频 E2E 断言 `response.audio.done` 到达且音频有效。^[PR #6564]
 
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 
