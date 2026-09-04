@@ -1,10 +1,10 @@
 ---
 title: "OmniInteract Realtime Benchmark"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: guide
 tags: [vllm-omni, benchmark]
-sources: ["PR #6522", docs/cli/bench/serve.md, vllm_omni/benchmarks/data_modules/omniinteract_dataset.py, vllm_omni/benchmarks/omniinteract.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/entrypoints/cli/benchmark/cli_args.py]
+sources: ["PR #6522", "PR #6696", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/experimental/fullduplex/openai/protocol.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, docs/cli/bench/serve.md, vllm_omni/benchmarks/data_modules/omniinteract_dataset.py, vllm_omni/benchmarks/omniinteract.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/entrypoints/cli/benchmark/cli_args.py]
 confidence: high
 ---
 
@@ -51,6 +51,11 @@ production deployment contract. ^[PR #6522]
   timing; ITL is reported only when all required intervals exist. Missing
   measurements remain missing rather than becoming zero, so request goodput
   cannot pair metrics from different responses.
+- TPOT 样本必须 finite 且严格大于零：优先使用长度完整的 exact ITL；否则只有各 Stage-0
+  `output_token_count` 合计与最终 token 数完全一致、且每段 `tpot_ms` 都是正有限值时，才按 decode
+  interval 数加权恢复 TPOT。native duplex 的逐段 metrics 是增量，需累加；chat fallback 发出的是
+  cumulative snapshot，需按 stage 替换最新值。上述来源都不可用时，仅当 client 观察到 finite
+  `text_latency > ttft > 0` 才可按总 token 数回退计算，否则 TPOT 保持 unavailable。^[PR #6696]
 
 ## Artifact and evidence contract
 
@@ -68,3 +73,6 @@ production deployment contract. ^[PR #6522]
   commit adds no performance threshold consumer, no answer-quality evaluation,
   and no 12-video nightly/production configuration. Do not promote its example
   command, default model, or smoke result to a runtime guarantee.
+- 若某 hardware baseline 配置了 `mean_tpot_ms`，结果必须同时有正的 `num_tpot_samples` 和 finite
+  aggregate；仅有字段或 `NaN` 不能通过 gate。目标 JSON serializer 仍允许 non-standard `NaN`，
+  因而 artifact consumer 仍需显式拒绝，不能把序列化成功当作 strict JSON/metric validity。^[PR #6696]
