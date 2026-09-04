@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #6318", "PR #6346", "PR #6404", "PR #6458", "PR #6619", "PR #6630", "PR #6678", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/experimental/fullduplex/minicpmo45/session.py, vllm_omni/experimental/fullduplex/minicpmo45/stage0.py, vllm_omni/experimental/fullduplex/openai/realtime_input.py, vllm_omni/experimental/fullduplex/openai/runtime_adapter.py, vllm_omni/experimental/fullduplex/openai/runtime_bridge.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, vllm_omni/experimental/fullduplex/video_stacking.py, tests/config/test_config_factory.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py]
+sources: ["PR #6318", "PR #6346", "PR #6404", "PR #6458", "PR #6619", "PR #6630", "PR #6678", "PR #6767", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/deploy/minicpmo_4_5_2gpu.yaml, vllm_omni/deploy/minicpmo_4_5_3gpu.yaml, vllm_omni/deploy/minicpmo_4_5_8x4090.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/minicpmo45/adapter.py, vllm_omni/experimental/fullduplex/minicpmo45/session.py, vllm_omni/experimental/fullduplex/minicpmo45/stage0.py, vllm_omni/experimental/fullduplex/openai/realtime_input.py, vllm_omni/experimental/fullduplex/openai/runtime_adapter.py, vllm_omni/experimental/fullduplex/openai/runtime_bridge.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/experimental/fullduplex/openai/session_runner.py, vllm_omni/experimental/fullduplex/video_stacking.py, tests/config/test_config_factory.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py]
 confidence: high
 ---
 
@@ -47,9 +47,14 @@ confidence: high
 ## MCPMO-4e — shipping profile 必须共服 chat 与 native duplex
 
 - 触发：修改任一 `minicpmo_4_5*.yaml`、duplex session placement 或 Stage 1 Talker 默认/运行时采样参数。
-- 强制：所有 shipping profile 设置 `session_mode=duplex`、`active_stream_window=1`，且 `duplex_session.max_sessions` 与 Stage 0/1 的 `max_num_seqs` 容量一致；replica overlay 从 base 继承这些字段。YAML 保留 chat 的 Stage 1 `min_tokens=50` 与既有 codec 参数，native duplex adapter 仅在该 session 的 runtime config 覆盖 `min_tokens=0`。AR stage 保留默认 async scheduler。
+- 强制：所有 shipping profile 设置 `session_mode=duplex`，且 `active_stream_window` 只限制
+  first-packet admission，不是 session lifetime cap。default/2gpu/3gpu profile 的 window、
+  `duplex_session.max_sessions` 与 Stage 0/1 `max_num_seqs` 均为 4；8×4090 profile 因 24GB
+  资源边界保持 window/stage capacity 1，并沿用 default session capacity 1。replica overlay 从 base
+  继承这些字段。YAML 保留 chat 的 Stage 1 `min_tokens=50` 与既有 codec 参数，native duplex adapter
+  仅在该 session 的 runtime config 覆盖 `min_tokens=0`；AR stage 保留默认 async scheduler。^[PR #6767]
 - 禁止：恢复独立 `minicpmo_4_5_duplex.yaml`；在 replica overlay 重复并漂移 session 配置；为 duplex 全局关闭 async scheduling；或把 runtime-only floor 写回 YAML 而改变 chat TTS。
-- 验收：展开四份 base profile 及三个 replica overlay，断言全部 duplex-enabled、窗口与 session capacity 正确；同一 server 分别验证 `/v1/realtime?duplex=1` 和 chat，前者 Stage 1 看到 `min_tokens=0`、后者仍看到 `50`。删除旧 overlay 是部署文件名迁移，外部显式引用必须同步更新。^[PR #6458] ^[PR #6619]
+- 验收：展开四份 base profile 及三个 replica overlay，断言全部 duplex-enabled、窗口与 session capacity 正确；同一 server 分别验证 `/v1/realtime?duplex=1` 和 chat，前者 Stage 1 看到 `min_tokens=0`、后者仍看到 `50`。删除旧 overlay 是部署文件名迁移，外部显式引用必须同步更新。PR #6767 的 L20X concurrency=4 观察只证明该精确 profile/workload 的 first-packet admission，不构成通用吞吐、延迟或硬件保证。^[PR #6458] ^[PR #6619] ^[PR #6767]
 
 - admission/expiry E2E probe 必须从实际启动的 deploy YAML 经
   `load_deploy_config(...).duplex_session.max_sessions` 取得 admission limit，不能保留
