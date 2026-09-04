@@ -1,10 +1,10 @@
 ---
 title: "Diffusion upstream 兼容规则"
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5976", vllm_omni/diffusion/compile.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/layers/fused_moe.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_diffusers_adapter.py, vllm_omni/quantization/_copy_missing_attrs.py, tests/diffusion/test_compile.py, tests/e2e/accuracy/test_qwen_image.py, "PR #6287", "PR #6273"]
+sources: ["PR #5976", vllm_omni/diffusion/compile.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/layers/fused_moe.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_diffusers_adapter.py, vllm_omni/quantization/_copy_missing_attrs.py, tests/diffusion/test_compile.py, tests/e2e/accuracy/test_qwen_image.py, "PR #6287", "PR #6273", "PR #6307", "PR #6717"]
 confidence: high
 ---
 
@@ -46,3 +46,9 @@ confidence: high
 - 禁止：直接从 `triton` 或 `triton.language` 导入，或把导入检查通过误认为真实 kernel 已完成跨平台验证。
 - 验收：静态检查确认无直接 Triton 导入，并在支持的 CUDA 环境执行目标 kernel 的导入与定向回归；非 CUDA fallback 仍需独立验证。^[PR #6273]
 
+## DIFF-4t — 重新引入拓扑可观测性前必须对齐 live parallel-state API
+
+- 触发：为 diffusion worker 添加或恢复基于并行拓扑的进程标题、日志前缀或 rank 标签。
+- 强制：从目标基线实际存在的 parallel-state API 读取 topology；在重排/rebase 后重新审查全部 group getter 与初始化时序，并以目标基线的定向测试和 CI 通过作为合入证据。
+- 禁止：把已撤回的 topology-aware title 当作当前行为，或复用已被 parallel-state 布局变更淘汰的 getter。
+- 验收：实现引用均能在当前基线解析，覆盖初始化前后边界并通过 post-rebase CI。^[PR #6307] ^[PR #6717]

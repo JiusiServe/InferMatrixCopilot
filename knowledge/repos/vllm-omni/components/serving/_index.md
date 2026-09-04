@@ -10,7 +10,7 @@ sources: []
 # Serving
 
 - 主要源码入口：`vllm_omni/entrypoints/`（cli、openai、openpi 及 omni/async_omni 入口）和 `vllm_omni/engine/`（orchestrator、stage engine core、stage pool/runtime、output processor）
-- 源码校验：以上路径均已在 `main @ 4ad455e61e2857450594189895fe860596f402dc` 验证存在
+- 源码校验：以上路径均已在 `main @ d5aced92966e6f12134fe9a30679fdeab07e4bb9` 验证存在
 - 主要职责：用户入口、请求解析、在线服务和 engine 边界
 
 ## 什么时候查这里
