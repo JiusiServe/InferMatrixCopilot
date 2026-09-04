@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/, "PR #5910", "PR #6119", "PR #5791", "vllm_omni/model_executor/models/common/qwen3_code_predictor.py", "vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py"]
+sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/, "PR #5910", "PR #6119", "PR #5791", "vllm_omni/model_executor/models/common/qwen3_code_predictor.py", "vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py", "PR #6138"]
 confidence: high
 ---
 
@@ -70,4 +70,11 @@ confidence: high
 - 强制：fused layout 必须分别保持 `[q,k,v]` 与 `[gate,up]` 行拼接；`CodePredictorBaseModel.load_weights` 按 layer、weight/bias 和 source shard 缓存后再拼装，并对部分或整组缺失硬失败。wrapper 必须归一化 `model.*`、`layers.*`、`codec_embedding.*`、`norm.*`、`rotary_emb.*` 以及 nested `talker.code_predictor.` 前缀后委托共享 loader，并恢复 returned loaded-name 前缀；MOSS local、Qwen3-Omni 与 NPU override 必须使用共享 loader、`qkv_proj` 和 `_split_qkv`。plain packed `nn.Linear` 在具备 TP-aware packing/loading/split 前保持 TP=1 与空 `base_model_tp_plan`。
 - 禁止：用逐 tensor `default_weight_loader` 绕过 fused assembler；以命中一个 source shard 或 target name 代表整组完整；保留已删除的 `q_proj`/`k_proj`/`v_proj` 属性、让 body-direct 或 nested shards 绕过 wrapper 归一化，或对 packed `[q,k,v]`/`[gate,up]` layout 宣告泛化 colwise TP。
 - 验收：用非等 q/KV width 数值核对 `cat([q,k,v])`、`cat([gate,up])` 及 bias，覆盖部分/整组缺 shard；覆盖 current、body-direct、nested 前缀和跨 shard incremental loading；断言 MOSS returned names、Qwen wrapper consumer、NPU mocked `prepare_qkv_weights`/forward 均走 fused 属性，并确认无 TP plan。 ^[PR #5791]
+
+## EXEC-2g — 预计算 speaker profile 必须由模型回调完成校验
+
+- 触发：共享 speaker profile 载入或校验逻辑新增模型专属字段、尺寸约束或新的 TTS consumer。
+- 强制：`load_validated_profile_tensors` 只负责 tensor 读取与 `expected_model_type` 校验，并必须接收 `validate_profile(profile, tensors)` 回调；Qwen3-TTS 由 talker hidden size 提供 embedding 维度，VoxCPM2 由各自 validator 提供 profile 合同，adapter 与模型运行时复用同一校验器。
+- 禁止：在共享 helper 内按 model type 分支选择校验、恢复可选的模型专属尺寸参数，或让未通过模型校验的 profile 进入 capability 列表和 prompt 路径。
+- 验收：分别用 Qwen3-TTS 与 VoxCPM2 的合法、错误尺寸、错误元数据和错误 tensor profile 测试回调结果；确认 adapter 载入与模型运行时载入只保留通过校验的 profile，并覆盖 validator 错误时的跳过行为。^[PR #6138]
 

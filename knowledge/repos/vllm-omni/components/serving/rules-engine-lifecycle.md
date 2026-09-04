@@ -128,6 +128,13 @@ confidence: high
 - 禁止：只在 `max_tokens=None` 时处理 `min_tokens`；让 `check_stop` 因过大的最小 token 数永远早退；用静默 fallback 掩盖上下文已满。
 - 验收：覆盖剩余 46、50、0 token 的请求，断言最终 request 参数、原始参数不变，并回归普通 stage 的默认 max-token 行为。 ^[PR #6346]
 
+### SERV-5l — TTS 静态能力与运行时 voice 必须分属 owner
+
+- 触发：TTS serving 提取或迁移 built-in speakers、precomputed profiles、supported languages、codec frame rate，或修改 voice upload/list/delete 与 embedding 校验。
+- 强制：adapter 初始化时一次性加载 `TTSCapabilities` 快照；静态模型能力归 adapter，`supported_speakers` 与 `supported_languages` 使用 `frozenset`，`precomputed_speakers` 保存 profile metadata，server 只拥有 `uploaded_speakers`，可用 speakers 由两者并集派生且上传集合独立维护。
+- 禁止：让 server 保存或修改静态能力；把上传 voice 合并进 built-in speaker 集合后在删除时 `discard`，或把 frozen dataclass 误解为内部 profile mapping 的深层不可变；在共享 serving 中恢复 model-type capability 分支。
+- 验收：构造相关 adapter，断言能力在初始化后进入 snapshot、集合类型正确且内置/预计算/上传 voice 的并集完整；删除与 built-in 同名的上传 voice 后内置 voice 仍存在，并验证无 adapter 的 diffusion 路径不会触发 adapter 属性错误或专属维度校验。^[PR #6138]
+
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 
 - 触发：full-duplex stage port、双工会话、async-chunk 或 stage fence 发生变化。
