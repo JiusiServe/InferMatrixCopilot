@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, serving, qwen-omni]
-sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", "PR #6523", vllm_omni/deploy/aura_omni.yaml, vllm_omni/deploy/qwen3_tts.yaml, vllm_omni/deploy/qwen3_tts_high_concurrency.yaml, vllm_omni/model_executor/models/aura_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, tests/e2e/online_serving/test_qwen3_tts_base_expansion.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_code2wav.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_incremental_decode.py, tests/model_executor/stage_input_processors/test_qwen3_tts_async_chunk.py, "PR #5048"]
+sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", "PR #6523", "PR #6728", vllm_omni/deploy/aura_omni.yaml, vllm_omni/deploy/qwen3_tts.yaml, vllm_omni/deploy/qwen3_tts_high_concurrency.yaml, vllm_omni/model_executor/models/aura_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_speech_stream.py, vllm_omni/entrypoints/openai/speech_usage.py, vllm_omni/entrypoints/openai/tts_adapters/qwen3_tts.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, tests/e2e/online_serving/test_qwen3_tts_base_expansion.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/entrypoints/openai_api/test_serving_speech_stream.py, tests/entrypoints/openai_api/test_tts_adapter.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_code2wav.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_incremental_decode.py, tests/model_executor/stage_input_processors/test_qwen3_tts_async_chunk.py, "PR #5048"]
 confidence: high
 ---
 
@@ -178,3 +178,23 @@ Qwen 家族入口见 [Qwen-Omni](../qwen-omni/_index.md)。
 - 强制：默认 `silence_ban_frames=0`；加载 checkpoint 后通过 `_encode_ref_audio_batch` 编码多种静音样本并只收集 codebook-0 ids，词表为空、越界或明显过大时记录 warning、清空启用值并禁用功能。decode 时只对 Base 的 x-vector-only request 在前 N 个 history steps 屏蔽派生 ids；mode resolution 必须与 prompt builder 一致，`voice_clone_prompt.icl_mode` 覆盖和未记录 mode 都要正确处理。
 - 禁止：硬编码当前 checkpoint 的 12 个 token、把 mask 施加到 ICL 或非 Base 请求、对不可信派生词表只做部分 masking，或把经验值 `N=3` 当成跨 checkpoint 的固定最优参数。
 - 验收：覆盖默认关闭、有效派生、空/越界/ oversized 派生和 encoder failure；覆盖 step 边界、mixed x-vector/ICL batch、ICL 与非目标请求保持未修改，以及实际 stage 配置能到达 talker。^[PR #5048]
+
+## Q3TTS-4b — Base codec token exhaustion 必须丢弃不完整音频
+
+- 触发：修改 Qwen3-TTS Base 的 codec token budget、Stage-0 finish metadata、speech generation
+  validation、非流式 retry 或 streaming terminal/error 语义。
+- 强制：caller 未显式给 `max_new_tokens`、task 为 Base 且 text token count>0 时，自动上限为
+  `min(configured_cap, max(192, 12*text_tokens))`（无 configured cap 时取 dynamic cap）；tokenizer
+  不可用或计数失败时保留 configured cap，非 Base 也不套 text-scaled ceiling。无论上限来自 caller、
+  config 或动态计算，只在 request metadata 记录了 effective cap、task 为 Base 且 Stage 0 实际
+  `finish_reason="length"` 时判为 budget exhaustion；不能从 token 数接近上限自行猜测。
+- 强制：exhausted generation 的音频不完整，non-streaming 只能在 caller 同时未指定 seed 与
+  `max_new_tokens` 时，用新 request id 和 fresh seed 重试恰好一次；不得修改原 request。raw audio、
+  SSE 与 WebSocket 等 streaming 路径不重试：若已经发出 delta，terminal error 必须标记
+  `partial_audio=true, action=discard`，且不得发 success/done；错误发生在首个 audio 前则不伪造 partial。
+- 禁止：把长度终止的 Base 音频当成功结果；用 fresh seed 覆盖显式可复现请求；在 streaming 中
+  隐式重放造成重复音频；把该 guard 外推到所有 TTS adapter 或声称 dynamic cap 保证 EOS。
+- 验收：覆盖 short/long text、configured cap、显式 max、token-count failure 与非 Base；分别验证
+  EOS/非 length 正常通过、length+recorded-cap 拒绝、非流式一次 retry 及显式 seed/max 不 retry；
+  raw/SSE/WebSocket 均携带 terminal metrics，并覆盖 partial/no-partial error。目标回归证明控制流和
+  丢弃语义，不证明任意 prompt 必达 EOS、音频质量或最佳 cap 比例。^[PR #6728]
