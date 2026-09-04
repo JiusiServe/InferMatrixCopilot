@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6234", "PR #6279", "PR #6445", "PR #6486", "PR #6591", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #4061"]
+sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6162", "PR #6234", "PR #6279", "PR #6445", "PR #6486", "PR #6591", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, vllm_omni/quantization/svdquant_config.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #4061"]
 confidence: high
 ---
 
@@ -208,3 +208,29 @@ confidence: high
   restored tensor byte/backing-pointer equality；验证 checkpoint mmap control path 不变。另覆盖 registration
   capability/budget/pin-memory gates、partial registration rollback、direct/staged transfer parity、没有
   staging allocation 的成功路径，以及 teardown 前 unregister。^[PR #6486] ^[PR #6591]
+
+## DIFF-2aa — serialized SVDQuant 只能按 NVFP4 checkpoint ABI 加载
+
+- 触发：修改 `quant_method="svdquant"` 的 diffusion checkpoint 解析、NVFP4 kernel 选择、
+  SVDQuant parameter 创建/加载、TP shard，或尝试扩展其 dtype、GPU 或 component 范围。
+- 强制：factory 必须从 transformer 的 serialized `quantization_config` 构造 SVDQuant config；
+  Phase 1 只接受 positive `rank`、`precision="nvfp4"` 和 signed BF16 activation。每个
+  TP-local input width 必须能被 16 整除；加载 `qweight`、`wscales`、`proj_down`、`proj_up`、
+  `smooth_factor`、`wcscales` 和 `wtscale` 时保持其 input/output shard axis。base GEMM 只能
+  复用 ABI-compatible FlashInfer、CUTLASS 或 FBGEMM NVFP4 kernel；原 activation 走 BF16
+  low-rank correction，只有 base GEMM 使用 smoothed activation；可选 per-output `wcscales`
+  在 base output 上逐 channel 应用后再加 correction，以保留 fused Q/K/V 的独立 outer scale。
+  `get_quant_method()` 对非 `LinearBase` 必须返回 `None` 让 embedding/LM-head 等使用 upstream
+  fallback，只有被 skip 的 eligible linear 返回 `UnquantizedLinearMethod`。没有 serialized scale 或
+  correction tensors 的 encoder/audio component 必须保持 BF16，不能从 transformer config
+  隐式继承 SVDQuant。
+- 禁止：在 model load 时 calibration/conversion；接受 FP16、unsigned activation、非-NVFP4
+  precision 或不兼容 forced kernel 后延迟到首个 forward 才失败；把 compatibility path 描述为
+  fused GEMM+correction，或把 SM103 之外的 GPU、其他 checkpoint layout、质量/性能结果写成
+  已验证支持。
+- 验收：mock/config tests 覆盖 config rejection、skip list、canonical tensor shape/dtype、
+  compatible-kernel rejection、BF16 base-plus-correction numerical path，以及 Column/Row/QKV
+  TP sharding；GPU 证据还必须在 exact checkpoint、backend、device、seed 和 quality workload
+  上比较真实 kernel 输出。当前合入测试未执行真实 kernel 或 released checkpoint E2E，故仅证明
+  loader contract；PR review 所要求的 frozen-head BF16-vs-SVDQuant quality/performance comparison
+  没有随本提交提供。^[PR #6162]

@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, ci]
-sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6303", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json]
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6303", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json]
 ---
 
 # vLLM-Omni CI
@@ -32,6 +32,14 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
   runs a minimal 256×256 five-frame, one-step request, and checks response success, frame
   shape, and nonzero variance. It is an offline inference smoke, not online-serving, FLUX,
   CUDA, or general backend coverage. ^[PR #5544]
+
+## SVDQuant W4A4 coverage boundary
+
+- The SVDQuant suite is CPU-marked and uses mocked NVFP4 kernels to check configuration,
+  tensor conversion, the BF16 correction calculation, and Column/Row/QKV TP loading. It does
+  not run a compatible real kernel, load a released checkpoint, or establish SM103 execution,
+  output quality, latency, or VRAM results. Any GPU support or performance claim requires a
+  separately recorded exact-device E2E run. ^[PR #6162]
 
 ## Diffusion GGUF nightly plugin compatibility
 

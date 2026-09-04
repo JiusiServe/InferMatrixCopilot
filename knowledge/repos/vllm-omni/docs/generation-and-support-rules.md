@@ -4,7 +4,7 @@ created: 2026-08-10
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, docs]
-sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, docs/user_guide/examples/online_serving/diffusers_pipeline_adapter.md, examples/online_serving/diffusers_pipeline_adapter/README.md, examples/online_serving/text_to_image/, examples/online_serving/image_to_video/, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969", "PR #5987", "PR #5998", "PR #6045", "PR #6049", "PR #6074", docs/features/README.md, docs/design/index.md, docs/user_guide/diffusion/startup_and_loading.md, docs/user_guide/diffusion_features.md, docs/user_guide/quantization/overview.md, docs/user_guide/quantization/bitsandbytes.md, docs/user_guide/quantization/gguf.md]
+sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, docs/user_guide/examples/online_serving/diffusers_pipeline_adapter.md, examples/online_serving/diffusers_pipeline_adapter/README.md, examples/online_serving/text_to_image/, examples/online_serving/image_to_video/, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969", "PR #5987", "PR #5998", "PR #6045", "PR #6049", "PR #6074", "PR #6162", docs/features/README.md, docs/design/index.md, docs/user_guide/diffusion/startup_and_loading.md, docs/user_guide/diffusion_features.md, docs/user_guide/quantization/overview.md, docs/user_guide/quantization/bitsandbytes.md, docs/user_guide/quantization/gguf.md, docs/user_guide/quantization/svdquant.md]
 ---
 
 # Generated docs and supported-model evidence rules
@@ -92,6 +92,13 @@ sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml,
   是 grouped 仅 TORCH_SDPA、仅 `max_num_seqs=1`；HSDP 与 Ulysses/CFG 可组合但与 TP 不兼容；local
   layerwise offload 与 multi-device DLO 分表。docs-only build 不证明 runtime；overview 移除 GGUF 只同步
   core 导航归属，保留的 GGUF guide、OOT plugin 说明与实现/测试证据仍须独立核查。^[PR #6045] ^[PR #6074]
+- SVDQuant guide must say that it consumes an offline serialized NVFP4 checkpoint, enumerate
+  the checkpoint tensor contract, and distinguish its SM103-compatible-kernel loading contract
+  from real-kernel quality or performance validation. Adding it to the Quantization nav does
+  not establish a model matrix, another GPU target, or fused-kernel support. The merged commit
+  adds only the dedicated user guide/nav entry; the review request to update
+  `docs/design/feature/quantization.md` and `docs/user_guide/quantization/overview.md` remains an
+  unresolved thread, so those broader matrices cannot be treated as synchronized evidence. ^[PR #6162]
 
 ## DOCGEN-1d — shared task example 不得把模型默认伪装成通用合同
 
