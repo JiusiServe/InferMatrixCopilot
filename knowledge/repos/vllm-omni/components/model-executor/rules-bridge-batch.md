@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py, "PR #4765", "PR #5666", "PR #5491", "PR #6186", "PR #5452", "vllm_omni/worker/output/payload_build.py"]
+sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py, "PR #4765", "PR #5666", "PR #5491", "PR #6186", "PR #5452", "vllm_omni/worker/output/payload_build.py", "PR #6406"]
 confidence: high
 ---
 
@@ -152,4 +152,11 @@ Direct 代码快速入口；loader 与 checkpoint 合同留在该页的 `EXEC-2x
 - 强制：tensor 的 leading dimension 与 list 长度必须等于 `input_batch.num_reqs`，逐请求构造 payload 并在 mismatch 时报告两侧长度；EC producer 分支必须先于 zero-token 分支，zero/negative-token step 仍按条件执行 DP `_dummy_run(1)` 或 `kv_connector_no_forward`。
 - 禁止：用同时要求输出维度为 1 和 `num_reqs` 的断言限制 batch；构造只含一个 entry 的 payload；用无条件 zero-token early return 遮蔽同步、DP 或 KV-transfer 分支。
 - 验收：覆盖两个及以上 request 的 tensor/list 输出、两类长度 mismatch、zero/negative-token、external-launcher + DP、KV no-forward 与 EC producer，分别断言 request 对齐、错误信息和分支调用顺序。 ^[PR #5452]
+
+## EXEC-1p — runtime snapshot 替换必须由 capability 和 producer marker 双重控制
+
+- 触发：shared GPU/NPU runner 消费跨 async-chunk 请求和 step 的 runtime additional information。
+- 强制：模型 capability `replace_runtime_additional_information` 必须同时控制 scheduled-new 与 scheduled-cached 路径；替换 helper 写入 request-owned CPU mirror，只保留 `num_processed_tokens`、`resumable` 等 runner bookkeeping；未 opt-in 模型继续使用增量 merge。
+- 禁止：让共享 runner 默认改用全量替换；把旧 terminal payload 合并回新 snapshot；只修 scheduled-new 而遗漏 cached admission；把 runner bookkeeping 当作模型 payload。
+- 验收：覆盖 new/cached replacement、未标记增量 merge、request mirror 和 sibling request 隔离，并确认 NPU 继承路径使用同一替换实现。 ^[PR #6406]
 

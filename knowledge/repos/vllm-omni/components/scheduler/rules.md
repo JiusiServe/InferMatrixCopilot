@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6033", "PR #6360"]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6033", "PR #6360", "PR #6406"]
 ---
 
 # Scheduler 规则
@@ -277,4 +277,11 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 - 禁止：按模型家族或 stage index 猜测 full-payload 能力；把 token-only 的 thinker→talker hop 放进 full-payload allowlist；让非 async deploy 逐 token搬运完整 code stack，或让 async 终端 chunk 缺少 finished/empty-terminal 语义。
 - 验收：覆盖 allowlisted code2wav 与 non-allowlisted talker 对照，分别验证普通 deploy 的一次 request-end 全 payload、streaming deploy 的累计 chunk/终端 chunk、connector requeue 和 abort cleanup。
 ^[PR #5842]
+
+## SCHED-6d — 显式 prompt replacement 必须一次性释放旧状态并回到 admission
+
+- 触发：running 或 computed 的 async prompt 显式携带 `replace_streaming_prompt`，或 ready 的 replacement 进入 scheduler。
+- 强制：替换先释放旧 KV/encoder state 一次，清除 in-flight prefill 所有权和 connector watermark；stale fence 以当前 `num_in_flight_tokens` 赋值，再将请求回到 `WAITING` 并走正常 admission。
+- 禁止：只更新 prompt 而继承旧 cache/watermark；把同一 in-flight frame 在更新和 replacement 路径重复计入 stale；绕过 scheduler admission 直接恢复运行。
+- 验收：覆盖 running replacement、ready async replacement 的重复 reset 和正常重新调度；断言 KV/encoder 释放各一次、watermark 清零、stale counter 恰好可排空且首个新 segment frame 不被丢弃。 ^[PR #6406]
 

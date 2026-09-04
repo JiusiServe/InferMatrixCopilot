@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6033", "PR #6360"]
+sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6033", "PR #6360", "PR #6406"]
 confidence: high
 ---
 
@@ -62,6 +62,13 @@ confidence: high
 - 强制：只在 connector 隐藏队列实际持有请求时恢复 `requests_origin_status`；对每个目标统一调用幂等的 `cleanup_receiver`，清理 active stream、ready/exhausted/finished/cancelled/waiting 状态，并移除 chunk 等待队列中的已完成请求；请求已回到 scheduler 可见队列后不得再使用过期 origin status 覆盖当前状态。
 - 禁止：仅凭 `requests_origin_status` 存在就恢复状态；把 resumable `FINISHED_STOPPED` 当作普通 finished 请求而跳过 connector 回收；分散复制部分 receiver 清理逻辑导致重复释放或残留 active-stream 占用；用无关请求的队列状态扩大清理范围。
 - 验收：覆盖 connector 隐藏持有、scheduler `running`/`waiting`/`skipped_waiting` 持有、无 connector 所有权及 stale origin；断言隐藏队列、origin ledger、active streams 和 receiver 状态在重复 finish 后仍为空且 active-window 可被新请求重新占用。^[PR #6360]
+
+## DIST-1f — Code2Wav 快照替换必须显式标记并保持终端就绪
+
+- 触发：async-chunk connector 收到 generation runtime payload、终端 chunk 或重复 terminal boundary。
+- 强制：只有 producer 显式设置 `replace_runtime_additional_information=True` 才全量替换；Code2Wav 的空 replacement 必须同时带 `is_segment_finished=True` 以标记就绪；替换时删除旧 `codes.audio`，但保留当前 snapshot 的 `codes.ref` 等 sibling 字段。
+- 禁止：把未标记的 generation/diffusion payload 改成替换语义；把 control-only boundary 写成未就绪的空更新；跨 segment merge/replay 旧 terminal audio。
+- 验收：覆盖标记/未标记、audio+ref、空 replacement 和重复 terminal；断言新 prompt、finished/ready 状态正确，旧 audio 不会进入下一次 Code2Wav。 ^[PR #6406]
 
 ## DIST-2a — diffusion EP group 必须满足运行中 MoE backend 的 communicator 合同
 
