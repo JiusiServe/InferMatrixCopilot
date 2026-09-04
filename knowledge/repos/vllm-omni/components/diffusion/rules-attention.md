@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6037", "PR #6518", "PR #6563", "PR #6909", docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/fastvideo_vsa.md, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/diffusion_kv/paged_attention_adapter.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_fastvideo_vsa.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/diffusion_kv/test_paged_attention_adapter.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py"]
+sources: ["PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6037", "PR #6518", "PR #6563", "PR #6724", "PR #6909", docs/design/feature/skip_softmax.md, docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/trtllm.md, docs/user_guide/diffusion/attention_backends/fastvideo_vsa.md, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/diffusion_kv/paged_attention_adapter.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_fastvideo_vsa.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/diffusion_kv/test_paged_attention_adapter.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py"]
 confidence: high
 ---
 
@@ -80,26 +80,35 @@ confidence: high
   没有证明 third-party registry override 或未继承 base class 的 backend 完成了 capability
   census；这些实现仍须继承合同或显式实现 method。^[PR #5891] ^[PR #5997]
 
-## DIFF-1m — TRTLLM packed-padding 快路径必须隔离 producer contract、ragged documents 与 SAGE gate
+## DIFF-1m — TRTLLM packed-padding、Skip-Softmax 与 SAGE 必须保留 producer、SP 和 schedule 合同
 
 - 触发：修改 `PackedPaddingMetadata`、TRTLLM packed `cu_seqlens`、`supports_packed_mask_free`、
-  padded-output restore、SAGE quantization gate 或 multi-document varlen capability。
-- 强制：TRTLLM 只把 `PackedPaddingMetadata` 当作 single physical batch 的 producer-owned
-  `[real,pad]` shortcut：Q/KV host lengths 必须是 Python int，在 flattened tensors bounds 内并与
-  `max_seqlen_q/k` 及可选 `valid_kv_length` 相等；canonical two-element `int32` cu_seqlens 必须和
-  Q/K device 一致。该 path 裁 Q/K/V 后把 output 补零回物理 shape，且从不读取或 materialize
-  `attn_mask`。generic complete cu_seqlens 仍支持 genuine multi-document ragged varlen，并删除
-  paired trailing empty document；两条合同不能互相降级或混用。
-- 禁止：接受任何 nonempty TRTLLM `attn_mask`、用 producer shortcut 表示 arbitrary mask 或
-  multi-request block-diagonal layout，或让未验证的 CUDA scalar read 回到 single-request fast path。
-  不得把 tail document 短于 `k_block_size` 造成的 dense fallback 描述为 SAGE 的真实-document
-  检查已经完成。
-- 验收：backend tests 分别覆盖 malformed host/device/dtype/shape/max-length metadata、trim/zero
-  restore、generic unequal Q/KV ragged batch、trailing empty pair、complete packed metadata 加
-  nonempty mask 的 rejection，以及 real multi-document output 对逐 document reference。SAGE 还要覆盖
-  alignment tail 不参与 real-document minimum；该 fix 在 PR #6542 尚未提交，现存行为可整 batch
-  fallback dense。性能只可引用该 PR 的 exact 4×B300 Nsight all-to-all→FMHA interval，不能以 CPU mock、
-  kernel gap 或 frame hash 声称 E2E latency/quality。^[PR #6542]
+  padded-output restore、SAGE/Skip-Softmax gate、calibration 或 multi-document varlen capability。
+- 强制：`PackedPaddingMetadata` 只表示 single physical batch producer-owned `[real,pad]`：Q/KV host
+  lengths 是 Python int、在 flattened bounds 内并与 max lengths/可选 `valid_kv_length` 相等；canonical
+  two-element `int32` cu_seqlens 与 Q/K 同 device。该 path trim Q/K/V、zero-restore output，且不读
+  `attn_mask`；generic complete cu_seqlens 仍是 genuine multi-document ragged varlen，paired trailing
+  empty document 删除，二者不可混用。
+- 强制：TRTLLM 仅在无 SP 或 pure Ulysses 运行；Ring+`skip_softmax` 报错、Ring 的 `quant` 不使用，
+  AllGather-KV 拒绝。SAGE 和 Skip-Softmax 都须显式 opt-in。`threshold` 与 `target_sparsity` 互斥：
+  kernel `lambda = threshold_scale_factor / max_kv_len`；direct path 的 factor 是
+  `threshold * max_kv_len`，故 `lambda = threshold`；calibrated path 是
+  `threshold_scale_factor = a * exp(b * target_sparsity)`，故
+  `lambda = a * exp(b * target_sparsity) / max_kv_len`。请求 `target_sparsity` 而无 calibration
+  metadata 必须失败，不得静默变 dense。
+- 强制：Skip-Softmax 的 tile 只有当 tile 内每个 query row 都满足
+  `exp(tile_max[i] - running_max[i]) < lambda` 时才跳过 Softmax/PV；`QK^T` 仍执行。正的
+  `disabled_until_timestep` 以已归一化、递减的 `t` gate：`t > cutoff` dense、`t <= cutoff` 才可 skip；
+  `0` 关闭 gate，缺 `t` 时保持 dense。MiniMax-H3 默认 flow shift `s=12` 的
+  `t = s*u / (1 + (s - 1)*u)`，50 sigma points/49 denoiser forwards 下 cutoff `.99`/`.97`/`.95`
+  分别留下 6/14/19 个 dense forwards；这些 counts 只属于该 schedule。
+- 禁止：接受 nonempty TRTLLM `attn_mask`、把 shortcut 用作 arbitrary mask/multi-request layout，或把
+  tail document 短于 `k_block_size` 的 dense fallback 当作 real-document SAGE gate 完成。不得将本
+  docs-only PR #6724 外推为 runtime、数值、质量或性能证明。
+- 验收：覆盖 malformed metadata、trim/zero restore、unequal Q/KV ragged、trailing empty、complete
+  metadata+mask rejection、real-document SAGE minimum；再覆盖 SP admission、mutually-exclusive
+  controls、missing calibration fail、tile-wide predicate、timestep gate/missing `t` 和 H3 flow-shift
+  cutoff counts。^[PR #6542] ^[PR #6724]
 
 ## DIFF-1h — RainFusion irregular tail 由 MindIE-SD 保护，不能 padding 伪对齐
 

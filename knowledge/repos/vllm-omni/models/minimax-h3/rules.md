@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5764", "PR #5779", "PR #5801", "PR #5824", "PR #5829", "PR #5836", "PR #5837", "PR #5840", "PR #5853", "PR #5881", "PR #5891", "PR #5896", "PR #5991", "PR #5997", "PR #6000", "PR #6040", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/time_request.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/module_residency.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_dlo_lifecycle.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/offloader/test_module_residency.py, tests/diffusion/quantization/test_int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py, "PR #5915", "PR #5990", "vllm_omni/diffusion/layers/fused_qk_norm_rope.py", "vllm_omni/diffusion/cache/teacache/extractors.py", "tests/diffusion/layers/test_fused_qk_norm_rope.py", "PR #6061", "vllm_omni/platforms/npu/models/minimax_h3.py", "vllm_omni/platforms/npu/platform.py", "tests/diffusion/models/minimax_h3/test_minimax_h3_qwen3vl_rope.py", "PR #6167", "PR #6173", "PR #6283", "PR #6281", "vllm_omni/diffusion/attention/ops/minimax_h3_modulation.py", "PR #6476", "PR #6526", "PR #6410", vllm_omni/diffusion/models/minimax_h3/denoise_loop.py]
+sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5764", "PR #5779", "PR #5801", "PR #5824", "PR #5829", "PR #5836", "PR #5837", "PR #5840", "PR #5853", "PR #5881", "PR #5891", "PR #5896", "PR #5991", "PR #5997", "PR #6000", "PR #6040", "PR #6724", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, docs/design/feature/skip_softmax.md, docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/trtllm.md, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/time_request.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/module_residency.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_dlo_lifecycle.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/offloader/test_module_residency.py, tests/diffusion/quantization/test_int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py, "PR #5915", "PR #5990", "vllm_omni/diffusion/layers/fused_qk_norm_rope.py", "vllm_omni/diffusion/cache/teacache/extractors.py", "tests/diffusion/layers/test_fused_qk_norm_rope.py", "PR #6061", "vllm_omni/platforms/npu/models/minimax_h3.py", "vllm_omni/platforms/npu/platform.py", "tests/diffusion/models/minimax_h3/test_minimax_h3_qwen3vl_rope.py", "PR #6167", "PR #6173", "PR #6283", "PR #6281", "vllm_omni/diffusion/attention/ops/minimax_h3_modulation.py", "PR #6476", "PR #6526", "PR #6410", vllm_omni/diffusion/models/minimax_h3/denoise_loop.py]
 confidence: high
 ---
 
@@ -102,44 +102,29 @@ confidence: high
   当前自动测试没有 MUSA dispatch/parity，CPU reference 只验证 96 维旋转和 32 维
   passthrough。^[PR #5881]
 
-## MMH3-1e — H3 TRTLLM 必须从 packed 结构裁掉 padding 并隔离短序列 role
+## MMH3-1e — H3 TRTLLM 必须以兼容性、packed 合同和 role 隔离决定 dense/opt-in 路径
 
-- 触发：修改 H3 的 TRTLLM default、packed `cu_seqlens`/mask、SAGE quant、Skip-Softmax、
-  token-refiner role 或 denoise timestep context。
-- 强制：H3 只在支持的 datacenter Blackwell SM100/103、head_dim=128、FlashInfer kernel 可用且
-  声明 compatible packed/mask-free path 时默认 dense BF16 TRTLLM；SM120/121、缺依赖、错误
-  head dim 或需要任意 mask 的路径保留平台 fallback，默认不自动开启 SAGE/Skip-Softmax。
-- 强制：四个 packed metadata key 必须完整、Q/K batch/terminal 覆盖一致。单 request 的
-  producer-owned `[real,pad]` path 仅在 non-Ring backend 声明 `supports_packed_mask_free()` 时可省略
-  `attn_mask`，并同时发布 Python `q_length`/`kv_length` 与同 device、`int32`、canonical
-  `[0,length]` 的 `PackedPaddingMetadata` views；TRTLLM 必须核对长度、bounds、max-length 与
-  `valid_kv_length` 后裁掉 suffix、再 quantize/attention，并把输出补零到 Ulysses 物理 shape。
-  TRTLLM 对任何 nonempty `attn_mask` 一律 fail closed；generic ragged cu_seqlens 仍是多 document
-  block-diagonal path，`[0,N,N]` 尾部空 sequence 必须折叠。AllGather-KV 的 local-Q/global-KV
-  metadata 不对称合同在初始化时明确拒绝，真正支持按 review 明确延期。
-- 强制：main DiT 与 `minimax_h3.token_refiner` 使用独立 role；任一 KV sequence 短于 SAGE
-  `k_block_size` 时该 input 告警并走 dense TRTLLM，不能让 14-token refiner 产生 non-finite，
-  也不能因此关闭 main DiT 的 SAGE。H3 将 scheduler 的降序 sigma（1→0）发布为
-  `normalized_timestep`；Skip-Softmax 在 sigma 大于 `disabled_until_timestep` 时保持 dense，
-  到达或低于阈值才启用。
-- 禁止：把 producer-owned packed-padding shortcut 泛化为任意 mask、multi-request batch 或第三方
-  metadata；让 padding 进入 SAGE block quantization；把 combined packed-H3 优化视频归因于本 PR
-  单一改动。请求级 `set_forward_context` wrapper 会在 `finally` 恢复 prior context，因此 loop 内的
-  step mutation 不会泄漏到后续请求。
-- 验收：测试覆盖 generic ragged batch、single-request packed-padding suffix trim/zero restore、empty
-  terminal、complete packed metadata 加 nonempty mask 的 unconditional rejection、invalid metadata、
-  short-role dense fallback、AllGather rejection 与 non-finite regression。Continuous batching 必须
-  覆盖 aligned non-final request 的严格递增 `cu_seqlens`；SAGE gate 应只依据 real documents，当前
-  multi-request alignment-tail case 仍可能使整 batch dense，是 PR #6542 留下的 unresolved P3，不能
-  声称 SAGE 保持启用。PR 报告的 4×B300 SXM6、TP1/Ulysses4/Ring1、1344×768、243 frames、49
-  updates、dense BF16 TRTLLM、单 warmup 后 Nsight interval 从 final Ulysses all-to-all 到 main FMHA：
-  9,797/9,680 paired samples的 gap p50 499.683→0.352 us、p95 698.308→0.384 us，且中间 GPU
-  activity/D2H copy 为 244,925/97,970→0/0；这只证明该 exact profiling interval，不是 E2E
-  latency、quality 或其他 workload/backend/topology 的保证。此前 PR 的 4×B300 SM103、
-  1248×768、209 frames、50 steps FA4/TRTLLM 对比仅绑定该 prompt/seed/topology：PSNR 27.10、
-  SSIM 0.8880 不是质量 gate；83.854→71.990 s diffusion、88.558→76.176 s wall 的 warmed A/B
-  来自 review follow-up 外部分支 commit `20cc23ae`，其 artifacts 明确是 combined packed-H3
-  optimization evidence，并非目标 commit 的隔离实验，不能泛化为稳定 14% 保证。^[PR #5779] ^[PR #6542]
+- 触发：修改 H3 的 TRTLLM default、packed `cu_seqlens`/mask、SAGE、Skip-Softmax、
+  `minimax_h3.token_refiner` role 或 denoise timestep context。
+- 强制：仅兼容 datacenter Blackwell SM100/103、`head_dim=128`、有 FlashInfer trtllm-gen capability
+  且模型声明 packed 或 mask-free path 时，H3 才自动选 dense BF16 `TRTLLM_ATTN`。workstation
+  Blackwell、缺依赖、错误 geometry 或需要 mask 的路径必须走平台 fallback；显式不兼容选择必须启动
+  失败。SAGE 与 Skip-Softmax 都是默认关闭的有损 opt-in。
+- 强制：TRTLLM 只允许无 SP 或 pure Ulysses；Ring 与 `skip_softmax` 组合报错、Ring 的 `quant`
+  不生效，AllGather-KV 在选择时拒绝。main DiT 与 token refiner 必须是独立 role；`per_role` 的
+  `AttentionSpec` 替换整个 default spec，故 token refiner 要显式只配 dense backend，不能继承 SAGE
+  或 Skip-Softmax。H3 checkpoint 没有 calibration metadata，recipe 应使用 direct
+  `threshold=0.05`，而非 `target_sparsity`。
+- 强制：单请求 producer-owned `[real,pad]` metadata 必须完整、Python host length 与同-device
+  `int32` canonical cu views 一致且在 bounds；TRTLLM 裁 suffix 后恢复零输出，任何 nonempty
+  `attn_mask` fail closed。generic complete cu_seqlens 保留真实 multi-document ragged path，尾部空
+  pair 折叠；不可把两种合同互换。短于 SAGE `k_block_size` 的实 KV 保持 dense，不得因 token refiner
+  关闭 main DiT。
+- 禁止：把 packed shortcut 泛化为 arbitrary mask、multi-request layout 或第三方 metadata；让 padding
+  进入 SAGE quantization；将 docs-only PR #6724 当作 runtime、质量或性能证明。
+- 验收：覆盖 default/fallback/explicit-incompatible matrix、pure-Ulysses/Ring/AllGather admission、
+  whole-spec `per_role` replacement 和 H3 direct-threshold recipe；并保留 packed trim/zero restore、
+  malformed metadata、ragged/empty terminal、mask rejection和 short-role dense regression。^[PR #6542] ^[PR #6724]
 
 ## MMH3-1g — H3 NPU mask-free opt-in 必须保留 Ring 与 malformed-metadata fallback
 
