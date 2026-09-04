@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614"]
+sources: ["PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py"]
 confidence: high
 ---
 
@@ -90,6 +90,13 @@ confidence: high
 - 强制：当 query 或 key 的序列长度为 1 时，在进入 cuDNN-only context 前显式使用 `sdpa_kernel([SDPBackend.MATH])`；其他形状才使用显式 cuDNN，并保留符号 shape 被 cuDNN 拒绝时的运行时 fallback。
 - 禁止：把单 token 形状交给 cuDNN 后等待 eager exception；用包含 FLASH/MATH 的 priority list 掩盖 backend 选择；因 Q/K 长度不同而丢弃已有 attention mask。
 - 验收：CPU/mock 参数化覆盖 `(1,1)`、`(8,1)`、`(1,8)` 与 `(8,8)`，精确断言选择的 SDP backend；另覆盖 compile、masked unequal-length 与 unmasked native path，并说明真实 GPU 数值仍需独立验证。^[PR #6070]
+
+## DIFF-1z — 混合 causal/full attention 必须经过共享 Attention 能力路径
+
+- 触发：diffusion 模型包含文本 causal 行与 image/timestep full-attention 行的混合序列，或修改 `full_attn_spans`、attention mask 与高分辨率长序列 dispatch。
+- 强制：通过 `vllm_omni.diffusion.attention.layer.Attention` 传递 `AttentionMetadata`；piecewise backend 消费连续的 `full_attn_spans`，不支持时才使用按请求构造并复用的 dense mask，且 mask 形状必须覆盖完整 text+image 序列。
+- 禁止：在模型内直接调用 raw `scaled_dot_product_attention`，绕过 diffusion attention backend/configuration；把所有 full rows 当作任意离散 spans；在每个 denoise step 重建只依赖 `token_types` 的 SxS mask，或因 fallback 方便而关闭 backend 能力检查。
+- 验收：CPU/mock 覆盖 contiguous full-span、piecewise path、dense fallback、batch mask shape 与 piecewise/dense 输出一致性；高分辨率请求另验证实际 backend 选择、显存边界和 attention mask 不被重复构造。^[PR #5194]
 
 ## DIFF-7a — 多控制 transfer attention 必须按控制独立计算并显式承担 Ulysses 复制成本
 

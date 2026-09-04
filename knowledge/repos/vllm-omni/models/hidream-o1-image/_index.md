@@ -51,3 +51,5 @@ confidence: high
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 该模型的硬门禁规则 | 尚未沉淀；由逐 commit 同步命中该 owner 时在 `rules.md` 建立 |
+
+| HiDream-O1 的请求限制、分辨率、TP、Cache-DiT、mixed attention 与输出验收 | [模型规则](rules.md) |

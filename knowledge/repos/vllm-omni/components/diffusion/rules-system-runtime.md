@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, "PR #5491"]
+sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
 confidence: high
 ---
 
@@ -169,4 +169,11 @@ confidence: high
 - 强制：模型加载后从每个 Worker 的 cache-enabled attention 生成 rank-local native `FullAttentionSpec`，以最大 per-rank profile batch 测量 KV headroom，再通过 `get_kv_cache_configs()`、`generate_scheduler_kv_cache_config()` 和 `resolve_kv_cache_block_sizes()` 构造 Worker/Scheduler 配置。Scheduler 侧只能以 native `KVCacheManager` 的薄 wrapper 为物理 owner；每个 CFG sequence 按完整首步 `seq_len` 以 `full_sequence_must_fit=True` 分配，先按空池所需 block 总数做 never-fit 检查，并在所有 sequence 成功前保持原子性。生成的 `DiffusionKVMetadata` 必须与请求绑定并随完整 `NewRequestData` envelope 传到 Worker；完成、取消、错误、pop 和 close 都必须释放整组 allocation，preemption 只保留既有 allocation。
 - 禁止：引入独立 block pool、KV spec、refcount 或 physical lifecycle；把部分 CFG 分配当作成功；把临时容量不足误报为永久失败，或让 never-fit 请求在 FIFO 头部无限阻塞；在 DLO DP wave 中拆开 request 与对应 metadata，或让 scheduler/busy-loop 异常逃逸而不唤醒请求流。
 - 验收：覆盖 dense 默认旁路、rank/spec/memory mismatch、profile 顺序、CFG partial rollback、临时压力返回 `None` 后 FIFO 重试、空池也放不下时只终止该请求、native allocation error、preemption metadata 保留，以及 finish/cancel/error/pop/close 全部释放；DLO 多 rank RPC 必须逐 envelope 保持 request 与 metadata 配对。 ^[PR #6094]
+
+## DIFF-4t — HiDream-O1 checkpoint signature 必须正向门禁
+
+- 触发：diffusion registry、`resolve_model_class_name()`、`OmniDiffusionConfig` enrichment 或 HF checkpoint 自动识别逻辑需要区分 HiDream-O1 与普通 Qwen3-VL。
+- 强制：仅当 `config.json` 的 `model_type` 为 `qwen3_vl`，且 `model.safetensors.index.json` 的原始 `weight_map` 含 `model.final_layer2.linear.weight` 或 `final_layer2.linear.weight` 时，才返回 `HiDreamO1ImagePipeline`；`resolve_model_class_name()` 与 config enrichment 必须复用同一正向 signature，registry 同时登记 pipeline 与 post-process。
+- 禁止：把任意 `qwen3_vl` 配置归类为 HiDream-O1；给 raw index key 强加 `model.` 前缀；只增加显式 `model_class_name` 映射而让通用 text-to-image/server 自动解析仍落到未注册 architecture；缺失或格式异常的 index 不得误报命中。
+- 验收：覆盖 HiDream signature 命中、普通 Qwen3-VL、缺失/错误 `weight_map`、显式类名与 signature 不一致，以及 resolver/enrichment 两条路径；再断言 registry pipeline 和 module-level post-process 均可解析。^[PR #5194]
 
