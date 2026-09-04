@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py"]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346"]
 confidence: high
 ---
 
@@ -120,6 +120,13 @@ confidence: high
 - 强制：注册 adapter 并由 adapter metadata 完成 detection；adapter 负责 `validate()`、prompt/token-id 构造和 `apply_sampling_overrides()`，明确 `input` lyrics、`instructions` caption、固定 sampling、长度上限及被拒绝的 TTS 字段，shared serving 只负责公共 dispatch。
 - 禁止：在 `serving_speech.py` 增加 model-type 分支；静默忽略 `voice`、reference audio、temperature 或 `stream` 等不支持字段；把无 speaker 模型套用普通 TTS 的 voice 或 temperature 语义。
 - 验收：通过真实 adapter detection 和 `/v1/audio/speech` 请求覆盖缺失/空 lyrics、缺失/空 caption、unsupported fields、长度边界、tokenizer 校验与非流式输出，并断言送入 engine 的实际 prompt、sampling 参数和 model type。 ^[PR #6186]
+
+### SERV-5k — stage request 的 min_tokens 必须受剩余上下文约束
+
+- 触发：orchestrator 用 `SamplingParams` 构造 stage request，且 prompt 已占用部分 `max_model_len`。
+- 强制：clone 参数后计算 `remaining=max_model_len-len(prompt_token_ids)`；`max_tokens is None` 时设为 `remaining`，并将 `min_tokens` 限制为 `max(0, remaining)`，不得改写调用方对象。
+- 禁止：只在 `max_tokens=None` 时处理 `min_tokens`；让 `check_stop` 因过大的最小 token 数永远早退；用静默 fallback 掩盖上下文已满。
+- 验收：覆盖剩余 46、50、0 token 的请求，断言最终 request 参数、原始参数不变，并回归普通 stage 的默认 max-token 行为。 ^[PR #6346]
 
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 

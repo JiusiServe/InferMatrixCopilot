@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082", "PR #5604", "PR #6274"]
+sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082", "PR #5604", "PR #6274", "PR #6346"]
 confidence: high
 ---
 
@@ -107,6 +107,13 @@ confidence: high
 - 禁止：让 eager backend 的 tracing/guard 构造进入每个未见 chunk shape 的实时响应；把该解包扩大为所有后端、模型或 CUDA Graph 路径的通用优化。
 - 验收：检查存在包装时初始化后 `forward_chunk` 已指向原始实现、无包装时保持不变；用 cold 与 warm 的多 chunk duplex 回归确认首个响应不再长时间停顿、后续响应持续产出音频，且 steady-state 行为未被改变。 ^[PR #6274]
 
+## MCPMO-1h — Code2Wav 编码窗口必须受 RelPos 与缓存预算约束
+
+- 触发：修改 MiniCPM-o Code2Wav 的长 codec prefill、`forward_chunk`、RelPos PE、upsample 或 conformer cache。
+- 强制：按 PE `max_pos`、upsample stride、cache offset 和 lookahead 计算安全 token 窗口，限制单片上限并切分超长输入；非最终片保留 lookahead，调用 `forward_chunk` 前确保 PE 足够，按 batch 行合并音频并延续 cache。
+- 禁止：把数千 codec token 一次送入固定 RelPos PE；忽略 cache offset 或把非最终短片静默截断；用空音频掩盖窗口溢出。
+- 验收：单测覆盖预算计算与切片计划，fake Code2Wav 测试断言每片大小、`last_chunk` 和非空音频；不得从该修复推断通用性能提升。 ^[PR #6346]
+
 ## MCPMO-2a — registry 使用 4.5 config/version predicate
 
 - 触发：pipeline auto-detection 看到通用 `MiniCPMO` architecture。
@@ -205,6 +212,13 @@ confidence: high
   也没有 NPU concurrency 1/4 的 latency、吞吐或内存数据，因此不得宣称性能或质量不变/提升。
   ^[PR #5792]
 
+## MCPMO-3d — Talker codec 采样必须由 Stage 1 Sampler 与 codec 词表闭环
+
+- 触发：修改 MiniCPM-o 4.5 Talker 的 codec 采样、词表、EOS、prompt penalty 或 Stage 1 sampling 参数。
+- 强制：`ConditionalChatTTSConfig` 暴露 `vocab_size=num_audio_tokens`、`eos_token_id=num_audio_tokens-1`；完整采样项由 Stage 1 `default_sampling_params` 提供，缺项初始化失败；`head_code`、`emb_code` 与 `codes.audio` 按采样 id 闭环，Sampler 前将 scheduler prompt 全置为 `vocab_size`。
+- 禁止：从 `tts_config` 回退或硬编码 codec knobs；把 Thinker token/embed 或 scheduler 占位符当作 codec history；丢失 sampled id 或让 EOS 不可达。
+- 验收：配置、pipeline EOS、prompt 不变、codec delta/empty EOS 单测通过，并用长文本真实 text+audio/ASR 检查完整输出。 ^[PR #6346]
+
 ## MCPMO-4a — native duplex 保留可恢复 Stage0，VAD 只作显式策略
 
 - 触发：MiniCPM-o native duplex 的连续音频、LISTEN/SPEAK handoff 或 server VAD interruption。
@@ -227,6 +241,13 @@ confidence: high
   true→false 绕过 native context lock。
 - 验收：成功更新同时改变派生状态；资源不足时无部分 mutation；buffer/defer/reject 均不锁，
   append 成功才锁，mode flip 明确拒绝。 ^[PR #6318]
+
+## MCPMO-4c — native duplex Talker 必须按 generate_chunk 预算终止
+
+- 触发：修改 MiniCPM-o native duplex Talker 的 `generate_chunk`、codec EOS 或请求级音频状态。
+- 强制：每个 native duplex 请求按一次 chunk 的 26 个采样管理状态；turn 边界 `min_tokens=0`，中间 chunk `min_tokens=max_tokens=26`，已转发 25 帧后强制下一个采样为 EOS，仅把非 EOS code 交给 Code2Wav。
+- 禁止：只依赖 YAML `max_tokens` 维持 turn 边界；在中间 chunk 永久屏蔽 EOS；把终止采样再次作为普通 codec frame 输出。
+- 验收：覆盖 prefill 边界元数据、step 24/25 的 mask/force EOS、simplex 不误触发以及多请求 delta/finished 对齐。 ^[PR #6346]
 
 ## MCPMO-5a — accuracy 与 duplex perf 证据必须绑定协议、硬件和实际 gate
 
