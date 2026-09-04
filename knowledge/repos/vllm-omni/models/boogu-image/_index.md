@@ -1,10 +1,10 @@
 ---
 title: "Boogu Image"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/boogu_image/]
+sources: ["PR #6701", docs/models/supported_models.md, recipes/Boogu/Boogu-Image.md, vllm_omni/diffusion/models/boogu_image/, vllm_omni/entrypoints/utils.py]
 confidence: high
 ---
 
@@ -20,6 +20,7 @@ confidence: high
 共 5 个文件：
 
 - `vllm_omni/diffusion/models/boogu_image/`
+- revision/component loader、Edit-Turbo checkpoint boundary：[rules](rules.md)
 
 ## 依赖的共享代码模块
 
