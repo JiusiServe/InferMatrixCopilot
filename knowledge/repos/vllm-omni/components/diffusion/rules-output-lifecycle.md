@@ -4,11 +4,28 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5550", "PR #5864", "PR #5885", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/io_support.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/output_formatter.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_timeout.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6255", "PR #6288", "PR #6308", "PR #6499"]
+sources: ["PR #5550", "PR #5864", "PR #5885", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/io_support.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/output_formatter.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_timeout.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6255", "PR #6288", "PR #6308", "PR #6499", "PR #6749", vllm_omni/diffusion/data.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, tests/diffusion/test_diffusion_output_formatter.py, tests/diffusion/test_diffusion_plugin_hooks.py]
 confidence: high
 ---
 
 # Diffusion output 与 multiprocess runtime 规则
+
+## DIFF-1aa — Diffusers execution backend 不得冒充 native checkpoint identity
+
+- 触发：修改 `diffusion_load_format`、custom pipeline 选择、checkpoint `model_class_name`、
+  pre/post-process hook、request batching 能力或 frame interpolation。
+- 强制：`uses_diffusers_adapter()` 只表示实际 execution backend；存在
+  `custom_pipeline_args` 时 custom pipeline 优先并令其为 false，即使 load format 是 Diffusers。
+  checkpoint 的 native `model_class_name` 继续承载 modality/capability metadata，但 effective
+  Diffusers adapter 不运行 native pre/post hooks。batch capability 必须从实际 executor 派生：先
+  custom pipeline，再 `DiffusersAdapterPipeline`，否则才查 native class。Diffusers adapter 收到
+  frame interpolation 必须 fail fast，因为它交付的 frame 已完成 post-process。
+- 禁止：从 checkpoint metadata 或 load format 单独推导 execution backend、native hooks 或 batching；
+  custom pipeline 已接管时仍套 adapter hook；对 adapter output 静默二次 interpolation。
+- 验收：组合覆盖 native、Diffusers adapter、Diffusers load format + custom pipeline 三类配置，断言
+  class identity 保留、hook 选择和 batch capability 跟随实际 executor；另验证所有 Diffusers pipeline
+  对 interpolation 抛出明确错误。PR #6749 的自动化测试覆盖这些选择边界，但不证明任意第三方
+  custom pipeline 或未来 Diffusers 版本兼容。^[PR #6749]
 
 ## DIFF-1d — async output 的 compute 与 output-ready 必须分成两个可观察阶段
 

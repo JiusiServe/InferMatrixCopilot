@@ -1,10 +1,10 @@
 ---
 title: "Diffusion 共享架构"
 created: 2026-07-10
-updated: 2026-07-16
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, components, diffusion]
-sources: [vllm_omni/diffusion/]
+sources: [vllm_omni/diffusion/, "PR #6749"]
 ---
 
 # Diffusion 共享架构
@@ -31,5 +31,10 @@ sources: [vllm_omni/diffusion/]
 1. 先确认问题是否同时影响多个 diffusion 模型。
 2. 沿配置、runner、pipeline、denoise loop 和输出逐层查证。
 3. 如果最终只在一个模型的 pipeline 或 checkpoint 上复现，把正文放回模型目录，并从这里链接。
+
+执行身份与 checkpoint 身份必须分开追踪：custom pipeline、Diffusers adapter 与 native pipeline
+决定实际 executor 和 hook；checkpoint `model_class_name` 则继续提供 modality/capability metadata。
+不要因 `diffusion_load_format=diffusers` 就覆盖 native metadata 或绕过 custom-pipeline precedence；
+具体审查合同见 [DIFF-1aa](rules-output-lifecycle.md)。
 
 源码会变化，具体类名和路径在改代码前必须以目标仓库当前版本为准。

@@ -37,6 +37,7 @@ confidence: high
 | worker title、log prefix、DP/PP/SP/CFG/TP/FS/RP/EP local rank | [worker observability](rules-worker-observability.md)：`DIFF-4w` | `diffusion_worker.py::_setup_diffusion_worker_proc_title_and_log_prefix` → `distributed/parallel_state.py` group getters |
 | image/diffusion service time、forward time、missing-versus-zero、per-step metric | [`metrics-evidence`](rules-metrics.md)：`DIFF-5a`, `DIFF-5b` | output formatter/sampling metadata → stage stats aggregation → serving Prometheus emission |
 | image/video/audio/action final type、registry alias、endpoint capability、formatter | [`output-runtime`](rules-output-lifecycle.md#diff-1s-diffusion-output-type-必须从模型声明闭合到-topology-与-formatter)：`DIFF-1s` | `model_metadata.py` → default/multi-stage config → video capability → `output_formatter.py` |
+| Diffusers/custom/native executor identity、hook、batch capability、frame interpolation | [`output-runtime`](rules-output-lifecycle.md#diff-1aa-diffusers-execution-backend-不得冒充-native-checkpoint-identity)：`DIFF-1aa` | `data.py::uses_diffusers_adapter` → `diffusion_engine.py::supports_request_batch` → registry hook / adapter sampling validation |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
