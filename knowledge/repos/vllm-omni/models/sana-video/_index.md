@@ -1,10 +1,10 @@
 ---
 title: "SANA Video"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5508", vllm_omni/diffusion/models/sana_video/, vllm_omni/diffusion/registry.py, vllm_omni/model_extras/sana_video.py]
+sources: ["PR #5508", "PR #5861", vllm_omni/diffusion/models/sana_video/, vllm_omni/diffusion/registry.py, vllm_omni/model_extras/sana_video.py]
 confidence: high
 ---
 
@@ -71,3 +71,4 @@ confidence: high
 | 遇到什么 | 查看哪里 |
 |---|---|
 | T2V/I2V、checkpoint、VAE、adapter 或验证边界 | [architecture](architecture.md) |
+| native TP/CFG topology、GLUMB/RMSNorm layout 或 I2V parallel invariant | [SANA rules](rules.md) |

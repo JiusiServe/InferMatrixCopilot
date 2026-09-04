@@ -1,10 +1,10 @@
 ---
 title: "SANA Video 架构"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5508", vllm_omni/diffusion/models/sana_video/pipeline_sana_video.py, vllm_omni/diffusion/models/sana_video/pipeline_sana_video_i2v.py, vllm_omni/diffusion/models/sana_video/transformer_sana_video.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, vllm_omni/diffusion/request.py]
+sources: ["PR #5508", "PR #5861", vllm_omni/diffusion/models/sana_video/pipeline_sana_video.py, vllm_omni/diffusion/models/sana_video/pipeline_sana_video_i2v.py, vllm_omni/diffusion/models/sana_video/transformer_sana_video.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, vllm_omni/diffusion/request.py]
 confidence: high
 ---
 
@@ -26,9 +26,10 @@ wrapper；scheduler 保留 checkpoint 的 `DPMSolverMultistepScheduler` 配置�
 
 Diffusers-adapter 并非 native pipeline 的替代实现：它由 model class 选择 SANA-specific hooks。
 特别是 checkpoint 声明的 T2V Diffusers class 在请求 I2V 时必须改装为 Diffusers I2V class，且
-shared `num_frames` 要翻译为 Diffusers 的 `frames`。当前 native 范围只由单 GPU 证明；sequence/
-tensor/CFG parallel、Cache-DiT、TeaCache 和 step execution 未验证，adapter 也不提供 native
-continuous batching 或并行能力。
+shared `num_frames` 要翻译为 Diffusers 的 `frames`。native pipeline 的 TP/CFG 各仅支持 `{1,2}`，
+包括 TP2×CFG2；SP、text-encoder TP、PP、HSDP 在加载前拒绝，精确 layout/CFG/I2V invariant 见
+[SANA-1a](rules.md#sana-1a-native-sana-video-只支持-tpcfg-的-12-矩阵)。Cache-DiT、TeaCache 和
+step execution 仍未验证，adapter 也不提供 native continuous batching 或并行能力。
 
 ## 从输入到输出的主要流程
 
