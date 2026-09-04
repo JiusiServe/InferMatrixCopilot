@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_runtime.py, tests/engine/test_async_omni_engine_stage_init.py, vllm_omni/deploy/, "PR #6186", "PR #6813", "PR #6291", tests/config/test_config_factory.py, tests/config/test_pipeline_registry.py]
+sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_runtime.py, tests/engine/test_async_omni_engine_stage_init.py, vllm_omni/deploy/, "PR #6186", "PR #6813", "PR #6291", "PR #6829", vllm_omni/config/pipeline_registry.py, tests/config/test_config_factory.py, tests/config/test_omni_config.py, tests/config/test_pipeline_registry.py, tests/utils/test_tracking_parser.py]
 confidence: high
 ---
 
@@ -84,15 +84,15 @@ confidence: high
 - 禁止：在 CLI、factory 或 stage startup 为模型名硬编码 alias/resolver；把 alias 广播到所有 stage；因 diffusion stage 只有一个 replica 就隐式改变所有多 stage pipeline 的进程隔离。
 - 验收：structured/legacy 两路覆盖 alias-only、canonical-only、相同/冲突值、错误 stage 与 unset control；用 root/partition/task path 证明 resolver 到达 stage model/tokenizer consumer，并用 single-stage、multi-stage opt-in/control 与 multi-replica veto 证明 exact inline predicate。PR #6813 只新增 default one/two-stage 参数化 test，其他组合仍须补验收。^[PR #5885] ^[PR #6813]
 
-## CONF-5j — PipelineConfig 终端 stage 必须显式声明且不依赖位置
+## CONF-5j — PipelineConfig 在构造时必须验证终端 topology
 
-- 触发：修改 `PipelineConfig.validate()`、静态 `OMNI_PIPELINES` registry，或新增/调整
+- 触发：修改 `PipelineConfig.__post_init__`、`get_validation_errors()`、静态 `OMNI_PIPELINES` registry，或新增/调整
   multi-stage pipeline 的 `final_output` 声明。
-- 强制：保留既有「没有 entry stage」校验，并要求至少一个 stage 显式
-  `final_output=True`；terminal 可以处于任意 position。静态 `PipelineConfig` registry
-  必须逐项通过该 topology guard。
-- 禁止：从最后一个 stage、stage 数、entry/input、`final_output_type` 推断 terminal；不得把
-  此静态 guard 外推为 cycle 检测、resolver 配置、运行时或 E2E 行为已经验证。
-- 验收：无 terminal 的配置返回错误；terminal-not-last 通过；有效 fixture 显式标记
-  terminal；所有静态 `PipelineConfig` 通过。resolver 生成的配置须在 materialize 后另测。
-  ^[PR #6291]
+- 强制：`__post_init__` 必须调用 `get_validation_errors()`，有 error 时以 formatted `ValueError`
+  eager fail；保留 nonempty stages、unique IDs、valid nonself inputs、entry 与任意位置 terminal
+  `final_output=True`。静态 registry 在构造时通过 guard；resolver callable 仅在 concrete object
+  materialize 时受 guard。
+- 禁止：保留 public `validate()` API 或 registry posthoc sweep；从最后 stage、stage 数、entry/input、
+  `final_output_type` 推断 terminal；不得声称 resolver 后有独立 revalidation、cycle/runtime/E2E proof。
+- 验收：无 stages/terminal、duplicate ID、invalid/self input eager error；terminal-not-last 与有效 fixture
+  pass；static configs pass，resolver concrete result materialization guarded。^[PR #6291] ^[PR #6829]
