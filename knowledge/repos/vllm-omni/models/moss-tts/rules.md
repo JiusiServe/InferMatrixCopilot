@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #5635", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, "PR #6241", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local_depth.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py", "PR #6543", vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, tests/entrypoints/openai_api/test_tts_adapter.py]
+sources: ["PR #5635", "PR #6908", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, "PR #6241", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local_depth.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py", "PR #6543", vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, tests/entrypoints/openai_api/test_tts_adapter.py]
 confidence: high
 ---
 
@@ -17,6 +17,7 @@ confidence: high
 | PR 描述信号 | 规则 | 第一批源码 |
 |---|---|---|
 | codec v1/v2、`number_channels`、missing weights | `MOSSTTS-1a` | `modeling_moss_tts_codec.py::MossTTSCodecDecoder._build_codec` → Stage-1 weight loader |
+| codec-v2 NPU RoPE、`npu_rotary_mul`、GPT-J pairs | `MOSSTTS-1b` | `audio_tokenizer_v2.py::apply_rope` |
 | `_ProjectedTransformer`、`in_proj`/`out_proj`、Identity | `MOSSTTS-1a` | `audio_tokenizer.py::_ProjectedTransformer` → codec checkpoint parameter names |
 | online request `seed`、adapter additional information、Nano/Local/Delay/Realtime reproducibility | `MOSSTTS-3a` | `tts_adapters/moss_tts.py::_MossTTSAdapterBase.build` → variant model seed/RNG consumer |
 
@@ -41,6 +42,13 @@ confidence: high
 
 共享 loader 的 dtype/config 最小读取合同见
 [Model Executor rules](../../components/model-executor/rules.md)。
+
+## MOSSTTS-1b — codec-v2 NPU RoPE 必须显式往返 GPT-J 与 NeoX pairs
+
+- 触发：codec-v2 `apply_rope`、time-before-heads broadcast、NPU kernel 或 RoPE table 变更。
+- 强制：保留 GPT-J interleaved pairs。NPU 从 `freqs*ts` 建 `cos_d2`/`sin_d2`、duplicate halves至 NeoX width，将 q/k 经 view-transpose-reshape-contiguous 变为 NeoX，分别 lazy-import `torch_npu.npu_rotary_mul`，再 inverse-permute 为 contiguous GPT-J；保持 time-before-heads shape/broadcast。non-NPU 保持 eager FP32 GPT-J；NPU import/kernel failure fail closed，无 recoverable fallback。
+- 禁止：直接给 kernel interleaved/noncontiguous input、改 pairing、只转 q/k 一侧，或改变 CPU/GPU path。
+- 验收：真实 NPU parity 与 non-NPU fallback 不变；target 无自动测试，只有作者 910B2C 观察，不能外推质量/性能。^[PR #6908]
 
 ## MOSSTTS-2a — Local talker 异步输出必须保持固定 shape 和 prefill 边界
 

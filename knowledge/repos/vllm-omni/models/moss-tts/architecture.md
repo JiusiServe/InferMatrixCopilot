@@ -9,6 +9,9 @@ sources: ["PR #5635", "PR #5235", "PR #6664", vllm_omni/model_executor/models/mo
 
 # MOSS-TTS 架构
 
+codec-v2 的 NPU RoPE layout conversion、kernel boundary 与 non-NPU eager path 见
+[MOSSTTS-1b](rules.md#mosstts-1b-codec-v2-npu-rope-必须显式往返-gpt-j-与-neox-pairs)。
+
 事实在 `main @ be335a86` 复核;变体/deploy 速查见 [index](_index.md)。
 
 ## 模型专有部分与共享模块的边界
