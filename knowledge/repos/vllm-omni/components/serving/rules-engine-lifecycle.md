@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5277", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/membership_controller.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, tests/engine/test_membership_controller.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346", "PR #6581", tests/entrypoints/test_omni_sleep_mode.py]
 confidence: high
 ---
 
@@ -156,6 +156,14 @@ confidence: high
   pause 仍调用 scheduler 与 cache clear，非法 stage ID 产生明确错误，fast path 仅命中四个方法且
   timeout 生效；abort success 后才清理 frontend state，orchestrator error 与 timeout 时 state 保留。
   ^[PR #6084] ^[PR #6581]
+
+### SERV-5n — remote replica attach/detach 必须按本次 membership generation 判定
+
+- 触发：修改 `MembershipController` 的 register、watcher snapshot、unregister、shutdown 或 remote client factory。
+- 强制：以 `(stage_id, replica_id)` 分别记录 attaching/attached，重复 register 在 attach 完成前后都只保留一个 client。每次 watcher snapshot 单调递增 generation；controller 创建的地址只有在本次 attach 开始后真实观察到 `UP`，才可因后续消失触发 detach；未跟踪的 static client 继续按相邻 snapshot 的 `UP -> absent` 清理。factory 返回后若 shutdown 已开始，或地址校验/`StagePool.add_client` 失败，必须关闭尚未接管的 client；正常 detach 同步清理 membership bookkeeping、pool client、受影响请求和 client 资源。
+- 禁止：让 attach 前的 stale `UP` snapshot 立即删除刚注册 client；并发重复创建同一 replica；shutdown 后继续接受 register 或挂入 late client；把“曾在任意 generation 出现”当作当前 attachment 已确认。
+- 已知边界：`asyncio.to_thread` 中正在执行的 factory 不能随外层 task cancellation 一起停止；若 membership task 被直接取消，thread 后来返回的 client 仍可能失去 cleanup owner。该低严重度泄漏在 PR 中明确延期，现有 shutdown/late-result 回归不能证明 cancellation 路径已关闭。
+- 验收：覆盖 register storm、register 前后 stale/fresh `UP`、attach 中 watcher churn、untracked disappearance、invalid stage/address、`add_client` 异常、shutdown-before/during/after factory、detach 后重新注册和受影响 request error；另以专门用例保留或修复上述 cancellation leak。^[PR #5277]
 
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 
