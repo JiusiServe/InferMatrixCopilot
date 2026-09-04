@@ -1,16 +1,16 @@
 ---
 title: "平台后端合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102", "PR #6054", "vllm_omni/platforms/npu/platform.py", tests/platforms/npu/test_diffusion_attn_backend_selector.py]
+sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102", "PR #6054", "vllm_omni/platforms/npu/platform.py", tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6674", vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_generation_model_runner.py, vllm_omni/platforms/npu/worker/npu_model_runner.py]
 confidence: high
 ---
 
 # 平台后端合同
 
-`EXEC-10a`、`EXEC-12a`–`EXEC-13a`：NPU 平台 runner 的 runtime mode 与 dummy-run 接口、ROCm 分页注意力的 packed KV varlen 路径，以及 NPU 模型补丁的注册与回归。触发条件与其余审查组见 [model-executor 共享规则](rules.md) 的 Direct 代码快速入口。
+`EXEC-10a`–`10e`、`EXEC-12a`–`EXEC-13h`：NPU 平台 runner 的 runtime mode 与 dummy-run 接口、ROCm 分页注意力的 packed KV varlen 路径，以及 NPU 模型补丁的注册与回归。触发条件与其余审查组见 [model-executor 共享规则](rules.md) 的 Direct 代码快速入口。
 
 ## EXEC-10a — NPU 平台 runner 必须保持 runtime mode 与 dummy-run 接口合同
 
@@ -90,3 +90,27 @@ confidence: high
 - 强制：显式 `FLASH_ATTN`（包括在 NPU 上回退到本地 FlashAttention 的 `FLASH_ATTN_HUB` / `FLASH_ATTN_3_HUB`）和 `RAINFUSION_ATTN` 在 `mindiesd` 可发现时必须在 backend path 返回前导入它；后者的 dense FlashAttention fallback 会在 `start_step` 前或没有可稀疏化 video segment 的 layer 触达 MindIE-SD。该导入须早于任何会让 CANN 固化 custom-op registry 的 regInfo lookup，使 `mindiesd.env` 能先把 vendor dirs 写入 `ASCEND_CUSTOM_OPP_PATH`。
 - 禁止：为 `TORCH_SDPA` 或其他不会到达 MindIE-SD kernel 的显式 backend 导入可选 `mindiesd`；不得把 optional-package 损坏扩散成这些 backend 的选择失败，也不得假定所有 RAINFUSION layer 都走 sparse path。
 - 验收：CPU/mock selector test 应分别断言 FLASH、两个 hub FLASH fallback 与 RAINFUSION 触发 eager import，TORCH_SDPA 不触发；同时覆盖 `mindiesd` 缺失时显式 FLASH 仍解析、未选择 backend 时才在可用条件下默认 FLASH，否则回退 SDPA。该测试不运行 NPU/CANN，不证明 custom-op 注册、真实 kernel 或 Ascend 生产可用性。^[PR #6054]
+## EXEC-10e — NPU runner 只能 shallow-copy 自己要改的 mutable map
+
+- 触发：NPU AR/generation runner 在 `speculative_config.use_ngram_gpu()` 下把同一
+  `SchedulerOutput` 交给会 trim invalid draft 的继承路径，或升级 upstream NPU runner ownership。
+- 强制：AR 与 generation 两条路径都用 `dataclasses.replace` 浅拷贝外层 `SchedulerOutput`，且只
+  `.copy()` 两个会被修改的 map：`num_scheduled_tokens` 与 `scheduled_spec_decode_tokens`；其他 immutable/
+  tensor state 继续共享。vLLM-Ascend 0.28 已拥有 CUDAGraph/KV-scale handling 与 SP/flashcomm-v1 output
+  gather 时，Omni 只保留自身 forwarding/output hooks，不重复 reset、calculate 或 gather。
+- 禁止：原地修改 EngineCore-owned maps；`deepcopy(scheduler_output)`；只修 AR 或 generation 一侧；
+  恢复已经上移给 upstream 的 KV-scale/CUDAGraph/SP gather，或把删除重复逻辑写成数值/性能已验证。
+- 验收：ngram enabled 时两 runner 的 inherited mutation 都不改变原始两个 map，copy 仅隔离它们；
+  disabled control 不额外复制。另以 owner/call-count 测试防止 duplicate KV-scale 与 SP gather。
+  PR #6674 未新增这些专项执行测试；CPU/mock 也不证明真实 NPU parity。^[PR #6674]
+
+## EXEC-13h — NPU profiling 只有 enabled 且 need_timing 才进入 timing path
+
+- 触发：NPU runner profiling、model execute timing 或 vLLM 0.28 profiler API 对齐。
+- 强制：AR 与 generation 都从同一 `profiling_chunk_config` 读取 gate；scheduler output 的
+  `disable_profiling_timing` 先把当前 call 的 `need_timing` 置 false。只有 `enabled && need_timing`
+  才启动/同步计时，并且只有同一 gate 成立才导出 `execution_time_ms`；其他调用保持 normal path。
+- 禁止：仅因 profiler/config object 存在或 `need_timing=true` 就计时；profiling disabled 时创建 timing
+  state；只在 start 处 gate、却无条件同步/导出，或将 gate 本身当作 NPU 性能结果。
+- 验收：AR/generation 都覆盖 enabled+timed、disabled+timed、enabled+not-timed 及 per-output disable，
+  断言 start/sync/export 一致。PR #6674 没有这些专项测试，属于后续验收要求。^[PR #6674]
