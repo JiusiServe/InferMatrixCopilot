@@ -1,10 +1,10 @@
 ---
 title: "Diffusion output 与 multiprocess runtime 规则"
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5550", "PR #5864", "PR #5885", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/io_support.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/output_formatter.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_timeout.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6255", "PR #6288", "PR #6308"]
+sources: ["PR #5550", "PR #5864", "PR #5885", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/io_support.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/output_formatter.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_timeout.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6255", "PR #6288", "PR #6308", "PR #6499"]
 confidence: high
 ---
 
@@ -112,9 +112,9 @@ confidence: high
 ## DIFF-9a — 共享 PyAV 预构造帧 mux 必须闭合资源与音频时间零点
 
 - 触发：修改共享 diffusion 的预构造 PyAV 视频帧 mux、可选音频 mux、container cleanup 或编码器异常传播。
-- 强制：`mux_av_video_audio_bytes()` 必须在 context manager 内打开并配置 MP4 video/audio streams，消费 `Iterable[av.VideoFrame]` 后 flush video encoder；音频按 `fltp` 和 mono/stereo layout 构造，并以 `pts=0`、`time_base=1/sample_rate` 标记输入时间零点。成功和 generator、encoder、mux 异常都必须退出 context 关闭 container，同时原样传播原始错误。
+- 强制：`mux_av_video_audio_bytes()` 必须在 context manager 内打开并配置 MP4 video/audio streams，消费 `Iterable[av.VideoFrame]` 后 flush video encoder；音频按 `fltp` 和 mono/stereo layout 构造，并以 `pts=0`、`time_base=1/sample_rate` 标记输入时间零点。`audio_sample_rate` 可为 `None`：仅在 audio waveform 存在时内部解析为 44.1 kHz，video-only 不创建 audio stream，也不需要采样率。成功和 generator、encoder、mux 异常都必须退出 context 关闭 container，同时原样传播原始错误。
 - 禁止：在 generator 消费前或 context 外打开/使用 container；只在成功路径手工 close；吞掉帧生成或编码异常后静默改走其他 muxer；把 mock container cleanup 或单一 CPU 运行误认为完整跨硬件 A/V parity。
-- 验收：测试覆盖预构造 `gbrp` 帧的 H.264 mux、无音频/mono/stereo 音频、AAC 首个有效 packet 的负 priming PTS、video flush 和 container close；让 frame generator 在中途抛错并断言 container 已关闭且异常 identity 保持，再用固定媒体输入执行 ffprobe 与完整 FFmpeg 解码。^[PR #6288]
+- 验收：测试覆盖预构造 `gbrp` 帧的 H.264 mux、无音频/mono/stereo 音频、`None` rate 的 video-only 与 audio 44.1 kHz default、AAC 首个有效 packet 的负 priming PTS、video flush 和 container close；让 frame generator 在中途抛错并断言 container 已关闭且异常 identity 保持，再用固定媒体输入执行 ffprobe 与完整 FFmpeg 解码。^[PR #6288] ^[PR #6499]
 
 ## DIFF-11a — 单 GPU diffusion executor 必须保持进程内故障与生命周期语义
 
