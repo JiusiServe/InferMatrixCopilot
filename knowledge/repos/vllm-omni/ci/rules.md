@@ -179,6 +179,10 @@ PR 报告的 collection=1 和 local two-card B300 184.97 s 是该精确 workload
   同时计入测试辅助模型：主模型占卡时，Whisper 等 grader 需要 spare accelerator 才能避免 CPU 超时。
 - 禁止：在 release image 上保留补偿旧 image 的依赖手术；用 Docker 默认 `/dev/shm`；只按被测模型
   卡数配置 lane 而忽略 grader；把部分 nightly green 当全部兼容问题已关闭。
+- v0.28 对齐的 release-boundary example：CUDA/CI/ROCm base image 与 installed vLLM 都指向
+  `v0.28.0`；CI Dockerfile 在官方同版本 image 出现后移除临时 wheel reinstall，而不是把旧
+  0.27 image 上的 ABI repair 带入 release。文档安装 pin 也必须同步；非 release SHA 才恢复
+  明确的 wheel/ABI block。^[PR #6606]
 - 验收：image tag 与目标 release 一致；startup 通过共享内存 preflight；目标 lane 证明实际 grader
   device；每个残余失败独立记录，尤其数值/质量回归不能由 API 兼容测试替代。^[PR #5976]
 

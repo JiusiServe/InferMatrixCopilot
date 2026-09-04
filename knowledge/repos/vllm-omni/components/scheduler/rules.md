@@ -156,6 +156,16 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
   Omni fast path 不重建与 generation fallback；AR/generation 分别验证 pending-input、queue
   restore、finished-set/abort policy。直接调用 scheduler 方法的轻量 stub 必须继承 mixin 或
   显式绑定本次方法真实依赖，使断言确实到达目标分支。 ^[PR #5461]
+- vLLM 0.28 的具体补充：当 `defer_block_free` 启用时，AR 与 generation scheduler 都必须在每个
+  非空 schedule step 推进 `sched_step_seq`，并在 `update_from_output()` 的开头推进
+  `processed_step_seq`、调用 `_drain_deferred_frees()`；generation fast path 的推进必须早于
+  `_update_after_schedule` 的 `last_sched_seq` 标记。EC connector 完成请求时先调用
+  `request_finished(request)`，将 delayed-free 合入 block 生命周期，并把
+  `ec_transfer_params` 经 `OmniEngineCoreOutput` 传给 output processor。prefill stats 必须在
+  request 尚在 KV cache manager 中时以 `estimate_cached_tokens()` finalize，随后在所有
+  `RequestOutput` 路径保留 `num_cache_creation_tokens`。这些是 upstream 0.28 合同，不是
+  optional compatibility shim；同时覆盖 AR/generation 两条 override 路径和 hook-order 测试。
+  ^[PR #6606]
 
 ## SCHED-4a — side-stream 复制必须拥有源 buffer 的完成期
 
