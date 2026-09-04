@@ -1,10 +1,10 @@
 ---
 title: "MiMo-Audio（融合 thinker+talker 单 AR stage 语音模型）"
 created: 2026-07-21
-updated: 2026-09-04
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models]
-sources: ["PR #6559", recipes/XiaomiMiMo/MiMo-Audio.md, vllm_omni/model_executor/models/mimo_audio/, vllm_omni/deploy/mimo_audio.yaml, vllm_omni/deploy/mimo_audio_5090d.yaml, vllm_omni/model_executor/stage_input_processors/mimo_audio.py]
+sources: ["PR #6559", "PR #6803", recipes/XiaomiMiMo/MiMo-Audio.md, vllm_omni/model_executor/models/mimo_audio/, vllm_omni/deploy/mimo_audio.yaml, vllm_omni/deploy/mimo_audio_5090d.yaml, vllm_omni/model_executor/stage_input_processors/mimo_audio.py]
 ---
 
 # MiMo-Audio
@@ -36,6 +36,10 @@ sources: ["PR #6559", recipes/XiaomiMiMo/MiMo-Audio.md, vllm_omni/model_executor
   `vllm_omni/model_executor/stage_input_processors/mimo_audio.py`。
 - 依赖共享模块：vLLM qwen2_audio 处理栈、SharedMemoryConnector、
   [Config 组件](../../components/configuration/architecture.md)。
+- vLLM 0.28 的 `SupportsPP` bare annotation 不会为 wrapper 创建 runtime attribute；fused
+  thinker/talker 在构造 nested Qwen2 后显式委托
+  `make_empty_intermediate_tensors`。这只覆盖观测到的 stage-0 load：Token2Wav 与 CovoAudio
+  仍是需各自确认的缺口，不能外推为通用 `SupportsPP` 或 PP>1 支持。^[PR #6803]
 
 ## 目录内容
 

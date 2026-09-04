@@ -4,13 +4,13 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/, "PR #5910", "PR #6119", "PR #5791", "vllm_omni/model_executor/models/common/qwen3_code_predictor.py", "vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py", "PR #6138", "PR #6640", vllm_omni/engine/stage_init_utils.py, tests/engine/test_async_omni_engine_stage_init.py, tests/engine/test_stage_engine_args.py, "PR #6830", vllm_omni/engine/arg_utils.py, tests/engine/test_arg_utils.py]
+sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/, "PR #5910", "PR #6119", "PR #5791", "vllm_omni/model_executor/models/common/qwen3_code_predictor.py", "vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py", "PR #6138", "PR #6640", vllm_omni/engine/stage_init_utils.py, tests/engine/test_async_omni_engine_stage_init.py, tests/engine/test_stage_engine_args.py, "PR #6830", vllm_omni/engine/arg_utils.py, tests/engine/test_arg_utils.py, "PR #6803", vllm_omni/model_executor/models/mimo_audio/mimo_audio_llm.py, vllm_omni/model_executor/models/mimo_audio/mimo_audio.py]
 confidence: high
 ---
 
 # loader 合同
 
-`loader-contract` 审查组的 `EXEC-2a`–`EXEC-2c`：dtype 与 config 获取、fused shard 完整性、多模块 checkpoint 载入。触发条件与其余审查组见 [model-executor 共享规则](rules.md) 的 Direct 代码快速入口。
+`loader-contract` 审查组的 `EXEC-2a`–`EXEC-2i`：dtype 与 config 获取、fused shard 完整性、多模块 checkpoint 载入与 wrapper runtime callable 委托。触发条件与其余审查组见 [model-executor 共享规则](rules.md) 的 Direct 代码快速入口。
 
 ## EXEC-2a — loader 的 dtype 与 config 获取必须显式、最小化
 
@@ -98,3 +98,19 @@ confidence: high
   success 还须断言 resolved tokenizer path 被赋值且 warning logger 未调用。模型专有 root
   completeness 另由 owner 验证。unit fixture 不证明真实 checkpoint load、音质、GPU E2E 或跨平台支持。
   ^[PR #6640] ^[PR #6830]
+
+## EXEC-2i — concrete `SupportsPP` wrapper 必须显式委托 required callable
+
+- 触发：上游 vLLM 的 `SupportsPP` interface/protocol 漂移，或包含 nested vLLM model 的 concrete
+  wrapper 声明/实现该 interface。
+- 强制：concrete consumer 必须在其自身运行时对象上显式提供 required callable；MiMo fused
+  thinker/talker 在构造 nested `Qwen2ForCausalLM` 后，必须将
+  `self.make_empty_intermediate_tensors` 委托为
+  `self.model.make_empty_intermediate_tensors`。
+- 禁止：把 `Protocol` 中的 bare annotation 当作会在 runtime 创建属性；把这一个 MiMo wrapper
+  修复泛化为所有 `SupportsPP` consumer 已实现委托，或以此宣称 PP>1 已验证。
+- 验收：MiMo stage-0 construct/load 路径必须能取得该 callable 并完成其已覆盖的初始化。当前
+  证据仅为修复前的 `AttributeError` 与 A6000 上两 stage `LOAD OK`；没有新增 unit 或 PP>1
+  覆盖。审计中 `MiMoAudioToken2WavForConditionalGenerationVLLM` 与
+  `CovoAudioCode2WavForConditionalGeneration` 的同类缺口仍须由各自 owner 单独确认。
+  ^[PR #6803]

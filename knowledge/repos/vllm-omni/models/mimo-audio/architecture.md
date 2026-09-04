@@ -1,10 +1,10 @@
 ---
 title: "MiMo-Audio 架构"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/mimo_audio/mimo_audio.py, vllm_omni/model_executor/models/mimo_audio/mimo_audio_llm.py, vllm_omni/model_executor/models/mimo_audio/mimo_audio_code2wav.py, vllm_omni/model_executor/models/mimo_audio/cuda_graph_decoder_wrapper.py, vllm_omni/model_executor/models/mimo_audio/modeling_audio_tokenizer.py, vllm_omni/model_executor/models/mimo_audio/quantization.py, vllm_omni/model_executor/models/mimo_audio/pipeline.py, vllm_omni/model_executor/stage_input_processors/mimo_audio.py, vllm_omni/model_executor/models/mimo_audio/config_mimo_audio.py]
+sources: ["PR #6803", vllm_omni/model_executor/models/mimo_audio/mimo_audio.py, vllm_omni/model_executor/models/mimo_audio/mimo_audio_llm.py, vllm_omni/model_executor/models/mimo_audio/mimo_audio_code2wav.py, vllm_omni/model_executor/models/mimo_audio/cuda_graph_decoder_wrapper.py, vllm_omni/model_executor/models/mimo_audio/modeling_audio_tokenizer.py, vllm_omni/model_executor/models/mimo_audio/quantization.py, vllm_omni/model_executor/models/mimo_audio/pipeline.py, vllm_omni/model_executor/stage_input_processors/mimo_audio.py, vllm_omni/model_executor/models/mimo_audio/config_mimo_audio.py]
 ---
 
 # MiMo-Audio 架构
@@ -18,6 +18,9 @@ sources: [vllm_omni/model_executor/models/mimo_audio/mimo_audio.py, vllm_omni/mo
   thinker/talker 分离);Qwen2 backbone + CUDA-graph 化的 local transformer
   （`MiMoLocalDecodeCudaGraph` 等,逐步产 RVQ 码）;自有采样器
   `MiMoSampler`/`MiMoLocalSamplerTensor`。
+- vLLM 0.28 只在 `SupportsPP` protocol 标注 callable，不会在 runtime 提供它；因此 stage-0
+  wrapper 在 nested Qwen2 构造后委托 `make_empty_intermediate_tensors`。这不是 Token2Wav、Covo
+  或 PP>1 的实现/验证声明。^[PR #6803]
 - 专有 stage 1（`mimo_audio_code2wav.py` + vendored
   `modeling_audio_tokenizer.py`/`quantization.py`）：VQ 反量化 → AudioDecoder
   → Vocos 声码器;`CUDAGraphMiMoDecoderWrapper` 把**整条解码路径**按
