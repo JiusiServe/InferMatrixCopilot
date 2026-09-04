@@ -10,7 +10,7 @@ sources: []
 # Diffusion
 
 - 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
-- 源码校验：以上子模块均已在 `main @ b454e349` 验证存在；本轮新增/扩展的
+- 源码校验：以上子模块均已在 `main @ 51b7565f` 验证存在；本轮新增/扩展的
   async output、distributed layerwise offload、MiniMax H3 和 SANA-Video 仍按各自模型/机制规则审查
 - 主要职责：多个 diffusion 模型共用的 pipeline、执行循环、scheduler 接入和运行机制
 
@@ -36,7 +36,7 @@ sources: []
 | Wan VAE height/width spatial reshard、empty tail、attention extent | [Wan spatial-shard rules](rules-wan-spatial-shard.md) |
 | multi-DiT、dotted `_dit_modules`、loader-to-offloader handoff 与跨 Cache-DiT/compile/LoRA/offload lifecycle | [component lifecycle rules](rules-component-lifecycle.md) |
 | PEFT 与 distilled LoRA、startup fusion、delta/key/alpha、Qwen/Wan transformer mapping | [LoRA rules](rules-lora.md) |
-| local FlashAttention deterministic opt-in、NPU packed mask-free/laser fallback 与 config propagation | [attention rules](rules-attention.md) |
+| local FlashAttention deterministic opt-in、NPU packed mask-free/laser fallback、TRTLLM packed-padding 与 config propagation | [attention rules](rules-attention.md) |
 | SP auto-padding、`mask_sp_padding`、dense/varlen 与 advanced UAA 边界 | [SP padding rules](rules-sp-padding.md) |
 | video/audio mux、DLO DP wave、result queue、async pump、SHM ownership、async-output wait 与 shutdown | [output/runtime rules](rules-output-lifecycle.md) |
 | distilled continuous sigma schedule、boundary/step 语义与 modality shift | [sigma schedule rules](sigma-schedules.md) |

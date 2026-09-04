@@ -76,8 +76,10 @@ confidence: high
 - LightX2V Turbo v1.0 仅支持 legacy dynamic LoRA；精确 artifact mapping、packed QKV/FC1
   binding、active-request sampling 合同与 offload 排除项见 MMH3-2j；转换后的 mixed-rank
   native PEFT checkpoint 不在该支持声明内。
-- datacenter Blackwell 上 H3 可默认 dense BF16 TRTLLM；packed suffix trim、SAGE 短序列 role、
-  mask/metadata fail-closed、AllGather-KV 禁用及性能证据边界见 MMH3-1e。
+- datacenter Blackwell 上 H3 可默认 dense BF16 TRTLLM；single-request producer-owned
+  `PackedPaddingMetadata` 可替代 structural suffix mask，generic ragged/continuous batches仍按
+  cu_seqlens 隔离 documents。SAGE short-role 与 multi-request tail gate、mask/metadata fail-closed、
+  AllGather-KV 禁用及有界 performance evidence 见 MMH3-1e。^[PR #6542]
 - 2×consumer-GPU profile 使用 TP-local no-AllGather DLO、VAE patch parallel、cuDNN attention
   和 eager execution；resident layers 只改变 HBM/transfer，不减少 pinned host master。
   实现合同与 standalone-audio staging 缺口见 MMH3-3a，5090/4090 证据边界见 MMH3-3b。

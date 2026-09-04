@@ -127,26 +127,37 @@ confidence: high
 - 强制：H3 只在支持的 datacenter Blackwell SM100/103、head_dim=128、FlashInfer kernel 可用且
   声明 compatible packed/mask-free path 时默认 dense BF16 TRTLLM；SM120/121、缺依赖、错误
   head dim 或需要任意 mask 的路径保留平台 fallback，默认不自动开启 SAGE/Skip-Softmax。
-- 强制：四个 packed metadata key 必须完整、Q/K batch/terminal 覆盖一致；只接受 prefix-valid
-  structural padding mask，按 boundary 裁掉无效 suffix 后再 quantize/attention，并把输出补零到
-  Ulysses 物理 shape。`[0,N,N]` 必须折叠尾部空 sequence；任意 mask、缺失或矛盾 metadata
-  fail closed。`attention_mask_free=True` 是 compatible packed-path capability，不表示物理 mask
-  永远为空。AllGather-KV 的 local-Q/global-KV metadata 不对称合同在初始化时明确拒绝，真正
-  支持按 review 明确延期。
+- 强制：四个 packed metadata key 必须完整、Q/K batch/terminal 覆盖一致。单 request 的
+  producer-owned `[real,pad]` path 仅在 non-Ring backend 声明 `supports_packed_mask_free()` 时可省略
+  `attn_mask`，并同时发布 Python `q_length`/`kv_length` 与同 device、`int32`、canonical
+  `[0,length]` 的 `PackedPaddingMetadata` views；TRTLLM 必须核对长度、bounds、max-length 与
+  `valid_kv_length` 后裁掉 suffix、再 quantize/attention，并把输出补零到 Ulysses 物理 shape。
+  TRTLLM 对任何 nonempty `attn_mask` 一律 fail closed；generic ragged cu_seqlens 仍是多 document
+  block-diagonal path，`[0,N,N]` 尾部空 sequence 必须折叠。AllGather-KV 的 local-Q/global-KV
+  metadata 不对称合同在初始化时明确拒绝，真正支持按 review 明确延期。
 - 强制：main DiT 与 `minimax_h3.token_refiner` 使用独立 role；任一 KV sequence 短于 SAGE
   `k_block_size` 时该 input 告警并走 dense TRTLLM，不能让 14-token refiner 产生 non-finite，
   也不能因此关闭 main DiT 的 SAGE。H3 将 scheduler 的降序 sigma（1→0）发布为
   `normalized_timestep`；Skip-Softmax 在 sigma 大于 `disabled_until_timestep` 时保持 dense，
   到达或低于阈值才启用。
-- 禁止：把 structural prefix mask 泛化为任意 mask；让 padding 进入 SAGE block quantization；
-  把 combined packed-H3 优化视频归因于本 PR 单一改动。请求级 `set_forward_context` wrapper
-  会在 `finally` 恢复 prior context，因此 loop 内的 step mutation 不会泄漏到后续请求。
-- 验收：测试覆盖 ragged batch、suffix trim/zero restore、empty terminal、invalid mask/metadata、
-  short-role dense fallback、AllGather rejection 与 non-finite regression。PR 的 4×B300 SM103、
+- 禁止：把 producer-owned packed-padding shortcut 泛化为任意 mask、multi-request batch 或第三方
+  metadata；让 padding 进入 SAGE block quantization；把 combined packed-H3 优化视频归因于本 PR
+  单一改动。请求级 `set_forward_context` wrapper 会在 `finally` 恢复 prior context，因此 loop 内的
+  step mutation 不会泄漏到后续请求。
+- 验收：测试覆盖 generic ragged batch、single-request packed-padding suffix trim/zero restore、empty
+  terminal、complete packed metadata 加 nonempty mask 的 unconditional rejection、invalid metadata、
+  short-role dense fallback、AllGather rejection 与 non-finite regression。Continuous batching 必须
+  覆盖 aligned non-final request 的严格递增 `cu_seqlens`；SAGE gate 应只依据 real documents，当前
+  multi-request alignment-tail case 仍可能使整 batch dense，是 PR #6542 留下的 unresolved P3，不能
+  声称 SAGE 保持启用。PR 报告的 4×B300 SXM6、TP1/Ulysses4/Ring1、1344×768、243 frames、49
+  updates、dense BF16 TRTLLM、单 warmup 后 Nsight interval 从 final Ulysses all-to-all 到 main FMHA：
+  9,797/9,680 paired samples的 gap p50 499.683→0.352 us、p95 698.308→0.384 us，且中间 GPU
+  activity/D2H copy 为 244,925/97,970→0/0；这只证明该 exact profiling interval，不是 E2E
+  latency、quality 或其他 workload/backend/topology 的保证。此前 PR 的 4×B300 SM103、
   1248×768、209 frames、50 steps FA4/TRTLLM 对比仅绑定该 prompt/seed/topology：PSNR 27.10、
   SSIM 0.8880 不是质量 gate；83.854→71.990 s diffusion、88.558→76.176 s wall 的 warmed A/B
   来自 review follow-up 外部分支 commit `20cc23ae`，其 artifacts 明确是 combined packed-H3
-  optimization evidence，并非目标 commit 的隔离实验，不能泛化为稳定 14% 保证。^[PR #5779]
+  optimization evidence，并非目标 commit 的隔离实验，不能泛化为稳定 14% 保证。^[PR #5779] ^[PR #6542]
 
 ## MMH3-1g — H3 NPU mask-free opt-in 必须保留 Ring 与 malformed-metadata fallback
 

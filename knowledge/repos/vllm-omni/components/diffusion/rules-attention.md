@@ -56,6 +56,27 @@ confidence: high
   没有证明 third-party registry override 或未继承 base class 的 backend 完成了 capability
   census；这些实现仍须继承合同或显式实现 method。^[PR #5891] ^[PR #5997]
 
+## DIFF-1m — TRTLLM packed-padding 快路径必须隔离 producer contract、ragged documents 与 SAGE gate
+
+- 触发：修改 `PackedPaddingMetadata`、TRTLLM packed `cu_seqlens`、`supports_packed_mask_free`、
+  padded-output restore、SAGE quantization gate 或 multi-document varlen capability。
+- 强制：TRTLLM 只把 `PackedPaddingMetadata` 当作 single physical batch 的 producer-owned
+  `[real,pad]` shortcut：Q/KV host lengths 必须是 Python int，在 flattened tensors bounds 内并与
+  `max_seqlen_q/k` 及可选 `valid_kv_length` 相等；canonical two-element `int32` cu_seqlens 必须和
+  Q/K device 一致。该 path 裁 Q/K/V 后把 output 补零回物理 shape，且从不读取或 materialize
+  `attn_mask`。generic complete cu_seqlens 仍支持 genuine multi-document ragged varlen，并删除
+  paired trailing empty document；两条合同不能互相降级或混用。
+- 禁止：接受任何 nonempty TRTLLM `attn_mask`、用 producer shortcut 表示 arbitrary mask 或
+  multi-request block-diagonal layout，或让未验证的 CUDA scalar read 回到 single-request fast path。
+  不得把 tail document 短于 `k_block_size` 造成的 dense fallback 描述为 SAGE 的真实-document
+  检查已经完成。
+- 验收：backend tests 分别覆盖 malformed host/device/dtype/shape/max-length metadata、trim/zero
+  restore、generic unequal Q/KV ragged batch、trailing empty pair、complete packed metadata 加
+  nonempty mask 的 rejection，以及 real multi-document output 对逐 document reference。SAGE 还要覆盖
+  alignment tail 不参与 real-document minimum；该 fix 在 PR #6542 尚未提交，现存行为可整 batch
+  fallback dense。性能只可引用该 PR 的 exact 4×B300 Nsight all-to-all→FMHA interval，不能以 CPU mock、
+  kernel gap 或 frame hash 声称 E2E latency/quality。^[PR #6542]
+
 ## DIFF-1h — RainFusion irregular tail 由 MindIE-SD 保护，不能 padding 伪对齐
 
 - 触发：修改 `RAINFUSION_ATTN`、`rf_v2`、`VideoTokenLayout`、block size、MindIE-SD
