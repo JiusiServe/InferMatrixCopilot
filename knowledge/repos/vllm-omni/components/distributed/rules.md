@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406"]
+sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626"]
 confidence: high
 ---
 
@@ -89,6 +89,20 @@ confidence: high
 - 强制：queued task 与其 sender generation token 绑定；abort 取消 token，旧 task 在 put 前后均须拒绝更新 state，in-flight task 在 finally 中回收。sender-state lock 只保护 token/state transition，不能包住 payload construction 或 connector I/O。
 - 禁止：`cleanup_sender` 清空 map 后让 pending save 用默认 chunk counter 写回旧 chunk 0；让 scheduler thread 等待 connector I/O；把同一 external ID 的新 generation 误当作旧 task 的 cleanup target。
 - 验收：覆盖 pending/in-flight abort、stale put completion、ID reuse 和普通 async-chunk transport。^[PR #6089]
+
+## DIST-1i — receiver registration 必须隔离旧 poll 与新 request generation
+
+- 触发：async-chunk receiver 注册/清理与 `connector.get()` 并发、同一 internal request ID 恢复或复用，
+  或已消费 payload 需在 scheduler thread 才能安全修改 prompt。
+- 强制：每次 receiver registration 持有独立 identity entry；`connector.get()` 可在锁外阻塞，但结果
+  commit 必须在 receiver-state lock 下确认当前 map 仍指向同一 entry。cleanup 是 commit barrier：旧
+  queued/in-flight poll 的迟到结果只能丢弃，不能重建已删除或新 generation 的 prompt/window state。
+  AR payload 先冻结为 pending update，再由 scheduler thread 用当前 live request 应用；contract error
+  进入一次性 receive-failure ledger，不得重取已消费 chunk。
+- 禁止：只按可复用 request-id 判断 poll 仍有效；在 I/O 期间持有 scheduler-facing lock；让旧
+  terminal cleanup 清掉新 registration；使用被移出 scheduler 的 fallback request 应用 pending mutation。
+- 验收：覆盖 cleanup-during-get、same-ID re-registration、late success/error、重复 register/cleanup、
+  scheduler live-ID replacement 与 invalid payload ledger drain；证明旧 entry 不影响新 request。^[PR #6626]
 
 ## DIST-2a — diffusion EP group 必须满足运行中 MoE backend 的 communicator 合同
 

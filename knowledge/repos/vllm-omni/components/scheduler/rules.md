@@ -1,10 +1,10 @@
 ---
 title: "Scheduler 规则"
 created: 2026-07-16
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6089", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619", "PR #6680"]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/core/sched/test_omni_scheduler_mixin_timeouts.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6089", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619", "PR #6680", "PR #6626"]
 ---
 
 # Scheduler 规则
@@ -27,6 +27,7 @@ PR 描述先命中下表，再打开对应规则组和首批源码；changed fil
 | sampled-token logprobs、spec decode trim、request-local output error | SCHED-5a | `core/sched/omni_ar_scheduler.py::_slice_sampled_logprobs`、`update_from_output` |
 | stateful async chunk、full-payload input、KV cleanup | SCHED-5b/5c | `core/sched/omni_generation_scheduler.py`、`omni_scheduling_coordinator.py`、`omni_ar_scheduler.py::_free_request` |
 | KV extraction wait、connector acknowledgement、partial interval cleanup | SCHED-5h | `core/sched/omni_ar_scheduler.py::{_free_request,update_from_output}` → scheduler stats → orchestrator metrics |
+| consumed chunk validation failure、receive ledger、live request termination | SCHED-5i | `core/sched/omni_scheduler_mixin.py::_process_chunk_receive_failures` → `chunk_transfer_adapter.py` |
 | async stop、streaming update、stale token fence、next duplex unit 被吞 | SCHED-6a | `core/sched/omni_ar_scheduler.py::{_handle_stopped_request,update_from_output}` → `test_omni_ar_scheduler_streaming.py` |
 
 若描述只写模型症状，先从模型 owner 找到 payload producer/consumer；只有实际断点落在调度、
@@ -270,6 +271,18 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 - 强制：先物化可能被多层消费的 request-id iterator，并在 adapter 清理前快照 `skipped_waiting` 中承担流式等待计数的请求；只对仍有活队列所有权的目标 resumable 终态请求恢复状态，`skipped_waiting` 恢复为 `WAITING_FOR_STREAMING_REQ`，`running`/`waiting` 按实际队列对齐；下游 async-chunk 的 segment stop 必须先清除该 segment 的 finished 标记。只有 connector `receives_chunks`、最终 stage `model_config.session_mode == "duplex"` 且 request 仍为 `WAITING_FOR_STREAMING_REQ` 时，才从 `skipped_waiting` 转为 ordinary `WAITING` 并恢复 connector polling；sender-only 或 turn-mode stage 保持 parked，等待显式 streaming update。同一 update 尾部按 stale stopped 集合清理时不得移除已重新入队的 request；running purge 必须限定本次 finish 集合，并确保 `_free_request`、coordinator 与 connector 清理恰好执行一次。
 - 禁止：把任意已完成请求重新打开；对脱离所有 live queue、可能等待 deferred block free 的终态请求调用释放；因 request 在本轮进入时是 `WAITING_FOR_CHUNK` 就撤销其同轮 requeue；全局清空 running 中无关的 resumable segment；重复消费单遍 request-id iterator，或因非流式 skipped 请求错误减少 streaming counter。
 - 验收：AR 与 generation scheduler 均覆盖 hidden、`running`、`waiting`、`skipped_waiting`、脱离队列及无关 resumable 请求；另覆盖 connector-fed duplex receiver 从 segment stop 同轮转回 `WAITING`，断言它保留在 waiting queue、离开 skipped queue、流式等待计数递减且 segment-finished 标记清除；sender-only duplex 与 connector-fed turn-mode controls 必须仍 parked，同时也清除标记。首次 finish 恰好释放、第二次无操作，并验证 generator request-id 输入。PR 作者报告的 H100 E2E 与 574-pass CPU/config suite 是提交时证据，不是当前环境或跨硬件保证。^[PR #6089] ^[PR #6360] ^[PR #6680]
+
+## SCHED-5i — consumed connector contract failure 必须在 scheduler thread 终止 live request
+
+- 触发：receiver 已消费 async-chunk，但 prompt/window validation 失败，后台线程不能安全修改 request
+  status 或释放 scheduler ownership。
+- 强制：receiver 只按 internal request ID 记录首次失败原因；scheduler 每轮原子 drain ledger，仅对仍在
+  `self.requests` 的 ID 调 `finish_requests(..., FINISHED_ERROR)`。已离开或被同 ID 新 generation 替换的
+  request 不得由 stale failure 终止；错误日志保留 request 与原因。
+- 禁止：在 recv thread 直接结束 request；重试已消费 chunk；将 stale ID 当作 live request；因单个
+  malformed duplex condition 阻断同批健康请求。
+- 验收：覆盖 live、已完成/abort、同 ID replacement、重复 failure 与同批健康 request，断言只终止
+  当前 owner 且 ledger 只消费一次。^[PR #6626]
 
 ## SCHED-6a — async discard 的计数单位必须与 stale drain 一致
 
