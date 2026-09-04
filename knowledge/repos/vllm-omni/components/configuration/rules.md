@@ -26,6 +26,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | `gpu_memory_utilization`、`kv_cache_memory_bytes`、多 stage 共卡、小显存 OOM | `deploy-memory`：`CONF-1a`, `CONF-2a` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/omni_config.py::{_build_runtime_config,_build_parallel_config,VllmOmniConfig.from_pipeline_config}` |
 | multi-stage HF sub-config、stage quantization view、`hf_config_name` | `stage-model-config`：`VOMNI-CFG-1i` | pipeline stage declaration → `OmniModelConfig::{draw_hf_text_config,get_model_arch_config}` → vLLM quantization selection |
 | pipeline `sampling_constraints`、`StageConfig.to_omegaconf()`、runtime stage config | `stage-config-propagation`：`VOMNI-CFG-1o` | `merge_pipeline_deploy` → `StageConfig.to_omegaconf()` → `engine.stage_configs` |
+| stage transport、`requires_full_payload_input`、topology projection 或 override rejection | `stage-transport`：`VOMNI-CFG-1p` | `stage_config.py::{StagePipelineConfig,_build_engine_args}` → `omni_config.py::_build_model_config` → `engine/arg_utils.py::OmniEngineArgs` |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
@@ -36,6 +37,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | `composable-strategy` | strategy axis、routing、load balancing | `CONF-4a`, `CONF-4c`–`4d`，见 [并行拓扑合同](rules-parallel-topology.md) |
 | `stage-model-config` | HF nested config、stage-specific quantization/text config | `VOMNI-CFG-1i` |
 | `stage-config-propagation` | pipeline sampling constraints、StageConfig serialization/runtime config | `VOMNI-CFG-1o` |
+| `stage-transport` | full-payload transport capability、topology projection、deploy/CLI override | `VOMNI-CFG-1p`，见 [stage transport capability](rules-stage-transport.md) |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `VOMNI-CFG-0a`, `VOMNI-CFG-0b` |
 
 ## 配置归一化与新老路径一致性

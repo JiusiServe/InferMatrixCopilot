@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6360", "PR #6406"]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6149", "PR #6360", "PR #6406"]
 ---
 
 # Scheduler 规则
@@ -258,25 +258,22 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 
 ## 相关
 
-## SCHED-6b — request-end full payload 是显式 admission capability
+## SCHED-6b — full-payload admission 是解析后的 downstream capability
 
-- 触发：新增或修改只在 request end 消费完整上游 sequence 的 stage。
-- 强制：coordinator allowlist 与模型 capability 同步；完成前零传输，完成时只 enqueue 一次完整 sequence，
-  consumer 使用 non-async-chunk topology。IndexTTS 2.5 的精确键是
-  `("IndexTTS25S2MelDecoder", "indextts2_5_s2mel_decoder")`。
-- 禁止：按模型名猜测、扩大到整个家族，或逐 token 重复搬运。
-- 验收：allowlisted/non-allowlisted 对照、完成时一次传输、abort 无残留。^[PR #5957]
+- 触发：新增或修改只在 request end 消费完整上游 sequence 的 stage，或修改 full-payload waiting coordinator。
+- 强制：以 pipeline 解析的 `requires_full_payload_input` 驱动 stage_id > 0 的 non-async coordinator；async-chunk stage 走 streamed connector，不创建 full-payload wait。完成前零传输，完成时只 enqueue 一次完整 sequence。
+- 禁止：按模型名、architecture/stage key 或旧 allowlist 猜测能力；扩大到整个模型家族；把 stage-0 async sender 因没有 full-payload input 而不初始化 chunk adapter；逐 token 重复搬运完整 payload。
+- 验收：覆盖 stage 0、async-chunk consumer、未声明 consumer 和声明的 sync consumer 四个 gates；另覆盖 stage-0 async sender 与 stage-1 receiver 都保有 adapter、完成时一次传输和 abort 无残留。^[PR #5957] ^[PR #6149]
 
 - 机制与边界见 [architecture](architecture.md)；跨 stage 数据面见
   [Distributed 组件](../distributed/_index.md)。
 
-## SCHED-6c — full-payload allowlist 必须精确绑定最终 consumer 与 async wiring
+## SCHED-6c — payload transport 的发送与接收能力必须分开验证
 
-- 触发：新增 async-chunk processor 或把某个 stage 加入 full-payload input allowlist。
-- 强制：allowlist 使用精确的 `(model_arch, stage_key)` consumer 配对；Nemotron 的 `talker -> code2wav` 才能接收完整 code payload，`thinker -> talker` 保持 token-only；sync full-payload builder 与 async-chunk builder 必须分别接入同一真实 code2wav consumer。
-- 禁止：按模型家族或 stage index 猜测 full-payload 能力；把 token-only 的 thinker→talker hop 放进 full-payload allowlist；让非 async deploy 逐 token搬运完整 code stack，或让 async 终端 chunk 缺少 finished/empty-terminal 语义。
-- 验收：覆盖 allowlisted code2wav 与 non-allowlisted talker 对照，分别验证普通 deploy 的一次 request-end 全 payload、streaming deploy 的累计 chunk/终端 chunk、connector requeue 和 abort cleanup。
-^[PR #5842]
+- 触发：新增 async-chunk processor、full-payload consumer，或变更 runner connector 初始化。
+- 强制：`requires_full_payload_input` 只声明同步 downstream receive/wait；`async_chunk` 独立保留 producer 与 receiver 的 chunk adapter。connector 需求还可来自 downstream processor hook 或 explicit connector role，且每个选择的 GPU/NPU/XPU worker 的 `model_runner_cls` 必须实现 `OmniConnectorModelRunnerMixin`，在 worker 启动前 fail fast。
+- 禁止：从 consumer capability 倒推出 sender；把 Nemotron token-only thinker→talker 设为 full-payload；让没有 connector mixin 的平台 worker 在运行时才挂起；让非 async deploy 逐 token 搬完整 code stack，或让 async terminal chunk 缺少 finished/empty-terminal 语义。
+- 验收：对一个支持和一个不支持 connector 的显式 worker、以及 platform-resolved worker 断言启动前成功/`ValueError`；验证 GPU、NPU 和 XPU worker 公开正确 runner class，并覆盖 sync request-end payload、streaming 累计/terminal chunk、requeue 和 abort cleanup。^[PR #5842] ^[PR #6149]
 
 ## SCHED-6d — 显式 prompt replacement 必须一次性释放旧状态并回到 admission
 

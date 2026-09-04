@@ -15,7 +15,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
   `tests/diffusion/test_diffusion_config_propagation.py`，以及各公开入口附近的配置测试
 - 部署配置：`vllm_omni/deploy/*.yaml`，以及 `pipeline_registry.py`、
   `endpoint_policy.py`、`server_settings.py`、`yaml_util.py`、`composable_parallel/`
-- 源码校验：以上路径在 `main @ bae58f84` 验证存在；机器基线见
+- 源码校验：以上路径在 `main @ b454e349` 验证存在；机器基线见
   `adapters/vllm_omni/release_baseline.yaml`
 
 ## 什么时候查这里
@@ -36,6 +36,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 |---|---|
 | 理解配置从 deploy、CLI、默认 factory 到 structured/legacy config 的稳定边界 | [配置构造架构](architecture.md) |
 | 根据 PR 描述直达 strict schema、pipeline sampling constraints、deploy/topology、composable strategy 或显存配置的规则组与第一批源码 | [配置开发门禁与代码地图](rules.md) |
+| stage full-payload transport capability、topology-owned projection 或 deploy/CLI override rejection | [stage transport capability](rules-stage-transport.md) |
 | 审计配置来源和多层加工 | [config audit](config-audit-plain-language.md) |
 | 设计配置归一化与 parity 验证 | [config normalization parity](config-normalization-parity.md) |
 | 查询 `Omni()` 初始化参数 | [Omni init args](omni-init-args.md) |
