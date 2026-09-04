@@ -29,6 +29,7 @@ confidence: high
 | vLLM rebase、chat parser/renderer API moved or removed | `engine-lifecycle` | target-release `vllm.parser.*` / renderer API → `serving_chat.py` / `api_server.py`; remove a compatibility fallback only after the pinned base image is the target release ^[PR #6606] |
 | TTS model detection、`stage_keys`/`model_archs`、adapter priority/topology、legacy migration | `engine-lifecycle`：`SERV-5e` | `tts_adapters/__init__.py::{iter_tts_detectors,detect_tts_model_type,all_tts_stage_keys,tts_entry_stage_archs}` → `serving_speech.py::_find_tts_stage` |
 | request-level LoRA、AR-only/multistage、streaming input update、stage cardinality | `request-contract`：`SERV-4l` | `serving_chat.py` LoRA resolve → `AsyncOmni.generate` → `AsyncOmniEngine._build_add_request_message` → stage-0 input processor |
+| Stage-0 prompt transform、downstream original prompt、临时 artifact ownership/cleanup | `request-contract`：[SERV-4q](rules-request-input.md#serv-4q-stage-0-prompt-transform-必须保留-downstream-原始视图并闭合临时-artifact-生命周期) | `AsyncOmniEngine._build_add_request_message` → `StageSubmissionMessage.request_artifact_dirs` → `OrchestratorRequestState` terminal cleanup |
 | caller sampling params、pipeline `sampling_constraints`、stage config runtime extraction | `request-contract`：`SERV-4o` | `OmniBase.resolve_sampling_params_list` → `_get_sampling_constraints_list` → `_apply_sampling_constraints` |
 | OpenAI integer bounds、msgpack overflow、request-local cleanup | `request-contract`：`SERV-4p` | protocol request models → orchestrator stage dispatch → `_fail_request_client_error` |
 | SSE/streaming speech、audio format、PCM/WAV、speed、首 chunk 前校验 | `streaming-format`：`SERV-1a`, `SERV-1b` | `vllm_omni/entrypoints/openai/protocol/audio.py::{OpenAICreateSpeechRequest.validate_streaming_constraints,StreamingSpeechSessionConfig.validate_streaming_constraints}` → `serving_speech.py::{OmniOpenAIServingSpeech._validate_speech_streaming_request,OmniOpenAIServingSpeech.create_speech}` |
@@ -47,7 +48,7 @@ confidence: high
 | `endpoint-capability` | endpoint restriction、route/app-state guard、公开 400 | `SERV-4c`, `SERV-4d` 见 [请求输入合同](rules-request-input.md)；`SERV-5d` 见 engine lifecycle；`SERV-5s` 见 [app assembly](rules-app-assembly.md) |
 | `engine-lifecycle` | pause/resume、sleep/wake、partial stage/tag、ACK、generation admission、abort cleanup、streaming raw terminal、event-driven orchestration、factory 状态矩阵、TTS adapter detection、replica membership/fault isolation | `SERV-5a`–`SERV-5e`、`SERV-5g`–`SERV-5q`（见 [engine 生命周期规则](rules-engine-lifecycle.md)），`SERV-5f` |
 | `full-duplex` | duplex opt-in、stage prewarm/fence、async-chunk、CFG companion lifecycle | `SERV-6a`–`SERV-6d`（见 [engine 生命周期规则](rules-engine-lifecycle.md)） |
-| `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view、stage sampling constraints、serialization bounds | `SERV-4a`–`4h`, `SERV-4l`–`4p`，全部见 [请求输入合同](rules-request-input.md) |
+| `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view、stage sampling constraints、serialization bounds、transform artifact ownership | `SERV-4a`–`4h`, `SERV-4l`–`4q`，全部见 [请求输入合同](rules-request-input.md) |
 | `batch-chat-contract` | frontend fan-out、identity、choice cardinality、error/cancellation | `SERV-4i`–`4k`，见 [batch chat rules](rules-batch-chat.md) |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
 

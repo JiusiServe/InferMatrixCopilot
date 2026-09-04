@@ -27,6 +27,7 @@ confidence: high
 | Qwen3-VL encoder、NPU causal GQA、AddRMSNorm residual | `MMH3-1k` | encoder SDPA helper/residual call → NPU model patch → `torch_npu` op |
 | FL2VA keyframe、Ref2VA mixed reference/时域限界、shape/output matrix | [MMH3-2a](rules-media.md#mmh3-2a-taskreferenceshape-与多输出必须作为一个输入矩阵维护) | `pipeline_minimax_h3.py` → `reference_video.py` |
 | media limit、typed/multipart reference、HTTP 400、temp source | [MMH3-2b](rules-media.md#mmh3-2b-media-ingress-在解码前限界request-错误保持-http-400) | `api_server.py` → `serving_video.py` → `reference_video.py` |
+| split text encoder、H3 presentation/tag、conditioning bridge、prepared artifact | [MMH3-2l](rules-media.md#mmh3-2l-split-text-encoder-必须保持-h3-presentation条件载荷与原始媒体的所有权) | Stage-0 prompt transform → `MiniMaxH3TextEncoder` → prefix-cache payload → Stage-1 H3 diffusion |
 | conditioned VAE、fixed seed、`fork_rng`、MUSA/device RNG | [MMH3-2c](rules-cache-task.md#mmh3-2c-conditioned-vae-的固定种子必须按实际设备隔离并恢复) | `pipeline_minimax_h3.py` condition encode caller → `vae.py::{encode_image,encode_video}` |
 | modular checkpoint、combined/partition task、两套 DiT、shared component | [MMH3-2d](rules-cache-task.md#mmh3-2d-modular-h3-的-task-selector-必须同步权重能力与所有-dit-lifecycle) | model index discovery → startup task selection → task-specific transformer/cache lifecycle |
 | request `quality`、lossless/high、dynamic Cache-DiT | [MMH3-2e](rules-cache-task.md#mmh3-2e-quality-映射只决定-request-的-cache-dit-目标) | request sampling → quality policy → request Cache-DiT runtime → denoise |

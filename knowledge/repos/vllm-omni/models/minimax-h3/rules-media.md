@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5752", "PR #5829", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6064"]
+sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6064"]
 confidence: high
 ---
 
@@ -93,3 +93,28 @@ confidence: high
 - 强制：`_probe_video` 优先使用容器提供的 `nb_read_frames`/`nb_frames`，仅在元数据缺失时追加 `-count_frames` 扫描；Qwen 抽样必须将请求的 frame indices 交给一次 ffmpeg raw-video pipe，通过 `select` 只解码这些帧，完整回退也复用同一 ffmpeg RGB24 路径。解码前校验 frame count、宽高和 indices，必须在 reshape 前校验输出字节数等于 `frame_count × width × height × 3`。
 - 禁止：为每个采样帧启动一次 ffmpeg、无条件对高码率 prepared stream 做完整扫描、在 decord 缺失时重新使用逐帧 PyAV 全量解码，或对不完整 raw-video 输出静默 reshape；不得把该 CPU 解码优化扩展成 MUSA/NPU 专用路径或通用 decoder 性能保证。
 - 验收：contract tests 覆盖 selective/full ffmpeg command、`select` indices、decord 缺失回退、容器帧数直读与缺失时的 count-frames fallback、非法 metadata 和 incomplete output；在固定 prepared video 上将 selective 与 full RGB24 数组逐像素对照 PyAV reference，并分别核对 sampled frame 数、尺寸和 timestamps。^[PR #6064]
+
+## MMH3-2l — split text encoder 必须保持 H3 presentation、条件载荷与原始媒体的所有权
+
+- 触发：`minimax_h3_disaggregated`、H3 Qwen3-VL prompt processor、Stage 0→1 bridge、prefix/sender
+  cache、reference-video preparation 或 encoder-free Stage 1。
+- 强制：Stage 0 只接收 H3 的 Qwen presentation；Stage 1 必须接收 original prompt/media 加上
+  typed `text_encoder_output`，不得把 encoder-transformed prompt 当作 DiT input。conditioning 是
+  hidden states `[tokens, 5120]` 与 token-role tags `[tokens]`；wire 上 tags 必须为 `[tokens, 1]`
+  才能作为 per-token prefix-cache payload，Stage 1 恢复一维语义并在 request ID、completion count、
+  tensor type/rank/shape 与二值 tags 边界 fail closed。H3 sender cache 必须 bypass：cache hit 只给
+  generic processor misses，不能重建 media-dependent presentation IDs。
+- 强制：Ref2VA 的 Stage 0 preparation 要把 serialized prepared-video descriptor 和 artifact owner
+  交给 original request；Stage 1 reuse the RGB stream for VAE/audio conditions, and terminal/error paths
+  must clean it. This avoids duplicate ffprobe/transcode while preserving raw media ownership at Stage 1.
+  `inline_diffusion` remains explicit pipeline opt-in; a single replica alone must not move another
+  multi-stage pipeline's diffusion engine into the orchestrator process. Encoder-free DLO must skip absent
+  components, and final-output validation follows declared final video metadata rather than requiring every
+  stage to be diffusion.
+- 禁止：把 split route 自动发现为 H3 default、把 `text_encoder_tp_size` broadcast 到 Stage 1、用
+  unvalidated positional output/tensor fields transfer conditioning，或把 H200/B300 single topology
+  observations扩展成 cross-node transport、throughput 或 all-profile compatibility evidence。
+- 验收：覆盖 fused fallback versus explicit split selection; exact H3 prompt IDs/tags including sender-cache
+  hits; chunked/prefix-cache token tags; malformed bridge payload/request mismatch; artifact reuse and cleanup;
+  resolver/local partition paths; Stage 0-only TP alias precedence/rejection; encoder-free DLO; explicit inline
+  isolation; and regular/Turbo default sampling profiles. ^[PR #5885]

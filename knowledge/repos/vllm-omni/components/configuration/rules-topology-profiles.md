@@ -4,13 +4,13 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #6082", vllm_omni/deploy/, "PR #6186"]
+sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/deploy/, "PR #6186"]
 confidence: high
 ---
 
 # topology 与部署 profile 合同
 
-`CONF-5a`–`CONF-5g`：冻结 topology 的单一来源、可选辅助 stage 注入、缺少 model_type 的多 stage checkpoint 路由，以及模型专用 deploy profile 的一致传递。触发条件与其余审查组见 [Configuration 规则](rules.md) 的 Direct 代码快速入口。
+`CONF-5a`–`CONF-5i`：冻结 topology 的单一来源、可选辅助 stage 注入、缺少 model_type 的多 stage checkpoint 路由，以及模型专用 deploy profile 的一致传递。触发条件与其余审查组见 [Configuration 规则](rules.md) 的 Direct 代码快速入口。
 
 ## CONF-5a — 冻结 topology 只保留一份，部署开关决定 wiring
 
@@ -77,3 +77,9 @@ confidence: high
 - 禁止：只依赖路径 basename、文件存在或 `trust_remote_code` 推断 pipeline；让 root architecture 覆盖 stage architecture；让单卡与多卡 profile 复制不同 topology 或行为合同。
 - 验收：用 bare root config、无显式 deploy 的 startup 和 structured/legacy 路径断言 pipeline、默认 deploy、stage 子目录、architecture 与 sampling-extra key 均进入最终逐 stage config；单卡与双卡配置除设备 placement 外保持一致。 ^[PR #6186]
 
+## CONF-5i — pipeline 专属 alias 与 hook 必须在通用配置层声明、归一并消费
+
+- 触发：pipeline 需要把全局 CLI 字段改写到特定 stage，或声明 stage-0 prompt transform、按 task 解析 checkpoint 的 hook、显式 inline diffusion。
+- 强制：alias 由 `PipelineConfig.stage_cli_aliases` 唯一声明并在 structured/legacy factory 进入 stage merge 前归一；canonical `stage_<id>_<target>` 与 alias 同时出现时，canonical 值优先并告警，alias 出现在其他 stage 必须拒绝。`prompt_transform_func`、`model_path_resolver` 与 `inline_diffusion` 由 `StagePipelineConfig` 投影到唯一 consumer；resolver 必须在构造 backend engine args 前消费并移除。inline 只允许单 replica，且须由 `inline_diffusion=true` 显式 opt in，或沿用已有 `custom_pipeline_args` 所声明的 in-process pipeline owner；其他 stage 默认保持 subprocess isolation。
+- 禁止：在 CLI、factory 或 stage startup 为模型名硬编码 alias/resolver；把 alias 广播到所有 stage；因 diffusion stage 只有一个 replica 就隐式改变所有多 stage pipeline 的进程隔离。
+- 验收：structured/legacy 两路覆盖 alias-only、canonical-only、相同/冲突值、错误 stage 与 unset control；用 root/partition/task path 证明 resolver 到达 stage model/tokenizer consumer，并用 opt-in 与相邻未 opt-in pipeline 证明 inline 只改变声明的 stage。^[PR #5885]

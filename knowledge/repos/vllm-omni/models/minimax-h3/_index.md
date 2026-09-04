@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5720", "PR #5723", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5824", "PR #5829", "PR #5837", "PR #5840", "PR #5850", "PR #5857", "PR #5881", "PR #5891", "PR #5896", "PR #5914", "PR #5946", "PR #5972", "PR #5978", "PR #5991", "PR #5863", "PR #6476", "PR #6555", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/design/architecture_overview.md, docs/models/supported_models.md, docs/user_guide/quantization/fp8.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/platforms/npu/platform.py, vllm_omni/platforms/rocm/platform.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, vllm_omni/entrypoints/openai/video_api_utils.py, "PR #6213"]
+sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5720", "PR #5723", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5824", "PR #5829", "PR #5837", "PR #5840", "PR #5850", "PR #5857", "PR #5881", "PR #5885", "PR #5891", "PR #5896", "PR #5914", "PR #5946", "PR #5972", "PR #5978", "PR #5991", "PR #5863", "PR #6476", "PR #6555", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/design/architecture_overview.md, docs/models/supported_models.md, docs/user_guide/quantization/fp8.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/model_executor/models/minimax_h3/, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/platforms/npu/platform.py, vllm_omni/platforms/rocm/platform.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, vllm_omni/entrypoints/openai/video_api_utils.py, "PR #6213"]
 confidence: high
 ---
 
@@ -28,6 +28,12 @@ confidence: high
   MMH3-2a/2b。^[PR #5914]
 - 生成合同固定为 24 FPS 视频与 32 kHz 音频；官方输出 duration、named ratio、768
   short-edge 与 32-pixel canvas policy 在 request validation 阶段执行，而不是由 VAE 静默修正。
+- `minimax_h3_disaggregated` 是显式 deploy 选取的两 stage topology：Stage 0 的
+  `MiniMaxH3TextEncoder` 用 native vLLM Qwen3-VL runner 产生 layer-50 residual hidden states
+  和 token-role tags，Stage 1 不加载 text encoder、保留原始媒体并 inline 执行 H3 diffusion。
+  裸 checkpoint discovery 仍走 fused single-stage fallback；不可将 split profile 当成默认拓扑。
+  `text_encoder_tp_size` 在该 profile 只是 Stage 0 `tensor_parallel_size` alias，stage-scoped
+  Stage 0 override 优先，Stage 1 的同名 override 被拒绝。^[PR #5885]
 
 ## 并行与加载约束
 
@@ -36,6 +42,10 @@ confidence: high
   并且必须同时整除 Qwen3-VL 的 64 个 attention heads 与 8 个 KV heads。
 - 单卡 accuracy 路径使用 CPU offload；多卡部署可使用 Ulysses、text-encoder TP、VAE
   tile/patch parallel 或 layerwise offload，但每个组合都必须按最终并行拓扑和设备数验证。
+- bundled split defaults bind Stage 0 to TP2/max-num-seqs 1 and Stage 1 to TP1 + USP4 + VAE
+  patch parallel 4 with `model_loaded.text_encoder: false`; regular uses 50 steps and the Turbo
+  LoRA profile uses five steps with its flow shifts. They are an H3-specific placement profile,
+  not a cross-node transport or general throughput claim.^[PR #5885]
 - H3 DiT 支持加载时 online FP8：默认覆盖 token-refiner/主 block 的 attention、MLP、
   condition projection 和 AdaLN projection；video/audio patch、timestep MLP、最终输出头、
   text encoder 与 VAE 保持 BF16/FP32。`ignored_layers` 按 DiT 内部的精确 runtime prefix

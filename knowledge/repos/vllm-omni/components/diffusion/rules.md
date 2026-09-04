@@ -35,6 +35,7 @@ confidence: high
 | paged KV/cache、backend/platform、GQA/layout、Ring/Ulysses、FlashInfer quant、masked cross-attention、预算与 admission | `system-runtime`：`DIFF-4a`–`4j`, `DIFF-4v` | engine init → metadata/config → attention parallel/backend → platform hook → scheduler/serving |
 | worker/RPC 异常、rank-status、traceback/device cache 清理 | `system-runtime`：`DIFF-4d` | `diffusion_worker.py::{_execute_rpc,_worker_busy_loop}` 的 raise/reply/status 路径 |
 | image/diffusion service time、forward time、missing-versus-zero、per-step metric | [`metrics-evidence`](rules-metrics.md)：`DIFF-5a`, `DIFF-5b` | output formatter/sampling metadata → stage stats aggregation → serving Prometheus emission |
+| image/video/audio/action final type、registry alias、endpoint capability、formatter | [`output-runtime`](rules-output-lifecycle.md#diff-1s-diffusion-output-type-必须从模型声明闭合到-topology-与-formatter)：`DIFF-1s` | `model_metadata.py` → default/multi-stage config → video capability → `output_formatter.py` |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|

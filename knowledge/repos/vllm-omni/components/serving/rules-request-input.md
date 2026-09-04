@@ -4,13 +4,13 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3805", "PR #5374", "PR #6598", vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/engine/orchestrator.py, vllm_omni/inputs/, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_invalid_audio_speech.py, tests/entrypoints/openai_api/test_serving_speech.py, "PR #5181", "PR #6182"]
+sources: ["PR #3805", "PR #5374", "PR #5885", "PR #6598", vllm_omni/data_entry_keys.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/engine/orchestrator.py, vllm_omni/inputs/, tests/engine/test_async_omni_engine_input.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_invalid_audio_speech.py, tests/entrypoints/openai_api/test_serving_speech.py, "PR #5181", "PR #6182"]
 confidence: high
 ---
 
 # 请求输入合同
 
-`SERV-4a`–`SERV-4p`：公开请求字段的校验、限界与 owner。触发条件与其余审查组见 [Serving 共享规则](rules.md) 的 Direct 代码快速入口。
+`SERV-4a`–`SERV-4q`：公开请求字段的校验、限界与 owner。触发条件与其余审查组见 [Serving 共享规则](rules.md) 的 Direct 代码快速入口。
 
 ## SERV-4a — 公开字段由 serving 显式拥有
 
@@ -132,3 +132,10 @@ engine 生命周期见 [engine 生命周期规则](rules-engine-lifecycle.md)；
 - 禁止：只靠 protocol allowlist 防御嵌套或 extra 参数；把 overflow 作为 engine-wide fatal；捕获无关异常来掩盖程序错误；为统一范围而丢失原有业务下界。
 - 验收：覆盖明确字段的越界 validation（含 speech token/seed 边界）和 mock dispatch 序列化 overflow；后者断言 400、request state 已清理、thread 仍存活。每个修改的公开整数字段须覆盖合法边界与非法一侧。^[PR #6598]
 - 边界与未合入建议：目标只捕获 `OverflowError`，不证明其他序列化失败的可恢复性。PR merge 后仍有两个未 resolve review threads：三个 protocol 文件重复定义 int64 constants，且负 TTS seed 的用户可见放宽未写入 PR body；前者是去重建议，后者可由 merged code/tests 与提交历史确认，但两者都不是本提交新增的 shared-constant 或 release-note 合同。
+
+## SERV-4q — Stage-0 prompt transform 必须保留 downstream 原始视图并闭合临时 artifact 生命周期
+
+- 触发：pipeline 用 `prompt_transform_func` 为 Stage 0 重写 prompt/media，同时 downstream stage 仍需原始请求，或 transform 创建 request-scoped 临时目录。
+- 强制：transform 只操作 Stage-0 copy；原始 prompt 保留给 downstream，并在 transform 前后保持同一 global request ID。只把已处理的 metadata 合并回原始视图，先移除 transform-owned stale keys。临时目录只通过内部 `REQUEST_ARTIFACT_DIRS_KEY` 交给 request state；preprocess、companion build、enqueue 前失败立即回收，admit 后由 orchestrator 在所有 terminal cleanup 路径回收，且内部 key 不得进入 stage payload。
+- 禁止：把 transformed prompt 当作 downstream 原始媒体、让旧 prepared descriptor 跨请求复用、在 ownership 已交给 orchestrator 后由 frontend 提前删除，或让异常路径泄漏转码目录。
+- 验收：覆盖 transform replacement/copy、request ID 与 metadata merge、成功 terminal/abort、preprocess/companion/enqueue 异常以及无 artifact control；断言 downstream 看见原始媒体+允许的 processed meta，目录恰好由当前 owner 回收，内部 key 未传输。^[PR #5885]

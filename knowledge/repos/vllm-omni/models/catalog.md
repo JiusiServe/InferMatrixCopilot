@@ -4,13 +4,13 @@ created: 2026-07-16
 updated: 2026-09-04
 type: guide
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/]
+sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/, "PR #5885"]
 ---
 
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ ed837e35`（2026-08-28）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ b6a4baa6`（2026-08-28）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -35,10 +35,14 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 
 | 注册点 | 位置 | 计数 |
 |---|---|---|
-| AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 88 个架构名 / 32 个模型族目录 |
+| AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 89 个架构名 / 32 个模型族目录 |
 | Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 65 条 pipeline / 40 个模型族目录 |
-| Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 58 个 key |
-| Deploy YAML | `vllm_omni/deploy/*.yaml` | 87 份 |
+| Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 59 个 key |
+| Deploy YAML | `vllm_omni/deploy/*.yaml` | 89 份 |
+
+PR #5885 adds `MiniMaxH3TextEncoder`, the opt-in `minimax_h3_disaggregated` pipeline key,
+and regular/Turbo deployment profiles. It preserves bare H3's fused single-stage fallback;
+the split topology is selected only by its explicit deploy config. ^[PR #5885]
 
 PR #6089 新增 `nemotron_labs_voicechat_duplex.yaml`，因此只增加 deploy profile；它没有
 增加 AR/diffusion registry architecture 或 `OMNI_PIPELINES` key。该 profile 是原生全双工
@@ -123,8 +127,8 @@ step_audio_2_asr、voxcpm2、voxtral_tts、wan2_2_ti2v
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from ab8d45d3 \
-  --to ed837e35 \
+  --from ed837e35 \
+  --to b6a4baa6 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
