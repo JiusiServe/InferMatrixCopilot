@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6033"]
+sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6033", "PR #6360"]
 confidence: high
 ---
 
@@ -55,6 +55,13 @@ confidence: high
 - 强制：从 task 内的 `request.request_id` 取得 scheduler 使用的内部请求 ID，在发送线程以锁保护的 ledger 中按请求记录首次失败原因；scheduler sweep 时原子 drain 并分别记录仍存活与已离开 scheduler 的请求。
 - 禁止：读取不存在的 `task["request_id"]`；用 `external_req_id` 代替 `self.requests` 的内部 key；发送失败后静默丢弃，或把已完成/已 abort 请求误当作仍可调度请求。
 - 验收：覆盖发送抛异常、`connector.put` 返回 `False`、内部/外部 ID 不同、同一请求多次失败、并发 record/drain，以及请求在 sweep 前后离开 scheduler；日志必须包含正确 request ID 和失败原因，且 ledger 只被消费一次。^[PR #6033]
+
+## DIST-1e — chunk connector 仅按隐藏队列所有权恢复状态并幂等回收 receiver
+
+- 触发：`OmniChunkTransferAdapter.finish_requests` 处理 resumable 请求的 `FINISHED_STOPPED` segment，且请求可能停在 `waiting_for_chunk_waiting_requests`、`waiting_for_chunk_running_requests` 或 `_held_non_active` 中。
+- 强制：只在 connector 隐藏队列实际持有请求时恢复 `requests_origin_status`；对每个目标统一调用幂等的 `cleanup_receiver`，清理 active stream、ready/exhausted/finished/cancelled/waiting 状态，并移除 chunk 等待队列中的已完成请求；请求已回到 scheduler 可见队列后不得再使用过期 origin status 覆盖当前状态。
+- 禁止：仅凭 `requests_origin_status` 存在就恢复状态；把 resumable `FINISHED_STOPPED` 当作普通 finished 请求而跳过 connector 回收；分散复制部分 receiver 清理逻辑导致重复释放或残留 active-stream 占用；用无关请求的队列状态扩大清理范围。
+- 验收：覆盖 connector 隐藏持有、scheduler `running`/`waiting`/`skipped_waiting` 持有、无 connector 所有权及 stale origin；断言隐藏队列、origin ledger、active streams 和 receiver 状态在重复 finish 后仍为空且 active-window 可被新请求重新占用。^[PR #6360]
 
 ## DIST-2a — diffusion EP group 必须满足运行中 MoE backend 的 communicator 合同
 
