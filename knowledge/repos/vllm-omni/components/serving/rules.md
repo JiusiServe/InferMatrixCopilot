@@ -237,23 +237,9 @@ confidence: high
 - 验收：同长度覆盖、并发改写、named+inline、speaker cache 和 prefix hit 均不复用旧内容；
   非法路径不 stat，日志只含截断值且命中真实 logger hierarchy。 ^[PR #5670]
 
-### SERV-10a — stage config 到 EngineArgs 的投影必须显式且由 owner 进程物化
-
-- 触发：修改 `stage_init_utils.py` 的 typed stage→`EngineArgs` projection、upstream config 字段映射或 stage startup 的终态配置构造。
-- 强制：AR/generation 从 upstream config dataclass 与 `EngineArgs` 的交集生成 projection map，显式记录且只投影构造时提供的字段，并集中处理 `cache_dtype`→`kv_cache_dtype`、`policy`→`scheduling_policy`、`data_parallel_master_ip`→`data_parallel_address` 等 alias；`CompilationConfig`/`ProfilerConfig` 以具体 upstream object 复制传递，最终 `VllmConfig` 由 engine-owning process 物化，diffusion 保持既有固定 owner 与 projection surface。
-- 禁止：维护会随 upstream schema 漂移的静态 allowlist；把 inherited defaults、runtime-owned `worker_cls`/`distributed_executor_backend`、topology-owned `scheduler_cls` 或 private API-process 字段静默送入 EngineArgs；显式提供但没有合法 projection 的字段不得被丢弃，也不得在 head process 解析设备、rank、端口或 backend。
-- 验收：非默认 upstream 字段能在最终 EngineArgs 读回且 alias 正确，未显式提供的 inherited defaults 不出现；显式无 projection 字段抛出明确错误；typed projection 保留 compilation/profiler 的 concrete type，structured stage registration 可 msgpack 传输，并回归 legacy/structured effective parity。 ^[PR #6050]
-
 ### SERV-11a — 用户输入日志必须默认降级并受限输出
 
 - 触发：修改 TTS、audio generation 或 diffusion chat serving 请求日志，以及 `request_logger` 或 `max_log_len` 的行为。
 - 强制：INFO 级别只记录 request ID、模型类型、voice clone、reference image 和参数等元数据；用户输入仅在 `self.request_logger` 存在时通过 `logger.debug` 输出，并按 `max_log_len` 预留日志前缀长度进行截断；未配置上限时使用 200 字符默认上限。
 - 禁止：在 INFO 日志中写入原始 `text` 或 `prompt`；无条件输出 DEBUG 用户内容；使用固定预览长度替代请求日志开关；在未配置 `max_log_len` 时输出无界用户输入。
 - 验收：覆盖 TTS、diffusion TTS、audio generation 和 diffusion chat，断言 INFO 不含用户内容；启用 `--enable-log-requests` 时 DEBUG 才输出内容，且配置与未配置 `max_log_len` 时均遵守截断上限。 ^[PR #6329]
-
-### SERV-12a — 多副本 stage 省略 devices 时仍按 replica 数生成设备槽位
-
-- 触发：修改 `split_devices_for_replicas()`、`compute_replica_layout()`、`StageRuntime._build_logical_stage_init_plans()`，或修改 stage 的 `num_replicas` 与可选 `devices` 语义。
-- 强制：当 stage 未声明 `devices` 时，返回与有效 replica 数对应的 `None` 槽位（至少保留一个槽位），使 `replica_devices_map` 和启动计划可按每个 `replica_id` 索引；每个 replica 继承 launcher 的 `CUDA_VISIBLE_DEVICES`，显式设备配置继续按既有规则拆分。
-- 禁止：因 `devices=None` 只返回单元素列表；让多副本 stage 的启动计划索引越界；将未声明设备误当成显式设备，或改变显式设备配置与既有 `ValueError` 语义。
-- 验收：覆盖 1、2、4 副本的未声明设备拆分、三副本 `replica_devices_map` 以及 logical stage init plans 的全部 replica ID 和 `None` 设备值；回归显式设备拆分、模板/池模式及错误路径。^[PR #5445]
