@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", "PR #6666", "PR #6714", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/fasth3.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/npu/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/entrypoints/openai/video_api_utils.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_fasth3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_native_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py, tests/entrypoints/openai_api/test_video_api_utils.py]
+sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", "PR #6666", "PR #6714", "PR #6909", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/fasth3.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/npu/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/entrypoints/openai/video_api_utils.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_fasth3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_native_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py, tests/entrypoints/openai_api/test_video_api_utils.py]
 confidence: high
 ---
 
@@ -155,7 +155,7 @@ Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期�
   matching/mismatched explicit step 和 legacy/partially-constructed fallback。仍缺真实 distilled
   checkpoint 的 CUDA/NPU E2E 与 teacher/student 质量阈值。^[PR #5991]
 
-## MMH3-2n — FastH3 只接受精确 artifact 并在启动时一次性融合
+## MMH3-2n — FastH3 只接受精确 artifact，并将 VSA gate 在启动时一次性融合
 
 - 触发：FastH3 `lora_path`、load-time fusion、four-step request 或 serving gate。
 - 强制：只 claim `fastvideo-lora-v2`、`finetuned_model` 位于 `fastvideo/` 且 identity 含 `fasth3`
@@ -163,17 +163,25 @@ Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期�
   root 与 claimed variant 都必须唯一，否则 fail closed；普通 FastVideo/PEFT/多 shard 交还 legacy
   dynamic LoRA，不可误认。
 - 强制：声明的 low-rank/diff/`set_weight` tensor count 必须 numeric 且与实物一致；任何 unmapped、
-  duplicate/unpaired factor、shape mismatch、extra/incomplete block、VSA `set_weight` 或 fused QKV/FC1
-  不支持的 full-rank delta 都失败。fusion 在 sharding 前完成：Diffusers Q/K/V 重排为 grouped native
-  QKV，FC1 value-first 重排为 gate-first，再加入 low-rank `B@A` 与 full-rank `diff`/`diff_b`。成功后
-  只保留永久 fused sentinel；不能 request-switch，dynamic manager 的 list/add/remove/pin 安全返回空/false。
-- 强制：serving 只允许 `t2va`、无 per-request `lora`、exact `num_inference_steps=4`（五 boundaries/
-  四 forwards）以及默认 video/audio shift `12/3`；拒绝 CPU/layerwise/DLO offload 与 Ref2VA。
-- 禁止：不得混同 Turbo/native dynamic adapters，支持 VSA/multi-adapter/Ref2VA/offload，或声称
-  quality parity、平台 portability 与通用性能收益；recipe/body 的旧 steps=5 不能覆盖 source 的 4。
-- 验收：synthetic artifact 覆盖 identity/base/root/variant、metadata counts、mapping/pairs、QKV/FC1
-  reorder、full/low-rank delta、block/shape 与 unapplied patch failures；request matrix 覆盖 task、steps、
-  shifts、request LoRA 和各 offload gate。CPU tests 不替代真实 artifact/hardware 质量或性能验证。^[PR #6714]
+  duplicate/unpaired factor、shape mismatch、extra/incomplete block 或 fused QKV/FC1 不支持的 full-rank
+  delta 都失败。fusion 在 sharding 前完成：Diffusers Q/K/V 重排为 grouped native QKV，FC1 value-first
+  重排为 gate-first，再加入 low-rank `B@A` 与 full-rank `diff`/`diff_b`。成功后只保留永久 fused sentinel；
+  不能 request-switch，dynamic manager 的 list/add/remove/pin 安全返回空/false。
+- 强制：FastH3 `vsa-datafree` artifact 的 `.set_weight` 必须精确映射到 main `transformer.` DiT 的
+  `blocks.{0..49}.attn.to_gate_compress.weight`：pipeline 在 streaming weights 之前只为这 50 个 main-DiT
+  attention 创建 zero-initialized gate projection；token refiner 保持 dense，base checkpoint 没有同名 parameter
+  collision。`set_weight` 是 assign 不是 base-delta；加载后以实际 `transformer_loaded` 集合调用
+  `validate_fully_applied`，保证每个 injected gate 唯一且确实被 transformer 消费。
+- 强制：VSA artifact 的 main-DiT self attention resolved backend 必须为 `FASTVIDEO_VSA`（含 `self`
+  per-role override）；dense substitute 不可运行该 sparse student。serving 只允许 `t2va`、无 per-request
+  `lora`、exact `num_inference_steps=4`（五 boundaries/四 forwards）以及默认 video/audio shift `12/3`；
+  拒绝 CPU/layerwise/DLO offload 与 Ref2VA。
+- 禁止：不得混同 Turbo/native dynamic adapters，支持 VSA multi-adapter、Ref2VA/offload，或声称 quality
+  parity、平台 portability 与通用性能收益；recipe/body 的旧 steps=5 不能覆盖 source 的 4。
+- 验收：synthetic artifact 覆盖 identity/base/root/variant、metadata counts、mapping/pairs、QKV/FC1 reorder、
+  full/low-rank delta、50 个 gate 的 mapping/unique/consumption、block/shape 与 unapplied patch failures；
+  request matrix 覆盖 backend、task、steps、shifts、request LoRA 和各 offload gate。CPU tests 不替代真实
+  artifact/hardware 质量或性能验证。^[PR #6714] ^[PR #6909]
 
 ## MMH3-2j — Turbo LoRA 只接受精确发布 artifact，并与 H3 task、sampling 和 offload lifecycle 共同门禁
 

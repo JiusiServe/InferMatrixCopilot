@@ -4,11 +4,35 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6037", "PR #6518", "PR #6563", docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/diffusion_kv/paged_attention_adapter.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/diffusion_kv/test_paged_attention_adapter.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py"]
+sources: ["PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6037", "PR #6518", "PR #6563", "PR #6909", docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/fastvideo_vsa.md, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/diffusion_kv/paged_attention_adapter.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_fastvideo_vsa.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/diffusion_kv/test_paged_attention_adapter.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py"]
 confidence: high
 ---
 
 # Diffusion attention 规则
+
+## DIFF-1ac — FastH3 VSA 必须保留 H3 packed document、tile 和 SP 合同
+
+- 触发：修改 `FASTVIDEO_VSA` 的 MiniMax-H3 route、`vsa_h3_prefix_segments`/`VideoTokenLayout`、
+  FastVideo 64-token kernel、compression gate，或 Ulysses attention all-to-all。
+- 强制：H3 metadata 表示一个 packed `[text | condition | audio | video]` document；prefix segment
+  RLE 的 sum 必须等于 target-video start，video grid 必须完整覆盖 query rows。prefix 以不跨 modality
+  边界的 64-token tiles 切分，target video 以 `(4,4,4)` tiles 切分；prefix query dense，video query
+  保留所有 prefix tiles 加 top-k video tiles。tile partition、non-pad index 与 untile 必须恢复原 row
+  顺序；native SM100a path 只为 even block-partner requirement 增加 transport-only partner，并在返回前移除。
+- 强制：compression gate 跟随 Q/K/V 的 Ulysses sequence-to-head all-to-all，使 local head shard 拥有
+  完整 document；仅 local 或 pure Ulysses 可进入 H3 VSA，Ring 与 AllGather SP 必须在 admission 拒绝。
+  H3 route 有意不走 generic `min_seq_len` 或 `disable_when_sp_active` fallback gates；不能把这些 knobs
+  当作 H3 sparse admission 的实际保护。
+- 禁止：让 prefix tile 跨 `[text|condition|audio]` boundary、把 video top-k 施加到 prefix keys、把
+  odd partner 留给输出 untile，或把 Ring/AllGather partial document 交给 block-sparse kernel。不得将
+  H3 route 的 CUDA error 之后的 dense fallback 描述为 sparse execution。
+- 验收：测试覆盖 segment-pure prefix、3-D video tiling、prefix-dense/top-k map、odd partner、gate
+  blending、packed-padding zero restore 和 pure-Ulysses gate resharing；真实 VSA 还须固定 checkpoint、
+  kernel build、GPU、topology、request shape 与 top-k。PR #6909 的 B300 Triton 与独立 B200 native
+  SM100a observations 仅限所报 8×GPU、USP8/Ring1、four-step、1344×768/24 FPS、top-k 64 workload，
+  不构成广泛性能或 support claim；两条路均依赖外部 `fastvideo-kernel`。
+- 证据缺口：multi-request layout error 会被 `fallback_on_error` 吞掉并运行 dense SDPA；尚无
+  continuous-batching proof。^[PR #6909]
 
 ## DIFF-1f — deterministic flag 只对构造时选定的 local dense FA 生效
 

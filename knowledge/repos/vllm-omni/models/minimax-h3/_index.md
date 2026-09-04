@@ -96,8 +96,10 @@ confidence: high
   交互与单 H100 校准边界见 MMH3-2g。
 - distilled checkpoint 的 continuous RF `base_schedule`、四步语义与 partition
   隔离见 MMH3-2h；它不替换 H3 的自定义 solver。
-- FastH3 是 exact FastVideo artifact 的 startup-only t2va fusion；它不使用 Turbo/native dynamic
-  manager，strict artifact/request/offload gates 见 MMH3-2n。^[PR #6714]
+- FastH3 `vsa-datafree` 是 exact FastVideo artifact 的 startup-only T2VA fusion：50 main-DiT
+  compression gates 只在 resolved self backend `FASTVIDEO_VSA` 下使用，token refiner 保持 dense；
+  pure Ulysses 可用，Ring/AllGather、request LoRA 与 offload 均拒绝。strict artifact/request/gate
+  loading 与外部 kernel 边界见 MMH3-2n，packed 64-token VSA layout 见 DIFF-1ac。^[PR #6909]
 - H100_2 merge lane 的 FL2VA/Ref2VA/Turbo/FastH3 四个隔离 process 只构成精确 L3 media
   contract，不能升级为 runtime 或性能支持声明；见 MMH3-3m。^[PR #6556]
 - step execution 是 H3 的模型专有 stateful path：只在 resolved attention backend 能隔离多个 packed documents 时合并 request；否则仍逐 request 前向。request state、rank-0 preparation、Cache-DiT/DLO/multi-output 排除与有界验证证据见 MMH3-2k，不能由 generic runner guard 推断 multi-rank failure synchronization。^[PR #5810]
