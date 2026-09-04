@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070"]
+sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070", "PR #6476", vllm_omni/diffusion/models/minimax_h3/lora.py, tests/diffusion/lora/test_lora_manager.py]
 confidence: high
 ---
 
@@ -20,10 +20,11 @@ confidence: high
 | `--lora-backend`、startup path/scale、deploy/CLI projection | `DIFF-2l` | `entrypoints/cli/serve.py` → `async_omni_engine.py`/stage config → `OmniDiffusionConfig` → `DiffusionWorker.init_lora_manager` |
 | distilled merge、key conversion、packed QKV、alpha、unload | `DIFF-2m` | `diffusion/lora/loader.py` → pipeline mixin → transformer parameter |
 | Wan dual transformer、high/low-noise file order、partial load | `DIFF-2n` | `WanLoraLoaderMixin` → `get_transformer_from_pipeline(name)` → `transformer`/`transformer_2` |
+| legacy dynamic adapter hook、packed/stacked binding、activation rollback | `DIFF-2x` | `DiffusionLoRAManager::{_load_adapter,_bind_adapter_weights,_activate_adapter}` → model pipeline hook |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
-| `checkpoint-distributed` | diffusion LoRA backend、checkpoint、融合与 transformer mapping | `DIFF-2l`, `DIFF-2m`, `DIFF-2n` |
+| `checkpoint-distributed` | diffusion LoRA backend、checkpoint、融合与 transformer mapping | `DIFF-2l`, `DIFF-2m`, `DIFF-2n`, `DIFF-2x` |
 
 ## DIFF-2l — backend 是 startup 配置，不是 request 字段
 
@@ -90,3 +91,10 @@ confidence: high
 - 禁止：为 phase adapter 增加第二个 resident Transformer 或 LTX 专用环境变量；允许 request/static LoRA 与内部 phase adapter 组合；在非 BF16 或量化 base 上声称 layer-fused 可用；对缺失配对、未映射模块或不匹配 shard 静默跳过。
 - 验收：覆盖官方 key mapping、缺失 A/B、unmapped/duplicate target、dynamic 与 fused 精确算术、Row/Column/QKV 本地切片、base 权重不变、phase 进入/退出和 finalize 时机；同时验证 generic `model_paths` sidecar 覆盖与 model-root/Hub fallback。^[PR #5500]
 
+## DIFF-2x — legacy dynamic manager 的模型专用 loader 与 activation 必须 fail-closed 且事务化
+
+- 触发：修改 `DiffusionLoRAManager` 的 request-time adapter load/bind、模型专用 loader hook 或 packed/stacked target。
+- 强制：先让 pipeline 的可选 loader 识别并返回其模型拥有的 `(LoRAModel, PEFTHelper)`，仅在其返回 `None` 时走既有 generic PEFT fallback；专用 loader 的 artifact、target 和全局 A/B shape 必须在 wrapper mutation 前完成校验。manager 必须记录实际绑定的 logical weights，模型 validator 证明完整覆盖；packed QKV/FFN 等布局由模型明确声明或转换，不由共享 manager 猜测。
+- 强制：activation fast path 只可在 active ID 与 scale 都匹配时跳过。首次 mutation 前清除 active ID；任一 `set_lora()` 或 binding validator 异常都 reset 所有 wrapper slot 并保持 inactive，不能保留混合权重或陈旧 fast-path 状态。
+- 禁止：将已识别的专用 artifact 悄悄退回 generic loader；按名称而非真实绑定确认成功；将一个模型的 packed layout/scale 规则泛化给所有 diffusion 模型；失败后继续声明旧 adapter active。
+- 验收：CPU regressions 覆盖 model hook/fallback、binding completeness、mid-loop failure 后 reset 与旧 adapter retry；模型 integration 另覆盖 artifact identity、target/shape rejection、packed QKV/FFN binding 和实际 request sampling contract。^[PR #6476]

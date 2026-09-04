@@ -4,14 +4,14 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5720", "PR #5837", "PR #5840", "PR #5853", "PR #5991", vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py]
+sources: ["PR #5703", "PR #5720", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py]
 confidence: high
 ---
 
 # MiniMax H3 缓存与任务生命周期规则
 
-`MMH3-2c`–`MMH3-2h`：conditioned VAE 的确定性、modular task 选择，以及 request 级
-Cache-DiT、TeaCache 与 distilled sigma schedule 的生命周期。触发信号见
+`MMH3-2c`–`MMH3-2j`：conditioned VAE 的确定性、modular task 选择，以及 request 级
+Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期。触发信号见
 [MiniMax H3 规则](rules.md) 的 Direct 代码快速入口；加载合同见
 [加载规则](rules-loading.md)，媒体输入见 [媒体规则](rules-media.md)。
 
@@ -153,6 +153,14 @@ Cache-DiT、TeaCache 与 distilled sigma schedule 的生命周期。触发信号
   H3 覆盖双 shift 精确值、combined partition 隔离、4-step 传入 solver/quality、
   matching/mismatched explicit step 和 legacy/partially-constructed fallback。仍缺真实 distilled
   checkpoint 的 CUDA/NPU E2E 与 teacher/student 质量阈值。^[PR #5991]
+
+## MMH3-2j — Turbo LoRA 只接受精确发布 artifact，并与 H3 task、sampling 和 offload lifecycle 共同门禁
+
+- 触发：MiniMax-H3 LightX2V Turbo 的 dynamic LoRA loader、artifact conversion、request task/steps/flow shift，或与 CPU/layerwise/distributed-layerwise offload 的组合。
+- 强制：仅识别声明文件名的 LightX2V Turbo v1.0 safetensors，且 metadata 必须为 `key_format=minimax-h3-diffusers`、rank/alpha `128/128`；任何未知 tensor、重复/不完整 A/B pair、unsupported target 或不精确的 global A/B shape 都在 binding 前失败。转换必须把 Diffusers token-refiner/main-block names 映射为 native H3 names，恢复 FC1 `[gate; up]` 行序为 model-owned packed weights，并通过 `stacked_params_mapping` 将独立 Q/K/V 接到 packed QKV。
+- 强制：Turbo 仅在非零 scale 的实际 active recognized adapter 时限制请求；只支持 FL2VA/T2VA，要求五个 sigma points（四次 denoiser evaluation）、video `flow_shift=6` 与 audio `audio_flow_shift=3`。每次真实 load 都替换该 client ID 的 Turbo classification，避免 eviction 后同 ID generic adapter 被误分类。
+- 禁止：将 exact Turbo artifact 的损坏 metadata 静默交给 generic fallback；将任意 H3 PEFT checkpoint、prefusion、multi-LoRA composition 或 Ref2VA 宣称为此功能支持；在 model-level CPU、layerwise 或 distributed-layerwise offload 下激活 Turbo，因为 legacy wrapper 的 LoRA tensors 不随 base parameter lifecycle 搬运。
+- 验收：覆盖 file/metadata/alpha/target/pair/shape rejection、QKV and FC1 packing、scale-zero/generic same-ID/Ref2VA lifecycle、steps/shifts errors 与三种 offload rejection；真实 artifact evidence 必须另绑定 exact checkpoint、task、topology、sampling 和 video/audio output。转换后的 native mixed-rank PEFT artifact 不属于本 PR 的 supported contract；其 generic fallback rank/scale mismatch 是 post-merge follow-up，不可用本页的 Turbo success 证明安全。^[PR #6476]
 
 共享 component quantization、checkpoint mapping 与 quality evidence 见
 [Diffusion rules](../../components/diffusion/rules.md)。
