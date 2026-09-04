@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, serving, qwen-omni]
-sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", "PR #6523", "PR #6728", "PR #6861", vllm_omni/deploy/aura_omni.yaml, vllm_omni/deploy/qwen3_tts.yaml, vllm_omni/deploy/qwen3_tts_high_concurrency.yaml, vllm_omni/model_executor/models/aura_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_speech_stream.py, vllm_omni/entrypoints/openai/speech_usage.py, vllm_omni/entrypoints/openai/tts_adapters/qwen3_tts.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, tests/e2e/online_serving/test_qwen3_tts_base.py, tests/e2e/online_serving/test_qwen3_tts_base_expansion.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/entrypoints/openai_api/test_serving_speech_stream.py, tests/entrypoints/openai_api/test_tts_adapter.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_code2wav.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_incremental_decode.py, tests/model_executor/stage_input_processors/test_qwen3_tts_async_chunk.py, "PR #5048"]
+sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", "PR #6113", "PR #6523", "PR #6728", "PR #6861", vllm_omni/deploy/aura_omni.yaml, vllm_omni/deploy/qwen3_tts.yaml, vllm_omni/deploy/qwen3_tts_high_concurrency.yaml, vllm_omni/model_executor/models/aura_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/prompt_embeds_builder.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_speech_stream.py, vllm_omni/entrypoints/openai/speech_usage.py, vllm_omni/entrypoints/openai/tts_adapters/qwen3_tts.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, tests/e2e/online_serving/test_qwen3_tts_base.py, tests/e2e/online_serving/test_qwen3_tts_base_expansion.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/entrypoints/openai_api/test_serving_speech_stream.py, tests/entrypoints/openai_api/test_tts_adapter.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_code2wav.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_incremental_decode.py, tests/model_executor/stage_input_processors/test_qwen3_tts_async_chunk.py, "PR #5048"]
 confidence: high
 ---
 
@@ -17,9 +17,9 @@ confidence: high
 | PR 描述信号 | 规则组 | 第一批源码 |
 |---|---|---|
 | Qwen3-TTS、`qwen3_tts` pipeline | Q3TTS-1a/1b | `config/pipeline_registry.py::OMNI_PIPELINES["qwen3_tts"]`；`model_executor/models/qwen3_tts/pipeline.py` |
-| `ref_audio`、x-vector、ICL、artifact-only reuse | Q3TTS-1a/1b/1c | `entrypoints/openai/serving_speech.py::_qwen3_tts_can_use_ref_audio_artifact_only`、`_track_ref_audio_artifact_warmup`、`_mark_ref_audio_artifact_ready_for_request` |
+| `ref_audio`、stored voice、task/checkpoint variant、x-vector、ICL、artifact-only reuse | Q3TTS-1a/1b/1c/1d | `entrypoints/openai/tts_adapters/qwen3_tts.py::{validate,_get_model_variant}` → `entrypoints/openai/serving_speech.py::_build_tts_params`、`_qwen3_tts_can_use_ref_audio_artifact_only`、`_track_ref_audio_artifact_warmup`、`_mark_ref_audio_artifact_ready_for_request` |
 | talker/code2wav、adaptive chunk、delta frame、request cache、segmented graph | Q3TTS-3a/3b/3c/3d/3e + Model Executor | `stage_input_processors/qwen3_tts.py::talker2code2wav_async_chunk` → `stage_input_processors/chunk_size_utils.py` → `qwen3_tts_code2wav.py::Qwen3TTSCode2Wav` → `segmented_graph_wrapper.py` |
-| OpenAI speech adapter | Q3TTS-1a/1b + Serving | `entrypoints/openai/tts_adapters/qwen3_tts.py::Qwen3TTSAdapter` → `serving_speech.py` |
+| OpenAI speech adapter | Q3TTS-1a/1b/1d + Serving | `entrypoints/openai/tts_adapters/qwen3_tts.py::Qwen3TTSAdapter` → `serving_speech.py` |
 | NPU、RoPE、BNSD/BSND、`codec_chunk_ramp` | Q3TTS-2a | `platforms/npu/models/qwen3_tts_tokenizer_v2.py::_apply_rotary_pos_emb_npu` → `platforms/npu/layers/rotary_embedding.py::npu_rotary_mul_with_bsnd_fallback` |
 
 ## Q3TTS-1a — ref-audio readiness 按 mode/capability 隔离
@@ -52,6 +52,26 @@ confidence: high
   `full_model` case 不构成 ready regression evidence。
 - 验收：ready 的实际 marker selector 收集并执行该 case；x-vector → ICL → x-vector 在同一
   audio 下通过，且在旧的 mode-agnostic artifact readiness 实现上失败。 ^[PR #5157] ^[PR #6523]
+
+## Q3TTS-1d — effective task 必须在 dispatch 前与 checkpoint variant 对齐
+
+- 触发：修改 Qwen3-TTS Speech API 的 `task_type` 推断、uploaded/precomputed voice、checkpoint
+  variant 识别，或 Base prompt 的 speaker embedding 拼接。
+- 强制：先确定 effective task：未显式 task 的 `ref_audio`/`ref_text` 选择 Base；uploaded voice 或
+  `capabilities.precomputed_speakers` 中的 voice 无条件选择 Base，即使 caller 给了另一 task；
+  `capabilities.supported_speakers` 的 built-in preset 仍是 CustomVoice。再以
+  `hf_config.tts_model_type` field-first 解析已识别 variant；field 缺失或未识别时，才从 model path
+  的 leaf 向上逐 component 查找 token-delimited marker。识别到 variant 且与 effective task 不同，
+  必须在 engine dispatch 前返回 public 400，明确 task、loaded variant 和可用 alternative；无法识别
+  variant 返回 `None` 并 fail-open。
+- 禁止：在 validation 后才把 stored voice 改写为 Base；读取 `server.precomputed_speakers` 而不是
+  adapter capability；把 `base_models`、`database` 或 parent substring 当 Base marker；让已知
+  task/variant mismatch 进入 prompt builder。prompt builder 的 speaker-dimension guard 仅保留为绕过
+  Speech API 时的 diagnostic，仍可能使 EngineCore 终止，不得把它宣传为 service-preserving admission。
+- 验收：focused tests 覆盖 uploaded 与 precomputed stored voice（包括 caller 的 conflicting task）、
+  built-in speaker、metadata priority over conflicting/uninformative path、unknown/unrecognized metadata 的
+  token-delimited leaf-up fallback 与 unknown fail-open，以及三种 known task/variant mismatch 在 engine
+  dispatch 前为 public 400；另验证 prompt-builder dimension mismatch diagnostic。 ^[PR #6113]
 
 ## Q3TTS-2a — NPU RoPE 按真实 shape 在 BNSD 与 BSND fused path 间选择
 
