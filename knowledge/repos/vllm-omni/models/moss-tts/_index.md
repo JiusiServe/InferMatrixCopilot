@@ -1,15 +1,15 @@
 ---
 title: "MOSS-TTS 家族（Delay/Realtime/Local/Nano,一族八 deploy）"
 created: 2026-07-21
-updated: 2026-09-02
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models]
-sources: ["PR #5635", vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/]
+sources: ["PR #5635", "PR #6664", vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts/audio_tokenizer_v2.py, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/]
 ---
 
 # MOSS-TTS 家族
 
-以下事实在 `main @ 740cb35a` 复核。
+以下事实在 `main @ be335a86` 复核。
 
 ## 名称与范围
 

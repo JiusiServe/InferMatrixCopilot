@@ -1,15 +1,15 @@
 ---
 title: "MOSS-TTS 架构"
 created: 2026-07-21
-updated: 2026-09-02
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models]
-sources: ["PR #5635", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, vllm_omni/model_executor/models/moss_tts/pipeline.py, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/moss_voice_generator.yaml]
+sources: ["PR #5635", "PR #5235", "PR #6664", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer_v2.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, vllm_omni/model_executor/models/moss_tts/pipeline.py, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/moss_voice_generator.yaml]
 ---
 
 # MOSS-TTS 架构
 
-事实在 `main @ 740cb35a` 复核;变体/deploy 速查见 [index](_index.md)。
+事实在 `main @ be335a86` 复核;变体/deploy 速查见 [index](_index.md)。
 
 ## 模型专有部分与共享模块的边界
 
@@ -27,6 +27,11 @@ sources: ["PR #5635", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts
   wrapper（批解码 vs 流式解码）;按 raw codec config 的 `number_channels` 运行期选代，
   字段缺失/单通道走 v1，≥2 走 v2。projection 的 Linear/Identity topology 同样属于
   checkpoint ABI，具体门禁见 [rules](rules.md)。
+- v2 decode 的 dtype 边界：#5235 的 decode-LUT 故意使用 `.float()` 保留精度，故
+  quantizer 可产出 FP32 embedding；它们随后经过 80 层 decoder transformer 的 BF16
+  LayerNorm。CUDA 已以包住完整 quantizer→decoder 段的 BF16 autocast 处理它；#6664
+  将同一 autocast 扩展给 NPU，避免 `aclnnLayerNorm` 拒绝 FP32 input/BF16 weight。
+  CPU 仍不启用 autocast；这不是 codec 算法或音质变化，也不能外推其他平台支持。
 - 共享框架面：[Config 组件](../../components/configuration/architecture.md)、
   SharedMemoryConnector、speaker cache（`reference_encoder.py`,树内注明援引
   Fish/CosyVoice3/Qwen3-TTS 先例）。
@@ -70,3 +75,8 @@ sources: ["PR #5635", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts
 - 已知未决：delay 路下 connector 级 `codec_chunk_frames` 是否还有残余作用
   未追;`moss_tts_local_codec` 与 `moss_tts_codec` 在 serving 侧的分流细节
   未逐行读。v1/v2 选择与 projection topology 已复核，但 pin 上没有对应自动化 regression。
+
+NPU dtype 修复的上游运行记录仅限 Ascend 910B、vLLM v0.27.1、
+`vllm-ascend b4b04c5eb` 与 Moss-TTS-Local-v1.5 的 serve/generate 成功。复验必须在
+此硬件/软件/模型组合真实走 codec decode；该 smoke 仅证明此 mixed-dtype crash 被解除，
+不能据此声明音频质量或泛平台兼容性。

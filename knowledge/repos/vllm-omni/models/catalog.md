@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ d5aced92`（2026-08-28）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ be335a86`（2026-08-28）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -52,6 +52,9 @@ realtime、确定性 barge-in 或一般硬件支持。^[PR #6089]
 PR #6634 adds Omni-DuplexEval benchmark support without changing the AR registry, diffusion
 registry, `OMNI_PIPELINES`, or deploy-YAML inventory. Its MiniCPM-o duplex endpoint is an
 evaluation consumer, not a new model registration or deploy profile. ^[PR #6634]
+
+PR #6664 only extends BF16 autocast for MossAudioTokenizer v2 decode on NPU; it does not
+change any AR/diffusion registry, `OMNI_PIPELINES`, or deploy-YAML inventory. ^[PR #6664]
 
 对比上一审计快照（`39c16d75`）：AR 架构 88→81，diffusion pipeline 65→64，
 OMNI_PIPELINES 57→55，deploy 86→84。PR #6353 删除 AudioX 的 diffusion registry、
@@ -127,8 +130,8 @@ step_audio_2_asr、voxcpm2、voxtral_tts、wan2_2_ti2v
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 13173d6b \
-  --to d5aced92 \
+  --from d5aced92 \
+  --to be335a86 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
