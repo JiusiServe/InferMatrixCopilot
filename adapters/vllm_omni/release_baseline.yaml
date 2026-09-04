@@ -114,6 +114,8 @@ owner_documents:
 ignored_paths:
 - pattern: .gitignore
   reason: repository metadata
+- pattern: .markdownlint.yaml
+  reason: repository tooling（PR #6273 引入 markdownlint）
 - pattern: .pre-commit-config.yaml
   reason: repository tooling
 - pattern: .readthedocs.yaml
