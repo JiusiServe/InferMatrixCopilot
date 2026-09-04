@@ -4,7 +4,7 @@ created: 2026-07-13
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
-sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py"]
+sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py", "PR #6306"]
 ---
 
 # HunyuanImage3 开发规则
@@ -136,3 +136,8 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
   - 禁止：保持 cache manager 为普通对象而期待 Worker spec discovery 找到嵌套 attention；把 paged KV 标记省略为默认 dense；只用一张参考图或关闭 CFG 生成 profile 后宣称容量覆盖最大请求；把 Scheduler-only `DiffusionKVRequest` 状态发送到 profile Worker execution。
   - 验收：模型测试断言 manager 是 `nn.Module`、attention identity 可从 `named_modules()` 读回且 `state_dict()` 为空；spec discovery 断言 layer、role、BF16 dtype 与 layout capability；profile 测试断言最大参考图数量、profile envelope 和 dense mode 的旁路行为。 ^[PR #6094]
 
+- **HY3-8a — HunyuanImage3 硬件优化层必须保持平台回退、checkpoint 与 VAE 内存边界**
+  - 触发：修改 HunyuanImage3 的 `layers/`、VAE/DiT `ResnetBlock`/`ResBlock`、patch embedding 相关块、平台分派、VAE 高分辨率内存策略或 cuDNN autotune。
+  - 强制：由 `current_omni_platform.is_cuda()` 选择 `nvidia` 实现，其他后端保留 `native` 实现；两套 block 必须保持相同的公开构造与 checkpoint `state_dict` key 布局，NVIDIA 版本只能通过共享融合算子获得加速；高分辨率 VAE 必须由统一 VAE tiling 管理，任何允许 tiling 关闭的入口都要显式定义容量、回退或拒绝策略；`torch.backends.cudnn` 这类进程级标志应在 worker 边界配置，若保留 block 内临时设置则必须证明 forward 不会并发。
+  - 禁止：在非 CUDA 平台导入或强制执行 NVIDIA block；把 Triton 可导入等同于所有平台支持；改变 `in_layers`/`out_layers` 等 checkpoint-facing module key；移除逐卷积内存保护后仍让 tiling-disabled 的高分辨率请求无条件执行；或在可能重叠的 forward 中修改进程级 cuDNN 标志。
+  - 验收：分别以 native/eager 与 CUDA/NVIDIA 实现覆盖 VAE、DiT 的真实 shape、dtype 和输出误差；验证旧 checkpoint 的 `state_dict` 加载与 key parity；对启用 tiling、关闭 tiling及直接 VAE 入口执行高分辨率容量/失败行为测试，并在并发 worker 或明确串行证明下验证 cuDNN 配置与恢复；性能数字只在固定模型、硬件、并行拓扑和 workload 下复测。^[PR #6306]

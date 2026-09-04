@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ cd3867c3`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 8d34d3b5`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `718d9a4c` 本轮沉淀 PR #5048 的 typed 配置透传、GPU/NPU AR runner 的 req_id 对齐、按 output history 的 logits 热路径，以及 Qwen3-TTS 的 checkpoint-derived silence mask 与 x-vector-only 门控。测试文件、手工 H200 结果和单纯的 serving 参数透传未另立规则；不应据此推断其他 checkpoint 已完成验证、NPU 已有硬件 E2E、`N=3` 是通用最优值，或所有 TTS 模式都会启用该 ban。
+本次相对 `cd3867c3` 本轮记录了 PR #6306 的共享 GroupNorm/AdaGN+SiLU 融合算子合同，以及 HunyuanImage3 的平台分派、VAE tiling 和 cuDNN 边界。其性能提升仅绑定 PR 中的 exact workload，不能推断为跨硬件、跨模型或通用加速结论；测试文件与目录整理未沉淀为独立规则。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 718d9a4c \
-  --to cd3867c3 \
+  --from cd3867c3 \
+  --to 8d34d3b5 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
