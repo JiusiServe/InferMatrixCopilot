@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", "PR #6814", "PR #6563", vllm_omni/diffusion/attention/, vllm_omni/diffusion/diffusion_kv/, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/npu/platform.py, tests/diffusion/diffusion_kv/, tests/diffusion/attention/test_piecewise_attn.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
+sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", "PR #6814", "PR #6563", "PR #5716", vllm_omni/diffusion/attention/, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/attention/parallel/ring_kernels.py, vllm_omni/diffusion/diffusion_kv/, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/npu/platform.py, tests/diffusion/diffusion_kv/, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_ulysses_uaa.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
 confidence: high
 ---
 
@@ -102,20 +102,19 @@ confidence: high
   SDPA 返回 LSE 供 ring accumulation，而这些调用没有该参数。实现以 K head 数计算 factor 并
   同样 repeat V，却未显式检查 `H_v == H_k`；现有测试始终令两者相等，future caller/backend 必须
   保持或提前断言该 invariant，不能等 SDPA 在更深处 cryptic failure。
-- 强制：`advanced_uaa` + Hybrid Ulysses/ Ring 时，在 Ulysses all-to-all 前检查 key 和 value
-  原始 head 数均可被 `ulysses_degree` 整除；否则 fail-fast。padding 出来的 zero K/V head 若交给
-  Ring 再 replicate 会被当成真实 group，不能作为合法 MQA/GQA。pure Ring（Ulysses=1）仍支持
-  1 或多 KV heads；valid Hybrid positive fixture 必须使用可整除布局。
+- 强制：advanced UAA 独立验证 `K==V`、`Q%KV==0`，main/joint 都适用。Ulysses `U`、ratio `R` 下先令
+  `padded_KV=ceil(KV/U)*U`，再令 `padded_Q=padded_KV*R`，协调 pad Q/K/V 后 A2A；strict Ulysses
+  保持 exact divisibility。Hybrid Ring 在既有 PyTorch ring path 本地 expand compact padded KV，不能 blanket reject；
+  Q padding >=1.5x 时按 `(Q,KV,U,label)` warn once，说明 FLOP/temp VRAM。
 - 禁止：用默认 backend 的绿测证明 SDPA 修复（安装 FA/FA3 时会绕过）；用 num_heads=3、
   Ulysses=2 的 padded case 当 Hybrid 正向测试；从通信量不变推断端到端性能不变。
-- 验收：4-card test 显式设 `TORCH_SDPA`，以 single-rank baseline 对 pure Ring GQA(8Q/2KV)、
-  MQA(8Q/1KV) 和既有 Ulysses+Ring/AllGather-KV 输出，BF16 容差 5e-2；CPU guard 覆盖 Hybrid
-  padded-MQA 拒绝，另以 4Q heads、Ulysses2×Ring2 验证 valid Hybrid。ready CI 的 L4×4 job
-  已收集 `test_attention_sp.py`，但不收集 `test_ulysses_uaa.py`；PR comment 的 primary matrix
-  是 pre-final head `e6857888` 在 4×B300 上 4 passed、max abs 0.015625，runtime fix 已在但 final
-  target 未复测。修正为 4 heads 的 Hybrid 25.30s pass 只见 final PR body，未附 hardware/SHA/log。
-  因此目标 pin 有局部数值证据和未来 L4 gate wiring，但没有附带 L4 run 产物，Hybrid
-  guard/positive 也未被该新 job 覆盖。^[PR #5255]
+- 禁止：独立 rounding（如 28/7/U2 成 32/8 以外的 Q/KV ratio）、把 padding 当真实 head、放松 malformed
+  shape，或外推 broad performance。CPU/main-joint、multi-GPU parity 与 4×H800 microbench 仅为有界证据。^[PR #5716]
+- 验收：CPU 覆盖 main/joint 的 valid coordinated padding 与 malformed shape；multi-GPU 以 no-SP
+  baseline 对 SP2 `28/7`、`6/3`、SP4 `12/3` 及 Ulysses2×Ring2 的 MHA/GQA/joint。warning threshold
+  与 dedup 需单独保护。PR #5716 的 4×H800 数据只是 attention microbenchmark：aligned case 接近
+  baseline，而 uneven/MQA padding overhead 可显著增加；不构成模型 E2E、质量或通用性能证明。
+  既有 pure-Ring/L4 gate 证据仍只覆盖其原始范围。^[PR #5255] ^[PR #5716]
 
 ## DIFF-4h — FlashInfer mixed-dtype plan 必须绑定完整 runtime shape 与 mask 内容
 
