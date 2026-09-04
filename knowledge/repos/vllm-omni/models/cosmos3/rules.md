@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107", "PR #5614"]
+sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107", "PR #5614", "PR #6325"]
 confidence: high
 ---
 
@@ -117,3 +117,11 @@ confidence: high
 - 强制：每个 active hint 只接受声明的字段，并将 `control_weight` 校验为 finite、non-negative 且总和为正；按 hint 声明顺序归一化为相对权重，单个正权重归一为 `1.0`，单控制的绝对强度仍由 `control_guidance` 控制。Transfer 必须使用专用 system prompt，同时对 CFG 两支启用；默认在 positive prompt 追加列出 active hints 并要求逐帧遵循形状、位置和运动的 directive，`emphasize_control_in_prompt=false` 才关闭。默认启用 duration/FPS 与 resolution metadata，并以 `negative_metadata_mode=same` 同步到 negative branch；可分别关闭模板，模式只允许 `same`、`inverse`、`none`。Transfer 不自动生成 negative prompt，调用方需显式传入可选参考 prompt。
 - 禁止：把 `weight` 等未声明字段静默当作 `control_weight`；接受负数、非 finite 或全零权重；用单控制归一化权重改变绝对 guidance；让 request 的 `system_prompt`/`use_system_prompt` 覆盖 transfer system prompt；把默认 metadata 或 negative prompt 行为外推到普通 T2I/T2V。
 - 验收：覆盖单/多控制权重归一化、未知字段、负数、全零和 `emphasize_control_in_prompt` ablation；断言 positive/negative 两支的 system prompt、metadata mode、模板和显式/省略 negative prompt；真实 serving 还需固定模型 revision、输入、seed、步数和硬件分别验证输出质量，当前单测与附件不构成通用质量或性能证据。^[PR #5614]
+
+## COSMOS-5b — Transfer canonical bucket 与 JSON aspect_ratio 元数据必须一致
+
+- 触发：修改 Cosmos3 transfer 的 `size`、`resolution`、`aspect_ratio`、控制输入 bucket 选择、JSON prompt 元数据，或 I2V/V2V 的 canvas ratio 格式化与多 rank prompt 处理。
+- 强制：Transfer 必须根据控制输入和选定 resolution 从 `VIDEO_RES_SIZE_INFO` 选择 canonical `(height, width, aspect_ratio)` bucket；原始请求尺寸先保存到 `COSMOS3_TRANSFER_REQUESTED_SIZE_KEY`，仅用于冲突告警，不能改变控制输入选出的几何。Transfer JSON prompt、以及 I2V/V2V 生成 canvas 的 aspect ratio 元数据必须使用 canonical ratio；若请求或 JSON prompt 的 ratio 与 canvas 冲突，所有 rank 都重写元数据，只有 rank 0 输出 warning。非 canonical canvas 必须映射到最近的受支持 ratio，而不是使用 gcd 形成新标签。
+- 禁止：把 Transfer 的任意 `size=HxW` 当作最终几何或宣称其会被采用；保留控制输入已覆盖的 stale `aspect_ratio`；将元数据重写也放在 `_is_rank_zero()` 条件内导致 rank 间 token ids 不一致；用非 canonical 的精确 gcd ratio 触发无意义的冲突告警。
+- 验收：覆盖 Transfer 请求尺寸与控制 bucket 不一致、请求/JSON ratio 冲突、rank 0 与非 rank 0 的 warning/rewrite 行为，以及 `1104x816`、`832x468` 等近似 canvas 映射到 `4,3`、`16,9` 的回归；JSON prompt 解析后必须逐 rank 得到相同 canonical `aspect_ratio`。^[PR #6325]
+
