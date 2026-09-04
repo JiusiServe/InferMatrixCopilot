@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5073", "PR #5671", "PR #5976", vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/registry.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, docs/design/qwen3_omni_tts_performance_optimization.md]
+sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/registry.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/quantization/component_config.py, docs/design/qwen3_omni_tts_performance_optimization.md]
 ---
 
 # Qwen-Omni 家族（Qwen2.5-Omni / Qwen3-Omni / Qwen3-TTS）
@@ -24,6 +24,10 @@ sources: ["PR #5073", "PR #5671", "PR #5976", vllm_omni/model_executor/models/qw
 - Qwen3-Omni 的 MUSA ModelOpt FP8 边界是 Thinker 保留量化、Talker/Code2Wav 通过 deploy
   overlay 显式清除 root quantization metadata，并仅关闭不安全的 Talker-MTP FULL graph
   wrapper；精确三态与验证边界归下方 architecture 入口。
+- Qwen3-Omni 的 AWQ/compressed-tensors checkpoint 名称必须在统一 wrapper 映射一次；嵌套
+  Thinker/Talker/Code2Wav 不得再次改名，仅在自身声明 packed modules 时补充对应 metadata。
+  component/default quant configs 都是同一映射合同的一部分；验收规则归本目录的
+  Qwen-Omni rules。^[PR #5687]
 - vLLM 0.27 后 upstream 与 Omni registry 有同名 architecture：Omni 必须覆盖全局 entry；plain
   `vllm serve` 缺 `model_stage` 时 Qwen2.5/Qwen3 默认 thinker，Qwen3 thinker 在非 staged 模式返回
   bare tensor，只有 staged talker consumer 才请求 captured layers；共享验收见
@@ -47,4 +51,4 @@ sources: ["PR #5073", "PR #5671", "PR #5976", vllm_omni/model_executor/models/qw
 | 遇到什么 | 查看哪里 |
 |---|---|
 | stage 拓扑、代际差异与官方性能优化结论 | [architecture](architecture.md) |
-| Qwen3-Omni Thinker MRoPE、CUDA compilation custom-op boundary 或固定种子音频回归 | [Qwen-Omni rules](rules.md) |
+| Qwen3-Omni Thinker MRoPE、CUDA compilation custom-op boundary、AWQ/compressed-tensors 名称映射或固定种子音频回归 | [Qwen-Omni rules](rules.md) |
