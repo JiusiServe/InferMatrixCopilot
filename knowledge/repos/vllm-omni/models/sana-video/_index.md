@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5508", "PR #5861", vllm_omni/diffusion/models/sana_video/, vllm_omni/diffusion/registry.py, vllm_omni/model_extras/sana_video.py]
+sources: ["PR #5508", "PR #5861", "PR #6953", vllm_omni/diffusion/models/sana_video/, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/model_extras/sana_video.py, tests/entrypoints/openai_api/test_video_pipeline_capability.py]
 confidence: high
 ---
 
@@ -14,6 +14,8 @@ confidence: high
 
 - 知识树 owner：`models/sana-video`；上游目录 `sana_video`。
 - registry 登记的 architecture / stage key：`SanaImageToVideoPipeline`；`SanaVideoPipeline`。
+- 两者都在 direct diffusion metadata 中声明 `final_output_type="video"`，使 serving 将 final
+  stage 分类为 video；这不定义或改变 I2V 请求输入、denoise、native/adapter topology 或 VAE 行为。
 
 ## 源码路径
 
@@ -55,6 +57,9 @@ confidence: high
 - 先运行 `tests/diffusion/models/sana_video/` 的组件回归；native/adapter、T2V/I2V、480p/720p
   的真实权重功能覆盖在 L4 serving expansion。golden 与 stage-alignment 是按需 correctness
   工具，不是默认 per-PR gate。
+- PR #6953 另有 `tests/entrypoints/openai_api/test_video_pipeline_capability.py` 的 CPU metadata
+  unit：只验证两种 SANA pipeline 名称的 serving output 分类为 video；PR 报告的 online/offline
+  情形不是新增 endpoint 或真实模型 E2E。
 
 ## 什么时候查这里
 

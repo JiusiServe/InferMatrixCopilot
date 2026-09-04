@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5508", "PR #5861", vllm_omni/diffusion/models/sana_video/pipeline_sana_video.py, vllm_omni/diffusion/models/sana_video/pipeline_sana_video_i2v.py, vllm_omni/diffusion/models/sana_video/transformer_sana_video.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, vllm_omni/diffusion/request.py]
+sources: ["PR #5508", "PR #5861", "PR #6953", vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/sana_video/pipeline_sana_video.py, vllm_omni/diffusion/models/sana_video/pipeline_sana_video_i2v.py, vllm_omni/diffusion/models/sana_video/transformer_sana_video.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, vllm_omni/diffusion/request.py, tests/entrypoints/openai_api/test_video_pipeline_capability.py]
 confidence: high
 ---
 
@@ -17,6 +17,10 @@ confidence: high
 self-attention 是模型专有 ReLU-kernel linear attention；prompt cross-attention 交给共享
 `vllm_omni.diffusion.attention.Attention`。VAE、component discovery、offload、request batch、
 postprocess 与 worker 生命周期仍属于共享 diffusion owner。
+
+Serving 只通过 direct model metadata 将上述两个 pipeline 的 final output 分类为 `video`。
+共享 resolver 的优先级是 direct class、metadata alias、registry architecture class/alias、default；
+未知项仍为 image。该分类不提供或校验 I2V input schema，也不改变 denoise、topology 或 VAE。
 
 ## 配置、checkpoint 与兼容范围
 
@@ -50,3 +54,7 @@ conditioning mask 令该首帧在 denoise 中固定，同时使用 spatial times
 硬件前提，不能把收集或跳过当作完整功能验证。480p T2V 的 frozen golden 只使用 case-specific
 0.91 SSIM gate；其余三例保持 0.93。该差异从 native prompt cross-attention 的 vLLM-Omni
 Attention 与 reference SDPA 边界开始，不能据此放宽其他 case。^[PR #5508]
+
+PR #6953 的 `test_video_pipeline_capability.py` 是 CPU metadata unit test：它仅断言两种 SANA
+class 的最终 serving 分类为 video；PR 叙述的 online/offline 行为不构成新增 endpoint 或真实模型
+E2E 覆盖。^[PR #6953]

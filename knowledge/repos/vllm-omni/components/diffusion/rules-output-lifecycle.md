@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5550", "PR #5864", "PR #5885", "PR #5978", "PR #6750", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/io_support.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/output_formatter.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/stage_diffusion_proc.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_timeout.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/diffusion/test_stage_diffusion_proc.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6255", "PR #6288", "PR #6308", "PR #6499", "PR #6749", vllm_omni/diffusion/data.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, tests/diffusion/test_diffusion_output_formatter.py, tests/diffusion/test_diffusion_plugin_hooks.py]
+sources: ["PR #5550", "PR #5864", "PR #5885", "PR #5978", "PR #6750", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/io_support.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/output_formatter.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/stage_diffusion_proc.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_timeout.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/diffusion/test_stage_diffusion_proc.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6255", "PR #6288", "PR #6308", "PR #6499", "PR #6749", "PR #6953", vllm_omni/diffusion/data.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, tests/diffusion/test_diffusion_output_formatter.py, tests/diffusion/test_diffusion_plugin_hooks.py, tests/entrypoints/openai_api/test_video_pipeline_capability.py]
 confidence: high
 ---
 
@@ -130,9 +130,16 @@ confidence: high
 ## DIFF-1s — diffusion output type 必须从模型声明闭合到 topology 与 formatter
 
 - 触发：diffusion pipeline 产生 image/video/audio/action 等输出，或修改 model metadata、registry alias、topology `final_output_type`、formatter/post-process 与 multiprocess 传递路径。
-- 强制：model class 与 registry alias 解析到同一 canonical output metadata；默认单 stage config、multi-stage final stage、video endpoint capability 与 `OmniRequestOutput` formatter 必须传播同一类型。未知模型才回 image；非媒体输出使用稳定的 `DiffusionOutput.output` key，并注册可跨 orchestrator multiprocess 边界解析的 module-level post-process callable。
+- 强制：metadata 按 direct class → metadata alias → registry architecture class/alias → default
+  的顺序解析；model class 与 registry alias 必须解析到同一 canonical output metadata。默认单
+  stage config、multi-stage final stage、video endpoint capability 与 `OmniRequestOutput` formatter
+  必须传播同一类型。未知模型才回 image；非媒体输出使用稳定的 `DiffusionOutput.output` key，并注册
+  可跨 orchestrator multiprocess 边界解析的 module-level post-process callable。SANA 的
+  `SanaVideoPipeline` 与 `SanaImageToVideoPipeline` 都必须 direct metadata 声明
+  `final_output_type="video"`；这是 serving metadata 分类，非 I2V input schema、denoise、topology
+  或 VAE 合同变更。
 - 禁止：只在 topology 标 video 但 formatter 仍发 image；要求每个 stage 都是 diffusion 才允许 video final；遗漏已注册 video alias 后静默回 image；用 ndarray 形状猜语义，或把局部 closure 作为跨进程 hook。
-- 验收：逐个 canonical class/alias 断言 default 与 multi-stage final type，video/image endpoint 正负 capability 及最终 output type；action 另验证 post-process callable 可跨目标进程边界使用，最终 output 保留 stable key、shape、dtype 和有限性。^[PR #4222] ^[PR #5885]
+- 验收：逐个 canonical class/alias 断言 default 与 multi-stage final type，video/image endpoint 正负 capability 及最终 output type；action 另验证 post-process callable 可跨目标进程边界使用，最终 output 保留 stable key、shape、dtype 和有限性。PR #6953 的 CPU metadata unit test 只断言两种 SANA class 均分类为 video；PR 所述 online/offline 行为不是新的 endpoint 或真实模型 E2E 证据。^[PR #4222] ^[PR #5885] ^[PR #6953]
 
 ## DIFF-9a — 共享 PyAV 预构造帧 mux 必须闭合资源与音频时间零点
 
