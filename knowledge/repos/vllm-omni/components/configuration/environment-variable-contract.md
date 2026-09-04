@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: guide
 tags: [vllm-omni, config, environment]
-sources: ["PR #6217", vllm_omni/config/environment_variable_inventory.py, tests/config/test_environment_variables.py, collect_env.py]
+sources: ["PR #6217", "PR #6631", vllm_omni/config/environment_variable_inventory.py, tests/config/test_environment_variables.py, collect_env.py]
 ---
 
 # 环境变量合同与诊断边界
@@ -19,7 +19,8 @@ sources: ["PR #6217", vllm_omni/config/environment_variable_inventory.py, tests/
 
 ## 已合并的合同
 
-- `environment_variable_inventory.py` 是**分类清单，不是值解析器**：实际 consumer 继续拥有默认值、解析、优先级和读取时机。仅 `PUBLIC_OMNI` 的 22 个名称构成审阅后的 Omni 公共边界；新公共 Omni 名称必须以 `VLLM_OMNI_` 开头，旧前缀仅为兼容保留。
+- `environment_variable_inventory.py` 是**分类清单，不是值解析器**：实际 consumer 继续拥有默认值、解析、优先级和读取时机。`main @ a708ae5b` 的 `PUBLIC_OMNI` 审阅边界有 23 个名称；新公共 Omni 名称必须以 `VLLM_OMNI_` 开头，旧前缀仅为兼容保留。
+- PR #6631 处理 #6217 合并后的 main 漂移：`VLLM_OMNI_ASYNC_OUTPUT_TIMEOUT` 是公开、实验性、仅环境变量的 float 秒数开关，默认 `600`；diffusion engine 在每次 `step_streaming` 请求路径读取它，非 float 或 `<=0` 时仅 warning-once 并回退默认值。它等待 async output，不是 `VLLM_OMNI_INPUT_WAIT_TIMEOUT_S` 的 full-payload input-coordinator 控制。`ROSVOT_SOURCE_DIR` 已随 SoulX-Singer 支持移除而从 model-specific `deprecate_remove` 清单删除。
 - 公开设置没有全局的 env-vs-CLI/YAML/request 优先级。按每个 consumer 的合同核实：请求可变行为应属于 request schema，稳定 model/stage 行为应属于 typed config，环境变量只适合启动、平台集成、诊断或兼容回退。import/startup 时读取的值必须在启动 CLI/导入前设置；启动后的父 shell 变化不会更新既有 worker。
 - stage 的 `env`（以及兼容的 `runtime.env`）仅在启动该 stage/child process 时临时应用：键和值会字符串化，child 可继承，随后恢复父进程旧环境。因此它不能追溯改变已在此前 import 缓存的值，也不应承载 request-varying 语义。日志和诊断只输出键，绝不输出 stage `env` 的值。
 - `collect_env.py` 只输出安全的公共 Omni allowlist、注册的 vLLM 名称和选择的平台前缀；显式 redact 的 `HF_TOKEN`、`HUGGINGFACE_HUB_TOKEN`、`OPENAI_API_KEY` 及常见 secret-like 名称不得输出值。为了诊断不完整/损坏的 Omni 安装，清单导入失败时 collector 回退为空清单而仍可报告既有安全信息。
@@ -29,7 +30,7 @@ sources: ["PR #6217", vllm_omni/config/environment_variable_inventory.py, tests/
 
 1. 先沿真实 consumer 确认解析、默认、优先级与读取时机；不要把 inventory 或文档表当成运行时实现。
 2. 新的稳定公开 Omni 设置同时更新分类、公开参考覆盖和 prefix gate；模型专用、benchmark、platform/external、internal 名称保持各自 owner，不因被读取而自动公开。
-3. 对 model-specific name 指定迁移目的（typed config、request scope、external、internalize 或 deprecate/remove）但不要把目的当成已经实现。PR #6217 的既有 57 个迁移项由 #6232 按模型族和 owner 跟踪，尚不是现有运行时保证。
+3. 对 model-specific name 指定迁移目的（typed config、request scope、external、internalize 或 deprecate/remove）但不要把目的当成已经实现。目标提交的 56 个 model-specific 项为 promote 33、request scope 6、external 0、internalize 11、deprecate/remove 6；#6232 仍按模型族和 owner 跟踪迁移，尚不是现有运行时保证。该 issue 的旧 seven-item removal checklist 含已退休的 `ROSVOT_SOURCE_DIR`，不能覆盖当前 inventory。
 4. 变更 collector 或 stage `env` 时，以真实 worker/inheritance 与 redaction 测试验收；错误安装场景不得因可选清单导入而使诊断工具本身失效。
 
 ## 已知证据限制
