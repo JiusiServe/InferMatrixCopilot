@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py, "PR #4765", "PR #5666", "PR #5491", "PR #6186"]
+sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py, "PR #4765", "PR #5666", "PR #5491", "PR #6186", "PR #5452", "vllm_omni/worker/output/payload_build.py"]
 confidence: high
 ---
 
@@ -138,4 +138,18 @@ Direct 代码快速入口；loader 与 checkpoint 合同留在该页的 `EXEC-2x
 - 强制：通过 `cfg_pair_id` 或注册的 companion suffix 从 external/user request identity 建立 pair；在 Scheduler 构造前安装通用 pairing patch；不完整 pair 必须等待，完整 pair 保持相邻并在每次 schedule 后 equalize progress、一起结束，同时按 pair/request id 保存状态而不是按 batch row 保存。
 - 禁止：用 row adjacency 或 internal UUID 推断 pair；让 prefix-cache 不对称命中、chunked prefill 或单边 preemption 使两行错位；只结束一方、把 per-request seed/position metadata 广播给整批，或让非 CFG stage 被无条件改写。
 - 验收：覆盖 suffix/显式 pair id、companion 缺失与到达、row reorder/compaction、chunked prefill、prefix-cache control、一起 finish、非 CFG no-op 和 patch 安装时序；同批不同 seed 与位置必须保持各自归属。 ^[PR #6186]
+
+## EXEC-1n — 多请求 payload 与共享调度状态必须保持 request ownership
+
+- 触发：修改 AR/generation runner 的 multimodal payload 路由、prefix-cache 合并、sparse `meta.req_id`，或模型 KV-transfer metadata 与 downstream payload memoization。
+- 强制：先由共享 resolver 校验 nested/flattened sparse declaration，按 `meta.req_id` 建立 sparse index；payload builder 按 request id/index 取值并过滤协议 metadata，singleton list 只作 request-invariant broadcast；合并模型 KV metadata 必须 copy-on-write，`omni_final_stage_id` 未到达前只能保守返回且不得缓存，获取失败原样抛出。
+- 禁止：用 batch index 代替 sparse index、用 `v[0]` 替代越界多元素值、把请求数据广播给另一 request、原地修改 scheduler-owned dict，或吞掉 transfer metadata 异常。
+- 验收：mixed batch 覆盖 sparse subset、combined prefix-cache/direct path、singleton broadcast、越界丢 key、nested/flat conflict、scheduler 原对象不变、marker 到达后 memoization 更新及异常传播；断言每个 request 只收到自己的 payload。 ^[PR #5452]
+
+## EXEC-1o — generation runner 必须逐请求构造 batch 输出并保持 zero-token 控制流
+
+- 触发：generation runner 支持并发请求，或修改 `sample_tokens`、`total_num_scheduled_tokens <= 0`、encoder transfer、DP dummy-run 与 KV no-forward 分支。
+- 强制：tensor 的 leading dimension 与 list 长度必须等于 `input_batch.num_reqs`，逐请求构造 payload 并在 mismatch 时报告两侧长度；EC producer 分支必须先于 zero-token 分支，zero/negative-token step 仍按条件执行 DP `_dummy_run(1)` 或 `kv_connector_no_forward`。
+- 禁止：用同时要求输出维度为 1 和 `num_reqs` 的断言限制 batch；构造只含一个 entry 的 payload；用无条件 zero-token early return 遮蔽同步、DP 或 KV-transfer 分支。
+- 验收：覆盖两个及以上 request 的 tensor/list 输出、两类长度 mismatch、zero/negative-token、external-launcher + DP、KV no-forward 与 EC producer，分别断言 request 对齐、错误信息和分支调用顺序。 ^[PR #5452]
 

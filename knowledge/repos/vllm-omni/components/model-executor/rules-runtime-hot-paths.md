@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/]
+sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py"]
 confidence: high
 ---
 
@@ -41,3 +41,18 @@ confidence: high
 - 验收：CPU codec stand-in 覆盖跨 first/steady chunk 边界的完整帧拼接、lookback 和 partial final chunk；真实 runner 覆盖 mixed requests、sparse routing、预算尾部与 cleanup；GPU smoke 断言 waveform 样本数等于 committed frames 的实际 frame ledger。 ^[PR #5666]
 
 相关执行流见 [model-executor architecture](architecture.md)；跨 stage 合同见 [bridge/batch 规则](rules-bridge-batch.md)。
+
+## EXEC-11c — sparse 音频 marker 必须执行协议校验并在非法声明时 fail closed
+
+- 触发：修改共享 AR 音频输出、sparse multimodal routing、`meta.sparse_audio`/`meta.req_id` producer 或 consumer。
+- 强制：marker 只接受 list of strings 或 bare string，并用同一 literal truthy set 判定；nested 与 flattened encoding 必须同时解析，冲突、重复 id、不可用 id 或非法 carrier 必须记录并在 audio 路由 fail closed；任何 subset producer（包括 VoxCPM2 dense 分支）都必须声明按 `meta.req_id` 对齐。
+- 禁止：对 tensor/ndarray/number marker 做元素读取或归一化、把非法 sparse declaration 降级为 dense、静默抹掉 nested marker，或发送未声明 alignment 的 subset 音频列表。
+- 验收：覆盖 legal list/string、invalid audio/non-audio、unusable `req_id`、nested marker without id、nested/flat conflict、duplicate id、合法 sparse routing 与 VoxCPM2 coalesce/plain producer；并验证一次性 classifier error、rate-limited fail-closed error 和无 D2H 读取。 ^[PR #5452]
+
+## EXEC-11d — model sampler fallback 与 penalty padding 必须保持显式合同
+
+- 触发：模型声明 `prefer_model_sampler`，修改 runner 的 model sampler fallback，或调整 prompt ids 与 logits vocab 的 penalty 处理。
+- 强制：`model.sample()` 返回非 `None` 时直接采用；返回 `None` 必须回退默认 sampler 并通过 `warning_once` 保持可见；prompt padding 必须 clamp 到 `logits_vocab`，保留 upstream 的 padding bin 语义；新增 declarer 必须经过精确 assignment inventory 同意。
+- 禁止：把合法的 `None` fallback 当作采样失败、无日志静默吞掉意外 fallthrough，或 clamp 到 `logits_vocab - 1` 使 padding 被计作最后一个真实 token。
+- 验收：覆盖真实 declarer 的 None/非 None sampler、重复调用仅一次 warning、inventory 增删、padding 对 penalty mask 无影响，以及较窄 logits vocab 下未 clamp 会失败的边界。 ^[PR #5452]
+
