@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5976", vllm_omni/diffusion/compile.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/layers/fused_moe.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_diffusers_adapter.py, vllm_omni/quantization/_copy_missing_attrs.py, tests/diffusion/test_compile.py, tests/e2e/accuracy/test_qwen_image.py, "PR #6287"]
+sources: ["PR #5976", vllm_omni/diffusion/compile.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/layers/fused_moe.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_diffusers_adapter.py, vllm_omni/quantization/_copy_missing_attrs.py, tests/diffusion/test_compile.py, tests/e2e/accuracy/test_qwen_image.py, "PR #6287", "PR #6273"]
 confidence: high
 ---
 
@@ -38,4 +38,11 @@ confidence: high
 - 强制：内部 diffusion 模块必须从 canonical upstream 路径 `vllm.config.lora` 导入 `LoRAConfig`；`vllm_omni.config.lora` 仅保留为对外兼容 re-export，并避免在 diffusion 模块初始化期间触发 `vllm_omni.config.__init__`、pipeline registry 或尚未完成初始化的 diffusion 模块。
 - 禁止：假设导入兼容包的子模块不会执行父包初始化；在 ROCm platform patch 已进入 diffusion registry 时重新引入该兼容导入；把此修复泛化为改变 `LoRAConfig` 类型或配置语义。
 - 验收：ROCm 启动/pytest collection 在 diffusion 模块完成初始化前不再出现 circular-import；断言两个导入路径解析为同一 `LoRAConfig` 类，并回归 LoRA manager/utils 的正常导入及 CUDA/XPU 初始化路径。^[PR #6287]
+
+## DIFF-4s — diffusion Triton kernel 必须通过 vLLM 兼容入口导入
+
+- 触发：修改 diffusion Triton kernel 或其第三方 Triton 导入路径。
+- 强制：diffusion 代码统一从 `vllm.triton_utils` 导入 `triton` 与 `tl`，并保持现有 kernel 装饰器和调用语义。
+- 禁止：直接从 `triton` 或 `triton.language` 导入，或把导入检查通过误认为真实 kernel 已完成跨平台验证。
+- 验收：静态检查确认无直接 Triton 导入，并在支持的 CUDA 环境执行目标 kernel 的导入与定向回归；非 CUDA fallback 仍需独立验证。^[PR #6273]
 
