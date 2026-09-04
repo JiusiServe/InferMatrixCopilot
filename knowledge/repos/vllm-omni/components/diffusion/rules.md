@@ -38,7 +38,7 @@ confidence: high
 |---|---|---|
 | `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d`, `DIFF-1e` |
 | `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、FA determinism、async output/shutdown | `DIFF-1a`–`1j` |
-| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT/cache lifecycle | `DIFF-2a`–`2e`, `2p`, `2q`, `2s` 见 [checkpoint 与加载合同](rules-checkpoint-loading.md)；`2f`–`2j`, `2r` 见 [component lifecycle](rules-component-lifecycle.md)；`2k` 见 [output/runtime](rules-output-lifecycle.md)；`2l`–`2o` 见 [LoRA](rules-lora.md) |
+| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT/cache lifecycle | `DIFF-2a`–`2e`, `2p`, `2q`, `2s`, `2y` 见 [checkpoint 与加载合同](rules-checkpoint-loading.md)；`2f`–`2j`, `2r`, `2w` 见 [component lifecycle](rules-component-lifecycle.md)；`2k` 见 [output/runtime](rules-output-lifecycle.md)；`2l`–`2o`, `2x` 见 [LoRA](rules-lora.md) |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
 | `distributed-vae` | Wan VAE spatial height/width shard、rank context、extent/padding | `DIFF-3b` |
 | `system-runtime` | cache/预算、native/backend/platform、attention layout、能力 metadata、异常与并发 | `DIFF-4a`–`4j`（`4a`–`4i` 见 [paged cache 与系统运行时规则](rules-system-runtime.md)） |

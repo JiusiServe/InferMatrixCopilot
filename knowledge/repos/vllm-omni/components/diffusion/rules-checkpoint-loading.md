@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6279", "PR #6445", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, "PR #5531", "PR #4061"]
+sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6234", "PR #6279", "PR #6445", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, "PR #5531", "PR #4061"]
 confidence: high
 ---
 
@@ -154,3 +154,18 @@ confidence: high
 - 禁止：用运行时 YAML parser、原始 NVLabs key remap、layout sniff 或宽泛下载模式弥补不兼容的 checkpoint；把命名为 `SanaWmTwoStagesPipeline` 的旧两阶段 repo 当作当前 Stage-1 registry 自动发现成功，或静默跳过缺文件、未知/重复/shape 不符权重。
 - 验收：local path 与 HF snapshot 都验证上述文件、`model_index.json` class 和 transformer config 读取；weight loader 对 unknown/duplicate/shape mismatch fail fast 并由 strict coverage 检查 expected keys；Stage-1 smoke 证明不下载/初始化 refiner，旧 layout 只能在显式且兼容的 class override 下运行。^[PR #4061]
 
+## DIFF-2y — Diffusers component index 必须是唯一的 shard manifest
+
+- 触发：修改 Diffusers component 的 safetensors index resolution、Hub/cache download、subfolder
+  path、`allow_patterns` 或本地 checkpoint discovery。
+- 强制：没有显式 `allow_patterns_overrides` 时，先在 local path 或配置的 Hub cache/remote
+  解析 component-local index；保留 `subfolder`、`revision`、`cache_dir` 和 offline
+  `local_files_only` 语义。唯一 index 的非空 `weight_map` 是唯一权威 shard manifest：只下载并加载
+  去重、稳定排序后的其中文件，且任何缺失 shard 都失败。没有 index 时，必须拒绝同一 shard
+  family 出现冲突的 `of-N` totals。
+- 禁止：因离线模式跳过已缓存 index、重复拼接 subfolder、用宽泛 glob 混入 snapshot 的陈旧
+  shard，或让目录枚举顺序决定 loader 行为。显式 override 是最高优先级选择，不能被 index
+  悄然改写。
+- 验收：覆盖 local、online 与 offline-cache index resolution，断言 revision/cache/subfolder
+  透传、只选择 manifest files 且缺文件失败；再覆盖显式 override、无 index 的冲突 shard
+  totals 拒绝，以及顺序无关的 manifest selection。^[PR #6234]
