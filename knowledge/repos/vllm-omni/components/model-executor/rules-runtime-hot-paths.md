@@ -4,13 +4,13 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048", "PR #6454", "vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py", "PR #6458"]
+sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048", "PR #6424", "PR #6454", vllm_omni/data_entry_keys.py, "vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py", "vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py", "vllm_omni/model_executor/stage_input_processors/cosyvoice3.py", "PR #6458"]
 confidence: high
 ---
 
 # 运行时热路径合同
 
-`EXEC-8a`、`EXEC-9a`、`EXEC-11a`–`EXEC-11b`：采样循环的不变量提取、固定输入缓存与掩码/精度边界，以及连续 AR 音频侧路和 codec 帧账本。触发条件与其余审查组见 [model-executor 共享规则](rules.md) 的 Direct 代码快速入口。
+`EXEC-8a`、`EXEC-9a`、`EXEC-11a`–`EXEC-11h`：采样循环的不变量提取、固定输入缓存与掩码/精度边界，以及连续 AR 音频侧路和 codec 帧账本。触发条件与其余审查组见 [model-executor 共享规则](rules.md) 的 Direct 代码快速入口。
 
 ## EXEC-8a — DiT Euler 采样循环必须只计算一次不变条件
 
@@ -66,9 +66,9 @@ confidence: high
 ## EXEC-11f — 音频 STFT 运行时窗口必须随模块迁移
 
 - 触发：模型的声码器或 HiFT 等 STFT 路径在 module `.to(...)`、多设备 stage 或 CUDA 推理中使用由 `__init__` 创建的运行时 tensor，尤其是子类绕过基类初始化时。
-- 强制：将不属于 checkpoint 的运行时 tensor 通过 `register_buffer(..., persistent=False)` 注册到实际消费它的 module，使 device/dtype 迁移覆盖所有初始化路径，并保持其与 STFT 输入同设备。
-- 禁止：把设备敏感 tensor 留作普通 attribute，依赖每次调用临时 `.to(device)` 兜底，或只修基类初始化而遗漏 causal/subclass 路径；不得把派生 window 写入 checkpoint state dict。
-- 验收：构造 CosyVoice3 `CausalHiFTGenerator`，执行 `.to(cuda)` 后断言 `stft_window.device` 与 STFT 输入一致并完成 causal inference；CPU 路径仍可运行，`persistent=False` buffer 不出现在 checkpoint state dict，并覆盖 subclass constructor。 ^[PR #6454]
+- 强制：将不属于 checkpoint 的运行时 tensor 通过 `register_buffer(..., persistent=False)` 注册到实际消费它的 module，使常规 `.to(...)` 能迁移它；STFT use site 还必须在 window 与输入设备不同时迁移并把结果保留回 buffer，因为 dummy loader 可能不调用 weight-loading hook。
+- 禁止：把设备敏感 tensor 留作普通 attribute，只在 weight-loading hook 迁移，或每次返回一个不保留的一次性 `.to(device)` 结果；不得只修基类初始化而遗漏 causal/subclass 路径，也不得把派生 window 写入 checkpoint state dict。
+- 验收：构造 CosyVoice3 `CausalHiFTGenerator`，分别覆盖 module `.to(cuda)` 与 dummy-loader 风格的首次 use-site mismatch，断言后续 `_stft/_istft` 复用同设备 buffer 并完成 causal inference；CPU 路径仍可运行，`persistent=False` buffer 不出现在 checkpoint state dict，并覆盖 subclass constructor。 ^[PR #6454] ^[PR #6424]
 
 ## EXEC-11g — MiniCPM-o Talker codec penalty 与终止预算必须在 Sampler 前后闭环
 
@@ -77,3 +77,20 @@ confidence: high
 - 禁止：把 vLLM whole-stream presence penalty 当作上游 16-frame codec penalty；让 forced EOS 被 `min_tokens` 再次屏蔽后以任意 codec id 继续解码；让无 EOS 的离线请求占满剩余上下文；用本次 simplex 修复改变 native duplex chunk 语义。
 - 验收：覆盖正负 logits、空 history、超过 16 frame 的遗忘、`no_penalties`、逐请求 penalty 与单次消费；覆盖 forced/unforced EOS、`min_tokens`、2048 上限和剩余 context clamp，并用真实长文本 TTS 检查请求在预算边界释放且无静默尾部。^[PR #6458]
 
+## EXEC-11h — CosyVoice3 sampler 与 stage handoff 必须保留有限 logits 和 typed nested payload
+
+- 触发：修改 CosyVoice3 talker sampling、RAS fallback、outer transformer config，或跨 stage 的
+  `additional_information` serializer/decoder。
+- 强制：在 request mask 与所有 logits processor 后只让 finite logits 参与 sampling；整行无
+  finite candidate 必须显式失败，RAS 为唯一合法 token 恢复时保存 clone 的 score。outer config 的
+  attention/KV-head metadata 必须与实际 nested Qwen checkpoint 一致。tensor payload 用 raw bytes、
+  recorded PyTorch dtype 与 shape round-trip，并经 shared decoder 重建 nested dotted keys，再由
+  stage processor 消费。
+- 禁止：把 NaN/±inf 变为可采样的均匀分布、从 all-`-inf` softmax 继续抽样、让 outer config
+  静默退回 query-head 数作为 KV-head 数，或以 NumPy/flat dotted-key local decoder 代替 shared typed
+  serialization。
+- 验收：覆盖 NaN/±inf、全非有限行、唯一合法 token 的 RAS fallback 和 14 query/2 KV config；BF16
+  payload 必须 bit-exact 并在 async handoff 中保留 `embed` conditioning；固定 seed 的 token 序列
+  不得被拿来与旧 `torch.multinomial` 比较。当前实现把 `+inf` 也排除，并在整行无 finite candidate
+  时从 `sample()` 抛错、可能终止整个 EngineCore；这两项是 review 接受的 follow-up 风险，不能描述成
+  per-request 隔离或通用正无穷采样语义。^[PR #6424]

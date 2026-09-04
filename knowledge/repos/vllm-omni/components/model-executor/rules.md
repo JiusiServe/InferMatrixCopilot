@@ -38,7 +38,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | `image-task-envelope` | shared image task example 或 `model_extras` prompt builder | `EXEC-6a`–`EXEC-6b`，见 [image task envelope 合同](rules-image-task-envelope.md) |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
 | `output-contract` | Omni 输出类型与字段/复制合同 | `EXEC-7a`–`EXEC-7b`，见 [输出类型合同](rules-output-contract.md) |
-| `runtime-hot-paths` | 采样循环不变量、固定输入缓存、AR 音频侧路与 codec 帧账本 | `EXEC-8a`, `EXEC-9a`, `EXEC-11a`–`EXEC-11b`，见 [运行时热路径合同](rules-runtime-hot-paths.md) |
+| `runtime-hot-paths` | 采样循环不变量、固定输入缓存、AR 音频侧路、codec 帧账本与 CosyVoice3 typed handoff | `EXEC-8a`, `EXEC-9a`, `EXEC-11a`–`EXEC-11h`，见 [运行时热路径合同](rules-runtime-hot-paths.md) |
 | `platform-backends` | NPU runner 接口、ROCm 分页注意力、NPU 模型补丁注册 | `EXEC-10a`, `EXEC-12a`–`EXEC-13a`，见 [平台后端合同](rules-platform-backends.md) |
 
 ## 严格配置校验
