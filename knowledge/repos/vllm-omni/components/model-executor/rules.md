@@ -27,7 +27,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | async Omni output、background builder、D2H snapshot、connector drain/fallback | `async-output`：`EXEC-5a` | `worker/gpu_ar_model_runner.py::{_should_use_async_omni_output,OmniAsyncGPUModelRunnerOutput}` → platform runner → connector output |
 | upstream runner/output API drift、`num_nans`、sample-budget 或 quant loader helper moved | `async-output` + output-contract | live upstream runner/output dataclasses → `gpu_{ar,generation}_model_runner.py` / `outputs/output_processor.py` → diffusion quant configs；moved symbol 必须用目标 release 的 canonical import，而非保留旧 fallback ^[PR #6606] |
 | Talker-MTP FULL graph、平台 capture 能力、显式 opt-out | `mtp-graph`：`EXEC-4c` | `platforms/interface.py::supports_talker_mtp_graph_capture` → platform override → model `talker_mtp_graph_safe` → `OmniGPUModelRunner._init_talker_mtp` |
-| `model_extras`、shared T2I/I2V example、canonical prompt envelope | `image-task-envelope`：`EXEC-6a` | `examples/offline_inference/{text_to_image/text_to_image.py,image_to_video/image_to_video.py}` → `model_extras/registry.py::{build_text_to_image_prompt,build_image_to_video_prompt}` → model pipeline validation |
+| `model_extras`、shared T2I/T2V/I2V example、canonical prompt envelope 或 video output consumer | `image-task-envelope`：`EXEC-6a`, `EXEC-6d` | `examples/offline_inference/{text_to_image/text_to_image.py,text_to_video/text_to_video.py,image_to_video/image_to_video.py}` → `model_extras/registry.py::{build_text_to_image_prompt,build_image_to_video_prompt}` → model pipeline validation |
 | CosyVoice3 non-module TensorRT CFM、stream/event ownership、raw-pointer buffer lifetime 或 context-pool reuse | [CosyVoice3 TensorRT handoff](../../models/cosyvoice3/rules.md)：`COSYVOICE3-1a` | `code2wav_core/cfm.py::ConditionalCFM.forward_estimator` → `flow_estimator_trt.py::TrtContextWrapper` |
 | Qwen3-TTS adaptive chunk、EWMA target、all-frame emit、controller cleanup | [Qwen3-TTS adaptive ramp](../../models/qwen3-tts/rules.md#q3tts-3e-adaptive-ramp-是-host-side每段-opt-in-控制器不是-cuda-graph-计划) | `stage_input_processors/qwen3_tts.py::talker2code2wav_async_chunk` → `chunk_size_utils.py::{AdaptiveChunkController,compute_adaptive_emit}` → Code2Wav |
 
@@ -40,7 +40,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | `loader-contract` | dtype、checkpoint config 获取、loader、fused shard 拼装 | `EXEC-2a`–`EXEC-2c`，见 [loader 合同](rules-loader-contract.md) |
 | `async-output` | AR async output、snapshot/live state、平台与 guard/fallback | `EXEC-5a`, `EXEC-5b` |
 | `mtp-graph` | Talker-MTP FULL graph、平台能力与 tri-state fallback | `EXEC-4c` |
-| `image-task-envelope` | shared image task example 或 `model_extras` prompt builder | `EXEC-6a`–`EXEC-6b`，见 [image task envelope 合同](rules-image-task-envelope.md) |
+| `image-task-envelope` | shared image/video task example、video output consumer 或 `model_extras` prompt builder | `EXEC-6a`–`EXEC-6d`，见 [image task envelope 合同](rules-image-task-envelope.md) |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
 | `output-contract` | Omni 输出类型与字段/复制合同 | `EXEC-7a`–`EXEC-7b`，见 [输出类型合同](rules-output-contract.md) |
 | `runtime-hot-paths` | 采样循环不变量、固定输入缓存、AR 音频侧路、codec 帧账本与 CosyVoice3 typed handoff | `EXEC-8a`, `EXEC-9a`, `EXEC-11a`–`EXEC-11h`，见 [运行时热路径合同](rules-runtime-hot-paths.md) |

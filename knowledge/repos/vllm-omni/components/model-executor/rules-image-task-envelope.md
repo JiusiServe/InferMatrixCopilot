@@ -1,16 +1,16 @@
 ---
 title: "image task envelope 合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #6049", "PR #6076", vllm_omni/model_extras/, "PR #6070", "vllm_omni/model_extras/registry.py", "PR #5614", "PR #6353"]
+sources: ["PR #6049", "PR #6076", "PR #6747", vllm_omni/model_extras/, "PR #6070", "vllm_omni/model_extras/registry.py", "PR #5614", "PR #6353", examples/offline_inference/text_to_video/text_to_video.py, examples/offline_inference/image_to_video/image_to_video.py, tests/examples/offline_inference/test_image_task_prompts.py]
 confidence: high
 ---
 
 # image task envelope 合同
 
-`image-task-envelope` 审查组的 `EXEC-6a`–`EXEC-6b`：shared image example 的 canonical envelope 与 `model_extras` 的模型专有参数声明。触发条件与其余审查组见 [model-executor 共享规则](rules.md) 的 Direct 代码快速入口。
+`image-task-envelope` 审查组的 `EXEC-6a`–`EXEC-6d`：shared image/video example 的 canonical envelope、输出 consumer 与 `model_extras` 的模型专有参数声明。触发条件与其余审查组见 [model-executor 共享规则](rules.md) 的 Direct 代码快速入口。
 
 ## EXEC-6a — shared image example 先建 canonical envelope，model-extra 只做特化变换
 
@@ -31,6 +31,13 @@ confidence: high
 - 强制：按解析后的 `model_class_name` 在 registry 中声明 `extra_body_params` 与 `output_tensor_range`，通过公开 accessor 提供；消费者按整个视频的声明合同统一转换浮点张量，未声明模型保持 `negative_one_to_one` 默认行为。
 - 禁止：把模型专有选项散落到共享 runner 的通用参数或绕过 registry；按每帧当前最小值推断范围；把已是 `[0, 1]` 的模型输出再次按 `[-1, 1]` 映射。
 - 验收：registry 测试断言目标模型的 extra-body 参数和 `zero_to_one` 范围、普通 pipeline 的默认范围；覆盖单帧与 list-valued 视频的明确范围、混合正负值的统一转换，以及最终视频导出结果。 ^[PR #6076]
+
+## EXEC-6d — shared offline video consumer 必须接受语义 video 与 legacy image 标签
+
+- 触发：修改 shared T2V/I2V offline example 的 `OmniRequestOutput.final_output_type` 校验或视频帧消费。
+- 强制：consumer 接受语义 `video` 和兼容旧 pipeline 的 `image`；继续从历史 `images` 字段取得视频帧，并对其他输出类型抛出明确错误。
+- 禁止：将 `images` frame carrier 改写为生成器、formatter、post-process 或 encoder 的输出类型合同；不得因兼容 `image` 而静默接收 `audio` 等无关 modality。
+- 验收：text-to-video 与 image-to-video 都覆盖 `video`、`image` 通过及 `audio` 拒绝；这些测试只证明 consumer contract，不证明帧生成、后处理或编码行为。^[PR #6747]
 
 相关执行流见 [model-executor architecture](architecture.md)；跨 stage 合同见 [bridge/batch 规则](rules-bridge-batch.md)。
 
