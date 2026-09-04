@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ b1da47b7`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ c6e38860`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `8d34d3b5` 本轮新增 EXEC-13d，记录 NPU diffusion 路径在真实 fused MoE runtime 中幂等注册 vllm-ascend 的 OOT `MoERunner`/`RoutedExperts` 实现，并限制注册范围以避免 diffusion 配置 shim 触发其他 Ascend 算子假设。该规则不能推断所有 Ascend custom ops、所有模型或非 NPU 平台都应采用同样注册方式。
+本次相对 `b1da47b7` 四个 inventory 均无变化；本次变更不改变 runtime registry 或支持范围。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 8d34d3b5 \
-  --to b1da47b7 \
+  --from b1da47b7 \
+  --to c6e38860 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
