@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6234", "PR #6279", "PR #6445", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, "PR #5531", "PR #4061"]
+sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6234", "PR #6279", "PR #6445", "PR #6486", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, "PR #5531", "PR #4061"]
 confidence: high
 ---
 
@@ -169,3 +169,20 @@ confidence: high
 - 验收：覆盖 local、online 与 offline-cache index resolution，断言 revision/cache/subfolder
   透传、只选择 manifest files 且缺文件失败；再覆盖显式 override、无 index 的冲突 shard
   totals 拒绝，以及顺序无关的 manifest selection。^[PR #6234]
+
+## DIFF-2z — final-layout HWR 只能接入 eligible no-AllGather DLO
+
+- 触发：修改 Diffusers loader 的 host-weight runtime selection、final-layout producer/restorer、
+  `HostWeightPlan`，或 DLO loader/backend handoff。
+- 强制：在 import、source preparation、identity/store construction 和 observer event 之前完成
+  mode/DLO/no-AllGather eligibility gate；disabled、DLO-disabled 和 AllGather 保持既有
+  checkpoint-mmap 或 ordinary-loader 路径且零 HWR interaction。eligible warm hit 必须跳过
+  ordinary DiT materialization，plan/commit 后把 exact final-layout tensors 作为 rank-local DLO
+  source；preferred miss 才 canonical load 并 post-load publish，required 对 miss 或
+  incompatible artifact fail startup，不能借 producer bootstrap。
+- 禁止：把 preferred 当成对 identity/configuration/compatibility error 的宽泛 fallback；让
+  HWR warm restore 重走 ordinary DiT loader、checkpoint mmap 或 byte-changing finalization；把
+  no-AllGather 的 rank-local staging 扩展成跨 rank collective 或 generic HWR support。
+- 验收：覆盖所有 zero-interaction gates、preferred hit/miss、required miss、mixed/dedicated
+  source rejection、warm path zero ordinary DiT materialization，以及 shared finalization 前后
+  restored tensor byte/backing-pointer equality；验证 checkpoint mmap control path 不变。^[PR #6486]

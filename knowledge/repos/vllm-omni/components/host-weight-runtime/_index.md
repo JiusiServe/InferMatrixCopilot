@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, components]
-sources: ["PR #6419", vllm_omni/host_weight_runtime/]
+sources: ["PR #6419", "PR #6486", vllm_omni/host_weight_runtime/]
 confidence: high
 ---
 
@@ -23,4 +23,4 @@ confidence: high
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| typed failure、lease/store concurrency、restore transaction | [rules](rules.md) |
+| typed failure、lease/store concurrency、single-take carrier、restore transaction | [rules](rules.md) |

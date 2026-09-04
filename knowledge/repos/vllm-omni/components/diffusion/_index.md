@@ -10,7 +10,7 @@ sources: []
 # Diffusion
 
 - 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
-- 源码校验：以上子模块均已在 `main @ 8fdb719a` 验证存在；本轮新增/扩展的
+- 源码校验：以上子模块均已在 `main @ 8360346a` 验证存在；本轮新增/扩展的
   async output、distributed layerwise offload 和 MiniMax H3 仍按各自模型/机制规则审查
 - 主要职责：多个 diffusion 模型共用的 pipeline、执行循环、scheduler 接入和运行机制
 
@@ -34,7 +34,7 @@ sources: []
 | 平台 IR-op priority、Inductor/eager 默认顺序与模型 hook 合并 | [platform runtime rules](rules-platform-runtime.md) |
 | runtime temporary 与 loader-scoped parameter dtype、shared RMSNorm accuracy | [tensor dtype rules](rules-tensor-dtype.md) |
 | Wan VAE height/width spatial reshard、empty tail、attention extent | [Wan spatial-shard rules](rules-wan-spatial-shard.md) |
-| multi-DiT、dotted `_dit_modules` 与跨 Cache-DiT/compile/LoRA/offload lifecycle | [component lifecycle rules](rules-component-lifecycle.md) |
+| multi-DiT、dotted `_dit_modules`、loader-to-offloader handoff 与跨 Cache-DiT/compile/LoRA/offload lifecycle | [component lifecycle rules](rules-component-lifecycle.md) |
 | PEFT 与 distilled LoRA、startup fusion、delta/key/alpha、Qwen/Wan transformer mapping | [LoRA rules](rules-lora.md) |
 | local FlashAttention deterministic opt-in、NPU packed mask-free/laser fallback 与 config propagation | [attention rules](rules-attention.md) |
 | SP auto-padding、`mask_sp_padding`、dense/varlen 与 advanced UAA 边界 | [SP padding rules](rules-sp-padding.md) |
@@ -47,4 +47,4 @@ sources: []
 | Cache-DiT、TeaCache 和 prefix cache | [cache acceleration](cache-acceleration.md) |
 | TP/PP/SP/CFG/VAE/HSDP 等并行策略 | [parallelism](parallelism.md) |
 | 实验性 world-model session 生命周期、LRU 与内存统计边界 | [session state](session-state.md) |
-| checkpoint remap、HSDP/FSDP、component quantization 与在线量化加载 | [checkpoint 与加载合同](rules-checkpoint-loading.md) |
+| checkpoint remap、HSDP/FSDP、final-layout HWR、component quantization 与在线量化加载 | [checkpoint 与加载合同](rules-checkpoint-loading.md) |

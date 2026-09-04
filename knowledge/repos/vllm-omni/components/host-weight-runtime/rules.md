@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components]
-sources: ["PR #6419", "PR #6445", vllm_omni/host_weight_runtime/, "PR #6427"]
+sources: ["PR #6419", "PR #6445", "PR #6486", vllm_omni/host_weight_runtime/, "PR #6427"]
 confidence: high
 ---
 
@@ -58,3 +58,17 @@ confidence: high
   post-load policy 当 cache miss。
 - 验收：plan failure 保持原 model，commit failure 后 fresh model fallback；schema/version mismatch、
   malformed artifact 和 unsupported policy 均 fail-closed。 ^[PR #6419] ^[PR #6445]
+
+## HWR-2b — cross-boundary lease handoff 必须是 process-local single-take
+
+- 触发：consumer 把 restored lease 从 loader 交给 runner/backend，或修改 carrier serialization、
+  startup cleanup、store publication hardening。
+- 强制：commit 后用 carrier 保留唯一 loader-owned open lease；transport owner 在任何 async work
+  前 `take()` 一次，随后只由 backend teardown/abort close。carrier 未被 take 时的 close 释放 lease，
+  taken/closed carrier 拒绝再次 take，且不得可序列化。filesystem artifact 在 atomic rename 后再
+  harden；harden failure quarantine artifact。
+- 禁止：复制 lease、让 loader and backend 同时 close，或在 source directory immutable 前 rename；
+  不能把 overlayfs-compatible publication 顺序改回 rename 前只读目录。
+- 验收：验证 duplicate take、serialization、loader-side abort、backend-side teardown、enable failure
+  cleanup 与 closed lease rejection；filesystem test 覆盖 writable staging → atomic rename → read-only
+  artifact，以及 hardening failure quarantine。^[PR #6486]

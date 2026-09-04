@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5720", "PR #5853", "PR #5884", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072"]
+sources: ["PR #5720", "PR #5853", "PR #5884", "PR #6486", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/offloader/startup.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072"]
 confidence: high
 ---
 
@@ -94,3 +94,17 @@ residency 留在模型 owner。规则入口与其他共享机制仍见 [Diffusio
 - 禁止：以可调用属性探测替代 protocol、只依赖 generic forward hook 管理 direct VAE call、在没有 activation/release scope 时直接调用 hooked component，或在启停失败后遗留部分 hooks 与设备状态。
 - 验收：CPU/mock 覆盖 protocol pipeline 与普通 pipeline、真实 discovery 的 DiT/stage 列表、初始 DiT CPU residency、direct component activation failure 的 finally cleanup，以及 enable/disable 后所有 hook 清理；真实 accelerator 的性能与完整模型显存结论仍需独立验证。^[PR #6072]
 
+### DIFF-12a — loader-to-offloader startup handoff 必须单次消费并事务性回收
+
+- 触发：loader 产生 backend-owned state、runner/offloader startup boundary，或 backend enable/
+  initial-prefetch failure cleanup。
+- 强制：loader 把 process-local startup state 附在 loaded pipeline 上，runner 只调用 generic
+  enable boundary；该 boundary 必须 take-and-remove state exactly once。backend enable 从 hook/
+  staging/lease acquisition 到 initial prefetch 失败时先 quiesce and disable，再关闭仍属 loader 的
+  state；已提交 final-layout restore 在 preferred mode 只能以 fresh canonical model retry，required
+  mode 必须传播失败。
+- 禁止：让 runner 解释 HWR policy 或重复 transfer plan；复用 commit 后的 disposable model；在
+  async work、partial hooks 或 staging 仍存活时释放 lease，或让 retry 再次 lookup/publish/mmap。
+- 验收：覆盖 absent/taken startup state、backend construction/enable/prefetch failure、single fresh
+  retry 与 required no-retry；断言 partial backend disable、carrier/lease close、fresh path bypasses
+  HWR and checkpoint mmap。^[PR #6486]

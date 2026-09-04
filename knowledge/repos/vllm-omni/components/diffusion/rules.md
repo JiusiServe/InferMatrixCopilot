@@ -23,12 +23,13 @@ confidence: high
 | CUDA Graph、compile、fused solver/norm/RoPE、FA determinism、eager parity、tensor dtype/device、async output/teardown | `execution-parity`：`DIFF-1a`–`1j` | `compile.py::regionally_compile` → shared layer/backend → model denoise/output pump/shutdown |
 | seed、request-local generator、guidance=0、并发 RNG、batched generators | `execution-parity`：`DIFF-1b` | `inputs/data.py::OmniDiffusionSamplingParams` → runner `_initialize_generator` → request-batch generator collate |
 | ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `diffusers_loader.py::{_get_checkpoint_adapter,load_weights}` → `modelopt.py::{_resolve_target_and_output_names,adapt}` |
-| host-weight artifact、source identity、layout/dtype、warm restore | `checkpoint-distributed`：`DIFF-2d` | `model_loader/host_weights/{source_identity,contracts,identity_adapter}.py` → policy/restorer |
+| host-weight artifact、source identity、layout/dtype、warm restore、no-AllGather DLO selection | `checkpoint-distributed`：`DIFF-2d`, `DIFF-2z` | `model_loader/host_weight_loader.py::_resolve_hwr` → `model_loader/host_weights/{source_identity,contracts,identity_adapter}.py` → policy/restorer |
 | HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → loader `_load_model_with_hsdp` → `hsdp_fp8.py` |
 | distributed layerwise offload、AllGather、异构 block、shared buffer | `checkpoint-distributed`：`DIFF-2e` | `offloader/distributed_layerwise_backend.py::{DistributedLayerwiseOffloadHook.initialize_hook,prefetch_layer,DistributedLayerwiseOffloadBackend._allocate_shared_buffers}` |
 | DLO+AllGather、DP wave、result queue、shutdown、constructor cleanup | `checkpoint-distributed`/`execution-parity`：`DIFF-2k`, `DIFF-1d/1g/1h/1j` | request compatibility key → multi-rank RPC → worker-owned queue/pump → bounded teardown |
 | component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `quantization/factory.py::{build_quant_config,resolve_quant_config_from_disk}` → `component_config.py::ComponentQuantizationConfig.resolve` → `data.py::_propagate_quantization_from_tf_config` → component linear consumer |
 | modular/multi-DiT、`_dit_modules`、request-scoped Cache-DiT/compile/SP/LoRA/offload lifecycle | `checkpoint-distributed`：`DIFF-2f`–`2j` | request batch key → model policy/cache runtime；pipeline component list → shared consumers |
+| loader-owned offload plan、backend enable/prefetch failure、fresh canonical retry | `checkpoint-distributed`：`DIFF-12a` | `offloader/startup.py` → `offloader/__init__.py::enable_offload_backend` → runner |
 | LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
 | Wan VAE spatial shard、gather/trim/reshard、empty tail、attention extent | `distributed-vae`：`DIFF-3b` | `distributed/autoencoders/wan_spatial_shard.py` → patched decoder attention/conv → gather final frame |
 | paged KV/cache、backend/platform、GQA/layout、Ring/Ulysses、FlashInfer quant、预算与 admission | `system-runtime`：`DIFF-4a`–`4j` | engine init → metadata/config → attention parallel/backend → platform hook → scheduler/serving |
@@ -38,7 +39,7 @@ confidence: high
 |---|---|---|
 | `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d`, `DIFF-1e` |
 | `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、FA determinism、async output/shutdown | `DIFF-1a`–`1j` |
-| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT/cache lifecycle | `DIFF-2a`–`2e`, `2p`, `2q`, `2s`, `2y` 见 [checkpoint 与加载合同](rules-checkpoint-loading.md)；`2f`–`2j`, `2r`, `2w` 见 [component lifecycle](rules-component-lifecycle.md)；`2k` 见 [output/runtime](rules-output-lifecycle.md)；`2l`–`2o`, `2x` 见 [LoRA](rules-lora.md) |
+| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT/cache lifecycle | `DIFF-2a`–`2e`, `2p`, `2q`, `2s`, `2y`, `2z` 见 [checkpoint 与加载合同](rules-checkpoint-loading.md)；`2f`–`2j`, `2r`, `2w`, `12a` 见 [component lifecycle](rules-component-lifecycle.md)；`2k` 见 [output/runtime](rules-output-lifecycle.md)；`2l`–`2o`, `2x` 见 [LoRA](rules-lora.md) |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
 | `distributed-vae` | Wan VAE spatial height/width shard、rank context、extent/padding | `DIFF-3b` |
 | `system-runtime` | cache/预算、native/backend/platform、attention layout、能力 metadata、异常与并发 | `DIFF-4a`–`4j`（`4a`–`4i` 见 [paged cache 与系统运行时规则](rules-system-runtime.md)） |

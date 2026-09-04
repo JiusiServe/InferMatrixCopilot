@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5706", "PR #5737", "PR #5824", vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, "PR #5910", "PR #6213", "PR #6445"]
+sources: ["PR #5706", "PR #5737", "PR #5824", vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, "PR #5910", "PR #6213", "PR #6445", "PR #6486"]
 confidence: high
 ---
 
@@ -68,3 +68,7 @@ load 完成时 dynamic quantize，text encoder、VAE 和非 eligible projection 
 - 禁止：用 dtype 字符串代替版本化 model ABI；遗漏 persistent buffer 或模型要求保留的 FP32 parameter/buffer；把 contract 声明或 validator 存在误认为 loader 已启用、DLO 已接入或 artifact 已具备跨拓扑性能保证。
 - 验收：contract test 断言 `vllm-omni.diffusion.final-layout-tensors-v1`、`minimax-h3-dit`、版本与 validator；reduced MiniMax H3 真实 ownership 同时覆盖 BF16 tensor、模型要求的 FP32 tensor 和 persistent buffer，并在 one-shot restore commit 后执行 validator；另以 exact identity、tensor coverage 与 source-change guard 覆盖失败时不变更模型。^[PR #6445]
 
+H3 的该 contract 当前只为 BF16 no-AllGather DLO final-layout consumer 接通：artifact identity
+区分 TP rank/size 与 SP layout，等价 DP replicas 才共享；TP/SP/layout/model revision 改变时必须以
+`preferred` 重新产生 artifact，`required` 只消费 exact hit。它不扩大 direct checkpoint mmap、
+online quantization 或 AllGather 的支持范围。^[PR #6486]
