@@ -206,6 +206,17 @@ collection 意图；没有实际 runtime 结果时，不能证明目标硬件行
   workload，而不是声称 perf 是 functional superset。^[PR #6079]
   ^[PR #5402] ^[PR #5845]
 
+- Qwen3-Omni Async Chunk 的一个 perf JSON 可以承载多个 top-level case；`mark` 是按 case
+  附着的，CI 即使使用 `--test-config-file` 也必须用硬件和 scheduling marker 过滤。CUDA nightly
+  选择 `H100 and full_model and not slow`，weekly 选择 `H100 and slow`；A3/NPU 保持独立
+  `npu` 选择。不要把没有 A3 实测值的 H100 baseline 留在 A3-only case：该 case 在重新测量前
+  只能 collect/run，不能伪装成 A3 阈值。减少 workload 后同样必须移除失效 baseline，待重新测量。
+  清理单例 E2E 前要按输入/输出合同检查 suite-level owner：本轮 default text+audio perf 与
+  streaming audio-only 由 multi-replica suite 保留，Async Chunk text-only 仍保留；不支持的
+  chat output `audio.format`（如 `aac`）则迁至 weekly invalid-parameter HTTP case，断言 400 和
+  supported-format 提示。纯文本五并发的 reduced-token 配置独立覆盖 batching，不能因删除相邻
+  audio-only case 而丢失。^[PR #6570]
+
 ## OMNI-CI-3b — patched upstream benchmark 必须保持参数与 output subtype 兼容
 
 - 触发：upstream `benchmarks/serve.py` 增参，或 Omni 聚合字段只存在于扩展 output subtype。
