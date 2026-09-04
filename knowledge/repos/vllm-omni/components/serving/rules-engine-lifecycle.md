@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346"]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6084", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/messages.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py", "PR #6346"]
 confidence: high
 ---
 
@@ -134,6 +134,27 @@ confidence: high
 - 强制：adapter 初始化时一次性加载 `TTSCapabilities` 快照；静态模型能力归 adapter，`supported_speakers` 与 `supported_languages` 使用 `frozenset`，`precomputed_speakers` 保存 profile metadata，server 只拥有 `uploaded_speakers`，可用 speakers 由两者并集派生且上传集合独立维护。
 - 禁止：让 server 保存或修改静态能力；把上传 voice 合并进 built-in speaker 集合后在删除时 `discard`，或把 frozen dataclass 误解为内部 profile mapping 的深层不可变；在共享 serving 中恢复 model-type capability 分支。
 - 验收：构造相关 adapter，断言能力在初始化后进入 snapshot、集合类型正确且内置/预计算/上传 voice 的并集完整；删除与 built-in 同名的上传 voice 后内置 voice 仍存在，并验证无 adapter 的 diffusion 路径不会触发 adapter 属性错误或专属维度校验。^[PR #6138]
+
+### SERV-5m — AR lifecycle 控制必须先封锁 admission，并以 backend 完成信号收尾
+
+- 触发：修改 `AsyncOmni` 的 pause/resume、sleep/wake 或 abort，或改变
+  `StagePool.collective_rpc` 到 AR EngineCore / diffusion worker 的控制面路由。
+- 强制：在 sleep drain/offload 前设置 frontend admission gate；AR stage 经 orchestrator
+  路由到 EngineCore 的 `pause_scheduler`、`resume_scheduler`、`sleep`、`wake_up`，diffusion
+  stage 继续走 worker sleep/wake RPC。`wake_up()` 不得替 AR/mixed engine 解除 admission，只有
+  `resume_generation()` 可以解除；已 paused 时的定向 pause 和 cache clear 仍须执行。stage ID
+  必须先校验范围。只允许这四个已知 EngineCore helper 使用 `*_async` fast path，并保持 caller
+  timeout；其余 RPC 仍走 collective path。需要 frontend cleanup 的 abort 必须关联 result，等待
+  orchestrator 完成 stage abort、binding release 和 request cleanup 后才移除 frontend state，失败或
+  timeout 必须保留 state 并传播。
+- 禁止：以单一 frontend flag 代替 AR scheduler 控制；在 sleep RPC 后才阻止 `generate()`；让
+  wake 隐式 resume；因已 paused 跳过不同 stage scope 或 cache reset；将任意同名 `*_async` helper
+  绕过 collective timeout；在 abort ack 前 pop request state，或将 abort failure 当成功。
+- 验收：覆盖 AR-only、diffusion-only 和 mixed stage 路由；sleep 进行时 generation 等待，AR
+  sleep → wake 后仍需显式 resume，而 diffusion-only sleep → wake 可恢复 admission；重复/定向
+  pause 仍调用 scheduler 与 cache clear，非法 stage ID 产生明确错误，fast path 仅命中四个方法且
+  timeout 生效；abort success 后才清理 frontend state，orchestrator error 与 timeout 时 state 保留。
+  ^[PR #6084]
 
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 
