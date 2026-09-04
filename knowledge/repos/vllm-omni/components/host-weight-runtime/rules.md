@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components]
-sources: ["PR #6419", "PR #6445", "PR #6486", vllm_omni/host_weight_runtime/, "PR #6427"]
+sources: ["PR #6419", "PR #6445", "PR #6486", "PR #6591", vllm_omni/host_weight_runtime/, "PR #6427"]
 confidence: high
 ---
 
@@ -18,6 +18,7 @@ confidence: high
 |---|---|---|
 | typed outcome、preferred/required、producer、timeout | `HWR-1a` | `runtime.py` → `outcomes.py`/`errors.py` → store/writer |
 | lease/lock、fork、deny、cleanup、filesystem locality | `HWR-1b` | `lease.py` → `filesystem/{locks,store,writer}.py` |
+| ordered producer、write-time digest、fsync/READY ordering | `HWR-1d` | `protocols.py` → `filesystem/writer.py` |
 | plan/commit、manifest/schema、fallback model | `HWR-2a` | `protocols.py`/`manifest.py` → consumer restorer |
 
 ## HWR-1a — fallback 只消费显式 retryable typed outcome
@@ -48,6 +49,19 @@ confidence: high
 - 禁止：让 `POST_LOAD_ONLY` producer 进入 pre-load `resolve()`；绕过 runtime 直接调用 store；恢复、rebind 或修改当前启动使用的 canonical model；让 post-load failure 改写已完成的 canonical-fallback resolution。
 - 验收：验证 policy-disabled/runtime-disabled 不运行 producer，pre-load 不调用 post-load producer，成功 publication 关闭 lease 且后续 `resolve()` 命中；验证 publication failure、`JOINED`、unexpected store status 和 observer 回调均产生正确的独立 typed report。 ^[PR #6427]
 
+## HWR-1d — publication 优化不得越过 digest 与 durability barrier
+
+- 触发：producer 增加 `ordered` 声明，或修改 payload write、checksum、`fsync`、manifest/`READY`
+  publication 顺序。
+- 强制：只有按 canonical storage-key order 发出 payload 的 producer 才可声明 `ordered=True`，由 writer
+  在写入时计算 file/tensor SHA256，并将已关闭 payload 的 `fsync` 与后续 producer work 重叠；未声明
+  ordered 的 producer 必须保留并行 readback checksum。两条路径都须等待全部 payload digest 与
+  `fsync` 完成后才能发布 manifest 和 `READY`。
+- 禁止：用 write-time hash 跳过 durable completion；在 payload future 未完成时暴露 ready artifact；
+  把 producer 顺序提示写进 artifact identity，或让 unordered output 复用 ordered fast path。
+- 验收：覆盖 ordered write-time digest、unordered parallel readback、payload `fsync` failure、digest
+  mismatch 与 publication barrier，断言失败不产生可命中的 `READY` artifact。^[PR #6591]
+
 ## HWR-2a — restore 是 validation-only plan 加一次性 commit
 
 - 触发：manifest/schema、producer/restorer identity 或模型 hydration 变化。
@@ -72,3 +86,18 @@ confidence: high
 - 验收：验证 duplicate take、serialization、loader-side abort、backend-side teardown、enable failure
   cleanup 与 closed lease rejection；filesystem test 覆盖 writable staging → atomic rename → read-only
   artifact，以及 hardening failure quarantine。^[PR #6486]
+
+## HWR-2c — registered mapping 的 ownership 必须晚于 CUDA、早于 lease close
+
+- 触发：为 immutable HWR mmap 增加/修改 CUDA 或其他 platform host registration、direct H2D、
+  registration budget 或 teardown。
+- 强制：transport owner 对完整 page-aligned mapping 先做 capability/budget preflight，再原子地注册；
+  partial failure 必须 reverse rollback。clean rollback 是 transport unavailable，不改变 HWR identity 或
+  artifact outcome；rollback/unregister 留有 live range 则保留 registration 和 open lease 以便 retry，
+  且跨 backend GC/fresh retry 仍保持强引用。正常 teardown 必须先停止使用这些 source、unregister every
+  range，最后 close lease。
+- 禁止：为 registered/staged transport 生成不同 artifact identity；budget/capability miss 后部分启用
+  direct H2D；在 CUDA 仍注册时 close/finalize lease；将 clean registration failure 升级成 required-HWR
+  artifact miss。
+- 验收：覆盖 capability/budget gate、mid-registration rollback、PyTorch pinned-source verification、
+  unregister retry 与 retained-owner GC，并断言 successful direct path 无 private staging allocation。^[PR #6591]

@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6234", "PR #6279", "PR #6445", "PR #6486", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #4061"]
+sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6234", "PR #6279", "PR #6445", "PR #6486", "PR #6591", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #4061"]
 confidence: high
 ---
 
@@ -78,6 +78,9 @@ confidence: high
   位置的内容寻址仓库，才可用 blob 名代替内容哈希，其他本地文件和 symlink 必须按内容定身份。
 - 禁止：因 symlink 目标名看似 40/64 位十六进制就假设不可变；把 `bf16`、具体 layout 或首个
   producer 名写进共享 identity/restorer API；用进程内 inode/mtime guard 代替跨启动身份校验。
+- 强制：node-local canonical-source digest cache 只能是 metadata-validated 的哈希工作复用；路径、
+  inode、size、timestamp、symlink target 或 cache-record checksum 任一不符即重算，cache I/O/coordination
+  失败也必须直接哈希 canonical source。它不改变 identity 内容、artifact selection 或 fallback policy。
 - 验收：第二种 synthetic representation 复用共享 identity/restorer；任意本地十六进制命名
   symlink 在同大小内容被替换后产生不同 identity；合法 Hub snapshot→blob 拓扑仍走受控快捷路径。
   ^[PR #6445]
@@ -191,9 +194,17 @@ confidence: high
   ordinary DiT materialization，plan/commit 后把 exact final-layout tensors 作为 rank-local DLO
   source；preferred miss 才 canonical load 并 post-load publish，required 对 miss 或
   incompatible artifact fail startup，不能借 producer bootstrap。
+- 强制：eligible warm HWR hit 的 registered transport 只在 `pin_cpu_memory` 开启时尝试，先对完整
+  page-aligned mapped ranges 做 read-only capability 与可选 per-worker budget preflight；成功后直接从
+  immutable final-layout mmap copy 到既有 HBM buffers，且不分配 private staging。unsupported、budget
+  exceeded 或已完整 rollback 的 registration failure 必须回到既有两槽 bounded staging；AllGather、
+  checkpoint mmap 和全部 zero-interaction gates 不得尝试 registration。该路径不减少 H2D payload，
+  也不是 GPU 直接访问 host memory。
 - 禁止：把 preferred 当成对 identity/configuration/compatibility error 的宽泛 fallback；让
   HWR warm restore 重走 ordinary DiT loader、checkpoint mmap 或 byte-changing finalization；把
   no-AllGather 的 rank-local staging 扩展成跨 rank collective 或 generic HWR support。
 - 验收：覆盖所有 zero-interaction gates、preferred hit/miss、required miss、mixed/dedicated
   source rejection、warm path zero ordinary DiT materialization，以及 shared finalization 前后
-  restored tensor byte/backing-pointer equality；验证 checkpoint mmap control path 不变。^[PR #6486]
+  restored tensor byte/backing-pointer equality；验证 checkpoint mmap control path 不变。另覆盖 registration
+  capability/budget/pin-memory gates、partial registration rollback、direct/staged transfer parity、没有
+  staging allocation 的成功路径，以及 teardown 前 unregister。^[PR #6486] ^[PR #6591]

@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5720", "PR #5853", "PR #5884", "PR #6486", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/offloader/startup.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072"]
+sources: ["PR #5720", "PR #5853", "PR #5884", "PR #6486", "PR #6591", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/offloader/startup.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072"]
 confidence: high
 ---
 
@@ -102,9 +102,13 @@ residency 留在模型 owner。规则入口与其他共享机制仍见 [Diffusio
   enable boundary；该 boundary 必须 take-and-remove state exactly once。backend enable 从 hook/
   staging/lease acquisition 到 initial prefetch 失败时先 quiesce and disable，再关闭仍属 loader 的
   state；已提交 final-layout restore 在 preferred mode 只能以 fresh canonical model retry，required
-  mode 必须传播失败。
+  mode 必须传播失败。worker shutdown 必须在 destroy distributed state 前 disable offloader；registered
+  HWR mmap teardown 先 drain/release source references、unregister all ranges，再 close lease。若 unregister
+  失败，保留 registration 与 open lease（跨 fresh retry/backend GC 亦然）供 retry 或 process exit，不能
+  让 finalizer unmap CUDA 仍持有的页面。
 - 禁止：让 runner 解释 HWR policy 或重复 transfer plan；复用 commit 后的 disposable model；在
   async work、partial hooks 或 staging 仍存活时释放 lease，或让 retry 再次 lookup/publish/mmap。
 - 验收：覆盖 absent/taken startup state、backend construction/enable/prefetch failure、single fresh
   retry 与 required no-retry；断言 partial backend disable、carrier/lease close、fresh path bypasses
-  HWR and checkpoint mmap。^[PR #6486]
+  HWR and checkpoint mmap；另注入 unregistration failure，断言 retryable retention、backend drop 和
+  distributed teardown ordering。^[PR #6486] ^[PR #6591]
