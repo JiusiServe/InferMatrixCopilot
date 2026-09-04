@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #5976", "PR #5957", vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, "PR #5036", "PR #6642", "PR #6773", vllm_omni/config/endpoint_policy.py]
+sources: ["PR #5976", "PR #5957", vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, tests/config/test_endpoint_policy.py, "PR #5036", "PR #6642", "PR #6773", "PR #6707", vllm_omni/config/endpoint_policy.py]
 confidence: high
 ---
 
@@ -41,14 +41,17 @@ confidence: high
 - 禁止：维护与 vLLM streamer 分离的本地 scheme allowlist；将对象存储 URI 当作 HF repo id 下载；让 bucket 或组织路径段参与模型名称匹配。
 - 验收：参数化 mock 测试覆盖 `s3://`、`gs://` 及上游支持的 `az://`，断言 HF 下载未调用且返回值未改变；同时覆盖本地路径、HF repo id 和欺骗性 bucket/组织段匹配，确认入口语义没有回归。resolved HF cache snapshot 的 repo-name recovery 已随 #6642 的 revert 不再是当前合同。^[PR #5036] ^[PR #6642]
 
-## SERV-7d — upstream error-response helper 必须按能力边界兼容两种布局
+## SERV-7d — error-response import 必须遵循各 caller 的已验证 owner
 
 - 触发：pinned vLLM 移动 `create_error_response`，或 endpoint policy / API server 增加直接 caller。
-- 强制：两个 caller 都先从新版 package owner `vllm.entrypoints.serve` 导入；只有该 import 抛
-  `ImportError` 时才回退旧布局 `vllm.entrypoints.serve.utils.error_response`。两处必须保持同一顺序，
-  使 endpoint rejection 与 engine error 都继续产生 upstream structured response。
-- 禁止：捕获任意 `Exception` 后伪装成版本兼容；在不同 caller 固定不同路径；因 import 成功就宣称
-  跨版本 API/JSON parity。该 shim 只覆盖这一个 symbol 的两种已知位置。
-- 验收：分别在仅提供新版 re-export、仅提供旧 module、两者都缺失的 import fixture 下加载两个
-  caller，并验证 400/error response shape。PR #6773 没有新增自动化回归或硬件执行证据；其 diff
-  只证明双 caller 的 import fallback，不能扩展为完整 vLLM 版本兼容声明。^[PR #6773]
+- 强制：`endpoint_policy.py` 直接从 pinned owner
+  `vllm.entrypoints.serve.exception_handling.error_response` 导入 `create_error_response`，不设 fallback；
+  `api_server.py` 则先从 package root `vllm.entrypoints.serve` 导入，只在 `ImportError` 时回退
+  `vllm.entrypoints.serve.utils.error_response`。这是两个 caller 各自的 source-authoritative 合同，
+  不要求共享 fallback 顺序。
+- 禁止：把 endpoint-policy 的直接模块 import 改回 package-root fallback；捕获任意 `Exception` 伪装
+  成兼容；或以这两个 import 成功声称跨版本 API/JSON parity。
+- 验收：在此 pinned revision，直接导入 relocated module，并运行
+  `tests/config/test_endpoint_policy.py`；API-server 路径仍仅为其 `ImportError` fallback 的静态合同。
+  PR 描述报告该 suite `4 passed`，批准 review 的边界是 static review、merge tree 与 CI，且明确未执行
+  untrusted fork code；因此不能扩展为完整 vLLM 版本兼容或端到端声明。^[PR #6707, merged 2026-09-02]
