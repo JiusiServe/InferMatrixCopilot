@@ -1,10 +1,10 @@
 ---
 title: "Serving 规则"
 created: 2026-07-20
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["Issue #5369", "PR #3576", "PR #4583", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", "Issue #5811", "PR #6150", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", .pre-commit-config.yaml, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py, "PR #4795", "PR #4755", "PR #3805", "PR #5878", "PR #6070", "PR #6122", "PR #4499", "PR #6050", "PR #6329", "PR #5999", "PR #5445", "PR #6288"]
+sources: ["Issue #5369", "PR #3576", "PR #4583", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", "Issue #5811", "PR #6150", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", .pre-commit-config.yaml, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_api_server_guards.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py, "PR #4795", "PR #4755", "PR #3805", "PR #5878", "PR #6070", "PR #6122", "PR #4499", "PR #6050", "PR #6329", "PR #5999", "PR #5445", "PR #6288", "PR #6622"]
 confidence: high
 ---
 
@@ -238,6 +238,20 @@ confidence: high
   locator 建无界共享 side table；把完整 base64/路径写日志。
 - 验收：同长度覆盖、并发改写、named+inline、speaker cache 和 prefix hit 均不复用旧内容；
   非法路径不 stat，日志只含截断值且命中真实 logger hierarchy。 ^[PR #5670]
+
+### SERV-3d — pure-diffusion speech 必须在 factory 固化 media policy
+
+- 触发：pure-diffusion speech 绕过普通 `OpenAIServing` 初始化，或修改 `ref_audio` 的
+  `MediaConnector`、local-media allowlist 或 factory 参数。
+- 强制：app bootstrap 将 `allowed_local_media_path` 和 `allowed_media_domains` 原样传给
+  speech factory；diffusion instance 在 factory 中创建并持有按该配置构造的 connector，且其
+  local cache-key stat 使用同一 allowed path。普通 multi-stage instance 仅在首次需要时从
+  `model_config` 构造 connector，不能要求 diffusion instance 拥有 `model_config`。
+- 禁止：diffusion 分支以无配置 connector 加载本地 `file:` URI；只把 allowlist 传到
+  `MediaConnector` 而遗漏 cache-key metadata gate；每次解析重新构造 connector 并漂移策略。
+- 验收：pure-diffusion bootstrap 断言两个 media 参数到达 speech factory；在 allowlisted
+  本地 ref-audio 上断言 connector 只按该配置创建一次，文件 size/mtime 改变后 cache miss 并
+  refetch；普通 multi-stage 路径仍从 `model_config` 延迟构造。 ^[PR #6622]
 
 ### SERV-11a — 用户输入日志必须默认降级并受限输出
 
