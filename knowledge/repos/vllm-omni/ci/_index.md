@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, ci]
-sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md]
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544"]
 ---
 
 # vLLM-Omni CI
@@ -24,6 +24,14 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
   `BadRequestError`、`param="response_format"` 和 `json_schema` 缺失提示；不要把
   vLLM 内部 validator 的 Pydantic `value_error` token 当成该接口合同。该断言曾因
   上游错误映射改为 `BadRequestError` 而导致 weekly CI 失败。^[PR #6290 / issue #6248]
+
+## AutoRound MXFP4 coverage boundary
+
+- Wan AutoRound MXFP4 has a CPU-marked configuration/layer-mapping test and a full-model
+  diffusion E2E test gated to XPU B60. The latter uses an environment-overridable model ID,
+  runs a minimal 256×256 five-frame, one-step request, and checks response success, frame
+  shape, and nonzero variance. It is an offline inference smoke, not online-serving, FLUX,
+  CUDA, or general backend coverage. ^[PR #5544]
 
 ## 目录内容
 

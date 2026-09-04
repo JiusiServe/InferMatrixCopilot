@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6234", "PR #6279", "PR #6445", "PR #6486", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, "PR #5531", "PR #4061"]
+sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6234", "PR #6279", "PR #6445", "PR #6486", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #4061"]
 confidence: high
 ---
 
@@ -50,6 +50,12 @@ confidence: high
 - 强制：`ComponentQuantizationConfig.resolve()` 只对 `get_quant_method` 收到的 runtime prefix 做
   longest-prefix match，未命中才落到 default；它不会自动感知 checkpoint `WeightsMapper`。
   因此 mapper、pipeline 与 layer 必须显式维持同一 namespace，并测试重叠 prefix 的最长匹配。
+- 强制：离线 AutoRound checkpoint 若 `config.json` 以 `data_type="mx_fp"` 声明 MXFP，
+  `resolve_quant_config_from_disk()` 必须用 checkpoint 的 `bits`（或现有 config 的
+  `weight_bits` fallback）重建量化 config，使 4-bit 与 8-bit 路径都由真实位宽选择；不能把
+  这种 metadata 当作只有 serialized flag 才会触发的 online/default config。Wan runtime
+  prefix 的 `block_name_to_quantize=["blocks"]` 必须只命中 `blocks.*` 的 linear，并保留
+  `condition_embedder.*` 等范围外层未量化。
 - 禁止：半途裁掉 owner prefix；resolve component 后又要求 ignored layer 带 owner；用一个
   组件配置隐式覆盖其他组件；因为同属一个模型就量化全部 linear。
 - 验收：至少覆盖“只量化一个组件、其他组件保持 BF16”的真实构造与加载，逐层断言
@@ -58,6 +64,11 @@ confidence: high
   [MiniMax H3 规则](../../models/minimax-h3/rules.md)；新增 quantization×offload 组合需给兼容矩阵，
   未验证 quantizer fail-closed，并核对 dtype/shape/stride。 ^[PR #5136] ^[PR #5737]
   ^[PR #6279]
+  对 AutoRound MXFP4，构造 Wan config 后用 runtime `WanTransformer3DModel` 配置量化层，断言
+  packed mapping identity、`blocks.*` 的 MXFP4 method dispatch 与范围外 non-quantized control；
+  再以 XPU B60 的 Wan2.1 离线 T2V smoke 验证成功响应、5×256×256 帧形状和非零帧方差。
+  这只证明 PR #5544 的离线 Wan2.1/XPU case；PR body 提到的 FLUX.1-dev 示例及任何 online/
+  serving/backend 兼容性均未由合入 diff 的测试覆盖，不得扩展为支持声明。^[PR #5544]
 
 ## DIFF-2d — Artifact identity 只信任已验证的不可变来源
 

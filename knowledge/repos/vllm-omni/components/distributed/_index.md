@@ -1,7 +1,7 @@
 ---
 title: "Distributed（跨 stage 通信与数据搬运）"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, components, distributed]
 sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coordinator/, docs/design/feature/disaggregated_inference.md]
@@ -14,7 +14,7 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
   `vllm_omni/distributed/omni_coordinator/`（协调器与 load balancer）
 - 知识面另覆盖跨 stage ZMQ 路由/端口分配（`vllm_omni/engine/stage_engine_startup.py::OmniMasterServer`）
   ——组件划分服务知识归属，与 manifest 运行时粒度不同
-- 源码校验：以上路径与下列锚点均已在 `main @ 683f3c92` 验证存在：
+- 源码校验：以上路径与下列锚点均已在 `main @ 0d5d1115` 验证存在：
   `OmniConnectorBase`（connectors/base.py:12）、`OmniKVTransferManager`
   （kv_transfer_manager.py:341）、`LoadBalancer` 三实现（load_balancer.py:39/64/74/102）、
   `OmniMasterServer._allocate_route_locked`（stage_engine_startup.py:254）
