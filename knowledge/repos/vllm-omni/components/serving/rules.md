@@ -28,6 +28,7 @@ confidence: high
 | serving class/factory 重构、optional adapter、diffusion/no-TTS 实例、warmup | `engine-lifecycle`：`SERV-5c` | `entrypoints/openai/serving_speech.py` 的所有 factory/`__new__` 路径 → `warmup`、voice upload/list、speech request caller |
 | TTS model detection、`stage_keys`/`model_archs`、adapter priority/topology、legacy migration | `engine-lifecycle`：`SERV-5e` | `tts_adapters/__init__.py::{iter_tts_detectors,detect_tts_model_type,all_tts_stage_keys,tts_entry_stage_archs}` → `serving_speech.py::_find_tts_stage` |
 | request-level LoRA、AR-only/multistage、streaming input update、stage cardinality | `request-contract`：`SERV-4l` | `serving_chat.py` LoRA resolve → `AsyncOmni.generate` → `AsyncOmniEngine._build_add_request_message` → stage-0 input processor |
+| caller sampling params、pipeline `sampling_constraints`、stage config runtime extraction | `request-contract`：`SERV-4o` | `OmniBase.resolve_sampling_params_list` → `_get_sampling_constraints_list` → `_apply_sampling_constraints` |
 | SSE/streaming speech、audio format、PCM/WAV、speed、首 chunk 前校验 | `streaming-format`：`SERV-1a`, `SERV-1b` | `vllm_omni/entrypoints/openai/protocol/audio.py::{OpenAICreateSpeechRequest.validate_streaming_constraints,StreamingSpeechSessionConfig.validate_streaming_constraints}` → `serving_speech.py::{OmniOpenAIServingSpeech._validate_speech_streaming_request,OmniOpenAIServingSpeech.create_speech}` |
 | video reference 解码、mixed media、frame conversion/mux、bounded memory | `media-ingress`：`SERV-1c`–`1e` | `entrypoints/openai/video_api_utils.py` decode/coerce/encode helpers → video server callers |
 | `ref_audio`、x-vector/ICL、content identity、artifact cache/readiness | `artifact-readiness`：`SERV-3a`–`3c` | `serving_speech.py` reference resolve/decode/cache → adapter speaker cache → prefix salt |
@@ -44,7 +45,7 @@ confidence: high
 | `endpoint-capability` | endpoint restriction、route/app-state guard、公开 400 | `SERV-4c`, `SERV-4d` 见 [请求输入合同](rules-request-input.md)；`SERV-5d` 本页 |
 | `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission、factory 状态矩阵、TTS adapter detection、replica fault isolation | `SERV-5a`–`SERV-5e`（见 [engine 生命周期规则](rules-engine-lifecycle.md)）, `SERV-5f` |
 | `full-duplex` | duplex opt-in、stage prewarm/fence、async-chunk、CFG companion lifecycle | `SERV-6a`–`SERV-6d`（见 [engine 生命周期规则](rules-engine-lifecycle.md)） |
-| `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`–`4h`, `SERV-4l`–`4m`，全部见 [请求输入合同](rules-request-input.md) |
+| `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view、stage sampling constraints | `SERV-4a`–`4h`, `SERV-4l`–`4o`，全部见 [请求输入合同](rules-request-input.md) |
 | `batch-chat-contract` | frontend fan-out、identity、choice cardinality、error/cancellation | `SERV-4i`–`4k`，见 [batch chat rules](rules-batch-chat.md) |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
 

@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -25,6 +25,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | composable strategy、axis、routing、load balancing、`strategy-config` | `composable-strategy`：`CONF-4a` | `vllm_omni/config/composable_parallel/strategy_loader.py::{parse_strategy_specs,load_strategy_specs}` → `translator.py::translate_strategy_stack` → `apply.py::apply_strategy_specs` → `config_factory.py::{StageConfigFactory._apply_strategy_specs,StageConfigFactory._reconcile_strategy_with_cli}` |
 | `gpu_memory_utilization`、`kv_cache_memory_bytes`、多 stage 共卡、小显存 OOM | `deploy-memory`：`CONF-1a`, `CONF-2a` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/omni_config.py::{_build_runtime_config,_build_parallel_config,VllmOmniConfig.from_pipeline_config}` |
 | multi-stage HF sub-config、stage quantization view、`hf_config_name` | `stage-model-config`：`VOMNI-CFG-1i` | pipeline stage declaration → `OmniModelConfig::{draw_hf_text_config,get_model_arch_config}` → vLLM quantization selection |
+| pipeline `sampling_constraints`、`StageConfig.to_omegaconf()`、runtime stage config | `stage-config-propagation`：`VOMNI-CFG-1o` | `merge_pipeline_deploy` → `StageConfig.to_omegaconf()` → `engine.stage_configs` |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
@@ -34,6 +35,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | `deploy-topology` | deploy、overlay、headless、topology wiring | `CONF-3a`–`3d`；`CONF-4b` 见 [并行拓扑合同](rules-parallel-topology.md)；`CONF-5a`–`5g` 见 [topology 与部署 profile](rules-topology-profiles.md) |
 | `composable-strategy` | strategy axis、routing、load balancing | `CONF-4a`, `CONF-4c`–`4d`，见 [并行拓扑合同](rules-parallel-topology.md) |
 | `stage-model-config` | HF nested config、stage-specific quantization/text config | `VOMNI-CFG-1i` |
+| `stage-config-propagation` | pipeline sampling constraints、StageConfig serialization/runtime config | `VOMNI-CFG-1o` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `VOMNI-CFG-0a`, `VOMNI-CFG-0b` |
 
 ## 配置归一化与新老路径一致性
@@ -117,6 +119,13 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：省略值必须以 `None` 贯穿 `OmniDiffusionConfig`、`_DiffusionConfigProjection` 和 async stage config，由 `DiffusionExecutor.get_class()` 按 `num_gpus` 解析为单 GPU 的 `uni`、多 GPU 的 `mp`；显式 `mp` 或 `uni` 必须保持调用方选择。
 - 禁止：在配置 projection 或 `AsyncOmniEngine` 中把省略值预先改成 `"mp"`，把 `None` 当作显式 backend，或用 truthiness 合并吞掉显式 backend；不能以文档或原始 YAML 值代替最终 stage config 的传播证明。
 - 验收：direct、structured 和 async 路径均断言 omitted 值在最终 stage config 仍为 `None`；覆盖单 GPU→`UniProcDiffusionExecutor`、多 GPU→`MultiprocDiffusionExecutor`、显式 `mp` 和显式 `uni`，并确认已 pin `mp` 的 deploy 配置不变。 ^[PR #6308]
+
+### VOMNI-CFG-1o — pipeline sampling constraints 必须穿过 stage runtime 配置
+
+- 触发：新增或修改 pipeline 的 `sampling_constraints`、`StageConfig` 字段、deploy 合并或 dataclass→OmegaConf runtime 转换。
+- 强制：每个 stage 的 resolved `sampling_constraints` 必须从 `merge_pipeline_deploy()` 复制到 `StageConfig`，并由 `to_omegaconf()` 导出为可在 `engine.stage_configs` 读取的原生 mapping；不得与默认 sampling params 混为唯一保存位置。
+- 禁止：只在 dataclass 或默认 params 上保留约束、让 OmegaConf runtime config 静默丢字段，或以测试直接注入 constraints list 代替真实序列化路径。
+- 验收：从 pipeline/deploy 合并走到 `StageConfig.to_omegaconf()` 和 runtime extraction，断言每 stage 的非默认 constraint 可读回；再由 serving 侧验证它到最终 sampling consumer 的效果。^[PR #6182]
 
 ### CONF-1a — 多 stage 共卡时 diffusion stage 必须显式设 gpu_memory_utilization
 
@@ -220,4 +229,3 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：将 registry 所需的静态 `PipelineConfig` 放入无 runtime 副作用的轻量模块；registry 只导入该模块，runtime pipeline 继续 re-export 同一对象以保持既有导入路径，并用干净子进程验证 registry 解析不加载 runtime。
 - 禁止：让 `pipeline_registry` eager import 模型 runtime、依赖已预加载模块或导入顺序掩盖循环；不得因拓扑模块轻量就改变模型 runtime 的实际加载语义。
 - 验收：隔离进程中导入并解析目标 registry key，断言对应 runtime module 不在 `sys.modules` 且返回的 `PipelineConfig` 身份与字段正确；再验证 runtime 的兼容导入路径仍 re-export 同一拓扑对象。^[PR #6322]
-

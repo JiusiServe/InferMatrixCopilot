@@ -4,13 +4,13 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3805", "PR #5374", vllm_omni/entrypoints/openai/, vllm_omni/inputs/, "PR #5181"]
+sources: ["PR #3805", "PR #5374", vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/inputs/, tests/entrypoints/test_omni_entrypoints.py, "PR #5181", "PR #6182"]
 confidence: high
 ---
 
 # 请求输入合同
 
-`SERV-4a`–`SERV-4m`：公开请求字段的校验、限界与 owner。触发条件与其余审查组见 [Serving 共享规则](rules.md) 的 Direct 代码快速入口。
+`SERV-4a`–`SERV-4o`：公开请求字段的校验、限界与 owner。触发条件与其余审查组见 [Serving 共享规则](rules.md) 的 Direct 代码快速入口。
 
 ## SERV-4a — 公开字段由 serving 显式拥有
 
@@ -118,3 +118,9 @@ engine 生命周期见 [engine 生命周期规则](rules-engine-lifecycle.md)；
 - 禁止：用 truthiness 判断 `num_cached_tokens` 而丢弃零值；只在一种响应模式填充详情；丢弃 `multimodal_tokens` 或以不同逻辑分别构造两种 usage；将该响应合同混同为 Prometheus 指标合同。
 - 验收：分别覆盖 streaming 与 non-streaming、`cached_tokens=0` 及非零值、image/audio 多模态计数和详情开关关闭场景，断言响应字段一致、计数准确且关闭时不产生详情。^[PR #5181]
 
+## SERV-4o — pipeline sampling constraints 必须在 caller 参数上重建并优先
+
+- 触发：修改 `OmniBase.resolve_sampling_params_list()`、stage runtime config、pipeline `sampling_constraints`，或让 caller 提供单/多 stage sampling params。
+- 强制：从每个 runtime stage config 取得约束并与同 stage caller params 合并；pipeline-required key 覆盖 caller 冲突值，其他 caller fields 保留。对 mapping 复制合并；对 dataclass/msgspec sampling object 以合并值重建，使 constructor/post-init 重新计算 stop-token 等 derived state，且 caller/default object 保持不变。
+- 禁止：caller 提供 params 时整包替换 pipeline constraints；只从 dataclass 而不是实际 OmegaConf runtime config 读取；对已构造 `SamplingParams` setattr/copy 后跳过 derived-state 更新，或静默以 caller 值赢得 pipeline-required field。
+- 验收：真实 stage config conversion 覆盖单与多 stage、normal caller field、pipeline-required `detokenize`/stop token conflict、derived stop-token state 及 caller immutability；默认 params 与无约束 control 保持既有行为。^[PR #6182]
