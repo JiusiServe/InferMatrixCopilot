@@ -1,10 +1,10 @@
 ---
 title: "Qwen3-TTS 规则"
 created: 2026-07-20
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, serving, qwen-omni]
-sources: ["PR #5157", "PR #5202", "PR #5608", vllm_omni/deploy/aura_omni.yaml, vllm_omni/deploy/qwen3_tts.yaml, vllm_omni/deploy/qwen3_tts_high_concurrency.yaml, vllm_omni/model_executor/models/aura_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_code2wav.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_incremental_decode.py, tests/model_executor/stage_input_processors/test_qwen3_tts_async_chunk.py]
+sources: ["PR #5157", "PR #5202", "PR #5608", vllm_omni/deploy/aura_omni.yaml, vllm_omni/deploy/qwen3_tts.yaml, vllm_omni/deploy/qwen3_tts_high_concurrency.yaml, vllm_omni/model_executor/models/aura_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_code2wav.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_incremental_decode.py, tests/model_executor/stage_input_processors/test_qwen3_tts_async_chunk.py, "PR #5048"]
 confidence: high
 ---
 
@@ -147,3 +147,10 @@ confidence: high
 
 共享 readiness/错误隔离规则见 [Serving rules](../../components/serving/rules.md)；
 Qwen 家族入口见 [Qwen-Omni](../qwen-omni/_index.md)。
+
+## Q3TTS-4a — silence codec ban 必须按 checkpoint 词表和 x-vector-only mode 生效
+
+- 触发：修改 Qwen3-TTS Base voice-clone 的 leading silence 行为、`silence_ban_frames`、talker codec mask 或 x-vector/ICL mode resolution。
+- 强制：默认 `silence_ban_frames=0`；加载 checkpoint 后通过 `_encode_ref_audio_batch` 编码多种静音样本并只收集 codebook-0 ids，词表为空、越界或明显过大时记录 warning、清空启用值并禁用功能。decode 时只对 Base 的 x-vector-only request 在前 N 个 history steps 屏蔽派生 ids；mode resolution 必须与 prompt builder 一致，`voice_clone_prompt.icl_mode` 覆盖和未记录 mode 都要正确处理。
+- 禁止：硬编码当前 checkpoint 的 12 个 token、把 mask 施加到 ICL 或非 Base 请求、对不可信派生词表只做部分 masking，或把经验值 `N=3` 当成跨 checkpoint 的固定最优参数。
+- 验收：覆盖默认关闭、有效派生、空/越界/ oversized 派生和 encoder failure；覆盖 step 边界、mixed x-vector/ICL batch、ICL 与非目标请求保持未修改，以及实际 stage 配置能到达 talker。^[PR #5048]

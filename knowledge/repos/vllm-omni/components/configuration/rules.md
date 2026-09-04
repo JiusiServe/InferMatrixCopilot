@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -103,6 +103,13 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：只有语义、配置归属、生命周期和 EngineArgs projection 均一致时才复用 upstream contract；继承的公开 structured config 必须 keyword-only，`stage.compilation_config` 与 `stage.profiler_config` 使用具体 upstream 类型并在构造期物化 mapping；保留 Omni 自有字段、延迟的 model/platform/rank/port/backend 初始化和显式 projection 边界。
 - 禁止：用字段同名替代语义与 owner 审计；让 positional constructor 因 upstream 字段重排而静默改变含义；把继承字段的默认值当作显式 engine input；在 head process 执行终态初始化，或让 quantization 等未审计边界随 upstream contract 自动扩张。
 - 验收：覆盖 keyword-only 签名与 positional rejection、mapping 到具体 upstream object、预构造 object 的类型保留、scheduler/parallel 传输安全 derived fields 及 msgpack/asdict registration；用非默认字段证明最终 EngineArgs projection，且默认值不泄漏、未归属字段明确失败，legacy 与 structured 结果保持一致。 ^[PR #6050]
+
+### VOMNI-CFG-1m — 模型专用 stage 开关必须经 typed projection 且默认关闭
+
+- 触发：为某一模型新增控制推理行为的 stage/deploy 字段，并让 deploy、CLI、structured 或 direct factory 可设置。
+- 强制：把字段放在 `StageDeployConfig`、`OmniEngineArgs`、`OmniModelConfig`/`OmniStageModelConfig` 与 `_ModelEngineOverrides` 的同一 canonical projection；默认关闭（本例 `silence_ban_frames=0`），从最终 stage config 传到唯一模型 consumer，并同步更新 structured/legacy known-field inventory。
+- 禁止：用未注册 env var 或模型初始化时自行读取绕过配置 owner；只在 YAML/dataclass 声明但在 engine args 或最终 stage 丢失；把模型专用字段变成所有 talker 的通用行为，或把 absent 当成显式启用。
+- 验收：用 direct、structured、legacy 入口的非默认值追到最终 stage config 和真实模型 consumer；断言默认值保持关闭、其他模型不产生副作用，并覆盖字段集合与 projection parity。^[PR #5048]
 
 ### CONF-1a — 多 stage 共卡时 diffusion stage 必须显式设 gpu_memory_utilization
 

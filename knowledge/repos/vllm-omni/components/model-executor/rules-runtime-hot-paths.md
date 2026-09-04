@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py"]
+sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048"]
 confidence: high
 ---
 
@@ -55,4 +55,11 @@ confidence: high
 - 强制：`model.sample()` 返回非 `None` 时直接采用；返回 `None` 必须回退默认 sampler 并通过 `warning_once` 保持可见；prompt padding 必须 clamp 到 `logits_vocab`，保留 upstream 的 padding bin 语义；新增 declarer 必须经过精确 assignment inventory 同意。
 - 禁止：把合法的 `None` fallback 当作采样失败、无日志静默吞掉意外 fallthrough，或 clamp 到 `logits_vocab - 1` 使 padding 被计作最后一个真实 token。
 - 验收：覆盖真实 declarer 的 None/非 None sampler、重复调用仅一次 warning、inventory 增删、padding 对 penalty mask 无影响，以及较窄 logits vocab 下未 clamp 会失败的边界。 ^[PR #5452]
+
+## EXEC-11e — 逐请求 logits mask 必须由 live history 与 batch identity 守住窗口
+
+- 触发：`compute_logits` 或 logits processor 按 request 的 sampling metadata 对前 N 个 decode step 施加 mask、penalty 或其他逐请求覆盖。
+- 强制：启用行为时请求并保留 `output_token_ids`；decode step 必须取每个 request 的 live history 长度，窗口严格使用 `step < N`，并按同一 batch 顺序结合 request mode；history 不得由独立 counter 代替，以保证 preemption/resume 不会重新触发窗口。metadata 或 req_id 长度不匹配、未分类 mode 和无法建立一行一请求映射时必须 warning 并 fail closed；没有早期目标行时跳过 device mask 分配。
+- 禁止：把 mask 应用于整个 batch、假定普通采样总会填充 history、用本地 counter 在恢复后重启 ban，或在 spec decode 的多行映射下按位置读取 mode；不得静默吞掉形状不一致而继续按错误 request masking。
+- 验收：覆盖默认关闭、step `0..N-1`、`step >= N`、mixed-step/mixed-mode batch、ICL/未记录 mode、缺失或空 `output_token_ids`、history/req_id mismatch、warning 去重与 preemption history 保留；确认无早期目标时不产生热路径 device allocation。^[PR #5048]
 

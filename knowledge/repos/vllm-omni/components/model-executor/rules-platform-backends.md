@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py"]
+sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048"]
 confidence: high
 ---
 
@@ -32,6 +32,13 @@ confidence: high
 - 强制：在 `vllm_omni/platforms/xpu/utils.py::torch_cuda_wrapper()` 中集中把 CUDA-facing API 映射到 XPU；`current_stream`、`default_stream`、`stream`、`set_stream`、`set_device` 使用 `partial`，`Stream` 映射为 `torch.xpu.Stream`，`Event` 忽略 CUDA 专属 `blocking` 参数后构造 `torch.xpu.Event`；仅在 `supports_xpu_graph()` 为真时映射 graph、`CUDAGraph`、pool 和 capture 状态接口。
 - 禁止：为适配 XPU 修改共享 `gpu_ar_model_runner.py`，或只映射 stream 而遗漏 `set_stream`、`set_device`、event 与受支持的 graph 接口；不得让通用 `torch.Stream.wait_event()` 接收不兼容的专用事件类型，也不得在不支持 XPU graph 时无条件安装 graph shim。
 - 验收：XPU 平台测试进入 wrapper 后断言异步 runner 所需的 stream、event、device 和 graph 调用均路由到对应 XPU API，且不支持 graph 时保持禁用；Qwen3-TTS 等 AR-stage warm-up 与完整异步输出 smoke 在 XPU 上成功完成，同时 CUDA 路径和共享 runner 行为保持不变。^[PR #5569]
+
+## EXEC-10d — GPU/NPU AR runner 必须镜像逐请求 logits metadata handoff
+
+- 触发：AR 模型在 logits 计算中需要 runner 提供按 request 的 req_id 或其他逐请求 metadata，且 GPU 与 NPU 有独立的 execute/logits 路径。
+- 强制：GPU/NPU runner 都必须在 `flush_pending_metadata` 后，以 logits 行顺序调用可选的 `set_batch_req_ids(req_ids[:num_reqs])`；仅在 `spec_decode_metadata is None` 时建立一行对应一个 request 的映射，并允许没有该 hook 的模型无操作通过。
+- 禁止：只在 GPU 路径接入、在 metadata flush 前调用、把 padding/dummy request 传入 batch，或在 spec decode 的多行 request 映射下继续按位置记录 req_id。
+- 验收：GPU 与 NPU 的测试分别断言 hook 的调用顺序、参数和 `num_reqs` 截断；覆盖无 hook 模型、mixed batch 与 spec decode，证明错误映射不会进入模型 logits mask。^[PR #5048]
 
 ## EXEC-12a — ROCm 分页注意力必须走 packed KV 的兼容 varlen 路径
 
