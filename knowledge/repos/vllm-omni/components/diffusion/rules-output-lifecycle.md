@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5550", "PR #5864", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6288"]
+sources: ["PR #5550", "PR #5864", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6288", "PR #6308"]
 confidence: high
 ---
 
@@ -115,3 +115,10 @@ confidence: high
 - 强制：`mux_av_video_audio_bytes()` 必须在 context manager 内打开并配置 MP4 video/audio streams，消费 `Iterable[av.VideoFrame]` 后 flush video encoder；音频按 `fltp` 和 mono/stereo layout 构造，并以 `pts=0`、`time_base=1/sample_rate` 标记输入时间零点。成功和 generator、encoder、mux 异常都必须退出 context 关闭 container，同时原样传播原始错误。
 - 禁止：在 generator 消费前或 context 外打开/使用 container；只在成功路径手工 close；吞掉帧生成或编码异常后静默改走其他 muxer；把 mock container cleanup 或单一 CPU 运行误认为完整跨硬件 A/V parity。
 - 验收：测试覆盖预构造 `gbrp` 帧的 H.264 mux、无音频/mono/stereo 音频、AAC 首个有效 packet 的负 priming PTS、video flush 和 container close；让 frame generator 在中途抛错并断言 container 已关闭且异常 identity 保持，再用固定媒体输入执行 ffprobe 与完整 FFmpeg 解码。^[PR #6288]
+
+## DIFF-11a — 单 GPU diffusion executor 必须保持进程内故障与生命周期语义
+
+- 触发：新增或修改单 GPU diffusion executor、inline worker RPC、设备故障处理或 executor shutdown 生命周期。
+- 强制：单 GPU 的 `uni` 路径必须在 engine 进程内构造并驱动 `WorkerWrapperBase`，仍初始化一个 rank 的 distributed environment，但不得创建 worker subprocess、`MessageQueue` 或 IPC 输出段；`collective_rpc` 直接调用 worker，保留 reply-rank 的返回形状，recoverable request error 留在请求级，sticky accelerator fault 必须 latch executor failure、只触发一次 failure callback，并让 `check_health()` 抛出 `EngineDeadError`。
+- 禁止：单 GPU 默认继续走 `mp`，多 GPU 选择 `uni`，把 inline `timeout` 描述成可强制的 RPC deadline，或把所有 worker exception 都升级为 engine death；设备上下文已中毒后不得继续报告健康，也不得让部分构造失败或重复 shutdown 遗留 worker、callback、缓存或 device allocation。
+- 验收：覆盖 omitted/显式 backend/多 GPU 的选择矩阵、直接 RPC 与返回形状、recoverable error、CUDA/NPU sticky fault、callback once、health failure、部分构造 cleanup 和幂等 shutdown；真实单 GPU smoke 还须验证一 rank group、`InlineStageDiffusionClient`、真实 `DiffusionOutput` 流程、worker shutdown，以及固定 seed 下与 pinned `mp` 的输出一致性，mock 不能替代这些证据。 ^[PR #6308]

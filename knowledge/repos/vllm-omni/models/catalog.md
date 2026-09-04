@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 72ee535f`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ b39f599b`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `c2daa471` 本轮新增配置、共享 diffusion、HunyuanImage3 与 model-executor 平台规则，分别记录 paged_scheduler 行上限、Worker 物理页与 Scheduler 逻辑分配的边界、H3 GQA 压缩以及 CUDA/NPU platform hook。不能由这些规则推断跨 stage KV transport、W2 prefix cache、真实 HunyuanImage3 E2E、NPU 硬件 parity 或一般模型/平台生产支持。
+本次相对 `72ee535f` 本轮新增两条可复用合同：diffusion 单 GPU 的进程内 executor 生命周期，以及 omitted `distributed_executor_backend` 必须保留到运行时按设备数解析。文档、测试改动和 serving 中仅承担该配置透传的实现细节未单独沉淀为规则，也不能据此推断所有硬件上的性能或生产级支持。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from c2daa471 \
-  --to 72ee535f \
+  --from 72ee535f \
+  --to b39f599b \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
