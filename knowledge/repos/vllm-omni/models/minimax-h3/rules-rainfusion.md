@@ -4,7 +4,7 @@ created: 2026-09-05
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5706", "PR #6000", "PR #6518", vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py]
+sources: ["PR #5706", "PR #6000", "PR #6037", "PR #6518", vllm_omni/diffusion/attention/backends/abstract.py, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py]
 confidence: high
 ---
 
@@ -31,6 +31,13 @@ confidence: high
 - 禁止：把 nominal sparsity 当 realized sparsity 或质量保证；未声明 layout 时不能让 sparse path 假设
   BSND 而 dense fallback 解释成 BNSD。INT8、RainFusion、no-AllGather DLO 可组合，但 online quantization
   不得与 DLO+AllGather 组合；本 PR 没有证明 HSDP 或其他 quantizer 的组合语义。
+- 强制：`end_step` 使 denoise 形成 dense→sparse→dense：当 `end_step>0` 且
+  `step_idx >= total_steps-end_step` 时保持 dense；`end_step=0` 不启用 tail fallback。serial 与处于
+  同一 progress point 的 homogeneous batch 必须发布 `(step, sigma, total_steps)`，请求结束后清空三者。
+  heterogeneous batch 发布 `(None,None,None)`；目标实现没有单独用缺失 progress 阻断 sparse plan，
+  因而不能把该状态宣称为已证明的 dense fallback。`precision` 只接受 `bf16|fp8|mix`，默认
+  `bf16`；non-BF16 只有在 MindIE-SD `sparse_attention` 的显式 signature 含 `precision` 时才可启用，
+  不能信任会吞掉未知 kwargs 的旧实现。^[PR #6037]
 - 验收：CPU plan tests 覆盖 aligned/irregular 均进 sparse plan、tail closure、min length、layout 和
   skip/step；NPU 条件数值测试以 `sparsity=0` 直接调用 kernel 对 dense reference，mean relative error
   阈值为 `2e-3`；它不证明 `sparsity=0.8` 质量 parity。PR #6518 的 CPU tests 覆盖 Ref2VA multi-span
