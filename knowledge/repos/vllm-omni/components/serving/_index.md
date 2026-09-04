@@ -10,7 +10,7 @@ sources: []
 # Serving
 
 - 主要源码入口：`vllm_omni/entrypoints/`（cli、openai、openpi 及 omni/async_omni 入口）和 `vllm_omni/engine/`（orchestrator、stage engine core、stage pool/runtime、output processor）
-- 源码校验：以上路径均已在 `main @ a65e89cb` 验证存在
+- 源码校验：以上路径均已在 `main @ 49c6fc15` 验证存在
 - 主要职责：用户入口、请求解析、在线服务和 engine 边界
 
 ## 什么时候查这里
@@ -39,3 +39,4 @@ sources: []
 | assembled FastAPI route 覆盖、method/path ownership 或 request-body forwarding | [app assembly 规则](rules-app-assembly.md) |
 | stage config→EngineArgs projection、explicit `devices`、TP/local-DP/PP、replica layout 或 worker 创建前的 layout guard | [stage 启动与设备布局规则](rules-stage-startup.md) |
 | 公开请求字段的校验、来源冲突、alias/extras 归一与 consumer view | [请求输入合同](rules-request-input.md) |
+| speech 输出采样率 capability、resample、streaming header/flush | [speech 输出规则](rules-speech-output.md) |

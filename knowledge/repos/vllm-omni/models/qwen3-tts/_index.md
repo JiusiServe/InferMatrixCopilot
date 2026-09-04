@@ -4,11 +4,14 @@ created: 2026-07-20
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, serving, qwen-omni]
-sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/platforms/npu/models/qwen3_tts_tokenizer_v2.py, vllm_omni/platforms/npu/layers/rotary_embedding.py]
+sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", "PR #6553", vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/tts_adapters/qwen3_tts.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/platforms/npu/models/qwen3_tts_tokenizer_v2.py, vllm_omni/platforms/npu/layers/rotary_embedding.py]
 confidence: high
 ---
 
 # Qwen3-TTS
+
+- Public `sample_rate` 只接受 adapter 声明的 24 kHz native 或 8 kHz server-resampled output；
+  streaming 状态/header/flush 边界见 [SERV-9b](../../components/serving/rules-speech-output.md#serv-9b-speech-sample_rate-必须由-adapter-capability-限定)。^[PR #6553]
 
 ## 名称与范围
 
