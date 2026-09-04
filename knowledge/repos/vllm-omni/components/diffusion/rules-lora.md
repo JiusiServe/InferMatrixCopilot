@@ -66,6 +66,10 @@ confidence: high
   alpha 与 unknown key；真实 smoke 另需固定 adapter、模型 revision、sampling 参数与输出比较。
   当前 CPU evidence 使用 TP=1 `nn.Linear`；图片/视频附件是人工示例，没有 TP/HSDP/量化、
   自动质量阈值或性能测量，不能作为持续 correctness gate。^[PR #2783]
+- 模型例外：SenseNova-U1.5 distilled adapter 是 startup-only exactly-one-file one-way fusion；它以
+  suffix/exact kohya mapping、fp32 delta 与 parameter `weight_loader` 做 TP sharding，zero-match fail，
+  成功只留 sentinel，partial fuse 失败 abort/reload，不适用本规则的 unload/reversible contract。见
+  [SENSENOVA-1a](../../models/sensenova-u1/rules.md#sensenova-1a-u15-distilled-lora-是启动期单文件单向融合)。^[PR #6516]
 
 ## DIFF-2n — Wan 多文件必须逐位置绑定 architecture-declared transformer
 

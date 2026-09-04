@@ -70,6 +70,9 @@ confidence: high
   却继续 dense；直接换用 upstream backend 丢失 Omni 能力。
 - 验收：unsupported platform/backend fail-fast；CUDA/NPU 对应 lane 和正式模型 E2E 证明
   resolved backend；mixed-mask piecewise/SP 回归通过。 ^[PR #5543] ^[PR #6102]
+- SenseNova-U1 paged AR decode 是 model-local, single-sequence CUDA fallback/capture，不是本规则的
+  scheduler-owned paged backend；其 eligibility、growth、sleep 与 dynamic-PEFT veto 见
+  [SENSENOVA-1b](../../models/sensenova-u1/rules.md#sensenova-1b-paged-ar-decode-是单序列模型本地-cuda-opt-in)。^[PR #6516]
 
 ## DIFF-4f — paged attention metadata 不从 padding 猜逻辑布局
 
