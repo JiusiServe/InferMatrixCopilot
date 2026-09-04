@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #6701", "PR #6571", docs/models/supported_models.md, recipes/Boogu/Boogu-Image.md, vllm_omni/diffusion/models/boogu_image/, vllm_omni/entrypoints/utils.py]
+sources: ["PR #6701", "PR #6571", "PR #6786", docs/models/supported_models.md, recipes/Boogu/Boogu-Image.md, vllm_omni/diffusion/models/boogu_image/, vllm_omni/entrypoints/utils.py]
 confidence: high
 ---
 
@@ -51,4 +51,4 @@ confidence: high
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| revision/component loader、Edit-Turbo checkpoint 或 real RoPE/platform selection | [Boogu rules](rules.md) |
+| revision/component loader、Edit-Turbo checkpoint、real RoPE/platform selection，或 Edit CFG branch/rank/VAE decode 合同 | [Boogu rules](rules.md#boogu-1c-edit-cfg-分支rank-分派与-vae-decode-必须保持语义闭合) |

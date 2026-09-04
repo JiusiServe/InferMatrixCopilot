@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", "PR #6814", "PR #6563", "PR #5716", vllm_omni/diffusion/attention/, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/attention/parallel/ring_kernels.py, vllm_omni/diffusion/diffusion_kv/, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/npu/platform.py, tests/diffusion/diffusion_kv/, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_ulysses_uaa.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
+sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", "PR #6814", "PR #6563", "PR #5716", "PR #6786", vllm_omni/diffusion/attention/, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/attention/parallel/ring_kernels.py, vllm_omni/diffusion/diffusion_kv/, vllm_omni/diffusion/distributed/cfg_parallel.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/npu/platform.py, tests/diffusion/diffusion_kv/, tests/diffusion/distributed/test_cfg_parallel.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_ulysses_uaa.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
 confidence: high
 ---
 
@@ -92,6 +92,19 @@ confidence: high
 - 强制：默认关闭；只在 `ulysses_degree > 1`、strict Ulysses 的正向 `(scatter,gather)=(2,1)` 与反向 `(1,2)` layout 启用，并在 worker/model 初始化时 JIT build/capability failure 直接 fail-at-init。advanced-UAA 保持其 `_ulysses_all_to_all_any_*` path；AllGather 不选择 Ulysses；strict Ulysses+Ring 的 Ulysses leg 仍可使用该 path。每个 `(device, process-group)` 只有一个单 CUDA stream 的 grow-only byte workspace；首次分配及增长必须是 collective、在增长前同步，容量内以 typed byte-slice view 复用；graph capture 中禁止增长，须先 warm up 最大 shape；worker shutdown 同步并释放 workspace。Fast Ulysses QKV staging 只有 input/output 同一 CUDA device、同一 dtype、input rank-3、shape 相同、output contiguous，且 inner row `stride(2)==1`、`stride(1)==size(2)`、outer stride 不小于一整 row（无 overlap）时，才可在 `CUDAGuard(input.device())` 与 current CUDA stream 上用 `cudaMemcpy2DAsync`。^[PR #6714] ^[PR #6814]
 - 禁止：把 flag 当作默认 transport、静默 fallback；按历史 shape/dtype 无界缓存 allocation；跨 stream 重用 staging buffer；capture 中隐式分配/扩容；把任意 strided tensor 当作 copy-engine eligible，或把 CPU/mock workspace 测试、PR benchmark 写成数学/输出 parity、普遍速度或跨硬件收益。
 - 验收：覆盖 CLI/deploy/default-stage 的显式 flag 透传与默认 false、eligible strict path 的 init build、UAA/AllGather/noneligible layout 不调用该 path、strict Ulysses+Ring 的 eligible Ulysses leg、peak workspace 复用/collective growth、capture growth fail、single-stream reject 与 shutdown release；copy op 必须拒绝 device/dtype/rank/shape/output-contiguity/inner-row/overlap 不匹配。当前没有新增 upstream unit；仅 B300 上 row-strided BF16 bitwise copy、四-rank forward/reverse parity 和四-GPU H3 smoke 证据，不能外推为一般硬件或性能结论。^[PR #6340] ^[PR #6814]
+
+## DIFF-4y — CFG parallel state 未初始化时串行，初始化错误必须可见
+
+- 触发：修改 `cfg_parallel`、CFG process-group 初始化/查询、正负 guidance branch 的 rank
+  分派，或其 runner 调用链。
+- 强制：CFG parallel state 未初始化时，所有 rank 必须走 serial-1 路径；state 已初始化后，
+  group 查询、world-size/rank 或 collective 的错误必须原样传播，不能将错误降级成 serial。
+  已初始化 group 的 two-branch 与 N-branch 路径都必须按该 group 的 rank/world-size 分派，不能
+  以默认 global parallel state 猜测 CFG 拓扑。
+- 禁止：把“group 不存在”和已初始化 group 的查询/通信失败混为同一 fallback；只实现 two-branch
+  而让 N-branch 静默串行、重复或遗漏 branch；在调用方吞掉初始化后的错误。
+- 验收：以 mock/distributed test 覆盖未初始化 → serial-1、已初始化 group 的错误传播、two-branch
+  rank 分派与 N-branch rank 分派；测试只证明这些 CFG state/path 合同，不外推为多节点吞吐或模型质量。^[PR #6786]
 
 ## DIFF-4g — Ring GQA 只在通信后扩展，Hybrid Ulysses 不把 padding 当真 head
 
