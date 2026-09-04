@@ -1,10 +1,10 @@
 ---
 title: "Host Weight Runtime 规则"
 created: 2026-08-23
-updated: 2026-08-23
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components]
-sources: ["PR #6419", "PR #6445", vllm_omni/host_weight_runtime/]
+sources: ["PR #6419", "PR #6445", vllm_omni/host_weight_runtime/, "PR #6427"]
 confidence: high
 ---
 
@@ -40,6 +40,13 @@ confidence: high
   mount 静默满足 local backend。
 - 验收：线程 close、fork、open-vs-deny race、orphan deny 和 remote/unknown filesystem 回归分别
   证明锁、状态和 typed result；cleanup 不移除活跃 mapping。 ^[PR #6419]
+
+## HWR-1c — post-load publication 只温热未来启动
+
+- 触发：canonical model 完成加载后需要通过 `POST_LOAD_ONLY` producer 显式温热缺失的 host artifact。
+- 强制：调用同步 `publish_after_load()`，由 runtime 统一执行 store policy；`allow_post_load_publish` 与 pre-load 的 `allow_local_build` 独立控制；成功取得的 validated lease 必须在返回前关闭，并通过独立 publication report 反馈 `PUBLISHED`、`ALREADY_PRESENT` 或 `JOINED`。
+- 禁止：让 `POST_LOAD_ONLY` producer 进入 pre-load `resolve()`；绕过 runtime 直接调用 store；恢复、rebind 或修改当前启动使用的 canonical model；让 post-load failure 改写已完成的 canonical-fallback resolution。
+- 验收：验证 policy-disabled/runtime-disabled 不运行 producer，pre-load 不调用 post-load producer，成功 publication 关闭 lease 且后续 `resolve()` 命中；验证 publication failure、`JOINED`、unexpected store status 和 observer 回调均产生正确的独立 typed report。 ^[PR #6427]
 
 ## HWR-2a — restore 是 validation-only plan 加一次性 commit
 
