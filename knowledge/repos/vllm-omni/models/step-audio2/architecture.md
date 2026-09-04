@@ -1,15 +1,15 @@
 ---
 title: "Step-Audio2 架构"
 created: 2026-07-21
-updated: 2026-09-02
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models]
-sources: ["PR #5067", "PR #5638", "PR #5869", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vllm_omni/model_executor/models/step_audio2/step_audio2_token2wav.py, vllm_omni/model_executor/models/step_audio2/step_audio2_dit_trt.py, vllm_omni/model_executor/models/step_audio2/step_audio2_constants.py, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py]
+sources: ["PR #5067", "PR #5638", "PR #5869", "PR #5917", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vllm_omni/model_executor/models/step_audio2/step_audio2_token2wav.py, vllm_omni/model_executor/models/step_audio2/step_audio2_dit_trt.py, vllm_omni/model_executor/models/step_audio2/step_audio2_constants.py, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py, tests/model_executor/models/step_audio2/test_step_audio2_token2wav_async_chunk.py]
 ---
 
 # Step-Audio2 架构
 
-事实在 `main @ 12a5f6fb` 复核;变体/入口速览见 [index](_index.md)，
+事实在 `main @ bfe8967c` 复核;变体/入口速览见 [index](_index.md)，
 设备边界与同步验收见 [rules](rules.md)。
 
 ## 模型专有部分与共享模块的边界
@@ -61,9 +61,12 @@ sources: ["PR #5067", "PR #5638", "PR #5869", vllm_omni/model_executor/models/co
    3 个 lookahead 被刻意重发给下一块（conformer 编码器需要未来 token,内部
    缓存）;末块发送全部剩余 token,纯文本完成发空 EOF 载荷。与 higgs/mimo 的
    左上下文滑窗是不同机制。
-3. **跨家族陷阱**：本家族 payload meta 的 `left_context_size` 被复用为
-   "是否末块"布尔（0/1）,**不是重叠帧数**——读 connector 元数据的共享代码
-   勿按 higgs/mimo 语义解释。
+3. **跨家族陷阱**：本家族由 runtime additional-information 条目的嵌套
+   `meta.left_context_size` 识别 async-chunk；只要该值存在（包括非末块的
+   `0`）就进入 token2wav 流式路径。它复用为"是否末块"布尔（`0/1`），
+   **不是重叠帧数**；`1` 传给 core 作为 `last_chunk`，而读 connector 元数据的
+   共享代码不得按 higgs/mimo 语义解释。空 EOF 仍返回一个零 waveform chunk，并
+   不因本次 metadata 路由修复改变。^[PR #5917]
 4. token2wav 流式:`_StreamState`（mel cache 160 ms、source cache 3840 样本、
    estimator cache 窗 100）,块缝用 Hamming `fade_in_out` 平滑。
 
