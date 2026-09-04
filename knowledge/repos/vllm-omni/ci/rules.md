@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni CI 规则"
 created: 2026-08-23
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6311", "PR #6339", "PR #6343", "PR #6468", "PR #6523", "PR #6613", "PR #6555", .buildkite/common/scripts/run_cov_split.sh, .buildkite/common/scripts/upload_pipeline.py, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/clean.py, tests/helpers/client.py, tests/helpers/mark.py, tests/helpers/runtime.py, tests/helpers/stage_config.py, tests/buildkite/test_upload_pipeline.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/dfx/stability/, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/nightly/run_nightly_jobs.sh, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py, .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, "PR #6704"]
+sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6311", "PR #6339", "PR #6343", "PR #6468", "PR #6523", "PR #6613", "PR #6555", .buildkite/common/scripts/run_cov_split.sh, .buildkite/common/scripts/upload_pipeline.py, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/clean.py, tests/helpers/client.py, tests/helpers/mark.py, tests/helpers/runtime.py, tests/helpers/stage_config.py, tests/buildkite/test_upload_pipeline.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/dfx/stability/, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/nightly/run_nightly_jobs.sh, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py, .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, "PR #6704", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743"]
 confidence: high
 ---
 
@@ -257,6 +257,22 @@ PR 报告的 collection=1 和 local two-card B300 184.97 s 是该精确 workload
   chat output `audio.format`（如 `aac`）则迁至 weekly invalid-parameter HTTP case，断言 400 和
   supported-format 提示。纯文本五并发的 reduced-token 配置独立覆盖 batching，不能因删除相邻
   audio-only case 而丢失。^[PR #6570]
+
+- Qwen3-Omni audio-output DFX baselines must select `mean_audio_rtf`, not
+  `mean_e2el_ms`, when the talker may free-run to its stop token: generated-audio
+  length changes e2el without establishing a serving-speed regression. At
+  `bbb3ae01`, this applies to the three async-chunk `random-mm` audio cases and
+  all four no-async-chunk audio cases (including the five-point `data=random`
+  sweep); their surviving H100 `mean_audio_rtf` limits are respectively
+  `[0.1098]`, `[0.1335]`, `[0.1798]`, `[0.169, 0.2041, 0.2382, 0.3177, 0.4595]`,
+  `[0.138]`, `[0.1609]`, and `[0.2048]`. Async-chunk cases with
+  `modalities: ["text"]` retain `mean_e2el_ms`, because they do not produce talker
+  audio. Do not confuse baseline metric selection for downstream comparison with
+  collection: `percentile-metrics` still includes `e2el` in every affected audio
+  case, so e2el remains reported but is no longer selected by the baseline.
+  This PR changes only perf configuration (25 deletions), not runtime behavior;
+  its local plan could validate JSON shape only because baseline comparison occurs
+  downstream after artifact upload. ^[PR #6743]
 
 ## OMNI-CI-3b — patched upstream benchmark 必须保持参数与 output subtype 兼容
 
