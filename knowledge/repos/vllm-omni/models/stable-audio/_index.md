@@ -1,10 +1,10 @@
 ---
 title: "Stable Audio Open（T2A,cosine DPM-solver）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-08-25
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/stable_audio/, vllm_omni/diffusion/registry.py]
+sources: [vllm_omni/diffusion/models/stable_audio/, vllm_omni/diffusion/registry.py, recipes/StabilityAI/Stable-Audio-Open.md, tests/e2e/online_serving/test_stable_audio_online_expansion.py]
 ---
 
 # Stable Audio Open
@@ -35,3 +35,13 @@ sources: [vllm_omni/diffusion/models/stable_audio/, vllm_omni/diffusion/registry
 ## 什么时候查这里
 
 - 审查 stable_audio 的 scheduler wrapper、时长条件或 Oobleck VAE 改动。
+
+## 在线发现与覆盖
+
+- `main @ 72beeaee` 已删除模型专属的
+  `examples/online_serving/stable_audio/` 和对应 User Guide 示例页；不要从这些旧路径寻找
+  可运行示例。当前可发现的使用入口是上游 `recipes/StabilityAI/Stable-Audio-Open.md` 与
+  `docs/serving/audio_generate_api.md`；模型目录的 registry 导航仍从 [模型 catalog](../catalog.md) 进入。
+- 在线 E2E 位于 `tests/e2e/online_serving/test_stable_audio_online_expansion.py`：对 gated
+  `stabilityai/stable-audio-open-1.0` 使用 2 秒、4 steps 的请求，并断言
+  `/v1/audio/generate` 返回成功 HTTP 200。它是接口可达 smoke，不是音频字节/WAV 完整性验证。^[PR #4807]
