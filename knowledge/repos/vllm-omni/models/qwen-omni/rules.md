@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5687", "PR #6284", "PR #6449", "PR #4322", vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py]
+sources: ["PR #5687", "PR #6284", "PR #6449", "PR #4322", "PR #6748", vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_quantization.py]
 confidence: high
 ---
 
@@ -24,13 +24,17 @@ confidence: high
 - 强制：在统一 Qwen3-Omni wrapper 暴露 checkpoint 到最终嵌套模块路径的映射，并先对完整
   quantization config 执行一次映射；`ComponentQuantizationConfig` 必须递归映射每个非空
   component 和 default config。子 stage 检测到该映射后不得再次改写名称，但仍须合并自己的
-  `packed_modules_mapping`，供量化 scheme 匹配 fused module。
+  `packed_modules_mapping`，供量化 scheme 匹配 fused module。该嵌套 metadata 是 optional：outer-map-once
+  marker 已存在时，缺少 attribute 必须 no-op；存在且非空时才 merge，且不得清掉 outer marker。
 - 禁止：只映射一个 component wrapper 而给它标记为已映射；让 Thinker/Talker/Code2Wav 各自
   重复应用 stage mapper；因修复名称匹配而把 BF16 router/encoder 也纳入量化；或把该构造期
   映射修复描述成 quantization kernel / inference hot path 变化。
 - 验收：以真实 component-wrapped `CompressedTensorsConfig`（含 `None` component 与 default）
   断言 `ignore` HF names 映射到最终路径；加载 AWQ checkpoint 时三 stage 都能完成 weight
-  loading，且不出现缺模块/参数或 routed-expert quantized-weight 属性错误。^[PR #5687]
+  loading，且不出现缺模块/参数或 routed-expert quantized-weight 属性错误。CPU regression 还必须覆盖
+  missing quant config、outer-mapped Talker-style model 缺 `packed_modules_mapping` 的 no-op、及 present
+  mapping merge；这只是 mapping/metadata contract，不是 quant scheme、kernel、quality 或 performance
+  evidence。^[PR #5687] ^[PR #6748]
 
 ## QOMNI-1c — Instruct 的 thinker-only deploy 必须选择静态 pipeline key
 
