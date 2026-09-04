@@ -1,15 +1,15 @@
 ---
 title: "HunyuanVideo-1.5（T2V/I2V,meanflow 旗标蒸馏）"
 created: 2026-07-21
-updated: 2026-09-02
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4645", vllm_omni/diffusion/models/hunyuan_video/, vllm_omni/deploy/hunyuan_video_15.yaml, vllm_omni/config/pipeline_registry.py]
+sources: ["PR #4645", vllm_omni/diffusion/models/hunyuan_video/, vllm_omni/deploy/hunyuan_video_15.yaml, vllm_omni/config/pipeline_registry.py, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, "PR #6349"]
 ---
 
 # HunyuanVideo-1.5
 
-以下事实在 `main @ 5d44868e` 复核。与
+以下架构事实在 `main @ c201fd77` 复核。与
 [hunyuan-image3](../hunyuan-image3/_index.md) 是**不同家族**（本家族纯
 diffusion 视频,AR registry 无入口;image3 的结构见该页）。
 

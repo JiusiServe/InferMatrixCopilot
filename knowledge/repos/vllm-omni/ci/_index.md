@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, ci]
-sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6303", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054"]
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6303", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349"]
 ---
 
 # vLLM-Omni CI
@@ -79,6 +79,21 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
   three `benchmark_params` under that shared server and retain their existing H100 baseline
   artifacts; the JSON change itself does not establish a performance result or an active
   regression threshold. ^[PR #6613]
+
+## HunyuanVideo-1.5 ready/merge and nightly coverage
+
+- The basic one-H100 CPU-offload T2V online-serving row is marked `core_model` and
+  `advanced_model`, and the ready and merge Buildkite jobs select it with the matching
+  run level. The CacheDiT + layerwise CPU-offload one-card row and CacheDiT + TP=2 +
+  VAE patch-parallel=2 (with VAE tiling) two-card row are `full_model` only, so their
+  function coverage remains in the nightly H100×2 lane. This is deliberately a
+  scope split, not evidence that the richer combinations run in ready/merge. ^[PR #6349]
+- The dedicated nightly DFX job runs separate T2V and I2V JSON configs: random data,
+  ten prompts at concurrency one, seed 42, negative prompt, and 832×480 / 33-frame /
+  four-step / 24-fps requests. Each has a one-H100 baseline and a two-H100
+  CacheDiT/TP2/VAE-patch-parallel=2/tiling case. It uploads result JSON and logs but
+  configures no threshold, so it is benchmark-report/artifact collection rather than
+  a performance regression gate. ^[PR #6349]
 
 ## 目录内容
 
