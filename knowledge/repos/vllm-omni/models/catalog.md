@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 39c16d75`（2026-08-23）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 1e2a6446`（2026-08-23）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -35,48 +35,48 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 
 | 注册点 | 位置 | 计数 |
 |---|---|---|
-| AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 81 个架构名 / 29 个模型族目录 |
-| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 58 条 pipeline / 38 个模型族目录 |
-| Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 51 个 key |
-| Deploy YAML | `vllm_omni/deploy/*.yaml` | 79 份 |
+| AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 81 个架构名 / 31 个模型族目录 |
+| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 64 条 pipeline / 41 个模型族目录 |
+| Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 55 个 key |
+| Deploy YAML | `vllm_omni/deploy/*.yaml` | 84 份 |
 
-对比上一审计快照（`807db6ef`）：AR 架构 72→77，diffusion pipeline 61→58，
-OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusion 新增
-`minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
-pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
-Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `72ee535f` 本轮新增两条可复用合同：diffusion 单 GPU 的进程内 executor 生命周期，以及 omitted `distributed_executor_backend` 必须保留到运行时按设备数解析。文档、测试改动和 serving 中仅承担该配置透传的实现细节未单独沉淀为规则，也不能据此推断所有硬件上的性能或生产级支持。
+对比上一审计快照（`39c16d75`）：AR 架构 88→81，diffusion pipeline 65→64，
+OMNI_PIPELINES 57→55，deploy 86→84。PR #6353 删除 AudioX 的 diffusion registry、
+processor/extras/recipe/examples/tests，并删除 MammothModa2 Preview/Dev 共用的七个 AR
+architecture、两个 pipeline key、两个 deploy YAML 及其 tokenizer/config/AR/DiT/bridge。
+因此 active owner 与 catalog 不再声明这两个家族；diffusion text-to-audio 的 first-party
+示例只剩 Stable Audio，Audex 的 TTA 仍是独立两阶段 autoregressive 路径。^[PR #6353]
 
-## AR/omni 模型族（29）
+## AR/omni 模型族（31）
 
-aura_omni、audex、bagel、cosyvoice3、covo_audio、dynin_omni、fish_speech、glm_image、
-glm_tts、higgs_audio_v2、higgs_audio_v3、hunyuan_image3、indextts2、indextts2_5、
-mammoth_moda2、mimo_audio、ming_flash_omni、ming_tts、minicpmo_4_5、moss_tts、
-moss_tts_nano、omnivoice、personaplex、qwen2_5_omni、qwen3_omni、qwen3_tts、step_audio2、
-voxcpm2、voxtral_tts
+aura_omni、audex、bagel、cosyvoice3、covo_audio、dots_tts、dynin_omni、fish_speech、
+gepard、glm_image、glm_tts、higgs_audio_v2、higgs_audio_v3、hunyuan_image3、indextts2、
+mimo_audio、ming_flash_omni、ming_tts、minicpmo_4_5、minimax_music3、moss_tts、
+moss_tts_nano、nemotron_voicechat、omnivoice、personaplex、qwen2_5_omni、qwen3_omni、
+qwen3_tts、step_audio2、voxcpm2、voxtral_tts
 
-## Diffusion 模型族（38）
+## Diffusion 模型族（41）
 
-audiox、bagel、boogu_image、cosmos3、diffusers_adapter（通用 diffusers 桥）、dreamid_omni、
+bagel、boogu_image、cosmos3、diffusers_adapter（通用 diffusers 桥）、dreamid_omni、
 dreamzero、ernie_image、flux、flux2、flux2_klein、glm_image、gr00t、helios、
-hidream_image、hunyuan_image3、hunyuan_video、internvla_a1、krea2、lance、
-lingbot_video、longcat_image、longcat_video、ltx2、magi_human、ming_flash_omni、nextstep_1_1、omnigen2、
-omnivoice、ovis_image、qwen_image、sd3、sdxl、sensenova_u1、stable_audio、wan2_2、z_image、minimax_h3
+hidream_image、hidream_o1_image、hunyuan_image3、hunyuan_video、internvla_a1、krea2、lance、
+lingbot_video、lingbot_world、longcat_image、longcat_video、ltx2、magi_human、ming_flash_omni、
+minimax_h3、nextstep_1_1、omnigen2、omnivoice、ovis_image、pi0、qwen_image、sana_wm、sd3、
+sdxl、sensenova_u1、stable_audio、wan2_2、z_image
 
-## OMNI_PIPELINES key（51）
+## OMNI_PIPELINES key（55）
 
-Gr00tN1d7（注意:唯一 CamelCase key）、aura_omni、audex_s2s、audex_thinker_only、
-audex_tta、audex_tts、bagel、bagel_single_stage、
-bagel_think、cosyvoice3、covo_audio、dreamzero、dynin_omni、fish_qwen3_omni、
-glm_image、glm_tts、higgs_audio_v2、higgs_multimodal_qwen3、hunyuan_image3_ar、
-hunyuan_image3_dit、hunyuan_image_3_moe、hunyuan_video_15、indextts2、lance、
-mammoth_moda2、mammoth_moda2_ar、mimo_audio、ming_flash_omni、
-ming_flash_omni_image、ming_flash_omni_thinker_only、ming_flash_omni_tts、
-ming_tts、ming_tts_moe、minicpmo_4_5、moss_tts_delay、moss_tts_local、
-moss_tts_nano、moss_tts_realtime、omnivoice、personaplex、qwen2_5_omni、
-qwen2_5_omni_thinker_only、qwen3_omni_moe（resolver）、qwen3_tts、
-step_audio_2、step_audio_2_asr、voxcpm2、
-voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
+Gr00tN1d7（注意:唯一 CamelCase key）、audex_s2s、audex_thinker_only、audex_tta、
+audex_tts、aura_omni、bagel、bagel_single_stage、bagel_think、cosyvoice3、covo_audio、
+dots_tts、dreamzero、dynin_omni、fish_qwen3_omni、gepard、glm_image、glm_tts、
+higgs_audio_v2、higgs_multimodal_qwen3、hunyuan_image3_ar、hunyuan_image3_dit、
+hunyuan_image_3_moe、hunyuan_video_15、indextts2、indextts2_5、lance、mimo_audio、
+ming_flash_omni、ming_flash_omni_image、ming_flash_omni_thinker_only、
+ming_flash_omni_tts、ming_tts、ming_tts_moe、minicpmo_4_5、minimax_music3、
+moss_tts_delay、moss_tts_local、moss_tts_nano、moss_tts_realtime、nemotron_labs_audex、
+nemotron_labs_voicechat、nemotron_voicechat、omnivoice、personaplex、pi0、qwen2_5_omni、
+qwen2_5_omni_thinker_only、qwen3_omni_moe（resolver）、qwen3_tts、step_audio_2、
+step_audio_2_asr、voxcpm2、voxtral_tts、wan2_2_ti2v
 
 注意：单 stage diffusion 模型**多数不在** `OMNI_PIPELINES`（引擎为它们生成
 默认 diffusion stage 配置,见 [Config 组件](../components/configuration/architecture.md)）;
@@ -87,8 +87,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 0db262de \
-  --to 39c16d75 \
+  --from 39c16d75 \
+  --to 1e2a6446 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

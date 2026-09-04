@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #6049", "PR #6076", vllm_omni/model_extras/, "PR #6070", "vllm_omni/model_extras/registry.py", "PR #5614"]
+sources: ["PR #6049", "PR #6076", vllm_omni/model_extras/, "PR #6070", "vllm_omni/model_extras/registry.py", "PR #5614", "PR #6353"]
 confidence: high
 ---
 
@@ -22,7 +22,7 @@ confidence: high
 - 禁止：pipeline 已负责 validation/normalization 时复制 generic builder；让 registry 从零重建 task
   modality；用 truthiness 丢空 negative prompt；为每个模型复制 Python example。
 - 验收：canonical builder 覆盖 omitted/empty/value negative prompt 与 PIL media identity；registry
-  覆盖 Bagel、MammothModa2、Ming、VACE custom path及 unknown identity path；Cosmos3/LingBot
+  覆盖 Bagel、Ming、VACE custom path及 unknown identity path；Cosmos3/LingBot
   pipeline tests继续拥有模型专属 validation。^[PR #6049]
 
 ## EXEC-6b — model_extras 必须声明模型专有参数与输出张量范围
@@ -40,4 +40,3 @@ confidence: high
 - 强制：按解析后的 `model_class_name` 在 registry 声明 resolver；公开 accessor 必须把真实 `model` 与 `revision` 传给 model-owned hook；共享 config/serving consumer 只调用 accessor，unknown model 保持安全默认值。
 - 禁止：在共享 serving/data 代码中写 LTX class/version 分支；按 repository basename 猜版本；用 class 名代替 checkpoint metadata；丢弃 pinned revision 或把共享 `LTX2Pipeline` 的策略无条件应用于 2、2.3、2.5。
 - 验收：覆盖 arbitrary local path、2/2.3/2.5 metadata、Full/distilled pipeline class、unknown class 和 pinned revision；断言 extra-body 声明、transformer subfolder 与 reference-image policy 都经 registry accessor 到达真实 consumer。^[PR #6070]
-
