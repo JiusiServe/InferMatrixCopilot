@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 4f7c08c0`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 260db8ba`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `ea0a2446` 本轮将 PR #6406 的可复用约束分别沉淀到 Distributed 的 async-chunk 快照、Scheduler 的 prompt replacement 清理、Model Executor 的 runtime snapshot 合同，并补充 MiniCPM-o 4.5 native duplex 的模型侧边界。测试改动仅作为验证线索，不表示所有 generation/diffusion 路径都改为替换语义，也不能据此推断自动 context rollover 或音频质量改善。
+本次相对 `4f7c08c0` 本轮为共享 diffusion offloader 增加模型级 CPU offload protocol 与非 forward component 的异常安全生命周期规则，并为 MiniMax H3 增加视觉/音频 VAE residency window 规则。未新增页面或索引行。不得据此推断完整模型峰值显存、通用性能收益或所有模型的 offload 兼容性。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from ea0a2446 \
-  --to 4f7c08c0 \
+  --from 4f7c08c0 \
+  --to 260db8ba \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
