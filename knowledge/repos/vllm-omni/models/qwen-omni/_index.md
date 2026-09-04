@@ -4,20 +4,22 @@ created: 2026-07-16
 updated: 2026-09-04
 type: index
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/registry.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/quantization/component_config.py, docs/design/qwen3_omni_tts_performance_optimization.md]
+sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/registry.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/quantization/component_config.py, docs/design/qwen3_omni_tts_performance_optimization.md]
 ---
 
 # Qwen-Omni 家族（Qwen2.5-Omni / Qwen3-Omni / Qwen3-TTS）
 
-- 常见别名：`qwen2_5_omni`、`qwen3_omni_moe`、`qwen3_tts`（家族目录：同一 thinker/
+- 常见别名：`qwen2_5_omni`、`qwen3_omni_moe`、`qwen3_omni_moe_thinker_only`、`qwen3_tts`（家族目录：同一 thinker/
   talker/code2wav 谱系的多个 checkpoint/代际，按别名规则共用本目录）
-- 源码模型族（`main @ e04210d6` 验证）：`model_executor/models/qwen2_5_omni/`、
+- 源码模型族（`main @ 94b1546c` 验证）：`model_executor/models/qwen2_5_omni/`、
   `qwen3_omni/`、`qwen3_tts/`；pipeline registry key `qwen2_5_omni`、
   `qwen2_5_omni_thinker_only`、`qwen3_omni_moe`（resolver
   `resolve_qwen3_omni_pipeline`，位于 `models/qwen3_omni/pipeline.py`，由
-  `pipeline_registry.py:86/:100` 引用）、`qwen3_tts`
+  `pipeline_registry.py:86/:100` 引用）、`qwen3_omni_moe_thinker_only`（静态单 stage
+  `PipelineConfig`，绕过 resolver）、`qwen3_tts`
 - deploy YAML：`qwen2_5_omni.yaml`（1×H100 验证）、`qwen3_omni_moe.yaml`
-  （2×H100 验证）、`qwen3_omni_moe_mori_intranode.yaml`、`qwen3_tts.yaml`
+  （2×H100 验证）、`qwen3_omni_moe_mori_intranode.yaml`、`qwen3_omni_moe_thinking.yaml`
+  （显式 thinker-only 覆盖）与 `qwen3_tts.yaml`
   （+ `_forced_aligner`、`_high_concurrency` 变体）
 - Qwen2.5 thinker-only 的 ModelOpt NVFP4 W4A4 checkpoint 支持、stage sub-config、Talker
   ingress/internal width 与硬件/accuracy 证据边界归下方 architecture 入口。

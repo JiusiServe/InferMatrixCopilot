@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5687", "PR #6449", vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py]
+sources: ["PR #5687", "PR #6284", "PR #6449", vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py]
 confidence: high
 ---
 
@@ -31,3 +31,19 @@ confidence: high
 - 验收：以真实 component-wrapped `CompressedTensorsConfig`（含 `None` component 与 default）
   断言 `ignore` HF names 映射到最终路径；加载 AWQ checkpoint 时三 stage 都能完成 weight
   loading，且不出现缺模块/参数或 routed-expert quantized-weight 属性错误。^[PR #5687]
+
+## QOMNI-1c — Instruct 的 thinker-only deploy 必须选择静态 pipeline key
+
+- 触发：修改 Qwen3-Omni 的 pipeline registry、`qwen3_omni_moe_thinking.yaml`，或依赖
+  `enable_audio_output` 自动拓扑选择的 serve/config-factory 路径。
+- 强制：需要 Instruct 权重只加载 Thinker 时，deploy YAML 必须显式设
+  `pipeline: qwen3_omni_moe_thinker_only`；该 registry key 必须直接绑定静态单 stage
+  text→text `PipelineConfig`，不能重新进入由 HF config 决定全三 stage 的
+  `qwen3_omni_moe` resolver。没有显式 YAML 的 Captioner/Thinking checkpoint 继续由 resolver
+  自动选择 thinker-only 拓扑。
+- 禁止：把 Instruct 的 `enable_audio_output` 当作 thinker-only 的充分条件；只修改 YAML 而未
+  注册静态 key；或以 key 存在/原始 YAML 替代最终 resolved pipeline 的断言。
+- 验收：分别以 Instruct 和 Thinking/Captioner HF config 经 `StageConfigFactory` 加载该 YAML，
+  断言同一 `qwen3_omni_moe_thinker_only` pipeline、仅一个 Thinker stage 和 text output；同时
+  直接解析该 key，断言其对象身份为 registry 的静态 `PipelineConfig` 而非 resolver 结果。PR
+  只有这类配置单元测试，未提供真实 `vllm serve`、质量、性能或资源证据。^[PR #6284]

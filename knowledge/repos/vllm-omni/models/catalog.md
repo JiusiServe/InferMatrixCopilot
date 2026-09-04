@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 19da2382`（2026-08-27）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 94b1546c`（2026-08-27）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -37,7 +37,7 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 |---|---|---|
 | AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 81 个架构名 / 31 个模型族目录 |
 | Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 65 条 pipeline / 40 个模型族目录 |
-| Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 55 个 key |
+| Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 56 个 key |
 | Deploy YAML | `vllm_omni/deploy/*.yaml` | 85 份 |
 
 PR #6089 新增 `nemotron_labs_voicechat_duplex.yaml`，因此只增加 deploy profile；它没有
@@ -90,7 +90,7 @@ lingbot_video、lingbot_world、longcat_image、longcat_video、ltx2、ming_flas
 minimax_h3、nextstep_1_1、omnigen2、omnivoice、ovis_image、pi0、qwen_image、sana_video、sana_wm、sd3、
 sdxl、sensenova_u1、stable_audio、wan2_2、z_image
 
-## OMNI_PIPELINES key（55）
+## OMNI_PIPELINES key（56）
 
 Gr00tN1d7（注意:唯一 CamelCase key）、audex_s2s、audex_thinker_only、audex_tta、
 audex_tts、aura_omni、bagel、bagel_single_stage、bagel_think、cosyvoice3、covo_audio、
@@ -101,7 +101,7 @@ ming_flash_omni、ming_flash_omni_image、ming_flash_omni_thinker_only、
 ming_flash_omni_tts、ming_tts、ming_tts_moe、minicpmo_4_5、minimax_music3、
 moss_tts_delay、moss_tts_local、moss_tts_nano、moss_tts_realtime、nemotron_labs_audex、
 nemotron_labs_voicechat、nemotron_voicechat、omnivoice、personaplex、pi0、qwen2_5_omni、
-qwen2_5_omni_thinker_only、qwen3_omni_moe（resolver）、qwen3_tts、step_audio_2、
+qwen2_5_omni_thinker_only、qwen3_omni_moe（resolver）、qwen3_omni_moe_thinker_only、qwen3_tts、step_audio_2、
 step_audio_2_asr、voxcpm2、voxtral_tts、wan2_2_ti2v
 
 注意：单 stage diffusion 模型**多数不在** `OMNI_PIPELINES`（引擎为它们生成

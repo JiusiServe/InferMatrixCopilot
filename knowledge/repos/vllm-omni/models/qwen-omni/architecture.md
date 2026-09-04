@@ -4,12 +4,12 @@ created: 2026-07-16
 updated: 2026-09-04
 type: architecture
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5073", "PR #5671", docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/module/engine_orchestration.md, docs/design/module/stage_runtime.md, docs/design/module/archive/async_omni_architecture.md, vllm_omni/config/model.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/registry.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/worker/gpu_model_runner.py]
+sources: ["PR #5073", "PR #5671", "PR #6284", docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/module/engine_orchestration.md, docs/design/module/stage_runtime.md, docs/design/module/archive/async_omni_architecture.md, vllm_omni/config/model.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/registry.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/worker/gpu_model_runner.py]
 ---
 
 # Qwen-Omni 家族拓扑与性能结论
 
-以下事实在 `main @ e04210d6` 复核。
+以下事实在 `main @ 94b1546c` 复核。
 
 ## Stage 拓扑
 
@@ -25,6 +25,12 @@ sources: ["PR #5073", "PR #5671", docs/design/qwen3_omni_tts_performance_optimiz
 - Qwen3-Omni 的 pipeline 由 resolver（`models/qwen3_omni/pipeline.py::
   resolve_qwen3_omni_pipeline`）按 checkpoint 结构动态决定，而不是冻结的
   `PipelineConfig` 字面量。
+- `qwen3_omni_moe_thinker_only` 是例外：它直接注册冻结的单 Thinker、text→text
+  `PipelineConfig`。`qwen3_omni_moe_thinking.yaml` 显式指定该 key，所以 Instruct
+  checkpoint 即使由 HF `enable_audio_output` 判为全三 stage，也会加载 Thinker 而不加载
+  Talker/Code2Wav；Captioner/Thinking checkpoint 不带该 YAML 时仍由 resolver 自动选同一
+  单 stage 拓扑。该变更只证明配置解析和拓扑选择，未提供质量、吞吐、显存或端到端 serve
+  证据。^[PR #6284]
 
 ## Qwen2.5-Omni ModelOpt NVFP4 边界
 
