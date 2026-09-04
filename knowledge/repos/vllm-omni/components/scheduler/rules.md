@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6149", "PR #6360", "PR #6406"]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6149", "PR #6360", "PR #6406", "PR #6150"]
 ---
 
 # Scheduler 规则
@@ -26,6 +26,7 @@ PR 描述先命中下表，再打开对应规则组和首批源码；changed fil
 | side-stream D2H、pinned host tensor、源 buffer 复用 | SCHED-4a/4b | `worker/gpu_ar_model_runner.py::_copy_tensor_payload_to_cpu`、`_get_or_create_omni_payload_copy_stream`；`core/prefix_cache.py` 的 async copy 路径 |
 | sampled-token logprobs、spec decode trim、request-local output error | SCHED-5a | `core/sched/omni_ar_scheduler.py::_slice_sampled_logprobs`、`update_from_output` |
 | stateful async chunk、full-payload input、KV cleanup | SCHED-5b/5c | `core/sched/omni_generation_scheduler.py`、`omni_scheduling_coordinator.py`、`omni_ar_scheduler.py::_free_request` |
+| KV extraction wait、connector acknowledgement、partial interval cleanup | SCHED-5h | `core/sched/omni_ar_scheduler.py::{_free_request,update_from_output}` → scheduler stats → orchestrator metrics |
 
 若描述只写模型症状，先从模型 owner 找到 payload producer/consumer；只有实际断点落在调度、
 prefix cache 或 copy lifetime 时才把 Scheduler 加为 owner。
@@ -230,6 +231,20 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 - 禁止：只在 AR scheduler 接 hook；decoder 异常 fail-open 为空成功；先完成请求再解码；把原始 pooler tensor 或错误 request 的 payload 发送给下游。
 - 验收：分别覆盖 AR/generation scheduler 的成功、decoder 抛异常、无 decoder 和同批健康 request；断言成功 payload、`FinishReason.ERROR`、request-local 错误归属及无跨请求污染。
 ^[PR #4795]
+
+## SCHED-5h — KV extraction wait 只能观测完整区间
+
+- 触发：AR scheduler 进入/离开 `waiting_for_transfer_free`，或传递 KV transfer
+  acknowledgement、connector type、abort/error cleanup metric。
+- 强制：在 `_free_request()` 进入 KV-transfer-free wait 时以 monotonic clock 记录 start；
+  仅在 extraction acknowledgement 到达时 emit completed duration，并携带实际 connector
+  type。任何 finish、abort、error 或 request removal 都清除未完成 start，不能输出 partial
+  wait。
+- 禁止：以 request wall-clock、enqueue time 或 cleanup time 补造 KV wait；把没有 start
+  的 acknowledgement 当零秒样本；因 telemetry 给 terminal request 保留 scheduler state。
+- 验收：覆盖 complete acknowledgement、无 start、abort/error/normal finish 清理和 iterator
+  request-id 输入；断言只有完整 wait 有一个样本，connector label 有界且没有 stale start。
+  ^[PR #6150]
 
 ## SCHED-5f — async-chunk 等待必须有可配置的截止时间
 
