@@ -10,6 +10,13 @@ confidence: high
 
 # SANA-Video 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| TP/CFG topology | `SANA-1a` |
+| Cache-DiT/offload 或 request refresh steps | `SANA-1b`、`SANA-1c` |
+
 ## SANA-1a — native SANA Video 只支持 TP/CFG 的 {1,2} 矩阵
 
 - 触发：native SANA Video TP/CFG、transformer layout、I2V 或 Diffusers adapter topology 变更。

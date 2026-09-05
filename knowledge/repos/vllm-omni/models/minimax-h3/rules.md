@@ -14,6 +14,17 @@ confidence: high
 
 ## Direct 代码快速入口
 
+| PR 描述信号 | 规则入口 |
+|---|---|
+| component quantization、weight loading、HWR | `MMH3-1a`、`MMH3-1f`；[loading](rules-loading.md) |
+| attention/RoPE/backend、encoder process state | `MMH3-1c`–`MMH3-1e`、`MMH3-1g`、`MMH3-1k`、`MMH3-1n` |
+| media ingress、reference tasks、split text encoder | `MMH3-2a`、`MMH3-2b`、`MMH3-2l`；[media](rules-media.md) |
+| modular task、cache policy、schedules、LoRA/FastH3 | `MMH3-2c`–`MMH3-2n`；[cache/task](rules-cache-task.md) |
+| DLO、hardware recipes、CI/perf evidence | `MMH3-3a`–`MMH3-3m`；[deployment](rules-deployment.md) |
+| VAE kernels、materialization、fallback | `MMH3-4c`；[VAE ops](rules-vae-ops.md) |
+
+## 完整代码路由
+
 | PR 描述信号 | 规则 | 第一批源码 |
 |---|---|---|
 | online FP8、`ignored_layers`、component prefix | [MMH3-1a](rules-loading.md#mmh3-1a-component-namespace-与-checkpoint-transform-必须在-active-loader-前闭合) | `pipeline_minimax_h3.py::_resolve_component_quant_config` → `MiniMaxH3DiTModel` linear prefix |

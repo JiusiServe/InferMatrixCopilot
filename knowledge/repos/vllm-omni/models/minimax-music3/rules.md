@@ -10,6 +10,12 @@ confidence: high
 
 # MiniMax Music3 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| composite checkpoint root、component completeness 或 snapshot revision | `MM3-1a` |
+
 ## MM3-1a — composite checkpoint 的直接组件必须与 AR snapshot 同 revision 且完整
 
 - 触发：MiniMax-Music3 从 Hub/cache/root/`language_model/` 初始化 AR 或 acoustic stage、恢复 repo

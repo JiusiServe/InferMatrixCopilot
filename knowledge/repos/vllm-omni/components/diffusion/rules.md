@@ -15,6 +15,19 @@ confidence: high
 
 ## Direct 代码快速入口
 
+| PR 描述信号 | 规则入口 |
+|---|---|
+| graph/eager、compile、solver、RNG、dtype/device | `DIFF-1a`–`DIFF-1j` |
+| checkpoint remap、HWR、HSDP、offload、quantization | `DIFF-2a`–`DIFF-2z`；[checkpoint/loading](rules-checkpoint-loading.md) |
+| component、multi-DiT、LoRA、request cache lifecycle | [component lifecycle](rules-component-lifecycle.md)、[LoRA](rules-lora.md) |
+| quality evidence、distributed VAE | `DIFF-3a`、`DIFF-3b` |
+| paged KV、attention backend/parallel、platform、admission | `DIFF-4a`–`DIFF-4x`；[system runtime](rules-system-runtime.md) |
+| worker reply、shutdown、final output/formatter | `DIFF-1s`、`DIFF-1aa`、`DIFF-4z`；[output/runtime](rules-output-lifecycle.md) |
+| service/forward/step metrics | `DIFF-5a`、`DIFF-5b`；[metrics](rules-metrics.md) |
+| worker title/rank observability | `DIFF-4w`；[worker observability](rules-worker-observability.md) |
+
+## 完整代码路由
+
 - **DIFF-0a — PR 描述先选共享执行地图。** 按 title/body 的 graph、RNG、checkpoint、HSDP、quantization 或质量信号命中下表，再用 pinned files 验证 owner。
 - **DIFF-0b — 共享 runner 与模型 pipeline 分层。** 先查命中行的共享 producer；只有 live 调用链落到单模型 pipeline/checkpoint/常量时才进入模型 owner，不横扫其他模型。
 
@@ -38,17 +51,6 @@ confidence: high
 | image/diffusion service time、forward time、missing-versus-zero、per-step metric | [`metrics-evidence`](rules-metrics.md)：`DIFF-5a`, `DIFF-5b` | output formatter/sampling metadata → stage stats aggregation → serving Prometheus emission |
 | image/video/audio/action final type、registry alias、endpoint capability、formatter | [`output-runtime`](rules-output-lifecycle.md#diff-1s-diffusion-output-type-必须从模型声明闭合到-topology-与-formatter)：`DIFF-1s` | `model_metadata.py` → default/multi-stage config → video capability → `output_formatter.py` |
 | Diffusers/custom/native executor identity、hook、batch capability、frame interpolation | [`output-runtime`](rules-output-lifecycle.md#diff-1aa-diffusers-execution-backend-不得冒充-native-checkpoint-identity)：`DIFF-1aa` | `data.py::uses_diffusers_adapter` → `diffusion_engine.py::supports_request_batch` → registry hook / adapter sampling validation |
-
-| 审查组 | 什么时候触发 | 规则 ID |
-|---|---|---|
-| `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d`, `DIFF-1e` |
-| `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、FA determinism、async output/shutdown | `DIFF-1a`–`1j` |
-| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT/cache lifecycle | `DIFF-2a`–`2e`, `2p`, `2q`, `2s`, `2y`, `2z` 见 [checkpoint 与加载合同](rules-checkpoint-loading.md)；`2f`–`2j`, `2r`, `2w`, `12a` 见 [component lifecycle](rules-component-lifecycle.md)；`2k` 见 [output/runtime](rules-output-lifecycle.md)；`2l`–`2o`, `2x` 见 [LoRA](rules-lora.md) |
-| `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
-| `distributed-vae` | Wan VAE spatial height/width shard、rank context、extent/padding | `DIFF-3b` |
-| `system-runtime` | cache/预算、native/backend/platform、attention layout、SymmMem A2A、能力 metadata、异常与并发 | `DIFF-4a`–`4j`、`4v`、`4x`（`4a`–`4i`、`4x` 见 [paged cache 与系统运行时规则](rules-system-runtime.md)，`4v` 见 [attention rules](rules-attention.md)）；reply ownership `4z` 见 [output/runtime](rules-output-lifecycle.md) |
-| [`metrics-evidence`](rules-metrics.md) | diffusion timing、step normalization、missing-versus-zero、benchmark interpretation | `DIFF-5a`, `DIFF-5b` |
-| `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
 
 ## 优化路径与 eager 的等价合同
 

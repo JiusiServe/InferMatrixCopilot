@@ -10,6 +10,12 @@ confidence: high
 
 # LongCat-Image 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| Edit request geometry、conditioning resize、latent/decode propagation | `LONGCAT-1a` |
+
 只有 `LONGCAT-数字字母` 是可审计规则 ID。
 
 ## LONGCAT-1a — Edit 请求几何必须单一解析并端到端传播

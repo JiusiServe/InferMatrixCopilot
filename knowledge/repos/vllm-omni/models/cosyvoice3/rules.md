@@ -10,6 +10,12 @@ confidence: high
 
 # CosyVoice3 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| TensorRT CFM stream handoff 或 flow-estimator plan publication | `COSYVOICE3-1a`、`COSYVOICE3-1b` |
+
 ## COSYVOICE3-1a — TensorRT CFM 的跨 stream handoff 必须同时守住顺序和 allocator lifetime
 
 - 触发：修改 CosyVoice3 `ConditionalCFM.forward_estimator` 的非-`torch.nn.Module`

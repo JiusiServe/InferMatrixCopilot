@@ -9,6 +9,13 @@ sources: ["PR #5067", vllm_omni/model_executor/models/step_audio2/step_audio2_th
 
 # Step-Audio2 设备边界与流式性能规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| streaming token ownership 或 ragged audio features | `STEPA2-1a`、`STEPA2-1b` |
+| shared audio runtime 或 DiT TensorRT plan publication | `STEPA2-2a`、`STEPA2-2b` |
+
 以下规则在 `main @ 12a5f6fb` 复核；主要约束 Step-Audio2 的 thinker/token2wav
 路径。共享 `Token2Wav` core 的 blast radius 在下文显式列出，runtime 的通用规则
 仍归组件 owner。

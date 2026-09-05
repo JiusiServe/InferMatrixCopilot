@@ -11,6 +11,21 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 
 ## Direct 代码快速入口
 
+| PR 描述信号 | 规则入口 |
+|---|---|
+| stage schema、projection、known fields | `EXEC-3a` |
+| connector capability、worker/runner selection | `EXEC-3c` |
+| runner preprocess、exact-shape input、MTP | `EXEC-4e` 与本页 runner 合同 |
+| stage TP/PP/DP、replica、device capacity | `EXEC-3d` |
+| runtime info、request RNG、bridge/batch/embedding width | `EXEC-1a`–`EXEC-1i`；[bridge/batch](rules-bridge-batch.md) |
+| loader、checkpoint config、snapshot/subdir、packed weights | `EXEC-2a`–`EXEC-2i`；[loader](rules-loader-contract.md) |
+| async output、MTP graph、output types | `EXEC-4c`、`EXEC-5a`–`5b`、`EXEC-7a`–`7b` |
+| NPU/ROCm/MUSA/XPU runner/backend | `EXEC-10a`–`EXEC-13h`；[platform backends](rules-platform-backends.md) |
+| image/video task envelope、`model_extras` | `EXEC-6a`–`EXEC-6d`；[image task envelope](rules-image-task-envelope.md) |
+| sampling/codec hot path | `EXEC-8a`、`EXEC-9a`、`EXEC-11a`–`11h`；[runtime hot paths](rules-runtime-hot-paths.md) |
+
+## 完整代码路由
+
 - **EXEC-0a — PR 描述先选代码地图。** Direct review 先按 title/body 声明的 runner、stage、bridge、loader 或设备语义命中下表，再用 pinned changed files 验证真实模型 consumer；路径只负责范围反查。
 - **EXEC-0b — 共享 producer 先于模型补丁。** 命中共享 runner、stage runtime 或 bridge producer 后立即沿 live consumer 审查；只有 producer 正确且问题只属于一个模型时才进入该模型 owner。
 
@@ -34,23 +49,6 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | CosyVoice3 non-module TensorRT CFM、stream/event ownership、raw-pointer buffer lifetime 或 context-pool reuse | [CosyVoice3 TensorRT handoff](../../models/cosyvoice3/rules.md)：`COSYVOICE3-1a` | `code2wav_core/cfm.py::ConditionalCFM.forward_estimator` → `flow_estimator_trt.py::TrtContextWrapper` |
 | Qwen3-TTS adaptive chunk、EWMA target、all-frame emit、controller cleanup | [Qwen3-TTS adaptive ramp](../../models/qwen3-tts/rules.md#q3tts-3e-adaptive-ramp-是-host-side每段-opt-in-控制器不是-cuda-graph-计划) | `stage_input_processors/qwen3_tts.py::talker2code2wav_async_chunk` → `chunk_size_utils.py::{AdaptiveChunkController,compute_adaptive_emit}` → Code2Wav |
 | Qwen3-Omni audio encoder 的 head/TP divisibility | [Qwen-Omni audio-encoder TP rule](../../models/qwen-omni/rules.md#qomni-1d-audio-encoder-tp-必须按-head-divisibility-局部回退) | `qwen3_omni_moe_thinker.py::{Qwen3OmniMoeAudioAttention,Qwen3OmniMoeAudioEncoderLayer}`；只影响该 encoder layer 的 QKV/output/FFN TP fallback ^[PR #4322] |
-
-| 审查组 | 什么时候触发 | 规则 ID |
-|---|---|---|
-| `core` | 每次 model-executor 审查 | `EXEC-1a` |
-| `strict-stage-config` | stage schema、projection、known fields | `EXEC-3a` |
-| `connector-capability` | full-payload/connector stage 的 worker runner validation | `EXEC-3c` |
-| `stage-runtime` | stage 数、replica、inline/subprocess 与设备容量 | `EXEC-3d` + 本页 stage 并行度验收 |
-| `bridge-batch` | runtime info、跨 stage payload、batch、request RNG | `EXEC-1a`–`EXEC-1i`，见 [跨 stage bridge 与 batch 合同](rules-bridge-batch.md) |
-| `loader-contract` | dtype、checkpoint config 获取、loader、fused shard 拼装、stage snapshot/subdir、wrapper callable 委托 | `EXEC-2a`–`EXEC-2i`，见 [loader 合同](rules-loader-contract.md) |
-| `async-output` | AR async output、snapshot/live state、平台与 guard/fallback | `EXEC-5a`, `EXEC-5b` |
-| `mtp-graph` | Talker-MTP FULL graph、平台能力与 tri-state fallback | `EXEC-4c` |
-| `runner-preprocess` | graph-bucket padded `input_ids` 与 semantic token-count metadata | `EXEC-4e` |
-| `image-task-envelope` | shared image/video task example、video output consumer 或 `model_extras` prompt builder | `EXEC-6a`–`EXEC-6d`，见 [image task envelope 合同](rules-image-task-envelope.md) |
-| `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
-| `output-contract` | Omni 输出类型与字段/复制合同 | `EXEC-7a`–`EXEC-7b`，见 [输出类型合同](rules-output-contract.md) |
-| `runtime-hot-paths` | 采样循环不变量、固定输入缓存、AR 音频侧路、codec 帧账本与 CosyVoice3 typed handoff | `EXEC-8a`, `EXEC-9a`, `EXEC-11a`–`EXEC-11h`，见 [运行时热路径合同](rules-runtime-hot-paths.md) |
-| `platform-backends` | NPU runner 接口、ROCm 分页注意力、NPU 模型补丁注册 | `EXEC-10a`–`EXEC-10e`, `EXEC-12a`–`EXEC-13h`，见 [平台后端合同](rules-platform-backends.md) |
 
 ## 严格配置校验
 

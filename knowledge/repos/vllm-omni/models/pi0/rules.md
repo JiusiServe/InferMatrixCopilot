@@ -10,6 +10,12 @@ confidence: high
 
 # Pi0 模型硬门禁
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| observation preprocessing、flow matching、attention 或 action output | `PI0-1a` |
+
 本页承载 Pi0 专有的 VLA 观测预处理、flow-matching kernel、attention 边界与动作输出验证合同；共享输出和配置 wiring 规则见相关页面。
 
 ## PI0-1a — π0 的观测、attention 与动作输出必须保持 OpenPI/LeRobot 合同

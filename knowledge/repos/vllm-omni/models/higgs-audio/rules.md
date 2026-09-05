@@ -10,6 +10,13 @@ confidence: high
 
 # Higgs-Audio 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| request RNG/decode state | `HIGGS-1a` |
+| voice-clone sentinel、placeholder positions 或 chunked prefill | `HIGGS-2a` |
+
 ## HIGGS-1a — V3 codec sampling 与 decode state 必须按 request 所有
 
 - 触发：Higgs-Audio V3 seeded sampling、八 codebook flatten/compaction、GPU decode delay 或 replacement request。

@@ -10,6 +10,12 @@ confidence: high
 
 # dots.tts 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| weekly E2E、prompt scaffold、result queue 或 request-noise oracle | `DOTS-1a` |
+
 ## DOTS-1a — weekly E2E scaffold 必须保留 prompt、队列与 request-noise oracle
 
 - 触发：修改 dots.tts offline E2E、prompt helper、`compute_logits` result queue 或 flow-matching noise test。

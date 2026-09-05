@@ -10,6 +10,12 @@ confidence: high
 
 # Mage-VL 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| experimental adapter、bounded duplex、codec backend 或 native-support claim | `MAGEVL-1a` |
+
 ## MAGEVL-1a — experimental adapter 必须保持 remote-code、bounded duplex 与 non-native boundary
 
 - 触发：Mage-VL loader/backend、adapter capability、visual window/gate flow、WebSocket protocol、codec backend、

@@ -10,6 +10,12 @@ confidence: high
 
 # Nemotron VoiceChat 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| duplex data plane、tool result、codec lifecycle 或 deployment evidence | `NVC-1a`–`NVC-1f` |
+
 只有 `NVC-数字字母` 是本页可审计规则 ID。
 
 ## NVC-1a — 原生 duplex 是 frame-locked、可恢复的三 stage 数据面

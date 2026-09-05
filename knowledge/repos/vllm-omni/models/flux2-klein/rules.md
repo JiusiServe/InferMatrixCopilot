@@ -10,6 +10,12 @@ confidence: high
 
 # FLUX.2-Klein 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| final-layout HWR、packed weights 或 warm restore validation | `FLUXK-1a` |
+
 只有 `FLUXK-数字字母` 是可审计规则 ID。共享 artifact、lease 和 DLO transport
 约束见 [Diffusion checkpoint rules](../../components/diffusion/rules-checkpoint-loading.md#diff-2z-final-layout-hwr-只能接入-eligible-no-allgather-dlo) 与
 [Host Weight Runtime rules](../../components/host-weight-runtime/rules.md)。

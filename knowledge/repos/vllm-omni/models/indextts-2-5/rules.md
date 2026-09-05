@@ -10,6 +10,12 @@ confidence: high
 
 # IndexTTS 2.5 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| bundle/topology、frontend/voice、证据边界或 S2Mel batching | `ITTS25-1a`–`ITTS25-1d` |
+
 ## ITTS25-1a — native bundle/config 与两 stage topology 必须 fail fast
 
 - 触发：修改 registry、pipeline、deploy、bundle discovery、tokenizer-free init 或 latent policy。

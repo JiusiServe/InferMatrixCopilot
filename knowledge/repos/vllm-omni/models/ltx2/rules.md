@@ -10,7 +10,14 @@ confidence: high
 
 # LTX-2.5 DiffVAE 规则
 
-### LTX25-1 — LTX-2.5 的 decoder、统计量与 artifact 必须作为同一版本化合同维护
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| DiffVAE artifact/version 或 request/distributed decode | `LTX25-1`、`LTX25-2` |
+| decoded-video transport、device quantization 或 profiler boundary | `LTX-3` |
+
+## LTX25-1 — LTX-2.5 的 decoder、统计量与 artifact 必须作为同一版本化合同维护
 
 - 触发：修改 LTX-2.5 full/distilled one- or two-stage pipeline 的视频 decoder、`ltx2_use_conv_vae`、
   latent normalization、Native sidecar、component residency 或 NATTEN Hub-kernel dependency/remediation
@@ -31,7 +38,7 @@ confidence: high
   guidance、production error 和 LTX-2.5 test 必须一致地说明 `kernels==0.15.2` 与上述 Transformers
   范围。^[PR #6189] ^[PR #7020]
 
-### LTX25-2 — DiffVAE 请求边界与分布式 decode 必须显式 fail-closed
+## LTX25-2 — DiffVAE 请求边界与分布式 decode 必须显式 fail-closed
 
 - 触发：修改 LTX-2.5 decode、`vae_parallel_mode`、tiling、request resolution validation 或 request RNG。
 - 强制：DiffVAE request validation 从首个 decoder-stage kernel 推导最小 latent H/W，并在 denoising 前
@@ -45,7 +52,7 @@ confidence: high
 - 验收：覆盖 early geometry rejection 与 ConvVAE control、tile positive/non-tile negative modes、serial
   RNG-order parity，以及 output/non-output rank 在 collective/non-collective decode 的分支。^[PR #6189]
 
-### LTX-3 — LTX decoded-video transport 必须在设备端量化且保持 presentation 与 profiler 边界
+## LTX-3 — LTX decoded-video transport 必须在设备端量化且保持 presentation 与 profiler 边界
 
 - 触发：修改 LTX-2/2.3/2.5 decoded-video finalization、`output_type="np"`、worker/IPC transport，或
   LTX diffusion-pipeline profiler wrapping。

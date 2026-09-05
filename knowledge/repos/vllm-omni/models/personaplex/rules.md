@@ -10,6 +10,14 @@ confidence: high
 
 # PersonaPlex 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| frame/de-delay、session codec、persona/voice mutation | `PPLEX-1a`–`PPLEX-1c` |
+| standalone lease | `PPLEX-2a` |
+| checkpoint config 或 sampling capability | `PPLEX-3a`、`PPLEX-3b` |
+
 只有 `PPLEX-数字字母` 是可审计规则 ID。
 
 ## PPLEX-1a — frame 与 de-delay 边界必须跨 chunk 连续

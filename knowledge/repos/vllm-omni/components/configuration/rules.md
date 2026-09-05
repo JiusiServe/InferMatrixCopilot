@@ -22,7 +22,6 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 |---|---|---|
 | strict schema、unknown field、alias、flat→nested、structured/legacy/direct parity、typed projection | `strict-normalization`：`VOMNI-CFG-1a`–`1h` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,strip_parent_engine_args}` → `vllm_omni/config/omni_config.py::{_build_diffusion_config_projection,VllmOmniConfig.from_pipeline_config}` → `vllm_omni/engine/stage_init_utils.py::{build_engine_args_dict,build_engine_args_dict_from_omni_stage_config}` |
 | deploy YAML、`base_config`、pipeline/stage overlay、pipeline-owned alias/hook、headless/offline parity、最终逐 stage config | `deploy-topology`：`CONF-3a`, `CONF-4b`, `CONF-5a`, [CONF-5i](rules-topology-profiles.md#conf-5i-pipeline-专属-alias-与-hook-必须在通用配置层声明归一并消费), [CONF-5j](rules-topology-profiles.md#conf-5j-pipelineconfig-在构造时必须验证终端-topology) | `vllm_omni/config/stage_config.py::{resolve_deploy_yaml,load_deploy_config,normalize_pipeline_cli_overrides,merge_pipeline_deploy,build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/config_factory.py::StageConfigFactory.create_from_model` → `vllm_omni/engine/stage_init_utils.py::_resolve_model_path` |
-| MiniCPM-o shipping profile、duplex/chat 共服、Talker sampling floor | model-specific [`MCPMO-4e`](../../models/minicpm-o-4-5/rules-duplex.md#mcpmo-4e-shipping-profile-必须共服-chat-与-native-duplex) | `deploy/minicpmo_4_5*.yaml` → `merge_pipeline_deploy`；duplex adapter runtime sampling override |
 | composable strategy、axis、routing、load balancing、`strategy-config` | `composable-strategy`：`CONF-4a` | `vllm_omni/config/composable_parallel/strategy_loader.py::{parse_strategy_specs,load_strategy_specs}` → `translator.py::translate_strategy_stack` → `apply.py::apply_strategy_specs` → `config_factory.py::{StageConfigFactory._apply_strategy_specs,StageConfigFactory._reconcile_strategy_with_cli}` |
 | `gpu_memory_utilization`、`kv_cache_memory_bytes`、多 stage 共卡、小显存 OOM | `deploy-memory`：`CONF-1a`, `CONF-2a` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/omni_config.py::{_build_runtime_config,_build_parallel_config,VllmOmniConfig.from_pipeline_config}` |
 | multi-stage HF sub-config、stage quantization view、`hf_config_name` | `stage-model-config`：`VOMNI-CFG-1i` | pipeline stage declaration → `OmniModelConfig::{draw_hf_text_config,get_model_arch_config}` → vLLM quantization selection |
@@ -30,21 +29,6 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | stage transport、`requires_full_payload_input`、topology projection 或 override rejection | `stage-transport`：`VOMNI-CFG-1p` | `stage_config.py::{StagePipelineConfig,_build_engine_args}` → `omni_config.py::_build_model_config` → `engine/arg_utils.py::OmniEngineArgs` |
 | SymmMem Ulysses transport | [VOMNI-CFG-1q](rules-diffusion-parallel-transport.md) + `DIFF-4x` | deploy → parallel config → Ulysses |
 | HF cache snapshot path、空 `config.json`、name-based pipeline fallback | [`model-reference-routing`](rules-model-reference-routing.md#conf-7a-模型引用解析必须物化对象存储配置并只从受控名称组件匹配)：`CONF-7a` | `config_factory.py::{_name_match_candidate,StageConfigFactory._try_infer_model_type}` → `pipeline_registry.py::OMNI_PIPELINES` → `tests/config/test_config_factory.py::TestNameMatchCandidateSnapshotPaths` |
-| Qwen3-TTS adaptive codec chunk keys、fixed-ramp precedence | [Qwen3-TTS `Q3TTS-3e`](../../models/qwen3-tts/rules.md#q3tts-3e-adaptive-ramp-是-host-side每段-opt-in-控制器不是-cuda-graph-计划) | `deploy/qwen3_tts{,_high_concurrency}.yaml` connector `extra` → `stage_input_processors/chunk_size_utils.py::parse_adaptive_config` |
-
-| 审查组 | 什么时候触发 | 规则 ID |
-|---|---|---|
-| `core` | 每次配置审查 | `VOMNI-CFG-1b`, `VOMNI-CFG-1c` |
-| `strict-normalization` | schema、alias、unknown field、structured/legacy/direct 路径 | `VOMNI-CFG-1a`, `VOMNI-CFG-1b`, `VOMNI-CFG-1c`, `VOMNI-CFG-1d`, `VOMNI-CFG-1e`, `VOMNI-CFG-1f`, `VOMNI-CFG-1g`, `VOMNI-CFG-1h` |
-| `deploy-memory` | 显存预算、KV pin、多 stage 共卡 | `CONF-1a`, `CONF-2a` |
-| `deploy-topology` | deploy、overlay、headless、topology wiring | `CONF-3a`–`3d`；`CONF-4b` 见 [并行拓扑合同](rules-parallel-topology.md)；`CONF-5a`–`5j` 见 [topology 与部署 profile](rules-topology-profiles.md)；MiniCPM-o profile 见 `MCPMO-4e` |
-| `composable-strategy` | strategy axis、routing、load balancing | `CONF-4a`, `CONF-4c`–`4d`，见 [并行拓扑合同](rules-parallel-topology.md) |
-| `stage-model-config` | HF nested config、stage-specific quantization/text config | `VOMNI-CFG-1i` |
-| `stage-config-propagation` | pipeline sampling constraints、StageConfig serialization/runtime config | `VOMNI-CFG-1o` |
-| `stage-transport` | full-payload transport capability、topology projection、deploy/CLI override | `VOMNI-CFG-1p`，见 [stage transport capability](rules-stage-transport.md) |
-| `diffusion-parallel-transport` | SymmMem Ulysses flag | [VOMNI-CFG-1q](rules-diffusion-parallel-transport.md) + `DIFF-4x` |
-| `model-reference-routing` | object-storage materialization、HF cache snapshot、name fallback | `CONF-7a`，见 [模型引用路由规则](rules-model-reference-routing.md) |
-| `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `VOMNI-CFG-0a`, `VOMNI-CFG-0b` |
 
 ## 配置归一化与新老路径一致性
 

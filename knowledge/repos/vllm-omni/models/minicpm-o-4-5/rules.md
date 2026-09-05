@@ -14,6 +14,17 @@ confidence: high
 
 ## Direct 代码快速入口
 
+| PR 描述信号 | 规则入口 |
+|---|---|
+| version/registry、processor、remote code | `MCPMO-1a`、`MCPMO-2a` |
+| Whisper/APM 或 SigLIP attention | `MCPMO-2b`、`MCPMO-2c` |
+| TTS/Code2Wav/TRT、CUDA Graph | `MCPMO-1b`–`MCPMO-1e`；[CUDA graphs](rules-cuda-graphs.md) |
+| batch、runtime info、reference-audio handoff | `MCPMO-3a`–`MCPMO-3e`；[Code2Wav batching](rules-code2wav-batching.md) |
+| native duplex、sampling budget、shipping profile、playback ACK | `MCPMO-4a`–`MCPMO-4h`；[duplex](rules-duplex.md) |
+| accuracy/performance/online-serving evidence | `MCPMO-5a`、`MCPMO-5b` |
+
+## 完整代码路由
+
 | PR 描述信号 | 规则组 | 第一批源码 |
 |---|---|---|
 | MiniCPM-o 4.5、`minicpmo_4_5`、版本识别 | MCPMO-2a | `config/pipeline_registry.py::OMNI_PIPELINES["minicpmo_4_5"]` → `model_executor/models/minicpmo_4_5/pipeline.py`；`model_executor/models/registry.py::_OMNI_MODELS` |
@@ -32,9 +43,6 @@ confidence: high
 | duplex Talker chunk、runtime `min_tokens`、chat sampling isolation | [`MCPMO-4c`](rules-duplex.md#mcpmo-4c-native-duplex-talker-必须按-generate_chunk-预算终止) | `experimental/fullduplex/minicpmo45/adapter.py` → stage 1 sampling → Talker `generate_chunk` |
 | shipping YAML、duplex/chat 共服、session capacity、async scheduler | [`MCPMO-4e`](rules-duplex.md#mcpmo-4e-shipping-profile-必须共服-chat-与-native-duplex) | `deploy/minicpmo_4_5*.yaml` → config merge → realtime/chat entrypoints |
 | playback ACK、response-owned assistant history、下一 input 后的 late ACK | [`MCPMO-4h`](rules-duplex.md#mcpmo-4h-responseplayback-history-必须由回答它的-input-commit-所有) | `experimental/fullduplex/openai/{protocol,serving}.py` → response snapshot / conversation item lifecycle |
-| Daily-Omni/Seed-TTS accuracy、simplex/duplex perf、TTFT/TTFP/RTF | MCPMO-5a | `tests/e2e/accuracy/minicpmo_4_5/`、`tests/dfx/perf/tests/test_minicpmo_4_5*.json` → `run_benchmark.py` |
-| online serving CI、async/sync chunk matrix、duplex fixture、soft-interrupt event oracle、local ref audio | MCPMO-5b | `tests/e2e/online_serving/{run_minicpmo_realtime_duplex_soft_interrupt.py,test_minicpmo_realtime_duplex_drivers.py}` → `helpers/minicpmo_4_5_duplex.py` |
-
 ## MCPMO-1a — trust_remote_code 服从用户选择
 
 - 触发：API/CLI server 为 MiniCPM-o 加载 tokenizer、processor、config 或模型代码。

@@ -10,6 +10,12 @@ confidence: high
 
 # Boogu-Image 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| revision、RoPE、Edit CFG/rank/VAE、request batching | `BOOGU-1a`–`BOOGU-1d` |
+
 ## BOOGU-1a — global revision 必须填入每个未显式设 revision 的 stage
 
 - 触发：全局/stage checkpoint revision handoff、Boogu component loader 或 Edit-Turbo recipe 变更。

@@ -301,7 +301,8 @@ def test_adapter_zero_declares_risk_tiers():
         # process-wide defaults, diffusion is multi-model shared code, and
         # distributed owns cross-stage transport — small diffs there still
         # need the full review ensemble
-        "platform", "diffusion", "distributed"}
+        "platform", "diffusion", "distributed",
+        "runtime_patch", "host_weight_runtime"}
 
 
 # -- repo-neutral core guard (§V2.2.1) -------------------------------------------

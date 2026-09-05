@@ -10,6 +10,12 @@ confidence: high
 
 # Qwen-Omni 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| MRoPE、quantization mapping、pipeline key、audio TP、code2wav 或 backend defaults | `QOMNI-1a`–`QOMNI-1f` |
+
 ## QOMNI-1a — Qwen3-Omni Thinker MRoPE 必须保留 CUDA custom-op 边界
 
 - 触发：修改 `qwen3_omni_moe.yaml` 的 CUDA compilation 配置、Thinker MRoPE/RMSNorm 路径，或升级会改变 Inductor MRoPE fusion 的 vLLM 版本。

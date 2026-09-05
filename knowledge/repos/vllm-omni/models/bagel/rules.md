@@ -10,6 +10,12 @@ confidence: high
 
 # BAGEL 实现规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| CFG position ID、nested DiT owner、step image wave/request state | `BAGEL-1`–`BAGEL-3` |
+
 ## BAGEL-1：CFG position ID 沿序列轴合并
 
 **适用范围**：`Bagel.forward` 将顺序 CFG 的 gen/cfg_text/cfg_img 分支合并为一次

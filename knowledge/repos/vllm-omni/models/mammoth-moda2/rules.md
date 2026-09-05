@@ -10,6 +10,13 @@ confidence: high
 
 # MammothModa2 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| task-scoped AR vocabulary | `MAMMO-1a` |
+| AR→DiT token/hidden-state bridge | `MAMMO-1b` |
+
 ## MAMMO-1a — AR sampling 必须按 task 隔离 text 与 visual vocabulary
 
 - 触发：修改 Preview/Qwen2.5-VL 或 Dev/Qwen3-VL 的 T2I prompt、额外 generation vocabulary、

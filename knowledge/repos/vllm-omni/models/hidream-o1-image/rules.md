@@ -10,6 +10,12 @@ confidence: high
 
 # HiDream-O1 Image 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| request geometry、mixed attention、TP、Cache-DiT 或 patch output | `HIDREAMO1-1a` |
+
 HiDream-O1 Image 的模型专属约束集中在本页；模型 registry signature、共享 attention backend 及通用 Cache-DiT lifecycle 不在此重复展开。
 
 ## HIDREAMO1-1a — HiDream-O1 Image pipeline 请求、并行与输出合同

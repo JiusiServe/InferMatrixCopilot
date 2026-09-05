@@ -10,6 +10,12 @@ confidence: high
 
 # Voxtral-TTS hot-path 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则 |
+|---|---|
+| graph layering、host sync 或 per-request CFG metadata | `VOXTTS-1a`–`VOXTTS-1c` |
+
 只有 `VOXTTS-数字字母` 是可审计规则 ID。
 
 ## VOXTTS-1a — variable-output full graph 与 inner acoustic graph 分层
