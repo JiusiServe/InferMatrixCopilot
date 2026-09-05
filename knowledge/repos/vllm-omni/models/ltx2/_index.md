@@ -1,10 +1,10 @@
 ---
 title: "LTX-2 家族（含 LTX-2.3/2.5）"
 created: 2026-07-16
-updated: 2026-09-04
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, ltx2]
-sources: [vllm_omni/diffusion/models/ltx2/, vllm_omni/diffusion/registry.py, recipes/LTX/LTX-2.md, recipes/LTX/LTX-2.5.md]
+sources: ["PR #6847", vllm_omni/diffusion/models/ltx2/, vllm_omni/diffusion/registry.py, recipes/LTX/LTX-2.md, recipes/LTX/LTX-2.5.md]
 ---
 
 # LTX-2 家族（含 LTX-2.3/2.5）
@@ -14,10 +14,12 @@ sources: [vllm_omni/diffusion/models/ltx2/, vllm_omni/diffusion/registry.py, rec
 - 厂商/模型：Lightricks；22B 参数文本→视频+音频生成（T2V/I2V，48kHz 同步音频，
   768x512 可达 20+ 秒）；Diffusers 格式 checkpoint `dg845/LTX-2.3-Diffusers`
 - 源码：`vllm_omni/diffusion/models/ltx2/`（纯 diffusion，无 AR stage）
-- registry：`LTX2Pipeline` 统一 LTX-2/LTX-2.3 的 one-stage T2V/I2V；
-  `LTX2DistilledPipeline` 统一 distilled two-stage T2V/I2V；DMD2 仍由
-  `LTX2T2VDMD2Pipeline`/`LTX2I2VDMD2Pipeline` 提供。旧的 LTX23、ImageToVideo 和
-  TwoStages registry names 已删除，没有兼容 alias。
+- registry：`LTX2Pipeline`/`LTX2TwoStagePipeline` 分别提供 ordinary one-/two-stage，
+  `LTX2DistilledOneStagePipeline`/`LTX2DistilledTwoStagePipeline` 分别提供 distilled
+  one-/two-stage T2V/I2V；后两个 explicit class 都解析到 canonical
+  `LTX2DistilledPipeline` video metadata，后者同时保留为 distilled two-stage 的 legacy
+  alias。DMD2 仍由 `LTX2T2VDMD2Pipeline`/`LTX2I2VDMD2Pipeline` 提供。旧的 LTX23、
+  ImageToVideo 和 plural `LTX2TwoStagesPipeline` registry names 已删除，没有兼容 alias。
 - 官方 recipe 已合并为 `recipes/LTX/LTX-2.md`；已删除的
   `recipes/LTX/LTX-2.3.md` 不能继续作为 source 或事实依据。
 - 依赖共享 [Diffusion 组件](../../components/diffusion/_index.md)

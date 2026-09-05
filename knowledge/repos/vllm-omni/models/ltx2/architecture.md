@@ -1,10 +1,10 @@
 ---
 title: "LTX-2/2.3/2.5 模型架构与证据索引"
 created: 2026-07-16
-updated: 2026-09-04
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models, ltx2]
-sources: [recipes/LTX/LTX-2.md, recipes/LTX/LTX-2.5.md, vllm_omni/diffusion/registry.py, "#4381", "#4464", "PR #6189", "PR #6342", vllm_omni/diffusion/models/ltx2/ltx2_components.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder_distributed.py, vllm_omni/diffusion/models/ltx2/ltx2_runtime.py, tests/diffusion/models/ltx2/test_ltx2_vae.py, tests/diffusion/models/ltx2/test_ltx2_vocoder_cuda.py, tests/e2e/accuracy/ltx/test_ltx25_official_similarity.py, tests/e2e/accuracy/ltx/test_ltx_official_similarity.py]
+sources: [recipes/LTX/LTX-2.md, recipes/LTX/LTX-2.5.md, vllm_omni/diffusion/registry.py, "#4381", "#4464", "PR #6189", "PR #6342", "PR #6847", vllm_omni/diffusion/models/ltx2/ltx2_components.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder_distributed.py, vllm_omni/diffusion/models/ltx2/ltx2_runtime.py, tests/diffusion/models/ltx2/test_ltx2_vae.py, tests/diffusion/models/ltx2/test_ltx2_vocoder_cuda.py, tests/e2e/accuracy/ltx/test_ltx25_official_similarity.py, tests/e2e/accuracy/ltx/test_ltx_official_similarity.py]
 ---
 
 # LTX-2/2.3/2.5 模型架构与证据索引
@@ -19,10 +19,15 @@ sources: [recipes/LTX/LTX-2.md, recipes/LTX/LTX-2.5.md, vllm_omni/diffusion/regi
 - serving 入口（LTX-2.3）：
   `vllm serve diffusers/LTX-2.3-Diffusers --omni --stage-init-timeout 600`；统一
   `LTX2Pipeline` 由 checkpoint metadata 选择 LTX-2 或 LTX-2.3 profile。
-- pipeline 变体：one-stage 使用 `LTX2Pipeline`，distilled two-stage 使用
-  `LTX2DistilledPipeline`，DMD2 使用 `LTX2T2VDMD2Pipeline`/
-  `LTX2I2VDMD2Pipeline`；T2V/I2V 通过是否提供 `image=` 选择，不再使用单独的
-  `*ImageToVideoPipeline` registry names。
+- pipeline 变体：ordinary one-/two-stage 分别使用 `LTX2Pipeline`/
+  `LTX2TwoStagePipeline`；distilled one-/two-stage 分别使用
+  `LTX2DistilledOneStagePipeline`/`LTX2DistilledTwoStagePipeline`，其中 legacy
+  `LTX2DistilledPipeline` 是后者 alias。两个 explicit distilled class 的 serving metadata
+  都解析到 canonical `LTX2DistilledPipeline` video metadata，避免 final stage 静默回落为
+  image；DMD2 使用 `LTX2T2VDMD2Pipeline`/`LTX2I2VDMD2Pipeline`。T2V/I2V 通过是否提供
+  `image=` 选择，不再使用单独的 `*ImageToVideoPipeline` registry names。PR #6847 仅以 CPU
+  metadata capability test 覆盖 explicit two-stage 的 video 分类，不证明 `/v1/videos`、真实模型
+  load、recipe 执行或 output formatter 的 E2E 行为。
 - LTX-2.5 的 video decode 将 canonical Native checkpoint 中的 decoder tensors 转换到
   Diffusers-compatible DiffVAE；full 与 distilled 的 one-/two-stage profile 默认将其作为额外
   video decoder component。ConvVAE 保留给 I2V encoding，也可由 startup-only
