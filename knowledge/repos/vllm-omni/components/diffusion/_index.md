@@ -9,8 +9,8 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 
 # Diffusion
 
-- 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
-- 源码校验：以上子模块均已在 `main @ 1e74807c` 验证存在；MiniMax-H3 的 VAE eager
+- 源码入口：`vllm_omni/diffusion/` 全树，含 17 个子模块：attention、cache、diffusion_kv、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
+- 源码校验：以上子模块均已在 `v0.29.0-alignment @ 1015b1ce`（`dev/vllm-align` 快照）验证存在；MiniMax-H3 的 VAE eager
   ops 仍由模型 owner 维护，其他 shared/模型机制按各自规则审查
 - 主要职责：多个 diffusion 模型共用的 pipeline、执行循环、scheduler 接入和运行机制
 

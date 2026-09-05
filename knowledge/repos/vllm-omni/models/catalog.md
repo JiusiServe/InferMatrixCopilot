@@ -10,7 +10,8 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 1e74807c`（2026-09-05）快照，数字会漂移，不能凭它断言“不支持”。
+`v0.29.0-alignment @ 1015b1ce`（2026-09-05）快照，数字会漂移，不能凭它断言“不支持”。
+`v0.29.0-alignment` 是 `dev/vllm-align` 的快照标签，不是上游 tag 或 main 修订。
 
 ## Direct 模型代码入口
 
@@ -39,6 +40,9 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 | Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 65 条 pipeline / 40 个模型族目录 |
 | Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 59 个 key |
 | Deploy YAML | `vllm_omni/deploy/*.yaml` | 89 份 |
+
+`1e74807c → 1015b1ce` 的对齐分支审计未改变四个 registry/deploy inventory 的
+条目或指纹；inventory 不变不代表注册逻辑或已有 deploy 文件内容没有变化。
 
 PR #5885 adds `MiniMaxH3TextEncoder`, the opt-in `minimax_h3_disaggregated` pipeline key,
 and regular/Turbo deployment profiles. It preserves bare H3's fused single-stage fallback;
@@ -137,8 +141,8 @@ step_audio_2_asr、voxcpm2、voxtral_tts、wan2_2_ti2v
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from ae57e406 \
-  --to 1e74807c \
+  --from 1e74807c \
+  --to 1015b1ce \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
