@@ -769,6 +769,7 @@ def test_rounds_stale_intent_never_approves_new_commit(tmp_path):
     assert fresh[0].state == "created"
     # the monitored build is the FRESH one at the new commit
     assert result.rounds[0].build_id == fresh[0].build_id
+    assert result.rounds[0].monitor_duration_sec is not None
     assert result.rounds[0].jobs == [{
         "name": "Green", "job_id": "Green", "state": "passed",
         "exit_status": 0, "classification": "passed", "log_file": "",

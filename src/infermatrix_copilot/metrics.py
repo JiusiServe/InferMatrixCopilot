@@ -207,6 +207,43 @@ def _read_json(path: Path) -> dict:
         return {}
 
 
+def _durable_rebase_signals(run_dir: Path, substate: dict) -> dict[str, Any]:
+    """Counts and timings recoverable from the rebase WAL/checkpoints."""
+    pushed = 0
+    build_ids: set[str] = set()
+    for path in (run_dir / "push_wal").glob("*.json") \
+            if (run_dir / "push_wal").is_dir() else ():
+        if _read_json(path).get("state") == "pushed":
+            pushed += 1
+    for path in (run_dir / "ci_ops").glob("*.json") \
+            if (run_dir / "ci_ops").is_dir() else ():
+        record = _read_json(path)
+        build_id = str(record.get("build_id") or "")
+        if build_id and record.get("state") in ("created", "cancelled"):
+            build_ids.add(build_id)
+
+    durations: list[float] = []
+    measured_ids: set[str] = set()
+    for round_ in ((substate.get("ci") or {}).get("rounds") or []):
+        build_id = str(round_.get("build_id") or "")
+        if build_id:
+            build_ids.add(build_id)
+        duration = round_.get("monitor_duration_sec")
+        if isinstance(duration, (int, float)) and duration >= 0:
+            durations.append(float(duration))
+            if build_id:
+                measured_ids.add(build_id)
+    ci_partial = bool(build_ids - measured_ids)
+    ci_minutes = round(sum(durations) / 60.0, 4) if durations else (
+        None if build_ids else 0.0)
+    return {
+        "pushes": pushed,
+        "ci_builds": len(build_ids),
+        "ci_minutes": ci_minutes,
+        "ci_minutes_partial": ci_partial,
+    }
+
+
 def _trace_events(run_dir: Path) -> list[dict]:
     """Read `run_dir/run_trace.jsonl` into a list of event dicts, skipping blank
     and malformed lines. Empty when the file is absent."""
@@ -346,24 +383,53 @@ def estimate_usd(tokens_in: int, tokens_out: int, ci_minutes: float,
 
 
 def _auto_components(kind: str, events: list[dict], progress: dict,
-                     status: str) -> dict[str, float | None]:
+                     status: str, *, substate: dict | None = None,
+                     durable: dict | None = None) -> dict[str, float | None]:
     """The honestly auto-derivable slice of each task's components. Everything
     that needs juries, GT, CI re-runs, or maintainer feedback stays None."""
     completed = progress.get("completed", {}) if isinstance(progress, dict) else {}
     components: dict[str, float | None] = {
         k: None for k in TASK_WEIGHTS.get(kind, {})}
     if kind in ("pr_rebase", "repo_rebase"):
-        if "push" in completed or ("rebase" in completed and status == "done"):
+        substate = substate or {}
+        durable = durable or {}
+        if ((status == "done" and (substate.get("phase") == "done"
+                                   or "finalize" in completed))
+                or "push" in completed
+                or ("rebase" in completed and status == "done")):
             components["completed"] = 1.0
         elif status in ("failed", "blocked"):
             components["completed"] = 0.0
         # push_safe: guard violations surface as incidents; a completed push
         # with no push-related incident was a with-lease PR-head push by
         # construction (single choke point)
-        if "push" in completed:
+        if "push" in completed or durable.get("pushes", 0) > 0:
             components["push_safe"] = 1.0
         if "verify" in completed and "gate" in completed:
             components["tests"] = 1.0
+        modules = substate.get("modules") or {}
+        active_modules = [m or {} for m in modules.values()
+                          if not (m or {}).get("skip")]
+        if active_modules:
+            components["conflict"] = 1.0 if all(
+                m.get("status") == "done" for m in active_modules) else 0.0
+        tests = substate.get("tests") or {}
+        pipeline = tests.get("pipeline") or {}
+        precommit = (tests.get("precommit") or {}).get("result")
+        ci_result = (substate.get("ci") or {}).get("result")
+        test_failed = (int(pipeline.get("failed") or 0) > 0
+                       or bool(tests.get("infra_failures"))
+                       or precommit == "failed"
+                       or (ci_result and ci_result != "passed"))
+        if test_failed:
+            components["tests"] = 0.0
+        elif ci_result == "passed" or (
+                int(pipeline.get("passed") or 0) > 0
+                and int(pipeline.get("skipped") or 0) == 0):
+            components["tests"] = 1.0
+        if substate and components.get("completed") is not None:
+            components["purity"] = 0.0 if any(
+                ev.get("kind") == "out_of_scope_edit" for ev in events) else 1.0
     elif kind == "pr_debug":
         # repro: fraction of debug groups whose output recorded tests_run
         # (foreach fan-out keys outputs by index; a single group is the
@@ -400,38 +466,57 @@ def collect_run_metrics(run_dir: Path, settings: "Settings",
     events = _trace_events(run_dir)
     task = _read_json(run_dir / "task.json")
     progress = _read_json(run_dir / "progress.json")
+    substate = _read_json(run_dir / "substate.json")
     spec = task.get("spec") or task or {}
     kind = str(spec.get("kind") or "")
 
     ts = [float(ev["ts"]) for ev in events if isinstance(ev.get("ts"), (int, float))]
     minutes = (max(ts) - min(ts)) / 60.0 if len(ts) >= 2 else 0.0
-    ci_minutes = sum(float(ev.get("minutes") or 0.0) for ev in events
-                     if ev.get("kind") == "ci_build")
+    durable = _durable_rebase_signals(run_dir, substate)
+    event_ci_minutes = [float(ev.get("minutes") or 0.0) for ev in events
+                        if ev.get("kind") == "ci_build"
+                        and ev.get("minutes") is not None]
+    ci_minutes = (sum(event_ci_minutes) if event_ci_minutes
+                  else durable["ci_minutes"])
+    ci_minutes_source = ("trace" if event_ci_minutes else
+                         "monitor_wall" if ci_minutes is not None
+                         and durable["ci_builds"] else "none")
+    ci_time_partial = bool(durable["ci_minutes_partial"])
     # ONE canonical cost source (W7): per-request llm spans when the trace
     # exists (each span priced by its own model + cache fields); the event
     # sum is the tagged fallback ONLY when no trace — never both
     span_cost = cost_from_spans(run_dir / "trace.jsonl", settings)
-    _, _, tool_calls = usage_from_events(events)
+    _, _, declared_tool_calls = usage_from_events(events)
+    explicit_tool_calls = sum(1 for ev in events
+                              if ev.get("kind") == "tool_call")
+    tool_calls = max(declared_tool_calls, explicit_tool_calls)
     if span_cost is not None:
         tokens_in = span_cost["input_tokens"]
         tokens_out = span_cost["output_tokens"]
-        usd = span_cost["usd"] + ci_minutes * settings.ci_rate_usd_per_min
+        usd = (span_cost["usd"]
+               + (ci_minutes or 0.0) * settings.ci_rate_usd_per_min)
         cost_source = "spans"
     else:
         tokens_in, tokens_out, _ = usage_from_events(events)
-        usd = estimate_usd(tokens_in, tokens_out, ci_minutes, settings)
+        usd = estimate_usd(tokens_in, tokens_out, ci_minutes or 0.0, settings)
         cost_source = "events"
 
     incidents = derive_incidents(events)
     s = safety_multiplier(incidents)
     usd_ref = settings.cost_ref_usd.get(kind, settings.cost_ref_usd.get("default", 1.0))
     min_ref = settings.cost_ref_min.get(kind, settings.cost_ref_min.get("default", 10.0))
-    cost_partial = bool((span_cost or {}).get("cost_partial"))
+    llm_requests = sum(1 for ev in events
+                       if ev.get("kind") == "rebase_llm_request")
+    usage_missing = span_cost is None and llm_requests > 0 \
+        and tokens_in == 0 and tokens_out == 0
+    cost_partial = bool((span_cost or {}).get("cost_partial")) \
+        or ci_time_partial or usage_missing
     # a partial usd is a lower bound — a cost index over it would flatter the
     # run, so it is omitted rather than computed from a fabrication
     c = None if cost_partial else cost_index(usd, minutes, usd_ref, min_ref)
 
-    components = _auto_components(kind, events, progress, status)
+    components = _auto_components(kind, events, progress, status,
+                                  substate=substate, durable=durable)
     for key, value in (extra_components or {}).items():
         components[key] = value
     abstained = _abstained(kind, events, status)
@@ -455,7 +540,10 @@ def collect_run_metrics(run_dir: Path, settings: "Settings",
         "cost": {
             "usd": round(usd, 4),
             "minutes": round(minutes, 2),
-            "ci_minutes": round(ci_minutes, 2),
+            "ci_minutes": (round(ci_minutes, 2)
+                           if ci_minutes is not None else None),
+            "ci_minutes_partial": ci_time_partial,
+            "ci_minutes_source": ci_minutes_source,
             "input_tokens": tokens_in,
             "output_tokens": tokens_out,
             "tool_calls": tool_calls,
@@ -465,7 +553,8 @@ def collect_run_metrics(run_dir: Path, settings: "Settings",
             "cost_partial": cost_partial,
             "unpriced_calls": (span_cost or {}).get("unpriced_calls", 0),
             "source": cost_source,
-            "llm_calls": (span_cost or {}).get("llm_calls"),
+            "llm_calls": ((span_cost or {}).get("llm_calls")
+                          if span_cost is not None else llm_requests or None),
             "by_role": (span_cost or {}).get("by_role"),
             "cache_read_tokens": (span_cost or {}).get("cache_read_tokens"),
             "cache_creation_tokens": (span_cost or {}).get("cache_creation_tokens"),
@@ -479,7 +568,9 @@ def collect_run_metrics(run_dir: Path, settings: "Settings",
         "tus": None if (q is None or c is None) else round(tus(q, s, c), 4),
         "signals": {
             "escalations": sum(1 for ev in events if ev.get("kind") == "escalation"),
-            "pushes": sum(1 for ev in events if ev.get("kind") == "push_requested"),
+            "pushes": (durable["pushes"] or sum(
+                1 for ev in events if ev.get("kind") == "push_requested")),
+            "ci_builds": durable["ci_builds"],
             "posted": sum(1 for ev in events if ev.get("kind") == "posted_artifact"),
             "steps_completed": len((progress or {}).get("completed", {})),
         },

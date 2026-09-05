@@ -34,6 +34,20 @@ async def _final_report(ctx: StepContext) -> StepResult:
     if note:
         lines += [f"- {note}", ""]
     outputs_map = ctx.state.get("outputs") or {}
+    if isinstance(spec, dict) and spec.get("kind") == "repo_rebase":
+        rebase_summary = ctx.run_dir / "FINAL_SUMMARY.md"
+        if rebase_summary.is_file():
+            try:
+                summary_lines = rebase_summary.read_text(
+                    encoding="utf-8").splitlines()
+                if summary_lines and summary_lines[0].startswith(
+                        "# FINAL_SUMMARY"):
+                    summary_lines = summary_lines[1:]
+                while summary_lines and not summary_lines[0].strip():
+                    summary_lines.pop(0)
+                lines += ["## Rebase result", "", *summary_lines, ""]
+            except OSError:
+                pass
     for key in _DELIVERABLE_KEYS:
         text = ctx.state.get(key)
         if not text:

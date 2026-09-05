@@ -128,6 +128,21 @@ def test_blocked_escalates(env, tmp_path):
     assert (tmp_path / "run" / "ESCALATION.md").exists()
 
 
+def test_resolved_escalation_moves_to_history(env, tmp_path):
+    registry, executor, notifier = env
+    registry.register(make_step(
+        "s.blocked", lambda ctx: StepResult(
+            False, FailureKind.BLOCKED, "temporary operator action")))
+    asyncio.run(executor.run(playbook([PlaybookStep("a", "s.blocked")]), {}))
+
+    assert notifier.resolve("resumed workflow completed") is True
+    assert not (tmp_path / "run" / "ESCALATION.md").exists()
+    history = (tmp_path / "run" / "ESCALATION_HISTORY.md").read_text()
+    assert "temporary operator action" in history
+    assert "resumed workflow completed" in history
+    assert notifier.resolve() is False
+
+
 def test_escalation_summary_and_artifacts_forwarded(env):
     registry, executor, notifier = env
     registry.register(make_step(

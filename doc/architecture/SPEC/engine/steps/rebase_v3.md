@@ -21,7 +21,7 @@ step —— 薄的受治理 wrapper，substate-first、类型化失败、发布�
 | `rebase.v3_test_loop` | script/write_workspace | `phase3_failed`；substate `tests.pipeline`/`infra_failures`；空 manifest ⇒ `manifest_empty` |
 | `rebase.v3_precommit` | script/write_workspace | 无发布 —— substate `tests.precommit`（passed/failed/failed_preexisting/not_declared） |
 | `rebase.v3_push_gate` | deterministic/read | `push_gate_flagged`、`push_gate_overrides`；不许 ⇒ FORBIDDEN；override 记 trace |
-| `rebase.v3_ci` | script/push | `ci_result`、`ci_build_urls`；substate `ci`（rounds/adopted/unfixed，以及逐 job 分类证据） |
+| `rebase.v3_ci` | script/push | `ci_result`、`ci_build_urls`；substate `ci`（rounds/adopted/unfixed，以及逐 job 分类证据与 monitor 时长） |
 | `rebase.v3_finalize` | deterministic/read | 无发布 —— substate `phase=done|needs_human`；有失败 ⇒ BLOCKED（复用 exit 3） |
 
 ## 公开契约（注册的 step 之外）

@@ -1,6 +1,6 @@
 # metrics.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-09-06 -->
 
 `LOC ~493 · 跨切（测量） · refactor-status: oversized`
 
@@ -8,7 +8,7 @@
 计算并持久化逐 run 的 `metrics.json`（CATQ = Q·S/C）。
 
 ## 功能
-读取该 run 的 trace/产物；计算 Q（按 kind 在**已知**分量上加权的质量）、
+读取该 run 的 trace/产物以及 rebase 的 substate/CI-op/push WAL；计算 Q（按 kind 在**已知**分量上加权的质量）、
 S（由 incident 得出的安全系数）、C（RQS3e 式的对数成本，基于 USD + 墙钟对参考预算）；
 写出 `metrics.json`。
 
@@ -24,6 +24,12 @@ S（由 incident 得出的安全系数）、C（RQS3e 式的对数成本，基�
 - **成本绝不编造。** harness 后端不向 span 记账暴露 token（每项都是 `tok_out=0`），
   所以来源被记为 `subscription`，**不发明 USD** —— 这正是 harness 的成本优势
   **是假设而非测量**的原因（`providers/base.md`）。
+- repo-rebase 的 push/build 计数来自 durable WAL，tool 数来自逐次
+  `tool_call` 事件；CI monitor wall-time 随 round 持久化并明确标来源。已有 build 但没有可恢复
+  时长、或有 LLM request 却没有 token usage 时，成本标 `partial` 且未知 CI
+  分钟写 `null`，绝不以 0 冒充。
+- repo-rebase 的 completed/conflict/tests/purity/push_safe 从 terminal substate、
+  WAL 与 incident trace 推导；未观察到的信号继续为 `null`。
 
 ## 边界 —— 不属于这里
 **不影响控制流。只做测量。**

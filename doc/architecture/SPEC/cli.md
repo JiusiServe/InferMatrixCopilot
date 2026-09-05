@@ -1,6 +1,6 @@
 # cli/ —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-09-06 -->
 
 `LOC ~1420（6 个文件） · 接口 + 编排门面 · refactor-status: ok`
 
@@ -67,6 +67,8 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
   `resolve()` 与 `_execute` 的 state seed 都走它。
 - 阻塞原因随终局落盘：`last_blocked_reason` 进入 `run_status.json` 的
   note —— 以前只打在子进程 console 上就被丢掉。
+- resume 成功终局调用 notifier resolution：旧 `ESCALATION.md` 归档到 history，
+  不让已经完成的 run 继续显示活动阻塞标记。
 
 ## 边界 —— 不属于这里
 不含 step 逻辑、不含仓库知识字面量、不含 LLM prompt。**只做编排接线。**

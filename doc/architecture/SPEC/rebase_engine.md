@@ -87,6 +87,8 @@ runner/LLM/CI client 全部可注入 —— 每个模块都能离线测试。
   shell 的 venv 状态绝不影响装到哪；只有 import 验证失败才重试。
 - CI 创建受守卫：durable op 记录先于 API 调用，恢复按 op id 精确匹配，
   **不确定时绝不重复创建**。
+- 每个被 monitor 的 CI round 持久化实际 monitor 时长，供 run metrics 从 durable
+  substate 计费；无法恢复的旧/中止 build 时长保持 unknown。
 - CI baseline 使用最高可信来源（schedule > API > other）的最近窗口：最新
   构建失败立即生效，较旧失败只有在窗口内重复出现才保留；单次陈旧红构建不会
   越过更新的绿构建复活。
