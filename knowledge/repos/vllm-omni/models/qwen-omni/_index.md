@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", "PR #4322", "PR #6886", vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/registry.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/quantization/component_config.py, docs/design/qwen3_omni_tts_performance_optimization.md]
+sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", "PR #4322", "PR #6886", "PR #7019", vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/registry.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/engine/stage_init_utils.py, vllm_omni/quantization/component_config.py, tests/engine/test_stage_engine_args.py, docs/design/qwen3_omni_tts_performance_optimization.md]
 ---
 
 # Qwen-Omni 家族（Qwen2.5-Omni / Qwen3-Omni / Qwen3-TTS）
@@ -30,6 +30,10 @@ sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", "PR #4322"
   Thinker/Talker/Code2Wav 不得再次改名，仅在自身声明 packed modules 时补充对应 metadata。
   component/default quant configs 都是同一映射合同的一部分；验收规则归本目录的
   Qwen-Omni rules。^[PR #5687]
+- Qwen3-Omni 的 MoE backend 默认仅在已解析值仍为 `auto`/缺失时选择 `triton`，显式 backend
+  保留；随仓库发布的 2×H100 profile 为 Thinker 与 Talker 都 pin `moe_backend: triton`，不再以
+  `VLLM_USE_FLASHINFER_MOE_FP16` 这类环境变量选择。legacy/typed builder 的最终 args 都是验收
+  边界；精确规则与证据限制见本目录 Qwen-Omni rules。^[PR #7019]
 - vLLM 0.27 后 upstream 与 Omni registry 有同名 architecture：Omni 必须覆盖全局 entry；plain
   `vllm serve` 缺 `model_stage` 时 Qwen2.5/Qwen3 默认 thinker，Qwen3 thinker 在非 staged 模式返回
   bare tensor，只有 staged talker consumer 才请求 captured layers；共享验收见
@@ -56,4 +60,4 @@ sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", "PR #4322"
 | 遇到什么 | 查看哪里 |
 |---|---|
 | stage 拓扑、代际差异与官方性能优化结论 | [architecture](architecture.md) |
-| Qwen3-Omni Thinker MRoPE、CUDA compilation custom-op boundary、AWQ/compressed-tensors 名称映射、固定种子音频回归、audio-encoder head/TP divisibility，或 Qwen2.5 code2wav soft-fail/旧 speech helper | [Qwen-Omni rules](rules.md) |
+| Qwen3-Omni Thinker MRoPE、CUDA compilation custom-op boundary、AWQ/compressed-tensors 名称映射、MoE backend default/override、固定种子音频回归、audio-encoder head/TP divisibility，或 Qwen2.5 code2wav soft-fail/旧 speech helper | [Qwen-Omni rules](rules.md) |
