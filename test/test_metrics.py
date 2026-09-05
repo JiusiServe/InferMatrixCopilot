@@ -208,6 +208,59 @@ def test_collect_rebase_auto_components_and_partial_flag(settings, tmp_path):
     assert m["catq"] is not None and 0 < m["catq"] <= 1.0
 
 
+def test_collect_repo_rebase_uses_durable_operations_and_substate(
+        settings, tmp_path):
+    run_dir = _make_run(tmp_path, "repo_rebase", events=[
+        {"kind": "task"},
+        {"kind": "rebase_llm_request"},
+        {"kind": "tool_call", "tool": "read_file"},
+        {"kind": "tool_call", "tool": "run_shell"},
+    ], completed={"finalize": {}})
+    (run_dir / "push_wal").mkdir()
+    (run_dir / "push_wal" / "p0.json").write_text(json.dumps({
+        "state": "pushed"}))
+    (run_dir / "ci_ops").mkdir()
+    (run_dir / "ci_ops" / "c0.json").write_text(json.dumps({
+        "state": "created", "build_id": "42"}))
+    (run_dir / "substate.json").write_text(json.dumps({
+        "phase": "done",
+        "modules": {"active": {"status": "done", "skip": False},
+                    "idle": {"skip": True}},
+        "tests": {"pipeline": {"passed": 0, "failed": 0, "skipped": 3},
+                  "precommit": {"result": "failed_preexisting"}},
+        "ci": {"result": "passed", "rounds": [{
+            "build_id": "42", "monitor_duration_sec": 150.0}]},
+    }))
+
+    metrics = collect_run_metrics(run_dir, settings, "done")
+    assert metrics["signals"]["pushes"] == 1
+    assert metrics["signals"]["ci_builds"] == 1
+    assert metrics["cost"]["ci_minutes"] == 2.5
+    assert metrics["cost"]["ci_minutes_source"] == "monitor_wall"
+    assert metrics["cost"]["tool_calls"] == 2
+    assert metrics["cost"]["llm_calls"] == 1
+    assert metrics["quality"]["components"] == {
+        "completed": 1.0, "conflict": 1.0, "tests": 1.0,
+        "purity": 1.0, "push_safe": 1.0,
+    }
+    # Tokens were not exposed for the durable LLM request, so USD/CATQ stay
+    # explicitly partial instead of pretending the run cost nothing.
+    assert metrics["cost"]["cost_partial"] is True
+    assert metrics["cost"]["cost_index"] is None
+
+
+def test_collect_repo_rebase_marks_unmeasured_ci_time_unknown(settings,
+                                                              tmp_path):
+    run_dir = _make_run(tmp_path, "repo_rebase", events=[{"kind": "task"}])
+    (run_dir / "ci_ops").mkdir()
+    (run_dir / "ci_ops" / "c0.json").write_text(json.dumps({
+        "state": "cancelled", "build_id": "old"}))
+    metrics = collect_run_metrics(run_dir, settings, "blocked")
+    assert metrics["cost"]["ci_minutes"] is None
+    assert metrics["cost"]["ci_minutes_partial"] is True
+    assert metrics["cost"]["cost_partial"] is True
+
+
 def test_collect_rebase_safe_abstain_scores_fixed(settings, tmp_path):
     run_dir = _make_run(tmp_path, "pr_rebase", events=[
         {"kind": "task"},

@@ -2195,6 +2195,7 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
             "ignored": r.ignored,
             "ignored_baseline": r.ignored_baseline,
             "jobs": list(r.jobs),
+            "monitor_duration_sec": r.monitor_duration_sec,
         } for r in result.rounds]}})
     updates = {"ci_result": result.result,
                "ci_build_urls": [r.build_url for r in result.rounds

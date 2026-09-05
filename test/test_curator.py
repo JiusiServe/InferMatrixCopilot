@@ -434,9 +434,16 @@ def test_phase5_report_and_compare_steps(settings, trace, tmp_path):
     run_dir.mkdir()
     sub = Substate(run_dir, "run-p")
     sub.update({"modules": {"core": {"status": "done"},
+                            "docs": {"skip": True},
                             "worker": {"status": "failed"}},
                 "tests": {"pipeline": {"passed": 3, "failed": 1,
-                                       "failed_tests": ["t_x"]}}})
+                                       "failed_tests": ["t_x"],
+                                       "skipped": 2}},
+                "ci": {"result": "passed", "reason": "baseline debt",
+                       "rounds": [{"build_id": "42",
+                                   "build_state": "failed", "passed": 8,
+                                   "failed": [], "ignored": 1,
+                                   "ignored_baseline": 2}]}})
 
     def ctx(params=None):
         return StepContext(
@@ -446,12 +453,26 @@ def test_phase5_report_and_compare_steps(settings, trace, tmp_path):
                                  "repo": "widget-repo",
                                  "params": {"rebase_mode": "full",
                                             **(params or {})}},
-                   "repo_path": str(repo), "run_id": "run-p"})
+                   "repo_path": str(repo), "run_id": "run-p",
+                   "manifest_jobs": 6})
 
     r = asyncio.run(registry.get("rebase.v3_phase5_report").handler(ctx()))
     assert r.ok
     summary = (run_dir / "FINAL_SUMMARY.md").read_text(encoding="utf-8")
     assert "worker: failed" in summary and "failed: t_x" in summary
+    assert "docs: skipped (not assigned)" in summary
+    assert "manifest jobs: 6" in summary and "not run/skipped: 2" in summary
+    assert "effective result: passed" in summary
+    assert "raw provider state: failed (build 42" in summary
+
+    # The generic report is the canonical user-facing artifact; for a rebase
+    # it embeds the phase-5 result rather than producing an empty shell.
+    r = asyncio.run(registry.get("report.final_summary").handler(ctx()))
+    assert r.ok
+    report = (run_dir / "RUN_REPORT.md").read_text(encoding="utf-8")
+    assert "## Rebase result" in report
+    assert "docs: skipped (not assigned)" in report
+    assert "raw provider state: failed" in report
 
     # compare with no baseline and no declared knowledge: artifact +
     # explicit no-baseline note, no drift machinery

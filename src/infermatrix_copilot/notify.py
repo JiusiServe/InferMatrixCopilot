@@ -67,6 +67,39 @@ class Notifier:
         self._email(f"[infermatrix-copilot] {severity}: {phase}", body)
         return path
 
+    def resolve(self, resolution: str = "run completed successfully") -> bool:
+        """Archive a stale active escalation after a resumed run succeeds.
+
+        ``ESCALATION.md`` is an active-attention marker. Keeping it beside a
+        successful terminal status is misleading, but deleting it would lose
+        useful history, so its full contents are appended to the history file
+        before the marker is removed.
+        """
+        active = self.run_dir / "ESCALATION.md"
+        if not active.is_file():
+            return False
+        try:
+            body = active.read_text(encoding="utf-8")
+            history = self.run_dir / "ESCALATION_HISTORY.md"
+            previous = (history.read_text(encoding="utf-8")
+                        if history.is_file() else "")
+            # Idempotent across a crash after the history append but before
+            # unlinking the active marker.
+            if body.rstrip() not in previous:
+                with open(history, "a", encoding="utf-8") as stream:
+                    if previous:
+                        stream.write("\n---\n\n")
+                    stream.write(body.rstrip())
+                    stream.write("\n\n## Resolution\n")
+                    stream.write(
+                        f"- **when**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    stream.write(f"- {resolution}\n")
+            active.unlink()
+        except OSError:
+            return False
+        self.trace.record("escalation_resolved", resolution=resolution)
+        return True
+
     def _render(self, esc: Escalation) -> str:
         """Render an Escalation into the ESCALATION.md Markdown body: run/phase/
         timestamp header, the reason, the state summary as a JSON block, and an

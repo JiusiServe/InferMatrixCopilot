@@ -1,6 +1,6 @@
 # engine/steps/rebase_knowledge.py —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-09-06 -->
 
 `LOC ~354 · step 库（v3 知识尾段） · refactor-status: ok`
 
@@ -24,6 +24,9 @@ v3 playbook 的 Rev 8 §2.2 流水线尾段（`phase5_report → curate → comp
   report_only 到不了 prep（它的 stores 全程只读）。
 - `phase5_report` 在 curate **之前**运行、只读 substate —— curation 永远
   没机会掩盖 run 实际做了什么。
+- phase5 事实必须可区分：未分派 module 显示 `skipped (not assigned)`，本地
+  测试分别报告 manifest 总数、实际执行数与 not-run/skipped；远端 CI 同时
+  展示 provider 原始状态和 baseline reconciliation 后的 effective 结果。
 - curate 只写 copilot **runtime** store —— 父 read-compat 层与 adapter 树
   绝不被写（**D2**）；watchdog 决策收割**恰好一次**（state log 的身份集是
   去重权威；`_repo_run_dirs` 按 task.json 定界到本仓库的 run dirs，跨仓库

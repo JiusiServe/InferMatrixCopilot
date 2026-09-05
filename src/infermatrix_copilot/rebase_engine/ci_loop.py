@@ -781,6 +781,7 @@ class CIBuildRound:
     ignored: int = 0
     ignored_baseline: int = 0
     jobs: list[dict] = field(default_factory=list)
+    monitor_duration_sec: float | None = None
 
 
 @dataclass
@@ -1143,6 +1144,7 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
         rounds.append(rec)
         _trace("ci_build", round=rnd, purpose=rec.purpose,
                build=rec.build_id, adopted=rec.adopted)
+        monitor_started = time.monotonic()
         outcome = await asyncio.to_thread(
             monitor_build, client, rec.build_id, spec=spec,
             poll_sec=poll_sec, timeout_sec=timeout_sec,
@@ -1150,6 +1152,8 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
             # run cannot prove it created (round-4 review)
             retry_max=0 if rec.adopted else job_retry_max,
             log_dir=log_dir, sleep=sleep, now=now)
+        rec.monitor_duration_sec = round(
+            max(0.0, time.monotonic() - monitor_started), 3)
         if outcome.no_run:
             rec.build_state = outcome.build_state
             _trace("ci_build_refused", build=rec.build_id,
@@ -1170,11 +1174,14 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
                                adopted=True)
             rounds.append(rec)
             _trace("ci_sibling_adopted", build=rec.build_id)
+            monitor_started = time.monotonic()
             outcome = await asyncio.to_thread(
                 monitor_build, client, rec.build_id, spec=spec,
                 poll_sec=poll_sec, timeout_sec=timeout_sec,
                 retry_max=0, log_dir=log_dir, sleep=sleep,
                 now=now)
+            rec.monitor_duration_sec = round(
+                max(0.0, time.monotonic() - monitor_started), 3)
         _record_outcome(rec, outcome)
         if outcome.clean_pass:
             return CIRunResult("passed", rounds=rounds,

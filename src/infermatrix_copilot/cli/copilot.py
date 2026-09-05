@@ -434,6 +434,9 @@ class Copilot:
             outcome = asyncio.run(
                 run_guarded(executor.run(playbook, state), run_dir))
 
+            if outcome.status == "done":
+                notifier.resolve()
+
             if self.settings.metrics_enabled:
                 try:  # metrics are facts about the run; never let them break it
                     from ..metrics import collect_run_metrics

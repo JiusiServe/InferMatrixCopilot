@@ -1,6 +1,6 @@
 # notify.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-09-06 -->
 
 `LOC ~112 · 跨切（升级） · refactor-status: ok`
 
@@ -9,16 +9,18 @@
 
 ## 功能
 `Notifier.escalate` 写出 `ESCALATION.md`、发邮件（配置了就走 Resend 或 SMTP）、
-把这次升级记进 trace；`BLOCKED_EXIT` = 3。
+把这次升级记进 trace；恢复后的 run 成功时 `Notifier.resolve` 把活动标记移入
+`ESCALATION_HISTORY.md`；`BLOCKED_EXIT` = 3。
 
 ## 公开契约
 `Notifier(settings, run_dir, trace, run_id)`，带 `escalate(reason, phase,
-severity, state_summary, artifacts)`；以及 `BLOCKED_EXIT`。
+severity, state_summary, artifacts)`、`resolve(resolution)`；以及 `BLOCKED_EXIT`。
 
 ## 不变量
 - 被阻塞的 run 会写出 `ESCALATION.md`、发出通知，调用方以退出码 3 结束。
 - **升级是一等结果** —— 绝不被当作错误路径吞掉。
 - 邮件失败是尽力而为的，**不得**掩盖升级本身。
+- `ESCALATION.md` 只表示当前仍需关注；成功 resume 后历史保留但活动标记消失。
 
 ## 边界 —— 不属于这里
 "要不要升级"由 executor 决定（类型化失败路由）—— 本文件只负责**执行通知**。

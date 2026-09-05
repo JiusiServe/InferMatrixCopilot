@@ -129,15 +129,23 @@ async def _v3_phase5_report(ctx: StepContext) -> StepResult:
              "## Modules"]
     for name, spec in sorted(mods.items()):
         spec = spec or {}
-        lines.append(f"- {name}: {spec.get('status', '?')}"
+        status = ("skipped (not assigned)" if spec.get("skip") else
+                  spec.get("status") or "not completed")
+        lines.append(f"- {name}: {status}"
                      + (f" — {spec.get('detail')}" if spec.get("detail")
                         else ""))
     if not mods:
         lines.append("- (none)")
+    passed = int(pipeline.get("passed") or 0)
+    failed = int(pipeline.get("failed") or 0)
+    skipped = int(pipeline.get("skipped") or 0)
+    manifest_jobs = int(ctx.state.get("manifest_jobs") or 0)
+    total = manifest_jobs or passed + failed + skipped
     lines += ["", "## Local tests",
-              f"- passed {pipeline.get('passed', 0)} / failed "
-              f"{pipeline.get('failed', 0)} / skipped "
-              f"{pipeline.get('skipped', 0)}"]
+              f"- manifest jobs: {total}",
+              (f"- executed: {passed + failed} ({passed} passed, "
+               f"{failed} failed)"),
+              f"- not run/skipped: {skipped}"]
     for t in pipeline.get("failed_tests") or []:
         lines.append(f"  - failed: {t}")
     for i in tests.get("infra_failures") or []:
@@ -147,8 +155,16 @@ async def _v3_phase5_report(ctx: StepContext) -> StepResult:
         lines.append(f"- precommit: {precommit}")
     if ci:
         lines += ["", "## Remote CI",
-                  f"- result: {ci.get('result', '')}"
+                  f"- effective result: {ci.get('result', '')}"
                   + (f" ({ci.get('reason')})" if ci.get("reason") else "")]
+        for round_ in ci.get("rounds") or []:
+            build = round_.get("build_id") or "?"
+            lines.append(
+                f"- raw provider state: {round_.get('build_state') or 'unknown'} "
+                f"(build {build}; {round_.get('passed', 0)} passed, "
+                f"{len(round_.get('failed') or [])} unresolved, "
+                f"{round_.get('ignored_baseline', 0)} baseline, "
+                f"{round_.get('ignored', 0)} ignored)")
         for name in ci.get("unfixed") or []:
             lines.append(f"  - unfixed: {name}")
     path = ctx.run_dir / "FINAL_SUMMARY.md"
