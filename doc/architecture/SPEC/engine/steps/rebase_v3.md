@@ -57,8 +57,9 @@ step —— 薄的受治理 wrapper，substate-first、类型化失败、发布�
 - **E1/E2**：能力缺失记 `capability_gap` 并声明式降级（无 tier key/CI
   token/客户端、debug backend 缺失 ⇒ 回归记为结构性失败），绝不静默跳过。
 - debug 尝试**快照护栏**：snapshot → agent → 内容 digest 变更检查（staged+
-  unstaged+untracked 字节+mode+symlink）→ 复跑/本地验证；被拒或验证失败的
-  尝试**回滚** —— 只有绿色复跑算修好。
+  unstaged+untracked 字节+mode+symlink）→ 复跑/本地验证 → patch policy；自动
+  patch 不得修改 assertion/tolerance，test 文件编辑必须有明确本地 passed。
+  被拒、验证失败或策略违规的尝试**回滚**。
 - 空/损坏 manifest ⇒ `manifest_empty`（push gate 阻塞，绝不空洞通过）；
   不可运行的命令归 STRUCTURAL —— 绝不借 bash rc=0 假通过。
 - **A5**：一切仓库知识来自 adapter manifest；parity 词汇泄漏上限 14，

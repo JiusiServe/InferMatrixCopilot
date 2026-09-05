@@ -19,6 +19,7 @@
 | `agent_loop.py` | rebase agent 循环（流式、`.decision.md` 计划闸、150 轮预算，cache-parity） |
 | `assign.py` | commit→模块 确定性归类 + 路径漂移检查 + 报告渲染 |
 | `ci_loop.py` | CI 构建生命周期：受守卫的创建/恢复、monitor、日志分类器、round 编排 |
+| `debug_patch_policy.py` | 自动 CI debug 补丁策略：禁止 oracle 弱化，未本地验证时禁止 test 编辑 |
 | `gitio.py` | git 机械层：暂存纪律、签名提交重试、token 头传输、执行已授权 decision |
 | `hooks.py` | `RebaseHooks` —— adapter 可定制的窄行为面，fail-closed 加载 |
 | `knowledge_attest.py` | 知识层的 WAL 安全逻辑摘要 + 快照/恢复（只读） |
@@ -93,6 +94,8 @@ runner/LLM/CI client 全部可注入 —— 每个模块都能离线测试。
   支持 `FAILED`/`ERROR` pytest node 的原因相关子集，但缺坐标、日志、当前签名
   或共同异常证据时一律 fail-closed。每个 job 的分类理由与 baseline build/job
   坐标随 round 持久化，供恢复和审计使用。
+- 自动 debug agent 不能修改 assertion/tolerance oracle；任何 test 文件编辑只有
+  在对应本地验证明确 passed 时才可进入远端重试。拒绝的尝试由调用方恢复快照。
 - **A5** —— 全包仓库中立：仓库值经 `WheelSpec`/`PinSpec`/`ManifestSpec`/
   `ModulePromptData`/`tool_schemas.json`/hooks 注入；`test_repo_neutral_core` 钉住。
 
