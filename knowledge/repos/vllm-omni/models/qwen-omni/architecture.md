@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: architecture
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5073", "PR #5671", "PR #6284", docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/module/engine_orchestration.md, docs/design/module/stage_runtime.md, docs/design/module/archive/async_omni_architecture.md, vllm_omni/config/model.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/registry.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/worker/gpu_model_runner.py]
+sources: ["PR #5073", "PR #5671", "PR #6284", "PR #6886", docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/module/engine_orchestration.md, docs/design/module/stage_runtime.md, docs/design/module/archive/async_omni_architecture.md, vllm_omni/config/model.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni.py, vllm_omni/model_executor/models/qwen3_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/registry.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/worker/gpu_model_runner.py]
 ---
 
 # Qwen-Omni 家族拓扑与性能结论
@@ -22,6 +22,13 @@ sources: ["PR #5073", "PR #5671", "PR #6284", docs/design/qwen3_omni_tts_perform
   `qwen2_5_omni_thinker_only` pipeline 提供纯理解形态——hunyuan 架构页把
   `qwen2_5_omni_thinker.py` 标为 **I2T blessed pattern**（新模型 I2T 适配的照抄
   基准）。
+- Qwen2.5-Omni 同样按 stage 分别构造：Thinker 产出文本 hidden states，Talker 产出
+  codec token，Code2Wav 独占 Token2Wav 并将 codec 解码成波形。PR #6886 因此删除未被
+  staged pipeline 使用的 `generate_speech` 及其私有 converter，而非只补 sampling metadata：
+  后者仍会以额外参数调用仅接受 `hidden_states` 的 Talker `compute_logits`，且没有已构造
+  instance 同时拥有 Talker 与 Token2Wav。Code2Wav 缺 Token2Wav 时 `_codec_to_audio` 返回
+  `None`；speaker resource initializer 只由有 HF folder 的 weight-loading path 调用。该
+  deletion-only PR 没有新增测试、E2E、质量或性能证据。^[PR #6886]
 - Qwen3-Omni 的 pipeline 由 resolver（`models/qwen3_omni/pipeline.py::
   resolve_qwen3_omni_pipeline`）按 checkpoint 结构动态决定，而不是冻结的
   `PipelineConfig` 字面量。

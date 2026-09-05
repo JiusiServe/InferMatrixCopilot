@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5687", "PR #6284", "PR #6449", "PR #4322", "PR #6748", vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_quantization.py]
+sources: ["PR #5687", "PR #6284", "PR #6449", "PR #4322", "PR #6748", "PR #6886", vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni.py, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_quantization.py]
 confidence: high
 ---
 
@@ -58,3 +58,10 @@ confidence: high
 - 强制：以 `encoder_attention_heads % global_tp_size` 判定该 audio-encoder layer 是否可分片。可整除时保持 global TP；不可整除时仅该 encoder layer 的 attention QKV、attention output projection、FC1 和 FC2 都以 `disable_tp=True` 构造，且 local attention head count 按 effective TP=1 计算。
 - 禁止：仅关闭 QKV 或仅修正 `num_local_heads` 而让 output/FFN 仍分片；把这项 fallback 扩大为整个 Qwen3-Omni 模型关闭 TP；或把 PR 的 TP1/2/4/8 手工音频请求、MI350x full-workload throughput 数字归因于该 fallback。
 - 验收：分别覆盖 heads 可被和不可被 global TP 整除的构造，断言四个 linear 的 `disable_tp` 一致、attention local-head count 正确，且 encoder 外的 Thinker/Talker TP 配置未被此条件改写。PR 仅报告手工请求与整体 workload 测量，未给出该局部回退的独立性能或质量证明。^[PR #4322]
+
+## QOMNI-1e — Qwen2.5-Omni code2wav 缺失时必须 soft-fail，不能复活跨 stage 的旧 speech helper
+
+- 触发：修改 Qwen2.5-Omni 的 `generate_audio`、`_codec_to_audio`、`_init_token2wav_model`、weight loading、Talker sampling/logits，或 Thinker/Talker/Code2Wav 的 staged 构造。
+- 强制：`_codec_to_audio` 在 `token2wav` 缺失时必须直接返回 `None`；`_init_token2wav_model` 只能由持有已解析 `hf_model_folder` 的 Token2Wav weight-loading 路径调用；语音生成维持 Thinker → Talker → Code2Wav 的 stage handoff。
+- 禁止：无参数调用 `_init_token2wav_model()`；恢复 `generate_speech` 或 `_convert_to_codec_tokens`；仅 thread `sampling_metadata` 就声称修复旧 helper（其 Talker `compute_logits` 调用仍带已失效的额外参数）；或让单一 wrapper 违反 staged ownership 而同时拥有 Talker 和 Token2Wav。
+- 验收：目标树中不存在两个已删除 helper 或无参数 initializer call；`token2wav is None` 的 `_codec_to_audio` 路径返回 `None` 而非 `TypeError`；Token2Wav load path 仍向 initializer 传入解析后的 HF directory。PR 未新增测试或 E2E，故这些是静态/call-site 合同，不构成运行时、音频质量或性能证据。^[PR #6886]
