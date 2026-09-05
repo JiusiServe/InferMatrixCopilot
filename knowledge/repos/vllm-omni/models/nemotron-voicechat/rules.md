@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, serving]
-sources: ["PR #6089", vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/experimental/fullduplex/nemotron_voicechat/, vllm_omni/experimental/fullduplex/openai/, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py, tests/e2e/features/fullduplex/nemotron_voicechat/, tests/e2e/online_serving/test_nemotron_voicechat_duplex.py, "PR #6831"]
+sources: ["PR #6089", "PR #6354", vllm_omni/deploy/nemotron_labs_voicechat.yaml, vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/deploy/nemotron_labs_voicechat_streaming.yaml, vllm_omni/experimental/fullduplex/nemotron_voicechat/, vllm_omni/experimental/fullduplex/openai/, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py, tests/e2e/features/fullduplex/nemotron_voicechat/, tests/e2e/online_serving/nemotron_voicechat_realtime_duplex.py, tests/model_executor/models/test_nemotron_voicechat_perception_window.py, tests/model_executor/models/test_nemotron_voicechat_talker_replay.py, tests/model_executor/stage_input_processors/test_nemotron_voicechat.py, "PR #6831"]
 confidence: high
 ---
 
@@ -40,3 +40,38 @@ confidence: high
 - 禁止：用非空 bytes、约 1 LSB 的 RMS 或文本成功证明音频可用；把作者在 H200 实测、generic nightly selector 或 YAML 存在写成 Buildkite pass、wall-clock realtime、确定性 barge-in 或跨硬件保证。不得把 240 秒写成生产模型设置、把 `FINISHED_ERROR` 称作 client error delivery，或声称 #6816 已修复。
 - 验收：PR 作者报告 targeted H200 suite 306 passed，reviewer 后续报告 399 CPU tests、offline WAV byte-identical 和 native duplex non-silent audio；这些是提交时证据，当前 KB validation 不能复现真实 checkpoint/H200 E2E。Buildkite 改动只把既有 AMD-ready 步骤的超时从 20 分钟增至 45 分钟，不新增该模型专属 pipeline。^[PR #6089]
 - stall diagnostic 的验收固定 server 240/client 300，复现 stall 时 server 先记录 full request ID 并标记 `FINISHED_ERROR`，之后 bare client `TimeoutError` 才到期；同时正常 run 仍有 audio。reviewer 已复现该 ordering，仍未证明 client error event。^[PR #6831]
+
+## NVC-1e — native talker 的 prompt、replay 与 batch 输出必须保持逐 request 的 frame feedback
+
+- 触发：修改 native talker、Thinker→Talker input processor、stage processor dispatch、talker prompt/
+  sampling budget，或 KV recomputation / multi-session output splitting。
+- 强制：native talker 的 placeholder prompt 必须覆盖实际 speaker prefill；shipped Aria geometry 为
+  `talker_init_len=37`，故 `max_model_len=16384` 时 budget 为 `max_tokens=16347`。processor 只在
+  具名 `next_stage_hf_config` 参数存在时传入该 stage config，同时按 `streaming_context` 或
+  `_streaming_context` 参数名保留既有 bridge state。duplex native producer 每次最多使一个新 timeline
+  step 可调度，live decode 按帧严格顺序。KV recomputation 必须从保留的 code history 重建 embeds：
+  `t=1` 使用 `initial_code`，后续 `t` 使用 `codes_rows[t-2]`；replay 不采样、不设置 live pending
+  step，也不推进没有 rewind 的 unconditional CFG stream。batch output 必须按 request 对齐并为无新
+  codes 的 slot 保留其自身 placeholder/cumulative view，供 generic splitter 按 index 分发。
+- 禁止：以第四个位置参数猜测 processor 能力而把 streaming context 传给 `next_stage_hf_config`；让
+  prompt 加 generation budget 超过 model length；让 coalesced duplex timeline 越过尚未执行的 frame；
+  replay 时重采样、推进 unconditional stream，或从别的 request 复用 code tensor。
+- 验收：覆盖 37-token prefill 与 16347 budget、具名 config/context dispatch、one-step duplex drip 和
+  batch-aligned outputs。replay tests 必须覆盖 pure replay、replay 后接一个 live step、跨 prefill
+  boundary、live-first boundary rejection、short-history 与 outpaced-position guards，并断言
+  `initial_code` / `codes_rows[t-2]` arithmetic 和 unconditional stream 在 replay 中不变。^[PR #6354]
+
+## NVC-1f — duplex perception 的滚动 mel window 必须保持 full-history 切片语义
+
+- 触发：修改 cache-aware perception、80 ms duplex frame ingestion、streaming mel slice、request
+  re-open/reset，或长 session 的 audio/mel retention。
+- 强制：rolling window 记录其 stream-global mel column origin，只保留当前 chunk 的 pre-encode cache
+  所需范围及足以隔离 reflect-pad/preemphasis 边界效应的前置 margin；slice 以 global geometry 计算后
+  再映射回本地 window。对相同输入，这个有界窗口的 chunk/cache 结果必须等同 full-history mel 的
+  对应切片。若已排队 append 或 stage request re-open 导致 model session 中途缺失，则从当前 input
+  frame 重新建立 perception state 并记录 warning。
+- 禁止：每个 frame 对全部历史音频重新 featurize；把 trimmed window 的 local column 当作 stream
+  origin；或因 mid-stream reset / fused prefill 判错令整个 engine core 失败。
+- 验收：以长序列覆盖 window trim 后的 global-origin slice 与 full-history reference 的逐块等价，
+  包括 cache、margin 和首帧边界；覆盖 mid-stream session reset/re-open 后从当前 frame 恢复，以及
+  prefill branch 由 engine position 而非 duplex sequence 决定。^[PR #6354]

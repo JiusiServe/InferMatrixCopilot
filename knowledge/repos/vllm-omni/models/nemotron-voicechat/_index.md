@@ -1,10 +1,10 @@
 ---
 title: "NVIDIA Nemotron-Labs VoiceChat"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, serving]
-sources: ["PR #6089", vllm_omni/deploy/nemotron_labs_voicechat.yaml, vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/deploy/nemotron_labs_voicechat_streaming.yaml, vllm_omni/experimental/fullduplex/nemotron_voicechat/, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/asr/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py]
+sources: ["PR #6089", "PR #6354", vllm_omni/deploy/nemotron_labs_voicechat.yaml, vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/deploy/nemotron_labs_voicechat_streaming.yaml, vllm_omni/experimental/fullduplex/nemotron_voicechat/, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/asr/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py]
 confidence: high
 ---
 
@@ -18,7 +18,7 @@ confidence: high
 
 ## 源码路径
 
-共 30 个文件：
+共 32 个文件：
 
 - `vllm_omni/deploy/nemotron_labs_voicechat.yaml`
 - `vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml`
@@ -27,6 +27,8 @@ confidence: high
 - `vllm_omni/model_executor/models/nemotron_voicechat/`
 - `vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/`
 - `vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/asr/`
+- `vllm_omni/model_executor/models/nemotron_voicechat/talker_graph.py`
+- `vllm_omni/model_executor/models/nemotron_voicechat/talker_native.py`
 - `vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py`
 
 ## 依赖的共享代码模块
@@ -55,4 +57,4 @@ confidence: high
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 原生 duplex、帧/工具合同与验证边界 | [Nemotron VoiceChat rules](rules.md) |
+| 原生 duplex、帧/工具合同与验证边界；native talker geometry/replay/batch output；有界 perception window | [Nemotron VoiceChat rules](rules.md) |
