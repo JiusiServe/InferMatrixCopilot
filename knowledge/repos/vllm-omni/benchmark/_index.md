@@ -21,6 +21,7 @@ sources: [benchmarks/tts/bench_tts.py, benchmarks/tts/model_configs.yaml, "PR #6
 
 | 遇到什么 | 查看哪里 |
 |---|---|
+| 新增/审查 perf JSON、warmup 覆盖、realtime artifact 或 Hub dataset fallback | [benchmark rules](rules.md) |
 | 查看旧 benchmark 总览 | [overview](overview.md) |
 | 运行 AR graph、Hunyuan 或 MiniCPM-o Omni-DuplexEval benchmark | [benchmark guides](guides/_index.md) |
 | 调查 profiling、模型加载和性能验证错误 | [benchmark incidents](incidents/_index.md) |
