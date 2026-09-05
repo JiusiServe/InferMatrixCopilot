@@ -4,7 +4,7 @@ created: 2026-09-05
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #6701", "PR #6571", "PR #6786", docs/models/supported_models.md, recipes/Boogu/Boogu-Image.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/models/boogu_image/pipeline_boogu_image.py, vllm_omni/diffusion/models/boogu_image/boogu_image_transformer.py, vllm_omni/entrypoints/utils.py, tests/diffusion/models/boogu_image/test_pipeline_boogu_image.py, tests/diffusion/models/boogu_image/test_boogu_image_transformer.py, tests/entrypoints/test_utils.py, tests/e2e/online_serving/test_boogu_image_edit.py]
+sources: ["PR #6701", "PR #6571", "PR #6786", "PR #6968", docs/models/supported_models.md, recipes/Boogu/Boogu-Image.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/models/boogu_image/pipeline_boogu_image.py, vllm_omni/diffusion/models/boogu_image/boogu_image_transformer.py, vllm_omni/entrypoints/utils.py, tests/diffusion/models/boogu_image/test_pipeline_boogu_image.py, tests/diffusion/models/boogu_image/test_boogu_image_transformer.py, tests/entrypoints/test_utils.py, tests/e2e/online_serving/test_boogu_image_edit.py]
 confidence: high
 ---
 
@@ -41,3 +41,22 @@ confidence: high
 - 验收：有界测试覆盖 Base/single Edit 两分支、double-stream Edit 三分支、CFG2 的
   `rank0=[0,2]`/`rank1=[1]`、CFG3 一 rank 一 branch、精确 guidance 合并式、CFG-off 每 rank
   positive-only，以及 CUDA VAE efficient→math fallback；不将这些测试外推为 TP/SP/HSDP、cache、offload 或通用性能结论。^[PR #6786]
+
+## BOOGU-1d — request batching 只能合并 T2I，并保持请求行与输出的对应关系
+
+- 触发：修改 `BooguImagePipeline` 的 request batching、pre-process compatibility key、prompt/mask
+  reshape、generator collate 或 request-level output split。
+- 强制：纯文本或无 reference image 的 T2I 必须写入稳定的
+  `("boogu_image", "t2i")` compatibility key 后才可合批；带 reference image 的 TI2I 必须把
+  `request_id` 放进 key，并在 `has_reference and req.num_reqs > 1` 时 fail-close。TI2I 保持
+  batch=1，直到 scheduler key 能区分 `guidance_scale_2_provided`：该字段目前不在
+  `RequestBatchSamplingParamsKey` 中，而 `forward` 会从 batch 首请求读取它。request-local
+  generators 按 request-major/output-minor 合并；`num_outputs_per_prompt` 的结果必须拆回每个
+  原始请求一个 `DiffusionOutput`。prompt mask 用 `repeat_interleave` 保持与 reshaped embeds 相同的
+  request-major 行序。
+- 禁止：让 T2I/TI2I 共用 key、以首请求的 guidance mode 代表 edit batch、把 TI2I 作为已安全
+  合批，或把不同 physical batch shape 的数值差异说成跨请求值泄漏或 serial-equivalence。
+- 验收：用真实 `DiffusionRequestBatch` 和 scheduler key builder 覆盖 stable T2I/unique TI2I key、
+  batched TI2I raise、B=2/N=2 distinct-mask 行序、request-major generators 和每请求 output slice；
+  CFG B=2 isolation 至少分别改变 partner 的 positive prompt、negative prompt 和 seed。CPU/mock
+  tests 不证明 GPU CFG、TI2I batch safety、吞吐或 QPS/perf claim。^[PR #6968]
