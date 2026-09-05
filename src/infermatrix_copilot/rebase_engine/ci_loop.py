@@ -221,6 +221,9 @@ class JobResult:
     classification: str = ""       # passed|failed|ignored|ignored_baseline|
     #                                budget_timeout|incomplete|retrying
     log_file: str = ""
+    classification_reason: str = ""
+    baseline_build_id: str = ""
+    baseline_job_id: str = ""
 
 
 @dataclass
@@ -325,21 +328,26 @@ def _save_job_log(log_dir, name: str, text: str) -> str:
     return str(path)
 
 
-def _baseline_match(spec: CIClassifySpec, name: str,
-                    exit_status: int) -> BaselineFailure | None:
+def _baseline_matches(spec: CIClassifySpec, name: str,
+                      exit_status: int) -> tuple[BaselineFailure, ...]:
+    """Same-name baseline candidates, preferring the same provider exit code.
+
+    Exit status is supporting evidence, not failure identity: a real pytest
+    failure can be followed by a teardown timeout and therefore land as -1 on
+    main but 1 on the branch. Root-cause comparison below remains mandatory.
+    """
     lower = name.lower()
     coded = exit_status or -1
-    for bf in spec.baseline:
-        if bf.name == lower and bf.exit_status == coded:
-            return bf
-    return None
+    matches = [bf for bf in spec.baseline if bf.name == lower]
+    return tuple(sorted(matches, key=lambda bf: bf.exit_status != coded))
 
 
 def _same_root_cause(client: CIClient, entry: BaselineFailure,
-                     log_text: str, spec: CIClassifySpec, log_dir) -> bool:
+                     log_text: str, spec: CIClassifySpec, log_dir) -> str:
     """Root-cause comparison against the baseline job's log: identical
-    normalized error signatures, or identical (non-empty) failing pytest
-    node-id sets, mean the same pre-existing failure.
+    normalized error signatures, or cause-correlated pytest node-id subsets,
+    mean the same pre-existing failure. The returned string is durable
+    evidence for the classification; an empty string means no safe match.
 
     FAIL-CLOSED on missing evidence (round-4 review — a deliberate
     divergence from the parent's lenient defaults): missing baseline
@@ -348,22 +356,32 @@ def _same_root_cause(client: CIClient, entry: BaselineFailure,
     comparison CANNOT be made — the failure stays actionable rather than
     being waved through as pre-existing."""
     if not entry.job_id or not entry.build_id:
-        return False
+        return ""
     fetch = spec.baseline_log_fn or client.get_job_log
     main_log = fetch(entry.build_id, entry.job_id)
     if not main_log:
-        return False
-    _save_job_log(log_dir, f"baseline_{entry.name}", main_log)
+        return ""
+    _save_job_log(log_dir,
+                  f"baseline_{entry.build_id}_{entry.job_id}_{entry.name}",
+                  main_log)
     cur_sig = extract_error_signature(log_text or "",
                                       spec.extra_exception_names)
     if not cur_sig:
-        return False
+        return ""
     main_sig = extract_error_signature(main_log, spec.extra_exception_names)
     if cur_sig == main_sig:
-        return True
+        return "identical normalized error signature"
     cur_tests = extract_failed_test_ids(log_text or "")
     main_tests = extract_failed_test_ids(main_log)
-    return bool(cur_tests) and cur_tests == main_tests
+    if not cur_tests or not cur_tests <= main_tests:
+        return ""
+    cur_errors = extract_exception_lines(log_text, spec.extra_exception_names)
+    main_errors = extract_exception_lines(main_log,
+                                          spec.extra_exception_names)
+    if cur_errors & main_errors:
+        return ("current pytest failure/error nodes are a cause-matched "
+                "subset of the baseline")
+    return ""
 
 
 def _classify_terminal(client: CIClient, build_id: str, job: dict,
@@ -416,11 +434,17 @@ def _classify_terminal(client: CIClient, build_id: str, job: dict,
         elif jr.state == "timed_out" and is_budget_timeout(log_text):
             jr.classification = "budget_timeout"
         else:
-            entry = _baseline_match(spec, name, jr.exit_status)
-            if entry is not None and _same_root_cause(client, entry,
-                                                      log_text, spec,
-                                                      log_dir):
+            match = next(((entry, reason)
+                          for entry in _baseline_matches(
+                              spec, name, jr.exit_status)
+                          if (reason := _same_root_cause(
+                              client, entry, log_text, spec, log_dir))), None)
+            if match is not None:
+                entry, reason = match
                 jr.classification = "ignored_baseline"
+                jr.classification_reason = reason
+                jr.baseline_build_id = entry.build_id
+                jr.baseline_job_id = entry.job_id
             else:
                 jr.classification = "failed"
     return jr
@@ -615,10 +639,11 @@ def normalize_log_line(line: str) -> str:
 
 
 def extract_failed_test_ids(log_text: str) -> set[str]:
-    """pytest node ids (`path::Class::test[param]`) from FAILED lines."""
+    """Pytest node ids from terminal FAILED and setup/teardown ERROR lines."""
     ids: set[str] = set()
     for line in log_text.split("\n"):
-        if "FAILED" not in line or "::" not in line:
+        if not any(token in line for token in ("FAILED", "ERROR")) \
+                or "::" not in line:
             continue
         m = re.search(r"([\w./-]+\.py::[\w:]+(?:\[[^\]]*\])?)",
                       normalize_log_line(line))
@@ -627,19 +652,30 @@ def extract_failed_test_ids(log_text: str) -> set[str]:
     return ids
 
 
-def extract_error_signature(log_text: str,
-                            extra_exception_names: Sequence[str] = ()) -> str:
-    """Key error lines, normalized so two runs of one failure compare equal.
-    Repo-specific exception class names arrive as adapter data."""
+def extract_exception_lines(
+        log_text: str,
+        extra_exception_names: Sequence[str] = ()) -> set[str]:
+    """All normalized exception lines used to corroborate pytest node matches."""
     base = (r"RuntimeError|AssertionError|TypeError|ValueError"
             r"|ModuleNotFoundError|ImportError|CalledProcessError"
             r"|torch\.OutOfMemoryError|CUDA out of memory"
             r"|exit status|SyntaxError|KeyError|AttributeError")
     names = "|".join([base, *map(re.escape, extra_exception_names)])
     rx = re.compile(rf".*({names}).*")
+    return {line for line in (
+        normalize_log_line(raw) for raw in log_text.split("\n"))
+        if line and rx.match(line)}
+
+
+def extract_error_signature(log_text: str,
+                            extra_exception_names: Sequence[str] = ()) -> str:
+    """Key error lines, normalized so two runs of one failure compare equal.
+    Repo-specific exception class names arrive as adapter data."""
     lines = log_text.split("\n")
+    exception_lines = extract_exception_lines(log_text,
+                                               extra_exception_names)
     sig_lines = [n for n in (normalize_log_line(ln) for ln in lines)
-                 if n and rx.match(n)]
+                 if n in exception_lines]
     failures = [normalize_log_line(ln) for ln in lines
                 if "FAILED" in ln and "::" in ln]
     result = sig_lines[-3:] if sig_lines else []
@@ -677,35 +713,54 @@ def pick_best_build(builds: Sequence[dict]) -> dict | None:
     return scored[0][2]
 
 
-def fetch_baseline_failures(client: CIClient,
-                            branch: str) -> tuple[BaselineFailure, ...]:
+def fetch_baseline_failures(client: CIClient, branch: str, *,
+                            window: int = 5) -> tuple[BaselineFailure, ...]:
     """Pre-existing failures on the baseline pipeline's `branch`, with
     coordinates so the monitor can root-cause-compare logs. The CLIENT is
     scoped to the BASELINE pipeline (adapter data), not the
     build-under-test's.
 
-    The best trustworthy COMPLETED build is selected first (schedule >
-    api > completed > newest) and failures are extracted only when THAT
-    build failed — querying failed builds alone would resurrect stale
-    failures that a newer green baseline run already proved fixed
-    (round-4 review)."""
+    Use a window from the best available trust tier (schedule > api > other).
+    A failure from the newest trusted build is current baseline evidence.
+    Older failures survive a newer green only when they recur in at least two
+    builds, distinguishing an intermittent baseline from one stale red run.
+    """
+    if window < 1:
+        raise ValueError("baseline window must be positive")
     builds = client.latest_builds(branch, states=("passed", "failed"),
                                   per_page=10)
-    build = pick_best_build(builds)
-    if not build or str(build.get("state", "")) != "failed":
+    if not builds:
         return ()
-    build_id = str(build.get("id", ""))
+    def trust(build: dict) -> int:
+        source = str(build.get("source", ""))
+        if source == "schedule":
+            return 3
+        if source == "api":
+            return 2
+        return 1
+
+    tier = max(map(trust, builds))
+    selected = [b for b in builds if trust(b) == tier][:window]
+    failures: dict[str, list[tuple[int, BaselineFailure]]] = {}
+    for index, build in enumerate(selected):
+        build_id = str(build.get("id", ""))
+        for job in client.list_jobs(build_id):
+            if str(job.get("state", "")) not in (
+                    "failed", "broken", "timed_out"):
+                continue
+            name = str(job.get("name", "") or "").lower()
+            if not name:
+                continue
+            raw = job.get("exit_status", -1)
+            failure = BaselineFailure(
+                name=name, exit_status=int(raw or -1),
+                job_id=str(job.get("id", "")), build_id=build_id)
+            failures.setdefault(name, []).append((index, failure))
+
     out: list[BaselineFailure] = []
-    for job in client.list_jobs(build_id):
-        if str(job.get("state", "")) not in ("failed", "broken", "timed_out"):
-            continue
-        name = str(job.get("name", "") or "").lower()
-        if not name:
-            continue
-        raw = job.get("exit_status", -1)
-        out.append(BaselineFailure(name=name, exit_status=int(raw or -1),
-                                   job_id=str(job.get("id", "")),
-                                   build_id=build_id))
+    for entries in failures.values():
+        if entries[0][0] == 0 or len(entries) >= 2:
+            out.extend(failure for _, failure in entries)
     return tuple(out)
 
 
@@ -725,6 +780,7 @@ class CIBuildRound:
     budget_timeouts: list[str] = field(default_factory=list)
     ignored: int = 0
     ignored_baseline: int = 0
+    jobs: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -748,6 +804,7 @@ def _record_outcome(rec: CIBuildRound, outcome: MonitorOutcome) -> None:
                       if j.classification == "ignored")
     rec.ignored_baseline = sum(1 for j in outcome.jobs
                                if j.classification == "ignored_baseline")
+    rec.jobs = [asdict(j) for j in outcome.jobs]
 
 
 def op_index_base(ops: Sequence[BuildOp], run_id: str) -> int:

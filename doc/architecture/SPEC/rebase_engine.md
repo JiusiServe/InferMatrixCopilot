@@ -1,6 +1,6 @@
 # rebase_engine/ —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-09-06 -->
 
 `LOC ~7500（26 个模块） · repo-rebase-v3 的原生 rebase 引擎 · refactor-status: ok`
 
@@ -86,6 +86,13 @@ runner/LLM/CI client 全部可注入 —— 每个模块都能离线测试。
   shell 的 venv 状态绝不影响装到哪；只有 import 验证失败才重试。
 - CI 创建受守卫：durable op 记录先于 API 调用，恢复按 op id 精确匹配，
   **不确定时绝不重复创建**。
+- CI baseline 使用最高可信来源（schedule > API > other）的最近窗口：最新
+  构建失败立即生效，较旧失败只有在窗口内重复出现才保留；单次陈旧红构建不会
+  越过更新的绿构建复活。
+- baseline 分类以同名 job 的日志根因为身份，provider exit code 只作候选排序；
+  支持 `FAILED`/`ERROR` pytest node 的原因相关子集，但缺坐标、日志、当前签名
+  或共同异常证据时一律 fail-closed。每个 job 的分类理由与 baseline build/job
+  坐标随 round 持久化，供恢复和审计使用。
 - **A5** —— 全包仓库中立：仓库值经 `WheelSpec`/`PinSpec`/`ManifestSpec`/
   `ModulePromptData`/`tool_schemas.json`/hooks 注入；`test_repo_neutral_core` 钉住。
 
