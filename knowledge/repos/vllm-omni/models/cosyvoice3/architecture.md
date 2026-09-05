@@ -1,10 +1,10 @@
 ---
 title: "CosyVoice3 架构"
 created: 2026-07-21
-updated: 2026-09-04
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models]
-sources: ["PR #5673", "PR #6424", vllm_omni/data_entry_keys.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3_code2wav.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/cfm.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/cosyvoice3/flow_estimator_trt.py, vllm_omni/model_executor/models/cosyvoice3/pipeline.py, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py, vllm_omni/transformers_utils/configs/cosyvoice3.py, vllm_omni/deploy/cosyvoice3.yaml]
+sources: ["PR #5673", "PR #6424", "PR #6955", vllm_omni/data_entry_keys.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3_code2wav.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/cfm.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/cosyvoice3/flow_estimator_trt.py, vllm_omni/model_executor/models/cosyvoice3/pipeline.py, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py, vllm_omni/transformers_utils/configs/cosyvoice3.py, vllm_omni/deploy/cosyvoice3.yaml]
 ---
 
 # CosyVoice3 架构
@@ -23,6 +23,10 @@ sources: ["PR #5673", "PR #6424", vllm_omni/data_entry_keys.py, vllm_omni/model_
 - **TRT 加速（本清单独有）**：campplus 说话人嵌入与 CFM DiT 估计器都可走
   TensorRT（启动时 ONNX→plan,按设备缓存 plan;campplus 有 CPU-ONNX 兜底）,
   统一由 `COSYVOICE3_TRT` 门控,默认开。
+- **CFM plan 发布**：flow-estimator builder 先序列化 engine bytes，再经自有、同目录的独占
+  临时 plan 写入并 close，最后以 `os.replace` 发布至缓存路径；因此并发 builder 可各自完成
+  artifact，最终缓存允许 last-writer-wins。失败清理仅处理 writer 自己创建的 tmp，不承担缓存
+  协调或持久化职责；具体改动约束见 [rules](rules.md)。^[PR #6955]
 - **CFM TensorRT handoff**：每个 execution context 与一个原始
   `torch.cuda.Stream` 成对入池；caller stream 先由该 stream 的 `wait_stream`
   建立 producer→TensorRT 依赖，TRT 在该 stream 的 raw `cuda_stream` handle 上

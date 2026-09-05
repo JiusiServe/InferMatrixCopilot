@@ -1,10 +1,10 @@
 ---
 title: "CosyVoice3（单架构双 stage,RAS 合并停止,TRT 加速）"
 created: 2026-07-21
-updated: 2026-09-04
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models]
-sources: ["PR #5673", "PR #5869", "PR #6424", vllm_omni/data_entry_keys.py, vllm_omni/model_executor/models/cosyvoice3/, vllm_omni/deploy/cosyvoice3.yaml, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py, vllm_omni/transformers_utils/configs/cosyvoice3.py]
+sources: ["PR #5673", "PR #5869", "PR #6424", "PR #6955", vllm_omni/data_entry_keys.py, vllm_omni/model_executor/models/cosyvoice3/, vllm_omni/deploy/cosyvoice3.yaml, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py, vllm_omni/transformers_utils/configs/cosyvoice3.py]
 ---
 
 # CosyVoice3
@@ -51,7 +51,7 @@ sources: ["PR #5673", "PR #5869", "PR #6424", vllm_omni/data_entry_keys.py, vllm
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | RAS 停止机制、双交接注册、TRT 门 | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
-| CosyVoice3 TensorRT CFM 的 stream handoff、allocator lifetime 或 context pool | [rules](rules.md) | `COSYVOICE3-1a` 的顺序、所有权与验收 |
+| CosyVoice3 TensorRT CFM 的 stream handoff、allocator lifetime、context pool、plan 并发发布、tmp 所有权或 cleanup failure | [rules](rules.md) | `COSYVOICE3-1a/1b` 的顺序、发布边界与验收 |
 
 ## 配置与 checkpoint 差异
 
