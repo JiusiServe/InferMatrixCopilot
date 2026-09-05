@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, ltx2, diffusion]
-sources: ["PR #6189", "PR #7000", recipes/LTX/LTX-2.5.md, vllm_omni/diffusion/models/ltx2/ltx2_components.py, vllm_omni/diffusion/models/ltx2/ltx2_conditioning.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder_distributed.py, vllm_omni/diffusion/models/ltx2/ltx2_latents.py, vllm_omni/diffusion/models/ltx2/ltx2_request.py, vllm_omni/diffusion/models/ltx2/ltx2_runtime.py, tests/diffusion/models/ltx2/test_ltx2_output_cuda.py, tests/diffusion/models/ltx2/test_ltx2_pipeline.py, tests/diffusion/models/ltx2/test_ltx2_vae.py]
+sources: ["PR #6189", "PR #7000", "PR #7020", recipes/LTX/LTX-2.5.md, requirements/common.txt, docs/user_guide/diffusion/attention_backends/huggingface_hub.md, vllm_omni/diffusion/models/ltx2/ltx2_components.py, vllm_omni/diffusion/models/ltx2/ltx2_conditioning.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder_distributed.py, vllm_omni/diffusion/models/ltx2/ltx2_latents.py, vllm_omni/diffusion/models/ltx2/ltx2_request.py, vllm_omni/diffusion/models/ltx2/ltx2_runtime.py, tests/diffusion/models/ltx2/test_ltx25_pipeline.py, tests/diffusion/models/ltx2/test_ltx2_output_cuda.py, tests/diffusion/models/ltx2/test_ltx2_pipeline.py, tests/diffusion/models/ltx2/test_ltx2_vae.py]
 confidence: high
 ---
 
@@ -13,19 +13,23 @@ confidence: high
 ### LTX25-1 — LTX-2.5 的 decoder、统计量与 artifact 必须作为同一版本化合同维护
 
 - 触发：修改 LTX-2.5 full/distilled one- or two-stage pipeline 的视频 decoder、`ltx2_use_conv_vae`、
-  latent normalization、Native sidecar 或 component residency。
+  latent normalization、Native sidecar、component residency 或 NATTEN Hub-kernel dependency/remediation
+  guidance。
 - 强制：LTX-2.5 默认构造 canonical Native DiffVAE；仅布尔 `ltx2_use_conv_vae=true` 可在启动时
   opt into ConvVAE，I2V encoding 仍使用 ConvVAE。provided latent 的 normalize 与 decode 前的
   denormalize 必须从实际视频 decoder 取得 mean、std 和 scaling factor。Native decoder 与独立
   sidecar 先查 model root；Hub fallback 使用 artifact repository 自己的 pinned revision，不能把
-  Diffusers model revision 跨仓库复用。DiffVAE 初始化必须要求 runtime `kernels==0.14.1`、支持的
-  NATTEN Hub kernel 和可操作的失败说明。
+  Diffusers model revision 跨仓库复用。DiffVAE 初始化必须要求 runtime `kernels==0.15.2`、支持的
+  NATTEN Hub kernel 和可操作的失败说明；该 pin 必须与支持范围
+  `transformers >=5.10.1, <5.15` 同步维护。
 - 禁止：让 ConvVAE statistics 处理 DiffVAE latent；将非布尔 opt-in 静默转换；把 local primary model
   path 误当成独立 sidecar 必须离线；使用未 pin 的 canonical Native artifact，或向用户建议不存在的
   production FlexAttention fallback。
 - 验收：覆盖 full/distilled profile 的默认和 ConvVAE opt-in、非布尔拒绝、Native decoder strict
   conversion、active-decoder statistics、local-first/repository-scoped revision routing，以及缺少 NATTEN
-  runtime prerequisite 的 actionable error。^[PR #6189]
+  runtime prerequisite 的 actionable error；`requirements/common.txt`、Hugging Face Hub installation
+  guidance、production error 和 LTX-2.5 test 必须一致地说明 `kernels==0.15.2` 与上述 Transformers
+  范围。^[PR #6189] ^[PR #7020]
 
 ### LTX25-2 — DiffVAE 请求边界与分布式 decode 必须显式 fail-closed
 
