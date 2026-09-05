@@ -14,10 +14,10 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
   `vllm_omni/distributed/omni_coordinator/`（协调器与 load balancer）
 - 知识面另覆盖跨 stage ZMQ 路由/端口分配（`vllm_omni/engine/stage_engine_startup.py::OmniMasterServer`）
   ——组件划分服务知识归属，与 manifest 运行时粒度不同
-- 源码校验：以上路径与下列锚点均已在 `main @ 1e74807c` 验证存在：
+- 源码校验：以上路径与下列锚点均已在 `v0.29.0-alignment @ 1015b1ce`（`dev/vllm-align` 快照）验证存在：
   `OmniConnectorBase`（connectors/base.py:12）、`OmniKVTransferManager`
-  （kv_transfer_manager.py:341）、`LoadBalancer` 三实现（load_balancer.py:39/64/74/102）、
-  `OmniMasterServer._allocate_route_locked`（stage_engine_startup.py:254）
+  （kv_transfer_manager.py:348）、`LoadBalancer` 三实现（load_balancer.py:39/64/74/102）、
+  `OmniMasterServer._allocate_route_locked`（stage_engine_startup.py:262）
 - 官方设计文档：`docs/design/feature/disaggregated_inference.md` +
   `docs/design/feature/omni_connectors/`（逐后端 spec）
 - 测试入口：`tests/distributed/`

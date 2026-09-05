@@ -11,9 +11,11 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_g
 
 - 源码入口：`vllm_omni/core/sched/`（`omni_ar_scheduler.py`、`omni_generation_scheduler.py`、
   `omni_scheduler_mixin.py`、`omni_scheduling_coordinator.py`）和 `vllm_omni/core/prefix_cache.py`
-- 源码校验：以上路径与下列类均已在 `main @ 1e74807c` 验证存在：`OmniARScheduler`（:73）、
-  `OmniARAsyncScheduler`（:815）、`OmniGenerationScheduler`（:29）、
-  `OmniSchedulerMixin`（:64）、`OmniTensorPrefixCache`（prefix_cache.py:33）
+- 源码校验：以上路径与下列类均已在 `v0.29.0-alignment @ 1015b1ce`（`dev/vllm-align` 快照）验证存在：
+  `OmniARScheduler`（omni_ar_scheduler.py:77）、`OmniARAsyncScheduler`（:1033）、
+  `KVCacheTransferData`（distributed/omni_connectors/kv_transfer_manager.py:146）、
+  `OmniGenerationScheduler`（omni_generation_scheduler.py:35）、
+  `OmniSchedulerMixin`（omni_scheduler_mixin.py:101）、`OmniTensorPrefixCache`（prefix_cache.py:33）
 - 官方 draft source map：`docs/design/module/ar_runtime.md`；旧继承关系、请求流转图只在
   `docs/design/module/archive/ar_module.md` 保留，须对当前代码复核。
 - 测试入口：`tests/core/`
