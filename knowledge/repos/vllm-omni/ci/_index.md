@@ -208,7 +208,7 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 审查硬件 lane（含 MiniMax-H3 DLO DP2 ready smoke 的证据边界）、回归 fence、CI 工具供应链或 xdist/shared fixture | [CI rules](rules.md) |
+| 审查硬件 lane（含 MiniMax-H3 DLO DP2 ready smoke 的证据边界）、回归 fence、CI 工具供应链、ASR 文本比较或 xdist/shared fixture | [CI rules](rules.md) |
 | AMD/ROCm timeout、quarantine、memory signal、Qwen3-TTS argv 或 Qwen3-Omni control-plane fixture | [AMD/ROCm CI rules](rules-amd.md) |
 | CUDA L4 Kubernetes preset、GPU-count shard、resource/retry policy | [L4 Kubernetes CI rules](rules-l4-k8s.md) |
 | 查看仓库特有 CI 陷阱 | [CI guides](guides/_index.md) |
