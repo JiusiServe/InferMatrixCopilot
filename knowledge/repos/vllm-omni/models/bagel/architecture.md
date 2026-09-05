@@ -1,10 +1,10 @@
 ---
 title: "BAGEL 架构"
 created: 2026-07-21
-updated: 2026-09-02
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/model_executor/models/bagel/bagel.py, vllm_omni/diffusion/models/bagel/bagel_transformer.py, vllm_omni/diffusion/models/bagel/pipeline_bagel.py, vllm_omni/model_executor/stage_input_processors/bagel.py]
+sources: ["PR #6359", "PR #7049", vllm_omni/model_executor/models/bagel/bagel.py, vllm_omni/diffusion/models/bagel/bagel_transformer.py, vllm_omni/diffusion/models/bagel/pipeline_bagel.py, vllm_omni/model_executor/stage_input_processors/bagel.py]
 ---
 
 # BAGEL 架构
@@ -71,6 +71,23 @@ sources: [vllm_omni/model_executor/models/bagel/bagel.py, vllm_omni/diffusion/mo
 - RNG 陷阱：`_regen_init_noise_on_device` 按请求在 CUDA 上重播 init noise
   （对齐 Lance 噪声流）;`forward` 单 prompt（多了只取第一个并告警）;分辨率超
   `max_latent_size × latent_downsample` 直接 raise。
+
+## Image step execution 与 wave 边界
+
+`prepare_encode` 为单 image request 留下 request-local state，`denoise_step` 可以将兼容 state
+pack 为一次 DiT forward，`step_scheduler` 推进各自进度，`post_decode` 逐 request 产出。有效
+img2img geometry 必须在 admission 前从输入图像解析；只有 geometry 与 BAGEL CFG/renormalization
+设置一致的请求可共用 wave。packing 后 CFG3 的分支 KV、token index、scheduler state 和可选
+trajectory 仍须逐 request 还原，不能把波内状态当成一个逻辑 request。
+
+`bagel`/`bagel_think` 仅 diffusion Stage 1 接入该 lifecycle，AR Thinker 不变；
+`bagel_single_stage` 的 image request 可接入，而显式 text2text/img2text 保持完整 `forward()`。
+Step mode 拒绝 SP 与 diffusion cache backend。完成/abort step request 后，runner 须先清掉 state
+和 paged diffusion-KV，才可切换到完整 text fallback。详细可执行合同见
+[BAGEL-3](rules.md#bagel-3step-image-wave-必须保持请求局部状态与兼容边界)。
+
+不要从 #6359 的历史文档继承 denoise count 或 benchmark 结论：#7049 已恢复 BAGEL 的 `N` schedule
+points / `N - 1` Euler update 约定，并拒绝 `N < 2` 的 image request。
 
 ## 怎样验证功能、精度和性能
 

@@ -1,10 +1,10 @@
 ---
 title: "BAGEL（统一模型多形态部署参照）"
 created: 2026-07-21
-updated: 2026-09-02
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/model_executor/models/bagel/, vllm_omni/diffusion/models/bagel/, vllm_omni/deploy/bagel.yaml]
+sources: ["PR #6359", "PR #7049", vllm_omni/model_executor/models/bagel/, vllm_omni/diffusion/models/bagel/, vllm_omni/deploy/bagel.yaml]
 ---
 
 # BAGEL
@@ -44,7 +44,7 @@ sources: [vllm_omni/model_executor/models/bagel/, vllm_omni/diffusion/models/bag
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | KV 桥接、3 路 CFG、MoT、变体拓扑 | [architecture](architecture.md) | AR→DiT 数据流与 reviewer 陷阱 |
-| CFG 分支 position ID 打包 | [rules](rules.md) | 1-D RoPE 与 Lance mRoPE 的序列轴合同 |
+| CFG 分支 position ID 打包、BAGEL-3 step wave | [rules](rules.md) | 1-D RoPE 与 Lance mRoPE 的序列轴合同；BAGEL 专有 step/packing、有效几何与 fallback 清理 |
 
 ## 配置与 checkpoint 差异
 
@@ -58,5 +58,7 @@ sources: [vllm_omni/model_executor/models/bagel/, vllm_omni/diffusion/models/bag
 
 - 一个模型要支持多种 stage 拓扑/思考形态时参考其拓扑与 KV 合同;审查
   KV-cache 桥接、CFG 伴随请求或 MoT 权重路径改动时先读 architecture。
+- 调查 BAGEL image step execution 时先读 BAGEL-3：two-stage 只在 diffusion Stage 1 step，
+  single-stage text 保持完整请求路径；有效 geometry/CFG 兼容性决定能否同 wave。
 - [Lance](../lance/_index.md) 的 pipeline 继承自 `BagelPipeline`
   （`diffusion/models/lance/`,见该页）——改 Bagel 公共面先扫 lance。

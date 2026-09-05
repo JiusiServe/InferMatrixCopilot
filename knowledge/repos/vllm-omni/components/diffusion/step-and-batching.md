@@ -1,10 +1,10 @@
 ---
 title: "Step 执行合同与 batching 模式"
 created: 2026-07-16
-updated: 2026-09-02
+updated: 2026-09-05
 type: guide
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5599", "PR #5810", "PR #6045", docs/design/feature/diffusion_continuous_batching.md, docs/user_guide/diffusion/execution_modes.md, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/sched/step_scheduler.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_step_pipeline.py]
+sources: ["PR #5599", "PR #5810", "PR #6045", "PR #6359", "PR #7049", docs/design/feature/diffusion_continuous_batching.md, docs/user_guide/diffusion/execution_modes.md, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/sched/step_scheduler.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_step_pipeline.py, tests/diffusion/models/bagel/test_step_execution.py]
 ---
 
 # Step 执行合同与 batching 模式
@@ -61,6 +61,27 @@ self-attention backend 为 `TORCH_SDPA` 时支持 grouped step；Helios 会拒�
 step mode 当前拒绝所有 diffusion cache backend，但这不等于拒绝 inter-stage KV transfer：
 runner 对新 admission 先调用 `receive_multi_kv_cache_distributed()`，再 `prepare_encode()`，且有
 顺序测试。限制描述必须区分这两个机制。
+
+## DIFF-1af：BAGEL image step wave 是模型专有的 packed-state 合同
+
+**适用范围**：BAGEL 的 image-only step execution，不向其他 pipeline 推导 geometry、CFG 或
+schedule 语义；模型侧完整合同见 [BAGEL-3](../../models/bagel/rules.md#bagel-3step-image-wave-必须保持请求局部状态与兼容边界)。
+
+**合同**：BAGEL 的四段 step lifecycle 可将多个兼容 image state 打成一波 DiT forward，但每个
+request 的 latent、timestep/scheduler、KV/CFG context、renormalization 和 output/trajectory 保持
+局部；packed token indexes 要按 request rebase，结果也要按 request split。admission 先为 img2img
+求 effective geometry，且仅 geometry 与 BAGEL CFG/renormalization 设置均相同者可同 wave。
+two-stage topology 只让 diffusion Stage 参与，single-stage 显式 text output 保持 complete-request
+forward；BAGEL step mode 拒绝 SP 和 diffusion cache backend，但可保留 inter-stage KV transfer。
+
+runner 在 finished/aborted step state 后若切到 full-forward wave，必须先清理 state cache、paged
+diffusion-KV 与 stale `InputBatch`。BAGEL schedule 以当前模型实现为准：#7049 已将 #6359 的临时
+语义恢复为 `N` schedule points 对应 `N - 1` Euler updates，image path 拒绝 `N < 2`；不要将该模型
+历史 benchmark 或“exactly N updates”泛化成 shared step contract。
+
+**验收**：至少两条兼容 image request 覆盖 packed-state isolation、CFG3、index rebasing 与逐请求
+output；再覆盖 geometry/CFG 不兼容不合批、SP/cache rejection、以及 step finish/abort → explicit
+text full-forward cleanup。^[PR #6359] ^[PR #7049]
 
 ## 多 document packing 是模型能力，不是 continuous batching 的默认语义
 
