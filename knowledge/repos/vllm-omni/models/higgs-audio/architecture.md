@@ -4,7 +4,7 @@ created: 2026-07-21
 updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models]
-sources: ["PR #6422", vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/model_executor/stage_input_processors/higgs_audio_v2.py, vllm_omni/model_executor/stage_input_processors/higgs_audio_v3.py, vllm_omni/deploy/README_higgs_audio_v3.md]
+sources: ["PR #6422", "PR #7065", vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.py, vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_tokenizer.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/model_executor/stage_input_processors/higgs_audio_v2.py, vllm_omni/model_executor/stage_input_processors/higgs_audio_v3.py, vllm_omni/deploy/README_higgs_audio_v3.md]
 ---
 
 # Higgs-Audio 架构
@@ -35,8 +35,12 @@ sources: ["PR #6422", vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio
   （`build_voice_clone_prompt`,字节级一致的 system prompt）,但
   `ref_audio_in_system_message`/多说话人/`profile:`/长文分块被显式拒绝
   4xx;v3 用
-  `<|tts|>/<|ref_text|>/<|ref_audio|>/<|text|>/<|audio|>` 模板,参考音频用
-  `-100` 占位符在 prefill 换成 delay 编码后的融合嵌入。
+  `<|tts|>/<|ref_text|>/<|ref_audio|>/<|text|>/<|audio|>` 模板。V3 prompt builder
+  内部以 `-100` 表示参考音频 embedding 槽；进入 vLLM 前 tokenizer adapter 将它们
+  换成非 audio-continuation 的 `<|tts|>` 词表 ID，并把绝对槽位置随 reference codes
+  一起传递。talker 在 transformer layers 前按这些位置（包括 chunked prefill 的局部
+  span）注入 delay 编码后的融合 embedding；绕过 engine validation 的旧内部调用仍可
+  使用 `-100` fallback。具体必须执行的合同见 [HIGGS-2a](rules.md)。
 - v3 config 从 checkpoint tokenizer 解析特殊 token 与 eos（缺失即 raise）。
 - 采样注意：v2 YAML 注释记载 greedy 会塌缩 codebook argmax，因此 v2 profile 启用 sampling；
   #6422 不改变也不重新证明 v2。V3 则显式消费 vLLM 的 per-request `torch.Generator`，将一个
