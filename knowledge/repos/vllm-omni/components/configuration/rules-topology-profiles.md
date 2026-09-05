@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_runtime.py, tests/engine/test_async_omni_engine_stage_init.py, vllm_omni/deploy/, "PR #6186", "PR #6813", "PR #6291", "PR #6829", vllm_omni/config/pipeline_registry.py, tests/config/test_config_factory.py, tests/config/test_omni_config.py, tests/config/test_pipeline_registry.py, tests/utils/test_tracking_parser.py]
+sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_runtime.py, tests/engine/test_async_omni_engine_stage_init.py, vllm_omni/deploy/, "PR #6186", "PR #6813", "PR #6291", "PR #6829", vllm_omni/config/pipeline_registry.py, tests/config/test_config_factory.py, tests/config/test_omni_config.py, tests/config/test_pipeline_registry.py, tests/utils/test_tracking_parser.py, "PR #6230", vllm_omni/entrypoints/utils.py, tests/entrypoints/test_serve.py, tests/entrypoints/test_utils.py]
 confidence: high
 ---
 
@@ -96,3 +96,24 @@ confidence: high
   `final_output_type` 推断 terminal；不得声称 resolver 后有独立 revalidation、cycle/runtime/E2E proof。
 - 验收：无 stages/terminal、duplicate ID、invalid/self input eager error；terminal-not-last 与有效 fixture
   pass；static configs pass，resolver concrete result materialization guarded。^[PR #6291] ^[PR #6829]
+
+## CONF-5k — `--stage-overrides` parser 只验证 shape，字段语义留给下游 owner
+
+- 触发：修改 `parse_stage_overrides`、`--stage-overrides` CLI 输入、stage-scoped
+  override forwarding，或考虑在 parser 对字段名、值类型、范围或 stage existence 做校验。
+- 强制：对 falsey raw input（包括 `None`、`False`、`0`、空 string/容器）在任何验证前返回
+  `None`；truthy string 先 JSON parse，再要求 top-level 为 dict、每个 key 为 ASCII
+  `isdigit()` string、每个 value 为 dict。非空 outer dict 中的空 inner dict 合法；parse 后的
+  空 dict 返回 `None`。保留所有 inner fields 原样，不在 parser 建 allowlist，也不在此层做
+  field type/range 或 stage-id existence 校验。
+- 禁止：把 `[]`、`0`、`false` 等 truthy JSON string 的 parsed scalar/container 当作
+  “无 override”接受；用只含 deploy schema 的 allowlist 拒绝 `extras` 或
+  `kv_cache_dtype`、`seed`、`swap_space`、`block_size`、`stage_connector_spec` 等
+  stage-scoped engine args；用 `str.isdigit()` 而不加 ASCII guard，导致 fullwidth digit
+  绕过并在下游错误路由。
+- 验收：覆盖 falsey raw passthrough、invalid JSON、truthy JSON list/scalar/bool rejection、
+  non-ASCII/non-string/negative/float stage key rejection、non-dict inner value rejection，
+  以及 `{"0": {}, "1": {}}` pass-through。再证明 `extras` 到 default-diffusion fallback/
+  registered stage merge 的既有 owner、surviving `stage_<id>_<key>` 到 `cli_overrides` 的
+  forwarding 均未被 parser 截断；未知 `OmniEngineArgs` field 仅在
+  `filter_dataclass_kwargs` 被 drop 并留下命名该 field 的 WARNING。^[PR #6230]
