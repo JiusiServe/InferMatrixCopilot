@@ -1,7 +1,7 @@
 ---
 title: "Serving"
 created: 2026-07-10
-updated: 2026-09-05
+updated: 2026-09-06
 type: index
 tags: [vllm-omni, components, serving]
 sources: []
@@ -9,8 +9,9 @@ sources: []
 
 # Serving
 
+- Duplex 公共客户端：`vllm_omni/clients/`；HTTP/WS 实现位于 `vllm_omni/entrypoints/duplex/`，模型 adapter 留在各模型的 `duplex/` 子目录。
 - 主要源码入口：`vllm_omni/entrypoints/`（cli、openai、openpi 及 omni/async_omni 入口）和 `vllm_omni/engine/`（orchestrator、stage engine core、stage pool/runtime、output processor）
-- 源码校验：以上路径均已在 `v0.29.0-alignment @ 1015b1ce`（`dev/vllm-align` 快照）验证存在
+- 源码校验：以上路径均已在 `main @ 44d3ae10`（upstream `main` 快照）验证存在
 - 主要职责：用户入口、请求解析、在线服务和 engine 边界
 
 ## 什么时候查这里

@@ -1,7 +1,7 @@
 ---
 title: "Scheduler（AR/生成请求调度）"
 created: 2026-07-16
-updated: 2026-09-05
+updated: 2026-09-06
 type: index
 tags: [vllm-omni, components, scheduler]
 sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, vllm_omni/core/prefix_cache.py, docs/design/module/ar_runtime.md, docs/design/module/archive/ar_module.md]
@@ -11,7 +11,7 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_g
 
 - 源码入口：`vllm_omni/core/sched/`（`omni_ar_scheduler.py`、`omni_generation_scheduler.py`、
   `omni_scheduler_mixin.py`、`omni_scheduling_coordinator.py`）和 `vllm_omni/core/prefix_cache.py`
-- 源码校验：以上路径与下列类均已在 `v0.29.0-alignment @ 1015b1ce`（`dev/vllm-align` 快照）验证存在：
+- 源码校验：以上路径与下列类均已在 `main @ 44d3ae10`（upstream `main` 快照）验证存在：
   `OmniARScheduler`（omni_ar_scheduler.py:77）、`OmniARAsyncScheduler`（:1033）、
   `KVCacheTransferData`（distributed/omni_connectors/kv_transfer_manager.py:146）、
   `OmniGenerationScheduler`（omni_generation_scheduler.py:35）、

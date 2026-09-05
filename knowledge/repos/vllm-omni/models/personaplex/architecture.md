@@ -1,10 +1,10 @@
 ---
 title: "PersonaPlex 架构"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-06
 type: architecture
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #4771", vllm_omni/experimental/fullduplex/personaplex/DESIGN.md, vllm_omni/model_executor/models/personaplex/pipeline.py, vllm_omni/deploy/personaplex.yaml]
+sources: ["PR #4771", docs/design/fullduplex-personaplex.md, vllm_omni/model_executor/models/personaplex/pipeline.py, vllm_omni/deploy/personaplex.yaml]
 confidence: high
 ---
 

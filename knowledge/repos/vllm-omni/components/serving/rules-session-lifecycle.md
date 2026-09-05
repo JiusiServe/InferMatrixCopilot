@@ -1,10 +1,10 @@
 ---
 title: "Serving session lifecycle 规则"
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-06
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #6537", "PR #6354", vllm_omni/config/stage_config.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/experimental/fullduplex/core/adapter.py, vllm_omni/experimental/fullduplex/core/runtime.py, vllm_omni/experimental/fullduplex/mage_vl/adapter.py, vllm_omni/experimental/fullduplex/mage_vl/serving/backend.py, vllm_omni/experimental/fullduplex/mage_vl/serving/server.py, tests/e2e/features/fullduplex/test_mage_vl_adapter.py, tests/e2e/features/fullduplex/test_mage_vl_serving.py, tests/e2e/online_serving/nemotron_voicechat_realtime_duplex.py]
+sources: ["PR #6537", "PR #6354", vllm_omni/config/stage_config.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/engine/duplex/adapter.py, vllm_omni/engine/duplex/runtime.py, vllm_omni/experimental/fullduplex/mage_vl/adapter.py, vllm_omni/experimental/fullduplex/mage_vl/serving/backend.py, vllm_omni/experimental/fullduplex/mage_vl/serving/server.py, tests/e2e/features/fullduplex/test_mage_vl_adapter.py, tests/e2e/features/fullduplex/test_mage_vl_serving.py, tests/e2e/online_serving/nemotron_voicechat_realtime_duplex.py]
 confidence: high
 ---
 

@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5"
 created: 2026-07-20
-updated: 2026-09-05
+updated: 2026-09-06
 type: index
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", "PR #6404", "PR #6678", "PR #6628", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/minicpmo45/stage0.py, vllm_omni/experimental/fullduplex/openai/realtime_input.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/platforms/npu/models/minicpmo_4_5_code2wav.py, "PR #6082", "PR #6587"]
+sources: ["PR #3642", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", "PR #6404", "PR #6678", "PR #6628", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/engine/duplex/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, vllm_omni/experimental/fullduplex/client.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/stage0.py, vllm_omni/entrypoints/duplex/realtime_input.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/platforms/npu/models/minicpmo_4_5_code2wav.py, "PR #6082", "PR #6587"]
 confidence: high
 ---
 

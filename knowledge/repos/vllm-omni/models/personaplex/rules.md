@@ -1,10 +1,10 @@
 ---
 title: "PersonaPlex 规则"
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-06
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #4771", "PR #6318", vllm_omni/experimental/fullduplex/personaplex/DESIGN.md, vllm_omni/experimental/fullduplex/personaplex/serving_adapter.py, vllm_omni/model_executor/stage_input_processors/personaplex.py, tests/e2e/features/fullduplex/, tests/entrypoints/openai_api/test_duplex_handler.py]
+sources: ["PR #4771", "PR #6318", docs/design/fullduplex-personaplex.md, vllm_omni/model_executor/models/personaplex/duplex/serving_adapter.py, vllm_omni/model_executor/stage_input_processors/personaplex.py, tests/e2e/features/fullduplex/, tests/entrypoints/openai_api/test_duplex_handler.py]
 confidence: high
 ---
 
