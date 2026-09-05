@@ -144,6 +144,18 @@ confidence: high
 - 禁止：只在 topology 标 video 但 formatter 仍发 image；要求每个 stage 都是 diffusion 才允许 video final；遗漏已注册 video alias 后静默回 image；用 ndarray 形状猜语义，或把局部 closure 作为跨进程 hook。
 - 验收：逐个 canonical class/alias 断言 default 与 multi-stage final type，video/image endpoint 正负 capability 及最终 output type；action 另验证 post-process callable 可跨目标进程边界使用，最终 output 保留 stable key、shape、dtype 和有限性。PR #6953 的 CPU metadata unit test 只断言两种 SANA class 均分类为 video；PR #6847 的同类 CPU metadata test 只覆盖显式 LTX distilled two-stage alias 分类。两者都不是新的 endpoint、真实模型或 online/offline E2E 证据。^[PR #4222] ^[PR #5885] ^[PR #6847] ^[PR #6953]
 
+## DIFF-4z — 全 rank RPC 必须执行，但仅 reply owner 保留输出
+
+- 触发：RPC 在所有 rank 执行，而 `output_rank` 或 DP replica primary 决定唯一回复者；结果可能
+  携带 device-resident diffusion 输出。
+- 强制：所有应执行 rank 都调用目标方法以维持 collective 语义；`should_reply=false` 时在
+  `_worker_busy_loop` 绑定返回值之前返回 `(None, False)`，只有回复 rank 保留并 enqueue 原结果。
+- 禁止：因不回复而跳过执行，或把非回复 rank 的 device-resident 结果交回 busy loop 并保留到下次
+  请求覆盖。
+- 验收：非回复 rank 断言目标方法确实执行且返回 `None, False`；回复 rank 断言返回同一对象。测试
+  必须覆盖实际采用的 reply-selection 形式。当前证据只覆盖 CPU 单元级返回所有权，不证明 GPU
+  显存下降或真实多进程回收时序。^[PR #6989]
+
 ## DIFF-9a — 共享 PyAV 预构造帧 mux 必须闭合资源与音频时间零点
 
 - 触发：修改共享 diffusion 的预构造 PyAV 视频帧 mux、可选音频 mux、container cleanup 或编码器异常传播。

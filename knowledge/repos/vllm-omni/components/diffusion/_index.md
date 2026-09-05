@@ -10,7 +10,7 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 # Diffusion
 
 - 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
-- 源码校验：以上子模块均已在 `main @ 0e903e96` 验证存在；MiniMax-H3 的 VAE eager
+- 源码校验：以上子模块均已在 `main @ 10701e18` 验证存在；MiniMax-H3 的 VAE eager
   ops 仍由模型 owner 维护，其他 shared/模型机制按各自规则审查
 - 主要职责：多个 diffusion 模型共用的 pipeline、执行循环、scheduler 接入和运行机制
 
@@ -41,7 +41,7 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 | PEFT 与 distilled LoRA、startup fusion、delta/key/alpha、Qwen/Wan transformer mapping | [LoRA rules](rules-lora.md) |
 | Blackwell FA4、显式/auto CUDA backend、per-role mask/SP pad；local FlashAttention deterministic opt-in、role-aware masked cross-attention、NPU packed mask-free/laser fallback、TRTLLM packed-padding 与 config propagation | [attention rules](rules-attention.md) |
 | SP auto-padding、`mask_sp_padding`、dense/varlen 与 advanced UAA 边界 | [SP padding rules](rules-sp-padding.md) |
-| video/audio mux、DLO DP wave、result queue、async pump、SHM ownership、async-output wait 与 shutdown | [output/runtime rules](rules-output-lifecycle.md) |
+| video/audio mux、DLO DP wave、RPC reply ownership/result release、result queue、async pump、SHM ownership、async-output wait 与 shutdown | [output/runtime rules](rules-output-lifecycle.md) |
 | distilled continuous sigma schedule、boundary/step 语义与 modality shift | [sigma schedule rules](sigma-schedules.md) |
 | HunyuanImage3 Distil CFG、MeanFlow special-token / scheduler-r 合同 | [HunyuanImage3 HY3-8d](../../models/hunyuan-image3/rules.md) |
 | diffusion step 与 request/continuous batching；DIFF-1af BAGEL image step wave、packed state、geometry/CFG admission 与 fallback cleanup | [step and batching](step-and-batching.md) |
