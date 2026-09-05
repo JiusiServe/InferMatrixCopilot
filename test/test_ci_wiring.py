@@ -492,13 +492,50 @@ def test_monitor_baseline_fails_closed_on_missing_evidence():
     out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(
         baseline=baseline), poll_sec=0, timeout_sec=0, sleep=lambda s: None)
     assert out.jobs[0].classification == "failed"
-    # exit-status mismatch means NO baseline match at all
+    # Exit-status mismatch alone is not failure identity: the same pytest
+    # fingerprint may be followed by a teardown timeout on only one side.
     baseline = (BaselineFailure(name="lane c", exit_status=2,
                                 job_id="mainC", build_id="mb"),)
     ci = ScriptedCI(snapshots=[{"state": "failed", "jobs": [
-        _job("Lane C", "failed", 1)]}], logs={"Lane C": log})
+        _job("Lane C", "failed", 1)]}],
+        logs={"Lane C": log, "mainC": log})
     out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(
         baseline=baseline), poll_sec=0, timeout_sec=0, sleep=lambda s: None)
+    assert out.jobs[0].classification == "ignored_baseline"
+    assert out.jobs[0].baseline_build_id == "mb"
+    assert out.jobs[0].baseline_job_id == "mainC"
+    assert out.jobs[0].classification_reason
+
+
+def test_monitor_baseline_matches_cause_checked_error_subset():
+    """A current ERROR-only subset matches a noisier baseline job, while a
+    new cause on the same node remains actionable."""
+    baseline = (BaselineFailure(name="lane", exit_status=1,
+                                job_id="main", build_id="mb"),)
+    baseline_log = (
+        "ValueError: triton is not supported for NvFP4 MoE\n"
+        "ERROR tests/nvfp4.py::test_marlin - RuntimeError: init failed\n"
+        "AssertionError: audio mismatch\n"
+        "FAILED tests/audio.py::test_stream - AssertionError: audio mismatch")
+    current = (
+        "ValueError: triton is not supported for NvFP4 MoE\n"
+        "ERROR tests/nvfp4.py::test_marlin - RuntimeError: init failed")
+    ci = ScriptedCI(
+        snapshots=[{"state": "failed",
+                    "jobs": [_job("Lane", "failed", 1)]}],
+        logs={"Lane": current, "main": baseline_log})
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(
+        baseline=baseline), poll_sec=0, timeout_sec=0,
+        sleep=lambda s: None)
+    assert out.jobs[0].classification == "ignored_baseline"
+    assert "subset" in out.jobs[0].classification_reason
+
+    ci.logs["Lane"] = (
+        "ValueError: a new regression\n"
+        "ERROR tests/nvfp4.py::test_marlin - RuntimeError: different")
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(
+        baseline=baseline), poll_sec=0, timeout_sec=0,
+        sleep=lambda s: None)
     assert out.jobs[0].classification == "failed"
 
 
@@ -731,6 +768,12 @@ def test_rounds_stale_intent_never_approves_new_commit(tmp_path):
     assert fresh[0].state == "created"
     # the monitored build is the FRESH one at the new commit
     assert result.rounds[0].build_id == fresh[0].build_id
+    assert result.rounds[0].jobs == [{
+        "name": "Green", "job_id": "Green", "state": "passed",
+        "exit_status": 0, "classification": "passed", "log_file": "",
+        "classification_reason": "", "baseline_build_id": "",
+        "baseline_job_id": "",
+    }]
 
 
 def test_rounds_active_intent_orphan_is_owned_at_prepush(tmp_path):
@@ -827,6 +870,9 @@ def test_pick_best_build_and_baseline_fetch():
             return self.builds
 
         def list_jobs(self, build_id):
+            if build_id == "9":
+                return [_job("Lane A", "passed", 0, id="jA9"),
+                        _job("Zero Exit", "passed", 0, id="jZ9")]
             assert build_id == "3"
             return [_job("Lane A", "failed", 1, id="jA"),
                     _job("Zero Exit", "failed", 0, id="jZ"),
@@ -845,6 +891,27 @@ def test_pick_best_build_and_baseline_fetch():
     ]
     assert ci_loop.fetch_baseline_failures(
         BaselineClient(fresh_green), "main") == ()
+
+    # A recurring older failure remains valid intermittent-baseline evidence
+    # even when the newest same-tier build happens to pass.
+    recurring = [
+        {"id": "9", "number": 9, "state": "passed", "source": "schedule"},
+        {"id": "3", "number": 3, "state": "failed", "source": "schedule"},
+        {"id": "2", "number": 2, "state": "failed", "source": "schedule"},
+    ]
+
+    class RecurringBaselineClient(BaselineClient):
+        def list_jobs(self, build_id):
+            if build_id == "9":
+                return [_job("Lane A", "passed", 0, id="jA9")]
+            return [_job("Lane A", "failed", 1, id=f"jA{build_id}")]
+
+    got = ci_loop.fetch_baseline_failures(
+        RecurringBaselineClient(recurring), "main")
+    assert got == (
+        BaselineFailure("lane a", 1, "jA3", "3"),
+        BaselineFailure("lane a", 1, "jA2", "2"),
+    )
 
 
 # ── run_ci_rounds ────────────────────────────────────────────────────────────
