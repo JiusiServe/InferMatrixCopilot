@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5775", "PR #5884", "PR #6359", "PR #7049", vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/models/bagel/bagel_transformer.py, vllm_omni/diffusion/models/bagel/pipeline_bagel.py, vllm_omni/diffusion/models/lance/lance_transformer.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/models/bagel/test_step_execution.py]
+sources: ["PR #5775", "PR #5884", "PR #6359", "PR #7049", vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/models/bagel/bagel_transformer.py, vllm_omni/diffusion/models/bagel/pipeline_bagel.py, vllm_omni/diffusion/models/lance/lance_transformer.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/test_diffusion_engine_dummy_run.py, tests/diffusion/models/bagel/test_step_execution.py]
 confidence: high
 ---
 
@@ -75,6 +75,9 @@ cache backend；这不否定 two-stage 的 inter-stage KV transfer。
 schedule points、`N - 1` 个 Euler denoise updates，所有 image path 对 `N < 2` 失败。不要把旧的
 “exactly N updates”、one-step 支持或该 PR 的 benchmark 当成当前合同。
 
+engine dummy warmup 在 request 和 step 两种 execution mode 都必须请求至少两个 inference
+steps，保证 BAGEL 至少执行一次 denoise iteration，不能把未去噪的 initial noise 当作 warmup。
+
 step request abort/finish 后，runner 必须先清理 request state、paged diffusion-KV 和 stale
 `InputBatch`，再 dispatch 后续完整 `forward()` 的 text fallback；否则先前 wave 的 tensor/KV 可
 保留并污染生命周期。
@@ -82,5 +85,5 @@ step request abort/finish 后，runner 必须先清理 request state、paged dif
 **验收**：以两个重叠 image request 覆盖 packed index rebasing、各自 CFG/renorm、state isolation
 和 output ownership；再覆盖 img2img effective geometry 不同而不合批、SP/cache rejection，以及
 step request finish/abort 后的 explicit text full-forward fallback。schedule regression 必须断言
-`N < 2` 在 complete 和 step image path 均被拒绝，且不将 denoise update 数写成 `N`。^[PR #6359]
-^[PR #7049]
+`N < 2` 在 complete 和 step image path 均被拒绝，且不将 denoise update 数写成 `N`；dummy-run
+regression 必须对 request 和 step 两种 mode 都断言两个 inference steps。^[PR #6359] ^[PR #7049]
