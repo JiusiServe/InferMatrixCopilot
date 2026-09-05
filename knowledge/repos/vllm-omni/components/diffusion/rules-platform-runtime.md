@@ -1,10 +1,10 @@
 ---
 title: "Diffusion 平台运行时规则"
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #6058", vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/platforms/musa/platform.py, "PR #6267", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py"]
+sources: ["PR #6058", vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/platforms/musa/platform.py, "PR #6267", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6983", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/models/dreamzero/pipeline_dreamzero.py]
 confidence: high
 ---
 
@@ -18,6 +18,7 @@ confidence: high
 | PR 描述在做什么 | 规则 | 第一批 live 源码 |
 |---|---|---|
 | IR-op priority、Inductor/eager 默认顺序、模型 hook 覆盖 | `DIFFPLAT-1a` | platform `get_default_ir_op_priority` → `diffusion_worker._resolve_ir_op_priority` → model `get_diffusion_ir_op_priority_func` |
+| pipeline `setup_compile()` 的平台准入 | `DIFFPLAT-3a` | `DiffusionModelRunner` → `pipeline.setup_compile()` |
 
 ## DIFFPLAT-1a — platform IR-op priority 必须区分 Inductor 与 eager
 
@@ -40,3 +41,10 @@ confidence: high
 - 强制：当 `current_platform.is_rocm()` 且 `input_.device.type == "cpu"` 时，必须使用 `F.linear(input_, weight, bias)`，绕过没有 CPU kernel 的 `rocm_unquantized_gemm`；其他设备路径继续遵循既有 dispatch 和 batch-invariant 逻辑。
 - 禁止：仅因 host platform 是 ROCm 就把 CPU tensor 交给 ROCm GEMM；不得把该 fallback 推广为 ROCm kernel 的通用 CPU 支持或改变其他平台的 dispatch 语义。
 - 验收：ROCm host 的 CPU 输入测试必须断言结果来自 `F.linear` 且未调用 `rocm_unquantized_gemm`；同时回归 ROCm device、CUDA/其他平台及既有 batch-invariant 路径。^[PR #6267]
+
+## DIFFPLAT-3a — runner 必须是 pipeline compile 的唯一平台准入者
+
+- 触发：修改 `DiffusionModelRunner` 的 `setup_compile()` 调用条件，或模型 pipeline 的 `setup_compile()`。
+- 强制：runner 仅在 `enforce_eager` 为 false 且 `current_omni_platform.supports_torch_inductor()` 时调用 pipeline `setup_compile()`；pipeline 只负责其模型专有的编译工作，沿用 runner 的平台能力决策。
+- 禁止：pipeline 以 `torch.cuda.is_available()` 或其他 CUDA 专属条件重复收窄该入口；不得仅据此变更宣称 XPU、ROCm 或其他平台已经完成运行时验证。
+- 验收：以 mock platform 覆盖 eager、Inductor 支持与不支持的组合，断言仅合格组合调用 `setup_compile()`；并回归 DreamZero 的 setup 路径经 runner 可达。^[PR #6983]
