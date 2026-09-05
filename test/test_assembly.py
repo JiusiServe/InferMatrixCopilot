@@ -1533,6 +1533,66 @@ def test_v3_ci_push_carries_the_settings_github_token(
     assert captured["token"] == "gh-push-tok"
 
 
+def test_v3_ci_debug_rejects_weakened_assertion(
+        v3_agent_env, settings, trace, monkeypatch):
+    """The CI-debug acceptance boundary restores an oracle-weakening patch,
+    even when the target test cannot be reproduced on the local host."""
+    import subprocess
+    from types import SimpleNamespace
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.engine.steps import rebase_v3
+    from infermatrix_copilot.rebase_engine import ci_loop
+    _, _, repo, run_dir = v3_agent_env
+    subprocess.run(["git", "checkout", "-qb", "dev/vllm-align"],
+                   cwd=repo, check=True)
+    helper = repo / "tests" / "audio_helpers.py"
+    helper.write_text("def check(score):\n    assert score > 0.8\n")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-qm", "add test helper"], cwd=repo,
+                   check=True)
+    original = helper.read_text()
+    monkeypatch.setattr(settings, "buildkite_api_token", "bk",
+                        raising=False)
+    monkeypatch.setattr(
+        rebase_v3, "_tier_client",
+        lambda ctx: (object(), SimpleNamespace(
+            model="m", api_key="k", base_url="", source="global")))
+
+    async def fake_agent(*args, **kwargs):
+        helper.write_text("def check(score):\n    assert score > 0.7\n")
+        return "done"
+
+    accepted = []
+
+    async def fake_rounds(**kwargs):
+        accepted.append(await kwargs["debug_fn"](SimpleNamespace(
+            name="Quick", log_file="", state="failed", exit_status=1)))
+        return SimpleNamespace(result="failed", reason="stub",
+                               fixed_jobs=[], unfixed_jobs=["Quick"],
+                               rounds=[])
+
+    monkeypatch.setattr(rebase_v3, "_run_debug_agent", fake_agent)
+    monkeypatch.setattr(ci_loop, "run_ci_rounds", fake_rounds)
+    registry = register_builtin_steps(StepRegistry())
+    rd = run_dir.parent / "dir-ci-policy"
+    rd.mkdir(exist_ok=True)
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=rd, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni",
+                             "params": {"rebase_mode": "remote_ci",
+                                        "upstream_commit": "f" * 40}},
+               "run_id": "run-ci-policy", "repo_path": str(repo),
+               "upstream_commit": "f" * 40})
+    result = asyncio.run(registry.get("rebase.v3_ci").handler(ctx))
+    assert result.ok and accepted == [False]
+    assert helper.read_text() == original
+    rejected = list(trace.events("ci_debug_policy_rejected"))
+    assert rejected and rejected[-1]["paths"] == ["tests/audio_helpers.py"]
+
+
 def test_v3_ci_arms_adoption_exemption_only_on_proven_remote_noop(
         v3_env, settings, trace, monkeypatch, tmp_path):
     """The pre-push adoption exemption may only arm when the push is a

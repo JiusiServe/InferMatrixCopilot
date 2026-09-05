@@ -19,6 +19,8 @@ import yaml
 
 from ...rebase_engine import test_loop as tl
 from ...rebase_engine import wheel as wheel_mod
+from ...rebase_engine.debug_patch_policy import (capture_patch_policy,
+                                                 evaluate_debug_patch)
 from ...rebase_engine.modes import MODES, MUTATING_MODES, mode_state_flags
 from ...rebase_engine.phase1_steps import Phase1Config, run_commit_assignment
 from ...rebase_engine.push_gate import evaluate_push_gate
@@ -2036,8 +2038,9 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
     async def debug_fn(jr) -> bool:
         """One serialized CI-debug dispatch (parent `_dispatch_sdk_ci_debug`
         parity): snapshot → agent → tree-change check → local harness
-        verification where possible; rejected/unverified-failed attempts
-        are REVERTED so they cannot leak into the retry commit."""
+        verification where possible → patch-policy check. Assertion/tolerance
+        edits and locally unverified test edits are REVERTED so they cannot
+        leak into the retry commit."""
         tier = _tier_client(ctx)
         if isinstance(tier, StepResult):
             ctx.trace.record("capability_gap",
@@ -2061,6 +2064,12 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
         # `status --porcelain` (round-1 review)
         before = _worktree_digest(repo)
         snap, untracked = tl.snapshot_worktree(Path(repo))
+        try:
+            policy_before = capture_patch_policy(Path(repo))
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+            ctx.trace.record("ci_debug_policy_unavailable", job=jr.name,
+                             detail=str(exc))
+            return False
         verdict = await _run_debug_agent(
             ctx, manifest, module, slug,
             log_tail or f"CI job {jr.name} failed "
@@ -2077,6 +2086,20 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
             ctx.trace.record("ci_debug_no_changes", job=jr.name)
             return False
         local = _verify_locally(slug)
+        try:
+            policy = evaluate_debug_patch(
+                Path(repo), policy_before, local_verdict=local)
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+            tl.restore_worktree(Path(repo), snap, untracked)
+            ctx.trace.record("ci_debug_policy_unavailable", job=jr.name,
+                             detail=str(exc))
+            return False
+        if not policy.allowed:
+            tl.restore_worktree(Path(repo), snap, untracked)
+            ctx.trace.record("ci_debug_policy_rejected", job=jr.name,
+                             reason=policy.reason,
+                             paths=list(policy.paths))
+            return False
         if local == "failed":
             tl.restore_worktree(Path(repo), snap, untracked)
             ctx.trace.record("ci_debug_verify_failed", job=jr.name)

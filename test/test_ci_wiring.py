@@ -14,7 +14,8 @@ from pathlib import Path
 import pytest
 
 from infermatrix_copilot.ci.buildkite import BuildkiteCI, BuildkiteError
-from infermatrix_copilot.rebase_engine import ci_loop, push_to_ci
+from infermatrix_copilot.rebase_engine import (ci_loop, debug_patch_policy,
+                                               push_to_ci)
 from infermatrix_copilot.rebase_engine.ci_loop import (BaselineFailure,
                                                        CIClassifySpec)
 
@@ -1331,6 +1332,54 @@ def test_worktree_digest_sees_content_edits_porcelain_misses(tmp_path):
     assert d3 != d4
     # and an unchanged tree digests stably
     assert _worktree_digest(repo) == d4
+
+
+def test_debug_patch_policy_rejects_oracle_weakening(tmp_path):
+    """A locally green run cannot authorize an agent to lower a test oracle."""
+    import subprocess
+
+    repo = tmp_path / "r"
+    (repo / "tests").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    helper = repo / "tests" / "audio_helpers.py"
+    helper.write_text("def check(score):\n    assert score > 0.8\n")
+    subprocess.run(["git", "-C", repo, "add", "-A"], check=True)
+    before = debug_patch_policy.capture_patch_policy(repo)
+
+    helper.write_text("def check(score):\n    assert score > 0.7\n")
+    decision = debug_patch_policy.evaluate_debug_patch(
+        repo, before, local_verdict="passed")
+    assert not decision.allowed
+    assert decision.paths == ("tests/audio_helpers.py",)
+    assert "assertions or tolerances" in decision.reason
+
+
+def test_debug_patch_policy_requires_local_pass_for_test_edits(tmp_path):
+    import subprocess
+
+    repo = tmp_path / "r"
+    (repo / "tests").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    test_file = repo / "tests" / "test_widget.py"
+    test_file.write_text("def test_widget():\n    pass\n")
+    source = repo / "widget.py"
+    source.write_text("VALUE = 1\n")
+    subprocess.run(["git", "-C", repo, "add", "-A"], check=True)
+
+    before = debug_patch_policy.capture_patch_policy(repo)
+    test_file.write_text("def test_widget():\n    # new coverage\n    pass\n")
+    skipped = debug_patch_policy.evaluate_debug_patch(
+        repo, before, local_verdict="skipped")
+    assert not skipped.allowed
+    assert "passing local verification" in skipped.reason
+    assert debug_patch_policy.evaluate_debug_patch(
+        repo, before, local_verdict="passed").allowed
+
+    subprocess.run(["git", "-C", repo, "checkout", "--", "."], check=True)
+    before = debug_patch_policy.capture_patch_policy(repo)
+    source.write_text("VALUE = 2\n")
+    assert debug_patch_policy.evaluate_debug_patch(
+        repo, before, local_verdict="unavailable").allowed
 
 
 def test_cancel_owned_active_builds_on_abort(tmp_path):
