@@ -1,41 +1,55 @@
 ---
-title: "dots.tts"
-created: 2026-09-04
+title: "dots.tts（单 stage 连续 AR 48 kHz TTS）"
+created: 2026-08-13
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, serving]
-sources: ["PR #6174", vllm_omni/model_executor/models/dots_tts/, vllm_omni/deploy/dots_tts.yaml, vllm_omni/transformers_utils/configs/dots_tts.py, tests/e2e/offline_inference/test_dots_tts_expansion.py]
+sources: ["PR #6174", "PR #6235", vllm_omni/model_executor/models/dots_tts/, vllm_omni/deploy/dots_tts.yaml, vllm_omni/transformers_utils/configs/dots_tts.py, vllm_omni/entrypoints/openai/tts_adapters/dots_tts.py, tests/e2e/offline_inference/test_dots_tts_expansion.py, tests/e2e/online_serving/test_dots_tts_expansion.py]
 confidence: high
 ---
 
 # dots.tts
 
-## 正式名称与别名
+## 名称与范围
 
 - 知识树 owner：`models/dots-tts`；上游目录 `dots_tts`。
-- pipeline registry key：`dots_tts`（`vllm_omni/config/pipeline_registry.py`）。
-- registry 登记的 architecture / stage key：`dots_tts_talker`。
+- 正式 checkpoint 为 `dots-studio/dots.tts-soar`；代码、pipeline 和 deploy 标识均为
+  `dots_tts`。这是约 1.7B 的连续 AR TTS（Qwen2.5-1.5B 基座、DiT 流匹配头和
+  AudioVAE），输出 48 kHz 单声道音频。^[PR #6235]
+- AR registry 入口是 `DotsTTSForConditionalGeneration` →
+  (`dots_tts`, `dots_tts_talker`)，并有单 stage `OMNI_PIPELINES` key
+  `dots_tts`；模型实现位于 `model_executor/models/dots_tts/`。
 
-## 源码路径
+## 配置与 checkpoint 差异
 
-共 8 个文件：
+- 默认 `dots_tts.yaml` 是单 AR stage：`max_num_seqs: 4`、`enforce_eager: true`、
+  `enable_prefix_caching: false`，且默认采样上限为 4096 tokens。
+- `async_chunk: false`、全局 `dtype: bfloat16`；该初始集成没有 CUDA Graph 或 batched
+  side-path 优化。
 
-- `vllm_omni/model_executor/models/dots_tts/`
-- `vllm_omni/deploy/dots_tts.yaml`
-- `vllm_omni/transformers_utils/configs/dots_tts.py`
+## 在线 serving 合同
 
-## 依赖的共享代码模块
+- PR #6235 为 `/v1/audio/speech` 注册 `DotsTTSAdapter`。adapter 只按
+  `DotsTTSForConditionalGeneration` architecture 识别，`stage_keys` 为空且
+  `detect_priority = 5`：不得因和 VoxCPM2 共用 `latent_generator` stage key 而把
+  请求路由给 VoxCPM2。
+- 支持 text-only 合成：`voice` 只能缺省或为 `default`；`ref_audio`、`ref_text`、
+  `speaker_embedding` 和 `x_vector_only_mode` 都不支持。prompt/tokenizer 的首次构建在
+  TTS executor 异步执行，避免占用 async request handler。
+- E2E 覆盖流式 WAV（含 `stream_format="audio"`）和非流式 PCM；二者都通过
+  `dots_tts.yaml` 启动 L4 单卡 server。^[PR #6235]
 
-- `vllm_omni/model_executor/models/` → [model-executor](../../components/model-executor/_index.md)
-- `vllm_omni/config/stage_config/` → [configuration](../../components/configuration/_index.md)
+## 共享边界
 
-## checkpoint、尺寸与量化
-
-- `dots_tts.yaml`：dots.tts deployment config (single-stage AR talker). Conservative first-integration settings: eager execution, no CUDA Graphs, no batched side-path optimizations yet — see voxcpm2.yaml for 配置：`async_chunk: false`；`dtype: bfloat16`。
+- OpenAI 请求、TTS adapter 注册和流式音频协议属于[Serving 组件](../../components/serving/_index.md)。
+- checkpoint talker、prompt builder 和 audio side-path 属于[Model Executor 组件](../../components/model-executor/_index.md)；不要把它们的共享加载或运行时规则复制到本页。
 
 ## 什么时候查这里
 
-只查 dots.tts 专有的行为、常量、注册入口和验证合同。
+- 审查 dots.tts 的 checkpoint、单 stage deploy、TTS adapter 检测，或 text-only
+  `/v1/audio/speech` 行为时。
+- 共享 OpenAI 协议或其他 TTS 适配器问题先进入 Serving；通用模型加载问题先进入
+  Model Executor。
 
 ## 目录内容
 
@@ -48,9 +62,3 @@ confidence: high
 上面列出的共享模块的执行、调度、加载或 serving 合同属于
 [components](../../components/_index.md)，这里只链接不复制；registry 快照和别名
 清单见 [模型 catalog](../catalog.md)；一次性历史默认不落盘。
-
-## 目录内容
-
-| 遇到什么 | 查看哪里 |
-|---|---|
-| 该模型的硬门禁规则 | 尚未沉淀；由逐 commit 同步命中该 owner 时在 `rules.md` 建立 |
