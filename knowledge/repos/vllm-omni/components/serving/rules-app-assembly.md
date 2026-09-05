@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #6609", "PR #6707", vllm_omni/config/endpoint_policy.py, vllm_omni/entrypoints/openai/api_server.py, tests/config/test_endpoint_policy.py, tests/entrypoints/openai/test_profiler_endpoints.py, tests/entrypoints/openai_api/test_api_server_guards.py]
+sources: ["PR #6609", "PR #6707", "PR #6723", vllm_omni/config/endpoint_policy.py, vllm_omni/entrypoints/openai/api_server.py, tests/config/test_endpoint_policy.py, tests/entrypoints/openai/test_profiler_endpoints.py, tests/entrypoints/openai_api/test_api_server_guards.py]
 confidence: high
 ---
 
@@ -28,7 +28,9 @@ confidence: high
   client 收到原值。`/start_profile` 与 `/stop_profile` 是当前实例。PR #6707 现有测试没有直接 method
   partition 或 API assembly 覆盖；review 的批准边界是 static review、merge tree 与 CI，不能据此作
   broad compatibility/E2E 声明。^[PR #6609] ^[PR #6707, merged 2026-09-02]
-- 已知边界：同一 assembled app 的 upstream `GET /health` 仍先于 Omni health route 注册，当前
-  first-match dispatch 会遮蔽 Omni 的 diffusion fallback/JSON handler；测试 fake upstream 也未注册
-  该 sibling route。该 review thread 在本提交获批时明确 defer，不能据 profiler 修复声称所有重复
-  route 已清零，后续修复还需核对 render-only `engine_client is None` 时 200/503 的语义差异。^[PR #6609]
+- 已修复边界：`build_openai_app()` 若先注册 upstream `GET /health`，必须在
+  `app.include_router(router)` 前用 `remove_route_from_app(app, "/health", {"GET"})` 从 assembled app
+  删除它；router-local 的预先删除发生在本地 health route 注册前，是 no-op。最终 assembled app 只保留
+  一个 `GET /health`，并由 Omni `health` handler 所有；这不改变 native vLLM 的 render-only health
+  route。现有证据仅为 CPU assembly guard：fake upstream health 后以 route count 和 endpoint identity
+  锁定所有权，不构成 server E2E 或 render-only 200/503 语义验证。^[PR #6723, merged 2026-09-03]
