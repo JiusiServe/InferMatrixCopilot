@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #5635", "PR #6908", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, "PR #6241", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local_depth.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py", "PR #6543", vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, tests/entrypoints/openai_api/test_tts_adapter.py]
+sources: ["PR #5635", "PR #6908", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, "PR #6241", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local_depth.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py", "PR #6543", "PR #4982", vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/moss_tts/reference_encoder.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, tests/entrypoints/openai_api/test_tts_adapter.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/model_executor/models/moss_tts/test_reference_encoder.py]
 confidence: high
 ---
 
@@ -20,6 +20,7 @@ confidence: high
 | codec-v2 NPU RoPE、`npu_rotary_mul`、GPT-J pairs | `MOSSTTS-1b` | `audio_tokenizer_v2.py::apply_rope` |
 | `_ProjectedTransformer`、`in_proj`/`out_proj`、Identity | `MOSSTTS-1a` | `audio_tokenizer.py::_ProjectedTransformer` → codec checkpoint parameter names |
 | online request `seed`、adapter additional information、Nano/Local/Delay/Realtime reproducibility | `MOSSTTS-3a` | `tts_adapters/moss_tts.py::_MossTTSAdapterBase.build` → variant model seed/RNG consumer |
+| reference audio cache、single-flight、micro-batch、TTSD 两 speaker | `MOSSTTS-4a` | `reference_encoder.py::MossReferenceEncoder` → `serving_speech.py::_encode_moss_references` |
 
 ## MOSSTTS-1a — codec 代际与 module topology 必须由 checkpoint 原始结构决定
 
@@ -80,3 +81,33 @@ confidence: high
   覆盖 stage default，且 request 缺省时回退 default；模型级结论分别验证 consumer。Nano 的
   并发异 seed 隔离需要在 shipping `max_num_seqs=4` 下单独以 per-request generator 验证，不能
   由 adapter CPU contract 或单请求结果推出。^[PR #6543]
+
+## MOSSTTS-4a — reference encoder 必须保持内容、slot 与 flight identity
+
+- 触发：修改 MOSS `reference_encoder.py`、reference-audio speaker/code cache、
+  `serving_speech.py` 的 MOSS reference handoff，或 reference preprocessing/batching。
+- 强制：server 只惰性构造一个 `MossReferenceEncoder`；在 model package 从 processor 推导
+  `n_vq` 和 working sample rate，Local reference encode 固定为 24 kHz，而不是其 48 kHz
+  output rate。anonymous clip 必须 resolve 后才选 speaker-code cache key，优先使用 resolved
+  waveform artifact key、缺失时回退 resolve identity，并以 MOSS variant 与 `n_vq` namespace。
+  cache 内只在 code 值可容纳时 compact 为 int32；每个 caller 都得到不 alias cache 的独立 int64
+  tensor。
+- 强制：named key 只能是 normalized uploaded `voice_name` 加 positive `created_at`，并且只用于
+  该 uploaded voice 自己的 reference；placeholder/unregistered/inline voice 必须 content-addressed。
+  TTSD 的 slot 0 才可用 named key，slot 1 必须 anonymous；`ref_audio_cache_key` 与
+  `ref_audio_2_cache_key` 必须按 slot 保存，不能按 concurrent completion order 保存。
+- 强制：同一 cold reference 的 concurrent miss 必须 join 一个 shielded flight；flight slot 只能由
+  task completion callback 以 identity guard 回收，不能因 creator waiter cancel/return 而撤销。
+  cold encode 在有界 coalescing window/max batch 内合批；每 clip prep failure 独立，batch forward
+  failure 必须回退为逐项 encode，不能让一个坏 clip poison 同批请求。
+- 禁止：两个 TTSD reference 都按 request voice key；将 raw locator 当成跨 locator content
+  identity；cache key 与 flight key 对 voice case 使用不同 normalization；向 caller 返回 cache
+  storage；串行 encode TTSD 两 reference；或在 creator exit 时 cleanup flight。
+- 验收：CPU tests 覆盖相同 content 的不同 locator 只 encode 一次、re-upload 的 `created_at` 只
+  invalidate named voice、default/inline voice 不 collide、caller mutation 不改 cache，以及 out-of-
+  range code 保持 int64。并发 tests 覆盖同 ref 只 resolve/encode 一次、creator cancellation 后
+  later waiter 仍 join 已有 flight、distinct refs 在 bounded batch 内执行、prep failure 与 batch
+  fallback 只影响失败 clip。TTSD test 必须用 uploaded voice 加不同双 reference，断言 codes 不同、
+  两个 cache salt 保持 slot order，并证明二者进入同一 batch window。PR 的 A/B 只支持此
+  preprocessing 的 content-addressed/single-flight/micro-batch/TTSD pair-encode 性能结论；同路径
+  warm-hit parity 属于既有 speaker cache，不能归因于本规则。^[PR #4982]

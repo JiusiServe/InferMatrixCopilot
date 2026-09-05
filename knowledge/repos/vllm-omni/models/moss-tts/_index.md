@@ -4,7 +4,7 @@ created: 2026-07-21
 updated: 2026-09-05
 type: index
 tags: [vllm-omni, models]
-sources: ["PR #5635", "PR #6664", "PR #6543", vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts/audio_tokenizer_v2.py, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/]
+sources: ["PR #5635", "PR #6664", "PR #6543", "PR #4982", vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts/reference_encoder.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer_v2.py, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/]
 ---
 
 # MOSS-TTS 家族
@@ -57,6 +57,7 @@ sources: ["PR #5635", "PR #6664", "PR #6543", vllm_omni/model_executor/models/re
 | delay 生命周期、伪文本 logits、双代 tokenizer | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
 | codec v1/v2 选择、projection/checkpoint topology | [rules](rules.md#direct-代码快速入口) | loader 门禁与测试缺口 |
 | online request `seed`、Nano/Local/Delay/Realtime 的可复现性或并发 | 同页 `MOSSTTS-3a` | adapter precedence 与各变体 RNG 边界 |
+| MOSS reference audio 的 cache、并发 encode、TTSD 双 speaker 或 prefix salt | 同页 `MOSSTTS-4a` | content/slot/flight identity、批处理和失败隔离 |
 
 ## 配置与 checkpoint 差异（8 份 deploy 速查）
 
