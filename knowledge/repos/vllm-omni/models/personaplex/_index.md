@@ -1,10 +1,10 @@
 ---
 title: "PersonaPlex"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-06
 type: index
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #4771", vllm_omni/model_executor/models/personaplex/, vllm_omni/experimental/fullduplex/personaplex/, vllm_omni/deploy/personaplex.yaml]
+sources: ["PR #4771", vllm_omni/model_executor/models/personaplex/, vllm_omni/model_executor/models/personaplex/duplex/, vllm_omni/deploy/personaplex.yaml]
 confidence: high
 ---
 

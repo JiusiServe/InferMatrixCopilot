@@ -1,17 +1,16 @@
 ---
 title: "模型代码入口与 registry 快照"
 created: 2026-07-16
-updated: 2026-09-05
+updated: 2026-09-06
 type: guide
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/, "PR #5885", "PR #6354", "PR #6727"]
+sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/, "PR #5885", "PR #6354", "PR #6727", "PR #5918"]
 ---
 
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`v0.29.0-alignment @ 1015b1ce`（2026-09-05）快照，数字会漂移，不能凭它断言“不支持”。
-`v0.29.0-alignment` 是 `dev/vllm-align` 的快照标签，不是上游 tag 或 main 修订。
+`main @ 44d3ae10`（2026-09-06 校验）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -36,13 +35,15 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 
 | 注册点 | 位置 | 计数 |
 |---|---|---|
-| AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 89 个架构名 / 32 个模型族目录 |
-| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 65 条 pipeline / 40 个模型族目录 |
+| AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 89 个架构名 / 33 个模型族目录 |
+| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 66 条 pipeline / 41 个模型族目录 |
 | Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 59 个 key |
 | Deploy YAML | `vllm_omni/deploy/*.yaml` | 89 份 |
 
-`1e74807c → 1015b1ce` 的对齐分支审计未改变四个 registry/deploy inventory 的
-条目或指纹；inventory 不变不代表注册逻辑或已有 deploy 文件内容没有变化。
+`1015b1ce → 44d3ae10` 将审计目标从 alignment 分支切回 upstream main。
+新增 `Magi2Pipeline`，实现位于 `vllm_omni/diffusion/models/magi2/pipeline_magi2.py`；
+AR、`OMNI_PIPELINES` 与 deploy YAML inventory 不变。MAGI-2 暂走共享 Diffusion owner，
+注册存在不等于所有硬件、online serving 或性能路径均已验证。^[PR #5918]
 
 PR #5885 adds `MiniMaxH3TextEncoder`, the opt-in `minimax_h3_disaggregated` pipeline key,
 and regular/Turbo deployment profiles. It preserves bare H3's fused single-stage fallback;
@@ -101,36 +102,36 @@ SANA-Video 2B 新增 native `SanaVideoPipeline`（T2V）和
 `OMNI_PIPELINES` key 或 deploy YAML。模型专有的 checkpoint、VAE 和 adapter 边界见
 [SANA Video](sana-video/_index.md)。^[PR #5508]
 
-## AR/omni 模型族（31）
+## AR/omni 模型族（33）
 
-aura_omni、audex、bagel、cosyvoice3、covo_audio、dots_tts、dynin_omni、fish_speech、
-gepard、glm_image、glm_tts、higgs_audio_v2、higgs_audio_v3、hunyuan_image3、indextts2、
-mammoth_moda2、mimo_audio、ming_flash_omni、ming_tts、minicpmo_4_5、minimax_music3、moss_tts、
-moss_tts_nano、nemotron_voicechat、omnivoice、personaplex、qwen2_5_omni、qwen3_omni、
-qwen3_tts、step_audio2、voxcpm2、voxtral_tts
+audex、aura_omni、bagel、cosyvoice3、covo_audio、dots_tts、dynin_omni、fish_speech、gepard、glm_image、
+glm_tts、higgs_audio_v2、higgs_audio_v3、hunyuan_image3、indextts2、mammoth_moda2、mimo_audio、
+ming_flash_omni、ming_tts、minicpmo_4_5、minimax_h3、minimax_music3、moss_tts、moss_tts_nano、
+nemotron_voicechat、omnivoice、personaplex、qwen2_5_omni、qwen3_omni、qwen3_tts、step_audio2、voxcpm2、
+voxtral_tts
 
-## Diffusion 模型族（40）
+## Diffusion 模型族（41）
 
-bagel、boogu_image、cosmos3、diffusers_adapter（通用 diffusers 桥）、dreamzero、ernie_image、
-flux、flux2、flux2_klein、glm_image、gr00t、helios、
-hidream_image、hidream_o1_image、hunyuan_image3、hunyuan_video、internvla_a1、krea2、lance、
-lingbot_video、lingbot_world、longcat_image、longcat_video、ltx2、ming_flash_omni、
-minimax_h3、nextstep_1_1、omnigen2、omnivoice、ovis_image、pi0、qwen_image、sana_video、sana_wm、sd3、
-sdxl、sensenova_u1、stable_audio、wan2_2、z_image
+bagel、boogu_image、cosmos3、diffusers_adapter、dreamzero、ernie_image、flux、flux2、flux2_klein、
+glm_image、gr00t、helios、hidream_image、hidream_o1_image、hunyuan_image3、hunyuan_video、internvla_a1、
+krea2、lance、lingbot_video、lingbot_world、longcat_image、longcat_video、ltx2、magi2、ming_flash_omni、
+minimax_h3、nextstep_1_1、omnigen2、omnivoice、ovis_image、pi0、qwen_image、sana_video、sana_wm、sd3、sdxl、
+sensenova_u1、stable_audio、wan2_2、z_image
 
-## OMNI_PIPELINES key（56）
+## OMNI_PIPELINES key（59）
 
-Gr00tN1d7（注意:唯一 CamelCase key）、audex_s2s、audex_thinker_only、audex_tta、
-audex_tts、aura_omni、bagel、bagel_single_stage、bagel_think、cosyvoice3、covo_audio、
-dots_tts、dreamzero、dynin_omni、fish_qwen3_omni、gepard、glm_image、glm_tts、
-higgs_audio_v2、higgs_multimodal_qwen3、hunyuan_image3_ar、hunyuan_image3_dit、
-hunyuan_image_3_moe、hunyuan_video_15、indextts2、indextts2_5、lance、mimo_audio、
-ming_flash_omni、ming_flash_omni_image、ming_flash_omni_thinker_only、
-ming_flash_omni_tts、ming_tts、ming_tts_moe、mammoth_moda2、mammoth_moda2_ar、minicpmo_4_5、minimax_music3、
+Gr00tN1d7、audex_s2s、audex_thinker_only、audex_tta、audex_tts、aura_omni、bagel、bagel_single_stage、
+bagel_think、cosyvoice3、covo_audio、dots_tts、dreamzero、dynin_omni、fish_qwen3_omni、gepard、glm_image、
+glm_tts、higgs_audio_v2、higgs_multimodal_qwen3、hunyuan_image3_ar、hunyuan_image3_dit、
+hunyuan_image_3_moe、hunyuan_video_15、indextts2、indextts2_5、lance、mammoth_moda2、mammoth_moda2_ar、
+mimo_audio、ming_flash_omni、ming_flash_omni_image、ming_flash_omni_thinker_only、
+ming_flash_omni_tts、ming_tts、ming_tts_moe、minicpmo_4_5、minimax_h3_disaggregated、minimax_music3、
 moss_tts_delay、moss_tts_local、moss_tts_nano、moss_tts_realtime、nemotron_labs_audex、
 nemotron_labs_voicechat、nemotron_voicechat、omnivoice、personaplex、pi0、qwen2_5_omni、
-qwen2_5_omni_thinker_only、qwen3_omni_moe（resolver）、qwen3_omni_moe_thinker_only、qwen3_tts、step_audio_2、
+qwen2_5_omni_thinker_only、qwen3_omni_moe、qwen3_omni_moe_thinker_only、qwen3_tts、step_audio_2、
 step_audio_2_asr、voxcpm2、voxtral_tts、wan2_2_ti2v
+
+`diffusers_adapter` 是通用 diffusers 桥；`Gr00tN1d7` 保留其大小写，`qwen3_omni_moe` 是 resolver key。
 
 注意：单 stage diffusion 模型**多数不在** `OMNI_PIPELINES`（引擎为它们生成
 默认 diffusion stage 配置,见 [Config 组件](../components/configuration/architecture.md)）;
@@ -141,8 +142,8 @@ step_audio_2_asr、voxcpm2、voxtral_tts、wan2_2_ti2v
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 1e74807c \
-  --to 1015b1ce \
+  --from 1015b1ce \
+  --to 44d3ae10 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

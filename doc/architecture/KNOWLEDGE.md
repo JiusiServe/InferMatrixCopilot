@@ -41,10 +41,8 @@ extensions merely because they are absent from the common source.
   (per-file upstream created/updated dates, captured before the submodule's git
   history was removed — used for page frontmatter).
 - **Code-mirror pin:** the `knowledge/repos/vllm-omni/components/` source maps
-  are verified against vllm-omni `v0.29.0-alignment @
-  1015b1ced073195ed19f0610264dfdf8a8150e6c`. Here
-  `v0.29.0-alignment` is a snapshot label for `dev/vllm-align`, not an
-  upstream tag or main revision. The canonical machine baseline is
+  are verified against vllm-omni `main @
+  44d3ae100afa8411770b8b4d9442318bc5e897b3`. The canonical machine baseline is
   `adapters/vllm_omni/release_baseline.yaml`.
 - **AFD code-mirror pin:** the `knowledge/repos/afd-plugin/components/` owner
   maps and architecture summaries are verified against

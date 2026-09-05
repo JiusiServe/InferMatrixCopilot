@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 性能指南"
 created: 2026-07-10
-updated: 2026-09-04
+updated: 2026-09-06
 type: index
 tags: [vllm-omni, benchmark]
 sources: ["PR #6522", "PR #6634", vllm_omni/benchmarks/data_modules/omniinteract_dataset.py, vllm_omni/benchmarks/omniinteract.py, vllm_omni/benchmarks/duplex/]

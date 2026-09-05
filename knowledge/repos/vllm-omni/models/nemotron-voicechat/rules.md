@@ -1,10 +1,10 @@
 ---
 title: "Nemotron VoiceChat 规则"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-06
 type: rule
 tags: [vllm-omni, models, serving]
-sources: ["PR #6089", "PR #6354", vllm_omni/deploy/nemotron_labs_voicechat.yaml, vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/deploy/nemotron_labs_voicechat_streaming.yaml, vllm_omni/experimental/fullduplex/nemotron_voicechat/, vllm_omni/experimental/fullduplex/openai/, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py, tests/e2e/features/fullduplex/nemotron_voicechat/, tests/e2e/online_serving/nemotron_voicechat_realtime_duplex.py, tests/model_executor/models/test_nemotron_voicechat_perception_window.py, tests/model_executor/models/test_nemotron_voicechat_talker_replay.py, tests/model_executor/stage_input_processors/test_nemotron_voicechat.py, "PR #6831"]
+sources: ["PR #6089", "PR #6354", vllm_omni/deploy/nemotron_labs_voicechat.yaml, vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/deploy/nemotron_labs_voicechat_streaming.yaml, vllm_omni/model_executor/models/nemotron_voicechat/duplex/, vllm_omni/entrypoints/duplex/, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py, tests/model_executor/models/nemotron_voicechat/duplex/, tests/e2e/online_serving/nemotron_voicechat_realtime_duplex.py, tests/model_executor/models/test_nemotron_voicechat_perception_window.py, tests/model_executor/models/test_nemotron_voicechat_talker_replay.py, tests/model_executor/stage_input_processors/test_nemotron_voicechat.py, "PR #6831"]
 confidence: high
 ---
 

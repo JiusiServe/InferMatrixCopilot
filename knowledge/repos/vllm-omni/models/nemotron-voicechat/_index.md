@@ -1,10 +1,10 @@
 ---
 title: "NVIDIA Nemotron-Labs VoiceChat"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-06
 type: index
 tags: [vllm-omni, models, serving]
-sources: ["PR #6089", "PR #6354", vllm_omni/deploy/nemotron_labs_voicechat.yaml, vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/deploy/nemotron_labs_voicechat_streaming.yaml, vllm_omni/experimental/fullduplex/nemotron_voicechat/, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/asr/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py]
+sources: ["PR #6089", "PR #6354", vllm_omni/deploy/nemotron_labs_voicechat.yaml, vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml, vllm_omni/deploy/nemotron_labs_voicechat_streaming.yaml, vllm_omni/model_executor/models/nemotron_voicechat/duplex/, vllm_omni/model_executor/models/nemotron_voicechat/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/, vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/asr/, vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py]
 confidence: high
 ---
 
@@ -23,7 +23,7 @@ confidence: high
 - `vllm_omni/deploy/nemotron_labs_voicechat.yaml`
 - `vllm_omni/deploy/nemotron_labs_voicechat_duplex.yaml`
 - `vllm_omni/deploy/nemotron_labs_voicechat_streaming.yaml`
-- `vllm_omni/experimental/fullduplex/nemotron_voicechat/`
+- `vllm_omni/model_executor/models/nemotron_voicechat/duplex/`
 - `vllm_omni/model_executor/models/nemotron_voicechat/`
 - `vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/`
 - `vllm_omni/model_executor/models/nemotron_voicechat/nemo_vendored/asr/`
@@ -33,7 +33,7 @@ confidence: high
 
 ## 依赖的共享代码模块
 
-- `vllm_omni/experimental/fullduplex/openai/` → [serving](../../components/serving/_index.md)
+- `vllm_omni/entrypoints/duplex/` → [serving](../../components/serving/_index.md)
 - `vllm_omni/core/sched/` → [scheduler](../../components/scheduler/_index.md)
 - `vllm_omni/distributed/omni_connectors/` → [distributed](../../components/distributed/_index.md)
 - `vllm_omni/model_executor/models/` → [model-executor](../../components/model-executor/_index.md)

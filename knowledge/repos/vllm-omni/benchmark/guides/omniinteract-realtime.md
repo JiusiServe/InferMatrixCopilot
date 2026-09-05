@@ -1,10 +1,10 @@
 ---
 title: "OmniInteract Realtime Benchmark"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-06
 type: guide
 tags: [vllm-omni, benchmark]
-sources: ["PR #6522", "PR #6696", "PR #6818", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/experimental/fullduplex/openai/protocol.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, docs/cli/bench/serve.md, vllm_omni/benchmarks/data_modules/omniinteract_dataset.py, vllm_omni/benchmarks/omniinteract.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/entrypoints/cli/benchmark/cli_args.py]
+sources: ["PR #6522", "PR #6696", "PR #6818", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/entrypoints/duplex/protocol.py, vllm_omni/entrypoints/duplex/chat_fallback.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, docs/cli/bench/serve.md, vllm_omni/benchmarks/data_modules/omniinteract_dataset.py, vllm_omni/benchmarks/omniinteract.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/entrypoints/cli/benchmark/cli_args.py]
 confidence: high
 ---
 
