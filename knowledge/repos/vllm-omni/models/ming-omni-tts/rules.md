@@ -1,10 +1,10 @@
 ---
 title: "Ming-Omni-TTS 规则"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #4341"]
+sources: ["PR #4341", "PR #6119"]
 confidence: high
 ---
 
@@ -53,3 +53,10 @@ confidence: high
 
 共享 graph/eager 规则见 [Diffusion DIFF-1a](../../components/diffusion/rules.md)；
 模型语义证据矩阵见 [model validation](../../review/guides/model-validation.md)。
+
+## MING-3a — 说话人抽取必须区分引擎预取与离线下载
+
+- 触发：修改 Ming-TTS 的 `SpeakerEmbeddingExtractor`、引擎模型预取、离线 speaker embedding 预处理，或调整 HF/ModelScope 模型路径策略。
+- 强制：引擎内的 `SpeakerEmbeddingExtractor` 默认使用 `allow_download=False`，依赖已预取且包含 `campplus.onnx` 的模型目录；引擎构造前的离线 `end2end` 提取必须显式传 `allow_download=True`，并限制解析到 `campplus.onnx`。
+- 禁止：在线请求路径在缓存未命中时隐式联网，离线引擎前处理使用 cache-only 却假定文件已经预取，或在 `VLLM_USE_MODELSCOPE` 下假定 HF 的 `local_files_only` 分支能够完成 ModelScope 首次解析。
+- 验收：覆盖本地已解析目录、缓存命中/未命中和离线显式下载三条路径；确认缺失 `campplus.onnx` 明确失败，ModelScope 预取后的目录走短路，并验证 serving 与离线提取都能产生 speaker embedding。 ^[PR #6119]

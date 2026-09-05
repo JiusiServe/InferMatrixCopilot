@@ -1,10 +1,10 @@
 ---
 title: "Qwen-Image（base/Edit/Edit-Plus/Layered/DMD2 五变体）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/qwen_image/, vllm_omni/diffusion/registry.py]
+sources: ["PR #2783", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/models/qwen_image/, vllm_omni/diffusion/registry.py, tests/diffusion/lora/test_loader.py]
 ---
 
 # Qwen-Image
@@ -39,9 +39,14 @@ sources: [vllm_omni/diffusion/models/qwen_image/, vllm_omni/diffusion/registry.p
   pipeline 共用）;DMD2 经 `DMD2PipelineMixin`
   （`pipeline_qwen_image.py:1097`）;prompt 长度校验
   `validate_prompt_sequence_lengths`。
+- distilled LoRA 当前由 `QwenImagePipeline` 及继承它的 DMD2 变体接入 `QwenImageLoraLoaderMixin`；支持 key converter、
+  packed parameter 与 Diffusers non-unit alpha/rank 缩放。共享 load/unload 门禁见
+  [DIFF-2m](../../components/diffusion/rules-lora.md#diff-2m-distilled-delta-必须按真实-parameter-布局可逆合并)；Edit/EditPlus/Layered 未接入，converter map 有名称也不代表 pipeline 拥有 loader mixin。
 
 ## 什么时候查这里
 
 - 审查 qwen_image 任一变体的 CFG-parallel、分布式 VAE 或 DMD2 改动——五变体
   共栈,单变体改动先扫其余四个;共享 mixin 见
   [Diffusion 组件](../../components/diffusion/_index.md)。
+- 审查 accuracy、regional compile 或 FlashAttention 确定性时见
+  [Qwen-Image 规则](rules.md)。

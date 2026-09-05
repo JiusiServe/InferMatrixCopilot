@@ -1,15 +1,15 @@
 ---
 title: "Higgs-Audio（V2/V3 双谱系 TTS;higgs_multimodal_qwen3 即 V3）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/higgs_audio_v2/, vllm_omni/model_executor/models/higgs_audio_v3/, vllm_omni/transformers_utils/configs/higgs_audio_v3.py]
+sources: ["PR #6422", "PR #7065", vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/higgs_audio_v2/, vllm_omni/model_executor/models/higgs_audio_v3/, vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_tokenizer.py, vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.py, vllm_omni/transformers_utils/configs/higgs_audio_v3.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/model_executor/models/higgs_audio_v3/test_higgs_audio_v3.py, tests/e2e/online_serving/test_higgs_audio_v3.py]
 ---
 
 # Higgs-Audio
 
-以下事实在 `main @ 5d44868e` 复核。
+以下事实在 `main @ c4192568` 复核。
 
 ## 名称与范围（先解开命名结）
 
@@ -53,6 +53,7 @@ sources: [vllm_omni/model_executor/models/higgs_audio_v2/, vllm_omni/model_execu
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | 谱系差异表、delay-pattern 生命周期、流式窗口数学 | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
+| V3 request RNG、decode state、voice-clone prompt sentinel 或 chunked prefill substitution | [rules](rules.md) | `HIGGS-1a`、`HIGGS-2a` |
 
 ## 配置与 checkpoint 差异（v2 vs v3 一览）
 

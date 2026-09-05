@@ -1,15 +1,15 @@
 ---
 title: "HunyuanVideo-1.5（T2V/I2V,meanflow 旗标蒸馏）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/hunyuan_video/, vllm_omni/deploy/hunyuan_video_15.yaml, vllm_omni/config/pipeline_registry.py]
+sources: ["PR #4645", vllm_omni/diffusion/models/hunyuan_video/, vllm_omni/deploy/hunyuan_video_15.yaml, vllm_omni/config/pipeline_registry.py, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, "PR #6349"]
 ---
 
 # HunyuanVideo-1.5
 
-以下事实在 `main @ 5d44868e` 复核。与
+以下架构事实在 `main @ c201fd77` 复核。与
 [hunyuan-image3](../hunyuan-image3/_index.md) 是**不同家族**（本家族纯
 diffusion 视频,AR registry 无入口;image3 的结构见该页）。
 
@@ -29,7 +29,7 @@ diffusion 视频,AR registry 无入口;image3 的结构见该页）。
   **I2V 不在 OMNI_PIPELINES**（走单 stage diffusion 兜底）。pipeline
   config **无 `default_deploy_config_name`**——`hunyuan_video_15.yaml` 不会
   自动加载;显式传裸文件名时按 `_DEPLOY_DIR` 解析（pin 上仅
-  `tests/test_config_factory.py` 按名加载它）。
+  `tests/config/test_config_factory.py` 按名加载它）。
 - T2V vs I2V 差异速览：I2V 加 SigLIP 图像编码器 + 图像预处理（从
   `max_area` 推 H/W）+ 首帧 VAE 条件 latent/掩码;T2V 供零 image_embeds、
   零 cond_latents、零 mask。
@@ -38,6 +38,9 @@ diffusion 视频,AR registry 无入口;image3 的结构见该页）。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)
   （CFGParallelMixin、SP `_sp_plan`、分布式/瓦片 VAE、cache-dit adapter）、
   `diffusion/models/t5_encoder.py`（glyph 路的共享 `T5EncoderModel`）。
+- SP 不可整除时仍由 `_sp_plan` auto-pad；默认 `mask_sp_padding=False` 不把尾部零 token 交给
+  attention mask，以避开 varlen path，strict opt-in 与证据边界见
+  [SP padding rules](../../components/diffusion/rules-sp-padding.md)。
 
 ## 目录内容
 

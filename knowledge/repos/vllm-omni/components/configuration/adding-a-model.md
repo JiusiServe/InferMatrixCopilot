@@ -1,15 +1,15 @@
 ---
 title: "vLLM-Omni 新模型接入路径"
 created: 2026-07-16
-updated: 2026-07-29
+updated: 2026-09-03
 type: guide
 tags: [vllm-omni, components, config, models]
-sources: ["claude-workflow-starter-private@296ea45", docs/contributing/model/]
+sources: ["PR #5682", "claude-workflow-starter-private@296ea45", .claude/skills/add-tts-model/SKILL.md, docs/contributing/model/, vllm_omni/entrypoints/openai/tts_adapters/]
 ---
 
 # 加新模型：三条官方路径与四个注册点
 
-官方 spec（`main @ 5c390096` 复核）：
+官方 spec（`main @ ebe93f5d` 复核）：
 `docs/contributing/model/adding_omni_model.md`（多 stage omni，以 Qwen3-Omni 为
 完整示例——目录结构/关键组件/注册/stage 配置/stage input processor/测试/recipe
 九节）、`adding_diffusion_model.md`（纯 diffusion pipeline）、
@@ -26,6 +26,16 @@ sources: ["claude-workflow-starter-private@296ea45", docs/contributing/model/]
 
 另有：跨 stage 转换 `stage_input_processors/<model>.py`（`ar2diffusion` 等）、
 serving TTS 适配 `entrypoints/openai/tts_adapters/`、`recipes/<Org>/<Model>.md`。
+
+## TTS serving 适配
+
+AR TTS 新模型写一个 adapter，并在 `tts_adapters/__init__.py` 底部 import 注册；不要在
+`serving_speech.py` 复制 stage 集合或增加 model-type branch。通常声明 `stage_keys`；stage
+歧义/缺失时才声明 `model_archs`，只有无专有 stage 的 AR entry 才设
+`arch_identifies_entry_stage`。非集合匹配用 `matches()`，部署拓扑能力用
+`stage_serves_speech()`，真实冲突才设 `detect_priority`。详细 detection 不变量见
+[SERV-5e](../serving/rules-engine-lifecycle.md#serv-5e-tts-detection-从-adapter-metadata-的有序并集派生)。纯
+diffusion TTS 仍走 `for_diffusion()` 直达路径，不能假设 adapter 的 `validate()`/`build()` 可达。
 
 ## 照抄谁
 

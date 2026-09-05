@@ -1,15 +1,15 @@
 ---
 title: "CosyVoice3 架构"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3_code2wav.py, vllm_omni/model_executor/models/cosyvoice3/pipeline.py, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py, vllm_omni/transformers_utils/configs/cosyvoice3.py, vllm_omni/deploy/cosyvoice3.yaml]
+sources: ["PR #5673", "PR #6424", "PR #6955", vllm_omni/data_entry_keys.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3_code2wav.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/cfm.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/cosyvoice3/flow_estimator_trt.py, vllm_omni/model_executor/models/cosyvoice3/pipeline.py, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py, vllm_omni/transformers_utils/configs/cosyvoice3.py, vllm_omni/deploy/cosyvoice3.yaml]
 ---
 
 # CosyVoice3 架构
 
-事实在 `main @ 5d44868e` 复核;入口/模式速览见 [index](_index.md)。
+事实在 `main @ 39c16d75` 复核;入口/模式速览见 [index](_index.md)。
 
 ## 模型专有部分与共享模块的边界
 
@@ -23,6 +23,20 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/mo
 - **TRT 加速（本清单独有）**：campplus 说话人嵌入与 CFM DiT 估计器都可走
   TensorRT（启动时 ONNX→plan,按设备缓存 plan;campplus 有 CPU-ONNX 兜底）,
   统一由 `COSYVOICE3_TRT` 门控,默认开。
+- **CFM plan 发布**：flow-estimator builder 先序列化 engine bytes，再经自有、同目录的独占
+  临时 plan 写入并 close，最后以 `os.replace` 发布至缓存路径；因此并发 builder 可各自完成
+  artifact，最终缓存允许 last-writer-wins。失败清理仅处理 writer 自己创建的 tmp，不承担缓存
+  协调或持久化职责；具体改动约束见 [rules](rules.md)。^[PR #6955]
+- **CFM TensorRT handoff**：每个 execution context 与一个原始
+  `torch.cuda.Stream` 成对入池；caller stream 先由该 stream 的 `wait_stream`
+  建立 producer→TensorRT 依赖，TRT 在该 stream 的 raw `cuda_stream` handle 上
+  enqueue。返回前 caller 对 estimator stream 再 `wait_stream`，所以后续 CFG
+  buffer 原地写入和 output dtype conversion 在 consumer stream 上发生在 TRT 后。
+  所有供 raw pointer binding 的输入/输出都 record estimator stream；输出还 record
+  caller stream，分别覆盖 enqueue 前后 allocator reuse。context 可在 enqueue 后回池，
+  因为它始终与专属 stream 成对且 TensorRT 已 snapshot 地址；这不是 host synchronize。
+  `torch.nn.Module` estimator 路径和 `COSYVOICE3_TRT` 的既有关闭/CPU fallback
+  不在这个非-module TensorRT 分支中改变。具体改动约束见 [rules](rules.md)。^[PR #5673]
 - 共享：diffusion Attention 层、SharedMemoryConnector、
   [Config 组件](../../components/configuration/architecture.md)。
 
@@ -32,7 +46,7 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/mo
   `FunAudioLLM/Fun-CosyVoice3-0.5B-2512`。
 - config（`transformers_utils/configs/cosyvoice3.py`）：`eos_token_id` 默认
   6562;注释明确官方把 **所有 ≥ speech_token_size 的 token（6561–6760）都视
-  为停止信号**;`sample_rate 24000`、hidden 896、heads 14 硬编码。
+  为停止信号**;`sample_rate 24000`、hidden 896、query heads 14、KV heads 2 硬编码。
 - **RAS 停止机制（停止失效 bug 类别）**：停止 token id **6562 接收 200 个
   停止 logit 的 logsumexp 合并分数**;YAML 的
   `repetition_penalty: 1.0001` 唯一存在理由是逼 vLLM 维护
@@ -44,7 +58,9 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/mo
 ## 从输入到输出的主要流程
 
 1. 文本 + 参考音频作为多模态条件进入（campplus 说话人嵌入与
-   speech_feat/speech_token 条件张量打进 `additional_information`）。
+   speech_feat/speech_token 条件张量打进 `additional_information`）；共享 serializer 以原始
+   `uint8` storage + recorded PyTorch dtype/shape 往返，因此 BF16 保持 bit-exact，shared decoder
+   还原 dotted nested keys（如 `embed.speech_token`）后交给 stage processor。
 2. talker AR 出 speech token（词表 6561,合并停止 6562）。
 3. 交接双注册（**唯一同时注册两条交接的家族**,由 `deploy.async_chunk` 选）:
    - 流式 `talker2code2wav_async_chunk`：prompt 条件按 chunk 对齐
@@ -68,6 +84,13 @@ gate（YAML 头注的 H100/H20-3e 连续性数字是部署调参记录,非精度
   `tests/model_executor/stage_input_processors/test_cosyvoice3_stage_input_processors.py`
   （资产 `tests/assets/cosyvoice3/zero_shot_prompt.wav`）;示例
   `examples/{offline_inference,online_serving}/text_to_speech/cosyvoice3/`。
+- 采样在 request mask 和 logits processor 之后排除 NaN/±inf；整行没有 finite candidate 必须
+  fail loudly 而不能抽样随机 speech。该 guard 每 sampler batch 有一次 device sync，且不同于
+  `torch.multinomial` 的 vLLM sampler 可改变固定 seed 的 token 序列。RAS 仅剩合法 token 时必须
+  恢复 clone 的原 score，不能从 all-`-inf` softmax 抽样。^[PR #6424]
+- 最新 head 的真实权重证据覆盖 H20 CUDA graph/attention 与 MI300X Triton/AITER，dummy 权重也在
+  H20/MI300X 通过；没有 H100/MI325 复测，且这些运行都未使用 TensorRT campplus，不能外推到该硬件或
+  TRT 路径。`+inf` 被当作非法值排除、无 finite 行会杀死 EngineCore 而非只 abort 单请求，仍是 follow-up。
 - 已知未决：6563–6760 的实际停止行为依赖 talker `compute_logits` 的合并
   逻辑（只略读）;NPU 侧 `cosyvoice2_dit_attn.py`（名字是 cosyvoice2）是否
   接到 v3 DiT 路径未追;code2wav 内 TRT/PyTorch 选择的具体代码未逐行读。

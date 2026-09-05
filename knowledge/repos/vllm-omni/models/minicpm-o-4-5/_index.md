@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5"
 created: 2026-07-20
-updated: 2026-08-23
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/minicpmo_4_5/]
+sources: ["PR #3642", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", "PR #6404", "PR #6678", "PR #6628", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/features/fullduplex/engine/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/minicpmo45/stage0.py, vllm_omni/experimental/fullduplex/openai/realtime_input.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/platforms/npu/models/minicpmo_4_5_code2wav.py, "PR #6082", "PR #6587"]
 confidence: high
 ---
 
@@ -27,11 +27,42 @@ MiniCPM-o 多个版本共享通用 `MiniCPMO` architecture 名称，4.5 不能�
 runtime bridge 交给 TTS stage，再包装为 `OmniOutput.multimodal_outputs`；deploy 变体改变
 资源拓扑，不改变数据合同。
 
-描述直达源码与模型专有门禁见 [rules](rules.md#direct-代码快速入口)；新模型语义验证见
+Code2Wav 在所有平台使用树内 `MiniCPMO45Token2wav`。CUDA 可显式开启 DiT estimator +
+Campplus TensorRT；这是可关闭的局部加速，不替换 encoder/HiFT，也不会自动启用
+Step-Audio2 的 token2wav。engine cache/profile 与 fallback 门禁见 MCPMO-1c。
+
+四份 bundled deploy 在 CUDA 上另默认开启 HiFT graph：只 capture pre-iSTFT 子图，按 connector
+chunk/cache shape 预捕并限量 lazy capture，且不服从 stage `enforce_eager`；非 CUDA 回 eager。
+HiFT/CFM 的 shape、显存、并发、整代退休与部分-graph 性能证据边界见
+[Code2Wav CUDA graph 规则](rules-cuda-graphs.md)。
+
+Thinker 的 Whisper/APM audio encoder 仍构造 dense `[B,1,T,T]` mask；chunk mask 已用
+broadcasted query/key index 代替逐 row Python fill，但不改变 chunk/left-context/lookahead
+边界，也不消除 O(T²) storage。语义与证据门禁见 MCPMO-2b。
+
+Talker 只收集 sampling-eligible active rows 批量执行 codec projection 与 logit transforms，
+同时保留逐请求 generator 的 row-wise multinomial；request alignment、terminal 与 workspace
+边界见 MCPMO-3c。
+
+Daily-Omni、Seed-TTS simplex/realtime duplex 已进入 accuracy/perf harness；阈值、逐轮 metrics、
+单卡 H100 perf 与“baseline 不是 regression gate”的证据边界见 MCPMO-5a。
+
+Online serving CI 的 core suite 固定 async chunk，expansion 分开覆盖 sync/async，native duplex
+fixture 不再覆盖 eager/KV cap 并固定 active-speech turn window；验证证据边界见 MCPMO-5b。
+
+描述直达源码与模型专有门禁见 [rules](rules.md#direct-代码快速入口)；并发 duplex 的 ragged
+Talker chunk、shipping profile 与 chat 隔离见 [native duplex 规则](rules-duplex.md)；Code2Wav
+state、batch cap 与 NPU residual limits 见 [Code2Wav 并发批处理规则](rules-code2wav-batching.md)。新模型语义验证见
 [model validation](../../review/guides/model-validation.md)。
+
+Seed-TTS chat reference audio 的 request lookup、private prompt preservation、Talker buffer 与
+Code2Wav per-field fallback 见 MCPMO-3e；它不覆盖 realtime。^[PR #6628]
+
+Realtime video 不以「每 200 ms append」定义 frame cadence：首个约 1030 ms、以后每秒关闭的 Stage 0 unit 才接收对应 camera frame；双图 stacking 与外部 WAV 覆盖 soundtrack 的边界见本页已链接的 native duplex 规则 MCPMO-4f。^[PR #6404]
 
 ## 什么时候查这里
 
-- 审查 MiniCPM-o 4.5 registry、remote-code gate、TTS dependency、batch/stage handoff 或 native duplex session。
+- 审查 MiniCPM-o 4.5 registry、remote-code gate、TTS dependency、Code2Wav TensorRT/HiFT/CFM graph、
+  batch/stage handoff 或 native duplex session。
 - 问题位于共享 bridge/batching 时转到
   [Model Executor rules](../../components/model-executor/rules.md)。

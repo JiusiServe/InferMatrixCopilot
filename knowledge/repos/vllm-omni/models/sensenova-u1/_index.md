@@ -1,15 +1,15 @@
 ---
 title: "SenseNova-U1（统一 LLM 即编码器即去噪器,无 VAE）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/sensenova_u1/, vllm_omni/diffusion/registry.py]
+sources: ["PR #6516", vllm_omni/diffusion/models/sensenova_u1/, vllm_omni/diffusion/registry.py]
 ---
 
 # SenseNova-U1
 
-以下事实在 `main @ 5d44868e` 复核（源码派生页,尚无本模型的运行经验沉淀）。
+U1.5 的 checkpoint/fusion 和 model-local decode 合同见 [rules](rules.md)。
 
 ## 名称与范围
 
@@ -17,7 +17,7 @@ sources: [vllm_omni/diffusion/models/sensenova_u1/, vllm_omni/diffusion/registry
   （`sensenova_u1`, `pipeline_sensenova_u1`）,post
   `get_sensenova_u1_post_process_func`。单 stage diffusion,引擎默认 stage
   配置（[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
-- 无变体有据,无 deploy YAML,树内未 pin checkpoint。
+- U1.5 `sensenova/SenseNova-U1.5-8B-MoT` 共享 pipeline；无 deploy YAML。它的 distilled adapter 是启动期单向融合，不是新增 pipeline/registry row。
 - 源码：`pipeline_sensenova_u1.py`（66 KB,内含 `NEOVisionModel`/
   `TimestepEmbedder`/`ConvDecoder`/`SenseNovaU1DenoisingAdapter`）+
   `sensenova_u1_transformer.py`（32 KB）+ `fused_rmsnorm_rope.py`
@@ -36,4 +36,5 @@ sources: [vllm_omni/diffusion/models/sensenova_u1/, vllm_omni/diffusion/registry
 ## 什么时候查这里
 
 - 审查 sensenova_u1 的统一编码/去噪路径、融合核或权重映射改动。
+- 审查 U1.5 distilled LoRA、paged AR decode、GQA/RoPE/mask 时使用本页上方规则入口。
 - 共享 RNG/graph 规则见 [Diffusion rules](../../components/diffusion/rules.md)。

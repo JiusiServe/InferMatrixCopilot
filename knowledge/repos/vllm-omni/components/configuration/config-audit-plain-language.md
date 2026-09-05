@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni config audit 说人话规则"
 created: 2026-07-16
-updated: 2026-07-30
+updated: 2026-09-02
 type: guide
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #5647", vllm_omni/entrypoints/cli/serve.py, examples/online_serving/chart-helm/templates/_helpers.tpl]
 ---
 
 # vLLM-Omni config audit 说人话规则
@@ -83,8 +83,9 @@ CLI / deploy YAML / legacy / default factory
 ## 围绕五个问题展开
 
 1. 入口太多。
-   - 新入口是 `--deploy-config`。
-   - 老入口是 `--stage-configs-path`。
+   - `vllm serve --omni` 的唯一公开 YAML 入口是 `--deploy-config`。
+   - `stage_configs_path` 只保留在 offline/programmatic API 和内部 resolver；serve CLI
+     会拒绝 `--stage-configs-path`。
    - 还有不传配置时的 diffusion fallback。
 
 2. 默认 diffusion 配置有好几处在造。
@@ -99,9 +100,10 @@ CLI / deploy YAML / legacy / default factory
    - 所以光看 yaml 不知道最后 runtime 真正用了什么。
 
 4. 新老配置路径混在一起。
-   - `--deploy-config` 是新方向。
-   - `--stage-configs-path` 还没死。
-   - 文档里出现 stage config 不一定都是错的，要区分过时写法和 legacy-required。
+   - `--deploy-config` 是 public serve 的唯一方向。
+   - `stage_configs_path` 仍存在于 offline/programmatic 调用，不等于 public CLI 仍兼容。
+   - 文档里出现 stage config 不一定都是错的：online serve 写法必须迁移，offline
+     legacy-required 需沿真实入口确认；Helm 旧 key 必须明确报迁移错误，不能静默忽略。
 
 5. 模型迁移和 runtime bugfix 容易混在一起。
    - pipeline registry 迁移应该讲 topology。

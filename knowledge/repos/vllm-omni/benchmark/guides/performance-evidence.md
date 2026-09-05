@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-07-20
 type: guide
 tags: [vllm-omni, benchmark]
-sources: ["PR #5052"]
+sources: ["PR #5052", "Issue #5811", "PR #6150"]
 ---
 
 # 性能与精度证据
@@ -50,7 +50,7 @@ sources: ["PR #5052"]
 
 **PR Test Result 规范**：
 - 表格标题必须带输入口径，例如 `Official IT2I performance comparison`，不要只写 `Performance`。
-- 精度表必须写 reference，例如 `against tests/e2e/accuracy/assets/hunyuan_image_ref.png`。
+- 精度表必须写 reference，例如 `against tests/assets/hunyuan/hunyuan_image_ref.png`。
 - 速度表必须写 `model initialization excluded/included`。
 - 如果同一 PR 同时有 smoke 和 official e2e，smoke 放在最后，且标题写 `Compatibility smoke`。
 
@@ -65,6 +65,20 @@ sources: ["PR #5052"]
    - 质量 / 精度图用 official 或用户指定输入。
    - 功能 smoke 图如果质量差，不贴；用日志证明 grouping 即可。
 5. 如果发现结果来源错了，不能用注释补救；必须撤掉旧表，重跑正确口径并替换。
+
+## 仪表盘 metric 的证据边界
+
+Prometheus family 的实现、unit test 或 scrape 成功只证明测量路径的 wiring；不证明吞吐、
+latency 改善、显存收益、图像质量或模型质量。将新的 image/diffusion service metrics 写入
+性能或评估结论前，Evidence Matrix 还必须锁定 collector 是否由 `--log-stats` 启用、profile
+开关、metric 的时间边界、缺失 versus 实测零、Prometheus query/window 和与 request/result
+artifact 的对应关系。
+
+尤其不要把 `stage_gen_time`、scheduler/request queue wait、service request time、forward
+denoise time 或 `*_per_step` 当作同一个量：前者可包括 queue/async wait，纯 forward 又可能在
+profiler off 时 unavailable。PR #6150 留有一个未解决的 inline review：默认 profiler-off
+路径的 benchmark-side `denoise_step_latency_ms` 可能显示为零。因此该字段在修复或明确标记
+unavailable 前不能用于比较、回归阈值或“无 denoise 耗时”的结论。^[Issue #5811] ^[PR #6150]
 
 **2026-05-21 HunyuanImage3 DiT grouped batching 反例**：
 

@@ -1,15 +1,15 @@
 ---
 title: "Wan 2.2 架构"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/wan2_2_transformer.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py, vllm_omni/diffusion/models/dmd2/mixin.py]
+sources: ["PR #2783", "PR #5969", "PR #4820", "PR #6343", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/models/wan2_2/wan2_2_transformer.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py, vllm_omni/diffusion/models/dmd2/mixin.py, tests/dfx/stability/tests/test_wan22.json]
 ---
 
 # Wan 2.2 架构
 
-事实在 `main @ 5d44868e` 复核;变体/入口速览见 [index](_index.md);共享
+事实在 `main @ b98b7c85` 复核;变体/入口速览见 [index](_index.md);共享
 diffusion 设施见 [Diffusion 组件](../../components/diffusion/_index.md)。
 
 ## 模型专有部分与共享模块的边界
@@ -43,7 +43,20 @@ diffusion 设施见 [Diffusion 组件](../../components/diffusion/_index.md)。
   `_sanitize_dmd2_request` 强制步数/guidance、清负向 prompt、**并从
   extra_args 里剥掉 `sample_solver`/`flow_shift`**——防止基类把 scheduler
   换回去。给 DMD2 变体"加回 CFG/负向"的 PR 违反此合同。
+- **FastVideo WanDMD 合同**：checkpoint 的 `_class_name="WanDMDPipeline"` 以
+  `diffusers_class_aliases` 发现后仍复用 `Wan22Pipeline`，但固定 Euler、shift `8.0`、
+  timesteps `(1000, 757, 522)`，并把 guidance 缺省值改为 `1.0`；它忽略 request 的步数（包括 engine
+  warmup）和 solver/shift override，并在每一步按 `predict_clean → add_noise(next timestep)`
+  推进。这与 DMD2 mixin 是两套调度契约，不能合并或相互覆盖。所有 Wan T2V/I2V/S2V/VACE
+  loader 都通过 shared helper：checkpoint 缺少 `to_gate_compress` 时删除零初始化 projection，
+  有权重时保留 learned gate；这项 loader 清理不代表这些变体都受 VSA 正式支持。当前正式范围
+  仅是 `FastVideo/FastWan2.2-TI2V-5B-Diffusers` 通过 `Wan22Pipeline` 提供的 T2V/I2V 模式，
+  独立 I2V-14B、S2V 与 VACE pipeline 均在范围外。^[PR #4820]
 - 量化:每 transformer 独立解析 `quantization_config`,双专家可各自量化。
+- distilled LoRA 同样按 architecture-declared transformer ownership 分开：T2V/I2V 及其 DMD2
+  子类的 mixin 读取 `has_transformer_2`，要求位置 0/1 分别对应 `transformer`/`transformer_2`，
+  并通过具名 getter 避免两个 delta 都落到第一 transformer。boundary 即使少加载一个 target 也不
+  减少 path cardinality；该 startup fusion 是 server-lifetime 状态，不改变请求协议，VACE/S2V 未接入。
 
 ## 从输入到输出的主要流程
 
@@ -69,8 +82,15 @@ e2e（t2v 离线/在线、W4A16）、**accuracy**
 （perf/reliability/stability）。上列家族测试中未见 DMD2 专属测试（未做穷举
 核对）。
 
-- 量化脚本 `examples/quantization/quantize_wan2_2_modelopt_fp8.py`;副本
-  数据并行示例 `examples/online_serving/replica_data_parallel/wan2_2_ti2v_dp.yaml`。
+- stability JSON 将 A14B I2V 的两卡 CUDA case 标记为 `H800`，并单列两卡 NPU
+  `A3` case（`usp=2`、VAE patch parallel=2、HSDP、VAE slicing）；nightly 必须以
+  对应硬件 pytest marker 选择，不能从同一文件的模型或 `diffusion` family marker 推断
+  可在另一后端运行。这些配置只声明收集和启动参数，不构成任何 24-hour 稳定性运行已通过的
+  证据。^[PR #6343]
+
+- 树内已无原 Wan2.2 ModelOpt FP8 exporter，也没有该模型专用的 quantization export example；
+  审查与验证不得继续引用已删除的 example 路径。副本数据并行示例仍为
+  `examples/online_serving/replica_data_parallel/wan2_2_ti2v_dp.yaml`。^[PR #5969]
 - 已知未决：六架构如何按 checkpoint 选择（解析链在家族外）;
   `wan2_2_ti2v` key 是否用于 A14B 双专家 checkpoint 是配置惯例问题,代码不
   强制。

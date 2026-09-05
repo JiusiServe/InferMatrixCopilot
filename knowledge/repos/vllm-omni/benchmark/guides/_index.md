@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni 性能指南"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, benchmark]
-sources: []
+sources: ["PR #6522", "PR #6634", vllm_omni/benchmarks/data_modules/omniinteract_dataset.py, vllm_omni/benchmarks/omniinteract.py, vllm_omni/benchmarks/duplex/]
 ---
 
 # vLLM-Omni 性能指南
@@ -23,3 +23,5 @@ sources: []
 | 验证动态或连续 batching | [dynamic batching](dynamic-batching-validation.md) |
 | 验证分叉执行路径 | [divergent path](divergent-path-validation.md) |
 | 查看旧 plan/validation 总入口 | [plan and validation](plan-and-validation.md) |
+| 复现或审查 OmniInteract realtime serving runner | [OmniInteract realtime](omniinteract-realtime.md) |
+| 生成、评分或审查 MiniCPM-o Omni-DuplexEval artifact | [Omni-DuplexEval](omni-duplex-eval.md) |

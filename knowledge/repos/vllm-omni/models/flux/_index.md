@@ -1,10 +1,10 @@
 ---
 title: "FLUX.1（base / Kontext 编辑 / DMD2 蒸馏）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/flux/, vllm_omni/diffusion/registry.py]
+sources: ["PR #5823", tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, vllm_omni/diffusion/models/flux/, vllm_omni/diffusion/registry.py]
 ---
 
 # FLUX.1
@@ -37,6 +37,10 @@ sources: [vllm_omni/diffusion/models/flux/, vllm_omni/diffusion/registry.py]
     （`pipeline_flux.py:685`,FastGen DMD2 蒸馏少步数变体）。
 - CFG-parallel 有 `check_cfg_parallel_validity` 对
   `get_classifier_free_guidance_world_size()` 的校验。
+- Flux Kontext 已从 tiny-model alignment exclusion 移除：builder 共用 Flux 的 CLIP/T5/DiT shrink，
+  common suite 覆盖 text-to-image、image-to-image，以及 TP/CFG/CPU-offload/Cache-DiT 三组组合；
+  原 online expansion 相应只保留单 L4 base smoke。该变化是测试资源/覆盖归属，不改变生产 pipeline；
+  验收门禁见 [OMNI-CI-2d](../../ci/rules.md#omni-ci-2d-diffusion-tiny-builder-必须替代资源缩减而不是能力缩减)。
 
 ## 什么时候查这里
 

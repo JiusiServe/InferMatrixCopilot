@@ -1,15 +1,15 @@
 ---
 title: "Step-Audio2（音频 token 内嵌 LM 词表的语音对话）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/step_audio2/, vllm_omni/deploy/step_audio_2.yaml, vllm_omni/model_executor/stage_input_processors/step_audio2.py]
+sources: ["PR #5067", "PR #5638", "PR #5869", "PR #5917", "PR #6957", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/, vllm_omni/model_executor/models/step_audio2/step_audio2_dit_trt.py, vllm_omni/deploy/step_audio_2.yaml, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py, tests/model_executor/models/step_audio2/test_step_audio2_dit_trt.py, vllm_omni/platforms/npu/models/step_audio2_token2wav.py, vllm_omni/platforms/npu/models/cosyvoice2_dit_attn.py]
 ---
 
 # Step-Audio2
 
-以下事实在 `main @ 5d44868e` 复核。
+以下事实在 `main @ bfe8967c` 复核。
 
 ## 名称与范围
 
@@ -39,14 +39,18 @@ sources: [vllm_omni/model_executor/models/step_audio2/, vllm_omni/deploy/step_au
   家族专属 reasoning parser（`vllm_omni/reasoning/step_audio_reasoning_parser.py`）;
   serving 双入口——chat completions **和** `/v1/audio/speech`
   （`serving_speech.py`）。
-- 独有外部运行时依赖：`onnxruntime`、`s3tokenizer`、`flashcosyvoice`、
-  `hyperpyyaml`（token2wav CosyVoice 栈）。
+- 独有外部运行时依赖仍包括 `onnxruntime`、`s3tokenizer`、`hyperpyyaml`；project 依赖的
+  `step-audio2` package 仍携带/标注 `flashcosyvoice`，但目标 runtime 已不再从它 import HiFT/mel。
+- HiFT 与 mel spectrogram 已改用树内 CosyVoice3 实现；strict state-dict 与数值测试对
+  `flashcosyvoice` reference 校验架构/输出，但测试在缺 optional package 时整体 skip，且
+  MiniCPM-o 的 `HiFTGraphWrapper` 没有接入 Step-Audio2。^[PR #5869]
 
 ## 目录内容
 
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | token 过滤桥、25+3 lookahead、流式状态 | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
+| 设备常驻 token、ragged 长度同步、TRT 临时文件发布 | [rules](rules.md) | Step-Audio2 专属审查规则 |
 
 ## 配置与 checkpoint 差异（三变体）
 

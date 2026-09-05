@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni 配置构造架构"
 created: 2026-07-16
-updated: 2026-07-29
+updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py]
+sources: ["claude-workflow-starter-private@296ea45", "PR #5647", "PR #5678", "PR #5914", docs/design/architecture_overview.md, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/diffusion/data.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/entrypoints/cli/serve.py]
 ---
 
 # vLLM-Omni 配置构造架构
@@ -59,6 +59,19 @@ direct kwargs ---------------------------------------> direct normalize + strict
 
 structured 与 legacy 可以有不同的最终对象，但不能有不同的字段语义。它们必须在第一位 consumer 前共享 normalization 和 full-key validation；差异只允许发生在校验之后的 typed projection 或对象构造。
 
+`main @ 3d7fc3b9` 的运行边界仍是过渡态：`VllmOmniConfig` 已能构造 typed stage，且
+`build_engine_args_dict_from_omni_stage_config()` 可将它投影为 backend flat args；但生产
+`StageRuntime`、headless serve 和 diffusion startup 仍把 legacy OmegaConf stage 交给稳定的
+`build_engine_args_dict()`，后者委托 `build_legacy_engine_args_dict()`。因此 typed projection 是
+cutover 前的兼容适配器和测试 oracle，不是当前 live startup source of truth；目标 pin 中
+typed builder 与 `StageConfigFactory.create_from_model` 都没有 non-test caller。
+
+`docs/design/architecture_overview.md` 的五层图是目标架构的 conceptual map，不改变上述 live
+边界。图中的 authoring→resolve→transport-safe config→launch plan→engine materialization 可用于
+定位 owner，但 target `9159cedb` 仍不能据此宣称 structured typed startup 已完成 production
+cutover；review 后的文档使用真实 `BaseVllmOmniStageConfig`、`StageConfigFactory.create_from_model()`
+与 `VllmOmniConfig.from_pipeline_config()` 名称，不存在额外 resolver API。^[PR #5914]
+
 ## 值状态合同
 
 | 状态 | 必须怎样处理 |
@@ -90,13 +103,13 @@ structured 与 legacy 可以有不同的最终对象，但不能有不同的字�
 
 ## PipelineConfig 与 deploy YAML 的具体结构
 
-以下事实曾在 `main @ 5c390096` 复核；源码会变化，动手前仍须刷新 live 版本。
+以下事实在 `main @ 7a2007cc` 复核；源码会变化，动手前仍须刷新 live 版本。
 
 - **`PipelineConfig`**（模型的冻结 stage 拓扑）由模型的 `pipeline.py` 注册；
   **deploy YAML**（`vllm_omni/deploy/*.yaml`）只描述“这些 stage 怎么跑”。
-  未迁移模型仍走 legacy `--stage-configs-path` + `stage_args` schema
-  （`vllm_omni/model_executor/stage_configs/*.yaml`）。
-- 未显式给 `--deploy-config`/`--stage-configs-path` 时，registry 按 `model_type`
+  public `vllm serve --omni` 只接受 `--deploy-config`；offline/programmatic API 仍保留
+  `stage_configs_path` 读取 legacy `stage_args` schema。
+- serve 未显式给 `--deploy-config` 时，registry 按 `model_type`
   自动解析 pipeline + bundled deploy YAML；单 stage diffusion 模型不在 registry，
   走 `async_omni_engine.py` 的 `_create_default_diffusion_stage_cfg` 兜底。
 - deploy 顶层字段包括 `base_config`、`async_chunk`、`connectors`/`edges`、`stages`、
@@ -129,5 +142,6 @@ out-of-tree 注册。
 - `endpoint_policy.py` 的 `OmniServingCapability` 与
   `shutdown_unsupported_routes` 允许 pipeline 关闭不支持的 serving 路由。
 - `composable_parallel/` 的 `--strategy-config` 在合并后的 stage 上叠加逐 stage
-  并行轴；已接线与 reserved axis 必须区分，且不能与 legacy
-  `--stage-configs-path` 静默混用。
+  并行轴；已接线与 reserved axis 必须区分。Public serve 已移除 legacy flag；
+  offline/programmatic resolver 仍须拒绝 `stage_configs_path` 与 `deploy_config_path`
+  同时出现。

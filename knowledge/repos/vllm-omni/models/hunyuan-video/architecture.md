@@ -1,15 +1,15 @@
 ---
 title: "HunyuanVideo-1.5 架构"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-04
 type: architecture
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/hunyuan_video/pipeline_hunyuan_video_1_5.py, vllm_omni/diffusion/models/hunyuan_video/pipeline_hunyuan_video_1_5_i2v.py, vllm_omni/diffusion/models/hunyuan_video/hunyuan_video_15_transformer.py]
+sources: [vllm_omni/diffusion/models/hunyuan_video/pipeline_hunyuan_video_1_5.py, vllm_omni/diffusion/models/hunyuan_video/pipeline_hunyuan_video_1_5_i2v.py, vllm_omni/diffusion/models/hunyuan_video/hunyuan_video_15_transformer.py, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #5969", "PR #6349"]
 ---
 
 # HunyuanVideo-1.5 架构
 
-事实在 `main @ 5d44868e` 复核;入口/变体速览见 [index](_index.md)。
+事实在 `main @ c201fd77` 复核;入口/变体速览见 [index](_index.md)。
 
 ## 模型专有部分与共享模块的边界
 
@@ -55,13 +55,19 @@ sources: [vllm_omni/diffusion/models/hunyuan_video/pipeline_hunyuan_video_1_5.py
 
 ## 怎样验证功能、精度和性能
 
-pin 上只有**功能面**验证入口;无精度基线或性能 gate 证据,相关结论需另行
-实测。TP>1 的 54 块 DiT 未见 CI 覆盖（deploy 默认 TP1）。
+功能覆盖分层：基本单 H100 CPU-offload T2V online-serving case 在 ready/merge 的
+`core_model` 与 `advanced_model` lane 运行；CacheDiT + layerwise CPU-offload（1 卡）和
+CacheDiT + TP=2 + VAE patch parallel=2 + tiling（2 卡）均为 nightly `full_model` 覆盖。
+nightly 另跑 T2V/I2V DFX configs：每项为随机数据、10 prompts、concurrency 1、seed 42、
+negative prompt、832×480、33 frames、4 steps、24 fps，比较单 H100 和 2×H100
+CacheDiT/TP2/VAE patch-parallel=2/tiling 方案。它们只上传 JSON/log artifacts，未设置
+基线阈值；因此不是性能 gate，也不证明超出该配置与运行的性能或硬件结论。^[PR #6349]
 
 - 单测：`tests/diffusion/models/hunyuan_video/test_hunyuan_video_quant_config_propagation.py`;
   e2e `tests/e2e/online_serving/test_hunyuan_video_15_expansion.py`;示例
   `examples/online_serving/{text_to_video,image_to_video}/run_server_hunyuan_video_15.sh`
-  与对应 `run_curl_hunyuan_video_15.sh` 客户端脚本;量化脚本
-  `examples/quantization/quantize_hunyuanvideo_15_modelopt_fp8.py`。
+  与对应 `run_curl_hunyuan_video_15.sh` 客户端脚本。树内已无原 ModelOpt FP8 exporter，也没有
+  该模型专用的 quantization export example；审查与验证不得继续引用已删除的 example 路径。
+  ^[PR #5969]
 - 已知未决：checkpoint 如何选 I2V 架构（推测经 model_index.json
   `_class_name`,解析链未追）;serving 文档是否期待用户显式传 YAML。

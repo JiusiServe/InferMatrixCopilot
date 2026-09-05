@@ -1,16 +1,16 @@
 ---
 title: "测试分级（L1–L5）与 pytest markers"
 created: 2026-07-16
-updated: 2026-07-31
+updated: 2026-09-05
 type: guide
 tags: [vllm-omni, ci]
-sources: [docs/contributing/ci/test_system_overview.md, docs/contributing/ci/test_writing_guide.md]
+sources: [docs/contributing/ci/test_system_overview.md, docs/contributing/ci/test_writing_guide.md, "PR #6650"]
 ---
 
 # 测试分级（L1–L5）与 pytest markers
 
 官方 spec：`docs/contributing/ci/test_system_overview.md` +
-`test_writing_guide.md`（`main @ 807db6ef` 复核）。测试金字塔五级 + Common 规范
+`test_writing_guide.md`（`v0.26.0 @ a4ea67a2` 复核）。测试金字塔五级 + Common 规范
 （PR 模板/checklist 与 CI 失败说明）。
 
 ## 五级定义
@@ -31,8 +31,9 @@ sources: [docs/contributing/ci/test_system_overview.md, docs/contributing/ci/tes
 - 分级：`core_model`（L1&L2）、`advanced_model`（L3）、`full_model`（L4）。
 - 领域：`diffusion`、`omni`、`tts`、`cache`、`parallel`。
 - 平台：`cpu`、`gpu`、`cuda`、`rocm`、`xpu`、`npu`。
-- 硬件：`H100`、`L4`、`MI325`、`A2`、`A3`；多卡：`distributed_{cuda,rocm,npu}`；
-  条件跳过：`skipif_{cuda,rocm,npu}`（卡数不足时跳过）。
+- 硬件：SKU 与 `cards_N` card-count markers 均由 `pyproject.toml` taxonomy/`hardware_test` 或
+  `hardware_marks` 派生（default `cards_1`）；Buildkite 按 `cards_N` 分区。handwritten SKU marks
+  由 `check-mark` pre-commit 拒绝；这是 collection/routing contract，不是 runtime claim。^[PR #6650]
 - 其他：`slow`（快速 CI 可跳）、`benchmark`。
 - 带 `*` 的平台/硬件/分布式/skipif markers 由 `@hardware_test` 参数化装饰器（或
   `hardware_marks`）**自动添加**，用法：

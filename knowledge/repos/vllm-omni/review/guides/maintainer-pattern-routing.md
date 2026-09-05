@@ -1,10 +1,10 @@
 ---
 title: "PR intent 到 maintainer owner 路由"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-09-04
 type: guide
 tags: [vllm-omni, review]
-sources: ["InferMatrixCopilot Issue #24", "PR #3576", "PR #3642", "PR #4106", "PR #4281", "PR #4341", "PR #4718", "PR #4730", "PR #4980", "PR #5001", "PR #5031", "PR #5037", "PR #5052", "PR #5084", "PR #5087", "PR #5088", "PR #5136", "PR #5157"]
+sources: ["InferMatrixCopilot Issue #24", "PR #3576", "PR #3642", "PR #4106", "PR #4281", "PR #4341", "PR #4718", "PR #4730", "PR #4980", "PR #5001", "PR #5031", "PR #5037", "PR #5052", "PR #5084", "PR #5087", "PR #5088", "PR #5136", "PR #5157", "PR #6049"]
 confidence: high
 ---
 
@@ -37,7 +37,8 @@ diff 的 producer、consumer、失败路径与链接规则一致。
 | PR 描述或风险信号 | 主 owner | 重点 |
 |---|---|---|
 | 任意模型名、别名、architecture、pipeline/model registry key | [Model resolver](../../models/catalog.md#direct-模型代码入口) | 搜三处 registry → folder/module/class → AR/diffusion models 目录 |
-| HunyuanImage3、`model_extras`、shared task examples、`extra_body`、AR prompt/tokenizer | [HunyuanImage3 rules](../../models/hunyuan-image3/rules.md) | 按描述命中快速代码地图；registry、server/offline seam、默认值与 fallback |
+| `model_extras`、shared image-task examples、canonical prompt envelope | [Model Executor rules](../../components/model-executor/rules-image-task-envelope.md#exec-6a-shared-image-example-先建-canonical-envelopemodel-extra-只做特化变换) | example owns task envelope；registry 只做 model-specific transform；再按命中模型追加 owner |
+| HunyuanImage3、`extra_body`、AR prompt/tokenizer | [HunyuanImage3 rules](../../models/hunyuan-image3/rules.md) | registry、server/offline seam、默认值与 fallback |
 | `tests/diffusion/quantization`、可选包 import、硬件支持文档 | [CI environment](../../ci/guides/ci-environment-gotchas.md) | 未安装环境、真实 kernel、claim 一致性 |
 | benchmark 脚本、percentile、warmup、replica isolation | [performance evidence](../../benchmark/guides/performance-evidence.md) | 计时、统计、失败退出、完整 key set |
 | 模块移动、compat shim、重复 class/schema | [API surface](../../../../general/review/guides/code-taste-api-surface.md) | identity、旧行为、返回合同 |

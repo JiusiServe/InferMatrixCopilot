@@ -1,7 +1,7 @@
 ---
 title: "Distributed（跨 stage 通信与数据搬运）"
 created: 2026-07-16
-updated: 2026-07-31
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, components, distributed]
 sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coordinator/, docs/design/feature/disaggregated_inference.md]
@@ -14,7 +14,7 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
   `vllm_omni/distributed/omni_coordinator/`（协调器与 load balancer）
 - 知识面另覆盖跨 stage ZMQ 路由/端口分配（`vllm_omni/engine/stage_engine_startup.py::OmniMasterServer`）
   ——组件划分服务知识归属，与 manifest 运行时粒度不同
-- 源码校验：以上路径与下列锚点均已在 `main @ 807db6ef` 验证存在：
+- 源码校验：以上路径与下列锚点均已在 `main @ 1e74807c` 验证存在：
   `OmniConnectorBase`（connectors/base.py:12）、`OmniKVTransferManager`
   （kv_transfer_manager.py:341）、`LoadBalancer` 三实现（load_balancer.py:39/64/74/102）、
   `OmniMasterServer._allocate_route_locked`（stage_engine_startup.py:254）
@@ -33,6 +33,7 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
 | PR 描述信号 | 第一批源码 | 已有知识 |
 |---|---|---|
 | connector backend、put/get、跨 stage 数据损坏 | `distributed/omni_connectors/connectors/base.py::OmniConnectorBase`；目标 backend 的 `put` / `get` | architecture |
+| async sender boundary、segment generation、chunk dedup watermark | `distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py::save_async` | DIST-1g/1j |
 | Mooncake、RDMA/TCP fallback、object decode | `connectors/mooncake_transfer_engine_connector.py::MooncakeTransferEngineConnector` | connector pitfalls |
 | KV transfer、connector lifecycle | `distributed/omni_connectors/kv_transfer_manager.py::OmniKVTransferManager` | architecture |
 | coordinator、replica selection、负载均衡 | `distributed/omni_coordinator/load_balancer.py::LoadBalancer` 及具体 balancer | architecture |
@@ -52,3 +53,4 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
 | 已修过的 connector/端口产品坑 | [connector pitfalls](connector-pitfalls.md) |
 | 选择和配置 connector backend | [connector backends](connector-backends.md) |
 | 跨 stage `async_chunk` 流式语义 | [async chunk](async-chunk.md) |
+| TP KV receive consensus、chunk boundary 与 active-window 合同 | [distributed rules](rules.md) |

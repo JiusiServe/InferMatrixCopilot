@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni Configuration"
 created: 2026-07-16
-updated: 2026-07-31
+updated: 2026-09-05
 type: index
 tags: [vllm-omni, components, config]
 sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
@@ -11,10 +11,11 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 
 - 主要源码：`vllm_omni/config/`
 - 跨边界入口：`vllm_omni/diffusion/data.py`、`vllm_omni/engine/arg_utils.py`、`vllm_omni/engine/stage_init_utils.py`、`vllm_omni/engine/async_omni_engine.py`
-- 主要测试：`tests/config/`、`tests/test_config_factory.py`、`tests/test_diffusion_config_propagation.py`，以及各公开入口附近的配置测试
+- 主要测试：`tests/config/`、`tests/config/test_config_factory.py`、
+  `tests/diffusion/test_diffusion_config_propagation.py`，以及各公开入口附近的配置测试
 - 部署配置：`vllm_omni/deploy/*.yaml`，以及 `pipeline_registry.py`、
   `endpoint_policy.py`、`server_settings.py`、`yaml_util.py`、`composable_parallel/`
-- 源码校验：以上路径在 `main @ 807db6ef` 验证存在；机器基线见
+- 源码校验：以上路径在 `main @ 1e74807c` 验证存在；机器基线见
   `adapters/vllm_omni/release_baseline.yaml`
 
 ## 什么时候查这里
@@ -34,11 +35,19 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解配置从 deploy、CLI、默认 factory 到 structured/legacy config 的稳定边界 | [配置构造架构](architecture.md) |
-| 根据 PR 描述直达 strict schema、deploy/topology、composable strategy 或显存配置的规则组与第一批源码 | [配置开发门禁与代码地图](rules.md) |
+| 根据 PR 描述直达 strict schema、pipeline sampling constraints、deploy/topology、composable strategy 或显存配置的规则组与第一批源码 | [配置开发门禁与代码地图](rules.md) |
+| 对象存储 URI、HF cache snapshot 或空 `config.json` 的模型名称回退与 pipeline 路由 | [模型引用路由规则](rules-model-reference-routing.md) |
+| stage full-payload transport capability、topology-owned projection 或 deploy/CLI override rejection | [stage transport capability](rules-stage-transport.md) |
+| diffusion Ulysses SymmMem transport flag 的 deploy/CLI/default-stage projection | [diffusion parallel transport rules](rules-diffusion-parallel-transport.md) |
+| diffusion attention shorthand、structured config 与 global override 的优先级和最终规范表示 | [diffusion attention precedence](rules-diffusion-attention-precedence.md) |
+| legacy stage engine args 的 copy boundary、connector/default injection 或 repeated build mutation | [legacy engine-args isolation](rules-legacy-engine-args.md) |
 | 审计配置来源和多层加工 | [config audit](config-audit-plain-language.md) |
 | 设计配置归一化与 parity 验证 | [config normalization parity](config-normalization-parity.md) |
 | 查询 `Omni()` 初始化参数 | [Omni init args](omni-init-args.md) |
 | 写或修改 deploy YAML | [deploy YAML](deploy-yaml.md) |
 | 核对 pipeline/deploy schema | [pipeline deploy schema](pipeline-deploy-schema.md) |
+| 审查或新增 process 环境变量、stage `env` 和安全诊断输出 | [environment-variable contract](environment-variable-contract.md) |
 | 计算多 stage 显存预算 | [deployment memory budget](deployment-memory-budget.md) |
 | 添加新模型和注册点 | [adding a model](adding-a-model.md) |
+| composable strategy 的 axis、并行拓扑与 load balancing owner | [并行拓扑合同](rules-parallel-topology.md) |
+| 冻结 topology、辅助 stage 注入与模型专用 deploy profile | [topology 与部署 profile](rules-topology-profiles.md) |

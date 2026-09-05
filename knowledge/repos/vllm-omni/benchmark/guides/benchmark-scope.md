@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-07-16
 type: guide
 tags: [vllm-omni, benchmark]
-sources: ["#3767", "#3938"]
+sources: ["#3767", "#3938", "PR #5957", benchmarks/tts/bench_tts.py, benchmarks/tts/model_configs.yaml]
 ---
 
 # vLLM-Omni Benchmark 口径
@@ -166,3 +166,14 @@ candidate PR 只能来自三种来源：
 - 禁止把第二种结果简称成 “AR 极限”。
 
 **一句话规则**：benchmark PR 是尺子，不是自动成为被测对象；candidate PR 是用户需求，不是 agent 推断。先锁四元组，再启动任何远端长跑。
+
+## Shared TTS runner 必须分离 registry identity 和实际 served model
+
+- `--model` 只选择 `model_configs.yaml` 的 workload/deploy/voice 配置；服务从本地 bundle
+  启动时，`--served-model-name` 独立指定发给 `vllm bench serve` 的 model 值，不得
+  因此变更 registry key 或工作负载。
+- 为请求注入 seed 前必须 copy task `extra_body`，不能在多轮 sweep 中污染共享
+  registry dict；`--num-warmups` 必须非负；`argparse.REMAINDER` 交给底层 CLI 前只移除
+  首个 literal `--`，其余参数和顺序原样保留。
+- 验收：用 local served name + registry key、连续两轮不同 seed、负 warmup 和带/不带
+  separator 的 remainder 构造最终 argv；registry 输入在调用后保持不变。^[PR #5957]

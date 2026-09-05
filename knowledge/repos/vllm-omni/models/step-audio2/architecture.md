@@ -1,15 +1,16 @@
 ---
 title: "Step-Audio2 架构"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-05
 type: architecture
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vllm_omni/model_executor/models/step_audio2/step_audio2_token2wav.py, vllm_omni/model_executor/models/step_audio2/step_audio2_constants.py, vllm_omni/model_executor/stage_input_processors/step_audio2.py]
+sources: ["PR #5067", "PR #5638", "PR #5869", "PR #5917", "PR #6957", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vllm_omni/model_executor/models/step_audio2/step_audio2_token2wav.py, vllm_omni/model_executor/models/step_audio2/step_audio2_dit_trt.py, vllm_omni/model_executor/models/step_audio2/step_audio2_constants.py, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py, tests/model_executor/models/step_audio2/test_step_audio2_token2wav_async_chunk.py, tests/model_executor/models/step_audio2/test_step_audio2_dit_trt.py]
 ---
 
 # Step-Audio2 架构
 
-事实在 `main @ 5d44868e` 复核;变体/入口速览见 [index](_index.md)。
+事实在 `main @ bfe8967c` 复核;变体/入口速览见 [index](_index.md)，
+设备边界与同步验收见 [rules](rules.md)。
 
 ## 模型专有部分与共享模块的边界
 
@@ -23,8 +24,13 @@ sources: [vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vl
   硬编码 backbone 类）;音频嵌入并入 `<audio_patch>`（id 151690）位置。
 - 专有 token2wav（`step_audio2_token2wav.py`）：CosyVoice 风格栈——
   s3tokenizer（prompt wav 语音 token）+ ONNX 说话人嵌入 + hyperpyyaml 加载的
-  flow-matching（10 步 ODE）+ flashcosyvoice HiFT 声码器 → 24 kHz;树内带说话人
+  flow-matching（10 步 ODE）+ 树内 CosyVoice3 HiFT/mel 实现 → 24 kHz;树内带说话人
   wav——`assets/default_female.wav` 是默认,`default_male.wav` 是备选。
+- 共享加速实现：`step_audio2_dit_trt.py` 提供流式 DiT ONNX export/TRT stepper，并以同目录
+  独占临时文件发布 ONNX/plan（成功时原子 replace、并发 last-writer-wins）；
+  `step_audio2_token2wav.py` 提供 Campplus TRT helper。在此 pin 上只有 MiniCPM-o 的 Code2Wav
+  wiring 显式启用它们，Step-Audio2 pipeline 不会因共享代码存在而自动切换；发布器不提供锁、
+  fsync/目录持久化、内容校验或 ONNX/plan 成对事务。^[PR #6957]
 - 常量单一来源 `step_audio2_constants.py`：文本 ≤151688;音频 token
   **151696–158257**（`audio_vocab_size` 6562,相对 `audio_eos` 6561）;流式
   `chunk_size 25` / `pre_lookahead_len 3` / mel cache 8 帧。
@@ -57,9 +63,12 @@ sources: [vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vl
    3 个 lookahead 被刻意重发给下一块（conformer 编码器需要未来 token,内部
    缓存）;末块发送全部剩余 token,纯文本完成发空 EOF 载荷。与 higgs/mimo 的
    左上下文滑窗是不同机制。
-3. **跨家族陷阱**：本家族 payload meta 的 `left_context_size` 被复用为
-   "是否末块"布尔（0/1）,**不是重叠帧数**——读 connector 元数据的共享代码
-   勿按 higgs/mimo 语义解释。
+3. **跨家族陷阱**：本家族由 runtime additional-information 条目的嵌套
+   `meta.left_context_size` 识别 async-chunk；只要该值存在（包括非末块的
+   `0`）就进入 token2wav 流式路径。它复用为"是否末块"布尔（`0/1`），
+   **不是重叠帧数**；`1` 传给 core 作为 `last_chunk`，而读 connector 元数据的
+   共享代码不得按 higgs/mimo 语义解释。空 EOF 仍返回一个零 waveform chunk，并
+   不因本次 metadata 路由修复改变。^[PR #5917]
 4. token2wav 流式:`_StreamState`（mel cache 160 ms、source cache 3840 样本、
    estimator cache 窗 100）,块缝用 Hamming `fade_in_out` 平滑。
 
@@ -69,7 +78,8 @@ pin 上只有**功能面**验证入口;无精度基线或性能 gate 证据,下�
 精度/性能维度,相关结论需另行实测。
 
 - 单元：`tests/model_executor/models/step_audio2/`（thinker、token2wav
-  async chunk）、`tests/model_executor/stage_input_processors/test_step_audio2_async_chunk.py`;
+  async chunk、`test_step_audio2_dit_trt.py` 的 CPU 原子发布）、
+  `tests/model_executor/stage_input_processors/test_step_audio2_async_chunk.py`;
   NPU:`tests/platforms/npu/test_step_audio2_token2wav.py`;parser:
   `tests/reasoning/test_step_audio_reasoning_parser.py`。
 - e2e：`tests/e2e/{offline_inference,online_serving}/test_step_audio2_expansion.py`

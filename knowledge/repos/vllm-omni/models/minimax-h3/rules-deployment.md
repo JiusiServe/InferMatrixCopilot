@@ -1,0 +1,265 @@
+---
+title: "MiniMax H3 部署与证据规则"
+created: 2026-09-02
+updated: 2026-09-05
+type: rule
+tags: [vllm-omni, models, diffusion]
+sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5850", "PR #5857", "PR #5863", recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", "PR #6555", "PR #6556", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, .buildkite/cuda/test-merge.yml, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/e2e/online_serving/minimax_h3/, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, "PR #5910", "PR #6213", "PR #6345", "tests/diffusion/models/minimax_h3/test_minimax_h3_vae_tiling.py", "PR #6072", "PR #6526", tests/diffusion/models/minimax_h3/test_minimax_h3_dlo_lifecycle.py, tests/diffusion/offloader/test_module_residency.py]
+confidence: high
+---
+
+# MiniMax H3 部署与证据规则
+
+只有 MMH3-数字字母 是可审计规则 ID。本页承载 deployment、capacity 与 hardware
+measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rules.md#direct-代码快速入口)。
+
+## MMH3-3a — H3 DLO 必须保持 loader layout 与 component stage 配对
+
+- 触发：H3 `OffloadPlan`、`dlo_no_use_allgather`、resident layer、text encoder/VAE staging
+  或 DLO 与 CPU/layerwise offload 组合。
+- 强制：H3 先走 regular loader 形成 TP-local grouped-QKV/fused-MLP layout，再以 no-AllGather
+  H2D streaming 使用它；`_supports_mmap_loading=False` 是安全门，不能绕过。plan 将
+  `token_refiner.blocks` 独立 stream，text encoder 的 vision/text block rank-local stream，
+  video/audio VAE 按 encode/decode stage on-demand，leading `transformer` blocks 只在 denoise
+  stage resident 并在 decode 前释放。`dlo_resident_layers>0` 必须与 no-AllGather 配对。MiniMax-H3
+  的 staged encoder→DiT→VAE 边界可共用一个 component-local `BoundedAllocatorCache`：仅当
+  cached-but-unallocated 不超过设备容量 25% 且物理 free 不低于 5% 时保留；遥测缺失、任何
+  component/stager failure 或 OOM retry 都保守释放。encoder 的非 block children 必须作为一个
+  immutable pinned-CPU snapshot group，以一条 copy stream/event stage，保持 parameter/buffer
+  storage alias、shape、stride、offset 与 dtype；DiT prefetch 和两个 shared device buffer 不变。
+- 禁止：让 encoder TP shard 进入 DiT AllGather；把 DLO+CPU offload 的早期分支优先级交给
+  generic CPU-offload hook；只因 component 有 `offload_to_cpu` 就推断每个 caller 都正确 staging。
+  目标 pin 的 `_encode_audio_conditions(standalone_audios)` 没有进入 `_component_on_device`，
+  会在前一个 embedded-audio context 已关闭后直接使用 CPU-bound audio VAE；没有外层 stage
+  context 或专属测试证明 image+standalone-audio Ref2VA 的 DLO device/performance 合同。不得把此
+  component-local retention 变成 global `empty_cache` override，或删除 executor 的 unconditional
+  shutdown cleanup；不得由 CUDA/no-AllGather 的有界 A/B 外推 AllGather、其他平台、其他 DLO 模型
+  或吞吐/并发收益。
+- 验收：分别覆盖 text、image、video、embedded audio、standalone audio 与 decode 的
+  load→use→finally-offload 次序，异常也释放；regular-loader transform sentinel 到 TP-local stream
+  后仍正确；resident layers 只围住 denoise。还须覆盖正常保留与两条 memory bound、遥测 fallback、
+  OOM 一次 flush/retry、load/offload/component failure 的 host-master restore/forced release，以及
+  alias-preserving non-block group 的 idempotent transitions。补齐上述 standalone-audio gap 前，不能用
+  其他 component staging 单测宣称所有 Ref2VA 输入已覆盖。PR #6526 的 L20X matched
+  single-request no-AllGather CUDA A/B 是有界 latency observation，B300 仅独立 functional smoke；
+  二者均非持续 benchmark 或跨 topology/platform performance proof。^[PR #5764] ^[PR #6526]
+
+## MMH3-3b — consumer-GPU profile 是有边界的容量证据
+
+- 触发：引用 H3 2×RTX 5090/4090 可运行性、延迟、峰值或 resident-layer 默认值。
+- 强制：5090 证据只绑定 vLLM-Omni `ae6577ea` 的一次 2×32 GiB、T2VA、1344×768、
+  124 frames、50 steps run：8m38s，约 22.6 GiB/GPU 是 sampled `nvidia-smi`，不是 allocator
+  high-water。早期 4090 容量依据只是 2×B300 的 5-step proxy；PR #5850 后新增的目标硬件
+  证据绑定 vLLM-Omni `81b48e83`（不是 merge target）、vLLM 0.26.0、PyTorch 2.11+cu130、
+  driver 580.126.09、BF16/CUDNN/eager、TP2、no-AllGather DLO、12 resident layers、单 partition、
+  1024×576、124 frames@24 FPS、60 steps、seed 1101、video/audio shift 12/3。
+- 强制：2×4090 使用 USP1、text-encoder TP2、VAE PP2；T2VA 两次约 435/429 s、rank-0 allocator
+  reserved high-water 15.3 GiB，Ref2VA 两次约 892/892 s、14.6 GiB，两者均报告完整 ffmpeg decode。
+  4×4090 使用 USP2、text-encoder TP4、VAE PP4；T2VA 两次约 274/270 s、rank-0 15.2 GiB并完整
+  decode；Ref2VA 只有一次 HTTP 200，约 545 s、rank-0 16.1 GiB，未声明完整 decode。后续 Ref2VA
+  虽完成 diffusion，却在 D2H 阶段触发 engine hardcoded 30 s async-output wait，因此 4 卡 Ref2VA
+  repeatability 不成立。header peak 只表示 rank 0 `torch.cuda.max_memory_reserved`，不是所有 rank
+  最大值；USP 不进一步 shard DiT weight，只能按该 workload 描述 per-GPU observation。
+- 禁止：把单次未 warmed 的 5090 run 写成 benchmark，把 B300 proxy 写成 target hardware，或从
+  HBM fit 推断 host fit。每个 FL2VA/Ref2VA partition 约 135 GiB、至少 200 GiB available RAM与
+  推荐 384 GiB 只是 recipe 声明，未给 checkpoint revision/checksum 或 host high-water；
+  no-AllGather worker 的 pinned CPU master 不因 resident layers 增加而消失。两次输出大小相差不超过
+  115 bytes 不证明数值、感知或 A/V 质量一致；这些是 single-request latency，不是 concurrent
+  throughput。单卡 4090 未测；5090 的 26.5 GiB 单卡 profile 超过 24 GiB，而降低 resident layers
+  的替代方案也未测。
+- 验收：新硬件/拓扑用单一 partition 与 exact config，记录 immutable model/environment、all-rank
+  allocator/整机峰值、warmup/repeats、stage/E2E latency 和 joint video/audio quality。recipe 的
+  “after #5720 lands” 已过期，因为 modular H3 在该 target 已存在；partition-path 命令本身仍保持
+  单 partition，无需据此推断 combined route。目标 pin 引用的
+  `examples/offline_inference/minimax_h3/run_h3_2gpu_all_tasks.sh` 实际不存在，因此不能把其
+  four-task/MP4 validation 描述成可执行入口；补文件或改文档后再验收。^[PR #5764] ^[PR #5850]
+
+## MMH3-3c — H100 DFX fixture 只证明 exact nightly workload 与 payload path
+
+- 触发：引用 H3 4×H100 latency、throughput、peak memory、DLO 节省，或修改 X2V perf lane、
+  random video reference 与 model-path resolution。
+- 强制：H100 测量只绑定 PR 中较早的 partition-path commit `e8c343d5`：4×H100 80 GiB、
+  USP4+HSDP4+encoder TP4+VAE PP4 tile、FLASH_ATTN、1344×768、209 frames、24 fps、8 steps、
+  seed 42、1 warmup、3 measured prompts、concurrency 1。后续 `4767c524` 才将 final cases 改成
+  repo-root modular model + `--task-type`，PR 没展示 switch 后复测；final nightly 只是预期采集。
+  target config 中 T2V/TI2V/V2V/DLO baseline 分别是 latency mean
+  38.3252/38.1385/105.7508/38.2089 s，peak-memory mean 54219.6/54622.8/55180.8/36218.4 MB；
+  它们是 result metadata，当前 completed-count gate 不消费这些阈值，不能称为 regression guard。
+  predecessor partition-path 实测值为 42.5836/42.3761/117.5009/42.4543 s、
+  60244/60692/61312/40242.67 MB、
+  0.0235/0.0236/0.0085/0.0236 qps，且 profiler 开启；不得外推为 no-profiler/production 数字。
+  config 对三类 metric 都存 0.9×实测；对越小越好的 latency/memory，这不是“允许 +10%”的
+  正确 upper bound，即使未来恢复断言也必须先修 directionality/threshold。
+- 强制：Ref2VA synthetic clip 先用 OpenCV 生成，再尽力用 ffmpeg/libx264 转 H.264；H3 request
+  必须走 `video_reference` data URL，使 server 持久化 `source_path` 给 ffprobe/ffmpeg consumer。
+  缺 ffmpeg 时 fallback `mp4v`，但 H3 要求 H.264/H.265，因此该 fallback 不是有效 H3 兼容路径。
+- 禁止：把上述 predecessor 数字当成 final repo-root modular route 的实测，或泛化到 50-step、
+  并发及其他 topology；PR #5836 final diff 本身没有其 body 所述 RoPE 修复，后续 PR #5896
+  才补 MindIE 3D→4D adapter。特殊 payload
+  当前靠 resolved model 字符串包含大小写敏感的 `MiniMax-H3` 判断；materialized env/cache path
+  若不含该 token 会退回 multipart `input_reference`，所以 lane 接入本身不证明 V2V 稳定执行。
+- 验收：nightly 必须证明四个 pytest case 均实际 collected、3/3 completed、artifact/log 上传，
+  并在 materialized root、offline snapshot 与 repo-id 三种 model resolution 下断言 Ref2VA 都走
+  `video_reference` 且 ffprobe 为 H.264/H.265；final diff 没有为新增 re-encode/model-routing helper
+  增加单测，PR 所报 77 个 video-server tests 只是既有 server/API suite。性能 gate 若启用需另
+  定义 metric directionality。
+  ^[PR #5836]
+
+## MMH3-3d — ROCm support 必须按 SKU、镜像、拓扑和测量协议限界
+
+- 触发：声明 H3 AMD/ROCm 支持，引用 gfx942/gfx950 latency，或推荐 `FLASH_ATTN`、ROCm image、
+  单卡 CPU offload/四卡并行配置。
+- 强制：`FLASH_ATTN` 只在 ROCm platform 检测 gfx942/gfx950 且 AITER 可用时解析到 AITER packed
+  varlen，否则回退 SDPA。gfx942 证据绑定 4×MI300X、BF16、USP4、text-encoder TP4、VAE PP4
+  tile、1344×768/209 frames/50 steps：一次 excluded warmup 后三次均值，T2VA encode/denoise/
+  decode/client E2E 为 0.09/244.04/4.15/267.42 s，FL2VA 为 13.98/257.58/4.11/287.07 s；输出
+  仅验证 H.264 24 FPS + 32 kHz stereo AAC。^[PR #5723]
+- 强制：gfx950 只绑定单张 MI350、vLLM `0.26.0+rocm723`/HIP 7.2、BF16、CPU offload、
+  832×480、约 4 s/40 steps 的 functional run；约 0.73 s/step、55 s client E2E 包含首次 lazy
+  compile，不是 tuned throughput。text-encoder TP 未在 gfx950 该证据中执行。
+- 禁止：从 architecture gate 外推到 MI325X/其他 MI355X SKU；从 PR body 的“single + 4 GPU”或
+  “约 2× SDPA”外推，因为 final evidence table 没有 gfx950 四卡协议/结果或 A/B；也不能用可变
+  `minimax-h3` tag 代替 image digest。评论中的旧 digest 缺后续 soundfile/TorchCodec/ffmpeg 状态，
+  更新镜像的回复没有给新 digest。
+- 验收：support table 的 AMD cell、footnote 与 recipe 必须一致；当前 H3 行已标记 AMD 并链接
+  published recipe，但这只修复 recipe-evidence 展示，不能扩大既有 SKU/task/topology 证据。
+  新增组合须逐项记录 immutable image/commit、软件栈、warmup/repeats、输入、各阶段时间、输出/质量
+  检查；recipe-only diff 没有 CI 或可执行测试，外部 gfx942 数据与 gfx950 functional observation
+  不能冒充持续回归 gate。^[PR #5969]
+
+## MMH3-3e — GB10 unified memory 容量证据不等于离散 GPU offload 合同
+
+- 触发：引用 DGX Spark/GB10 可运行性、97.7/102.8 GiB allocator peak、T2VA/Ref2VA latency，
+  或推荐 offload/FP8。
+- 强制：只启动一个约 135 GiB FL2VA/Ref2VA partition；约 121 GiB 可用 unified memory 下必须用
+  online FP8（仅 DiT 约 62→31 GiB，encoder/VAE 仍 BF16），禁用 CPU/DLO offload，因为 host/device
+  共用物理池，DLO 观察到启动后 exit -9。用 eager、CUDNN_ATTN，并保持 TP/USP/ring/VAE patch
+  parallel degree 全为 1，同时显式配置长 timeout。
+- 禁止：把 97.7 GiB allocator reserved header 当整机 pool peak（不含 context/非 PyTorch），或把
+  单次 50-step T2VA 写成 throughput。960×576、8 s、50 steps 的 text/denoise/decode/mux/E2E 约
+  0.25/2088/70/4.84/2169.4 s，部分 stage 来自另一次 10-step run；相同 10-step denoise 波动
+  397–490 s，只能绑定该机器/配置。^[PR #5946]
+- 强制：Ref2VA 新证据只绑定同一单机 GB10/aarch64、单 Ref2VA partition、online FP8/eager/
+  CUDNN_ATTN/tiled VAE、parallel degrees 全 1、单请求、单 reference image、960×576、24 FPS、
+  8 s、flow shift 12、seed 1101。三次 10-step E2E 为 770.3–861.1 s，单次 50-step 为
+  4157.0 s；50-step denoise/per-step/decode 为 4039.6/80.79/69.4 s，allocator peak 102.8 GiB。
+  与相同 shape/steps 的 T2VA 2169.4 s 比值 1.92×只是这两个单次 observation，不是 mode 固有倍率。
+  10-step per-step 66.55–74.88 s、长请求 80.79 s 的热态差异要求容量规划用较慢端，不能承诺
+  cold-run 66 s。^[PR #5972]
+- 禁止：把 `X-Peak-Memory-MB: 105318.000` 当 GB10 整池峰值；它是
+  `torch.cuda.max_memory_reserved`。recipe 的 1 Hz `/proc/meminfo` 交叉检查只对该 50-step
+  单图请求成立：121.7 GiB 总池、`MemAvailable` 最低 7.4 GiB，推算约 114.3 GiB 已占用。
+  因此不能外推到更多图片、reference video、更大输出、并发或第二进程；这些均未测。6883-token
+  presentation 和 1.90× per-step 是该单图 prompt/log observation；“这些 attention tokens 导致
+  denoise 变慢”没有受控对照，只是 recipe 的合理推断，不是任意 Ref2VA 输入定律。两次后续热态
+  run 接近也没有温度/功耗 sensor 证据，不能据此证明稳定 thermal state。
+- 验收：probe 确认 HTTP 200、H.264 960×576/24 FPS、32 kHz stereo AAC 和约 8.032 s artifact，
+  并记录 exact commit、partition、reference count/type、shape/steps、stage-header、server-log mux、
+  allocator 与整机内存。FL2VA 仍无独立完成证据。PR #5972 只有 recipe diff、无可执行回归；
+  其 driver 仍是 placeholder，且版本说明同时写 vLLM 0.26.0、
+  vLLM-Omni `main @ e1aa6eae` 与“newer than v0.26.0”，复现时必须分别锁定两项目版本。recipe 又称
+  sync timeout 默认 1800 s，但 target `api_server.py` 默认是 600 s；T2VA/Ref2VA full run 都必须
+  显式设置更大值。raw log/header、reference image、输出 artifact 与 quality metric 均未提交或链接，
+  所以 HTTP/codec 描述不能替代可复核质量证据。当前文件还多出未配对的末尾 code fence，且版本
+  句含 malformed `.suggestion is v0.26.1`，发布前需修复。^[PR #5972]
+
+## MMH3-3f — RTX PRO 6000 scaling 只绑定单机 T2VA 协议
+
+- 触发：引用 2/4/8×RTX PRO 6000 latency、96 GiB capacity、TP/Ulysses scaling 或 device order。
+- 强制：证据只绑定 YLX Y762、8×96 GiB、driver 580.105.08/CUDA 13.0、BF16/CUDNN_ATTN、
+  1344×768、5 s、50 steps、seed 1101、两次 warmup、单请求、默认 device order/no NUMA binding。
+  2/4/8 GPU 分别 TP2×USP1/2/4，E2E 284.76/172.32/90.48 s，1 Hz `nvidia-smi` peak
+  77.49/66.44/61.07 GiB/GPU；这些不是 allocator high-water。^[PR #5863]
+- 禁止：把 PCIe/NUMA 重排或 TP4 headroom variant 当已测；权重 residency 由 TP、activation 由 USP
+  主导，但三点拟合的约 55 GiB floor 不是跨 shape/concurrency 定律。两 server 布局未测，且会把
+  host RAM/storage 需求翻倍。Ref2VA latency/memory 明确未测；review 回复的成功附件无协议/峰值，
+  不能把 T2VA 数字外推。recipe 只给可变 `vllm/vllm-omni:minimax-h3` tag，没有 vLLM SHA、image
+  digest 或 PyTorch version；复现前必须补齐，不能把 linked issue #5901 的关闭归因于 docs-only diff。
+- 验收：新 topology 记录实际 rank groups、device order、warmup、stage/E2E、per-rank peak 与 joint
+  output/quality；每个 topology 当前仅两次 warmup 后测一个请求，无 repeats/variance。recipe-only diff
+  无自动回归，4/8 GPU scaling 和首次请求 19% 慢均为单机观察。SM120 显式 CUDNN 合理，因为 target
+  TRTLLM auto-default 只覆盖 compute major 10；这不构成其他 SM120 backend 的比较证据。
+
+## MMH3-3g — Ascend mask-free 数字只绑定报告的 H3 packed workload
+
+- 触发：引用 NPU quadratic mask churn、packed varlen/Laser latency、A3 HBM 或 H3 mask-free E2E。
+- 强制：memory snapshot 只绑定报告的 T2VA packed S=63232、约 100 attention/step×50 steps：旧
+  `full_qk` 行产生 3.72/14.90 GiB transient mask、累计 45.6 TiB allocation churn，并使 57 GiB
+  reserved 中约 33.7 GiB 成为 idle segments；这是 profiler observation，不是所有 shape 的 allocator
+  定律。single-kernel 20-iteration average 只覆盖 USP8 per-rank 的四个 T/N/D shape，最大一行
+  63232/7/128 为 170.8→90.6 ms；per-call peak 18.86→0.44 GiB。^[PR #5891]
+- 强制：E2E 数字只绑定 8×Ascend 910、batch1/BF16/50 steps/flow shift12/24 FPS、USP8/Ring1/
+  HSDP8/TE-TP8/VAE tile-patch8、768p、每格两次均值。varlen→Laser 分别是 T2VA 10 s
+  450→337 s、FL2VA 8 s keyframe 316→244 s、Ref2VA 5 s video+audio 642→473 s；Laser+Cache-DiT
+  的 226/143/249 s 是叠加另一机制，不归因本 PR。recipe 另报 DLO 下 Ref2VA 13.88 s input→15 s
+  1344×768 output 约 45 GB/device；不能与 HSDP E2E topology 合并成同一 capacity/perf case。
+- 禁止：把这些值写成 Ascend/NPU 通用收益，或声称 PR 已证实整请求从旧 mask path 的 speedup；E2E
+  表比较的是新 varlen、Laser 和可选 Cache-DiT，没有 old-mask E2E control。rank0 reserved
+  40–44 GB 与 recipe DLO 45 GB 也不是所有 rank/任务峰值上界。
+- 验收：复现必须补 exact source commit、immutable environment/image、Atlas/Ascend SKU、输入 artifact/
+  prompt/seed、warmup、逐 run raw headers/logs、all-rank memory 与 same-seed output metric。PR body 引用的
+  `server_test/{fl2va,ref2va}` scripts 不在 commit，raw profiler/benchmark artifact 也未提交；其 output
+  video 只覆盖 Ref2VA Laser case，不是数值 quality gate。后续仍需 same-seed E2E comparison 和重抓
+  snapshot 证明 churn/reserved 实际下降。^[PR #5891]
+
+## MMH3-3h — RTX PRO 5000 recipe 的 topology 与证据必须逐 workload 绑定
+
+- 触发：引用 2/4/8×72 GiB RTX PRO 5000 的 H3 capacity、latency、device order 或 DLO/resident 推荐。
+- 强制：2 卡只绑定 TP1×Ulysses2、rank-local no-AllGather DLO、20 resident layers、TE-TP2、VAE
+  patch2、CUDNN/eager；4 卡绑定 TP2×Ulysses2/TE-TP4/VAE4，8 卡 production 推荐绑定
+  TP4×Ulysses2/TE-TP8/VAE8，后二者 resident 且不加 eager。物理 GPU ID 只是已测双 NUMA/PCIe host
+  的映射示例，复现必须先按 `nvidia-smi topo -m` 重建同等 group locality。
+- 禁止：把 4/8 卡 latency winner 表中其他 topology 写成最终 recipe 推荐；从 20 resident layers 推导
+  host master 减少；把 FL2VA first-frame 或相同 encoder/decoder/DiT shape 外推成 Ref2VA 已测。
+- 验收：只把最终 recipe 表内 T2VA 与 first-frame FL2VA 的单 host、单请求、固定 shape/frames/steps
+  observation 作为有界证据：PyTorch 2.11+cu130、CUDA 13、driver 580.95.05、1344×768、124 frames、
+  50 requested→49 denoise updates。2/4/8 卡推荐路线的 T2VA E2E/denoise/per-update/external peak 分别为
+  515.57/504.69 s/10,300 ms/36.38 GiB、284.01/278.73 s/5,688 ms/67.58 GiB、
+  163.20/159.40 s/3,253 ms/45.83 GiB；first-frame FL2VA 分别为
+  553.45/541.90 s/11,059 ms/36.38 GiB、305.72/299.85 s/6,119 ms/67.58 GiB、
+  171.62/167.25 s/3,413 ms/45.83 GiB。final recipe 写两次 warmup，但 PR body 只明确绑定 4/8 卡，
+  因而 2 卡 warmup 范围不能视为已澄清；没有 repeat/variance、immutable image/source/checkpoint pin
+  或可复核 quality artifact，且 PR 只有 markdown/pre-commit。review 明确 Ref2VA 未测试，因此
+  `MODEL=Ref2VA` 重启说明只是配置建议。重测仍须记录 exact image/SHA、rank groups、NUMA policy、
+  all-rank peak 与 artifact/quality。^[PR #5857]
+
+## MMH3-3i — H3 online FP8 的 layerwise/DLO 组合必须限界并保持 stride
+
+- 触发：MiniMax-H3 同时启用 online FP8 与普通 layerwise offload、distributed layerwise offload、resident layers 或 transposed Cutlass weight replay。\n- 强制：online FP8 可以与 resident/no-offload、普通 layerwise offload 以及 DLO full-weight per-rank no-AllGather 路径组合；DLO 启动必须使用 `--dlo-no-use-allgather`，保留 standard loader 生成的物理布局，并在 streaming、prefetch、resident replay 中保存和恢复真实 stride。\n- 禁止：继续把 online FP8 与所有 layerwise offload一概标记为不兼容；runtime-created FP8 进入 sharded DLO AllGather；用 `.view()` 把物理转置权重恢复成 contiguous 逻辑布局；把单次 B300 的显存或速度观察写成 H3 通用容量/性能保证。\n- 验收：H3 contract 覆盖 resident、普通 layerwise、DLO no-AllGather 与 no-offload 的启动/输出路径；online FP8 + DLO AllGather 在 loader 边界明确报错；转置权重回放逐值核对 stride，并分别记录 exact GPU、shape、steps、checkpoint 和 all-rank 资源结果。^[PR #5910]
+
+## MMH3-3j — H3 DLO host-weight plan 必须限界在 TP=1 direct mmap
+
+- 触发：MiniMax H3 启用 DLO、`dlo_use_allgather`、direct checkpoint mmap、resident layers，或调整 DiT 与 text encoder 等 component 的 host storage。
+- 强制：loader 只把 dedicated DiT sources 纳入 `HostWeightPlan`，其他 text encoder 等 source 继续由 ordinary component loader 加载并参与 strict coverage；AllGather 且有效 DLO group 大于一时仅复制 rank-local persistent shard 后释放 mmap handle；rank-local/no-AllGather 保留 file-backed checkpoint views，并以两个按最大 block 限定的 pinned host staging slots 逐块打包；有效 group size 为一时即使 `dlo_use_allgather=True` 也不得执行 collective。direct mmap 只适用于 TP=1、非 HSDP、非 online quantization 的已证明布局。
+- 禁止：让 backend 自行决定 checkpoint compatibility 或混合 DiT/非 DiT source 后只跳过部分 materialization；把 TP>1 ordinary-loader fallback、HSDP、online quantization 或其他 fail-closed 路径宣称具有 node-shared mmap 节省；把 resident layers 增加描述成减少 rank-local pinned host master。
+- 验收：覆盖 dedicated/mixed source、strict non-DiT loading、AllGather shard 与 handle release、rank-local source retention、双 staging slot 上界、group size one 无 collective、TP>1 ordinary-loader fallback 及 unsupported-platform 不能静默丢弃 plan。PR 的 DP=2/TP=1 no-AllGather 与四 GPU topology smoke 只证明报告的 H3 配置和输出/资源观察；TP=2 行证明的是 ordinary-loader fallback，不是 shared-mmap memory guarantee。^[PR #6213]
+
+  PR #6555 adds a separate ready smoke for TP=1/DP=2 DLO with two concurrent T2VA
+  requests, but its server arguments do not include `--dlo-no-use-allgather`; do not use
+  it to widen this rule's no-AllGather/direct-mmap claim. Its reported local B300 pass is
+  limited runtime evidence for that exact request workload, while the H100_2 YAML entry
+  remains collection/configuration intent until the lane result is available. ^[PR #6555]
+
+## MMH3-3k — H3 VAE decoder 的 tile 不足 rank 时必须进入 rank-local decode
+
+- 触发：MiniMax-H3 修改 decoder tile 切分、`vae_patch_parallel_size`、parallel state，或低分辨率 preview/smoke 测试可能产生少于 tile group rank 数的 decoder tile。
+- 强制：`decode_latent` 必须按 latent shape 乘 `vae_ratio` 转为 pixel-space，并使用 checkpoint 的 decoder `split_tiles(..., True)` 计算 tile 数。当 `parallel_size > 1` 且 tile 数更少时，所有 rank 必须一致进入 `_rank_local_tiling`，将 checkpoint parallel state 设为 rank-local（`group_size`/`sp_size=1`、rank 为 0、process group 清空、parallel disabled）并将 `parallel_tiling=False`，使每个 rank 解码全部 tile；tile 数足够时保留并行路径，退出时完整恢复原状态。
+- 禁止：让无 tile 的 rank 抛错退出 collective、让其他 rank 留在 `all_gather`；不得使用 encoder grid 代替 decoder grid、让各 rank 依据不同条件分支，或把 rank-local fallback 描述成无性能代价或通用 VAE 并行支持。
+- 验收：CPU 回归必须实际调用 `decode_latent`，覆盖 decoder tile count 1、2、4、28、112 及 2/4、4/4、2/2、`parallel_size=1` 边界，断言 decode 观察到的 rank-local state，并验证正常与异常退出恢复完整 group state；4-rank 硬件复现中 2 tiles 必须正常退出，4 tiles 与 shipped `48x84` latent（28 tiles）必须保持并行路径。^[PR #6345]
+
+## MMH3-3l — H3 直接 VAE 调用必须共享请求级 residency window
+
+- 触发：MiniMax H3 在 model-level CPU offload 下处理 image/video reference 或 embedded/standalone audio reference，且 pipeline 直接调用 Video-VAE 或 Audio-VAE。
+- 强制：`_encode_visual_conditions` 必须在同一个 `video_vae` residency window 内完成该请求的全部 image 与 video encode；`_encode_reference_audio_conditions` 必须在同一个 `audio_vae` residency window 内完成 embedded 与 standalone audio encode。resident helper 只能在对应 scope 内调用，scope 退出时必须释放 component，异常也必须清理。
+- 禁止：按 image、video 或 audio 条目分别建立重复的 H2D/D2H lifecycle；在前一个 scope 结束后直接调用 CPU-bound VAE；把单次 image 的行为外推为混合 reference，或把 transfer-level A/B 结果写成完整模型峰值显存与通用性能保证。
+- 验收：contract tests 覆盖单/多 image、image+video、embedded+standalone audio 以及 encode exception，精确断言每个 VAE 只有一次 activate/offload；另验证 H3 model-level offload 注册所有实际 DiT 与 VAE stage，并以固定硬件和 workload 单独复核真实性能与输出质量。^[PR #6072]
+
+## MMH3-3m — H100_2 merge lane 只覆盖精确 H3 CI matrix
+
+- 触发：H3 CUDA merge CI、DLO/DP/TP/USP/HSDP/TE/VAE-PP e2e fixture。
+- 强制：一个 `h100_2` 150m job 以四个独立 35m pytest spawn processes 运行：FL2VA TP1/DP2 两并发、
+  Ref2VA image-only 同配置、Turbo FL2VA TP2+DLO/no-AllGather（五 sigma/四 eval）、FastH3 1024×576
+  四步 HSDP2/USP2/TE TP2/VAE PP2。断言仅同步 MP4 geometry/FPS/audio positive sample。
+- 禁止：把 CI collection 写成 runtime support/performance/general topology proof；final target 的 runtime
+  changes已 reverted，不得以它宣称 generic support。
+- 验收：核对四 process timeout/request 600s/spawn isolation 与上述 exact cases。^[PR #6556]

@@ -1,10 +1,10 @@
 ---
 title: "HunyuanImage3 开发规则"
 created: 2026-07-13
-updated: 2026-07-31
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
-sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py]
+sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py", "PR #6306", "PR #6102", "PR #6563", "PR #4048", vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_tokenizer.py, vllm_omni/diffusion/models/hunyuan_image3/request_layout.py, tests/diffusion/models/hunyuan_image3/test_hunyuan_image3_step_execution.py, tests/diffusion/models/hunyuan_image3/test_image_kv_cache_manager.py]
 ---
 
 # HunyuanImage3 开发规则
@@ -46,6 +46,7 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
 | `size-ratio` | size=auto、ratio、batch ratio | `HY3-4a`, `HY3-4b`, `HY3-4c`, `HY3-4d`, `HY3-6g` |
 | `randomness` | seed、RNG、复现 | `HY3-5d`, `HY3-5e`, `HY3-5f`, `HY3-6h` |
 | `alignment-residual` | prompt、token、stop 已验证后仍有真实输出差异 | `HY3-3d`, `HY3-5b`, `HY3-7a`, `HY3-7b`, `HY3-7c`, `HY3-7d`, `HY3-7e` |
+| `paged-kv` | Hunyuan scheduler-paged KV、Q/K/V layout、prefill/denoise span 或 mixed attention | `HY3-5h`, `HY3-5i` |
 
 ## 完整行为链
 
@@ -129,3 +130,34 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
 - **HY3-7c — 再查 VAE 前的 dtype 边界。** 条件图像素保持官方精度直到真实 VAE 边界；逐点比较进入 VAE 前的 tensor，不能用最终图片“看起来差不多”替代。
 - **HY3-7d — 再查 router 和 top-k 精度。** 输出前缀已对齐后才核对 MoE router、top-k、softmax 和 reduction dtype；只提高某一层精度必须有 logit/token 差异证据，不能全模型盲目 fp32。
 - **HY3-7e — 最后区分可修差异和架构差异。** 已关闭 processor、VAE 和 router 等可修边界后，再评估 TP、paged KV、fused kernel 和 reduction order；没有证据不得承诺 bit-exact，也不能用“架构噪声”掩盖仍可修的差异。
+
+- **HY3-5g — ImageKVCacheManager 必须可被 paged KV discovery 注册且按最大图输入 profile**
+  - 触发：修改 HunyuanImage3 的 `ImageKVCacheManager`、image attention 注册、paged KV role/dtype，或为 `paged_scheduler` 调整启动 memory profile 与参考图数量。
+  - 强制：`ImageKVCacheManager` 必须是 `nn.Module` 并以 `forward` 暴露内部 attention，使其出现在 `named_modules()` 而不把 dense cache state 写入 `state_dict()`；内部 attention 必须显式设置 `paged_kv_cache_role="primary"` 与 `paged_kv_cache_dtype=torch.bfloat16`，该 KV dtype 独立于权重加载 dtype。paged 启动 profile 必须经过模型 owner preprocessing，使用 1024x1024、启用 CFG 和 metadata 声明的最大参考图数量，当前 HunyuanImage3 为 3 张；普通 dense warmup 仍保持独立的 512x512、无 CFG 路径。
+  - 禁止：保持 cache manager 为普通对象而期待 Worker spec discovery 找到嵌套 attention；把 paged KV 标记省略为默认 dense；只用一张参考图或关闭 CFG 生成 profile 后宣称容量覆盖最大请求；把 Scheduler-only `DiffusionKVRequest` 状态发送到 profile Worker execution。
+  - 验收：模型测试断言 manager 是 `nn.Module`、attention identity 可从 `named_modules()` 读回且 `state_dict()` 为空；spec discovery 断言 layer、role、BF16 dtype 与 layout capability；profile 后必须清除 dense `image_kv_cache_map/lens` 再 sizing/physical allocation。^[PR #6094] ^[PR #6563]
+
+- **HY3-8a — HunyuanImage3 硬件优化层必须保持平台回退、checkpoint 与 VAE 内存边界**
+  - 触发：修改 HunyuanImage3 的 `layers/`、VAE/DiT `ResnetBlock`/`ResBlock`、patch embedding 相关块、平台分派、VAE 高分辨率内存策略或 cuDNN autotune。
+  - 强制：由 `current_omni_platform.is_cuda()` 选择 `nvidia` 实现，其他后端保留 `native` 实现；两套 block 必须保持相同的公开构造与 checkpoint `state_dict` key 布局，NVIDIA 版本只能通过共享融合算子获得加速；高分辨率 VAE 必须由统一 VAE tiling 管理，任何允许 tiling 关闭的入口都要显式定义容量、回退或拒绝策略；`torch.backends.cudnn` 这类进程级标志应在 worker 边界配置，若保留 block 内临时设置则必须证明 forward 不会并发。
+  - 禁止：在非 CUDA 平台导入或强制执行 NVIDIA block；把 Triton 可导入等同于所有平台支持；改变 `in_layers`/`out_layers` 等 checkpoint-facing module key；移除逐卷积内存保护后仍让 tiling-disabled 的高分辨率请求无条件执行；或在可能重叠的 forward 中修改进程级 cuDNN 标志。
+  - 验收：分别以 native/eager 与 CUDA/NVIDIA 实现覆盖 VAE、DiT 的真实 shape、dtype 和输出误差；验证旧 checkpoint 的 `state_dict` 加载与 key parity；对启用 tiling、关闭 tiling及直接 VAE 入口执行高分辨率容量/失败行为测试，并在并发 worker 或明确串行证明下验证 cuDNN 配置与恢复；性能数字只在固定模型、硬件、并行拓扑和 workload 下复测。^[PR #6306]
+
+- **HY3-8d — Distil CFG 与 MeanFlow 是独立的 HunyuanImage3 diffusion 合同**
+  - 触发：修改 `cfg_distilled`、`use_meanflow`、Hunyuan image layout/tokenizer、denoise/step execution、CFG、AR KV reuse，或相关 checkpoint loader。
+  - 强制：两个 flag 独立决定 `<guidance>`、`<timestep_r>` placeholder 和对应 embedding；layout 的序列化、tokenizer output、prepared/step kwargs、CFG-parallel split 与 AR-KV truncate 必须完整携带并重基 scatter index。special-prefix 数量由 `num_special_tokens` 统一计算，decode final layer 从该数量之后取 latent，不能假定只有 timestep token。`guidance_emb` 与 `timestep_r_emb` 由外层 `HunyuanImage3Pipeline` 创建、放到 execution device 并加载权重，不由 transformer-core loader 静默跳过。
+  - 强制：`cfg_distilled=True` 时 `cfg_factor=1`，guidance 以 `guidance_scale * 1000` 写入 embedding；不得构造 negative prompt/prefill、外部 CFG combine 或 CFG parallel。`use_meanflow=True` 时每个 denoise step 注入 scheduler 的下一 timestep `r`；最后一个 step 的 `r` 必须为零。两项 flag 可以单独开启，不能把 MeanFlow-only 路径误当成 CFG-distil。
+  - 禁止：用 `x[:, 1:, :]` 或固定 special-token 个数切 latent；只在 normal loop 而漏掉 step execution；AR prefix 截断后保留绝对 guidance/timestep-r index；漏传任一 embedding/scatter field；把 transformer 的 non-model skip list 当作外层 embedding 的加载路径。
+  - 验收：CPU 测试覆盖 guidance/timestep-r 四个 kwargs、1/2/3 special-prefix decode、AR-KV rebasing、MeanFlow-only CFG-parallel split，以及 step execution 的 single-row CFG-distil 和每-step `r`。准确性证据固定模型 artifact、BF16/硬件拓扑、seed、steps、guidance、prompt/reference 和各项 threshold；只报告实际运行的 online/offline/quant case，未运行的 quant 不得外推为通过。^[PR #4048]
+
+- **HY3-5h — paged GQA 必须保留压缩 K/V，dense 路径保持扩展**
+  - 触发：修改 HunyuanImage3 的 `ImageKVCacheManager`、Q/K/V head layout，或在 dense 与 Scheduler-managed paged attention 之间切换 GQA 处理。
+  - 强制：HunyuanImage3 的 dense 路径继续把 K/V 从 8 个 KV heads 扩展到 32 个 Q heads；paged KV active 时必须保留原生压缩的 32Q/8KV 形状，由 native adapter/backend 消费 `num_heads=32` 与 `num_kv_heads=8`。
+  - 禁止：在 paged adapter 中把已经压缩的 K/V 再扩成 Q heads，或为兼容 generic shape 在 adapter 内猜测并折叠重复 head；也不得让 paged 分支改变既有 dense 路径的输出布局。
+  - 验收：以实际 32Q/8KV geometry 覆盖 dense 与 paged 两条路径，断言 attention consumer 的 K/V shape 分别为 32 和 8，并覆盖 adapter 的 packed Q/K/V 与 native backend 调用；paged strict-Ulysses 还验证 padding restore 和 required `query_lens/image_mask/position_ids`。^[PR #6102] ^[PR #6563]
+
+- **HY3-5i — paged Hunyuan 只描述模型 layout，runner 驱动请求级 execution**
+  - 触发：修改 HunyuanImage3 `ImageKVCacheManager`、`full_attn_spans`、Scheduler-paged prefill/denoise 或 model/runner ownership。
+  - 强制：model 仅提供 32Q/8KV Q/K/V layout 与每 sequence 的 `full_attn_spans`；runner 从 Scheduler snapshot 激活 rows。first prefill 写整个 allocated sequence，后续 denoise 只从 prefix offset 写 target；paged forward 前清除 model-owned dense prompt state。
+  - 禁止：model 分配 Scheduler blocks、激活 Worker runtime、复用 cross-request prefix，或在 paged path 接受 imported AR KV/negative CFG；不得把 request-mode 覆盖外推为 `denoise_step`、Ring 或 AllGather。
+  - 验收：覆盖 full-allocation prefill、prefix-offset target update、32Q/8KV、full-attention spans 与 dense prompt-state clear；正式证据限 GPU/NPU request execution，其他 execution/parallel contracts另测。^[PR #6563]

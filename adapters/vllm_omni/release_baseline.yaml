@@ -2,25 +2,25 @@ schema_version: 1
 
 upstream:
   repository: vllm-project/vllm-omni
-  previous_audited_sha: 5d44868e918ecf9d3a6f1158c45acfad5989e1a7
-  audited_ref: v0.26.0rc1
-  audited_sha: 807db6efd70ff2e9b55a63d6e1b0530e2b74f8f2
+  previous_audited_sha: ae57e406fd02516ef5ee8cd40a1458328e13a2a5
+  audited_ref: main
+  audited_sha: 1e74807c356be5cba4239faae7c38763fe1a44be
 
 # These fingerprints are generated from sorted registry/deploy inventories.
 # They make the baseline exact without duplicating hundreds of entries here.
 inventories:
   autoregressive:
-    count: 72
-    sha256: 79afac742125003b8d65a02e0e6b53398c4fc5f1c6e765fa8e1eb31f74871195
+    count: 89
+    sha256: cd6b56fe44e88ca35e4d2c961a00cf7a257695ca193e8279d6562eb72ca58fc4
   diffusion:
-    count: 61
-    sha256: f5c0b782cb98f20a9c7c77b696fda620a12d0899fd9e8abc9ccb696fe0c457e1
+    count: 65
+    sha256: 6107384ad499e668c1ed3690d740b7be816c900c504f244dce557ef51a257f2a
   pipelines:
-    count: 46
-    sha256: ce4f6edb8748e030f04bf7a6fe038231453cd1cd75f64311c898acff8c14b14b
+    count: 59
+    sha256: 4f012fb016221c2115520b16577bb69be03e84987122729bea696c14e5bca42f
   deploy_yamls:
-    count: 71
-    sha256: fb4c591580262a2dc8d03dd8c7fd681d98486f31007696d56adf349c24c25147
+    count: 89
+    sha256: 7895ed1c963b0d2a4afedda6a45c422288973a50c73a1255d271a8beefe0a39f
 
 # Structural review owners for changed upstream paths. This is deliberately
 # separate from manifest.modules: changing that runtime map alters rebase fan-out.
@@ -33,6 +33,7 @@ path_owners:
   - .github/
   - docker/
   configuration:
+  - collect_env.py
   - vllm_omni/config/
   - vllm_omni/deploy/
   diffusion:
@@ -43,8 +44,8 @@ path_owners:
   - .claude/skills/
   - docs/
   - examples/
+  - mkdocs.yml
   - recipes/
-  - realtime_video_prompt_interaction_protocol.md
   model-executor:
   - vllm_omni/attention/
   - vllm_omni/experimental/
@@ -74,11 +75,15 @@ path_owners:
   - tests/
   tooling:
   - tools/
+  - apps/ComfyUI-vLLM-Omni/
   runtime-core:
   - vllm_omni/__init__.py
   - vllm_omni/data_entry_keys.py
+  - vllm_omni/patch.py
   - vllm_omni/request.py
 
+  host-weight-runtime:
+  - vllm_omni/host_weight_runtime/
 # Direct review destination for every structural owner above. The audit checks
 # that each route has a real current knowledge entrypoint.
 owner_documents:
@@ -91,7 +96,7 @@ owner_documents:
   diffusion:
   - knowledge/repos/vllm-omni/components/diffusion/rules.md
   distributed:
-  - knowledge/repos/vllm-omni/components/distributed/_index.md
+  - knowledge/repos/vllm-omni/components/distributed/rules.md
   documentation:
   - knowledge/general/docs/_index.md
   model-executor:
@@ -105,17 +110,23 @@ owner_documents:
   testing:
   - knowledge/repos/vllm-omni/ci/_index.md
   tooling:
-  - knowledge/repos/vllm-omni/rules.md
+  - knowledge/repos/vllm-omni/tooling/rules.md
   runtime-core:
   - knowledge/repos/vllm-omni/components/model-executor/rules.md
 
+  host-weight-runtime:
+  - knowledge/repos/vllm-omni/components/host-weight-runtime/rules.md
 ignored_paths:
 - pattern: .gitignore
   reason: repository metadata
+- pattern: .markdownlint.yaml
+  reason: repository tooling（PR #6273 引入 markdownlint）
 - pattern: .pre-commit-config.yaml
   reason: repository tooling
 - pattern: .readthedocs.yaml
   reason: documentation tooling
+- pattern: .readthedocs.yml
+  reason: documentation tooling（上游在 PR #6129 改了扩展名）
 - pattern: CODE_OF_CONDUCT.md
   reason: community metadata
 - pattern: CONTRIBUTING.md

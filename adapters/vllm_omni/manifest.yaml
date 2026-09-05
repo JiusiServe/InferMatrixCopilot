@@ -72,14 +72,14 @@ modules:
     wave: 1
     risk: high
   model_executor:
-    local_paths: [vllm_omni/model_executor/]
+    local_paths: [vllm_omni/model_executor/, vllm_omni/experimental/, vllm_omni/model_extras/, vllm_omni/transformers_utils/]
     upstream_paths: [vllm/model_executor/]
     test_paths: [tests/model_executor/, tests/diffusion/, tests/e2e/offline_inference/]
     import_check: "from vllm_omni.model_executor.models.registry import *; print('Model Executor imports OK')"
     wave: 1
     risk: high
   input_output:
-    local_paths: [vllm_omni/inputs/, vllm_omni/outputs/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/serialization.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_engine_core_client.py, vllm_omni/engine/output_processor.py, vllm_omni/request.py]
+    local_paths: [vllm_omni/inputs/, vllm_omni/outputs/, vllm_omni/utils/mm_outputs.py, vllm_omni/data_entry_keys.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/serialization.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_engine_core_client.py, vllm_omni/engine/output_processor.py, vllm_omni/request.py]
     upstream_paths: [vllm/inputs/, vllm/v1/engine/input_processor.py, vllm/v1/engine/output_processor.py, vllm/v1/request.py]
     test_paths: [tests/entrypoints/test_omni_new_request_data.py, tests/engine/test_async_omni_engine_input.py, tests/test_outputs.py]
     import_check: "from vllm_omni.inputs.data import *; from vllm_omni.inputs.preprocess import *; from vllm_omni.engine.async_omni_engine import AsyncOmniEngine; from vllm_omni.engine.orchestrator import Orchestrator; from vllm_omni.engine.serialization import serialize_additional_information; print('Input/Output imports OK')"
@@ -92,13 +92,13 @@ modules:
     wave: 1
     risk: high
   online_serving:
-    local_paths: [vllm_omni/entrypoints/]
+    local_paths: [vllm_omni/entrypoints/, vllm_omni/engine/]
     upstream_paths: [vllm/entrypoints/]
     test_paths: [tests/entrypoints/test_async_omni.py, tests/entrypoints/test_async_omni_diffusion_config.py, tests/entrypoints/openai_api/]
     import_check: "from vllm_omni.entrypoints.omni import Omni; from vllm_omni.entrypoints.async_omni import AsyncOmni; from vllm_omni.entrypoints.openai.api_server import omni_run_server; from vllm_omni.entrypoints.openai.serving_speech import ServingSpeech; from vllm_omni.entrypoints.cli.serve import OmniServeCommand; print('Online Serving imports OK')"
     wave: 1
   model_config:
-    local_paths: [vllm_omni/config/, vllm_omni/engine/arg_utils.py]
+    local_paths: [vllm_omni/config/, vllm_omni/deploy/, vllm_omni/engine/arg_utils.py]
     upstream_paths: [vllm/config/, vllm/engine/arg_utils.py]
     test_paths: [tests/entrypoints/test_stage_utils.py, tests/metrics/test_stats.py]
     import_check: "from vllm_omni.config.model import OmniModelConfig; from vllm_omni.engine.arg_utils import OmniEngineArgs; print('Model Config imports OK')"
@@ -143,6 +143,19 @@ modules:
   quantization:
     local_paths: [vllm_omni/quantization/]
     wave: 1
+  runtime_patch:
+    local_paths: [vllm_omni/patch.py]
+    test_paths: [tests/diffusion/test_inductor_divisibility_patch.py]
+    wave: 1
+    risk: high
+  # Filesystem-backed immutable host artifacts have process-wide lock, lease,
+  # durability, and fallback contracts; keep this owner explicit rather than
+  # letting generic runtime scopes silently omit it.
+  host_weight_runtime:
+    local_paths: [vllm_omni/host_weight_runtime/]
+    test_paths: [tests/host_weight_runtime/]
+    wave: 1
+    risk: high
   sampling:
     local_paths: [vllm_omni/sample/]
     wave: 1
@@ -158,8 +171,16 @@ modules:
     test_paths: [tests/benchmarks/test_serve_cli.py]
     import_check: "from vllm_omni.benchmarks.serve import main; from vllm_omni.entrypoints.cli.benchmark.serve import OmniBenchmarkServingSubcommand; print('Benchmarks imports OK')"
     wave: 2
+  fullduplex:
+    local_paths: [vllm_omni/experimental/fullduplex/]
+    test_paths: [tests/benchmarks/duplex/, tests/e2e/features/fullduplex/]
+    import_check: "from vllm_omni.experimental.fullduplex.client import RealtimeDuplexClient; print('Full-duplex client imports OK')"
+    wave: 2
 
 review_routes:
+- prefix: vllm_omni/patch.py
+  owner: tooling
+  doc: repos/vllm-omni/tooling/rules.md
 - prefix: vllm_omni/config/
   owner: config
   doc: repos/vllm-omni/components/configuration/rules.md

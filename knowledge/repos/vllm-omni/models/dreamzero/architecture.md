@@ -66,14 +66,14 @@ sources: [vllm_omni/diffusion/models/dreamzero/pipeline_dreamzero.py, vllm_omni/
 
 ## 怎样验证功能、精度和性能
 
-pin 上有**上游一致性测试**（`tests/dreamzero/upstream/` 对上游 socket
-server 的 e2e 源一致性）与较全单测;本次调查未发现性能 gate——但有
+pin 上有 `tests/e2e/accuracy/test_dreamzero.py` 与较全的
+`tests/diffusion/models/dreamzero/` 单测;本次调查未发现性能 gate——但有
 `DZ_PHASE_TIMING=1` 分相计时插桩（逐 mark 同步 CUDA,**benchmark 时应
 关闭**,源注释明示）。共享设施见
 [Diffusion 组件](../../components/diffusion/_index.md)。
 
-- 单测：`tests/dreamzero/`（crossattn cache、fused_qk_rms_norm、QKV 融合、
-  pipeline state、utils、OpenPI helper）;e2e
+- 单测：`tests/diffusion/models/dreamzero/`（crossattn cache、fused_qk_rms_norm、
+  QKV 融合、pipeline state、utils、OpenPI helper）;e2e
   `tests/e2e/online_serving/test_dreamzero_expansion.py`;配置解析
   `tests/entrypoints/test_resolve_dreamzero_config.py`;示例
   `examples/{offline_inference,online_serving}/dreamzero/`

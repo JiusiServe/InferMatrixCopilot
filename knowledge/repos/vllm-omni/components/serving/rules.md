@@ -1,10 +1,10 @@
 ---
 title: "Serving 规则"
 created: 2026-07-20
-updated: 2026-08-23
+updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5157", "PR #5670", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/metrics/prometheus.py]
+sources: ["Issue #5369", "PR #3576", "PR #4583", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", "Issue #5811", "PR #6150", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", .pre-commit-config.yaml, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_api_server_guards.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py, "PR #4795", "PR #4755", "PR #3805", "PR #5878", "PR #6070", "PR #6122", "PR #4499", "PR #6050", "PR #6329", "PR #5999", "PR #5445", "PR #6288", "PR #6622", "PR #6499", "PR #6529", "PR #6776", recipes/MiniMaxAI/MiniMax-H3.md]
 confidence: high
 ---
 
@@ -20,24 +20,37 @@ confidence: high
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
 | `extra_body`、flattened/nested/canonical/legacy 输入、alias、`negative_prompt`、diffusion request extras | `request-contract`：`SERV-4a`–`4h` | `vllm_omni/entrypoints/openai/diffusion_request_utils.py::{normalize_diffusion_request_args,apply_normalized_diffusion_request_extra_args}` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.generate_diffusion_images}` |
+| batched chat、fan-out/fan-in、sub-request ID、choice collapse、whole-batch error | `batch-chat-contract`：`SERV-4i`–`4k` | `api_server.py::create_batch_chat_completion` → `batch_serving.py::OmniOpenAIServingChatBatch` → ordinary chat completion children |
 | `chat_template_kwargs`、raw HTTP/SDK `extra_body`、text/audio modalities、choices、空音频 | `chat-multimodal-contract`：`SERV-4c` + 命中模型规则 | upstream `ChatCompletionRequest` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.chat_completion_full_generator,OmniOpenAIServingChat._create_text_choice,OmniOpenAIServingChat._create_audio_choice}` |
-| endpoint restriction、route/app-state guard、capability、公开 400 | `endpoint-capability`：`SERV-4c`, `SERV-4d`, `SERV-5d` | endpoint policy → `api_server.py::build_app` assembled app → public handler |
-| sleep/wake、partial stage/tag、idempotency、ACK、generation admission | `engine-lifecycle`：`SERV-5a`, `SERV-5b` | `entrypoints/async_omni.py::{AsyncOmni.sleep,AsyncOmni.wake_up,AsyncOmni.generate}` → `worker/base.py::{handle_sleep_task,handle_wake_task}` / `diffusion/worker/diffusion_worker.py` |
+| endpoint restriction、route/app-state guard、capability、公开 400 | `endpoint-capability`：`SERV-4c`, `SERV-4d`, `SERV-5d`, [SERV-5s](rules-app-assembly.md#serv-5s-覆盖-upstream-http-route-前必须先移除同-methodpath-的旧-route) | endpoint policy → `api_server.py::build_app` assembled app → public handler |
+| pause/resume、sleep/wake、partial stage/tag、ACK、generation admission、abort cleanup acknowledgment 或 shutdown-time abort race | `engine-lifecycle`：`SERV-5a`, `SERV-5b`, `SERV-5m`；[SERV-5t](rules-abort-lifecycle.md#serv-5t-acknowledged-abort-在-shutdown-边界只忽略已识别的-transport-closure) | `entrypoints/async_omni.py::{AsyncOmni.pause_generation,AsyncOmni.resume_generation,AsyncOmni.sleep,AsyncOmni.wake_up,AsyncOmni._abort}` → `engine/{async_engine_utils,stage_pool,orchestrator,async_omni_engine}.py` → AR EngineCore helper / diffusion worker RPC |
+| stage/replica death、remote membership register/watch/detach、`EngineDeadError`、`StageUnavailableError`、health/readiness、eviction | `engine-lifecycle`：[SERV-5f](rules-fault-isolation.md#serv-5f-stage-death-按-replica-隔离request-fatal-不等于-process-fatal)、[SERV-5n](rules-engine-lifecycle.md#serv-5n-remote-replica-attachdetach-必须按本次-membership-generation-判定) | `engine/membership_controller.py` register/watcher generation → `engine/stage_pool.py` live set → `engine/orchestrator.py` poll/dispatch/cleanup → `entrypoints/{omni_base,async_omni}.py` error transport |
 | serving class/factory 重构、optional adapter、diffusion/no-TTS 实例、warmup | `engine-lifecycle`：`SERV-5c` | `entrypoints/openai/serving_speech.py` 的所有 factory/`__new__` 路径 → `warmup`、voice upload/list、speech request caller |
+| vLLM rebase、chat parser/renderer API moved or removed | `engine-lifecycle` | target-release `vllm.parser.*` / renderer API → `serving_chat.py` / `api_server.py`; remove a compatibility fallback only after the pinned base image is the target release ^[PR #6606] |
+| TTS model detection、`stage_keys`/`model_archs`、adapter priority/topology、legacy migration | `engine-lifecycle`：`SERV-5e` | `tts_adapters/__init__.py::{iter_tts_detectors,detect_tts_model_type,all_tts_stage_keys,tts_entry_stage_archs}` → `serving_speech.py::_find_tts_stage` |
+| request-level LoRA、AR-only/multistage、streaming input update、stage cardinality | `request-contract`：`SERV-4l` | `serving_chat.py` LoRA resolve → `AsyncOmni.generate` → `AsyncOmniEngine._build_add_request_message` → stage-0 input processor |
+| Stage-0 prompt transform、downstream original prompt、临时 artifact ownership/cleanup | `request-contract`：[SERV-4q](rules-request-input.md#serv-4q-stage-0-prompt-transform-必须保留-downstream-原始视图并闭合临时-artifact-生命周期) | `AsyncOmniEngine._build_add_request_message` → `StageSubmissionMessage.request_artifact_dirs` → `OrchestratorRequestState` terminal cleanup |
+| caller sampling params、pipeline `sampling_constraints`、stage config runtime extraction | `request-contract`：`SERV-4o` | `OmniBase.resolve_sampling_params_list` → `_get_sampling_constraints_list` → `_apply_sampling_constraints` |
+| OpenAI integer bounds、msgpack overflow、request-local cleanup | `request-contract`：`SERV-4p` | protocol request models → orchestrator stage dispatch → `_fail_request_client_error` |
 | SSE/streaming speech、audio format、PCM/WAV、speed、首 chunk 前校验 | `streaming-format`：`SERV-1a`, `SERV-1b` | `vllm_omni/entrypoints/openai/protocol/audio.py::{OpenAICreateSpeechRequest.validate_streaming_constraints,StreamingSpeechSessionConfig.validate_streaming_constraints}` → `serving_speech.py::{OmniOpenAIServingSpeech._validate_speech_streaming_request,OmniOpenAIServingSpeech.create_speech}` |
+| speech `sample_rate`、adapter capability、resample 与 stream header | [SERV-9b](rules-speech-output.md#serv-9b-speech-sample_rate-必须由-adapter-capability-限定) | protocol → TTS adapter capability → `serving_speech.py` / `audio_utils_mixin.py` |
+| video reference 解码、mixed media、frame conversion/mux、bounded memory | `media-ingress`：`SERV-1c`–`1e`, `1k` | `entrypoints/openai/video_api_utils.py` decode/coerce/encode helpers → video server callers |
 | `ref_audio`、x-vector/ICL、content identity、artifact cache/readiness | `artifact-readiness`：`SERV-3a`–`3c` | `serving_speech.py` reference resolve/decode/cache → adapter speaker cache → prefix salt |
-| Prometheus、waiting/running gauge、replica stats、throttle、collector lifecycle | `metrics-lifecycle`：`SERV-2a`, `SERV-2b` | `vllm_omni/entrypoints/omni_base.py::{OmniBase._log_summary_and_cleanup,OmniBase._process_stage_metrics_message}` → `vllm_omni/metrics/prometheus.py::{OmniPrometheusMetrics.__init__,set_running,set_waiting}` |
+| Prometheus、waiting/running gauge、replica stats、throttle、collector lifecycle、pipeline request gauge 或 image/diffusion metric emission | [metrics-lifecycle rules](rules-metrics.md)：`SERV-2a`, `SERV-2b`, `SERV-2e`, `SERV-2f` | `vllm_omni/entrypoints/omni_base.py::{OmniBase._log_summary_and_cleanup,OmniBase._process_stage_metrics_message,_publish_request_gauges}` → `vllm_omni/metrics/prometheus.py::{OmniPrometheusMetrics.__init__,set_running,set_waiting}` |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
-| `core` | 每次 serving 审查 | `SERV-4c` |
+| `core` | 每次 serving 审查 | `SERV-4c`，见 [请求输入合同](rules-request-input.md) |
 | `streaming-format` | SSE、audio streaming、format/default/capability | `SERV-1a`, `SERV-1b` |
-| `metrics-lifecycle` | metrics、gauge、replica、collector | `SERV-2a`, `SERV-2b` |
+| `media-ingress` | video reference、decoder registry/backend、mixed capability、bounded upload/conversion | `SERV-1c`–`1e` |
+| `metrics-lifecycle` | metrics、gauge、replica、collector、pipeline request gauge 或 image/diffusion measurement boundary | [SERV-2a–2f](rules-metrics.md) |
 | `artifact-readiness` | artifact/content cache、capability、ready/mark/discard | `SERV-3a`, `SERV-3b`, `SERV-3c` |
-| `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c` + 命中模型规则 |
-| `endpoint-capability` | endpoint restriction、route/app-state guard、公开 400 | `SERV-4c`, `SERV-4d`, `SERV-5d` |
-| `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission、factory 状态矩阵 | `SERV-5a`, `SERV-5b`, `SERV-5c` |
-| `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h` |
+| `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c`（见 [请求输入合同](rules-request-input.md)）+ 命中模型规则 |
+| `endpoint-capability` | endpoint restriction、route/app-state guard、公开 400 | `SERV-4c`, `SERV-4d` 见 [请求输入合同](rules-request-input.md)；`SERV-5d` 见 engine lifecycle；`SERV-5s` 见 [app assembly](rules-app-assembly.md) |
+| `engine-lifecycle` | pause/resume、sleep/wake、partial stage/tag、ACK、generation admission、abort cleanup/shutdown race、streaming raw terminal、event-driven orchestration、factory 状态矩阵、TTS adapter detection、replica membership/fault isolation | `SERV-5a`–`SERV-5e`、`SERV-5g`–`SERV-5r`（见 [engine 生命周期规则](rules-engine-lifecycle.md)）、[SERV-5t](rules-abort-lifecycle.md#serv-5t-acknowledged-abort-在-shutdown-边界只忽略已识别的-transport-closure)，`SERV-5f` |
+| `full-duplex` | duplex opt-in、stage prewarm/fence、async-chunk、CFG companion、stage-keyed segment lifecycle，adapter-owned deferred cognition/session cleanup，或 startup warmup/realtime admission | `SERV-6a`–`SERV-6f` 见 [engine 生命周期规则](rules-engine-lifecycle.md)；`SERV-6g` 见 [duplex 编排规则](rules-duplex-orchestration.md)；`SERV-6h`、`SERV-6i` 见 [session lifecycle](rules-session-lifecycle.md) |
+| `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view、stage sampling constraints、serialization bounds、transform artifact ownership | `SERV-4a`–`4h`, `SERV-4l`–`4q`，全部见 [请求输入合同](rules-request-input.md) |
+| `batch-chat-contract` | frontend fan-out、identity、choice cardinality、error/cancellation | `SERV-4i`–`4k`，见 [batch chat rules](rules-batch-chat.md) |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
 
 ## SERV-1a — 所有可预判错误在第一个 streaming chunk 前返回
@@ -59,23 +72,116 @@ confidence: high
 - 验收：每个公开格式都有 encoder smoke；移除格式只改 canonical owner，协议和校验测试
   同步反映。 ^[PR #4718]
 
-## SERV-2a — 指标节流和 gauge 按 scheduler/stage/replica owner 隔离
+## SERV-1c — media decoder 参数只在真实入口可达时对外声明
 
-- 触发：orchestrator 聚合多 stage/replica stats，或新增全局 throttle/gauge。
-- 强制：节流状态按实际 producer owner 隔离；request 状态 cleanup 后再计算 waiting 等
-  gauge。
-- 禁止：用一个全局时间戳让先上报的 replica 抑制其他 replica；在 pop/cleanup 前发布
-  最终 gauge。
-- 验收：同一窗口内两个 replica 都能上报；单请求完成并清理后 waiting=0。 ^[PR #3576]
+- 触发：替换 video/image reference decoder、接入 loader registry、新增 backend/fps/
+  frame-selection 参数或改变坏媒体错误。
+- 强制：只有请求/配置入口能把值传到 loader 时才声明参数可配；否则在最近
+  loader 调用处固定实际值。frame sampling 只消费真正传入的 target metadata；decoder
+  返回零帧必须继续映射为 `InvalidInputReferenceError`，不能因共享 loader 只记 warning
+  就返回空 `VideoFrames`。
+- 禁止：不得留下没有 caller 传入的 backend/fps 形参或死分支；不得因 registry 存在
+  多 backend 就宣称 vLLM-Omni 已支持运行时选择；不得丢失替换前的非空帧 fail-safe。
+- 验收：同一合成视频分别断言 first-N 与 last-N 顺序、数量和 fps；覆盖非法
+  `keep`、非正 `max_frames`、无效字节与 loader 零帧，且真实 Qwen multimodal/video
+  请求仍通过公开入口。 ^[PR #5085]
 
-## SERV-2b — collector 重建只保护本项目 family
+## SERV-1d — mixed media 必须 capability-gated，request 错误在解码前限界
 
-- 触发：同进程重建 engine、注册 Prometheus collectors 或调整 unregister 行为。
-- 强制：只保护需要跨实例保留的 `vllm:omni_*` family，并保留 upstream collector 的
-  正常 unregister/cleanup。
-- 禁止：把 upstream unregister 整体置空，导致重复 timeseries 注册。
-- 验收：同进程连续创建/销毁两次 engine，无 duplicate-timeseries 错误且 Omni family
-  仍可采集。 ^[PR #3576]
+- 触发：共享 video serving 接受 mixed image/video/audio、typed URL/data URL 或 multipart upload。
+- 强制：unknown model 默认无 mixed capability；只有 model metadata 明示支持才允许 image+video。
+  multipart 大小/格式等可在字节边界判定的约束必须 bounded-read 并在解码前拒绝；pipeline 的
+  request-facing validation 使用可跨 worker 保留 client metadata 的错误类型，统一映射为 400。
+- 禁止：删除旧互斥 guard 后让所有 diffusion 模型继承 mixed input；用 unbounded `read()` 后
+  再检查；让 plain `ValueError` 穿过 stage worker 变成 500。
+- 验收：支持模型的 mixed request 成功，unknown/不支持模型在 engine 前返回 400；multipart
+  oversize/bad format 与 pipeline count/shape 错误保持同一 client-error 合同。typed URL/data URL
+  是否同样 bounded 必须单独证明；本 pin 的 helper 仍完整读取。模型专有 allowlist、temp-file
+  与 input matrix 见 [MiniMax H3 rules](../../models/minimax-h3/rules.md)。 ^[PR #5752]
+
+## SERV-1e — 长视频转换只保留必要的全视频 buffer，并逐帧保持旧语义
+
+- 触发：修改 video output 的 normalize、float→uint8、RGBA strip、mux 或 fragmented encode。
+- 强制：预分配最终 contiguous uint8 video，逐帧 clip/scale/round 写入，禁止先 `np.stack`
+  全量 float frames 再产生全量转换临时量；这只消除额外副本，原 normalized float frames、最终
+  uint8 buffer 及上游 device→host 分配仍存在，不能称为 O(1) memory。
+- 强制：所有 frame shape 相同；只有 rank-3 HWC 且 C=4 才去 alpha，二维 width=4 灰度不能
+  截断。mixed float dtype 先用 `np.result_type` 得到 common dtype，再逐帧计算，以保持 legacy
+  stack 的 promotion/rounding/checksum；不得原地改输入。仅当输入是 `np.ndarray`、`uint8`、rank-4
+  FHWC、last dim=3 且 C-contiguous 时，fast branch identity-return；其他输入一律回既有 conversion。^[PR #6824]
+- 验收：回归测试禁止 float path 调用 `np.stack`，并覆盖 input immutability、RGBA、width-4
+  grayscale、mixed float16/float32 与 exact uint8 output。性能证据必须分开报告 conversion 和
+  未改动的 MP4 encode：PR #5732 的可复现实验仅绑定 209×1344×768 float32 RGB、24 FPS、
+  ultrafast、fresh process、3 次 median/RSS 10 ms；conversion 1201.15→529.47 ms、conversion+MP4
+  1808.96→1235.26 ms、peak RSS 8.874→4.141 GiB、above-resident 5.393→0.660 GiB，两个 hashes
+  相同。PR body 的 362-frame 与 4×MI300X E2E 是另一组观察，不能混合或泛化。另须断言 exact
+  eligible ndarray 返回同一对象，并以 dtype/rank/channel/contiguity controls 证明其他输入仍转换。^[PR #5732] ^[PR #6824]
+
+## SERV-1f — TTS word timestamps 必须按 transport capability 显式门禁和传输
+
+- 触发：公开 `word_timestamps`、forced-aligner CLI/config，或修改 HTTP non-stream、SSE 和 WebSocket speech transport。
+- 强制：服务启动时统一记录 aligner capability；无 aligner 时 `word_timestamps=true` 明确返回 400。HTTP non-stream 将短 JSON 时间戳放入 `X-Word-Timestamps`，超过 4096 bytes 用可检测的 `X-Word-Timestamps-Omitted`；WebSocket 仅在 `stream_audio=true` 且 PCM 合同满足时，在每句音频结束后发送 trailing timestamps frame。
+- 禁止：无 aligner 时静默返回 200 音频；让 `stream=true` 的 HTTP 路径伪装支持该字段；把长 header 静默丢弃；以 in-process sidecar 或离线示例替代 pipeline stage 的真实输出。
+- 验收：覆盖 non-stream、HTTP streaming、WebSocket、无/有 aligner、短/超限 alignment 和多句音频；分别断言 400、header/frame 内容、超限标记，以及音频在时间戳缺失或超限时仍按合同返回。
+^[PR #4795]
+
+## SERV-1g — TTS voice 输入、占位 default 与可用 speaker 必须闭环
+
+- 触发：修改 OpenAI speech 的 `voice` 输入校验、VoiceID 归一化、可用 voice 列表、上传 speaker 或无 speaker 模型的默认 voice 语义。
+- 强制：协议层同时接受字符串和包含 `id` 的 VoiceID 对象，并在 serving 校验前归一化为小写名称；可用 voice 列表必须统一包含内置 speaker、上传 speaker 和 `default` 占位项。无实际 `default` speaker 时，`default` 请求必须被接受并转换为后端忽略的无 voice 请求；存在同名真实 speaker 时必须优先使用真实 speaker；其他非法名称返回结构化 400。
+- 禁止：要求没有可用 speaker 的模型提供一个实际存在的 voice 名称；让 voice 列表遗漏 `default` 或上传 speaker；把 `default` 占位值传入后端作为真实 speaker；仅支持字符串而拒绝合法 VoiceID 对象。
+- 验收：覆盖无上传 speaker 时的字符串和 `{\"id\": ...}` 请求、未知 voice 的 400、上传前后 `default` 与新增 speaker 的列表和语音请求，以及注册并删除同名 `default` 后占位行为恢复；另需验证同名上传 voice 的实际使用，而不只断言请求成功。 ^[PR #5878]
+
+## SERV-1h — I2V resize ownership 必须按 checkpoint version 解析
+
+- 触发：在线视频 API 处理 I2V reference image，且 pipeline 的预处理可能随 checkpoint version 改变。
+- 强制：serving 从 active diffusion `od_config` 取得 `model_class_name`、`model` 和 `revision`，通过 model_extras resolver 判断 resize ownership；只有 LTX-2.5 保留 source geometry 交给 pipeline，LTX-2/2.3 继续在 serving 侧 resize，随后由 pipeline 执行其版本化 conditioning。
+- 禁止：以共享 `LTX2Pipeline` class 全局开启 preserve-image-size；按请求目标尺寸或路径名猜版本；跳过 revision；未经版本化回归就让 online 与 legacy offline I2V framing 政策改变。
+- 验收：用 2、2.3、2.5 checkpoint metadata、Full/Distilled class、pinned revision 和 off-aspect image 覆盖 HTTP I2V，断言 legacy resize、2.5 source geometry、CRF 委托及最终尺寸各自符合合同。^[PR #6070]
+
+## SERV-1i — image reference 重定向必须遵循媒体 URL 策略
+
+- 触发：`decode_image_url` 处理 HTTP(S) `image_reference.image_url`，或修改媒体 URL 重定向策略与下载错误映射。
+- 强制：读取 vLLM 的 `envs.VLLM_MEDIA_URL_ALLOW_REDIRECTS` 并传给 HTTPX 的 `follow_redirects`；策略关闭时在收到 3xx 后拒绝请求且不得请求重定向目标；最终非成功 HTTP 状态与网络/请求失败必须分别映射；data URL 继续走本地解码路径。
+- 禁止：硬编码或绕过媒体重定向策略；策略关闭时仍跟随可能跨主机的重定向；把 HTTP 状态错误与连接失败混为同一诊断；为 data URL 创建 HTTP client。
+- 验收：用确定性的 HTTPX transport 覆盖允许重定向并请求原路径和目标路径、禁用重定向且目标未被请求并在错误中指出 `VLLM_MEDIA_URL_ALLOW_REDIRECTS`、最终 404 与连接失败的错误区分，以及 data URL 不创建 HTTP client；再通过公开 `/v1/videos` image reference 回归验证解码图像进入 engine。该验证不覆盖未修改的 video/audio reference 或 image-edit fetcher。 ^[PR #6122]
+
+## SERV-1j — 非流式 speech raw-audio 响应通过 headers 暴露 usage
+
+- 触发：修改 `/v1/audio/speech` 非流式 raw-audio 响应、speech usage 计算或 usage headers，或需要对齐 streaming/batch 的 token 统计语义。
+- 强制：非流式 raw-audio 响应必须复用 `build_speech_usage` 生成的 `SpeechTokenUsage`，在 usage 可用且服务非 diffusion mode 时发送 `X-VLLM-OMNI-INPUT-TOKENS`、`X-VLLM-OMNI-OUTPUT-TOKENS`、`X-VLLM-OMNI-TOTAL-TOKENS`、`X-VLLM-OMNI-INPUT-TEXT-TOKENS` 和 `X-VLLM-OMNI-INPUT-AUDIO-TOKENS`；input 使用 text 与 ICL audio tokens，output 使用生成的 codec/audio tokens，raw audio body 保持不变。
+- 禁止：把 usage JSON 塞入 raw-audio body；用原始 stage prefill 长度替代共享 usage 语义；在 streaming headers 已发送后补发尚未确定的最终 totals；宣称 diffusion-mode 路径必然提供这些 headers。
+- 验收：测试非流式请求返回 `200`、raw audio body 未改变且五个 headers 的值与 `SpeechTokenUsage` 精确一致；覆盖 usage 不可用时不生成 headers，并回归 streaming 与 batch 的 usage 语义及 diffusion-mode 的无 headers 行为。^[PR #4499]
+
+## SERV-1k — 非流式 MP4 编码必须按运行时能力自动选择并保留回退语义
+
+- 触发：修改非流式 MP4 视频响应的 normalize、frame layout/dtype 判断、mux、raw/base64 输出或 fallback 行为。
+- 强制：公共 dispatcher 先完成一次帧准备和形状校验。共同 direct 条件是所有帧具有相同的正 HWC 形状、3/4 通道和支持的 common dtype（`uint8`、bool 或浮点）。C-contiguous RGB channel view 可直接写入 PyAV GBR planar 帧；strided RGB planes 仅可由 server-owned、`max_workers > 1` 的 converter 接受，并必须复制到其 owned scratch/PyAV planes，保持相同量化语义。没有 converter 或 `max_workers == 1` 时，strided planes 必须在打开 PyAV container 前以稳定 reason `non_contiguous_rgb_planes` 选择 `legacy_fallback`。raw MP4 和 base64 共用该 dispatcher，不提供 CLI、模型声明或请求级编码策略；流式 fMP4 保持原路径。
+- 强制：converter 的 scratch 是每个 worker thread 的实例本地存储；`iter_frames()` 按 FIFO 产生帧，并且一次调用最多保留 `2 * min(frame_count, max_workers)` 个 pending futures。无论 mux 成功还是抛错，调用方都必须关闭 iterator 以 cancel remaining futures；server `finally` 关闭 video handler，handler shutdown 必须幂等并以 `wait=True, cancel_futures=True` 关闭 executor。日志报告 effective frame-conversion workers（legacy 为 0）。
+- 禁止：为能力探测再次 normalize/copy 视频；在 direct mux 开始后因异常重试 legacy；把非法形状或不支持 dtype 静默送入 planar path；不得把 async route 仍同步执行 mux/base64 或单请求 pending 上限说成全请求 nonblocking、全局并发上限、普遍模型/process/performance 改进。共享 pool 只在一个 API process 内限制 conversion threads；多 process 仍各自拥有 pool。
+- 验收：覆盖无 converter、1 worker、8 workers 的 interleaved routing，及 channel-first-backed direct、非法 shape/dtype fallback、RGB contiguity、GBR plane 与 padded stride、FIFO、future bound、iterator close 后 cancel、reused executor 幂等 shutdown、direct failure 不重试；音频存在时 serving resolver 才以 24 kHz 为缺省。固定输入下有无音频的 parallel-interleaved/legacy MP4 必须 byte-identical 并通过 ffprobe/完整 FFmpeg decode，raw/base64 传同一 persistent converter，streaming 行为不变。^[PR #6288] ^[PR #6499] ^[PR #6776]
+
+## SERV-2e — 指标发射必须保持测量边界、缺失语义与请求唯一性
+
+- 触发：新增 image/diffusion Prometheus family，或修改 `OmniBase` terminal result、
+  `OrchestratorAggregator`、scheduler snapshot、失败清理或 stage/replica membership。
+- 强制：只在同一 finished result 的首次消费中发射 stage workload；request-finalize
+  family 由 e2e guard 发射一次。保留已测得的零 queue duration，但没有来源的 optional
+  profiler/KV/memory measurement 不发射。failure counter 在 abort、disconnect、stage error
+  和 cleanup 之间去重，并将 reason 归一到有界 taxonomy。waiting gauge 只求 live replicas
+  的最新快照，且 abort/error、death 和正常 unregister 都必须刷新或移除旧快照。
+- 禁止：把缺失值补成零、重放 terminal message 后重复加 Counter/Histogram、把已移除
+  replica 的历史 waiting 值留在总和，或把 `stage_gen_time` 当纯 DiT forward 时间。
+- 验收：覆盖 finished-result replay、present-zero 与 missing、错误/abort cleanup、正常及
+  dead replica unregister、一次请求的多个 failure path，以及 image-only workload guard。
+  profiler-off 与 profiler-on 均须断言各自可观测合同。^[Issue #5811] ^[PR #6150]
+
+## SERV-2d — 图像生成与编辑响应必须透传 diffusion 指标
+
+- 触发：修改 `/v1/images/generations` 或 `/v1/images/edits` 的 diffusion generation result 解包、指标字段或 OpenAI 响应构造。
+- 强制：单 stage 从 result 属性、multi-stage 从返回 tuple 捕获 `stage_durations` 与 `peak_memory_mb`，并在两个图像端点的响应 `metrics` 中透传；指标不可用时保留 `null`，内存值按稳定的数值类型输出。
+- 禁止：让 `edit_images()` 丢弃已生成的阶段耗时或峰值内存；只修复 generations 路径，或以 HTTP 成功代替指标字段的传播证明。
+- 验收：对 generations 和 edits 分别覆盖 single-stage 与 multi-stage stub 结果，断言响应状态为 200，且 `metrics.stage_durations`、`metrics.peak_memory_mb` 与 generation result 精确一致；同时覆盖指标缺失时的 `null` 响应。^[PR #5999]
 
 ## 缓存 readiness 与失败隔离
 
@@ -111,119 +217,23 @@ confidence: high
 - 验收：同长度覆盖、并发改写、named+inline、speaker cache 和 prefix hit 均不复用旧内容；
   非法路径不 stat，日志只含截断值且命中真实 logger hierarchy。 ^[PR #5670]
 
-## 请求输入合同
+### SERV-3d — pure-diffusion speech 必须在 factory 固化 media policy
 
-### SERV-4a — 公开字段由 serving 显式拥有
+- 触发：pure-diffusion speech 绕过普通 `OpenAIServing` 初始化，或修改 `ref_audio` 的
+  `MediaConnector`、local-media allowlist 或 factory 参数。
+- 强制：app bootstrap 将 `allowed_local_media_path` 和 `allowed_media_domains` 原样传给
+  speech factory；diffusion instance 在 factory 中创建并持有按该配置构造的 connector，且其
+  local cache-key stat 使用同一 allowed path。普通 multi-stage instance 仅在首次需要时从
+  `model_config` 构造 connector，不能要求 diffusion instance 拥有 `model_config`。
+- 禁止：diffusion 分支以无配置 connector 加载本地 `file:` URI；只把 allowlist 传到
+  `MediaConnector` 而遗漏 cache-key metadata gate；每次解析重新构造 connector 并漂移策略。
+- 验收：pure-diffusion bootstrap 断言两个 media 参数到达 speech factory；在 allowlisted
+  本地 ref-audio 上断言 connector 只按该配置创建一次，文件 size/mtime 改变后 cache miss 并
+  refetch；普通 multi-stage 路径仍从 `model_config` 延迟构造。 ^[PR #6622]
 
-- 触发：修改请求 allowlist、冲突字段集或兼容输入。
-- 强制：逐项绑定真实 consumer，公开字段由 serving 边界显式声明。
-- 禁止：从包含 tensor、KV 状态或运行时中间量的内部结构反射生成公开字段。
-- 验收：加入一个内部同名字段反例，证明它不会被误算成公开 root 字段。
+### SERV-11a — 用户输入日志必须默认降级并受限输出
 
-### SERV-4b — 多来源输入验证前不得合并
-
-- 触发：请求同时支持 flattened、raw nested、声明字段、alias 或 canonical container。
-- 强制：保留来源直到冲突检查结束；验证通过后若用字典展开构造并集，必须注明各映射
-  已经不相交。
-- 禁止：用 `or`、字典展开或 `update()` 决定重复值，制造未声明优先级。
-- 验收：重复字段返回明确 4xx，不重叠字段全部到达最终 consumer。
-
-### SERV-4c — 入口接受必须闭环到每个生产消费者
-
-- 触发：新增请求字段或改变字段分流。
-- 强制：对每条 dispatcher 追踪字段到 engine、pipeline、prompt 或 sampling 参数。
-- 禁止：用 helper 返回值或 HTTP 成功代替传播证明。
-- 验收：真实请求对象同时覆盖默认值和非默认值，并断言最终 consumer。
-
-### SERV-4d — 同一请求合同错误跨 dispatcher 保持同一响应合同
-
-- 触发：同一非法输入可进入 diffusion-only、multi-stage 或其他多个 dispatcher。
-- 强制：使用一致的 status、错误类型和消息策略，并在公共边界转换一次。
-- 禁止：一路本地映射为 4xx，另一路交给远处通用 `ValueError` 捕获。
-- 验收：同一冲突输入经过每条受影响 dispatcher 时响应等价，且都在 engine/pipeline
-  调用前失败。
-
-### SERV-4e — 请求期弃用信号必须对 operator 可见
-
-- 触发：serving 路径继续接收 deprecated 输入。
-- 强制：使用项目 logger 的 `warning_once` 或明确限频策略。
-- 禁止：使用仅写 stderr 且按调用点过滤的 `warnings.warn`。
-- 验收：合法旧输入恰好记录一次警告；因冲突返回 4xx 的输入不记录兼容警告；用户响应
-  合同与日志合同分别断言。
-
-### SERV-4f — Serving 只编译当前 slice 拥有的请求语义
-
-- 触发：同一 serving 字段存在 flattened、nested、canonical 或 legacy 来源。
-- 强制：在 request mutation、preprocess 和 dispatcher 分支之前完成一次来源校验，并
-  产出当前 slice 限定字段的 consumer view。
-- 禁止：dispatcher 重读 raw request 或重新决定优先级；为了 request-extra
-  normalization 把 topology、模型能力、逐 stage 参数或其他 owner 吸进完整 compiler。
-- 验收：root control + nested extras 分别经过 pure/mixed dispatcher 到达 prompt、
-  AR metadata 与 diffusion sampling consumer；registry 字段与 service control 重名时
-  仍只有一个 owner。
-
-### SERV-4g — 多来源合同编码前必须完成来源矩阵
-
-- 触发：一个语义存在多个来源、dispatcher 或 stage scope。
-- 强制：按 [source-consumer decision matrix](../../../../general/review/guides/review-execution-contract.md#source-consumer-decision-matrix)
-  标明路由、重复拒绝、不适用和 defaults；兼容写法默认进入同一 consumer scope，只有
-  矩阵声明不同语义时才能分流。规范化结果拆成多个 consumer view 时默认互不重叠，
-  同一字段确需进入多个 view 时逐一命名最终 consumer。
-- 禁止：矩阵缺失时声称实现或审查完成；由字段集合运算、输入写法或 dispatcher 末端
-  defaults 隐式决定 scope。
-- 验收：每个来源组合都有明确 decision 和生产路径证据；每个 consumer view 的重叠项
-  都有显式最终 consumer，不存在接受后丢弃或末端重新读取 raw request。
-
-### SERV-4h — 请求合同膨胀时停止逐评论修补
-
-- 触发：生产 diff 超过预算上限 1.5 倍、出现第二个重叠语义 owner，或下一审查波次
-  再次发现同一 owner 漏洞。
-- 强制：执行 [架构重置验收](../../../../general/review/guides/code-taste.md#架构重置怎样验收)，
-  重新确认唯一最终产物、删除清单和规模上限。
-- 禁止：继续堆 helper、compatibility branch 或 reviewer-specific patch。
-- 验收：恢复编码前 owner、consumer、删除项和 diff 预算都有可检查记录。
-
-## Engine 生命周期合同
-
-### SERV-5a — sleep/wake 状态必须保留 stage 和 tag 作用域
-
-- 触发：sleep/wake 接受 `stage_ids`、resource tags 或 partial wake。
-- 强制：状态 key 与公开操作的 stage/tag 作用域一致；只有全部必需 stage/tag 已 warm
-  才放行 generation。
-- 禁止：用一个全局 tag set 表示多 stage 状态；唤醒一个 stage 后清掉其他 stage 的
-  sleeping 状态或把后续定向 wake 当成 already warm。
-- 验收：sleep 两个 stage、只 wake 一个时 generation 仍拒绝，随后 wake 另一个才放行。
-  ^[PR #4834]
-
-### SERV-5b — 只有成功 ACK 和真实 backend capability 才能转为 warm
-
-- 触发：worker ACK 可返回 error，或不同 backend 对 level-2 restore 能力不同。
-- 强制：逐目标确认成功 ACK 后再清状态；level-2 能力按 backend/stage 表达。
-- 禁止：错误 ACK 也清 tag；用 engine 全局禁令误伤已经支持 restore 的 diffusion worker。
-- 验收：失败 ACK 保留 sleeping 状态；支持 level-2 的 diffusion 路径仍能
-  sleep → wake → generate，不支持的 stage 在调用 worker 前明确拒绝。
-  ^[PR #4834] ^[PR #4905] ^[PR #4912]
-
-### SERV-5c — 共享服务类重构必须闭合全部构造状态
-
-- 触发：移动 model-specific capability 到 adapter、增加 factory/`__new__` 快路径，或让同一
-  serving class 同时承载普通、无对应 stage、diffusion-only 等实例。
-- 强制：列出每个生产构造入口及其必有/可选属性；所有公共 caller 通过统一 accessor 或显式
-  `None` 状态访问 optional capability，startup warmup 与 request route 使用同一状态合同。
-- 禁止：只测试目标 adapter 的正常构造；在 factory 实例上直接读取未初始化属性；用旧的
-  model-type early return 掩盖无 adapter 状态。
-- 验收：至少覆盖普通 adapter、无 adapter 和 bypass-`__init__` factory 三类实例，并实际调用
-  startup warmup、voice list/upload 与对应 request route；每条路径保持重构前的成功或结构化
-  错误合同，不得出现 `AttributeError`。 ^[PR #6138]
-
-### SERV-5d — 应用 wiring guard 检查可用性而非属性名
-
-- 触发：assembled app 的 route/middleware 依赖 `app.state` handler 或 factory wiring。
-- 强制：mandatory state 同时检查属性存在且非 `None`；guard 测试通过 assembled app/公开 handler
-  观察行为，并覆盖应用实际暴露的方法和 middleware inner-app 调用。
-- 禁止：`hasattr` 接受显式 `None`；测试绑定可搬迁私有 symbol/单 router；用恒真断言证明 wiring。
-- 验收：把 handler 置空、移除 route/method、绕过 inner app 三类 mutation 均使 guard 失败；
-  正常 app 的 HEAD/OPTIONS census 与必需 state key 完整。 ^[PR #6202]
-
-请求到 engine 的边界见 [Serving architecture](architecture.md)；公开协议通用检查见
-[review contracts](../../../../general/review/guides/reviewer-lens-contracts.md)。
+- 触发：修改 TTS、audio generation 或 diffusion chat serving 请求日志，以及 `request_logger` 或 `max_log_len` 的行为。
+- 强制：INFO 级别只记录 request ID、模型类型、voice clone、reference image 和参数等元数据；用户输入仅在 `self.request_logger` 存在时通过 `logger.debug` 输出，并按 `max_log_len` 预留日志前缀长度进行截断；未配置上限时使用 200 字符默认上限。
+- 禁止：在 INFO 日志中写入原始 `text` 或 `prompt`；无条件输出 DEBUG 用户内容；使用固定预览长度替代请求日志开关；在未配置 `max_log_len` 时输出无界用户输入。
+- 验收：覆盖 TTS、diffusion TTS、audio generation 和 diffusion chat，断言 INFO 不含用户内容；启用 `--enable-log-requests` 时 DEBUG 才输出内容，且配置与未配置 `max_log_len` 时均遵守截断上限。 ^[PR #6329]
