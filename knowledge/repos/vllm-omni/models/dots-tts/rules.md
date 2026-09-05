@@ -34,3 +34,10 @@ confidence: high
   hardware marker；weekly `-m "slow and L4 and tts"` 收集 3，nightly
   `-m "full_model and L4 and tts"` 收集 0。PR 未在 L4 实跑，真实 weekly run 才能证明硬件结果。
   ^[PR #6174]
+
+## DOTS-2a — online serving detection 必须以 dots.tts architecture 优先，不能认领共享 stage key
+
+- 触发：修改 `dots_tts` 的 `/v1/audio/speech` adapter、TTS detector metadata、`serving_speech` 的 stage discovery，或与 VoxCPM2 共用 `latent_generator` 一类 stage key 的模型接入。
+- 强制：`DotsTTSAdapter` 只按 `DotsTTSForConditionalGeneration` architecture 识别 dots.tts，并用高于 VoxCPM2 的 `detect_priority` 先参与排序；`stage_keys` 必须保持空集合，避免把共享的 `latent_generator` entry stage 当作 dots.tts 的充分证据。最终 online speech 路由必须经统一 adapter detection，而不是在 `serving_speech.py` 增加模型专用分支。
+- 禁止：让 dots.tts 通过共享 stage key 抢占 VoxCPM2 请求；在优先级上落后于 VoxCPM2 再依赖 stage 扫描“碰运气”命中；或把一次成功的 dots.tts speech 请求当成 detector 消歧已被证明。
+- 验收：检测测试必须同时覆盖 dots.tts architecture 命中 `DotsTTSAdapter`、VoxCPM2 architecture 仍命中 `VoxCPM2Adapter`，并断言 dots.tts 不因 `latent_generator` 进入候选；serving 集成测试还要证明 `/v1/audio/speech` 的 dots.tts 请求走到正确 adapter。E2E 通过只证明该精确 online-serving 路径可达，不外推为其他共享 stage-key 模型都已安全。^[PR #6235]
