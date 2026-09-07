@@ -198,6 +198,9 @@ review_routes:
 - prefix: pyproject.toml
   owner: plugin-boundary
   doc: repos/afd-plugin/components/plugin-boundary/rules.md
+- prefix: uv.lock
+  owner: plugin-boundary
+  doc: repos/afd-plugin/components/plugin-boundary/rules.md
 - prefix: afd_plugin/v1/worker/attention_model_runner.py
   owner: attention-runtime
   doc: repos/afd-plugin/components/attention-runtime/architecture.md
@@ -217,6 +220,9 @@ review_routes:
   owner: ffn-runtime
   doc: repos/afd-plugin/components/ffn-runtime/architecture.md
 - prefix: afd_plugin/v1/worker/ffn_worker.py
+  owner: ffn-runtime
+  doc: repos/afd-plugin/components/ffn-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/ffn_metadata.py
   owner: ffn-runtime
   doc: repos/afd-plugin/components/ffn-runtime/architecture.md
 - prefix: afd_plugin/v1/worker/npu/ffn_model_runner.py
