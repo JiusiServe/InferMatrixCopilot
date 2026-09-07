@@ -194,10 +194,15 @@ def _classify_target_main_changes(repo: str, base: str, head: str,
     if not base or not head or base == head:
         return {"changed_paths": [], "affected_modules": [],
                 "unmapped_paths": [], "ignored_paths": []}
-    result = subprocess.run(
-        ["git", "-C", str(repo), "diff", "--name-status", "--find-renames",
-         f"{base}..{head}"], capture_output=True, text=True,
-        errors="replace", timeout=60, check=False)
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo), "diff", "--name-status", "--find-renames",
+             f"{base}..{head}"], capture_output=True, text=True,
+            errors="replace", timeout=60, check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(
+            f"AFD main range {base[:12]}..{head[:12]} could not be read: "
+            f"{exc}") from exc
     if result.returncode != 0:
         raise RuntimeError(
             f"AFD main range {base[:12]}..{head[:12]} is unusable: "
@@ -1058,8 +1063,9 @@ async def _v3_sync_target(ctx: StepContext) -> StepResult:
         return StepResult(False, FailureKind.BLOCKED,
                           "could not resolve fetched target main SHA")
 
-    start_sha = git("rev-parse", "HEAD").stdout.strip()
     branch_exists = git("rev-parse", "--verify", f"refs/heads/{result_branch}").returncode == 0
+    start_sha = (git("rev-parse", result_branch).stdout.strip()
+                 if branch_exists else git("rev-parse", "HEAD").stdout.strip())
     if branch_exists:
         checked = git("checkout", result_branch)
     else:
