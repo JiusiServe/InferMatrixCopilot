@@ -622,6 +622,17 @@ def test_v3_finalize_terminal_row(v3_env, settings):
                        params={}, run_dir=run_dir2,
                        trace=RunTrace(run_dir2 / "trace.jsonl"))
     assert asyncio.run(fin.handler(ctx2)).ok
+    run_dir3 = Path(settings.run_root) / "run-fin3"
+    run_dir3.mkdir(parents=True, exist_ok=True)
+    Substate(run_dir3, "run-fin3").update({"modules": {"a": {"status": "done"}}})
+    ctx3 = StepContext(
+        settings=settings,
+        state={"run_id": "run-fin3",
+               "task_spec": {"params": {"rebase_mode": "local_rebase"}}},
+        params={}, run_dir=run_dir3,
+        trace=RunTrace(run_dir3 / "trace.jsonl"))
+    result3 = asyncio.run(fin.handler(ctx3))
+    assert not result3.ok and "publish" in result3.summary
 
 
 # -- v3 per-mode matrix + runtime init -----------------------------------------

@@ -2039,6 +2039,9 @@ async def _v3_finalize(ctx: StepContext) -> StepResult:
                         + (f": {ci.get('reason')}" if ci.get("reason")
                            else ""))
         failures.extend(f"ci job {name}" for name in ci.get("unfixed") or [])
+    if (_task_params(ctx).get("rebase_mode") == "local_rebase"
+            and data.get("push_result") != "pushed"):
+        failures.append("local rebase publish not completed")
     sub.update({"phase": "needs_human" if failures else "done"})
     if failures:
         return StepResult(False, FailureKind.BLOCKED,
