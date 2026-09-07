@@ -2156,7 +2156,7 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
         module_scope = _module_scope(repo_root, module, manifest,
                                      run_dir=ctx.run_dir)
 
-        async def _run_harness(prompt: str):
+        async def _run_harness(prompt: str, *, require_plan_review: bool = True):
             # The harness transport is synchronous. Keep the module wave's
             # event loop responsive while preserving the serialized module
             # contract and the shared bridge/audit path.

@@ -395,6 +395,38 @@ def test_module_rebase_partial_e2e(tmp_path, prompt_data):
     assert substate.get("modules.model_config.status") == "done"  # untouched
 
 
+def test_harness_module_requires_success_contract_and_plan_decision(
+        tmp_path, prompt_data):
+    """A harness response is not a successful module result unless it has
+    the structured success status and the required plan decision."""
+    from types import SimpleNamespace
+
+    module_root = tmp_path / "module"
+    module_root.mkdir()
+    log_dir = tmp_path / "logs"
+    calls = []
+
+    async def harness(prompt, **kwargs):
+        calls.append((prompt, kwargs))
+        return SimpleNamespace(
+            text='{"status":"success","summary":"claimed"}',
+            truncated=False, iterations=1)
+
+    config = ModuleRunConfig(
+        vllm_path=str(module_root), omni_path=str(module_root),
+        script_dir="/parent", model="codex", log_dir=str(log_dir),
+        max_debug_retries=1)
+    substate = Substate(tmp_path / "run", "run-harness")
+    outcome = asyncio.run(rebase_module(
+        "model_config", client=None, config=config,
+        prompt_data=prompt_data, tool_defs=[], extra_tools={},
+        substate=substate, harness_runner=harness))
+    assert outcome["status"] == "failed"
+    assert outcome["debug_attempts"] == 1
+    assert len(calls) == 2
+    assert all("Plan-Review-Decision Gate" in prompt for prompt, _ in calls)
+
+
 def test_phase1_steps_composition(tmp_path):
     """The deterministic phase-1 units end-to-end over fixture repos: drift +
     assignment reports under the parent's filenames, skip flags in substate,

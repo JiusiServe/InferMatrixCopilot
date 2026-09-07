@@ -60,7 +60,7 @@ async def rebase_module(
     trace: RunTrace | None = None,
     broken_imports: list[dict] | None = None,
     module_test_plan: dict | None = None,
-    harness_runner: Callable[[str], Any] | None = None,
+    harness_runner: Callable[..., Any] | None = None,
 ) -> dict:
     """Run one module's rebase agent and record the outcome in substate.
     Returns the module's result dict (also written under
@@ -94,8 +94,23 @@ async def rebase_module(
         try:
             if harness_runner is not None:
                 import inspect
+                from pathlib import Path
 
-                outcome = harness_runner(p)
+                decision_dir = Path(config.log_dir) / "plans" / \
+                    f"module-{module}"
+                decisions_before = set(decision_dir.rglob("*.decision.md")) \
+                    if decision_dir.is_dir() else set()
+                harness_prompt = p
+                if require_plan_review and \
+                        "Plan-Review-Decision Gate" not in harness_prompt:
+                    from .prompt_builder import _plan_review_contract
+
+                    harness_prompt += ("\n\n" + _plan_review_contract(
+                        log_dir=config.log_dir,
+                        session=f"module-{module}"))
+
+                outcome = harness_runner(
+                    harness_prompt, require_plan_review=require_plan_review)
                 if inspect.isawaitable(outcome):
                     outcome = await outcome
                 # Harness transports return AgentOutcome, while the in-process
@@ -103,11 +118,20 @@ async def rebase_module(
                 # retry/substate semantics remain identical.
                 text = str(getattr(outcome, "text", "") or "")
                 truncated = bool(getattr(outcome, "truncated", False))
-                return {"done": not truncated, "text": text,
+                from ..llm import parse_json_reply
+                parsed = parse_json_reply(text)
+                status = str(parsed.get("status", "")).lower() \
+                    if isinstance(parsed, dict) else ""
+                decisions_after = set(decision_dir.rglob("*.decision.md")) \
+                    if decision_dir.is_dir() else set()
+                plan_done = bool(decisions_after or decisions_before)
+                return {"done": not truncated and status == "success" and
+                        (not require_plan_review or plan_done),
+                        "text": (text if status else
+                                 "Harness did not return a valid output "
+                                 f"contract: {text}"),
                         "turns": int(getattr(outcome, "iterations", 0) or 0),
-                        # The harness receives the same plan-review contract
-                        # in the prompt and owns its tool loop.
-                        "plan_done": not truncated}
+                        "plan_done": plan_done}
             return await run_agent_loop(
                 client, p, model=config.model, tool_defs=tool_defs,
                 extra_tools=extra_tools, scope=scope, trace=trace,
