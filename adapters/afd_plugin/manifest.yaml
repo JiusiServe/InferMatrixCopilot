@@ -25,7 +25,7 @@ upstream:
   require_exact_target: true
 
 knowledge:
-  source: vllm-project/afd-plugin@a432692
+  source: vllm-project/afd-plugin@44de75e
   repo_subdir: repos/afd-plugin
   briefing_docs:
   - repos/afd-plugin/rules.md
