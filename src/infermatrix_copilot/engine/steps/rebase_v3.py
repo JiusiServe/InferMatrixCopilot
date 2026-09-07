@@ -180,6 +180,68 @@ def _repo_revision(repo: str) -> str:
         re.fullmatch(r"[0-9a-fA-F]{40}", revision) else ""
 
 
+def _classify_target_main_changes(repo: str, base: str, head: str,
+                                  modules: Mapping) -> dict:
+    """Map files introduced by the target repo's main-line sync to modules.
+
+    The vLLM assignment and the target-repo assignment are independent: a
+    vLLM range with zero commits must not hide new AFD code. Unmapped
+    documentation is reported but ignored; an unmapped source/config/test path
+    is returned to the caller so the run can stop rather than silently skip it.
+    """
+    import subprocess
+
+    if not base or not head or base == head:
+        return {"changed_paths": [], "affected_modules": [],
+                "unmapped_paths": [], "ignored_paths": []}
+    result = subprocess.run(
+        ["git", "-C", str(repo), "diff", "--name-status", "--find-renames",
+         f"{base}..{head}"], capture_output=True, text=True,
+        errors="replace", timeout=60, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"AFD main range {base[:12]}..{head[:12]} is unusable: "
+            f"{result.stderr.strip()[:300]}")
+
+    paths: list[str] = []
+    for line in result.stdout.splitlines():
+        fields = line.split("\t")
+        paths.extend(p for p in fields[1:] if p)
+    affected: set[str] = set()
+    unmapped: list[str] = []
+    ignored: list[str] = []
+    relevant_suffixes = (".py", ".pyi", ".toml", ".yaml", ".yml", ".json",
+                         ".c", ".cc", ".cpp", ".cu", ".h", ".hpp")
+
+    def matches(path: str, pattern: str) -> bool:
+        pattern = str(pattern)
+        if pattern.endswith("/"):
+            return path.startswith(pattern)
+        return path == pattern or path.startswith(pattern + "/")
+
+    for path in sorted(set(paths)):
+        matched = False
+        for module, data in modules.items():
+            spec = data or {}
+            patterns = tuple(spec.get("local_paths") or ()) + \
+                tuple(spec.get("test_paths") or ())
+            if any(matches(path, pattern) for pattern in patterns):
+                affected.add(module)
+                matched = True
+        if matched:
+            continue
+        if path.startswith(("docs/", "doc/", ".github/")) or \
+                Path(path).name.upper() in {"README", "README.MD", "LICENSE"}:
+            ignored.append(path)
+        elif path.endswith(relevant_suffixes):
+            unmapped.append(path)
+        else:
+            ignored.append(path)
+    return {"changed_paths": sorted(set(paths)),
+            "affected_modules": sorted(affected),
+            "unmapped_paths": unmapped, "ignored_paths": ignored}
+
+
 def _venv_declared(manifest: dict) -> bool:
     """Whether the adapter DECLARES a runtime venv at all — declared-but-
     unresolved blocks (misconfiguration must surface), while an adapter
@@ -1248,6 +1310,9 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
 @step("rebase.v3_assign", "deterministic", "read",
       "Classify upstream commits into modules; publish the wave lists.")
 async def _v3_assign(ctx: StepContext) -> StepResult:
+    repo = require_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
     manifest = _adapter_manifest(ctx)
     if isinstance(manifest, StepResult):
         return manifest
@@ -1286,6 +1351,32 @@ async def _v3_assign(ctx: StepContext) -> StepResult:
     except AssignError as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
     active = [m for m, s in result.skip.items() if not s]
+    target_main_assignment = {
+        "changed_paths": [], "affected_modules": [],
+        "unmapped_paths": [], "ignored_paths": []}
+    afd_main_start = str(ctx.state.get("afd_branch_start_sha") or "")
+    afd_main_head = str(ctx.state.get("afd_main_sha") or "")
+    if afd_main_start and afd_main_head:
+        try:
+            target_main_assignment = _classify_target_main_changes(
+                str(repo), afd_main_start, afd_main_head, modules)
+        except RuntimeError as exc:
+            return StepResult(False, FailureKind.BLOCKED, str(exc))
+        unmapped = target_main_assignment["unmapped_paths"]
+        if unmapped:
+            ctx.trace.record("target_main_unmapped_paths", paths=unmapped)
+            return StepResult(False, FailureKind.BLOCKED,
+                              "AFD main changed source/config/test paths that "
+                              "map to no module: " + ", ".join(unmapped[:10]))
+        for module in target_main_assignment["affected_modules"]:
+            if module not in active:
+                active.append(module)
+            _substate(ctx).update({"modules": {module: {"skip": False}}})
+        ctx.trace.record(
+            "target_main_assignment",
+            changed_paths=target_main_assignment["changed_paths"],
+            affected_modules=target_main_assignment["affected_modules"],
+            ignored_paths=target_main_assignment["ignored_paths"])
     # wave ordering is a dependency contract (manifest `wave`, parent
     # parity): wave 1 runs first; the wave gate empties wave 2 on failure
     wave1 = [m for m in modules if m in active
@@ -1298,7 +1389,8 @@ async def _v3_assign(ctx: StepContext) -> StepResult:
                       outputs={"state_updates": {
                           "active_modules": active,
                           "wave1_modules": wave1,
-                          "wave2_modules": wave2}})
+                          "wave2_modules": wave2,
+                          "afd_main_assignment": target_main_assignment}})
 
 
 @step("rebase.v3_wave_gate", "deterministic", "read",

@@ -205,6 +205,42 @@ def test_afd_adapter_supplies_a_runnable_local_cpu_job(tmp_path):
     assert job.timeout_sec == 1800
 
 
+def test_target_main_assignment_keeps_afd_only_changes(tmp_path):
+    """A target-repo main change activates its module even when the vLLM
+    assignment range is empty; unmapped source files remain visible."""
+    from infermatrix_copilot.engine.steps.rebase_v3 import \
+        _classify_target_main_changes
+
+    repo = tmp_path / "afd"
+    (repo / "afd_plugin" / "connectors").mkdir(parents=True)
+    (repo / "README.md").write_text("base")
+    (repo / "afd_plugin" / "connectors" / "base.py").write_text("base")
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c",
+                    "user.email=t@example.com", "add", "-A"],
+                   cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c",
+                    "user.email=t@example.com", "commit", "-qm", "base"],
+                   cwd=repo, check=True)
+    base = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,
+                          capture_output=True, text=True, check=True).stdout.strip()
+    (repo / "afd_plugin" / "connectors" / "base.py").write_text("main")
+    (repo / "README.md").write_text("main")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c",
+                    "user.email=t@example.com", "commit", "-qm", "main"],
+                   cwd=repo, check=True)
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,
+                          capture_output=True, text=True, check=True).stdout.strip()
+    result = _classify_target_main_changes(
+        str(repo), base, head,
+        {"connectors": {"local_paths": ["afd_plugin/connectors/"],
+                         "test_paths": []}})
+    assert result["affected_modules"] == ["connectors"]
+    assert result["unmapped_paths"] == []
+    assert "README.md" in result["ignored_paths"]
+
+
 # -- test loop -----------------------------------------------------------------
 
 def test_test_loop_decision_matrix(tmp_path):
