@@ -66,3 +66,5 @@ Realtime video 不以「每 200 ms append」定义 frame cadence：首个约 103
   batch/stage handoff 或 native duplex session。
 - 问题位于共享 bridge/batching 时转到
   [Model Executor rules](../../components/model-executor/rules.md)。
+
+- [MiniCPM-o 4.5 Code2Wav 运行时合同](rules-code2wav-runtime.md)：`MCPMO-1f`, `MCPMO-1g`, `MCPMO-1h`, `MCPMO-1i`。
