@@ -74,13 +74,13 @@ modules:
     - vllm/v1/worker/ubatch_utils.py
     test_paths:
     - tests/unit/v1/worker/
-    - tests/e2e/features/
     wave: 1
     risk: high
   ffn_runtime:
     local_paths:
     - afd_plugin/v1/worker/ffn_model_runner.py
     - afd_plugin/v1/worker/ffn_worker.py
+    - afd_plugin/v1/worker/ffn_metadata.py
     - afd_plugin/v1/worker/npu/ffn_model_runner.py
     - afd_plugin/v1/worker/npu/ffn_worker.py
     upstream_paths:
