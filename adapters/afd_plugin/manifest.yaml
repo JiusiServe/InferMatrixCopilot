@@ -43,6 +43,7 @@ modules:
     - afd_plugin/v1/__init__.py
     - afd_plugin/v1/worker/__init__.py
     - afd_plugin/v1/worker/npu/__init__.py
+    - uv.lock
     - pyproject.toml
     upstream_paths:
     - vllm/plugins/
