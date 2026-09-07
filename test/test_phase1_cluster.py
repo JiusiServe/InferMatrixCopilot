@@ -101,6 +101,17 @@ def test_pick_first_hit_wins(upstream_pair):
     assert found == c3
 
 
+def test_pick_exact_target_ref_does_not_walk_to_an_older_wheel(upstream_pair):
+    """An adapter that pins a release tag must fail if that exact target has
+    no artifact; it must not silently select an older commit."""
+    _, clone, shas = upstream_pair
+    target = shas[-1]
+    with pytest.raises(WheelPickError, match="forced commit"):
+        wheel.pick_wheel_commit(
+            clone, "main", SPEC, target_ref=target, force_commit=target,
+            probe=lambda rev: False)
+
+
 def test_pick_no_wheel_anywhere_raises(upstream_pair):
     _, clone, _ = upstream_pair
     with pytest.raises(WheelPickError, match="no commit with a"):

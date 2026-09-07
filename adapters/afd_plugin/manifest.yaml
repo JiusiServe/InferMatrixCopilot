@@ -13,6 +13,7 @@ repo:
   remote: upstream
   source_remote: upstream
   language: python
+  venv: ${AFD_PLUGIN_VENV}
 
 upstream:
   kind: fork_tracking
@@ -21,6 +22,7 @@ upstream:
   target_branch: main
   target_ref: v0.28.0
   target_version: 0.28.0
+  require_exact_target: true
 
 knowledge:
   source: vllm-project/afd-plugin@a432692
@@ -319,6 +321,14 @@ rebase:
   testing:
     python: ${AFD_PLUGIN_PYTHON}
     artifact_globs: []
+  wheel:
+    package: vllm
+    index_url_template: "https://wheels.vllm.ai/{commit}/{variant}/{package}/"
+    variant: ${VLLM_WHEEL_VARIANT}
+    arch: ${VLLM_WHEEL_ARCH}
+    import_check_modules: [vllm]
+    install_env: {VLLM_USE_PRECOMPILED: "1"}
+    reinstall_retries: 3
   local_tests:
     source: adapter
     command: >-

@@ -18,6 +18,7 @@ from typing import Mapping
 import yaml
 
 from ...rebase_engine import test_loop as tl
+from ...rebase_engine import assign as assign_mod
 from ...rebase_engine import wheel as wheel_mod
 from ...rebase_engine.debug_patch_policy import (capture_patch_policy,
                                                  evaluate_debug_patch)
@@ -1058,15 +1059,20 @@ async def _v3_scan(ctx: StepContext) -> StepResult:
             name: tuple((spec or {}).get("upstream_paths") or ())
             for name, spec in modules.items()}
         try:
-            assignment = run_commit_assignment(
-                Phase1Config(
-                    upstream_repo=Path(upstream), target_repo=Path(repo),
-                    log_dir=ctx.run_dir, baseline_commit=str(baseline),
-                    target_branch=str((manifest.get("upstream") or {})
-                                       .get("target_ref") or
-                                       (manifest.get("upstream") or {})
-                                       .get("target_branch") or "")),
-                module_paths, _substate(ctx))
+            assignment = assign_mod.assign_commits(
+                Path(upstream), str(baseline), module_paths,
+                target_branch=str((manifest.get("upstream") or {})
+                                  .get("target_ref") or
+                                  (manifest.get("upstream") or {})
+                                  .get("target_branch") or ""))
+            (ctx.run_dir / "path_drift_check.md").write_text(
+                assign_mod.render_drift_report(
+                    assignment.head[:12], assignment.missing_paths),
+                encoding="utf-8")
+            (ctx.run_dir / "commits_assignment.md").write_text(
+                assign_mod.render_assignment_report(
+                    assignment, repo_label="Upstream"),
+                encoding="utf-8")
             updates["upstream_assignment"] = {
                 "baseline": assignment.baseline,
                 "head": assignment.head,
@@ -1101,13 +1107,26 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
     if blocked is not None:
         return blocked
     rb = manifest.get("rebase") or {}
-    if not rb.get("wheel"):
+    raw_wheel = rb.get("wheel") or {}
+    if not raw_wheel:
         return StepResult(False, FailureKind.BLOCKED,
                           "the adapter declares no rebase.wheel workflow — "
                           "full/local_rebase mode needs the wheel data "
                           "(report_only/local_ci remain available)")
-    wheel_spec = wheel_mod.WheelSpec.from_manifest(rb["wheel"])
-    pin = wheel_mod.PinSpec.from_manifest(rb["wheel"]["pin"])
+    from ...adapters.base import expand_path
+    wheel_data = dict(raw_wheel)
+    expansion_env = ctx.settings.expansion_env()
+    for key in ("package", "index_url_template", "variant", "arch"):
+        value = expand_path(str(wheel_data.get(key) or ""),
+                            extra=expansion_env)
+        if not value:
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"rebase.wheel.{key} is unset or unresolved — "
+                              "refusing to use an unspecified target runtime")
+        wheel_data[key] = value
+    wheel_spec = wheel_mod.WheelSpec.from_manifest(wheel_data)
+    pin = (wheel_mod.PinSpec.from_manifest(wheel_data["pin"])
+           if wheel_data.get("pin") else None)
     upstream = _ensure_upstream_scratch(ctx)
     if isinstance(upstream, StepResult):
         return upstream
@@ -1125,11 +1144,15 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
         or (manifest.get("repo") or {}).get("default_branch", "main")
     target_ref = str((manifest.get("upstream") or {}).get("target_ref") or "")
     try:
+        target_cfg = manifest.get("upstream") or {}
+        force_commit = _task_params(ctx).get("force_upstream_commit", "")
+        if not force_commit and target_cfg.get("require_exact_target"):
+            force_commit = target_ref
         found = wheel_mod.pick_wheel_commit(
             Path(upstream), branch, wheel_spec,
             probe=wheel_mod.make_arch_probe(wheel_spec),
             baseline=ctx.state.get("last_rebase_upstream_commit", ""),
-            force_commit=_task_params(ctx).get("force_upstream_commit", ""),
+            force_commit=force_commit,
             target_ref=target_ref)
         # the selection contract ends with the package INSTALLED at the
         # picked commit in the TARGET venv — otherwise stale extensions or
@@ -1146,7 +1169,8 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
             install_log=ctx.run_dir / "wheel_install.log",
             import_check_log=ctx.run_dir / "wheel_import_check.log",
             pre_checkout_head=pre_head)
-        wheel_mod.pin_dockerfile(Path(repo), found, pin)
+        if pin is not None:
+            wheel_mod.pin_dockerfile(Path(repo), found, pin)
     except wheel_mod.WheelPickError as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
     except wheel_mod.PinError as exc:
@@ -1955,8 +1979,12 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
         module_scope = _module_scope(repo_root, module, manifest,
                                      run_dir=ctx.run_dir)
 
-        def _run_harness(prompt: str):
-            return run_harness_step(
+        async def _run_harness(prompt: str):
+            # The harness transport is synchronous. Keep the module wave's
+            # event loop responsive while preserving the serialized module
+            # contract and the shared bridge/audit path.
+            return await asyncio.to_thread(
+                run_harness_step,
                 ctx, target, step_name=f"rebase.module.{module}",
                 system=(
                     "You are a governed Codex agent performing one repository "

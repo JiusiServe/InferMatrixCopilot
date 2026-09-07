@@ -188,6 +188,23 @@ def test_manifest_build(ci_repo):
     assert "worker_runner" in built.module_plans
 
 
+def test_afd_adapter_supplies_a_runnable_local_cpu_job(tmp_path):
+    """The AFD adapter cannot depend on a Buildkite-shaped pipeline: its
+    declared local CPU command must still produce a concrete manifest job."""
+    manifest = yaml.safe_load(
+        (REPO_ROOT / "adapters/afd_plugin/manifest.yaml").read_text())
+    spec = ManifestSpec.from_manifest(manifest)
+    built = build_manifest(tmp_path / "afd", spec)
+    local = [job for job in built.jobs if job.source == "local"]
+    assert len(local) == 1
+    job = local[0]
+    assert job.module == "plugin_boundary"
+    assert job.min_gpus == 0 and job.hw == "cpu"
+    assert "tests/unit" in job.command
+    assert "not gpu" in job.command
+    assert job.timeout_sec == 1800
+
+
 # -- test loop -----------------------------------------------------------------
 
 def test_test_loop_decision_matrix(tmp_path):
