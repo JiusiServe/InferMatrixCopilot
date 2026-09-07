@@ -339,8 +339,7 @@ rebase:
   local_tests:
     source: adapter
     command: >-
-      python -m pytest -q tests/unit -m "not gpu and not npu and not
-      vllm_runtime and not e2e"
+      python -m pytest -q tests/unit -m "not gpu and not npu and not e2e"
     timeout_sec: 1800
     module: plugin_boundary
     min_gpus: 0
