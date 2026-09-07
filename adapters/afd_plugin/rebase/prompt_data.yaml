@@ -4,18 +4,18 @@ pytest_wrapper: "python3 -m pytest"
 pytest_wrapper_live: "python3 -m pytest"
 
 module_vllm_paths:
-  plugin_boundary: "vllm/config.py vllm/plugins/ vllm/platforms/"
-  attention_runtime: "vllm/config.py vllm/forward_context.py vllm/v1/attention/ vllm/v1/worker/"
-  ffn_runtime: "vllm/config.py vllm/compilation/ vllm/distributed/ vllm/model_executor/ vllm/v1/worker/"
-  connectors: "vllm/config.py vllm/forward_context.py vllm/distributed/ vllm/utils/"
-  model_integration: "vllm/config.py vllm/forward_context.py vllm/model_executor/ vllm/platforms/"
+  plugin_boundary: "vllm/config/ vllm/plugins/ vllm/platforms/"
+  attention_runtime: "vllm/config/ vllm/forward_context.py vllm/v1/attention/ vllm/v1/worker/"
+  ffn_runtime: "vllm/config/ vllm/compilation/ vllm/distributed/ vllm/model_executor/ vllm/v1/worker/"
+  connectors: "vllm/config/ vllm/forward_context.py vllm/distributed/ vllm/utils/"
+  model_integration: "vllm/config/ vllm/forward_context.py vllm/model_executor/ vllm/platforms/"
   execution_platforms: "vllm/compilation/ vllm/distributed/ vllm/platforms/ vllm/v1/worker/"
   compatibility: "vllm/config/ vllm/engine/ vllm/forward_context.py vllm/v1/engine/ vllm/v1/worker/"
 
 module_omni_files:
-  plugin_boundary: "afd_plugin/__init__.py afd_plugin/config.py afd_plugin/validation.py pyproject.toml"
+  plugin_boundary: "afd_plugin/__init__.py afd_plugin/config.py afd_plugin/validation.py pyproject.toml uv.lock"
   attention_runtime: "afd_plugin/v1/worker/attention_model_runner.py afd_plugin/v1/worker/attention_worker.py afd_plugin/v1/worker/ubatch_wrapper.py"
-  ffn_runtime: "afd_plugin/v1/worker/ffn_model_runner.py afd_plugin/v1/worker/ffn_worker.py afd_plugin/v1/worker/ubatch_wrapper.py"
+  ffn_runtime: "afd_plugin/v1/worker/ffn_model_runner.py afd_plugin/v1/worker/ffn_worker.py afd_plugin/v1/worker/ffn_metadata.py afd_plugin/v1/worker/ubatch_wrapper.py"
   connectors: "afd_plugin/connectors/ afd_plugin/distributed/"
   model_integration: "afd_plugin/model_executor/"
   execution_platforms: "afd_plugin/v1/worker/cuda_graph.py afd_plugin/v1/worker/dbo.py afd_plugin/compat/npu/ afd_plugin/connectors/"
@@ -23,7 +23,7 @@ module_omni_files:
 
 module_test_map:
   plugin_boundary: ["tests/unit/config/", "tests/unit/test_envs.py", "tests/unit/package/"]
-  attention_runtime: ["tests/unit/v1/worker/", "tests/e2e/features/"]
+  attention_runtime: ["tests/unit/v1/worker/"]
   ffn_runtime: ["tests/unit/v1/worker/", "tests/unit/model_executor/"]
   connectors: ["tests/unit/connectors/", "tests/unit/distributed/"]
   model_integration: ["tests/unit/model_executor/", "tests/unit/package/"]
