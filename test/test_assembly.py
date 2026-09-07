@@ -70,6 +70,7 @@ def test_mode_truth_table():
     assert mode_state_flags("remote_ci")["mode_runs_push_gate"] is True
     assert mode_state_flags("report_only")["mode_runs_push_gate"] is False
     assert mode_state_flags("local_rebase")["mode_runs_adaptation"] is True
+    assert mode_state_flags("local_rebase")["mode_runs_push_gate"] is True
     assert mode_state_flags("local_rebase")["mode_runs_publish"] is True
 
 
@@ -647,7 +648,7 @@ def test_v3_per_mode_matrix():
                  "report", "finalize"},
         "local_rebase": {"prelude", "guard", "knowledge_prep", "sync_target",
                           "wheel", "assign", "wave1", "wave_gate", "wave2",
-                          "tests", "precommit", "phase5_report", "curate",
+                          "tests", "precommit", "push_gate", "phase5_report", "curate",
                           "compare", "report", "finalize"},
     }
     for mode, expect in matrix.items():

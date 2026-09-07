@@ -29,7 +29,7 @@ requires: [modules, upstream.fork_tracking, ci.provider]
 #                 (NO local test loop — phase 4 is push+monitor; prelude
 #                 enforces the prepared-tree preconditions)
 #   local_rebase: prelude, guard, knowledge_prep, wheel, assign, wave1,
-#                 wave_gate, wave2, tests, precommit, report, finalize
+#                 wave_gate, wave2, tests, precommit, push_gate, report, finalize
 #                 (complete adaptation and local validation; no remote CI)
 #   full        : prelude, guard, wheel, assign, wave1, wave_gate, wave2,
 #                 tests, precommit, push_gate, ci, report, finalize

@@ -68,14 +68,14 @@ def mode_state_flags(mode: str) -> Mapping[str, bool]:
       an already prepared tree)
     - `mode_runs_local_tests`: full | local_ci | local_rebase (remote_ci does NOT run the
       local loop; its phase 4 is push+monitor only)
-    - `mode_runs_push_gate`: full | remote_ci (§2.3: vacuous in
-      report_only/local_ci — a local-only run pushes nothing to gate)
+    - `mode_runs_push_gate`: full | remote_ci | local_rebase (§2.3: vacuous in
+      report_only/local_ci — local_rebase still gates its eventual publish)
     - `mode_runs_remote_ci`: full | remote_ci (phase-4 push+monitor)
     """
     flags = {f"mode_{m}": (m == mode) for m in MODES}
     flags["mode_runs_adaptation"] = mode in ("full", "local_rebase")
     flags["mode_runs_local_tests"] = mode in ("full", "local_ci", "local_rebase")
-    flags["mode_runs_push_gate"] = mode in ("full", "remote_ci")
+    flags["mode_runs_push_gate"] = mode in ("full", "remote_ci", "local_rebase")
     flags["mode_runs_remote_ci"] = mode in ("full", "remote_ci")
     flags["mode_runs_publish"] = mode == "local_rebase"
     return flags
