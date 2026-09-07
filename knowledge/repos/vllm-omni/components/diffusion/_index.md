@@ -52,3 +52,5 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 | TP/PP/SP/CFG/VAE/HSDP 等并行策略 | [parallelism](parallelism.md) |
 | 实验性 world-model session 生命周期、LRU 与内存统计边界 | [session state](session-state.md) |
 | checkpoint remap、HSDP/FSDP、final-layout HWR、registered HWR mmap DLO transport、component quantization 与在线量化加载 | [checkpoint 与加载合同](rules-checkpoint-loading.md) |
+
+- [Diffusion 平台 kernel 与设备合同](rules-platform-kernels.md)：`DIFF-1t`, `DIFF-1u`, `DIFF-1v`, `DIFF-1w`。
