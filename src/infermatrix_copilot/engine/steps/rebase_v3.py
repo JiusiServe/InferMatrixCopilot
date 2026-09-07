@@ -93,6 +93,27 @@ def _tier_client(ctx: StepContext):
         target = ctx.settings.tier_target(mode)
     except TierNotConfiguredError as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
+    if target.kind == "harness":
+        from ...providers.registry import transport_for_id
+
+        try:
+            transport = transport_for_id(ctx.settings, target.provider_id)
+        except (RuntimeError, ValueError, NotImplementedError) as exc:
+            ctx.trace.record("capability_gap", capability="rebase.module_agent",
+                             detail=str(exc))
+            return StepResult(False, FailureKind.BLOCKED, str(exc))
+        if transport.cli_path() is None:
+            detail = (f"{target.provider_id} CLI is unavailable — configure "
+                      "STRICT_BACKEND_CLI or install the selected backend")
+            ctx.trace.record("capability_gap", capability="rebase.module_agent",
+                             detail=detail)
+            return StepResult(False, FailureKind.BLOCKED, detail)
+        auth_gap = transport.auth_gap()
+        if auth_gap:
+            ctx.trace.record("capability_gap", capability="rebase.module_agent",
+                             detail=auth_gap)
+            return StepResult(False, FailureKind.BLOCKED, auth_gap)
+        return transport, target
     if not target.api_key:
         ctx.trace.record("capability_gap", capability="rebase.module_agent",
                          detail=f"no API key for tier target {target.source} "
@@ -606,7 +627,7 @@ def _ensure_checkout_locks(ctx: StepContext, manifest: dict,
     # the CANONICAL upstream is what external users contend on — the
     # per-run scratch clone inside run_dir needs no shared lock
     upstream = ctx.state.get("upstream_origin_path", "")
-    if upstream and mode == "full":
+    if upstream and mode in ("full", "local_rebase"):
         locks.append(CheckoutLock(Path(upstream), "upstream"))
     held: list = []
     for lock in locks:
@@ -781,15 +802,15 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
         or ctx.state.get("last_rebase_upstream_commit", "")
     if baseline:
         updates["last_rebase_upstream_commit"] = baseline
-    if mode == "full":
+    if mode in ("full", "local_rebase"):
         if not upstream:
             return StepResult(False, FailureKind.BLOCKED,
-                              "full mode needs the upstream checkout — set "
+                              f"{mode} needs the upstream checkout — set "
                               "the manifest upstream.repo_path (env var "
                               "unset?)")
         if not baseline:
             return StepResult(False, FailureKind.BLOCKED,
-                              "full mode needs the last-rebase baseline — "
+                              f"{mode} needs the last-rebase baseline — "
                               "pass --task-param last_rebase_commit=<sha>")
 
     # §2.2 preconditions for the prepared-tree modes: they operate on a tree
@@ -825,7 +846,7 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
         blocked = _ensure_checkout_locks(ctx, manifest, mode)
         if blocked is not None:
             return blocked
-    if mode == "full":
+    if mode in ("full", "local_rebase"):
         # per-run DISPOSABLE upstream (Rev 8 §4): wheel checkout/reset and
         # agent shells mutate the SCRATCH clone, never the canonical tree
         scratch = _ensure_upstream_scratch(ctx)
@@ -871,6 +892,136 @@ async def _v3_guard(ctx: StepContext) -> StepResult:
     return await _guard_clean_rebase(inner)
 
 
+@step("rebase.v3_sync_target", "script", "write_workspace",
+      "Sync the target repository's main branch into the isolated rebase branch.")
+async def _v3_sync_target(ctx: StepContext) -> StepResult:
+    """Prepare the AFD result branch before upstream assignment.
+
+    The upstream vLLM delta and the target repository's own main-line changes
+    are independent inputs. This step fetches the declared source main, creates
+    the result branch when needed, or merges source main into an existing result
+    branch. A conflict is handed to the governed agent and is successful only
+    when the index is clean and the merge is completed.
+    """
+    import subprocess
+
+    repo = require_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
+    manifest = _adapter_manifest(ctx)
+    if isinstance(manifest, StepResult):
+        return manifest
+    blocked = _ensure_checkout_locks(
+        ctx, manifest, _task_params(ctx).get("rebase_mode", ""))
+    if blocked is not None:
+        return blocked
+
+    repo_cfg = manifest.get("repo") or {}
+    push_cfg = manifest.get("push") or {}
+    source_remote = str(repo_cfg.get("source_remote")
+                        or repo_cfg.get("remote") or "origin")
+    source_branch = str(repo_cfg.get("default_branch") or "main")
+    result_branch = str(push_cfg.get("rebase_branch")
+                        or repo_cfg.get("rebase_branch") or "")
+    if not result_branch:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "adapter declares no result rebase branch")
+
+    def git(*args: str, timeout: int = 120) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(["git", "-C", str(repo), *args],
+                              capture_output=True, text=True,
+                              errors="replace", timeout=timeout,
+                              check=False)
+
+    fetched = git("fetch", "--no-tags", source_remote, source_branch)
+    if fetched.returncode != 0:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"fetch {source_remote}/{source_branch} failed: "
+                          f"{fetched.stderr.strip()[:400]}")
+    source_sha = git("rev-parse", "FETCH_HEAD").stdout.strip()
+    if not source_sha:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "could not resolve fetched target main SHA")
+
+    start_sha = git("rev-parse", "HEAD").stdout.strip()
+    branch_exists = git("rev-parse", "--verify", f"refs/heads/{result_branch}").returncode == 0
+    if branch_exists:
+        checked = git("checkout", result_branch)
+    else:
+        checked = git("checkout", "-B", result_branch, "FETCH_HEAD")
+    if checked.returncode != 0:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"checkout result branch {result_branch} failed: "
+                          f"{checked.stderr.strip()[:400]}")
+
+    merged = False
+    if branch_exists:
+        merge = git("merge", "--no-edit", "FETCH_HEAD", timeout=300)
+        if merge.returncode != 0:
+            conflicts = git("diff", "--name-only", "--diff-filter=U").stdout.splitlines()
+            ctx.trace.record("target_main_conflict", files=conflicts,
+                             source_sha=source_sha, result_branch=result_branch)
+            if ctx.llm is None or not ctx.llm.available:
+                git("merge", "--abort")
+                return StepResult(False, FailureKind.ESCALATE,
+                                  "AFD main merge has conflicts and no Codex "
+                                  f"backend is available: {conflicts}",
+                                  outputs={"conflicts": conflicts})
+            from ...engine.agent_runtime.runner import run_agent_step
+            from ...scopes import post_plan_scope
+
+            result, output = await run_agent_step(
+                ctx, step_name="rebase.target_main_conflicts",
+                purpose=(f"Resolve conflicts while merging {source_remote}/"
+                         f"{source_branch} into {result_branch}. Preserve "
+                         "both AFD main behavior and the existing vLLM 0.28 "
+                         "adaptation."),
+                guidance=(
+                    "Inspect git status and every unmerged file. Resolve each "
+                    "conflict semantically, then git add the resolved files "
+                    "and finish the merge. Do not discard either side or "
+                    "change unrelated files. The step succeeds only when "
+                    "no unmerged paths remain."),
+                expected="status=success only when the merge is complete",
+                evidence={"conflict_files": "\n".join(conflicts),
+                          "source_sha": source_sha,
+                          "result_branch": result_branch},
+                output_extension={"resolution_summary": "summary of resolutions"},
+                scope=post_plan_scope(repo),
+                max_iters=ctx.settings.max_agent_iters)
+            remaining = git("diff", "--name-only", "--diff-filter=U").stdout.splitlines()
+            if not result.ok or remaining:
+                git("merge", "--abort")
+                return StepResult(False, FailureKind.ESCALATE,
+                                  "Codex could not complete AFD main merge: "
+                                  f"{remaining or result.summary[:300]}",
+                                  outputs={"conflicts": conflicts})
+            merge_head = git("rev-parse", "-q", "--verify", "MERGE_HEAD")
+            if merge_head.returncode == 0:
+                completed = git("commit", "--no-edit", timeout=120)
+                if completed.returncode != 0:
+                    git("merge", "--abort")
+                    return StepResult(False, FailureKind.ESCALATE,
+                                      "Codex resolved files but the merge "
+                                      f"could not be committed: {completed.stderr.strip()[:300]}")
+            merged = True
+        else:
+            merged = True
+
+    result_sha = git("rev-parse", "HEAD").stdout.strip()
+    return StepResult(
+        True,
+        summary=(f"{result_branch} prepared from {source_remote}/{source_branch} "
+                 f"at {source_sha[:12]}"),
+        outputs={"state_updates": {
+            "afd_main_sha": source_sha,
+            "afd_branch": result_branch,
+            "afd_branch_start_sha": start_sha,
+            "afd_sync_result_sha": result_sha,
+            "afd_main_merge_performed": merged,
+        }})
+
+
 @step("rebase.v3_scan", "deterministic", "read",
       "Report-only scan: manifest + drift preview, stores untouched.")
 async def _v3_scan(ctx: StepContext) -> StepResult:
@@ -891,9 +1042,49 @@ async def _v3_scan(ctx: StepContext) -> StepResult:
         summary += (f"; {len(built.dropped)} labeled step(s) with no "
                     "runnable command DROPPED (structural in a test run)")
         ctx.trace.record("manifest_steps_dropped", labels=built.dropped)
+    updates = {"manifest_jobs": len(built.jobs)}
+    # Report-only is intentionally read-only, but when the operator supplies
+    # an upstream checkout and last-rebase SHA it also provides the useful
+    # A..B -> affected-modules preview. Do not treat a missing input as
+    # "no changes"; leave the preview absent and explain it in the report.
+    from ...adapters.base import expand_path
+    upstream = expand_path(
+        (manifest.get("upstream") or {}).get("repo_path", ""),
+        extra=ctx.settings.expansion_env())
+    baseline = _task_params(ctx).get("last_rebase_commit", "")
+    if upstream and baseline and Path(upstream).is_dir():
+        modules = manifest.get("modules") or {}
+        module_paths = {
+            name: tuple((spec or {}).get("upstream_paths") or ())
+            for name, spec in modules.items()}
+        try:
+            assignment = run_commit_assignment(
+                Phase1Config(
+                    upstream_repo=Path(upstream), target_repo=Path(repo),
+                    log_dir=ctx.run_dir, baseline_commit=str(baseline),
+                    target_branch=str((manifest.get("upstream") or {})
+                                       .get("target_ref") or
+                                       (manifest.get("upstream") or {})
+                                       .get("target_branch") or "")),
+                module_paths, _substate(ctx))
+            updates["upstream_assignment"] = {
+                "baseline": assignment.baseline,
+                "head": assignment.head,
+                "total_commits": assignment.total_commits,
+                "affected_modules": [
+                    name for name, skipped in assignment.skip.items()
+                    if not skipped],
+            }
+            summary += (f"; upstream {assignment.baseline[:12]}.."
+                        f"{assignment.head[:12]}: "
+                        f"{assignment.total_commits} commits")
+        except Exception as exc:  # noqa: BLE001 - invalid ranges fail closed
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"upstream assignment preview failed: {exc}")
+    else:
+        summary += "; upstream assignment preview not requested/configured"
     return StepResult(True, summary=summary,
-                      outputs={"state_updates": {
-                          "manifest_jobs": len(built.jobs)}})
+                      outputs={"state_updates": updates})
 
 
 @step("rebase.v3_wheel", "deterministic", "write_workspace",
@@ -913,8 +1104,8 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
     if not rb.get("wheel"):
         return StepResult(False, FailureKind.BLOCKED,
                           "the adapter declares no rebase.wheel workflow — "
-                          "full mode needs the wheel data (report_only/"
-                          "local_ci remain available)")
+                          "full/local_rebase mode needs the wheel data "
+                          "(report_only/local_ci remain available)")
     wheel_spec = wheel_mod.WheelSpec.from_manifest(rb["wheel"])
     pin = wheel_mod.PinSpec.from_manifest(rb["wheel"]["pin"])
     upstream = _ensure_upstream_scratch(ctx)
@@ -932,12 +1123,14 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
         capture_output=True, text=True, timeout=30).stdout.strip()
     branch = (manifest.get("upstream") or {}).get("target_branch") \
         or (manifest.get("repo") or {}).get("default_branch", "main")
+    target_ref = str((manifest.get("upstream") or {}).get("target_ref") or "")
     try:
         found = wheel_mod.pick_wheel_commit(
             Path(upstream), branch, wheel_spec,
             probe=wheel_mod.make_arch_probe(wheel_spec),
             baseline=ctx.state.get("last_rebase_upstream_commit", ""),
-            force_commit=_task_params(ctx).get("force_upstream_commit", ""))
+            force_commit=_task_params(ctx).get("force_upstream_commit", ""),
+            target_ref=target_ref)
         # the selection contract ends with the package INSTALLED at the
         # picked commit in the TARGET venv — otherwise stale extensions or
         # a different installed version drive every later module check.
@@ -1062,7 +1255,6 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
     if isinstance(client, StepResult):
         return "error:debug backend unavailable"
     client, target = client
-    from ...rebase_engine.agent_loop import run_agent_loop
     from ...rebase_engine.prompt_builder import (ModulePromptData,
                                                  build_debug_prompt)
     from ...rebase_engine.rebase_tools import (RebasePaths,
@@ -1088,15 +1280,35 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
     ctx.trace.record("debug_attempt", slug=slug, module=module,
                      model=target.model)
     try:
-        result = await run_agent_loop(
-            client, prompt, model=target.model, tool_defs=defs,
-            extra_tools=tools,
-            scope=_module_scope(repo_root, module, manifest,
-                                run_dir=ctx.run_dir),
-            trace=ctx.trace, require_plan_review=False,
-            model_aliases=ctx.settings.model_aliases,
-            model_mismatch_policy=ctx.settings.model_mismatch_policy,
-            agent_log=str(agent_log))
+        scope = _module_scope(repo_root, module, manifest,
+                              run_dir=ctx.run_dir)
+        if target.kind == "harness":
+            from ...providers import run_harness_step
+
+            outcome = await asyncio.to_thread(
+                run_harness_step, ctx, target,
+                step_name=f"rebase.debug.{slug}",
+                system=(
+                    "You are a governed Codex debugging agent. Inspect the "
+                    "failure, make a minimal verified fix in the scoped "
+                    "repository, and report honestly if the failure is not "
+                    "resolved."),
+                prompt=prompt, scope=scope,
+                max_iters=int(getattr(ctx.settings, "review_max_iters", 40)))
+            result = {"done": not outcome.truncated,
+                      "text": outcome.text,
+                      "turns": outcome.iterations,
+                      "plan_done": True}
+        else:
+            from ...rebase_engine.agent_loop import run_agent_loop
+
+            result = await run_agent_loop(
+                client, prompt, model=target.model, tool_defs=defs,
+                extra_tools=tools, scope=scope, trace=ctx.trace,
+                require_plan_review=False,
+                model_aliases=ctx.settings.model_aliases,
+                model_mismatch_policy=ctx.settings.model_mismatch_policy,
+                agent_log=str(agent_log))
     except Exception as exc:  # noqa: BLE001 - a debug crash is STRUCTURAL
         ctx.trace.record("debug_attempt_error", slug=slug, error=str(exc))
         return f"error:debug agent crashed: {exc}"
@@ -1736,6 +1948,26 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
         model_aliases=ctx.settings.model_aliases,
         model_mismatch_policy=ctx.settings.model_mismatch_policy,
         baseline_ref=_baseline_ref(manifest))
+    harness_runner = None
+    if target.kind == "harness":
+        from ...providers import run_harness_step
+
+        module_scope = _module_scope(repo_root, module, manifest,
+                                     run_dir=ctx.run_dir)
+
+        def _run_harness(prompt: str):
+            return run_harness_step(
+                ctx, target, step_name=f"rebase.module.{module}",
+                system=(
+                    "You are a governed Codex agent performing one repository "
+                    "maintenance module. Follow the plan-review contract in "
+                    "the user prompt, use only the supplied scoped tools, "
+                    "make the smallest semantic adaptation, and report "
+                    "honestly when validation cannot complete."),
+                prompt=prompt, scope=module_scope,
+                max_iters=config.max_turns)
+
+        harness_runner = _run_harness
     async with _serial_lock(ctx.run_dir):
         outcome = await rebase_module(
             module, client=client, config=config,
@@ -1744,7 +1976,8 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
             scope=_module_scope(repo_root, module, manifest,
                                 run_dir=ctx.run_dir),
             module_test_plan=test_plan,
-            trace=ctx.trace)
+            trace=ctx.trace,
+            harness_runner=harness_runner)
     return StepResult(True,
                       summary=f"{module}: {outcome['status']} "
                               f"(debug_attempts={outcome['debug_attempts']})",

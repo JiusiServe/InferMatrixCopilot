@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from ..run_trace import RunTrace
 from ..scopes import ToolScope
@@ -60,6 +60,7 @@ async def rebase_module(
     trace: RunTrace | None = None,
     broken_imports: list[dict] | None = None,
     module_test_plan: dict | None = None,
+    harness_runner: Callable[[str], Any] | None = None,
 ) -> dict:
     """Run one module's rebase agent and record the outcome in substate.
     Returns the module's result dict (also written under
@@ -91,6 +92,22 @@ async def rebase_module(
 
     async def _attempt(p: str, *, require_plan_review: bool = True) -> dict:
         try:
+            if harness_runner is not None:
+                import inspect
+
+                outcome = harness_runner(p)
+                if inspect.isawaitable(outcome):
+                    outcome = await outcome
+                # Harness transports return AgentOutcome, while the in-process
+                # loop returns a dict. Normalize both at this boundary so
+                # retry/substate semantics remain identical.
+                text = str(getattr(outcome, "text", "") or "")
+                truncated = bool(getattr(outcome, "truncated", False))
+                return {"done": not truncated, "text": text,
+                        "turns": int(getattr(outcome, "iterations", 0) or 0),
+                        # The harness receives the same plan-review contract
+                        # in the prompt and owns its tool loop.
+                        "plan_done": not truncated}
             return await run_agent_loop(
                 client, p, model=config.model, tool_defs=tool_defs,
                 extra_tools=extra_tools, scope=scope, trace=trace,

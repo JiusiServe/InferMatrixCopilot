@@ -35,7 +35,8 @@ def test_mode_truth_table():
     """Every cell of the Rev 8 §2.1 table, including the write-back."""
     for raw, expect in [("", "report_only"), ("report_only", "report_only"),
                         ("full", "full"), ("local_ci", "local_ci"),
-                        ("remote_ci", "remote_ci")]:
+                        ("remote_ci", "remote_ci"),
+                        ("local_rebase", "local_rebase")]:
         s = _spec({"rebase_mode": raw} if raw else {})
         assert resolve_effective_mode(s) == expect
         assert s.params["rebase_mode"] == expect          # write-back
@@ -44,7 +45,7 @@ def test_mode_truth_table():
     for raw in ("", "report_only"):
         s = _spec({"rebase_mode": raw} if raw else {}, report_only=True)
         assert resolve_effective_mode(s) == "report_only"
-    for raw in ("full", "local_ci", "remote_ci"):
+    for raw in ("full", "local_ci", "remote_ci", "local_rebase"):
         with pytest.raises(ModeConflictError, match="narrowing"):
             resolve_effective_mode(_spec({"rebase_mode": raw},
                                          report_only=True))
@@ -58,8 +59,9 @@ def test_mode_truth_table():
     assert mode_state_flags("full") == {
         "mode_report_only": False, "mode_full": True,
         "mode_local_ci": False, "mode_remote_ci": False,
+        "mode_local_rebase": False, "mode_runs_adaptation": True,
         "mode_runs_local_tests": True, "mode_runs_push_gate": True,
-        "mode_runs_remote_ci": True}
+        "mode_runs_remote_ci": True, "mode_runs_publish": False}
     # the composites encode the §2.2 or-of-modes (single-key `when:`)
     assert mode_state_flags("local_ci")["mode_runs_local_tests"] is True
     assert mode_state_flags("local_ci")["mode_runs_push_gate"] is False
@@ -67,6 +69,8 @@ def test_mode_truth_table():
     assert mode_state_flags("remote_ci")["mode_runs_local_tests"] is False
     assert mode_state_flags("remote_ci")["mode_runs_push_gate"] is True
     assert mode_state_flags("report_only")["mode_runs_push_gate"] is False
+    assert mode_state_flags("local_rebase")["mode_runs_adaptation"] is True
+    assert mode_state_flags("local_rebase")["mode_runs_publish"] is True
 
 
 def test_locked_playbook_is_not_mode_governed(tmp_path):
@@ -584,10 +588,14 @@ def test_v3_per_mode_matrix():
                      "precommit", "report", "finalize"},
         "remote_ci": {"prelude", "guard", "knowledge_prep", "push_gate",
                       "ci", "report", "finalize"},
-        "full": {"prelude", "guard", "knowledge_prep", "wheel", "assign",
+        "full": {"prelude", "guard", "knowledge_prep", "sync_target", "wheel", "assign",
                  "wave1", "wave_gate", "wave2", "tests", "precommit",
                  "push_gate", "ci", "phase5_report", "curate", "compare",
                  "report", "finalize"},
+        "local_rebase": {"prelude", "guard", "knowledge_prep", "sync_target",
+                          "wheel", "assign", "wave1", "wave_gate", "wave2",
+                          "tests", "precommit", "phase5_report", "curate",
+                          "compare", "report", "finalize"},
     }
     for mode, expect in matrix.items():
         state = {"task_spec": {}, **mode_state_flags(mode)}

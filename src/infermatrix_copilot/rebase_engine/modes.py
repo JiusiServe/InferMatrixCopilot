@@ -9,10 +9,10 @@ guessing which of the two the operator meant.
 
 Truth table (spec.report_only × params.rebase_mode), pinned row-by-row:
 
-| report_only | unset        | report_only | full    | local_ci | remote_ci |
-|-------------|--------------|-------------|---------|----------|-----------|
-| False       | report_only  | report_only | full    | local_ci | remote_ci |
-| True        | report_only  | report_only | BLOCKED | BLOCKED  | BLOCKED   |
+| report_only | unset        | report_only | full    | local_ci | remote_ci | local_rebase |
+|-------------|--------------|-------------|---------|----------|-----------|--------------|
+| False       | report_only  | report_only | full    | local_ci | remote_ci  | local_rebase |
+| True        | report_only  | report_only | BLOCKED | BLOCKED  | BLOCKED    | BLOCKED      |
 
 `resolve_effective_mode` also WRITES BACK: the canonical mode lands in
 `spec.params["rebase_mode"]` and `spec.report_only` is set to
@@ -25,8 +25,8 @@ from __future__ import annotations
 
 from typing import Mapping
 
-MODES = ("report_only", "full", "local_ci", "remote_ci")
-MUTATING_MODES = ("full", "local_ci", "remote_ci")
+MODES = ("report_only", "full", "local_ci", "remote_ci", "local_rebase")
+MUTATING_MODES = ("full", "local_ci", "remote_ci", "local_rebase")
 
 
 class ModeConflictError(ValueError):
@@ -59,20 +59,25 @@ def mode_state_flags(mode: str) -> Mapping[str, bool]:
     """The `mode_*` flags seeded into run state — playbook `when:` gates use
     ONLY these (never raw params), pinned by the when-key hygiene test.
 
-    Besides the per-mode booleans, three COMPOSITE flags encode the Rev 8
+    Besides the per-mode booleans, composite flags encode the execution
     §2.2 execution matrix directly (`_eval_when` is single-key, so or-of-modes
     must be precomputed here, one authority):
 
-    - `mode_runs_local_tests`: full | local_ci (remote_ci does NOT run the
+    - `mode_runs_adaptation`: full | local_rebase (the complete upstream
+      preparation, assignment, wheel and module waves; local_ci operates on
+      an already prepared tree)
+    - `mode_runs_local_tests`: full | local_ci | local_rebase (remote_ci does NOT run the
       local loop; its phase 4 is push+monitor only)
     - `mode_runs_push_gate`: full | remote_ci (§2.3: vacuous in
       report_only/local_ci — a local-only run pushes nothing to gate)
     - `mode_runs_remote_ci`: full | remote_ci (phase-4 push+monitor)
     """
     flags = {f"mode_{m}": (m == mode) for m in MODES}
-    flags["mode_runs_local_tests"] = mode in ("full", "local_ci")
+    flags["mode_runs_adaptation"] = mode in ("full", "local_rebase")
+    flags["mode_runs_local_tests"] = mode in ("full", "local_ci", "local_rebase")
     flags["mode_runs_push_gate"] = mode in ("full", "remote_ci")
     flags["mode_runs_remote_ci"] = mode in ("full", "remote_ci")
+    flags["mode_runs_publish"] = mode == "local_rebase"
     return flags
 
 

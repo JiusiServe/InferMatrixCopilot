@@ -66,12 +66,19 @@ class ManifestSpec:
     # correction) covers — the parent indexed .py only; a non-Python
     # repo declares its own (2026-08-01 neutrality audit)
     file_index_suffixes: Sequence[str] = (".py",)
+    # Small, repository-local validation jobs that do not come from a remote
+    # CI provider. This keeps V1 usable for repositories whose CI is not in the
+    # Buildkite-style `steps` format while preserving the existing parser.
+    local_jobs: Sequence[Mapping] = ()
 
     @classmethod
     def from_manifest(cls, manifest: Mapping) -> "ManifestSpec":
         rb = (manifest.get("rebase") or {})
         tm = rb.get("test_manifest") or {}
         modules = manifest.get("modules") or {}
+        local_cfg = rb.get("local_tests") or {}
+        local_jobs = local_cfg.get("jobs") or (
+            [local_cfg] if local_cfg.get("command") else [])
         return cls(
             yaml_dir=tm["yaml_dir"],
             pipelines=dict(tm["pipelines"]),
@@ -96,6 +103,7 @@ class ManifestSpec:
                                     or ("tests/",)),
             file_index_suffixes=tuple(tm.get("file_index_suffixes")
                                       or (".py",)),
+            local_jobs=tuple(local_jobs),
         )
 
 
@@ -489,6 +497,8 @@ def _validate_file_paths(jobs: list[ManifestJob], repo: Path,
 def _assign_modules(jobs: list[ManifestJob], spec: ManifestSpec) -> None:
     routing = spec.assignment_paths or spec.module_test_paths
     for job in jobs:
+        if job.module and not job.file_refs:
+            continue
         best_module, best_score = "", 0
         for module, patterns in routing.items():
             score = 0
@@ -530,6 +540,29 @@ def build_manifest(repo: Path, spec: ManifestSpec) -> BuiltManifest:
     repo = Path(repo)
     dropped: list[str] = []
     jobs = _parse_ci_yaml(repo, spec, dropped)
+    if spec.local_jobs:
+        for raw in spec.local_jobs:
+            if not isinstance(raw, Mapping):
+                continue
+            label = str(raw.get("label") or "AFD local tests")
+            command = str(raw.get("command") or "")
+            if not is_runnable_command(command):
+                if dropped is not None:
+                    dropped.append(label)
+                continue
+            queue = str(raw.get("queue") or spec.default_queue)
+            min_gpus, hw = spec.queue_map.get(queue, (0, "cpu"))
+            jobs.append(ManifestJob(
+                slug=_label_to_slug(label), label=label, source="local",
+                command=command,
+                timeout_sec=int(raw.get("timeout_sec") or 1800),
+                min_gpus=int(raw.get("min_gpus", min_gpus)),
+                hw=str(raw.get("hardware") or hw),
+                env=str(raw.get("env") or ""),
+                module=str(raw.get("module") or ""),
+                setup=str(raw.get("setup") or ""),
+                file_refs=list(raw.get("file_refs") or ()),
+            ))
     changes = _classify_test_changes(repo, spec)
     rename_map = {c.path: c.new_path for c in changes
                   if c.change_type == "renamed" and c.new_path}

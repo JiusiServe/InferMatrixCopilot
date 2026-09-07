@@ -10,7 +10,17 @@ repo:
   full_name: vllm-project/afd-plugin
   aliases: [afd-plugin, afd_plugin, vllm-project/afd-plugin]
   default_branch: main
+  remote: upstream
+  source_remote: upstream
   language: python
+
+upstream:
+  kind: fork_tracking
+  repo_path: ${VLLM_UPSTREAM_REPO}
+  remote: origin
+  target_branch: main
+  target_ref: v0.28.0
+  target_version: 0.28.0
 
 knowledge:
   source: vllm-project/afd-plugin@a432692
@@ -32,6 +42,15 @@ modules:
     - afd_plugin/v1/worker/__init__.py
     - afd_plugin/v1/worker/npu/__init__.py
     - pyproject.toml
+    upstream_paths:
+    - vllm/plugins/
+    - vllm/config.py
+    - vllm/platforms/
+    - vllm/entrypoints/
+    test_paths:
+    - tests/unit/config/
+    - tests/unit/test_envs.py
+    - tests/unit/package/
     wave: 1
     risk: high
   attention_runtime:
@@ -41,6 +60,18 @@ modules:
     - afd_plugin/v1/worker/ubatch_wrapper.py
     - afd_plugin/v1/worker/npu/attention_model_runner.py
     - afd_plugin/v1/worker/npu/attention_worker.py
+    upstream_paths:
+    - vllm/config.py
+    - vllm/forward_context.py
+    - vllm/sequence.py
+    - vllm/compilation/
+    - vllm/v1/attention/
+    - vllm/v1/worker/gpu_model_runner.py
+    - vllm/v1/worker/gpu_ubatch_wrapper.py
+    - vllm/v1/worker/ubatch_utils.py
+    test_paths:
+    - tests/unit/v1/worker/
+    - tests/e2e/features/
     wave: 1
     risk: high
   ffn_runtime:
@@ -49,14 +80,46 @@ modules:
     - afd_plugin/v1/worker/ffn_worker.py
     - afd_plugin/v1/worker/npu/ffn_model_runner.py
     - afd_plugin/v1/worker/npu/ffn_worker.py
+    upstream_paths:
+    - vllm/config.py
+    - vllm/forward_context.py
+    - vllm/compilation/
+    - vllm/distributed/
+    - vllm/model_executor/
+    - vllm/v1/worker/gpu_worker.py
+    - vllm/v1/worker/worker_base.py
+    - vllm/v1/worker/workspace.py
+    - vllm/v1/kv_cache_interface.py
+    test_paths:
+    - tests/unit/v1/worker/
+    - tests/unit/model_executor/
     wave: 1
     risk: high
   connectors:
     local_paths: [afd_plugin/connectors/, afd_plugin/distributed/]
+    upstream_paths:
+    - vllm/config.py
+    - vllm/forward_context.py
+    - vllm/distributed/
+    - vllm/utils/torch_utils.py
+    - vllm/v1/worker/ubatch_utils.py
+    - vllm/distributed/device_communicators/
+    test_paths:
+    - tests/unit/connectors/
+    - tests/unit/distributed/
     wave: 1
     risk: high
   model_integration:
     local_paths: [afd_plugin/model_executor/]
+    upstream_paths:
+    - vllm/config.py
+    - vllm/forward_context.py
+    - vllm/model_executor/
+    - vllm/platforms/
+    - vllm/sequence.py
+    test_paths:
+    - tests/unit/model_executor/
+    - tests/unit/package/
     wave: 1
     risk: high
   execution_platforms:
@@ -75,10 +138,30 @@ modules:
     - csrc/
     - setup.py
     - MANIFEST.in
+    upstream_paths:
+    - vllm/compilation/
+    - vllm/distributed/
+    - vllm/platforms/
+    - vllm/v1/worker/
+    - vllm/v1/kv_cache_interface.py
+    test_paths:
+    - tests/unit/v1/worker/
+    - tests/unit/compat/
     wave: 1
     risk: high
   compatibility:
     local_paths: [afd_plugin/compat/]
+    upstream_paths:
+    - vllm/config/
+    - vllm/config.py
+    - vllm/engine/
+    - vllm/forward_context.py
+    - vllm/v1/engine/
+    - vllm/v1/worker/
+    - vllm/distributed/
+    test_paths:
+    - tests/unit/compat/
+    - tests/unit/v1/worker/test_runtime_classpaths.py
     wave: 1
     risk: high
 
@@ -222,5 +305,54 @@ ci:
 
 push:
   default_remote: origin
+  rebase_branch: codex/vllm-0.28-sync
+  rebase_branch_allowed: true
   protected_branches: [main, master]
-  allowed: false
+  allowed: true
+
+rebase:
+  lock_name: afd-plugin
+  precommit:
+    command: pre-commit run --all-files
+    timeout_sec: 600
+    retry_once: true
+  testing:
+    python: ${AFD_PLUGIN_PYTHON}
+    artifact_globs: []
+  local_tests:
+    source: adapter
+    command: >-
+      python -m pytest -q tests/unit -m "not gpu and not npu and not
+      vllm_runtime and not e2e"
+    timeout_sec: 1800
+    module: plugin_boundary
+    min_gpus: 0
+    hardware: cpu
+  test_manifest:
+    yaml_dir: .infermatrix-copilot
+    pipelines: {local-tests.yml: local}
+    priority_source: local
+    queue_map: {cpu: [0, cpu]}
+    default_queue: cpu
+    skip_patterns: []
+    rename_suffixes: []
+    file_ref_prefixes: [tests, afd_plugin]
+    file_tree_roots: [tests, afd_plugin]
+    test_change_roots: [tests/]
+    assignment_paths:
+      plugin_boundary: [tests/unit/config/, tests/unit/package/, tests/unit/test_envs.py]
+      attention_runtime: [tests/unit/v1/worker/, tests/e2e/features/]
+      ffn_runtime: [tests/unit/v1/worker/, tests/unit/model_executor/]
+      connectors: [tests/unit/connectors/, tests/unit/distributed/]
+      model_integration: [tests/unit/model_executor/, tests/unit/package/]
+      execution_platforms: [tests/unit/v1/worker/, tests/unit/compat/]
+      compatibility: [tests/unit/compat/, tests/unit/v1/worker/]
+    change_path_rules:
+    - [afd_plugin/v1/worker/attention, attention_runtime]
+    - [afd_plugin/v1/worker/ffn, ffn_runtime]
+    - [afd_plugin/connectors, connectors]
+    - [afd_plugin/distributed, connectors]
+    - [afd_plugin/model_executor, model_integration]
+    - [afd_plugin/compat, compatibility]
+    - [tests/unit, plugin_boundary]
+    setup_map: {}

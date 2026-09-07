@@ -28,11 +28,14 @@ requires: [modules, upstream.fork_tracking, ci.provider]
 #   remote_ci   : prelude, guard, push_gate, ci, report, finalize
 #                 (NO local test loop — phase 4 is push+monitor; prelude
 #                 enforces the prepared-tree preconditions)
+#   local_rebase: prelude, guard, knowledge_prep, wheel, assign, wave1,
+#                 wave_gate, wave2, tests, precommit, report, finalize
+#                 (complete adaptation and local validation; no remote CI)
 #   full        : prelude, guard, wheel, assign, wave1, wave_gate, wave2,
 #                 tests, precommit, push_gate, ci, report, finalize
 mode_aware: true
 params:
-  rebase_mode: {type: str, default: ""}     # report_only|full|local_ci|remote_ci
+  rebase_mode: {type: str, default: ""}     # report_only|full|local_ci|remote_ci|local_rebase
   main_ci_idx: {type: int, default: 0}
   halt_on_module_failure: {type: bool, default: false}
   halt_on_phase3_failures: {type: bool, default: false}
@@ -55,16 +58,18 @@ steps:
   # points; report_only never reaches it (stores stay read-only)
   - {id: knowledge_prep, step: rebase.v3_knowledge_prep,
      when: not mode_report_only}
+  - {id: sync_target, step: rebase.v3_sync_target,
+     when: mode_runs_adaptation}
   - {id: scan, step: rebase.v3_scan, when: mode_report_only}
-  - {id: wheel, step: rebase.v3_wheel, when: mode_full}
-  - {id: assign, step: rebase.v3_assign, when: mode_full}
+  - {id: wheel, step: rebase.v3_wheel, when: mode_runs_adaptation}
+  - {id: assign, step: rebase.v3_assign, when: mode_runs_adaptation}
   # wave ordering is a dependency contract: wave 1 completes before the gate
   # rules, and only then does wave 2 fan out (the gate empties it on failure)
   - {id: wave1, step: rebase.v3_module_rebase, foreach: wave1_modules,
-     when: mode_full}
-  - {id: wave_gate, step: rebase.v3_wave_gate, when: mode_full}
+     when: mode_runs_adaptation}
+  - {id: wave_gate, step: rebase.v3_wave_gate, when: mode_runs_adaptation}
   - {id: wave2, step: rebase.v3_module_rebase, foreach: wave2_modules,
-     when: mode_full}
+     when: mode_runs_adaptation}
   - {id: tests, step: rebase.v3_test_loop, when: mode_runs_local_tests}
   # phase 3.2 (parent parity: always follows the local loop) — its substate
   # verdict is what makes the push gate's "red precommit" rule non-vacuous
@@ -76,9 +81,9 @@ steps:
   # curate failure is a REAL run failure and precedes the final report),
   # then the closing knowledge attestation + baseline comparison, then
   # the generic final report — so the report reflects curation AND drift.
-  - {id: phase5_report, step: rebase.v3_phase5_report, when: mode_full}
-  - {id: curate, step: rebase.v3_curate, when: mode_full}
-  - {id: compare, step: rebase.v3_compare, when: mode_full}
+  - {id: phase5_report, step: rebase.v3_phase5_report, when: mode_runs_adaptation}
+  - {id: curate, step: rebase.v3_curate, when: mode_runs_adaptation}
+  - {id: compare, step: rebase.v3_compare, when: mode_runs_adaptation}
   # report BEFORE finalize: the terminal-row ruling may end the run blocked
   # (needs-human, exit 3) and RUN_REPORT must already exist when it does
   - {id: report, step: report.final_summary}

@@ -1,0 +1,28 @@
+You are adapting AFD module `{MODULE_NAME}` to the fixed vLLM target.
+
+{PLAN_REVIEW_CONTRACT}
+
+## Inputs
+- AFD checkout: `{OMNI_PATH}` (edit only this checkout)
+- vLLM checkout: `{VLLM_PATH}` (read-only upstream reference)
+- AFD commit: `{OMNI_COMMIT}`
+- vLLM target commit: `{VLLM_COMMIT}`
+- Upstream paths: `{UPSTREAM_FILES}`
+- AFD paths: `{OMNI_FILES}`
+- Relevant tests:
+{PYTEST_COMMANDS}
+
+## Upstream changes
+{COMMIT_LIST}
+
+## Goal
+Understand the target vLLM contract and update the AFD module while preserving
+AFD behavior. Resolve semantic API and lifecycle changes; do not make a test
+green by deleting coverage, swallowing errors, or disabling functionality.
+
+{MODULE_TEST_PLAN}
+
+Run this import check when applicable:
+{IMPORT_CHECK}
+
+Use the scoped tools, keep changes minimal, and finish with an honest summary.

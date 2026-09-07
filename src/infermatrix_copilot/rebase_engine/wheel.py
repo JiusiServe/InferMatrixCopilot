@@ -138,6 +138,7 @@ def pick_wheel_commit(repo: Path, target_branch: str, spec: WheelSpec, *,
                       probe: Callable[[str], bool],
                       baseline: str = "",
                       force_commit: str = "",
+                      target_ref: str = "",
                       release_mode: bool = False,
                       run: RunFn = _run,
                       log: Callable[[str], None] = _log) -> str:
@@ -149,19 +150,22 @@ def pick_wheel_commit(repo: Path, target_branch: str, spec: WheelSpec, *,
     if rc != 0:
         raise WheelPickError(f"git fetch origin failed in {repo}: {err.strip()}")
 
-    rc, _, _ = run(["git", "rev-parse", "--verify", f"origin/{target_branch}"],
+    ref = target_ref.strip() or f"origin/{target_branch}"
+    rc, _, _ = run(["git", "rev-parse", "--verify", f"{ref}^{{commit}}"],
                    cwd=repo)
     if rc != 0:
         raise WheelPickError(
-            f"remote branch origin/{target_branch} does not exist in {repo}; "
-            "check the configured target branch")
+            f"target ref {ref!r} does not exist in {repo}; check the "
+            "configured upstream target")
 
-    log(f"Checking out {target_branch} (resetting to origin/{target_branch})...")
-    rc, _, err = run(["git", "checkout", "-B", target_branch,
-                      f"origin/{target_branch}"], cwd=repo)
+    log(f"Checking out target ref {ref}...")
+    checkout = (["git", "checkout", "--detach", ref]
+                if target_ref.strip() else
+                ["git", "checkout", "-B", target_branch, ref])
+    rc, _, err = run(checkout, cwd=repo)
     if rc != 0:
         raise WheelPickError(
-            f"failed to reset {target_branch} to origin/{target_branch}: "
+            f"failed to checkout target ref {ref}: "
             f"{err.strip()} — working tree may be dirty; clean {repo} and retry")
 
     found = ""

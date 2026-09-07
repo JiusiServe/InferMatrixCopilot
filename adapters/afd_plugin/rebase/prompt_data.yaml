@@ -1,0 +1,57 @@
+template: module_rebase.prompt.tmpl
+template_live: module_rebase.prompt.tmpl
+pytest_wrapper: "python3 -m pytest"
+pytest_wrapper_live: "python3 -m pytest"
+
+module_vllm_paths:
+  plugin_boundary: "vllm/config.py vllm/plugins/ vllm/platforms/"
+  attention_runtime: "vllm/config.py vllm/forward_context.py vllm/v1/attention/ vllm/v1/worker/"
+  ffn_runtime: "vllm/config.py vllm/compilation/ vllm/distributed/ vllm/model_executor/ vllm/v1/worker/"
+  connectors: "vllm/config.py vllm/forward_context.py vllm/distributed/ vllm/utils/"
+  model_integration: "vllm/config.py vllm/forward_context.py vllm/model_executor/ vllm/platforms/"
+  execution_platforms: "vllm/compilation/ vllm/distributed/ vllm/platforms/ vllm/v1/worker/"
+  compatibility: "vllm/config/ vllm/engine/ vllm/forward_context.py vllm/v1/engine/ vllm/v1/worker/"
+
+module_omni_files:
+  plugin_boundary: "afd_plugin/__init__.py afd_plugin/config.py afd_plugin/validation.py pyproject.toml"
+  attention_runtime: "afd_plugin/v1/worker/attention_model_runner.py afd_plugin/v1/worker/attention_worker.py afd_plugin/v1/worker/ubatch_wrapper.py"
+  ffn_runtime: "afd_plugin/v1/worker/ffn_model_runner.py afd_plugin/v1/worker/ffn_worker.py afd_plugin/v1/worker/ubatch_wrapper.py"
+  connectors: "afd_plugin/connectors/ afd_plugin/distributed/"
+  model_integration: "afd_plugin/model_executor/"
+  execution_platforms: "afd_plugin/v1/worker/cuda_graph.py afd_plugin/v1/worker/dbo.py afd_plugin/compat/npu/ afd_plugin/connectors/"
+  compatibility: "afd_plugin/compat/"
+
+module_test_map:
+  plugin_boundary: ["tests/unit/config/", "tests/unit/test_envs.py", "tests/unit/package/"]
+  attention_runtime: ["tests/unit/v1/worker/", "tests/e2e/features/"]
+  ffn_runtime: ["tests/unit/v1/worker/", "tests/unit/model_executor/"]
+  connectors: ["tests/unit/connectors/", "tests/unit/distributed/"]
+  model_integration: ["tests/unit/model_executor/", "tests/unit/package/"]
+  execution_platforms: ["tests/unit/v1/worker/", "tests/unit/compat/"]
+  compatibility: ["tests/unit/compat/", "tests/unit/v1/worker/test_runtime_classpaths.py"]
+
+module_import_check:
+  plugin_boundary: "import afd_plugin; print('OK')"
+  attention_runtime: "from afd_plugin.v1.worker.attention_model_runner import AFDAttentionModelRunner; print('OK')"
+  ffn_runtime: "from afd_plugin.v1.worker.ffn_model_runner import AFDFFNModelRunner; print('OK')"
+  connectors: "import afd_plugin.connectors; import afd_plugin.distributed; print('OK')"
+  model_integration: "import afd_plugin.model_executor; print('OK')"
+  execution_platforms: "import afd_plugin.v1.worker.cuda_graph; import afd_plugin.v1.worker.dbo; print('OK')"
+  compatibility: "import afd_plugin.compat; print('OK')"
+
+debug_prompt_template: |
+  ## Debug: fix failing validation for AFD module `{module}`
+
+  ### Failure
+  ```
+  {traceback}
+  ```
+
+  ### Task
+  1. Inspect the failure and the target vLLM source at the fixed commit.
+  2. Compare the affected AFD code with the AFD main baseline.
+  3. Make the smallest semantic compatibility fix.
+  4. Run the relevant local test or import check.
+
+  Preserve AFD behavior and do not hide failures with skips or broad catches.
+  MODULE={module}
