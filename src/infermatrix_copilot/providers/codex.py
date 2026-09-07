@@ -7,11 +7,11 @@ claude-code this transport is exercised offline against recorded shapes —
 the readiness path reports the login gap before any run starts).
 
 Governance posture (disclosed, per doc/features/provider-registry.md): codex
-cannot disable its native shell, but ``--sandbox read-only`` is an OS-level
-PREVENTIVE guarantee against writes and network egress; the MCP tool
-bridge is offered alongside via ``-c mcp_servers...`` overrides so scoped
-reads flow through ``tools.dispatch``. Broad *reads* inside the sandbox
-remain possible and are a documented limitation of this backend class.
+uses ``--sandbox read-only`` for read-only scopes and
+``--sandbox workspace-write`` for an explicitly writable ToolScope. The
+workspace mode remains bounded by the tool bridge's path policy and does not
+grant danger-full-access or an unrestricted network mode. Broad *reads* inside
+the sandbox remain a documented limitation of this backend class.
 
 Env is the shared allowlist (`base.sanitized_env`); codex keeps its own
 auth under HOME (~/.codex)."""
@@ -73,10 +73,13 @@ class CodexTransport(HarnessTransport):
         ]
 
     def _run(self, text: str, *, cwd: str, timeout_s: float, model: str = "",
-             mcp_spec: Path | None = None) -> tuple[list[dict], bool]:
+             mcp_spec: Path | None = None,
+             sandbox: str = "read-only") -> tuple[list[dict], bool]:
         """One CLI invocation → (parsed events, timed_out). Prompt on stdin
         (the ``-`` positional; argv has a 128KiB per-arg limit)."""
-        cmd = [self.require_cli(), "exec", "--json", "-s", "read-only",
+        if sandbox not in ("read-only", "workspace-write"):
+            raise ValueError(f"unsupported Codex sandbox mode: {sandbox}")
+        cmd = [self.require_cli(), "exec", "--json", "-s", sandbox,
                "--skip-git-repo-check", "-C", cwd]
         selected = model or self.settings.strict_backend_model
         if selected:
@@ -156,7 +159,9 @@ class CodexTransport(HarnessTransport):
         events, timed_out = self._run(
             f"{req.system}\n\n{req.prompt}", cwd=cwd,
             timeout_s=req.timeout_s, model=req.model,
-            mcp_spec=req.bridge_spec_path)
+            mcp_spec=req.bridge_spec_path,
+            sandbox=("read-only" if req.scope.read_only
+                      else "workspace-write"))
         usage = self._usage(events)
         used = self._tool_activity(events)
         if req.trace is not None:

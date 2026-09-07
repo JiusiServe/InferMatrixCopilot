@@ -206,6 +206,40 @@ def test_run_harness_step_pins_explicit_provider_and_model(tmp_path, monkeypatch
     assert transport.calls[0].model == "composer-2.5"
 
 
+def test_codex_sandbox_follows_scope_write_permission(tmp_path, monkeypatch):
+    """Codex keeps read-only review sessions read-only but can perform a
+    governed module edit when the supplied ToolScope is writable."""
+    import json
+    from types import SimpleNamespace
+
+    from infermatrix_copilot.providers.base import AgentSessionRequest
+    from infermatrix_copilot.providers.codex import CodexTransport
+    from infermatrix_copilot.scopes import post_plan_scope
+
+    settings = _settings(strict_backend="codex")
+    transport = CodexTransport(settings)
+    monkeypatch.setattr(transport, "require_cli", lambda: "codex")
+    commands = []
+
+    def fake_run(cmd, **kwargs):
+        commands.append(cmd)
+        event = {"item": {"type": "agent_message", "text": "ok"}}
+        return SimpleNamespace(returncode=0, stdout=json.dumps(event), stderr="")
+
+    monkeypatch.setattr("infermatrix_copilot.providers.codex.subprocess.run",
+                        fake_run)
+
+    def request(scope):
+        return AgentSessionRequest(
+            system="system", prompt="prompt", scope=scope, model="m",
+            max_iters=1, timeout_s=5, run_dir=tmp_path)
+
+    transport.run_session(request(read_only_scope()))
+    transport.run_session(request(post_plan_scope(tmp_path)))
+    assert commands[0][commands[0].index("-s") + 1] == "read-only"
+    assert commands[1][commands[1].index("-s") + 1] == "workspace-write"
+
+
 # -- harness model selection (PR3) -------------------------------------------
 # Call sites hold API-tier model settings (INTENT_MODEL, REVIEWER_MODEL) chosen
 # for the raw-API path. Forwarding one to a vendor CLI does not fail loudly: the
