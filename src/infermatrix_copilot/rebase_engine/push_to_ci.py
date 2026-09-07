@@ -101,7 +101,9 @@ def commit_and_push(repo: Path, *,
     ALLOW_PUSH env flag) — this function NEVER self-authorizes. Raises
     `PushPreflightError` on a refused preflight; returns a non-pushed
     `PushOutcome` with the reason when authorization, reconciliation, or
-    execution refuses."""
+    execution refuses. When `allowed_remote_url` is supplied, the resolved
+    remote identity must match it before staging or committing; it is an
+    adapter allowlist, not an alternate transport URL."""
     import time as _time
     sleep = sleep or _time.sleep
     repo = Path(repo)
