@@ -55,6 +55,27 @@ def _recent_repo_runs(ctx: StepContext, repo_slug: str,
     return list(reversed(newest))
 
 
+def _provenance_value(ctx: StepContext, substate: dict, key: str,
+                      *, fallback: str = "") -> str:
+    """Return one run-input/output value for the human-facing report.
+
+    Version and publication fields are written as top-level state updates by
+    the execution steps.  Reading the substate as a fallback keeps the report
+    useful for resumed runs and for future publish implementations that store
+    their result alongside the other rebase facts.
+    """
+    value = ctx.state.get(key)
+    if value in (None, ""):
+        value = substate.get(key)
+    if value in (None, "") and fallback:
+        value = fallback
+    if value in (None, ""):
+        return "not recorded"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 def _kpaths(ctx: StepContext):
     from ...memory.paths import KnowledgePaths
 
@@ -122,11 +143,37 @@ async def _v3_phase5_report(ctx: StepContext) -> StepResult:
     tests = (data.get("tests") or {})
     pipeline = tests.get("pipeline") or {}
     ci = data.get("ci") or {}
+    target_sha = _provenance_value(
+        ctx, data, "vllm_target_sha",
+        fallback=str(data.get("upstream_commit") or ""))
     lines = ["# FINAL_SUMMARY — repo-rebase v3", "",
              f"- run: {ctx.state.get('run_id', ctx.run_dir.name)}",
              f"- mode: {_task_params(ctx).get('rebase_mode', '')}",
              f"- upstream commit: {data.get('upstream_commit', '')}", "",
-             "## Modules"]
+             "## Input and result provenance",
+             f"- Copilot SHA: {_provenance_value(ctx, data, 'copilot_sha')}",
+             f"- AFD main SHA: {_provenance_value(ctx, data, 'afd_main_sha')}",
+             f"- AFD result branch: {_provenance_value(ctx, data, 'afd_branch')}",
+             f"- AFD branch start SHA: "
+             f"{_provenance_value(ctx, data, 'afd_branch_start_sha')}",
+             f"- AFD sync result SHA: "
+             f"{_provenance_value(ctx, data, 'afd_sync_result_sha')}",
+             f"- AFD main merge performed: "
+             f"{_provenance_value(ctx, data, 'afd_main_merge_performed')}",
+             f"- vLLM target ref: "
+             f"{_provenance_value(ctx, data, 'vllm_target_ref')}",
+             f"- vLLM target version: "
+             f"{_provenance_value(ctx, data, 'vllm_target_version')}",
+             f"- vLLM target SHA: {target_sha}",
+             f"- AFD validation SHA: "
+             f"{_provenance_value(ctx, data, 'afd_validation_sha')}",
+             f"- AFD validation worktree digest: "
+             f"{_provenance_value(ctx, data, 'afd_validation_worktree_digest')}",
+             f"- push result: {_provenance_value(ctx, data, 'push_result')}",
+             f"- push remote: {_provenance_value(ctx, data, 'push_remote')}",
+             f"- push branch: {_provenance_value(ctx, data, 'push_branch')}",
+             f"- push SHA: {_provenance_value(ctx, data, 'push_sha')}",
+             "", "## Modules"]
     for name, spec in sorted(mods.items()):
         spec = spec or {}
         status = ("skipped (not assigned)" if spec.get("skip") else

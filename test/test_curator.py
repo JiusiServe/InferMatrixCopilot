@@ -454,7 +454,22 @@ def test_phase5_report_and_compare_steps(settings, trace, tmp_path):
                                  "params": {"rebase_mode": "full",
                                             **(params or {})}},
                    "repo_path": str(repo), "run_id": "run-p",
-                   "manifest_jobs": 6})
+                   "manifest_jobs": 6,
+                   "copilot_sha": "a" * 40,
+                   "afd_main_sha": "b" * 40,
+                   "afd_branch": "codex/vllm-0.28-sync",
+                   "afd_branch_start_sha": "c" * 40,
+                   "afd_sync_result_sha": "d" * 40,
+                   "afd_main_merge_performed": True,
+                   "vllm_target_ref": "v0.28.0",
+                   "vllm_target_version": "0.28.0",
+                   "vllm_target_sha": "e" * 40,
+                   "afd_validation_sha": "f" * 40,
+                   "afd_validation_worktree_digest": "sha256:test",
+                   "push_result": "pushed",
+                   "push_remote": "https://example.invalid/afd-plugin.git",
+                   "push_branch": "codex/vllm-0.28-sync",
+                   "push_sha": "g" * 40})
 
     r = asyncio.run(registry.get("rebase.v3_phase5_report").handler(ctx()))
     assert r.ok
@@ -464,6 +479,11 @@ def test_phase5_report_and_compare_steps(settings, trace, tmp_path):
     assert "manifest jobs: 6" in summary and "not run/skipped: 2" in summary
     assert "effective result: passed" in summary
     assert "raw provider state: failed (build 42" in summary
+    assert "Copilot SHA: " + "a" * 40 in summary
+    assert "AFD main SHA: " + "b" * 40 in summary
+    assert "AFD result branch: codex/vllm-0.28-sync" in summary
+    assert "vLLM target SHA: " + "e" * 40 in summary
+    assert "push result: pushed" in summary
 
     # The generic report is the canonical user-facing artifact; for a rebase
     # it embeds the phase-5 result rather than producing an empty shell.
