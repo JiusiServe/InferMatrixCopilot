@@ -138,6 +138,48 @@ def _target_venv(manifest: dict, extra: dict | None = None) -> str:
                        extra=extra)
 
 
+def _copilot_revision(ctx: StepContext) -> str:
+    """Resolve the exact Copilot revision used for a run, without assuming
+    that the process cwd is the Copilot checkout. A caller-supplied revision
+    is accepted for packaged deployments; source checkouts derive it from the
+    module's repository root and fail closed when neither is available."""
+    import re
+    import subprocess
+
+    supplied = str(_task_params(ctx).get("copilot_sha") or
+                   ctx.state.get("copilot_sha") or "").strip()
+    if supplied and re.fullmatch(r"[0-9a-fA-F]{40}", supplied):
+        return supplied.lower()
+    source_root = Path(__file__).resolve().parents[4]
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(source_root), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    revision = result.stdout.strip()
+    return revision.lower() if result.returncode == 0 and \
+        re.fullmatch(r"[0-9a-fA-F]{40}", revision) else ""
+
+
+def _repo_revision(repo: str) -> str:
+    """Return the current checkout revision, or an empty value when the
+    repository state cannot be identified. The caller records a worktree
+    digest separately because module agents edit before validation."""
+    import re
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    revision = result.stdout.strip()
+    return revision.lower() if result.returncode == 0 and \
+        re.fullmatch(r"[0-9a-fA-F]{40}", revision) else ""
+
+
 def _venv_declared(manifest: dict) -> bool:
     """Whether the adapter DECLARES a runtime venv at all — declared-but-
     unresolved blocks (misconfiguration must surface), while an adapter
@@ -791,6 +833,16 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
             layers={k: v.get("digest", "") for k, v in provenance.items()})
 
     updates: dict = {}
+    copilot_sha = _copilot_revision(ctx)
+    if copilot_sha:
+        updates["copilot_sha"] = copilot_sha
+    elif mode in MUTATING_MODES:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "could not resolve the Copilot revision used for "
+                          "this mutating run; pass copilot_sha explicitly")
+    else:
+        ctx.trace.record("capability_gap", capability="copilot_revision",
+                         detail="revision unavailable for report-only run")
     from ...adapters.base import expand_path
     upstream = ctx.state.get("upstream_origin_path", "") \
         or ctx.state.get("upstream_path", "") or expand_path(
@@ -1178,11 +1230,19 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
     except wheel_mod.WheelInstallError as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
     _substate(ctx).set_field("upstream_commit", found)
+    target_cfg = manifest.get("upstream") or {}
     return StepResult(True,
                       summary=f"wheel commit {found[:12]} "
                               + ("(reinstalled)" if installed
                                  else "(install healthy, skipped)"),
-                      outputs={"state_updates": {"upstream_commit": found}})
+                      outputs={"state_updates": {
+                          "upstream_commit": found,
+                          "vllm_target_sha": found,
+                          "vllm_target_ref": str(
+                              target_cfg.get("target_ref") or ""),
+                          "vllm_target_version": str(
+                              target_cfg.get("target_version") or ""),
+                      }})
 
 
 @step("rebase.v3_assign", "deterministic", "read",
@@ -1620,13 +1680,21 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
             "failed_tests": result["failed_tests"],
             "skipped": len(result["skipped_tests"])},
         "infra_failures": infra}})
+    validation_sha = _repo_revision(str(repo))
+    if not validation_sha:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "could not resolve the AFD revision validated by "
+                          "the local test loop")
     return StepResult(True,
                       summary=f"{result['passed']} passed, "
                               f"{result['failed']} failed "
                               f"({len(infra)} infra), "
                               f"{len(result['skipped_tests'])} skipped",
                       outputs={"state_updates": {
-                          "phase3_failed": result["failed_tests"]}})
+                          "phase3_failed": result["failed_tests"],
+                          "afd_validation_sha": validation_sha,
+                          "afd_validation_worktree_digest":
+                              _worktree_digest(repo)}})
 
 
 def _halt_on_phase3(ctx: StepContext, sub: Substate) -> StepResult | None:
@@ -1788,6 +1856,15 @@ async def _v3_precommit(ctx: StepContext) -> StepResult:
     sub.update({"tests": {"precommit": {
         "result": result, "attempt": attempt, "baseline_rc": baseline_rc,
         "last_log": outcome.log_file or None}}})
+    validation_sha = _repo_revision(str(repo))
+    if not validation_sha:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "could not resolve the AFD revision validated by "
+                          "pre-commit")
+    validation_state = {
+        "afd_validation_sha": validation_sha,
+        "afd_validation_worktree_digest": _worktree_digest(repo),
+    }
     halted = _halt_on_phase3(ctx, sub)
     if halted is not None:
         return halted
@@ -1795,12 +1872,14 @@ async def _v3_precommit(ctx: StepContext) -> StepResult:
         return StepResult(True,
                           summary=f"precommit red PRE-EXISTS the run "
                                   f"(baseline rc={baseline_rc}); gate "
-                                  "flags, does not block")
+                                  "flags, does not block",
+                          outputs={"state_updates": validation_state})
     return StepResult(True,
                       summary="precommit "
                               + ("passed" if passed else
                                  f"FAILED (rc={outcome.rc}; push gate "
-                                 "blocks)"))
+                                 "blocks)"),
+                      outputs={"state_updates": validation_state})
 
 
 @step("rebase.v3_push_gate", "deterministic", "read",
