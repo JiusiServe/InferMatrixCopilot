@@ -92,6 +92,7 @@ def commit_and_push(repo: Path, *,
                     push_retries: int = 3,
                     push_base_delay: float = 5.0,
                     precommit_fix: Callable[[], None] | None = None,
+                    allowed_remote_url: str = "",
                     run: gitio.RunFn = gitio._run,
                     sleep: Callable[[float], None] = None,
                     log: Callable[[str], None] = _log) -> PushOutcome:
@@ -110,6 +111,19 @@ def commit_and_push(repo: Path, *,
         # workflow has no Dockerfile pin to check
         preflight_dockerfile_pin(repo, commit, pin)
     dest_ref = f"refs/heads/{branch}"
+
+    # Resolve and authorize the destination before staging or committing. The
+    # same observed URL is reused for the WAL identity and push execution so a
+    # concurrent remote reconfiguration cannot redirect this operation.
+    url = gitio.resolve_push_url(repo, remote=remote, token=token, run=run)
+    if not url:
+        return PushOutcome(False, reason="push denied: could not resolve the "
+                           "configured remote URL")
+    if allowed_remote_url and \
+            gitio.canonical_remote_identity(url) != \
+            gitio.canonical_remote_identity(allowed_remote_url):
+        return PushOutcome(False, reason="push denied: resolved remote identity "
+                           "does not match the adapter allowlist")
 
     # re-entry hygiene BEFORE any new work: unresolved intents settle first
     pending = push_wal.resolve_pending(repo, wal_dir, remote_name=remote,
@@ -170,7 +184,6 @@ def commit_and_push(repo: Path, *,
     # one canonical transport for probe, WAL identity, and push — resolved
     # ONCE; execution receives this exact URL so a concurrent `remote
     # set-url` cannot redirect the push after the probe
-    url = gitio.resolve_push_url(repo, remote=remote, token=token, run=run)
     if resumed is not None and gitio.canonical_remote_identity(url) != \
             resumed.remote_url:
         return PushOutcome(False, committed=committed,

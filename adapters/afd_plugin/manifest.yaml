@@ -307,7 +307,8 @@ ci:
   provider: github_actions
 
 push:
-  default_remote: origin
+  default_remote: fork
+  remote_url: https://github.com/jiaran-king/afd-plugin.git
   rebase_branch: codex/vllm-0.28-sync
   rebase_branch_allowed: true
   protected_branches: [main, master]
