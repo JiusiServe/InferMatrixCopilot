@@ -214,3 +214,5 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
 | Whisper 转写 helper 的 GPU 首选、16 GiB 门槛、CPU fallback 或 CUDA ready/merge source dependency | [Whisper 转写 CI 规则](rules-whisper-transcription.md) |
 | 查看仓库特有 CI 陷阱 | [CI guides](guides/_index.md) |
 | 调查历史 CI 失败 | [CI incidents](incidents/_index.md) |
+
+- [CI 并行测试与 engine fixture 合同](rules-test-fixtures.md)：`OMNI-CI-2b`, `OMNI-CI-2c`, `OMNI-CI-2d`。
