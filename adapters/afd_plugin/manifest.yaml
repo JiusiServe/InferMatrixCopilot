@@ -47,7 +47,7 @@ modules:
     - pyproject.toml
     upstream_paths:
     - vllm/plugins/
-    - vllm/config.py
+    - vllm/config/
     - vllm/platforms/
     - vllm/entrypoints/
     test_paths:
@@ -64,7 +64,7 @@ modules:
     - afd_plugin/v1/worker/npu/attention_model_runner.py
     - afd_plugin/v1/worker/npu/attention_worker.py
     upstream_paths:
-    - vllm/config.py
+    - vllm/config/
     - vllm/forward_context.py
     - vllm/sequence.py
     - vllm/compilation/
@@ -84,7 +84,7 @@ modules:
     - afd_plugin/v1/worker/npu/ffn_model_runner.py
     - afd_plugin/v1/worker/npu/ffn_worker.py
     upstream_paths:
-    - vllm/config.py
+    - vllm/config/
     - vllm/forward_context.py
     - vllm/compilation/
     - vllm/distributed/
@@ -101,7 +101,7 @@ modules:
   connectors:
     local_paths: [afd_plugin/connectors/, afd_plugin/distributed/]
     upstream_paths:
-    - vllm/config.py
+    - vllm/config/
     - vllm/forward_context.py
     - vllm/distributed/
     - vllm/utils/torch_utils.py
@@ -115,7 +115,7 @@ modules:
   model_integration:
     local_paths: [afd_plugin/model_executor/]
     upstream_paths:
-    - vllm/config.py
+    - vllm/config/
     - vllm/forward_context.py
     - vllm/model_executor/
     - vllm/platforms/
@@ -156,7 +156,6 @@ modules:
     local_paths: [afd_plugin/compat/]
     upstream_paths:
     - vllm/config/
-    - vllm/config.py
     - vllm/engine/
     - vllm/forward_context.py
     - vllm/v1/engine/
