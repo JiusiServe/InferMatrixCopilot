@@ -59,7 +59,10 @@ Three stages, deliberately decoupled so each can fail without losing events.
 ### 2. Distillation (expensive, at most once a day)
 
 - ReviewBot converts pending rows into typed `KnowledgeEvidenceEvent` values
-  and one bounded `KnowledgeEvidenceBatch`. It creates `KnowledgeCurator`
+  and one bounded `KnowledgeEvidenceBatch`. Each merged-PR event may carry a
+  `diff_excerpt`, the host's selection of the change's most rule-bearing hunks
+  (non-test, non-doc first); the SDK bounds it to 8 KiB per event and 160 KiB
+  per batch so a twenty-event batch stays one model call. It creates `KnowledgeCurator`
   over a dedicated work clone of this repo — never the immutable knowledge
   resources shipped inside the runtime wheel — then asks the SDK to build the catalog-constrained
   prompt and strict JSON schema. ReviewBot invokes the configured model; the

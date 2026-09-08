@@ -54,7 +54,8 @@
   owner rule page document ID —— 每个 owner 的 `rules.md` 入口页及其
   `type: rule` 的 `rules-<topic>.md` 专题页（`catalog_entries()` 附每页
   `free_bytes`/`free_lines`，与 `check_knowledge_tree.py` 的拆分门对齐）；prompt 把
-  事件放进唯一 `<untrusted_data>` fence，proposal shape、rule ID、heading、source
+  事件放进唯一 `<untrusted_data>` fence（`KnowledgeEvidenceEvent.diff_excerpt` 是宿主
+  选取的 diff 片段，SDK 以每事件 8 KiB、每批 160 KiB 截断，先到先得），proposal shape、rule ID、heading、source
   citation、目标页、重复 ID 与页面剩余容量都由 SDK 机械校验——超出目标页剩余容量的
   proposal 以 `page full` 在 validator 之前被拒绝，宿主据此改路由而不是整批回滚。
   `proposal_id` 同时绑定 batch、输入下标、repository、section、sources 与目标页
