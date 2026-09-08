@@ -1,29 +1,31 @@
 # AFD Copilot 使用指南
 
-本文面向第一次配置、复用 AFD 维护 Agent 的同事，覆盖安装、功能、一次维护和失败恢复。适用实现：Copilot 的 `codex/afd-rebase-v1` 分支，包含 `dfddec86` 及后续提交；不要假定其他分支或已发布安装包包含这些功能。
+本文说明 AFD Copilot 的环境配置、功能范围及分支维护操作，包括首次初始化、上游变更同步、适配验证、结果发布和失败恢复。
 
-目标是每天或每隔几天**手动启动一次**，把 vLLM 上游变化和 AFD 官方 main 的变化逐步消化到团队维护分支，减少发版时积累的适配工作。不要求严格追上 main HEAD，也没有内置定时任务。
+本指南依据 `codex/afd-rebase-v1` 分支截至 `4b2e2f3f` 的实现编写。其他分支、安装包或后续版本是否适用，应以对应版本的配置和命令行为为准。
 
-## 1. 第一次使用：如何配置
+AFD Copilot 用于将 vLLM 上游变更与 AFD 官方 `main` 分支的变更增量整合到维护分支，以减少版本发布时集中处理的适配工作。工作流由操作者手动触发，可按日或每隔数日执行；当前未提供定时调度功能，跟踪目标也不要求与 vLLM `main` 的最新提交一致。
 
-### 1.1 先确定在哪里执行
+## 1. 环境要求与初始配置
 
-| 入口 | 适合做什么 | 是否自动记录维护基线 |
+### 1.1 执行方式与环境要求
+
+| 执行方式 | 适用场景 | 维护基线管理 |
 | --- | --- | --- |
-| 在 Codex App 中使用 Copilot 知识/Review 能力，或让 Codex 直接改代码 | Review、问题修复、单功能适配试验 | 不会因为对话完成就自动推进 workflow 基线 |
-| 独立 CLI：`repo-rebase-v3 / local_rebase` | 同步 AFD main、选择 vLLM wheel、模块适配、测试、发布维护分支 | 成功发布后记录，下次继承 |
+| Codex App 交互任务，结合 Copilot 知识与审查能力 | 代码审查、问题修复、单功能适配验证 | 不自动更新维护工作流的基线 |
+| 独立 CLI：`repo-rebase-v3 / local_rebase` | AFD main 同步、vLLM wheel 选择、模块适配、测试和分支发布 | 成功发布后记录，后续维护继承 |
 
-**本文的版本维护命令使用第二个入口。** 它通过配置并登录的 Codex CLI 启动独立 Agent 会话，不续用 App 聊天上下文。仅安装 Direct MCP，不等于已配置好维护执行器。
+本文的版本维护操作采用独立 CLI。执行器通过已配置并完成认证的 Codex CLI 启动独立 Agent 会话，不继承 Codex App 的当前会话上下文。Direct MCP 的安装与独立维护执行器的配置是两个独立步骤。
 
-本指南采用**手动确认启动**：当前显式 playbook 的外层计划审查仍走 API reviewer；只配置 Codex 登录时，该 reviewer 会显示 unavailable，由操作者看过计划后确认。模块内的适配/计划审查再使用 Codex。不要给下面的新运行命令加 `--yes`，否则缺少外层 reviewer 会直接阻塞。无需为了日常手动使用而额外配置 API key。
+本指南采用交互确认方式启动任务。当前显式 playbook 入口的外层计划审查使用 API reviewer；仅配置 Codex 登录时，该审查返回 `unavailable`，操作者可在核对计划后确认执行。模块内部的适配与计划审查使用 Codex。本文的新任务命令因此不包含 `--yes`：在外层 reviewer 未配置时，该参数会使任务阻塞。采用交互确认方式无需额外配置 API key。
 
-完整 `local_rebase` 会安装目标 vLLM runtime、检查原生扩展和类接口。执行机器须支持目标 wheel；当前 GPU 路径通常是匹配 CUDA 环境的 Linux x86_64。macOS 可控制任务、Review 或做 CPU 单点试验，不能在本机完成 Linux CUDA wheel 的完整验收。
+`local_rebase` 会安装目标 vLLM 运行时，并检查原生扩展与类接口。执行环境必须支持目标 wheel 的操作系统、架构、Python 和 CUDA 要求。本文示例采用 Linux x86_64 与 CUDA wheel。macOS 可用于任务协调、代码审查和 CPU 单功能验证，但不能执行 Linux CUDA wheel 的运行时验收。
 
-**当前 workflow 没有 SSH 测试转发功能。** Copilot、AFD checkout、vLLM checkout 和目标虚拟环境须在执行机器可访问的文件系统中。从本地 Codex 协调服务器时，需另行提交服务器任务，不能仅把远程目录填成 SSH 地址。共享服务器上的安装、构建和测试遵守该服务器调度规则，不在登录节点做重工作。
+当前工作流不支持通过 SSH 自动转发测试。Copilot、AFD 代码检出目录、vLLM 代码检出目录和目标虚拟环境必须位于执行机器可访问的文件系统中。本地 Codex 协调远程执行时，需另行提交服务器任务；路径配置不接受 SSH 地址。共享服务器上的安装、构建和测试必须遵守资源调度规则，计算密集型任务不得在登录节点执行。
 
-### 1.2 安装工具和 Copilot
+### 1.2 安装与认证
 
-需要 Git、uv、Python 3.11+、Codex CLI，以及对目标 fork 的 Git 推送权限。下面用 Python 3.12；实际目标 Python 仍须匹配所选 wheel。
+所需工具包括 Git、uv、Python 3.11 及以上版本和 Codex CLI。发布维护结果还需要目标 fork 的 Git 推送权限。以下安装示例采用 Python 3.12；目标运行时的 Python 版本仍需满足所选 wheel 的要求。
 
 ```bash
 mkdir -p "$HOME/work/afd-maintenance"
@@ -35,7 +37,7 @@ uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python -e '.[mcp,dev]'
 ```
 
-Codex CLI 未安装时，按 [OpenAI 官方 CLI 安装说明](https://learn.chatgpt.com/docs/codex/cli) 安装。账号登录流程见 [官方认证说明](https://learn.chatgpt.com/docs/auth)。在**实际执行机器、实际执行用户**下确认：
+Codex CLI 的安装与认证分别参见 [OpenAI 官方 CLI 文档](https://learn.chatgpt.com/docs/codex/cli) 和 [认证文档](https://learn.chatgpt.com/docs/auth)。使用任务执行机器上的实际运行账号检查版本并完成认证：
 
 ```bash
 codex --version
@@ -43,11 +45,11 @@ codex login
 codex login status
 ```
 
-已登录可跳过 `codex login`。本指南选择 Codex 登录后端，不需要为它另配 Anthropic API key。Git 认证是另一回事：使用团队已有的 SSH key 或 HTTPS credential helper，不把 token 写入文档或 adapter。
+已完成认证时可跳过 `codex login`。本文使用 Codex 登录后端，无需为该后端配置 Anthropic API key。Git 认证独立配置，可使用团队提供的 SSH key 或 HTTPS credential helper；访问令牌不得写入文档或适配器配置。
 
-### 1.3 准备两个 checkout 和维护分支
+### 1.3 仓库与维护分支初始化
 
-使用独立 AFD checkout，不与正在开发或运行服务的目录混用。以下路径可替换；`YOUR_TEAM` 和示例身份必须改为自己的值。
+为维护任务创建独立的 AFD 代码检出目录，避免与其他开发任务或运行中的服务共用目录。以下路径可按部署位置调整；执行前应将 `YOUR_TEAM` 替换为实际 GitHub 用户或组织名称。
 
 ```bash
 cd "$HOME/work/afd-maintenance"
@@ -57,29 +59,29 @@ git -C afd-plugin remote add fork git@github.com:YOUR_TEAM/afd-plugin.git
 git clone https://github.com/vllm-project/vllm.git vllm
 ```
 
-| 仓库 | remote | 用途 |
+| 代码检出目录 | Git remote | 用途 |
 | --- | --- | --- |
-| AFD checkout | `upstream` → `vllm-project/afd-plugin` | 获取官方 AFD main |
-| AFD checkout | `fork` → 团队可写仓库 | 继承、发布维护分支 |
-| vLLM checkout | `origin` → `vllm-project/vllm` | 获取 vLLM main 和版本历史 |
+| AFD | `upstream` → `vllm-project/afd-plugin` | 获取官方 AFD main |
+| AFD | `fork` → 团队可写仓库 | 继承、发布维护分支 |
+| vLLM | `origin` → `vllm-project/vllm` | 获取 vLLM main 和版本历史 |
 
-长期使用一个维护分支，例如 `codex/afd-maintenance`，不要每轮新建空分支。
+连续维护应使用固定的结果分支，例如 `codex/afd-maintenance`，以保留适配历史和已发布基线。
 
-- **fork 已有维护分支**：执行器会 fetch 并继承它；初次可先 checkout，确认包含团队已有补丁。
-- **首次创建分支**：从团队确认的 AFD 基线创建，必须包含要保留的修改。不要直接从官方 main 重开，丢掉尚未上游的适配。
+- **已有远端维护分支**：执行器会获取并继承该分支。初始化时应检查其是否包含需要保留的补丁。
+- **新建维护分支**：从经维护者确认的 AFD 基线创建，并保留尚未合入官方仓库的适配。只有官方 main 已包含全部所需修改时，才可直接以其作为起点。
 
-已有远端分支的例子：
+检出已有远端维护分支：
 
 ```bash
 git -C afd-plugin fetch fork codex/afd-maintenance
 git -C afd-plugin switch --track -c codex/afd-maintenance fork/codex/afd-maintenance
 ```
 
-新分支则使用 `git switch -c codex/afd-maintenance <已确认的AFD基线ref>`。这里填 **AFD ref**；第 3 节的 `last_rebase_commit` 填 **vLLM SHA**，不能混用。
+新建分支时，在 AFD 目录执行 `git switch -c codex/afd-maintenance <已确认的AFD基线ref>`。该命令使用 AFD 仓库的 ref；第 3 节的 `last_rebase_commit` 使用 vLLM 仓库的完整提交 SHA，二者含义不同。
 
-### 1.4 配置自己的 adapter
+### 1.4 适配器配置
 
-仓库自带 AFD adapter 中的 fork、分支和签名属于原维护者。**不要照搬后直接 push。** 在 Copilot 根目录复制本地配置：
+仓库提供的 AFD 适配器包含特定维护环境的 fork、结果分支和提交签名。部署时必须将这些字段调整为目标环境的配置。首先在 Copilot 根目录创建本地配置副本：
 
 ```bash
 cd "$HOME/work/afd-maintenance/copilot"
@@ -88,7 +90,7 @@ cp -R adapters/afd_plugin local/afd/adapters/
 printf '\n/local/afd/\n' >> .git/info/exclude
 ```
 
-编辑 `local/afd/adapters/afd_plugin/manifest.yaml` 的 `push` 段，保留其他模块和测试配置：
+修改 `local/afd/adapters/afd_plugin/manifest.yaml` 的 `push` 配置段，保留其他模块和测试配置。将示例名称、邮箱和仓库地址替换为实际值：
 
 ```yaml
 push:
@@ -101,14 +103,14 @@ push:
   signoff: {name: Your Name, email: you@example.com}
 ```
 
-`remote_url` 与 AFD checkout 的 `fork` 保持一致，`rebase_branch` 是要维护的分支。配置允许 push 后，每次执行仍需显式 `ALLOW_PUSH=true`。Git 本地提交身份也设置为自己的：
+`remote_url` 必须与 AFD 仓库的 `fork` 地址一致，`rebase_branch` 指定结果分支。远端发布同时要求适配器允许推送和运行环境设置 `ALLOW_PUSH=true`。Git 本地提交身份应与配置的签名一致：
 
 ```bash
 git -C ../afd-plugin config user.name 'Your Name'
 git -C ../afd-plugin config user.email 'you@example.com'
 ```
 
-保留下面的跟踪配置；不要同时添加固定 `target_ref` 或传 `force_upstream_commit`：
+采用滚动跟踪模式时，保留以下配置。`latest_wheel` 不能与固定 `target_ref` 或 `force_upstream_commit` 同时使用：
 
 ```yaml
 upstream:
@@ -119,11 +121,11 @@ upstream:
   tracking: latest_wheel
 ```
 
-本地 adapter 是快照。以后更新 Copilot 时，对照更新模块映射、wheel 和测试规则，保留自己的 push/身份配置。
+本地适配器副本不会随 Copilot 更新自动同步。更新程序后，应核对模块映射、wheel 配置和测试规则的变化，同时保留目标环境的仓库地址、结果分支及提交身份。
 
-### 1.5 配置运行环境
+### 1.5 运行环境配置
 
-将下面内容保存为 Copilot 的 `local/afd/env.sh`，路径改为**执行机器上的绝对路径**。上一步将 `local/afd/` 加入当前 checkout 的 Git 排除列表，不提交凭据或机器配置。
+将以下内容保存至 Copilot 的 `local/afd/env.sh`，并根据执行机器调整路径。所有路径必须解析为执行机器上的绝对路径。上一步已将该配置目录加入当前仓库的 Git 排除列表。
 
 ```bash
 export COPILOT_REPO="$HOME/work/afd-maintenance/copilot"
@@ -138,11 +140,11 @@ export ALLOW_PUSH=false
 export RUN_ROOT="$HOME/work/afd-maintenance/runs"
 ```
 
-`cu130 / x86_64` 是例子，需匹配目标软件栈和架构。AFD 目标环境独立于 Copilot 的 `.venv`，也不能复用正在服务的环境：维护会替换其中的 vLLM。
+`cu130` 和 `x86_64` 分别为示例 CUDA 变体和目标架构，实际值需与目标环境匹配。AFD 目标虚拟环境必须独立于 Copilot 的 `.venv` 及部署环境，因为维护过程会替换目标环境中的 vLLM 安装。
 
-`STRICT_BACKEND_MODEL` 默认留空，沿用所用 Codex CLI 的模型配置。PATH 上的 Codex 不能启动时，可设 `STRICT_BACKEND_CLI=/absolute/path/to/codex`，并对这个**同一可执行文件**检查版本和登录状态，不必改全局安装。
+`STRICT_BACKEND_MODEL` 留空时使用 Codex CLI 的模型配置。如需指定 CLI 路径，可设置 `STRICT_BACKEND_CLI=/absolute/path/to/codex`，并使用该可执行文件检查版本和认证状态；该设置不修改全局 CLI 安装。
 
-加载配置，安装 AFD 自身与开发工具：
+加载配置，创建目标虚拟环境并安装 AFD 与开发依赖：
 
 ```bash
 cd "$HOME/work/afd-maintenance/copilot"
@@ -154,11 +156,11 @@ AFD_BUILD_ASCEND_OPS=0 uv pip install --python "$AFD_PLUGIN_VENV/bin/python" \
 cd "$COPILOT_REPO"
 ```
 
-不要手工安装旧 `[vllm]` extra 覆盖目标。workflow 会选择源码提交、使用预编译 wheel 安装 vLLM，并让 Agent 更新依赖和 `uv.lock`。安装有网络和磁盘开销；不跑模型不代表完整维护是纯离线轻任务。
+此阶段不安装旧版本的 `[vllm]` 可选依赖。工作流负责选择上游提交、使用预编译 wheel 安装目标 vLLM，并更新依赖声明和 `uv.lock`。完整维护涉及依赖下载与安装，即使不执行模型推理，也需要相应的网络、磁盘和计算资源。
 
-### 1.6 首次检查
+### 1.6 配置检查
 
-下面检查分别发现环境/认证缺项、仓库连错和未提交改动；发现问题先修正，再启动维护。
+启动维护前，检查运行环境与认证状态、Git remote 和工作区状态。配置错误或影响本轮任务的未提交改动应在执行前处理。
 
 ```bash
 "$COPILOT_REPO/.venv/bin/infermatrix-copilot" doctor
@@ -167,36 +169,36 @@ git -C "$VLLM_UPSTREAM_REPO" remote -v
 git -C "$AFD_PLUGIN_REPO" status --short --branch
 ```
 
-`doctor` 不等于 wheel/原生扩展/GPU 验收，也不保证可 push。只处理本次 AFD/Codex 路径所需缺项，不必为无关 provider 配密钥。若已有 `REPO_PATHS` 或其他 `.env`，确认没有将 `afd-plugin` 指到另一 checkout。
+`doctor` 用于配置诊断，不验证目标 wheel、原生扩展、GPU 执行或远端推送权限。诊断结果应按本次使用的 AFD/Codex 配置处理，其他后端的凭据不属于本指南的前置要求。若环境中已有 `REPO_PATHS` 或其他 `.env` 配置，应确认其未将 `afd-plugin` 解析到其他目录。
 
-只想在 Codex App 中 Review、设计或修 issue：另按 [Codex 宿主接入说明](hosts/codex.md) 安装 Direct MCP/skills。这是可选入口，不是下面 CLI 的前置要求。
+在 Codex App 中使用代码审查、设计或 issue 修复能力时，按 [Codex 宿主接入说明](hosts/codex.md) 安装 Direct MCP 与 skills。该接入方式为可选配置，不是独立 CLI 的前置要求。
 
-## 2. 目前有哪些功能
+## 2. 功能范围与验证状态
 
-| 功能 | 当前支持与边界 |
+| 功能 | 支持范围与限制 |
 | --- | --- |
-| 仓库识别与知识路由 | 根据范围加载 AFD 架构、组件和 Review 知识；历史知识不替代目标源码 |
-| Review、设计、issue 修复 | 可复用 `imreview`、`imdesign`、`imcifix` 等宿主流程；评论/PR 发布需另行授权 |
-| 跟进 vLLM main | 选择 main 第一父链上有目标架构 wheel 的近期提交；本轮固定 SHA |
-| 跟进 AFD main | merge 官方 main 到维护分支，保留已发布适配；文本冲突与语义适配分别处理 |
-| 模块适配与 Debug | 7 个模块、计划审查、Codex 工具执行、有限重试和失败报告 |
-| 依赖与原生扩展检查 | 目标源码/runtime 身份、原生扩展导入、版本、commit 专属 wheel 索引和 uv lock |
-| 默认本地测试 | CPU 单测＋必需 runtime 类路径/方法签名检查；必需测试 skip 不算通过 |
-| pre-commit 与发布 | 修改后重验，绑定已验证内容再提交；受控 push，不覆盖分叉远端或 protected branch |
-| 跨次维护和恢复 | 已发布提交记录 `AFD-Upstream-Commit`，下一次继承；失败可 resume |
-| GPU/NPU 模型验收 | **未接入默认维护流程**；仓库已有 E2E 需另行提交服务器任务执行 |
-| 远程 CI 修复循环 | AFD **未接通**；`github_actions` provider 声明不代表已有闭环 |
-| release 审计/验收 | 滚动维护提供准备工作，不替代精确 release 和硬件验收，也不等于具备 Omni 全部 release audit |
+| 仓库识别与知识路由 | 按变更范围加载 AFD 架构、组件和审查规则；兼容性判断以目标源码为准 |
+| 代码审查、设计与 issue 修复 | 支持 `imreview`、`imdesign`、`imcifix` 等宿主流程；评论和 PR 发布需另行授权 |
+| vLLM main 跟踪 | 从 main 第一父链选择具有目标架构 wheel 的近期提交，并在本轮固定目标 SHA |
+| AFD main 同步 | 将官方 main 合并到维护分支，保留已发布适配；分别处理文本冲突与接口、行为差异 |
+| 模块适配与调试 | 支持 7 个模块的变更分配、计划审查、Codex 工具执行、有限重试和失败报告 |
+| 依赖与原生扩展检查 | 核对目标源码与运行时标识、原生扩展导入、版本、提交专属 wheel 索引和 uv 锁文件 |
+| 默认本地测试 | 执行 CPU 单测及必需运行时的类路径、方法签名检查；必需测试被跳过时不视为通过 |
+| pre-commit 与发布 | 修改后重新验证，将提交绑定到已验证内容；受控推送，不覆盖分叉远端或受保护分支 |
+| 连续维护与恢复 | 在已发布提交中记录 `AFD-Upstream-Commit`，供后续维护继承；支持失败任务恢复 |
+| GPU/NPU 模型验收 | 未接入默认维护流程；已有 E2E 测试需另行通过服务器任务执行 |
+| 远程 CI 修复循环 | 尚未接入 AFD；配置中的 `github_actions` 后端声明不表示已实现远程 CI 调试循环 |
+| 发布版本审计与验收 | 增量适配为版本发布提供准备，不替代精确版本和硬件验收；AFD 尚未完整接入发布版本审计流程 |
 
-目前已验证真实 Codex/MCP 单功能适配，以及本地 Git 两轮基线/发布机制；尚未完成真实 AFD 全范围维护＋GPU 验收。Copilot 自身 CI 绿色不代表 AFD GPU 功能通过。
+截至上述版本，验证范围包括通过 Codex/MCP 执行的单功能适配，以及使用本地 Git 仓库进行的两轮基线继承与发布验证。真实 AFD 全范围维护及 GPU 验收尚未完成。Copilot 自身 CI 的通过状态仅说明其对应检查通过，不构成 AFD GPU 功能的验收证据。
 
-## 3. 如何进行一次版本维护
+## 3. 版本维护操作流程
 
-### 3.1 首次运行：确认 vLLM 基线
+### 3.1 确认首次维护基线
 
-需要对应的两项事实：维护分支已有的 **AFD 代码**，以及它此前已适配的 **vLLM commit**。`last_rebase_commit` 告诉执行器从哪里开始分析上游差异。
+首次维护需要确认 AFD 代码基线与其已适配的 vLLM 提交之间的对应关系。参数 `last_rebase_commit` 指定 vLLM 变更分析的起始提交，必须填写完整 SHA。
 
-从团队记录或已验证标签解析完整 SHA，把下面 `vX.Y.Z` 替换为实际基线标签：
+根据维护记录确定基线后，可从对应标签解析完整 SHA。以下命令中的 `vX.Y.Z` 应替换为实际基线标签：
 
 ```bash
 source "$HOME/work/afd-maintenance/copilot/local/afd/env.sh"
@@ -204,13 +206,13 @@ export BASELINE_REF=vX.Y.Z
 export BASELINE_VLLM_SHA="$(git -C "$VLLM_UPSTREAM_REPO" rev-parse "$BASELINE_REF^{commit}")"
 ```
 
-不要填 AFD SHA，也不要仅凭包版本号认定已有适配完成。没有可信基线时先与维护者确认，不能随意填最新 SHA 跳过未做工作。此前的单功能试验分支不能作为整版维护成功基线。
+该参数不接受 AFD 仓库的提交作为维护基线。包版本声明本身也不能证明适配已完成；缺少可信记录时，应先确认代码与 vLLM 版本的对应关系。仅完成单功能验证的试验分支不能作为整版适配完成的依据。
 
-### 3.2 先预览，控制本轮范围
+### 3.2 预览变更并确认维护范围
 
-当前 CLI 的显式 playbook 入口使用 `--task-param repo=afd-plugin` 指定仓库；不要替换成 `--repo afd-plugin`，后者在此入口不会覆盖默认仓库。输出的 `task` 必须明确是 `afd-plugin`，否则不要继续。
+当前 CLI 的显式 playbook 入口通过 `--task-param repo=afd-plugin` 指定仓库，`--repo afd-plugin` 在该入口不覆盖默认仓库。继续操作前，应确认输出的任务仓库为 `afd-plugin`。
 
-只看 playbook，不执行适配：
+仅解析并显示工作流，不执行适配：
 
 ```bash
 "$COPILOT_REPO/.venv/bin/infermatrix-copilot" \
@@ -218,7 +220,7 @@ export BASELINE_VLLM_SHA="$(git -C "$VLLM_UPSTREAM_REPO" rev-parse "$BASELINE_RE
   --task-param rebase_mode=local_rebase
 ```
 
-查看实际 vLLM 差异对应的模块和 wheel 候选：
+分析 vLLM 上游差异，生成模块分配与 wheel 候选报告：
 
 ```bash
 "$COPILOT_REPO/.venv/bin/infermatrix-copilot" \
@@ -227,22 +229,22 @@ export BASELINE_VLLM_SHA="$(git -C "$VLLM_UPSTREAM_REPO" rev-parse "$BASELINE_RE
   --task-param last_rebase_commit="$BASELINE_VLLM_SHA"
 ```
 
-`report_only` 会 fetch 上游、写报告并在临时 scratch 中选目标；不安装 runtime、不改 AFD 源码、不发布。**当前预览要显式传基线**，不像正式维护自动继承已发布记录。关注 `commits_assignment.md` 和 `path_drift_check.md`。
+`report_only` 获取上游历史，在临时工作目录中选择目标并生成报告，不安装运行时、不修改 AFD 源码、不发布结果。该模式当前需要显式指定基线，不自动继承已发布记录。主要输出为 `commits_assignment.md` 和 `path_drift_check.md`。
 
-预览或正式运行显示 `Run locked playbook ... [y/N]` 时，确认仓库、模式和配置无误后输入 `y`。显示 `no reviewer LLM` 是上述外层审查缺项，不等于 Codex 登录失败；若是明确的 `block` 结论则先处理原因。
+预览或正式维护显示 `Run locked playbook ... [y/N]` 时，核对仓库、模式和配置后输入 `y`。`no reviewer LLM` 表示外层 API reviewer 未配置，不表示 Codex 认证失败。审查结果为 `block` 时，应先处理报告中的阻塞原因。
 
-这不是完整 AFD-main 合并预演。已有维护分支时，可单独看官方变化：
+上述预览不包含完整的 AFD main 合并分析。已有本地维护分支时，可单独查看尚未纳入维护分支的官方提交：
 
 ```bash
 git -C "$AFD_PLUGIN_REPO" fetch upstream main
 git -C "$AFD_PLUGIN_REPO" log --oneline codex/afd-maintenance..upstream/main
 ```
 
-**`local_rebase` 会处理命中的所有模块，没有已实现的“只适配一个特性”开关。** 预览发现改动很大时，不直接启动完整维护。可先让 Codex 在独立试验分支做一个明确接口的适配和针对性测试，但不推进整版维护基线。
+`local_rebase` 会处理变更映射命中的全部模块，当前不提供按单个特性限制执行范围的参数。若预览范围超出本轮维护预算，应先拆分适配任务。单接口适配可在独立试验分支中完成并进行针对性测试，但该结果不更新整版维护基线。
 
-### 3.3 首次正式维护
+### 3.3 执行首次维护
 
-确认配置、基线和范围后执行：
+确认配置、基线和维护范围后，执行以下命令：
 
 ```bash
 cd "$COPILOT_REPO"
@@ -252,23 +254,23 @@ ALLOW_PUSH=true "$COPILOT_REPO/.venv/bin/infermatrix-copilot" \
   --task-param last_rebase_commit="$BASELINE_VLLM_SHA"
 ```
 
-流程依次执行：
+工作流的主要执行阶段如下：
 
-1. 固定 AFD main 与维护分支输入，继承成果，merge AFD main。
-2. 固定 vLLM main 快照，选择不早于已发布基线的 wheel-ready commit。
-3. 安装并核对目标 runtime，按 vLLM 与 AFD-main 改动分配模块。
-4. 审查计划、适配 AFD、更新依赖与锁文件，运行测试和有限轮 Debug。
-5. pre-commit、必要重验和发布检查通过后，提交并 push 指定维护分支。
+1. 固定 AFD main 和维护分支的输入提交，继承已有成果并合并 AFD main。
+2. 固定 vLLM main 快照，选择具有可用 wheel 且不早于已发布基线的提交。
+3. 安装并核对目标运行时，根据 vLLM 和 AFD main 的变更分配适配模块。
+4. 审查模块计划，适配 AFD 代码，更新依赖声明与锁文件，执行测试及有限轮调试。
+5. 通过 pre-commit、必要的重新验证及发布检查后，提交并推送指定维护分支。
 
-这里 rebase 是工作流名称，不是简单执行 `git rebase`。AFD main 用 merge 同步；vLLM 是外部依赖，需要适配 AFD 对其接口/行为的使用。没有 Git conflict 仍可能需要改代码。
+`rebase` 在此表示维护工作流，不等同于单次 `git rebase` 操作。AFD main 通过 Git merge 同步；vLLM 作为外部依赖，其接口或行为变化需要在 AFD 中适配。文本合并无冲突不能证明语义兼容。
 
-没有更新的可用 wheel 时，可保持 vLLM 基线，仍处理 AFD main 的变化。每轮最多探测 200 个新增第一父链提交；超出且无 wheel 时停止，不无限回退。
+当没有更新的可用 wheel 且原基线满足候选检查时，vLLM 目标可保持不变，工作流仍可处理 AFD main 的变化。每轮最多探测 200 个新增第一父链提交；达到探测上限仍未找到候选时，任务停止并报告原因。
 
-首次想先检查本地产物，可改用 `ALLOW_PUSH=false`。这**不是 dry-run**：仍会改代码、安装依赖、测试和创建本地提交，只在远程发布前停止，不推进已发布基线。
+如需先检查本地产物，可设置 `ALLOW_PUSH=false`。该设置仅禁用远端发布：工作流仍会修改代码、安装依赖、执行测试并创建本地提交。已发布基线保持不变。仅预览应使用 `report_only`。
 
-### 3.4 第二次及以后
+### 3.4 执行后续增量维护
 
-首次成功发布后，继续使用相同维护分支，**不再传** `last_rebase_commit`：
+首次成功发布后，后续维护使用相同结果分支，并省略 `last_rebase_commit`：
 
 ```bash
 source "$HOME/work/afd-maintenance/copilot/local/afd/env.sh"
@@ -278,50 +280,50 @@ ALLOW_PUSH=true "$COPILOT_REPO/.venv/bin/infermatrix-copilot" \
   --task-param rebase_mode=local_rebase
 ```
 
-执行器从 fetch 后的远端维护历史读取 `AFD-Upstream-Commit`。换同事或机器也可继承，前提是 fork、分支和环境配置一致。失败/未授权的 push 不算成功，不手工伪造 trailer。新目标无需代码变化时，可创建一个空的验证记录提交；同一目标重复执行不会不断生成该记录。
+执行器从获取到的远端维护历史读取提交尾注 `AFD-Upstream-Commit`。更换操作者或执行机器后，可通过相同的 fork 和结果分支继承该记录，目标运行环境仍需正确配置。推送失败或未授权时不更新已发布基线，尾注应由发布流程生成。新目标无需修改代码时，执行器可创建空提交记录验证结果；同一目标不会重复生成该记录。
 
-同一维护分支一次由一个操作者执行；任务期间不要让其他工具修改 checkout 或替换目标环境。
+同一维护分支应串行执行维护任务。任务运行期间，其他进程不得修改该代码检出目录或替换目标虚拟环境。
 
-### 3.5 查看结果、恢复失败
+### 3.5 结果检查与失败恢复
 
-命令输出 run 目录；上文存入 `RUN_ROOT`，未设置时默认为 `~/.infermatrix-copilot/runs/`。
+命令输出本次运行目录。其父目录由 `RUN_ROOT` 指定，默认值为 `~/.infermatrix-copilot/runs/`。
 
 | 文件 | 用途 |
 | --- | --- |
 | `RUN_REPORT.md`、存在时的 `FINAL_SUMMARY.md` | 状态、停止原因和结论 |
 | `substate.json` | 固定输入、上游目标、模块、测试、发布状态 |
 | `plans/`、工具轨迹 | Agent 计划、审查与实际操作 |
-| `tests/`、JUnit、`wheel_install.log`、`wheel_import_check.log` | 测试、失败/skip、安装与导入证据 |
+| `tests/`、JUnit、`wheel_install.log`、`wheel_import_check.log` | 测试结果、跳过原因、安装与导入证据 |
 | `push_wal/` | 发布尝试与恢复记录 |
 
-区分**适配完成、默认测试通过、远端发布成功**；不能只看 Agent 的 success 文本。必需 runtime 未运行、失败或 skip，不能跳过门禁宣布成功。
+结果检查应分别确认适配状态、默认测试结果和远端发布状态。Agent 返回 `success` 不足以单独证明维护成功。必需运行时测试未执行、失败或被跳过时，不满足发布条件。
 
-修复报告中的登录、网络、依赖或冲突等问题后，继续同一轮：
+解决报告中记录的认证、网络、依赖或冲突问题后，可恢复原任务：
 
 ```bash
 ALLOW_PUSH=true "$COPILOT_REPO/.venv/bin/infermatrix-copilot" --resume
 ```
 
-`--resume` 恢复当前 `RUN_ROOT` 最近的保存任务，沿用原 AFD/vLLM 输入，不重新追最新 main。先确认最近任务正是要恢复的维护任务；不要混用他人的 run 目录。获取更新输入用第 3.4 节的新运行命令。
+`--resume` 恢复当前 `RUN_ROOT` 中最近保存的任务，沿用原 AFD 与 vLLM 输入。执行前应确认恢复对象正确，并避免多个操作者共用运行目录。若需获取新的上游输入，应按第 3.4 节启动新任务。
 
-失败的维护保留 scratch 和 editable-runtime 产物供恢复；成功后清理 scratch。目标虚拟环境是维护基础设施，不直接当部署环境。远端分叉需人工协调，执行器不 force push 覆盖同事提交。
+失败任务保留临时源码工作目录及可编辑安装产物，以支持恢复；成功后清理临时源码工作目录。目标虚拟环境仅用于维护验证，不作为部署环境。远端分支分叉时需人工协调，执行器不会强制推送覆盖已有提交。
 
-## 4. GPU 验收、发版与排查
+## 4. 硬件验收与常见问题
 
-**GPU 验收不必先接 CI。** 本地 Codex/操作者可向服务器调度器提交限定范围的验证任务，运行已有 E2E 并收集结果；当前需要另行执行，尚非 AFD `local_rebase` 自动步骤。资源申请和清理遵守目标服务器规则，本文不固化个人机器地址或账号。
+GPU 验收可独立于 CI 执行。操作者或本地 Codex 可通过服务器调度器提交限定范围的验证任务，运行仓库已有的 E2E 测试并收集结果。该过程尚未接入 AFD `local_rebase` 的自动执行步骤。资源申请、运行和清理应遵循目标服务器规范，连接信息由部署环境提供。
 
-日常 CPU/runtime 通过不代表 eager、Graph、DBO、通信、模型正确性或 NPU 通过。vLLM release 时仍需固定精确 release、检查剩余变化并做团队要求的硬件验收，不能仅凭 main nightly 结果宣称支持 release。
+默认 CPU 与运行时接口测试不验证 eager、CUDA Graph、DBO、分布式通信、模型正确性或 NPU 执行。对 vLLM 正式版本声明兼容前，必须固定该版本的精确提交，检查相对于已维护目标的剩余变化，并完成所要求的硬件验收。main nightly 的测试结果不能直接替代正式版本验收。
 
-| 现象 | 怎么处理 |
+| 问题 | 处理方法 |
 | --- | --- |
-| App 可用，CLI 启动/模型失败 | 检查执行机器上的 CLI、登录和模型；需要时设 `STRICT_BACKEND_CLI` |
-| `no reviewer LLM ... --yes ... blocked` | 使用本文的交互命令，去掉 `--yes`，核对计划后人工确认；不是修改模块审查门禁 |
-| 仓库找不到或目录错误 | 核对 `ADAPTERS_DIR`、路径变量、已有 `REPO_PATHS` 和加载的 env |
-| wheel 有包但安装失败 | 候选存在不等于可安装；核对 Python、平台、CUDA 和日志，不扩大为源码编译任务 |
-| 缺首次 baseline | 填此前已适配的 vLLM 完整 SHA，不填 AFD SHA |
-| 显式 baseline 与远端不一致 | 后续正式运行去掉旧参数，确认远端记录正确 |
-| 测试 skip、pre-commit 失败、提交内容变化 | 按报告修正；内容变更后重验，不绕过发布门禁 |
-| push 权限不足或分叉 | 核对自己的 fork/认证，协调分叉后恢复 |
-| push 维护分支未触发 AFD CI | 核对实际 workflow；当前候选 CPU CI 面向 main/master 的 push/PR，维护分支 push 不等于自动跑 CI |
+| Codex App 可用，但 CLI 启动或模型调用失败 | 检查执行机器上的 CLI、认证和模型配置；必要时指定 `STRICT_BACKEND_CLI` |
+| `no reviewer LLM ... --yes ... blocked` | 使用本文的交互命令，移除 `--yes`，核对计划后人工确认；模块审查要求保持不变 |
+| 仓库未找到或解析目录错误 | 核对 `ADAPTERS_DIR`、路径变量、已有 `REPO_PATHS` 和已加载的环境配置 |
+| wheel 索引存在候选，但安装失败 | 核对 Python、平台、CUDA 变体及安装日志；候选存在不保证环境兼容，源码编译不属于本指南流程 |
+| 首次运行缺少基线 | 指定此前已适配的 vLLM 完整 SHA，不使用 AFD SHA |
+| 显式基线与远端记录不一致 | 确认远端记录正确；后续正式维护省略旧的基线参数 |
+| 必需测试被跳过、pre-commit 失败或待提交内容变化 | 按报告处理并重新验证；满足发布条件后再继续 |
+| 推送权限不足或远端分叉 | 核对目标 fork 与 Git 认证，协调分叉后恢复任务 |
+| 维护分支推送后未触发 AFD CI | 检查目标仓库 workflow 的触发条件；所检查候选版本的 CPU CI 面向 main/master 的 push/PR，不覆盖任意维护分支推送 |
 
 实现依据：[AFD adapter](../../adapters/afd_plugin/manifest.yaml)、[维护 playbook](../../playbooks/repo-rebase-v3.yaml)、[执行步骤](../../src/infermatrix_copilot/engine/steps/rebase_v3.py)、[上游跟踪](../../src/infermatrix_copilot/rebase_engine/upstream_tracking.py)。
