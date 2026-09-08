@@ -1,6 +1,6 @@
 # engine/steps/pr/ —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-09-08 -->
 
 `LOC ~1390（6 个文件） · step 库（PR） · refactor-status: ok`
 
@@ -61,8 +61,15 @@
 - `pr.post_review` 是**双闸**的（**C5**）。
 - `pr.harvest_debug_knowledge` **只在真实推送后落盘**（push 输出存在且非 dry-run，
   且至少一组修复同时有 root_cause 与 verification —— 与 debug memory 同一门槛），
-  写入 `settings.knowledge_intake_dir`（空 = 关闭，默认）。它是**刻意 fail-open**
-  的：目录未配、dry-run、无已验证修复、写失败（trace
+  投递到两个**彼此独立**的 sink：`settings.knowledge_intake_dir`（同主机落盘）与
+  `settings.knowledge_intake_issue`（跨主机 mailbox），各自配置了才尝试，任一失败
+  不压制另一个；两者都空 = 关闭（默认）。mailbox 投递（`_publish_intake_record`）把同一条记录以
+  `<!-- infermatrix-copilot:bugfix-record:v1 -->` + 一个 fenced JSON 块通过 `gh api`
+  贴为该 issue 的评论；它是对外写入，按不变量 5 双闸：配置了 mailbox **且**
+  `ALLOW_POST=1`，否则只 trace `knowledge_intake_publish_skipped` 作 dry-run；贴失败
+  trace `knowledge_intake_publish_failed` 并写 outputs `intake_publish_error`，成功写
+  `intake_comment`。它是**刻意 fail-open**
+  的：两处都未配、dry-run、无已验证修复、写失败（trace
   `knowledge_intake_write_failed` 后吞掉）都返回 ok —— 关闭学习回路
   **绝不能**让已落地的修复失败。它消费 executor 维护的 `state["outputs"]`，
   该表在 resume 时由 checkpoint 恢复（见 `test_knowledge_harvest.py` 的

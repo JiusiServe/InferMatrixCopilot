@@ -1,6 +1,6 @@
 # config.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-09-08 -->
 
 `LOC ~658 · 配置 · refactor-status: oversized`
 
@@ -19,7 +19,9 @@ MCP `repo_path` 授权面与 idempotency 保留期：
 checkout —— 最小权限；放宽是**运维**决定，不是调用方的）与
 `idem_retention_days`（默认 30，圈住 `.idem/` 索引）；以及
 知识回流落盘目录 `knowledge_intake_dir`（`KNOWLEDGE_INTAKE_DIR`，默认空 = 关闭；
-消费方见 `doc/RFC-knowledge-intake.md`）。
+消费方见 `doc/RFC-knowledge-intake.md`）与跨主机发布目标 `knowledge_intake_issue`
+（`KNOWLEDGE_INTAKE_ISSUE`，`owner/repo#N`，默认空 = 关闭：harvest step 把同一条记录
+以带标记的 JSON 评论贴到该锁定的 mailbox issue，供另一台主机上的 reviewbot 摄取）。
 
 ## 公开契约
 带全部可调项的 `Settings`；`reviewer` / `intent`（回退到 `agent_model`）；

@@ -9,6 +9,7 @@ is a recorded capability gap (debug degrades to name grouping), never a failure.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -199,9 +200,11 @@ async def _pr_harvest_debug_knowledge(ctx: StepContext) -> StepResult:
     is traced and swallowed (`knowledge_intake_write_failed`) — closing the
     learning loop must never fail the landed fix."""
     intake_dir = str(ctx.settings.knowledge_intake_dir or "").strip()
-    if not intake_dir:
+    intake_issue = str(ctx.settings.knowledge_intake_issue or "").strip()
+    if not intake_dir and not intake_issue:
         return StepResult(True, summary="knowledge intake disabled "
-                                        "(knowledge_intake_dir unset)")
+                                        "(knowledge_intake_dir and "
+                                        "knowledge_intake_issue unset)")
     outputs_map = ctx.state.get("outputs") or {}
     push_outputs = outputs_map.get("push")
     if push_outputs is None or push_outputs.get("dry_run"):
@@ -242,23 +245,92 @@ async def _pr_harvest_debug_knowledge(ctx: StepContext) -> StepResult:
         "groups": fixes,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    try:
-        directory = Path(intake_dir).expanduser()
-        directory.mkdir(parents=True, exist_ok=True)
-        final = directory / f"{ctx.run_dir.name}.json"
-        tmp = final.with_suffix(".tmp")
-        tmp.write_text(json.dumps(record, ensure_ascii=False, indent=1),
-                       encoding="utf-8")
-        tmp.replace(final)
-    except OSError as exc:
-        ctx.trace.record("knowledge_intake_write_failed",
-                         error=str(exc)[:300])
-        return StepResult(True, summary=f"intake drop failed (traced): {exc}",
-                          outputs={"intake_error": str(exc)[:300]})
-    ctx.trace.record("knowledge_intake_dropped", path=str(final),
-                     fixes=len(fixes))
+    # Two independent sinks: the local drop (same-host consumer) and the
+    # mailbox issue (cross-host consumer). Each is attempted when
+    # configured, and neither one's failure suppresses the other.
+    outputs: dict = {"fixes": len(fixes)}
+    delivered = []
+    if intake_dir:
+        try:
+            directory = Path(intake_dir).expanduser()
+            directory.mkdir(parents=True, exist_ok=True)
+            final = directory / f"{ctx.run_dir.name}.json"
+            tmp = final.with_suffix(".tmp")
+            tmp.write_text(json.dumps(record, ensure_ascii=False, indent=1),
+                           encoding="utf-8")
+            tmp.replace(final)
+            ctx.trace.record("knowledge_intake_dropped", path=str(final),
+                             fixes=len(fixes))
+            outputs["intake_path"] = str(final)
+            delivered.append("drop file")
+        except OSError as exc:
+            ctx.trace.record("knowledge_intake_write_failed",
+                             error=str(exc)[:300])
+            outputs["intake_error"] = str(exc)[:300]
+    if intake_issue:
+        outputs.update(_publish_intake_record(ctx, record, intake_issue))
+        if "intake_comment" in outputs:
+            delivered.append("mailbox issue")
+    if not delivered:
+        failures = ", ".join(
+            v for k, v in outputs.items() if k.endswith("_error")
+        )
+        return StepResult(True,
+                          summary=f"intake delivery failed (traced): {failures}",
+                          outputs=outputs)
     return StepResult(True,
                       summary=f"dropped {len(fixes)} verified fix record(s) "
-                              "for knowledge intake",
-                      outputs={"intake_path": str(final),
-                               "fixes": len(fixes)})
+                              "for knowledge intake via "
+                              + " and ".join(delivered),
+                      outputs=outputs)
+
+
+BUGFIX_RECORD_MARKER = "<!-- infermatrix-copilot:bugfix-record:v1 -->"
+_INTAKE_ISSUE = re.compile(r"^(?P<slug>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(?P<number>[1-9][0-9]*)$")
+
+
+def _publish_intake_record(ctx: StepContext, record: dict, target: str) -> dict:
+    """Post the harvested record as a marked JSON comment on the configured
+    mailbox issue (`settings.knowledge_intake_issue`, owner/repo#N), the
+    cross-host counterpart of the drop directory. It is an outward write, so
+    it is double-gated like every other one (invariant 5): the operator
+    configures the mailbox AND sets ALLOW_POST=1; without the flag the post
+    is a traced dry-run skip. Fail-open: any failure is traced
+    (`knowledge_intake_publish_failed`) and reported in outputs, never raised.
+    """
+    if not ctx.settings.allow_post:
+        ctx.trace.record("knowledge_intake_publish_skipped",
+                         reason="ALLOW_POST=0 (dry-run)", issue=target)
+        return {"intake_publish_skipped": "ALLOW_POST=0 (dry-run)"}
+    match = _INTAKE_ISSUE.match(target)
+    if match is None:
+        ctx.trace.record("knowledge_intake_publish_failed",
+                         error=f"KNOWLEDGE_INTAKE_ISSUE is not owner/repo#N: {target[:80]}")
+        return {"intake_publish_error": "bad KNOWLEDGE_INTAKE_ISSUE"}
+    body = (BUGFIX_RECORD_MARKER + "\n```json\n"
+            + json.dumps(record, ensure_ascii=False, indent=1) + "\n```\n")
+    body_path = ctx.run_dir / "knowledge-intake-comment.md"
+    try:
+        body_path.write_text(body, encoding="utf-8")
+    except OSError as exc:
+        ctx.trace.record("knowledge_intake_publish_failed", error=str(exc)[:300])
+        return {"intake_publish_error": str(exc)[:300]}
+    try:
+        code, out = _gh(["api", f"repos/{match.group('slug')}/issues/"
+                         f"{match.group('number')}/comments",
+                         "-X", "POST", "-F", f"body=@{body_path}"])
+    except Exception as exc:  # noqa: BLE001 — a timeout or launch error
+        # must not turn a landed fix into a BLOCKED step.
+        detail = f"{type(exc).__name__}: {exc}"[:300]
+        ctx.trace.record("knowledge_intake_publish_failed", error=detail)
+        return {"intake_publish_error": detail}
+    if code != 0:
+        ctx.trace.record("knowledge_intake_publish_failed",
+                         error=(out or f"gh exit {code}")[:300])
+        return {"intake_publish_error": (out or f"gh exit {code}")[:300]}
+    try:
+        url = str(json.loads(out).get("html_url") or "")
+    except (ValueError, AttributeError):
+        url = ""
+    ctx.trace.record("knowledge_intake_published", issue=target, url=url)
+    return {"intake_comment": url or target}

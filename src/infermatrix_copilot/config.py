@@ -194,6 +194,11 @@ class Settings(BaseSettings):
     # (e.g. the reviewbot's daily distillation batch). Empty disables the
     # drop; the step then no-ops without failing the run.
     knowledge_intake_dir: str = ""
+    # Cross-host publisher for the same record (KNOWLEDGE_INTAKE_ISSUE,
+    # "owner/repo#N"): the harvest step also posts it as a marked JSON
+    # comment on that locked mailbox issue, so a reviewbot on another host
+    # can ingest it. Operator opt-in; empty = off. Fail-open like the drop.
+    knowledge_intake_issue: str = ""
 
     # Engine
     run_root: Path = Path.home() / ".infermatrix-copilot" / "runs"
