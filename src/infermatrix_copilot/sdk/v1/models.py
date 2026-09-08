@@ -109,6 +109,10 @@ class KnowledgeEvidenceEvent(_Serializable):
     summary: str = ""
     changed_paths: tuple[str, ...] = ()
     attributes: dict[str, Any] = field(default_factory=dict)
+    # Host-selected excerpt of the change itself (unified-diff hunks, the
+    # most rule-bearing files first). Bounded by the SDK per event and per
+    # batch; empty when the host has none.
+    diff_excerpt: str = ""
 
 
 @dataclass(frozen=True)
