@@ -120,6 +120,25 @@ def test_auth_gap_reports_login_fix(tmp_path):
     assert transport.auth_gap() is None
 
 
+def test_rebase_bridge_approval_is_server_scoped_and_native_stays_readonly(tmp_path):
+    transport = _transport(tmp_path)
+    req = _request(tmp_path)
+    req.scope = type(req.scope)(name="rebase-module", allowed_tools=frozenset(),
+                               read_only=False, root=req.scope.root)
+    req.bridge_managed_writes = True
+
+    transport.run_session(req)
+
+    capture = json.loads((tmp_path / "bin" / "capture.json").read_text())
+    argv = capture["argv"]
+    overrides = [argv[i + 1] for i, arg in enumerate(argv) if arg == "-c"]
+    approval_overrides = [value for value in overrides if "approval" in value.split("=", 1)[0]]
+    assert approval_overrides == [
+        'mcp_servers.infermatrix-tools.default_tools_approval_mode="approve"']
+    assert argv[argv.index("-s") + 1] == "read-only"
+    assert all(value.startswith("mcp_servers.infermatrix-tools.") for value in overrides)
+
+
 def test_auth_gap_distinguishes_cli_startup_failure(tmp_path):
     transport = _transport(tmp_path)
     cli = tmp_path / "bin" / "codex"

@@ -75,6 +75,10 @@ class CodexTransport(HarnessTransport):
             "-c", f"mcp_servers.{_BRIDGE_SERVER}.args={args}",
             "-c", (f"mcp_servers.{_BRIDGE_SERVER}.env="
                    f'{{PYTHONPATH = "{package_root}"}}'),
+            # The operator authorized this scoped bridge's tools. Codex exec
+            # cannot prompt interactively; leave native/global approvals and
+            # other MCP servers unchanged while the bridge enforces its gate.
+            "-c", f'mcp_servers.{_BRIDGE_SERVER}.default_tools_approval_mode="approve"',
             # Plan review and bounded test tools can exceed the MCP default
             # timeout; the enclosing session still supplies the wall limit.
             "-c", f"mcp_servers.{_BRIDGE_SERVER}.tool_timeout_sec={max(1, int(timeout_s))}",

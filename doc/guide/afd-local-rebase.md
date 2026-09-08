@@ -5,6 +5,11 @@ the result branch, adapts it to the fixed vLLM target through Codex, runs local
 validation, and publishes the result branch. It does not run remote CI or merge
 into main.
 
+This guide is for running the standalone Copilot program. You can also ask
+Codex App to adapt AFD, run checks, and push a work branch directly; that does
+not require this CLI/MCP integration. The standalone program starts a separate
+Codex session using the CLI login, rather than continuing the App conversation.
+
 ## Setup
 
 Install Copilot with its MCP extra in a control environment with Python 3.11 or
@@ -32,11 +37,17 @@ export STRICT_BACKEND=codex
 
 If the `codex` launcher on PATH cannot start, set `STRICT_BACKEND_CLI` to an
 existing working Codex executable. Verify that executable with `--version` and
-`login status`; this setting does not require changing the system installation.
+`login status`, and ensure its version supports your configured model; this
+setting does not require changing the system installation.
 
 The wheel variant and architecture must match the target environment. Codex
 uses the current CLI login; no Anthropic API key is required. Set
 `STRICT_BACKEND_MODEL` only to override the CLI's configured model.
+
+For the non-interactive session, Copilot approves only its injected
+`infermatrix-tools` MCP server. The bridge still enforces tool scope and plan
+review before changes. This is a per-invocation override; it does not change
+your global approval settings or approvals for other MCP servers.
 
 ## Run
 
