@@ -1,7 +1,7 @@
 ---
 title: "AFD plugin 仓库知识入口"
 created: 2026-08-05
-updated: 2026-08-06
+updated: 2026-09-08
 type: index
 tags: [afd-plugin]
 sources:
@@ -15,7 +15,7 @@ sources:
 
 - 上游仓库：`vllm-project/afd-plugin`。
 - 默认分支：`main`。
-- 知识镜像基线：`a432692ed7d5dd6437a4755b530ee7aaf2685dad`，对应 vLLM `0.26.0`。
+- 知识镜像基线：`a432692ed7d5dd6437a4755b530ee7aaf2685dad`，对应历史 vLLM `0.26.0`；它是知识来源，不是滚动维护的目标版本。
 - 适用范围：AFD 插件的注册与配置、Attention/FFN 角色运行时、connector/distributed、模型集成、CUDA/Ascend 平台机制和上游兼容 patch。
 - 仓库自己的 `AGENTS.md`、`.agents/skills/run-e2e/SKILL.md`、CI 和当前代码保持权威；这里保存可路由的 owner 知识。
 
@@ -36,7 +36,7 @@ sources:
 
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
-| 开始任何 AFD review 或 issue answer | [仓库规则](rules.md) | 仓库身份、支持边界与验证门禁 |
+| 开始 AFD review、issue answer 或维护 | [仓库规则](rules.md) | 仓库身份、授权维护边界、目标 runtime 与验证门禁 |
 | 理解系统边界和端到端数据流 | [仓库架构](architecture.md) | Attention/FFN、connector、模型与平台关系 |
 | 按源码路径找最近 owner | [组件入口](components/_index.md) | 七个 owner、源码边界与 focused tests |
 | 修改注册、配置、CPU-safe import 或 worker 选择 | [plugin-boundary](components/plugin-boundary/_index.md) | normative 插件边界和专项规则 |

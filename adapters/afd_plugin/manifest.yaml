@@ -67,6 +67,8 @@ modules:
     - vllm/sequence.py
     - vllm/compilation/
     - vllm/v1/attention/
+    - vllm/v1/outputs.py
+    - vllm/v1/core/sched/output.py
     - vllm/v1/worker/gpu_model_runner.py
     - vllm/v1/worker/gpu_ubatch_wrapper.py
     - vllm/v1/worker/ubatch_utils.py
@@ -88,6 +90,8 @@ modules:
     - vllm/distributed/
     - vllm/model_executor/
     - vllm/v1/worker/gpu_worker.py
+    - vllm/v1/outputs.py
+    - vllm/v1/core/sched/output.py
     - vllm/v1/worker/worker_base.py
     - vllm/v1/worker/workspace.py
     - vllm/v1/kv_cache_interface.py
@@ -336,7 +340,7 @@ rebase:
     index_url_template: "https://wheels.vllm.ai/{commit}/{variant}/{package}/"
     variant: ${VLLM_WHEEL_VARIANT}
     arch: ${VLLM_WHEEL_ARCH}
-    import_check_modules: [vllm]
+    import_check_modules: [vllm._C_stable_libtorch, vllm._C]
     install_env: {VLLM_USE_PRECOMPILED: "1"}
     selected_install_env:
       VLLM_PRECOMPILED_WHEEL_COMMIT: "{commit}"

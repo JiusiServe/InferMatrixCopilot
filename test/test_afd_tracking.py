@@ -1,14 +1,17 @@
 """Rolling AFD maintenance over local Git histories; no model or network calls."""
 
 import asyncio
+import subprocess
+import sys
 from dataclasses import asdict, replace
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 from infermatrix_copilot.engine.steps import rebase_v3
 from infermatrix_copilot.engine.step import StepContext
-from infermatrix_copilot.rebase_engine import pytest_results, wheel
+from infermatrix_copilot.rebase_engine import assign, pytest_results, wheel
 from infermatrix_copilot.rebase_engine.prompt_builder import ModulePromptData, build_module_prompt
 from infermatrix_copilot.rebase_engine import upstream_tracking as tracking
 from infermatrix_copilot.rebase_engine.dependency_lock import check_uv_dependency
@@ -22,6 +25,81 @@ pytest_plugins = ("test_afd_publish", "test_afd_sync_state")
 
 SPEC = WheelSpec("vllm", "https://wheels.example/{commit}/{variant}/{package}/",
                  "cu130", "x86_64")
+
+
+@pytest.mark.parametrize("path", ["vllm/v1/outputs.py", "vllm/v1/core/sched/output.py"])
+def test_runtime_output_changes_assign_both_roles(tmp_path, path):
+    manifest = yaml.safe_load((ROOT / "adapters/afd_plugin/manifest.yaml").read_text())
+    repo = init_repo(tmp_path / "upstream")
+    base = commit(repo, {path: "old contract\n"}, "baseline")
+    commit(repo, {path: "new contract\n"}, "output contract changed")
+    result = assign.assign_commits(repo, base, {
+        name: module["upstream_paths"] for name, module in manifest["modules"].items()})
+    assert not result.skip["attention_runtime"]
+    assert not result.skip["ffn_runtime"]
+
+
+def test_shipped_wheel_check_rejects_python_only_package(tmp_path):
+    manifest = yaml.safe_load((ROOT / "adapters/afd_plugin/manifest.yaml").read_text())
+    spec = WheelSpec.from_manifest(manifest["rebase"]["wheel"])
+    package = tmp_path / "vllm"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    result = subprocess.run([sys.executable, "-c", wheel.build_import_check_snippet(spec)],
+                            cwd=tmp_path, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert "compiled kernel extension missing" in result.stderr
+
+
+def test_two_rounds_select_inherit_and_publish(upstream, sync_env, settings):
+    """Real local Git transport; wheel availability and validation evidence are fixtures.
+
+    This checks orchestration continuity, not model adaptation or GPU compatibility.
+    """
+    env = sync_env
+    env.manifest["upstream"] = {"tracking": "latest_wheel"}
+    env.manifest["push"].update(
+        remote_url=str(env.fork), allowed=True, rebase_branch_allowed=True,
+        protected_branches=["main", "master"],
+        signoff={"name": "Fixture", "email": "fixture@example.invalid"})
+    settings.allow_push = True
+    settings.github_token = ""
+    baseline = upstream.first
+    published = None
+    for round_number in (1, 2):
+        target = commit(upstream.remote, {"module.py": f"value = {round_number + 1}\n"},
+                        f"wheel-ready round {round_number}")
+        upstream.available.add(target)
+        ctx = env.context(f"maintenance-{round_number}")
+        ctx.settings = settings
+        if round_number == 1:
+            ctx.state["task_spec"]["params"]["last_rebase_commit"] = baseline
+        synced = asyncio.run(rebase_v3._v3_sync_target(ctx))
+        assert synced.ok, synced.summary
+        ctx.state.update(synced.outputs["state_updates"])
+        assert ctx.state["last_rebase_upstream_commit"] == baseline
+        if published:
+            assert ctx.state["afd_branch_start_sha"] == published
+            assert (env.repo / "afd_plugin/config.py").read_text() == "API = 1\n"
+        selected = upstream.select(f"selection-{round_number}", baseline)
+        assert selected["selected_sha"] == target
+        (env.repo / "afd_plugin/config.py").write_text(f"API = {round_number}\n")
+        ctx.state.update(upstream_target_sha=target,
+                         afd_validation_sha=git(env.repo, "rev-parse", "HEAD"),
+                         afd_validation_worktree_digest=rebase_v3._worktree_digest(env.repo))
+        rebase_v3._substate(ctx).update({"tests": {
+            "pipeline": {"complete": True, "passed": 1, "failed": 0, "failed_tests": []},
+            "precommit": {"result": "passed"}, "infra_failures": []}})
+        result = asyncio.run(rebase_v3._v3_publish(ctx))
+        assert result.ok, result.summary
+        branch = env.manifest["push"]["rebase_branch"]
+        new_head = git(env.fork, "rev-parse", branch)
+        assert tracking.published_baseline(env.fork, branch) == target
+        if published:
+            git(env.repo, "merge-base", "--is-ancestor", published, new_head)
+        published, baseline = new_head, target
+    assert git(env.source, "rev-parse", "main") == env.base
+    assert git(env.fork, "rev-parse", "main") == env.base
 
 
 @pytest.fixture

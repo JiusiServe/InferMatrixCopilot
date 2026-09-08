@@ -1,7 +1,7 @@
 ---
 title: "AFD plugin 仓库规则"
 created: 2026-08-05
-updated: 2026-08-06
+updated: 2026-09-08
 type: rule
 tags: [afd-plugin, review, config, distributed, model-executor]
 sources:
@@ -21,12 +21,12 @@ sources:
 ## 1. 仓库身份和权威来源
 
 - AFD-1a：review 或 issue 回答前必须确认目标是 canonical `vllm-project/afd-plugin`，不能把 vLLM-Omni 的知识树、模型规则、远端策略或 rebase 假设带入 AFD。
-- AFD-1b：AFD 仓库自己的 `AGENTS.md`、`CLAUDE.md`、`.agents/skills/run-e2e/SKILL.md`、CI workflow 和仓库脚本是权威来源；InferMatrixCopilot 只做只读路由、提示和证据组织。
-- AFD-1c：默认路径保持只读；不能自动发 PR 评论、push、改 protected branch，不能要求 AFD runtime 行为因为本 adapter 初始化而改变。
+- AFD-1b：AFD 仓库自己的 `AGENTS.md`、`CLAUDE.md`、`.agents/skills/run-e2e/SKILL.md`、CI workflow 和仓库脚本是权威来源；InferMatrixCopilot 按任务授权执行 review 或维护，不得将知识镜像替代目标 checkout 的当前约束。
+- AFD-1c：review 默认只读，不自动发 PR 评论；已授权的维护可修改候选代码，并在 adapter push 策略与运行开关均允许时推送维护分支，禁止推送 protected branch。adapter 初始化本身不要求改变 AFD runtime 行为。
 
 ## 2. 上游兼容和历史证据边界
 
-- AFD-2a：兼容结论必须精确写当前声明的 runtime：vLLM `0.26.0`；Ascend NPU 以 vLLM-Ascend source commit `80d8c194f` 及与该 snapshot 匹配的 CANN/torch/torch-npu 环境为证据。仓库未声明 released vLLM-Ascend v0.26 package/container，不得推断更宽版本范围。
+- AFD-2a：兼容结论必须绑定目标 checkout 的依赖声明及本轮实际验证的 vLLM commit、wheel 和 runtime；滚动维护以选中的有 wheel 提交为目标，不将镜像的 vLLM `0.26.0` 当作固定升级目标。历史 Ascend 证据绑定 vLLM-Ascend source commit `80d8c194f` 及当时匹配的 CANN/torch/torch-npu 环境；不得据此推断新目标的 NPU 兼容性或已发布的 Ascend package/container。
 - AFD-2e：当前 DeepSeek-V3.2 NPU PCP8 recipe 是 `v0.19.1rc1` 历史实验，不是 v0.26 启动样例；不得把旧 recipe、旧镜像或 PCP 部署当作 v0.26 model-runner-v1 支持证据。
 
 ## 3. Connector、worker 和平台 review
