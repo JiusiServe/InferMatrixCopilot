@@ -101,7 +101,7 @@ jobs:
           if not caps.supports_knowledge_curation:
               sys.exit("SDK capabilities omit knowledge curation")
           if not (
-              caps.knowledge_api_version == KNOWLEDGE_API_VERSION == "1.0.0"
+              caps.knowledge_api_version == KNOWLEDGE_API_VERSION == "1.1.0"
           ):
               sys.exit("installed SDK knowledge API version mismatch")
           if KnowledgeCurator.proposal_schema(max_rules=3)["properties"][
