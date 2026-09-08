@@ -148,7 +148,7 @@ def test_capabilities_reports_the_real_worker_count():
     assert caps["supports_expected_head"] is True
     assert caps["supports_structured_result"] is True
     assert caps["supports_knowledge_curation"] is True
-    assert contract.KNOWLEDGE_API_VERSION == "1.0.0"
+    assert contract.KNOWLEDGE_API_VERSION == "1.1.0"
 
 
 def test_capabilities_reports_missing_file_locking():

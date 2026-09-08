@@ -13,7 +13,7 @@
 
 ## 公开契约（`__all__`）
 `SDK_API_VERSION` / `DIRECT_API_VERSION` / `STRICT_API_VERSION` /
-`QUALITY_API_VERSION` / `KNOWLEDGE_API_VERSION`（当前均为 `"1.0.0"`，且都从 `sdk.v1.models`
+`QUALITY_API_VERSION` / `KNOWLEDGE_API_VERSION`（当前前四者为 `"1.0.0"`，Knowledge 为 `"1.1.0"`，且都从 `sdk.v1.models`
 取唯一值）。`capabilities(max_strict_workers=1,
 supports_file_locking=True) -> dict` 委托 SDK typed handshake 再投影为兼容
 dict；它包含 distribution/SDK/Direct/Strict/Quality/Knowledge 版本、resource

@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-08-31 -->
+<!-- verified-against: 2026-09-08 -->
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
 
@@ -51,8 +51,12 @@
   idempotency key 的重试返回 `created=False` 且绝不再次入队。review depth 只经
   policy allowlisted `params` 传入。
 - **知识规则由 provider 唯一定义**：catalog 只暴露当前仓库 owner 与 general 的
-  `rules.md` document ID；prompt 把事件放进唯一 `<untrusted_data>` fence，proposal
-  shape、rule ID、heading、source citation、目标页和重复 ID 都由 SDK 机械校验。
+  owner rule page document ID —— 每个 owner 的 `rules.md` 入口页及其
+  `type: rule` 的 `rules-<topic>.md` 专题页（`catalog_entries()` 附每页
+  `free_bytes`/`free_lines`，与 `check_knowledge_tree.py` 的拆分门对齐）；prompt 把
+  事件放进唯一 `<untrusted_data>` fence，proposal shape、rule ID、heading、source
+  citation、目标页、重复 ID 与页面剩余容量都由 SDK 机械校验——超出目标页剩余容量的
+  proposal 以 `page full` 在 validator 之前被拒绝，宿主据此改路由而不是整批回滚。
   `proposal_id` 同时绑定 batch、输入下标、repository、section、sources 与目标页
   SHA，宿主不能在 model call 后静默改写已接纳 proposal。
 - **知识 apply 是 append-only transaction**：只追加完整 rule section 并更新唯一
@@ -65,8 +69,9 @@
   push、开 PR 或 schedule。ReviewBot 必须向 `KnowledgeCurator` 传 dedicated work
   checkout，并继续拥有重试、artifact 与 fork publication；SDK 也绝不写 packaged
   knowledge tree。
-- SDK、Direct、Strict、Quality、Knowledge API 版本常量均为 `1.0.0`，distribution 为
-  `0.2.0`；`Capabilities.knowledge_api_version` 与
+- SDK、Direct、Strict、Quality API 版本常量均为 `1.0.0`，Knowledge 为 `1.1.0`
+  （1.1 向后兼容地新增 `catalog_entries()` / `KnowledgeCatalogEntry` 与容量预检），
+  distribution 为 `0.2.0`；`Capabilities.knowledge_api_version` 与
   `supports_knowledge_curation` 组成 ReviewBot 的 paired-release 握手，避免只按
   wheel 名称误接缺失知识 API 的 artifact。后者只有完整 apply 所需的 process file
   lock 在当前平台可用时才为 true，否则 fail closed；旧 `contract.py` 仅做

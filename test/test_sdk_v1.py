@@ -171,7 +171,7 @@ def test_capabilities_identify_package_protocols_and_resources():
     assert caps.direct_api_version
     assert caps.strict_api_version
     assert caps.quality_api_version == "1.0.0"
-    assert caps.knowledge_api_version == KNOWLEDGE_API_VERSION == "1.0.0"
+    assert caps.knowledge_api_version == KNOWLEDGE_API_VERSION == "1.1.0"
     assert caps.supports_idempotent_strict_start is True
     assert caps.supports_quality_review is True
     assert caps.supports_knowledge_curation is True

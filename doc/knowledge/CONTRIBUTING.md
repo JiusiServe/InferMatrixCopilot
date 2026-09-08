@@ -59,7 +59,8 @@ python knowledge/tools/check_wiki_lint.py
 - 新增、移动、重命名、拆分或删除 Markdown 时，必须在同一修改中更新索引和所有链接。
 - PR/review 学习只能落可执行规则：完整 diff、评论、thread、commit 和回放输出只在
   整理时进入 Git 忽略的临时目录；批次结束必须删除。正式树只更新最近 component 或
-  model owner 的 `rules.md` 及必要索引，不新增 PR case/history/result/incident 页面。
+  model owner 的 rule page（`rules.md` 入口页，或该 owner 已拆出的 `type: rule`
+  `rules-<topic>.md` 专题页）及必要索引，不新增 PR case/history/result/incident 页面。
 - 非 PR 学习的既有 guide/architecture 继续按原 owner 维护；不得把不同模型、组件、
   benchmark 和 review 内容压成一篇 catch-all 页面。
 - 评测 cases、hidden labels、predictions、judgments 和 run reports 属于 `eval/`，

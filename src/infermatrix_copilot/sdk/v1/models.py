@@ -9,7 +9,7 @@ SDK_API_VERSION = "1.0.0"
 DIRECT_API_VERSION = "1.0.0"
 STRICT_API_VERSION = "1.0.0"
 QUALITY_API_VERSION = "1.0.0"
-KNOWLEDGE_API_VERSION = "1.0.0"
+KNOWLEDGE_API_VERSION = "1.1.0"
 
 
 class _Serializable:
@@ -82,6 +82,20 @@ class KnowledgeRoute(_Serializable):
     quick_map: str
     quick_map_status: str
     read_required: bool
+
+
+@dataclass(frozen=True)
+class KnowledgeCatalogEntry(_Serializable):
+    """One owner rule page a proposal may target, with its remaining room.
+
+    ``free_bytes`` / ``free_lines`` are what a new section may add before the
+    page crosses the tree validator's split gate; a proposal that needs more
+    is rejected before validation so the host can reroute it."""
+
+    document_id: str
+    size_bytes: int
+    free_bytes: int
+    free_lines: int
 
 
 @dataclass(frozen=True)

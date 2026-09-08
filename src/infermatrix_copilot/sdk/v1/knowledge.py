@@ -28,6 +28,7 @@ from typing import Any, Final
 from .models import (
     InvalidRequestError,
     KnowledgeApplyResult,
+    KnowledgeCatalogEntry,
     KnowledgeCurationError,
     KnowledgeEvidenceBatch,
     KnowledgeProposalRejection,
@@ -48,6 +49,15 @@ _VALIDATOR_IDS: Final = (
     "knowledge/tools/check_knowledge_tree.py",
     "knowledge/tools/check_wiki_lint.py",
 )
+# Owner rule pages: the entry page plus its split-out topic pages, which the
+# tree already treats as rule pages (frontmatter ``type: rule``).
+_RULE_PAGE_NAME: Final = re.compile(r"rules(?:-[a-z0-9][a-z0-9-]*)?\.md")
+_PAGE_TYPE: Final = re.compile(r"^type:\s*(?P<type>[A-Za-z]+)\s*$", re.MULTILINE)
+# Mirrors knowledge/tools/check_knowledge_tree.py's split gate: a page fails
+# at >= 32 KiB or >= 500 non-empty lines, so that is the capacity a proposal
+# may consume before validation would reject the whole batch.
+_PAGE_MAX_BYTES: Final = 32 * 1024
+_PAGE_MAX_LINES: Final = 500
 _MAX_SECTION_CHARS = 16 * 1024
 _MAX_SUMMARY_CHARS = 3000
 _MAX_ATTRIBUTE_CHARS = 3000
@@ -204,35 +214,92 @@ class KnowledgeCurator:
             )
         return path
 
+    def _is_rule_page(self, path: Path) -> bool:
+        """A rule page is named ``rules.md`` or ``rules-<topic>.md`` AND
+        declares ``type: rule``; a topic page of another type (a guide that
+        happens to share the prefix) is never a proposal target."""
+        if not _RULE_PAGE_NAME.fullmatch(path.name):
+            return False
+        try:
+            head = path.read_text(encoding="utf-8")[:4096]
+        except OSError as exc:
+            raise KnowledgeCurationError(
+                f"knowledge catalog page is unreadable: {path.name}"
+            ) from exc
+        match = _FRONTMATTER.match(head)
+        if match is None:
+            return False
+        page_type = _PAGE_TYPE.search(match.group("body"))
+        return page_type is not None and page_type.group("type") == "rule"
+
     def catalog(
         self, repository: RepositoryRef | None = None
     ) -> tuple[str, ...]:
-        """Return sorted, relative IDs for allowed ``rules.md`` owner pages."""
+        """Return sorted, relative IDs for allowed owner rule pages: each
+        owner's ``rules.md`` entry page and its ``rules-<topic>.md`` topic
+        pages (``type: rule``)."""
+        return tuple(entry.document_id for entry in self.catalog_entries(repository))
+
+    def catalog_entries(
+        self, repository: RepositoryRef | None = None
+    ) -> tuple[KnowledgeCatalogEntry, ...]:
+        """The catalog with each page's remaining capacity."""
         prefixes = ("knowledge/general/", "knowledge/repos/")
         if repository is not None:
             slug = self._repo_slug(repository)
             prefixes = ("knowledge/general/", f"knowledge/repos/{slug}/")
 
-        documents: list[str] = []
-        for path in sorted(self._knowledge.rglob("rules.md")):
+        entries: list[KnowledgeCatalogEntry] = []
+        for path in sorted(self._knowledge.rglob("rules*.md")):
             if path.is_symlink():
                 raise KnowledgeCurationError(
-                    "knowledge catalog contains a symlinked rules.md"
+                    "knowledge catalog contains a symlinked rules page"
                 )
+            if not self._is_rule_page(path):
+                continue
             resolved = path.resolve()
             try:
                 document_id = resolved.relative_to(self._workspace).as_posix()
             except ValueError as exc:
                 raise KnowledgeCurationError(
-                    "knowledge catalog contains an escaping rules.md"
+                    "knowledge catalog contains an escaping rules page"
                 ) from exc
-            if any(document_id.startswith(prefix) for prefix in prefixes):
-                documents.append(document_id)
-        if len(documents) > self.max_catalog_pages:
+            if not any(document_id.startswith(prefix) for prefix in prefixes):
+                continue
+            data = resolved.read_bytes()
+            entries.append(KnowledgeCatalogEntry(
+                document_id=document_id,
+                size_bytes=len(data),
+                free_bytes=max(0, _PAGE_MAX_BYTES - 1 - len(data)),
+                free_lines=max(
+                    0, _PAGE_MAX_LINES - 1 - self._non_empty_lines(data)
+                ),
+            ))
+        if len(entries) > self.max_catalog_pages:
             raise KnowledgeCurationError(
                 "knowledge rules catalog exceeds the configured page bound"
             )
-        return tuple(documents)
+        return tuple(entries)
+
+    @staticmethod
+    def _non_empty_lines(data: bytes) -> int:
+        return sum(
+            1 for line in data.decode("utf-8", "replace").splitlines()
+            if line.strip()
+        )
+
+    @staticmethod
+    def _appended_size(section: str, page_data: bytes) -> tuple[int, int]:
+        """Bytes and non-empty lines ``apply`` adds for one section: what
+        ``_updated_page`` renders, including the newline it first inserts
+        when the page does not end with one (the ``updated:`` bump is a
+        same-length replacement)."""
+        rendered = "\n" + section.rstrip() + "\n"
+        normalization = 0 if page_data.endswith((b"\n", b"\r")) else 1
+        return (
+            len(rendered.encode("utf-8")) + normalization,
+            sum(1 for line in rendered.splitlines() if line.strip()),
+        )
 
     def _validate_batch(self, batch: KnowledgeEvidenceBatch) -> None:
         if not batch.batch_id.strip() or len(batch.batch_id) > 128:
@@ -305,21 +372,35 @@ class KnowledgeCurator:
     def build_prompt(self, batch: KnowledgeEvidenceBatch) -> str:
         """Build the catalog-constrained prompt with evidence fenced as data."""
         self._validate_batch(batch)
-        catalog = self.catalog(batch.repository)
-        if not catalog:
+        entries = self.catalog_entries(batch.repository)
+        if not entries:
             raise KnowledgeCurationError(
-                "knowledge workspace has no rules.md page for this repository"
+                "knowledge workspace has no rule page for this repository"
             )
+        catalog = [
+            {
+                "page": entry.document_id,
+                "free_bytes": entry.free_bytes,
+                "free_lines": entry.free_lines,
+            }
+            for entry in entries
+        ]
         schema = self.proposal_schema(max_rules=batch.max_rules)
         return (
             "You distill repository-maintenance learnings into a governed "
-            "knowledge tree. The catalog lists every rules.md page you may "
-            "target.\n\n"
+            "knowledge tree. The catalog lists every owner rule page you may "
+            "target: an owner's `rules.md` entry page and its `rules-<topic>.md` "
+            "topic pages, each with the room it has left.\n\n"
             "Contract (violations are rejected mechanically):\n"
             "- Propose only executable rules that change what a reviewer or "
             "debugger does next time; no case narration or raw event pages.\n"
             "- Route each rule to the nearest owner page in the catalog. Read "
             "that page first and match its language, heading, and bullet style.\n"
+            "- Respect capacity: a page's free_bytes / free_lines are what new "
+            "sections may add before the page must split. A proposal that "
+            "needs more than its page has left is rejected, so prefer the "
+            "owner's topic page that fits, or shorten; never target a page "
+            "outside the catalog.\n"
             "- Each proposal is one complete `## <rule_id> — <title>` section. "
             "Never modify or restate an existing section.\n"
             f"- Return at most {batch.max_rules} rules. An empty list is correct "
@@ -384,13 +465,21 @@ class KnowledgeCurator:
         if not isinstance(raw_rules, list):
             raise InvalidRequestError("proposal output rules must be an array")
 
-        catalog = set(self.catalog(batch.repository))
+        entries = {
+            entry.document_id: entry
+            for entry in self.catalog_entries(batch.repository)
+        }
+        catalog = set(entries)
         allowed_sources = {
             event.source_reference.strip() for event in batch.events
         }
         accepted: list[KnowledgeRuleProposal] = []
         rejected: list[KnowledgeProposalRejection] = []
         seen: set[tuple[str, str]] = set()
+        # Room consumed on each page by proposals accepted earlier in this
+        # same batch, so two rules routed to one nearly full page do not
+        # both pass here and then fail together at the validator.
+        consumed: dict[str, tuple[int, int]] = defaultdict(lambda: (0, 0))
         for index, item in enumerate(raw_rules):
             reason = ""
             if index >= batch.max_rules:
@@ -459,6 +548,32 @@ class KnowledgeCurator:
                         )
                         if self._rule_exists(page_text, rule_id):
                             reason = "rule_id already exists in the target page"
+                    if not reason:
+                        used_bytes, used_lines = consumed[page]
+                        # The normalization newline is paid once per page:
+                        # after the first accepted section the page ends
+                        # with one.
+                        add_bytes, add_lines = self._appended_size(
+                            section,
+                            self._document_path(page).read_bytes()
+                            if (used_bytes, used_lines) == (0, 0) else b"\n",
+                        )
+                        entry = entries[page]
+                        if (
+                            used_bytes + add_bytes > entry.free_bytes
+                            or used_lines + add_lines > entry.free_lines
+                        ):
+                            reason = (
+                                "page full: section needs "
+                                f"{add_bytes} bytes / {add_lines} lines but "
+                                f"{entry.free_bytes - used_bytes} bytes / "
+                                f"{entry.free_lines - used_lines} lines remain "
+                                "before the page must split"
+                            )
+                        else:
+                            consumed[page] = (
+                                used_bytes + add_bytes, used_lines + add_lines
+                            )
 
             if reason:
                 rejected.append(KnowledgeProposalRejection(index, reason))

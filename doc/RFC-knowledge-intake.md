@@ -15,7 +15,8 @@
 ## Motivation
 
 The knowledge tree has a written intake contract — PR-learning produces only
-executable rules in the nearest owner's `rules.md`, raw material is deleted,
+executable rules on the nearest owner's rule pages (its `rules.md` entry page
+or a `type: rule` `rules-<topic>.md` topic page), raw material is deleted,
 two validators plus the release audit gate every batch — but no automated
 feeder. Learnings evaporate at exactly the two moments they are freshest:
 

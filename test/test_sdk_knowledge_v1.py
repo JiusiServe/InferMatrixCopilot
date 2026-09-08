@@ -22,6 +22,7 @@ from infermatrix_copilot.sdk.v1 import (
 PAGE = "knowledge/repos/x/rules.md"
 GENERAL_PAGE = "knowledge/general/review/rules.md"
 OTHER_PAGE = "knowledge/repos/y/rules.md"
+TOPIC_PAGE = "knowledge/repos/x/rules-topic.md"
 PAGE_TEXT = """---
 title: x rules
 created: 2026-08-01
@@ -136,6 +137,133 @@ def test_catalog_is_repo_scoped_sorted_and_path_free(workspace):
     assert scoped == (GENERAL_PAGE, PAGE)
     assert all_pages == (GENERAL_PAGE, PAGE, OTHER_PAGE)
     assert all(not Path(item).is_absolute() for item in all_pages)
+
+
+def _non_empty(text: str) -> int:
+    return sum(1 for line in text.splitlines() if line.strip())
+
+
+def _fill_to_free_bytes(workspace: Path, page: str, free_bytes: int) -> None:
+    """Pad `page` with one long filler rule so exactly `free_bytes` remain
+    before the tree validator's 32 KiB split gate."""
+    path = workspace / page
+    text = path.read_text(encoding="utf-8")
+    head = "\n## X-F — filler\n\n- "
+    tail = " ^[PR #1]\n"
+    target = 32 * 1024 - 1 - free_bytes
+    body_len = target - len((text + head + tail).encode("utf-8"))
+    assert body_len > 0
+    path.write_text(text + head + "f" * body_len + tail, encoding="utf-8")
+    assert len(path.read_bytes()) == target
+
+
+def test_catalog_includes_owner_topic_rule_pages_with_capacity(workspace):
+    (workspace / TOPIC_PAGE).write_text(
+        PAGE_TEXT.replace("X-1", "X-T1"), encoding="utf-8"
+    )
+    # A guide sharing the prefix and a look-alike name are never targets.
+    (workspace / "knowledge/repos/x/rules-howto.md").write_text(
+        PAGE_TEXT.replace("type: rule", "type: guide"), encoding="utf-8"
+    )
+    (workspace / "knowledge/repos/x/rulesx.md").write_text(
+        PAGE_TEXT, encoding="utf-8"
+    )
+    curator = KnowledgeCurator(workspace)
+
+    assert curator.catalog(RepositoryRef("x")) == (GENERAL_PAGE, TOPIC_PAGE, PAGE)
+    entries = {
+        entry.document_id: entry
+        for entry in curator.catalog_entries(RepositoryRef("x"))
+    }
+    entry = entries[PAGE]
+    assert entry.size_bytes == len(PAGE_TEXT.encode("utf-8"))
+    assert entry.free_bytes == 32 * 1024 - 1 - entry.size_bytes
+    assert entry.free_lines == 499 - _non_empty(PAGE_TEXT)
+    assert entry.to_dict() == {
+        "document_id": PAGE,
+        "size_bytes": entry.size_bytes,
+        "free_bytes": entry.free_bytes,
+        "free_lines": entry.free_lines,
+    }
+    prompt = curator.build_prompt(_batch())
+    assert TOPIC_PAGE in prompt and "rules-howto.md" not in prompt
+    assert '"free_bytes": ' in prompt and "free_lines" in prompt
+    # A topic page is a real target end to end, not only a listing.
+    validation = curator.validate_proposals(
+        _document(_rule(page=TOPIC_PAGE)), _batch()
+    )
+    assert validation.rejected == () and validation.accepted[0].page_document_id == TOPIC_PAGE
+    result = curator.apply(validation, updated_on="2026-09-08")
+    assert result.applied == 1 and result.updated_document_ids == (TOPIC_PAGE,)
+    assert "## X-2" in (workspace / TOPIC_PAGE).read_text(encoding="utf-8")
+
+
+def test_full_page_is_rejected_before_validation_not_after(workspace):
+    (workspace / TOPIC_PAGE).write_text(
+        PAGE_TEXT.replace("X-1", "X-T1"), encoding="utf-8"
+    )
+    _fill_to_free_bytes(workspace, PAGE, 100)
+    curator = KnowledgeCurator(workspace)
+
+    validation = curator.validate_proposals(
+        _document(_rule(), _rule(page=TOPIC_PAGE, rule_id="X-3",
+                                 section=SECTION.replace("X-2", "X-3"))),
+        _batch(),
+    )
+
+    assert [item.index for item in validation.rejected] == [0]
+    assert validation.rejected[0].reason.startswith("page full: section needs ")
+    assert "100 bytes" in validation.rejected[0].reason
+    assert [p.page_document_id for p in validation.accepted] == [TOPIC_PAGE]
+    # Nothing was written or validated to learn that the page was full.
+    assert not (workspace / "validator-order.txt").exists()
+    assert curator.build_prompt(_batch()).count('"free_bytes": 100') == 1
+
+
+def test_capacity_counts_the_newline_added_to_an_unterminated_page(workspace):
+    """A page without a final newline gets one inserted by apply; the
+    precheck must charge that byte, or a proposal that exactly fits the
+    listed room renders a 32 KiB page and fails the validator gate."""
+    rendered = len(("\n" + SECTION + "\n").encode("utf-8"))
+    path = workspace / PAGE
+    _fill_to_free_bytes(workspace, PAGE, rendered - 1)
+    path.write_bytes(path.read_bytes().rstrip(b"\n"))
+    curator = KnowledgeCurator(workspace)
+    assert curator.catalog_entries(RepositoryRef("x"))[1].free_bytes == rendered
+
+    validation = curator.validate_proposals(_document(_rule()), _batch())
+
+    assert validation.accepted == ()
+    assert validation.rejected[0].reason.startswith("page full")
+    assert f"needs {rendered + 1} bytes" in validation.rejected[0].reason
+    # A terminated page with exactly that room fits, and the applied page
+    # stays one byte under the gate.
+    path.write_text(PAGE_TEXT, encoding="utf-8")
+    _fill_to_free_bytes(workspace, PAGE, rendered)
+    validation = curator.validate_proposals(_document(_rule()), _batch())
+    assert validation.rejected == ()
+    result = curator.apply(validation, updated_on="2026-09-08")
+    assert result.applied == 1
+    assert len(path.read_bytes()) == 32 * 1024 - 1
+
+
+def test_capacity_is_consumed_across_one_batch(workspace):
+    room = len(("\n" + SECTION + "\n").encode("utf-8"))
+    _fill_to_free_bytes(workspace, PAGE, room + 10)
+    curator = KnowledgeCurator(workspace)
+
+    validation = curator.validate_proposals(
+        _document(_rule(), _rule(rule_id="X-3",
+                                 section=SECTION.replace("X-2", "X-3"))),
+        _batch(),
+    )
+
+    assert [p.rule_id for p in validation.accepted] == ["X-2"]
+    assert validation.rejected[0].index == 1
+    assert validation.rejected[0].reason.startswith("page full")
+    result = curator.apply(validation, updated_on="2026-09-08")
+    assert result.applied == 1
+    assert len((workspace / PAGE).read_bytes()) < 32 * 1024
 
 
 def test_constructor_and_catalog_fail_closed(tmp_path, workspace):
