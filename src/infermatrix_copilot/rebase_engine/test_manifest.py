@@ -120,6 +120,7 @@ class ManifestJob:
     module: str = ""
     setup: str = ""                # parent CI_TEST_SETUP[slug], adapter data
     file_refs: list[str] = field(default_factory=list)
+    runtime_required: bool = False
 
 
 @dataclass
@@ -155,7 +156,8 @@ class BuiltManifest:
             "jobs": [{"slug": j.slug, "label": j.label, "source": j.source,
                       "command": j.command, "timeout_sec": j.timeout_sec,
                       "min_gpus": j.min_gpus, "hw": j.hw, "env": j.env,
-                      "module": j.module, "setup": j.setup}
+                      "module": j.module, "setup": j.setup,
+                      **({"runtime_required": True} if j.runtime_required else {})}
                      for j in self.jobs],
             "changes": [{"path": c.path, "type": c.change_type,
                          "new_path": c.new_path} for c in self.changes],
@@ -562,6 +564,7 @@ def build_manifest(repo: Path, spec: ManifestSpec) -> BuiltManifest:
                 module=str(raw.get("module") or ""),
                 setup=str(raw.get("setup") or ""),
                 file_refs=list(raw.get("file_refs") or ()),
+                runtime_required=bool(raw.get("runtime_required", False)),
             ))
     changes = _classify_test_changes(repo, spec)
     rename_map = {c.path: c.new_path for c in changes

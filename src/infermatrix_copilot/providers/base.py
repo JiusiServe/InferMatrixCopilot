@@ -85,6 +85,9 @@ class AgentSessionRequest:
     step_name: str = ""
     bridge_spec_path: Path | None = None
     trace: Any = None  # RunTrace-shaped (record(kind, **fields)) or None
+    # A rebase bridge owns the plan gate and all writes. Native CLI writes
+    # must stay disabled even while its MCP tools have a writable scope.
+    bridge_managed_writes: bool = False
 
 
 @dataclass

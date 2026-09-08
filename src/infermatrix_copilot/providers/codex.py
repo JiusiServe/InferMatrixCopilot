@@ -7,11 +7,10 @@ claude-code this transport is exercised offline against recorded shapes —
 the readiness path reports the login gap before any run starts).
 
 Governance posture (disclosed, per doc/features/provider-registry.md): codex
-uses ``--sandbox read-only`` for read-only scopes and
-``--sandbox workspace-write`` for an explicitly writable ToolScope. The
-workspace mode remains bounded by the tool bridge's path policy and does not
-grant danger-full-access or an unrestricted network mode. Broad *reads* inside
-the sandbox remain a documented limitation of this backend class.
+uses ``--sandbox read-only`` for read-only scopes and rebase sessions whose
+MCP bridge owns the plan gate and writes. Other explicitly writable scopes
+use ``--sandbox workspace-write``. Broad native reads remain a documented
+limitation of this backend class.
 
 Env is the shared allowlist (`base.sanitized_env`); codex keeps its own
 auth under HOME (~/.codex)."""
@@ -50,16 +49,19 @@ class CodexTransport(HarnessTransport):
             out = subprocess.run([cli, "login", "status"], capture_output=True,
                                  text=True, encoding="utf-8", errors="replace",
                                  timeout=15, check=False)
-        except (OSError, subprocess.SubprocessError):
-            return None  # status probe itself broken — let the run surface it
+        except (OSError, subprocess.SubprocessError) as exc:
+            return f"codex CLI login-status check failed: {exc}"
         blob = f"{out.stdout}\n{out.stderr}"
-        if out.returncode != 0 or "Not logged in" in blob:
+        if "not logged in" in blob.lower():
             return ("codex CLI is not logged in — run: codex login "
                     "(ChatGPT subscription auth)")
+        if out.returncode != 0:
+            return (f"codex CLI login-status check failed (exit {out.returncode}): "
+                    + blob.strip()[-500:])
         return None
 
     # -- process plumbing ----------------------------------------------------
-    def _mcp_overrides(self, spec_path: Path) -> list[str]:
+    def _mcp_overrides(self, spec_path: Path, timeout_s: float) -> list[str]:
         """``-c`` config overrides wiring the tool bridge as an MCP server —
         config-only, so nothing is written into the session tree."""
         package_root = Path(__file__).resolve().parents[2]
@@ -70,6 +72,9 @@ class CodexTransport(HarnessTransport):
             "-c", f"mcp_servers.{_BRIDGE_SERVER}.args={args}",
             "-c", (f"mcp_servers.{_BRIDGE_SERVER}.env="
                    f'{{PYTHONPATH = "{package_root}"}}'),
+            # Plan review and bounded test tools can exceed the MCP default
+            # timeout; the enclosing session still supplies the wall limit.
+            "-c", f"mcp_servers.{_BRIDGE_SERVER}.tool_timeout_sec={max(1, int(timeout_s))}",
         ]
 
     def _run(self, text: str, *, cwd: str, timeout_s: float, model: str = "",
@@ -85,7 +90,7 @@ class CodexTransport(HarnessTransport):
         if selected:
             cmd += ["-m", selected]
         if mcp_spec is not None:
-            cmd += self._mcp_overrides(mcp_spec)
+            cmd += self._mcp_overrides(mcp_spec, timeout_s)
         cmd += ["-"]
         timed_out = False
         try:
@@ -160,7 +165,7 @@ class CodexTransport(HarnessTransport):
             f"{req.system}\n\n{req.prompt}", cwd=cwd,
             timeout_s=req.timeout_s, model=req.model,
             mcp_spec=req.bridge_spec_path,
-            sandbox=("read-only" if req.scope.read_only
+            sandbox=("read-only" if req.scope.read_only or req.bridge_managed_writes
                       else "workspace-write"))
         usage = self._usage(events)
         used = self._tool_activity(events)

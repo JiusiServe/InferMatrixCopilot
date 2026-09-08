@@ -109,6 +109,17 @@ async def rebase_module(
                         log_dir=config.log_dir,
                         session=f"module-{module}"))
 
+                harness_prompt += (
+                    "\n\nUse the rebase MCP tools for all edits and commands. "
+                    "Native shell writes are disabled. Before the plan decision, "
+                    "run_shell and all execution tools are locked; explore with "
+                    "read_file, grep and the git inspection tools.\n"
+                    "Your final response must be exactly one JSON object: "
+                    '{"status":"success|failed|blocked","summary":"what changed '
+                    'and what was verified"}. Use success only after completing '
+                    "the requested adaptation and validation; report missing "
+                    "runtime or tools as blocked, never success.")
+
                 outcome = harness_runner(
                     harness_prompt, require_plan_review=require_plan_review)
                 if inspect.isawaitable(outcome):

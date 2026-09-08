@@ -58,7 +58,7 @@ def llm_for(settings):
 
 def run_harness_step(ctx, target, *, step_name: str, system: str, prompt: str,
                      scope, max_iters: int, provider_id: str = "",
-                     model: str = ""):
+                     model: str = "", rebase_bridge: dict | None = None):
     """Run one agent step through a harness: write the bridge spec for this
     scope, then delegate the whole step to the transport. Returns
     `agent_loop.AgentOutcome` so the runner's downstream (output coercion,
@@ -73,10 +73,12 @@ def run_harness_step(ctx, target, *, step_name: str, system: str, prompt: str,
     spec = ctx.state.get("task_spec") or {}
     bridge_spec = write_bridge_spec(
         run_dir=ctx.run_dir, step_name=step_name, scope=scope,
-        repo=str(spec.get("repo") or ctx.settings.default_repo))
+        repo=str(spec.get("repo") or ctx.settings.default_repo),
+        rebase=rebase_bridge)
     return transport.run_session(AgentSessionRequest(
         system=system, prompt=prompt, scope=scope,
         model=model or target.model,
         max_iters=max_iters, timeout_s=ctx.settings.strict_backend_timeout_s,
         run_dir=ctx.run_dir, step_name=step_name,
-        bridge_spec_path=bridge_spec, trace=ctx.trace))
+        bridge_spec_path=bridge_spec, trace=ctx.trace,
+        bridge_managed_writes=rebase_bridge is not None))

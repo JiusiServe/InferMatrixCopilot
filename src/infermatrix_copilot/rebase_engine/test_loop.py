@@ -1,12 +1,12 @@
 """THE local test loop — port of the parent's `run_manifest_test_loop`
 (phase 3; phase 4's local-CI fallback reuses it).
 
-Control-flow parity, pinned by tests: per-test resume from checkpointed
-progress (this run only — substate is run-stamped); GPU-count skips; a
-failure re-runs the SAME test on the main-baseline worktree to split
-pre-existing failures from rebase regressions (an unavailable worktree must
-not mask a regression behind a git error — it is treated as a regression);
-regressions go to the debug loop; every transition checkpoints.
+Per-test resume uses checkpointed progress from this run only. Outside
+local_rebase, a failure may re-run on the main-baseline worktree; only
+matching structured failure evidence can establish a pre-existing failure.
+local_rebase disables that exemption because the baseline uses the newly
+installed dependency runtime too. Unproven failures go to the debug loop;
+every transition checkpoints.
 
 One recorded divergence stands (plan §6.8): the PR1 runner produces TYPED
 skip outcomes, so the parent's `_shell_skipped` rc=0 heuristic is not
@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Awaitable, Callable, Mapping, Sequence
 
@@ -42,6 +42,10 @@ class TestRunResult:
     # test-assertion failures, so the loop must keep them out of
     # `failed_tests` (which the push gate passes through flagged)
     infra: str = ""
+    # JUnit failure identities, not just a process exit code. Without these
+    # a red baseline cannot establish that it reproduced the same failures.
+    failures: tuple[tuple[str, str, str], ...] = ()
+    counts: Mapping[str, int] = field(default_factory=dict)
 
 
 # run_fn(slug) -> TestRunResult; baseline_fn(slug) -> TestRunResult | None
@@ -55,6 +59,12 @@ BaselineFn = Callable[[str], "TestRunResult | None"]
 DebugFn = Callable[[str, str, int, str], "Awaitable[bool | str]"]
 
 
+def reset_progress(substate: Substate) -> None:
+    """A changed validation tree cannot reuse completed or failed jobs."""
+    substate.update({"phase3_progress": {
+        "completed": [], "failed": [], "skipped": [], "infra": [], "current": ""}})
+
+
 async def run_test_loop(
     jobs: Sequence[Mapping],
     *,
@@ -64,6 +74,7 @@ async def run_test_loop(
     debug_fn: DebugFn,
     visible_gpus: int = 0,
     phase_label: str = "Phase 3",
+    allow_preexisting: bool = True,
 ) -> dict:
     """Returns the parent's shape plus the structural split:
     ``{"passed", "failed", "failed_tests", "skipped_tests",
@@ -131,12 +142,6 @@ async def run_test_loop(
             skipped_tests.append(slug)
             checkpoint(slug)
             continue
-        if result.rc == 0:
-            log.info("  PASSED: %s", label)
-            passed += 1
-            completed_slugs.append(slug)
-            checkpoint()
-            continue
         if result.infra:
             # STRUCTURAL (Rev 8 §2.3): timeouts / watchdog kills / harness
             # crashes never enter the baseline-vs-regression split or the
@@ -148,8 +153,16 @@ async def run_test_loop(
             failed += 1
             checkpoint()
             continue
+        if result.rc == 0:
+            log.info("  PASSED: %s", label)
+            passed += 1
+            completed_slugs.append(slug)
+            checkpoint()
+            continue
 
-        baseline = baseline_fn(slug)
+        # In local_rebase both trees use the new dependency runtime. An old
+        # tree failing there is not evidence that its old runtime was red.
+        baseline = baseline_fn(slug) if allow_preexisting else None
         if baseline is None:
             # infra failure preparing the worktree — do not mask a possible
             # regression behind a git error; treat as a regression
@@ -162,7 +175,8 @@ async def run_test_loop(
             # regression; regression-preserving, like an absent worktree
             log.warning("  baseline INFRA FAILURE (%s) on %s — treating as "
                         "REGRESSION", baseline.infra, label)
-        elif baseline.rc != 0:
+        elif (baseline.rc != 0 and result.failures and baseline.failures
+              and set(result.failures) <= set(baseline.failures)):
             log.info("  [PRE-EXISTING] %s fails on main too (rebase rc=%d, "
                      "main rc=%d) — skipping, not a regression", label,
                      result.rc, baseline.rc)
@@ -170,7 +184,7 @@ async def run_test_loop(
             checkpoint(slug)
             continue
 
-        log.info("  [REGRESSION] %s passes on main but fails on rebase — "
+        log.info("  [REGRESSION] %s has failures not proven pre-existing — "
                  "debugging", label)
         verdict = await debug_fn(slug, label, result.rc, result.output)
         if verdict is True:

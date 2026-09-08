@@ -2,6 +2,7 @@ template: module_rebase.prompt.tmpl
 template_live: module_rebase.prompt.tmpl
 pytest_wrapper: "python3 -m pytest"
 pytest_wrapper_live: "python3 -m pytest"
+import_command: "python3"
 
 module_vllm_paths:
   plugin_boundary: "vllm/config/ vllm/plugins/ vllm/platforms/"

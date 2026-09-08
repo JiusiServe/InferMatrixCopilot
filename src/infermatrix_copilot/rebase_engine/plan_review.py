@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 _REVIEW_PROMPT = """You are a strict senior reviewer for an automated \
 repository-rebase agent. Review the plan below for correctness, missing \
@@ -48,10 +48,12 @@ def _parse_review(text: str) -> dict | None:
 
 def review_plan(client: Any, model: str, *, plan_json_path: str,
                 plan_md_path: str = "", kind: str = "rebase",
-                max_tokens: int = 2000) -> dict:
+                max_tokens: int = 2000,
+                complete: Callable[[str], str] | None = None) -> dict:
     """Run one plan review (SYNC — tool backends dispatch synchronously
     from inside the agent loop, so this takes a sync Anthropic-compatible
-    client). Never raises — every failure is an `{"error": ...}` result
+    client, or a tool-less harness completion callback). Never raises —
+    every failure is an `{"error": ...}` result
     the agent can see and retry on."""
     json_path = Path(plan_json_path)
     if not json_path.exists():
@@ -73,10 +75,13 @@ def review_plan(client: Any, model: str, *, plan_json_path: str,
                                    plan_json=plan_json[:20000],
                                    plan_md=plan_md[:20000])
     try:
-        response = client.messages.create(
-            model=model, max_tokens=max_tokens,
-            messages=[{"role": "user", "content": prompt}])
-        text = "".join(getattr(b, "text", "") or "" for b in response.content)
+        if complete is not None:
+            text = complete(prompt)
+        else:
+            response = client.messages.create(
+                model=model, max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}])
+            text = "".join(getattr(b, "text", "") or "" for b in response.content)
     except Exception as exc:  # noqa: BLE001 - review failure is a result
         return {"error": f"Plan review call failed: {exc}"}
 

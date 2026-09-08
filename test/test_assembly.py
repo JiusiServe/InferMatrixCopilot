@@ -197,7 +197,7 @@ def test_afd_adapter_supplies_a_runnable_local_cpu_job(tmp_path):
     spec = ManifestSpec.from_manifest(manifest)
     built = build_manifest(tmp_path / "afd", spec)
     local = [job for job in built.jobs if job.source == "local"]
-    assert len(local) == 1
+    assert len(local) == 2
     job = local[0]
     assert job.module == "plugin_boundary"
     assert job.min_gpus == 0 and job.hw == "cpu"
@@ -251,11 +251,13 @@ def test_test_loop_decision_matrix(tmp_path):
                       "regression_stuck", "infra")]
     runs = {"pass": tl.TestRunResult(0),
             "hwskip": tl.TestRunResult(0, skipped=True, skip_reason="gpu"),
-            "preexisting": tl.TestRunResult(1),
+            "preexisting": tl.TestRunResult(
+                1, failures=(("test_old", "AssertionError", "known failure"),)),
             "regression_fixed": tl.TestRunResult(1),
             "regression_stuck": tl.TestRunResult(1),
             "infra": tl.TestRunResult(1)}
-    baselines = {"preexisting": tl.TestRunResult(1),       # fails on main too
+    baselines = {"preexisting": tl.TestRunResult(
+                     1, failures=(("test_old", "AssertionError", "known failure"),)),
                  "regression_fixed": tl.TestRunResult(0),
                  "regression_stuck": tl.TestRunResult(0),
                  "infra": None}                            # worktree broken
@@ -659,7 +661,7 @@ def test_v3_per_mode_matrix():
                  "report", "finalize"},
         "local_rebase": {"prelude", "guard", "knowledge_prep", "sync_target",
                           "wheel", "assign", "wave1", "wave_gate", "wave2",
-                          "tests", "precommit", "push_gate", "phase5_report", "curate",
+                          "tests", "precommit", "push_gate", "publish", "phase5_report", "curate",
                           "compare", "report", "finalize"},
     }
     for mode, expect in matrix.items():
@@ -929,6 +931,9 @@ def test_v3_dropped_steps_are_structural(v3_env, settings, trace, tmp_path,
             {"label": "Good", "timeout_in_minutes": 1, "commands": ["true"]},
             {"label": "Broken Stub", "timeout_in_minutes": 1,
              "commands": []}]}))
+    subprocess.run(["git", "add", "-A"], cwd=repo2, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-qm", "test manifest"], cwd=repo2, check=True)
     monkeypatch.setattr(
         runner_mod.TestRunner, "run",
         lambda self, job, env, *, baseline=False, dry_run=False:
@@ -1019,7 +1024,7 @@ def test_v3_debug_fn_invokes_agent_and_verifies(v3_agent_env, settings,
     monkeypatch.setattr(
         rebase_v3, "_tier_client",
         lambda ctx: (object(), SimpleNamespace(
-            model="m-test", api_key="k", base_url="", source="tier:eco")))
+            model="m-test", api_key="k", base_url="", source="tier:eco", kind="api")))
     agent_calls = []
 
     async def fake_loop(client, prompt, **kw):
@@ -1071,7 +1076,7 @@ def test_v3_module_scope_and_serialization(v3_agent_env, settings, trace,
     monkeypatch.setattr(
         rebase_v3, "_tier_client",
         lambda ctx: (object(), SimpleNamespace(
-            model="m-test", api_key="k", base_url="", source="tier:eco")))
+            model="m-test", api_key="k", base_url="", source="tier:eco", kind="api")))
     events, scopes, configs = [], {}, {}
 
     async def fake_rebase_module(module, **kw):
@@ -1409,7 +1414,7 @@ def test_v3_module_rebase_idempotent_on_resume(v3_agent_env, settings,
     monkeypatch.setattr(
         rebase_v3, "_tier_client",
         lambda ctx: (object(), SimpleNamespace(
-            model="m", api_key="k", base_url="", source="global")))
+            model="m", api_key="k", base_url="", source="global", kind="api")))
     called = []
 
     async def fake_rebase_module(module, **kw):
@@ -1568,7 +1573,6 @@ def test_v3_ci_push_carries_the_settings_github_token(
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.step import StepContext
     from infermatrix_copilot.engine.steps import register_builtin_steps
-    from infermatrix_copilot.engine.steps import rebase_v3
     from infermatrix_copilot.rebase_engine import ci_loop, push_to_ci
     _, _, repo, run_dir = v3_env
     # the step pushes ONLY from the adapter-declared rebase branch
@@ -1632,7 +1636,7 @@ def test_v3_ci_debug_rejects_weakened_assertion(
     monkeypatch.setattr(
         rebase_v3, "_tier_client",
         lambda ctx: (object(), SimpleNamespace(
-            model="m", api_key="k", base_url="", source="global")))
+            model="m", api_key="k", base_url="", source="global", kind="api")))
 
     async def fake_agent(*args, **kwargs):
         helper.write_text("def check(score):\n    assert score > 0.7\n")
@@ -1858,7 +1862,7 @@ def test_v3_debug_reject_restores_worktree(v3_agent_env, settings, trace,
     monkeypatch.setattr(
         rebase_v3, "_tier_client",
         lambda ctx: (object(), SimpleNamespace(
-            model="m", api_key="k", base_url="", source="global")))
+            model="m", api_key="k", base_url="", source="global", kind="api")))
     tracked = repo / ".buildkite" / "cuda" / "test-merge.yml"
     original = tracked.read_text()
 
@@ -1912,7 +1916,7 @@ def test_v3_backends_are_production(v3_env, settings, trace, tmp_path,
                           state={"task_spec": {"repo": "vllm-omni"},
                                  "run_id": "run-b"})
     target = SimpleNamespace(model="m-test", api_key="k", base_url="",
-                             source="tier:eco")
+                             source="tier:eco", kind="api")
     backends = _build_backends(ctx, manifest, str(repo), target)
 
     # plan review: a real reviewer call, verdict files written
@@ -2166,11 +2170,9 @@ def test_v3_test_loop_requires_target_venv(v3_env, settings, trace,
     assert not r.ok and "venv" in r.summary
 
 
-def test_v3_assign_syncs_paths_first(v3_env, settings, trace, tmp_path,
+def test_v3_assign_preserves_historical_paths(v3_env, settings, trace, tmp_path,
                                      monkeypatch):
-    """Path sync runs BEFORE assignment: an upstream path that vanished
-    (rename/refactor) is dropped from the module's map instead of silently
-    yielding zero commits and a skippable module."""
+    """Historical paths remain in assignment so removals/renames are visible."""
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.step import StepContext
     from infermatrix_copilot.engine.steps import rebase_v3, \
@@ -2204,8 +2206,7 @@ def test_v3_assign_syncs_paths_first(v3_env, settings, trace, tmp_path,
                "last_rebase_upstream_commit": "d" * 40})
     r = asyncio.run(registry.get("rebase.v3_assign").handler(ctx))
     assert r.ok, r.summary
-    assert captured["worker_runner"] == ("vllm/v1/worker/",)
-    assert any(e for e in trace.events("upstream_path_sync_dropped"))
+    assert captured["worker_runner"] == ("vllm/v1/worker/", "vllm/vanished/")
     asyncio.run(_finalize_run(rd))
 
 
@@ -2222,7 +2223,7 @@ def test_v3_module_gets_live_test_plan(v3_agent_env, settings, trace,
     monkeypatch.setattr(
         rebase_v3, "_tier_client",
         lambda ctx: (object(), SimpleNamespace(
-            model="m", api_key="k", base_url="", source="global")))
+            model="m", api_key="k", base_url="", source="global", kind="api")))
     plans = {}
 
     async def fake_rebase_module(module, **kw):

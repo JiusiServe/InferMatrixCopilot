@@ -23,10 +23,10 @@ degrades to a traced `capability_gap`, never a crash), and the read-only
 change-archaeology set (`diff_stat`, `file_at_base`, `show_commit`,
 `search_history`, `calc`).
 
-Known gap, disclosed: **skill/memory retrieval is deliberately NOT bridged.**
-Those tools can propose knowledge candidates, and opening a cross-process
-write path for them was declined — a harness session may read this repo's
-knowledge, never add to it.
+Generic review sessions do not bridge skill/memory writes. Rebase sessions
+instead rebuild the adapter's existing rebase tool pack with its resolved
+runtime and knowledge paths; plan-gated edits and candidate proposals use
+the same backends and dispatch audit as API module agents.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ _SPEC_VERSION = 1
 
 # -- spec serialization ------------------------------------------------------
 def write_bridge_spec(*, run_dir: Path, step_name: str, scope: ToolScope,
-                      repo: str) -> Path:
+                      repo: str, rebase: dict | None = None) -> Path:
     """Serialize one step's tool surface under ``<run_dir>/bridge/``. The
     filename is sanitized from the step name (ensemble steps carry ``#``)."""
     bridge_dir = Path(run_dir) / "bridge"
@@ -67,6 +67,7 @@ def write_bridge_spec(*, run_dir: Path, step_name: str, scope: ToolScope,
         "repo": repo,
         "run_dir": str(run_dir),
         "trace_path": str(Path(run_dir) / "bridge_trace.jsonl"),
+        **({"rebase": rebase} if rebase is not None else {}),
     }, indent=2), encoding="utf-8")
     return path
 
@@ -131,6 +132,11 @@ def build_server(spec_path: Path):
     _call = make_dispatcher(scope, roots, trace)
 
     mcp = FastMCP("infermatrix-tool-bridge")
+    if "rebase" in spec:
+        from .rebase_engine.harness_bridge import register_rebase_tools
+
+        register_rebase_tools(mcp, scope, spec, trace)
+        return mcp
     allowed = scope.allowed_tools & set(TOOLS)
 
     if "read_file" in allowed:

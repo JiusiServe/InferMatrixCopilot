@@ -29,7 +29,8 @@ requires: [modules, upstream.fork_tracking, ci.provider]
 #                 (NO local test loop — phase 4 is push+monitor; prelude
 #                 enforces the prepared-tree preconditions)
 #   local_rebase: prelude, guard, knowledge_prep, wheel, assign, wave1,
-#                 wave_gate, wave2, tests, precommit, push_gate, report, finalize
+#                 wave_gate, wave2, tests, precommit, push_gate, publish,
+#                 report, finalize
 #                 (complete adaptation and local validation; no remote CI)
 #   full        : prelude, guard, wheel, assign, wave1, wave_gate, wave2,
 #                 tests, precommit, push_gate, ci, report, finalize
@@ -75,6 +76,7 @@ steps:
   # verdict is what makes the push gate's "red precommit" rule non-vacuous
   - {id: precommit, step: rebase.v3_precommit, when: mode_runs_local_tests}
   - {id: push_gate, step: rebase.v3_push_gate, when: mode_runs_push_gate}
+  - {id: publish, step: rebase.v3_publish, when: mode_runs_publish}
   - {id: ci, step: rebase.v3_ci, when: mode_runs_remote_ci}
   # Rev 8 §2.2 tail, restored (completion design D5): the rebase-specific
   # FINAL_SUMMARY lands first, then curation (runtime stores only; a

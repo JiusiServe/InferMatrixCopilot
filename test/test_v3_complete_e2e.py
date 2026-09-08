@@ -212,7 +212,7 @@ def test_full_mode_complete_run_to_current_terminal(complete_env,
     monkeypatch.setattr(
         rebase_v3, "_tier_client",
         lambda ctx: (object(), SimpleNamespace(
-            model="m-test", api_key="k", base_url="", source="tier:eco")))
+            model="m-test", api_key="k", base_url="", source="tier:eco", kind="api")))
     agent_calls = []
 
     async def fake_rebase_module(module, **kw):           # the LLM piece

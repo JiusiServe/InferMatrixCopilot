@@ -54,6 +54,22 @@ class PushOutcome:
     reason: str = ""
 
 
+@dataclass(frozen=True)
+class LocalCommitOutcome:
+    """Result of preparing a local rebase commit without observing a remote.
+
+    The local-rebase publish step uses this path while remote publication is
+    not explicitly authorized.  Keeping it separate from ``commit_and_push``
+    is deliberate: the latter resolves and probes a remote before its
+    ``allow_push`` gate, which is correct for the existing remote-CI flow but
+    would violate the local-rebase no-remote default.
+    """
+
+    committed: bool
+    commit: str
+    reason: str = ""
+
+
 def preflight_upstream_commit(commit: str) -> str:
     commit = (commit or "").strip()
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
@@ -71,6 +87,51 @@ def preflight_dockerfile_pin(repo: Path, commit: str, pin: PinSpec) -> None:
         raise PushPreflightError(
             f"refusing to push: {pin.dockerfile} wheel pin does not match the "
             f"resolved upstream commit {commit[:12]}; re-run the pin step")
+
+
+def commit_local_changes(repo: Path, *,
+                         upstream_commit: str,
+                         pin: PinSpec | None,
+                         message_template: str,
+                         unstage_globs: Sequence[str],
+                         author_name: str, author_email: str,
+                         commit_retries: int = 3,
+                         precommit_fix: Callable[[], None] | None = None,
+                         run: gitio.RunFn = gitio._run,
+                         log: Callable[[str], None] = _log
+                         ) -> LocalCommitOutcome:
+    """Stage and sign a rebase result locally without contacting a remote.
+
+    This is the safe first half of the V1 publish contract.  It retains the
+    target-SHA and optional Dockerfile-pin preflights, excludes generated
+    outputs, and uses the same signed-commit retry implementation as the
+    remote path.  Remote URL resolution, ref probing, WAL creation, and push
+    are intentionally absent; callers may enter ``commit_and_push`` only
+    after their explicit publication gate has passed.
+    """
+    commit = preflight_upstream_commit(upstream_commit)
+    if pin is not None:
+        preflight_dockerfile_pin(repo, commit, pin)
+    gitio.stage_commit_changes(repo, unstage_globs, run=run)
+    committed = False
+    if gitio.has_staged_changes(repo, run=run):
+        message = message_template.format(commit=commit, short=commit[:12])
+        if not gitio.run_signed_commit(
+                repo, message, author_name=author_name,
+                author_email=author_email, retries=commit_retries,
+                unstage_patterns=unstage_globs, precommit_fix=precommit_fix,
+                run=run, log=log):
+            return LocalCommitOutcome(
+                False, "", f"commit failed after {commit_retries} attempts")
+        committed = True
+    head = run(["git", "rev-parse", "HEAD"], cwd=repo)
+    if head.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}",
+                                                 (head.stdout or "").strip()):
+        raise gitio.GitIOError(
+            f"could not resolve local HEAD after commit: "
+            f"{(head.stderr or '').strip()}")
+    return LocalCommitOutcome(committed=committed,
+                              commit=head.stdout.strip())
 
 
 def commit_and_push(repo: Path, *,
@@ -93,6 +154,7 @@ def commit_and_push(repo: Path, *,
                     push_base_delay: float = 5.0,
                     precommit_fix: Callable[[], None] | None = None,
                     allowed_remote_url: str = "",
+                    fast_forward_only: bool = False,
                     run: gitio.RunFn = gitio._run,
                     sleep: Callable[[float], None] = None,
                     log: Callable[[str], None] = _log) -> PushOutcome:
@@ -103,7 +165,9 @@ def commit_and_push(repo: Path, *,
     `PushOutcome` with the reason when authorization, reconciliation, or
     execution refuses. When `allowed_remote_url` is supplied, the resolved
     remote identity must match it before staging or committing; it is an
-    adapter allowlist, not an alternate transport URL."""
+    adapter allowlist, not an alternate transport URL. ``fast_forward_only``
+    keeps local publication from turning an interrupted ordinary push into a
+    history rewrite when an existing WAL intent is resumed."""
     import time as _time
     sleep = sleep or _time.sleep
     repo = Path(repo)
@@ -212,7 +276,7 @@ def commit_and_push(repo: Path, *,
     pre_push_oid = push_wal.ABSENT
     if remote_oid != push_wal.ABSENT:
         pre_push_oid = remote_oid
-        if rebase_performed or resumed is not None:
+        if not fast_forward_only and (rebase_performed or resumed is not None):
             # resumed pushes are ALWAYS leased to the recorded pre-push tip
             lease_expect = remote_oid
 

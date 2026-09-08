@@ -28,16 +28,28 @@ def _git(repo: Path, *args: str) -> "subprocess.CompletedProcess[str]":
                           text=True, capture_output=True, errors="replace")
 
 
-def check_path_drift(repo: Path, module_paths: Mapping[str, Sequence[str]],
+def check_path_drift(repo: Path, module_paths: Mapping[str, Sequence[str]], *,
+                     tree_ref: str = "",
                      ) -> list[tuple[str, str]]:
     """Upstream may rename/move directories between rebases: report every
     configured module path that no longer exists in the tree as
     ``(module, path)`` (trailing slash ignored for the existence test)."""
     repo = Path(repo)
+    tree_paths: set[str] | None = None
+    if tree_ref:
+        result = _git(repo, "ls-tree", "-r", "--name-only", tree_ref)
+        if result.returncode != 0:
+            raise AssignError(f"cannot inspect target tree {tree_ref}: "
+                              f"{result.stderr.strip()}")
+        tree_paths = set(result.stdout.splitlines())
     missing: list[tuple[str, str]] = []
     for module, paths in module_paths.items():
         for entry in paths:
-            if not (repo / entry.rstrip("/")).exists():
+            path = entry.rstrip("/")
+            exists = ((repo / path).exists() if tree_paths is None else
+                      path in tree_paths or
+                      any(p.startswith(path + "/") for p in tree_paths))
+            if not exists:
                 missing.append((module, entry))
     return missing
 
@@ -79,9 +91,10 @@ class Assignment:
 def assign_commits(repo: Path, baseline: str,
                    module_paths: Mapping[str, Sequence[str]], *,
                    target_branch: str = "",
+                   head_ref: str = "HEAD",
                    base_class_watch_paths: Sequence[str] = (),
                    log: Callable[[str], None] = _log) -> Assignment:
-    """Classify every commit in ``baseline..HEAD`` into modules by the paths
+    """Classify every commit in ``baseline..head_ref`` into modules by the paths
     it touches (one commit may land in several modules — that is deliberate:
     each module's rebase wave needs to see it).
 
@@ -90,12 +103,12 @@ def assign_commits(repo: Path, baseline: str,
     module skippable and skip the whole rebase. Per-module log failures stay
     tolerated as empty (shell `|| echo ""` parity)."""
     repo = Path(repo)
-    r = _git(repo, "rev-parse", "HEAD")
+    r = _git(repo, "rev-parse", "--verify", f"{head_ref}^{{commit}}")
     if r.returncode != 0:
-        raise AssignError(f"git rev-parse HEAD failed in {repo}: "
+        raise AssignError(f"git rev-parse {head_ref} failed in {repo}: "
                           f"{r.stderr.strip()}")
     head = r.stdout.strip()
-    range_spec = f"{baseline}..HEAD"
+    range_spec = f"{baseline}..{head}"
     r = _git(repo, "log", "--oneline", range_spec)
     if r.returncode != 0:
         raise AssignError(
@@ -106,7 +119,9 @@ def assign_commits(repo: Path, baseline: str,
 
     result = Assignment(baseline=baseline, head=head,
                         target_branch=target_branch, total_commits=total,
-                        missing_paths=check_path_drift(repo, module_paths))
+                        missing_paths=check_path_drift(
+                            repo, module_paths,
+                            tree_ref=head if head_ref != "HEAD" else ""))
     for module, path in result.missing_paths:
         log(f"  WARNING: path '{path}' for module '{module}' does not exist in tree")
 

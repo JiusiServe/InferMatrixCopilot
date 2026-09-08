@@ -101,7 +101,9 @@ def test_shipped_afd_adapter_parses_and_resolves_alias(monkeypatch, tmp_path):
     assert p.name == "afd_plugin"
     assert p.manifest["repo"]["full_name"] == "vllm-project/afd-plugin"
     assert p.manifest["ci"]["provider"] == "github_actions"
-    assert p.manifest["push"]["allowed"] is False
+    assert p.manifest["push"]["allowed"] is True
+    assert p.manifest["push"]["rebase_branch"] == "codex/vllm-0.28-sync"
+    assert "main" in p.manifest["push"]["protected_branches"]
     assert p.matches_name("afd-plugin")
     assert p.matches_name("vllm-project/afd-plugin")
     assert (

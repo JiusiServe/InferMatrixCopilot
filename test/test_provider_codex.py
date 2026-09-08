@@ -110,6 +110,15 @@ def test_auth_gap_reports_login_fix(tmp_path):
     assert transport.auth_gap() is None
 
 
+def test_auth_gap_distinguishes_cli_startup_failure(tmp_path):
+    transport = _transport(tmp_path)
+    cli = tmp_path / "bin" / "codex"
+    cli.write_text("#!/bin/sh\necho 'dyld: Library not loaded' >&2\nexit 134\n")
+    gap = transport.auth_gap()
+    assert "exit 134" in gap and "Library not loaded" in gap
+    assert "not logged in" not in gap
+
+
 def test_run_session_timeout_is_truncated(tmp_path):
     transport = _transport(tmp_path)
     req = _request(tmp_path, with_bridge=False)

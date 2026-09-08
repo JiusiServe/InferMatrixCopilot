@@ -18,7 +18,7 @@ deterministically from substate before any push.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Mapping
 
 from .modes import resolve_push_gate_conflict
@@ -59,6 +59,9 @@ def _assertion_failures(substate: Mapping) -> list[str]:
 def evaluate_push_gate(substate: Mapping, params: Mapping) -> GateDecision:
     """The gate ruling. Raises ModeConflictError on the
     strict+with-failures conflict (Decision 3) before any evaluation."""
+    if params.get("rebase_mode") == "local_rebase":
+        failures = local_rebase_failures(substate)
+        return GateDecision(not failures, reasons=tuple(failures))
     resolve_push_gate_conflict(params)
     structural = _structural_failures(substate)
     assertions = _assertion_failures(substate)
@@ -72,3 +75,23 @@ def evaluate_push_gate(substate: Mapping, params: Mapping) -> GateDecision:
     return GateDecision(True, flagged=tuple(assertions),
                         reasons=tuple(f"pushed despite (explicit): {s}"
                                       for s in structural))
+
+
+def local_rebase_failures(substate: Mapping) -> list[str]:
+    """Local publication has no later remote CI to resolve flagged failures."""
+    failures = _structural_failures(substate) + _assertion_failures(substate)
+    for name, module in (substate.get("modules") or {}).items():
+        if not module.get("skip") and module.get("status") not in ("done", "failed"):
+            failures.append(f"module {name} is not complete")
+    tests = substate.get("tests") or {}
+    pipeline = tests.get("pipeline") or {}
+    if not pipeline.get("complete"):
+        failures.append("local validation is incomplete")
+    if not pipeline.get("passed"):
+        failures.append("no local validation jobs passed")
+    if pipeline.get("failed") and not pipeline.get("failed_tests"):
+        failures.append("local validation has failed jobs")
+    if (tests.get("precommit") or {}).get("result") != "passed":
+        if "precommit red" not in failures:
+            failures.append("precommit has not passed")
+    return failures

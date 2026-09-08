@@ -32,6 +32,9 @@ class ModulePromptData:
     pytest_wrapper: str
     template_live: str = ""
     pytest_wrapper_live: str = ""
+    # Adapters using plain pytest need a separate Python import command;
+    # the historical module wrapper accepts both shapes itself.
+    import_command: str = ""
     debug_prompt_template: str = ""
     module_vllm_paths: Mapping[str, str] = field(default_factory=dict)
     module_omni_files: Mapping[str, str] = field(default_factory=dict)
@@ -48,6 +51,7 @@ class ModulePromptData:
                    pytest_wrapper=data["pytest_wrapper"],
                    template_live=data.get("template_live", ""),
                    pytest_wrapper_live=data.get("pytest_wrapper_live", ""),
+                   import_command=data.get("import_command", ""),
                    debug_prompt_template=data.get("debug_prompt_template", ""),
                    module_vllm_paths=data.get("module_vllm_paths", {}),
                    module_omni_files=data.get("module_omni_files", {}),
@@ -220,7 +224,8 @@ def build_module_prompt(
     check = data.module_import_check.get(module, 'print("OK")')
     if live:
         import shlex
-        import_check_cmd = f"{wrapper} python -c {shlex.quote(check)}"
+        import_runner = data.import_command or f"{wrapper} python"
+        import_check_cmd = f"{import_runner} -c {shlex.quote(check)}"
     else:
         import_check_cmd = f"{wrapper} python -c '{check}'"
 

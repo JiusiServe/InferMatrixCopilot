@@ -184,6 +184,8 @@ def _classify_target_main_changes(repo: str, base: str, head: str,
                                   modules: Mapping) -> dict:
     """Map files introduced by the target repo's main-line sync to modules.
 
+    Compare the common main ancestor to the incoming main tree so previously
+    adapted files on the result branch are not counted as new main changes.
     The vLLM assignment and the target-repo assignment are independent: a
     vLLM range with zero commits must not hide new AFD code. Unmapped
     documentation is reported but ignored; an unmapped source/config/test path
@@ -197,7 +199,7 @@ def _classify_target_main_changes(repo: str, base: str, head: str,
     try:
         result = subprocess.run(
             ["git", "-C", str(repo), "diff", "--name-status", "--find-renames",
-             f"{base}..{head}"], capture_output=True, text=True,
+             f"{base}...{head}"], capture_output=True, text=True,
             errors="replace", timeout=60, check=False)
     except (OSError, subprocess.SubprocessError) as exc:
         raise RuntimeError(
@@ -328,7 +330,8 @@ def _agent_shell_env(ctx: StepContext, manifest: dict, repo_root: str,
     return env
 
 
-def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
+def _build_backends(ctx: StepContext, manifest: dict, repo: str, target,
+                    *, agent_env: dict | None = None):
     """The PRODUCTION `RebaseBackends`: plan review on the run's resolved
     tier backend, pytest/reproduce/precommit through the PR1 runner in the
     TARGET env, and the knowledge tools on the copilot stores (agents may
@@ -347,6 +350,27 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
         or target.model
 
     def request_plan_review(**kw) -> dict:
+        if getattr(target, "kind", "api") == "harness":
+            if target.provider_id != "codex":
+                return {"error": "rebase plan review requires the configured Codex backend"}
+            from ...providers.registry import transport_for_id
+
+            transport = transport_for_id(ctx.settings, "codex")
+
+            def complete(prompt: str) -> str:
+                reply = transport.complete(
+                    system="Review the proposed repository adaptation plan.",
+                    messages=[{"role": "user", "content": prompt}],
+                    model=target.model, max_tokens=2000, role="plan_reviewer")
+                if reply.stop_reason == "max_tokens":
+                    raise RuntimeError("plan reviewer did not finish within its session budget")
+                return reply.text
+
+            return review_plan(
+                None, target.model, complete=complete,
+                plan_json_path=str(kw.get("plan_json_path", "")),
+                plan_md_path=str(kw.get("plan_md_path", "") or ""),
+                kind=str(kw.get("kind", "rebase")))
         from anthropic import Anthropic
         ckw: dict = {"api_key": target.api_key}
         if target.base_url:
@@ -376,7 +400,7 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
             TestJob(key=f"{key}_{abs(hash(cmd)) % 10 ** 8}", command=cmd,
                     timeout_sec=float(kw.get("timeout") or 1800),
                     min_gpus=0, gpu_lock=True),
-            _target_test_env(ctx, manifest))
+            agent_env if agent_env is not None else _target_test_env(ctx, manifest))
         tail = ""
         try:
             if outcome.log_file and Path(outcome.log_file).is_file():
@@ -419,7 +443,7 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
             TestJob(key="agent_precommit", command=command,
                     timeout_sec=float(pc.get("timeout_sec") or 600),
                     min_gpus=0, gpu_lock=False),
-            _target_test_env(ctx, manifest))
+            agent_env if agent_env is not None else _target_test_env(ctx, manifest))
         return {"exit_code": outcome.rc, "passed": outcome.rc == 0,
                 "log_file": outcome.log_file}
 
@@ -661,11 +685,17 @@ def _register_scratch_teardown(ctx: StepContext, scratch: Path) -> None:
         return
     _SCRATCH_REGISTERED.add(key)
     from ..lifecycle import register_finalizer
+    keep_failed = _task_params(ctx).get("rebase_mode") == "local_rebase"
 
     async def _teardown_scratch(_outcome, _path=scratch, _key=key) -> None:
         import shutil
-        shutil.rmtree(_path, ignore_errors=True)
         _SCRATCH_REGISTERED.discard(_key)
+        if keep_failed and _outcome is not None and _outcome.status != "done":
+            # The target venv is editable against this tree, including its
+            # compiled artifacts. Keep a failed local run usable on resume.
+            ctx.trace.record("upstream_scratch_preserved", path=str(_path))
+            return
+        shutil.rmtree(_path, ignore_errors=True)
 
     register_finalizer(ctx.run_dir, _teardown_scratch)
 
@@ -682,12 +712,22 @@ def _ensure_upstream_scratch(ctx: StepContext) -> str | StepResult:
     import subprocess
     scratch = Path(ctx.state.get("upstream_path", "") or "")
     origin = ctx.state.get("upstream_origin_path", "")
+    target = (ctx.state.get("vllm_target_sha")
+              or ctx.state.get("upstream_commit") or "")
     # only a path INSIDE the run dir counts as an existing scratch — a
     # canonical path in `upstream_path` (older state, manual seeding) must
     # never be adopted as the mutable tree
     if str(scratch).startswith(str(ctx.run_dir)) \
             and (scratch / ".git").exists():
         _register_scratch_teardown(ctx, scratch)
+        if target:
+            actual = subprocess.run(
+                ["git", "-C", str(scratch), "rev-parse", "HEAD"],
+                capture_output=True, text=True, timeout=30)
+            if actual.returncode != 0 or actual.stdout.strip() != target:
+                return StepResult(False, FailureKind.BLOCKED,
+                                  "surviving upstream scratch differs from "
+                                  f"the run's fixed target {target}")
         return str(scratch)
     if not origin:
         return StepResult(False, FailureKind.BLOCKED,
@@ -701,10 +741,18 @@ def _ensure_upstream_scratch(ctx: StepContext) -> str | StepResult:
             return StepResult(False, FailureKind.BLOCKED,
                               "upstream scratch clone failed: "
                               + r.stderr.strip()[:300])
-        subprocess.run(["git", "-C", str(scratch), "checkout", "--detach",
-                        "HEAD"], capture_output=True, text=True,
-                       timeout=300)
         ctx.trace.record("upstream_scratch_created", path=str(scratch))
+    # Completed wheel steps are replayed from the checkpoint on resume.
+    # Rebuild their selected tree, never the canonical checkout's newer
+    # HEAD, while leaving surviving in-run scratch edits intact above.
+    checked = subprocess.run(
+        ["git", "-C", str(scratch), "checkout", "--detach", target or "HEAD"],
+        capture_output=True, text=True, timeout=300)
+    if checked.returncode != 0:
+        _register_scratch_teardown(ctx, scratch)
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"upstream scratch cannot restore {target or 'HEAD'}: "
+                          + checked.stderr.strip()[:300])
     _register_scratch_teardown(ctx, scratch)
     ctx.state["upstream_path"] = str(scratch)
     return str(scratch)
@@ -1015,13 +1063,11 @@ async def _v3_guard(ctx: StepContext) -> StepResult:
 @step("rebase.v3_sync_target", "script", "write_workspace",
       "Sync the target repository's main branch into the isolated rebase branch.")
 async def _v3_sync_target(ctx: StepContext) -> StepResult:
-    """Prepare the AFD result branch before upstream assignment.
+    """Merge one fixed main input into the adapter's result branch.
 
-    The upstream vLLM delta and the target repository's own main-line changes
-    are independent inputs. This step fetches the declared source main, creates
-    the result branch when needed, or merges source main into an existing result
-    branch. A conflict is handed to the governed agent and is successful only
-    when the index is clean and the merge is completed.
+    Only adapters declaring ``repo.source_remote`` opt in. Persist inputs
+    before changing branches so an interrupted merge resumes the same main
+    SHA and keeps its partially resolved files.
     """
     import subprocess
 
@@ -1031,15 +1077,16 @@ async def _v3_sync_target(ctx: StepContext) -> StepResult:
     manifest = _adapter_manifest(ctx)
     if isinstance(manifest, StepResult):
         return manifest
+    repo_cfg = manifest.get("repo") or {}
+    source_remote = str(repo_cfg.get("source_remote") or "")
+    if not source_remote:
+        return StepResult(True, summary="adapter does not request main sync")
     blocked = _ensure_checkout_locks(
         ctx, manifest, _task_params(ctx).get("rebase_mode", ""))
     if blocked is not None:
         return blocked
 
-    repo_cfg = manifest.get("repo") or {}
     push_cfg = manifest.get("push") or {}
-    source_remote = str(repo_cfg.get("source_remote")
-                        or repo_cfg.get("remote") or "origin")
     source_branch = str(repo_cfg.get("default_branch") or "main")
     result_branch = str(push_cfg.get("rebase_branch")
                         or repo_cfg.get("rebase_branch") or "")
@@ -1053,83 +1100,146 @@ async def _v3_sync_target(ctx: StepContext) -> StepResult:
                               errors="replace", timeout=timeout,
                               check=False)
 
-    fetched = git("fetch", "--no-tags", source_remote, source_branch)
-    if fetched.returncode != 0:
-        return StepResult(False, FailureKind.BLOCKED,
-                          f"fetch {source_remote}/{source_branch} failed: "
-                          f"{fetched.stderr.strip()[:400]}")
-    source_sha = git("rev-parse", "FETCH_HEAD").stdout.strip()
-    if not source_sha:
-        return StepResult(False, FailureKind.BLOCKED,
-                          "could not resolve fetched target main SHA")
+    sub = _substate(ctx)
+    sync = sub.read().get("target_sync") or {}
+    if not sync:
+        if git("rev-parse", "-q", "--verify", "MERGE_HEAD").returncode == 0:
+            return StepResult(False, FailureKind.BLOCKED,
+                              "existing merge has no input record for this run")
+        fetched = git("fetch", "--no-tags", source_remote, source_branch)
+        if fetched.returncode != 0:
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"fetch {source_remote}/{source_branch} failed: "
+                              f"{fetched.stderr.strip()[:400]}")
+        source_sha = git("rev-parse", "FETCH_HEAD").stdout.strip()
+        if not source_sha:
+            return StepResult(False, FailureKind.BLOCKED,
+                              "could not resolve fetched target main SHA")
 
-    branch_exists = git("rev-parse", "--verify", f"refs/heads/{result_branch}").returncode == 0
-    start_sha = (git("rev-parse", result_branch).stdout.strip()
-                 if branch_exists else git("rev-parse", "HEAD").stdout.strip())
-    if branch_exists:
-        checked = git("checkout", result_branch)
+        local = git("rev-parse", "--verify", f"refs/heads/{result_branch}")
+        local_sha = local.stdout.strip() if local.returncode == 0 else ""
+        remote_sha = ""
+        result_remote = str(push_cfg.get("default_remote") or "")
+        if result_remote:
+            remote_ref = f"refs/heads/{result_branch}"
+            advertised = git("ls-remote", "--exit-code", "--heads",
+                             result_remote, remote_ref)
+            if advertised.returncode == 0:
+                fetched = git("fetch", "--no-tags", result_remote, remote_ref)
+                if fetched.returncode != 0:
+                    return StepResult(False, FailureKind.BLOCKED,
+                                      "fetch result branch failed: "
+                                      + fetched.stderr.strip()[:400])
+                remote_sha = git("rev-parse", "FETCH_HEAD").stdout.strip()
+            elif advertised.returncode != 2:  # 2 means the branch is absent
+                return StepResult(False, FailureKind.BLOCKED,
+                                  "cannot inspect existing result branch: "
+                                  + advertised.stderr.strip()[:400])
+        start_sha = local_sha or remote_sha or source_sha
+        if local_sha and remote_sha and local_sha != remote_sha:
+            if git("merge-base", "--is-ancestor", local_sha,
+                   remote_sha).returncode == 0:
+                start_sha = remote_sha
+            elif git("merge-base", "--is-ancestor", remote_sha,
+                     local_sha).returncode != 0:
+                return StepResult(False, FailureKind.BLOCKED,
+                                  "local and remote result branches diverged; "
+                                  "preserving both for reconciliation")
+        main_base = git("merge-base", start_sha, source_sha)
+        if main_base.returncode != 0:
+            return StepResult(False, FailureKind.BLOCKED,
+                              "result branch and source main have no common base")
+        sync = {"source_sha": source_sha, "start_sha": start_sha,
+                "main_base_sha": main_base.stdout.strip(),
+                "source_remote": source_remote, "source_branch": source_branch,
+                "result_branch": result_branch, "remote_sha": remote_sha}
+        sub.update({"target_sync": sync})
+
+    source_sha = sync["source_sha"]
+    start_sha = sync["start_sha"]
+    source_remote = sync["source_remote"]
+    source_branch = sync["source_branch"]
+    result_branch = sync["result_branch"]
+    merge_head = git("rev-parse", "-q", "--verify", "MERGE_HEAD")
+    if merge_head.returncode == 0:
+        if (merge_head.stdout.strip() != source_sha
+                or git("branch", "--show-current").stdout.strip() != result_branch
+                or git("rev-parse", "HEAD").stdout.strip() != start_sha):
+            return StepResult(False, FailureKind.BLOCKED,
+                              "pending merge differs from this run's fixed inputs")
     else:
-        checked = git("checkout", "-B", result_branch, "FETCH_HEAD")
-    if checked.returncode != 0:
-        return StepResult(False, FailureKind.BLOCKED,
-                          f"checkout result branch {result_branch} failed: "
-                          f"{checked.stderr.strip()[:400]}")
+        branch_exists = git("rev-parse", "--verify",
+                            f"refs/heads/{result_branch}").returncode == 0
+        checked = (git("checkout", result_branch) if branch_exists else
+                   git("checkout", "-b", result_branch, start_sha))
+        if checked.returncode != 0:
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"checkout result branch {result_branch} failed: "
+                              + checked.stderr.strip()[:400])
+        current = git("rev-parse", "HEAD").stdout.strip()
+        if current != start_sha:
+            if git("merge-base", "--is-ancestor", current,
+                   start_sha).returncode == 0:
+                advanced = git("merge", "--ff-only", start_sha)
+                if advanced.returncode != 0:
+                    return StepResult(False, FailureKind.BLOCKED,
+                                      "cannot fast-forward to recorded result "
+                                      "branch: " + advanced.stderr.strip()[:400])
+            elif (git("merge-base", "--is-ancestor", start_sha,
+                      current).returncode != 0
+                  or git("merge-base", "--is-ancestor", source_sha,
+                         current).returncode != 0):
+                return StepResult(False, FailureKind.BLOCKED,
+                                  "result branch changed outside this run's merge")
+        merge = git("merge", "--no-edit", source_sha, timeout=300)
+        merge_head = git("rev-parse", "-q", "--verify", "MERGE_HEAD")
+        if merge.returncode != 0 and merge_head.returncode != 0:
+            return StepResult(False, FailureKind.BLOCKED,
+                              "main merge failed: " + merge.stderr.strip()[:400])
 
-    merged = False
-    if branch_exists:
-        merge = git("merge", "--no-edit", "FETCH_HEAD", timeout=300)
-        if merge.returncode != 0:
-            conflicts = git("diff", "--name-only", "--diff-filter=U").stdout.splitlines()
+    if merge_head.returncode == 0:
+        conflicts = git("diff", "--name-only", "--diff-filter=U").stdout.splitlines()
+        if conflicts:
             ctx.trace.record("target_main_conflict", files=conflicts,
                              source_sha=source_sha, result_branch=result_branch)
-            if ctx.llm is None or not ctx.llm.available:
-                git("merge", "--abort")
-                return StepResult(False, FailureKind.ESCALATE,
-                                  "AFD main merge has conflicts and no Codex "
-                                  f"backend is available: {conflicts}",
-                                  outputs={"conflicts": conflicts})
             from ...engine.agent_runtime.runner import run_agent_step
             from ...scopes import post_plan_scope
 
-            result, output = await run_agent_step(
+            result, _ = await run_agent_step(
                 ctx, step_name="rebase.target_main_conflicts",
-                purpose=(f"Resolve conflicts while merging {source_remote}/"
-                         f"{source_branch} into {result_branch}. Preserve "
-                         "both AFD main behavior and the existing vLLM 0.28 "
-                         "adaptation."),
+                purpose=(f"Resolve this run's merge of {source_remote}/"
+                         f"{source_branch} at {source_sha} into {result_branch}. "
+                         "Preserve main behavior and the existing adaptation."),
                 guidance=(
-                    "Inspect git status and every unmerged file. Resolve each "
-                    "conflict semantically, then git add the resolved files "
-                    "and finish the merge. Do not discard either side or "
-                    "change unrelated files. The step succeeds only when "
-                    "no unmerged paths remain."),
+                    "Inspect git status and the partially resolved files. "
+                    "Continue this merge without aborting it. Resolve each "
+                    "conflict semantically, git add the resolved files and "
+                    "finish the merge. Do not discard either side or change "
+                    "unrelated files."),
                 expected="status=success only when the merge is complete",
                 evidence={"conflict_files": "\n".join(conflicts),
-                          "source_sha": source_sha,
-                          "result_branch": result_branch},
+                          "source_sha": source_sha, "result_branch": result_branch},
                 output_extension={"resolution_summary": "summary of resolutions"},
-                scope=post_plan_scope(repo),
-                max_iters=ctx.settings.max_agent_iters)
+                scope=post_plan_scope(repo), max_iters=ctx.settings.max_agent_iters)
             remaining = git("diff", "--name-only", "--diff-filter=U").stdout.splitlines()
             if not result.ok or remaining:
-                git("merge", "--abort")
                 return StepResult(False, FailureKind.ESCALATE,
-                                  "Codex could not complete AFD main merge: "
+                                  "main merge remains incomplete; edits preserved: "
                                   f"{remaining or result.summary[:300]}",
-                                  outputs={"conflicts": conflicts})
-            merge_head = git("rev-parse", "-q", "--verify", "MERGE_HEAD")
-            if merge_head.returncode == 0:
-                completed = git("commit", "--no-edit", timeout=120)
-                if completed.returncode != 0:
-                    git("merge", "--abort")
-                    return StepResult(False, FailureKind.ESCALATE,
-                                      "Codex resolved files but the merge "
-                                      f"could not be committed: {completed.stderr.strip()[:300]}")
-            merged = True
-        else:
-            merged = True
+                                  outputs={"conflicts": remaining})
+        if git("rev-parse", "-q", "--verify", "MERGE_HEAD").returncode == 0:
+            completed = git("commit", "--no-edit")
+            if completed.returncode != 0:
+                return StepResult(False, FailureKind.ESCALATE,
+                                  "resolved merge could not be committed; edits "
+                                  "preserved: " + completed.stderr.strip()[:300])
 
     result_sha = git("rev-parse", "HEAD").stdout.strip()
+    if (git("merge-base", "--is-ancestor", source_sha, result_sha).returncode != 0
+            or git("diff", "--quiet").returncode != 0
+            or git("diff", "--cached", "--quiet").returncode != 0):
+        return StepResult(False, FailureKind.BLOCKED,
+                          "main sync is not a clean, completed merge")
     return StepResult(
         True,
         summary=(f"{result_branch} prepared from {source_remote}/{source_branch} "
@@ -1138,8 +1248,9 @@ async def _v3_sync_target(ctx: StepContext) -> StepResult:
             "afd_main_sha": source_sha,
             "afd_branch": result_branch,
             "afd_branch_start_sha": start_sha,
+            "afd_main_base_sha": sync["main_base_sha"],
             "afd_sync_result_sha": result_sha,
-            "afd_main_merge_performed": merged,
+            "afd_main_merge_performed": result_sha != start_sha,
         }})
 
 
@@ -1181,6 +1292,9 @@ async def _v3_scan(ctx: StepContext) -> StepResult:
         try:
             assignment = assign_mod.assign_commits(
                 Path(upstream), str(baseline), module_paths,
+                head_ref=str(_task_params(ctx).get("force_upstream_commit")
+                             or (manifest.get("upstream") or {})
+                             .get("target_ref") or "HEAD"),
                 target_branch=str((manifest.get("upstream") or {})
                                   .get("target_ref") or
                                   (manifest.get("upstream") or {})
@@ -1335,22 +1449,12 @@ async def _v3_assign(ctx: StepContext) -> StepResult:
         base_class_watch_paths=tuple((manifest.get("rebase") or {})
                                      .get("base_class_watch_paths") or ()))
     modules = manifest.get("modules") or {}
-    # PATH SYNC before assignment (parent 35_sync_module_paths): after an
-    # upstream rename, `git log -- <missing-path>` yields no commits and
-    # the module would be SILENTLY marked skippable — retarget the static
-    # upstream_paths against the live tree first (existence-filtered,
-    # never-empty)
-    from ...rebase_engine.path_sync import sync_path_map
+    # Assignment reads HISTORY: a path absent from the target tree may be
+    # precisely the removed/renamed interface this module must adapt to.
+    # Keep those paths in the log query; the drift report exposes stale maps.
     module_paths = {
-        m: tuple(paths) for m, paths in sync_path_map(
-            Path(upstream),
-            {m: list((s or {}).get("upstream_paths") or ())
-             for m, s in modules.items()}).items()}
-    dropped = {m: sorted(set((modules[m] or {}).get("upstream_paths") or ())
-                         - set(module_paths[m])) for m in modules}
-    dropped = {m: d for m, d in dropped.items() if d}
-    if dropped:
-        ctx.trace.record("upstream_path_sync_dropped", dropped=dropped)
+        m: tuple((spec or {}).get("upstream_paths") or ())
+        for m, spec in modules.items()}
     from ...rebase_engine.assign import AssignError
     try:
         result = run_commit_assignment(cfg, module_paths, _substate(ctx))
@@ -1360,7 +1464,8 @@ async def _v3_assign(ctx: StepContext) -> StepResult:
     target_main_assignment = {
         "changed_paths": [], "affected_modules": [],
         "unmapped_paths": [], "ignored_paths": []}
-    afd_main_start = str(ctx.state.get("afd_branch_start_sha") or "")
+    afd_main_start = str(ctx.state.get("afd_main_base_sha")
+                         or ctx.state.get("afd_branch_start_sha") or "")
     afd_main_head = str(ctx.state.get("afd_main_sha") or "")
     if afd_main_start and afd_main_head:
         try:
@@ -1447,8 +1552,13 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
     data = ModulePromptData.load(adapter_dir / "rebase")
     defs = load_tool_schemas(adapter_dir / "rebase" / "tool_schemas.json")
     repo_root = ctx.state.get("repo_path", "")
+    upstream_path = ctx.state.get("upstream_path", "")
+    if ctx.state.get("upstream_origin_path"):
+        upstream_path = _ensure_upstream_scratch(ctx)
+        if isinstance(upstream_path, StepResult):
+            return f"error:{upstream_path.summary}"
     paths = RebasePaths(omni_path=repo_root,
-                        vllm_path=ctx.state.get("upstream_path", ""),
+                        vllm_path=upstream_path,
                         env=_agent_shell_env(ctx, manifest, repo_root,
                                              adapter_dir),
                         baseline_ref=_baseline_ref(manifest),
@@ -1466,6 +1576,7 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
                               run_dir=ctx.run_dir)
         if target.kind == "harness":
             from ...providers import run_harness_step
+            from ...rebase_engine.harness_bridge import rebase_bridge_config
 
             outcome = await asyncio.to_thread(
                 run_harness_step, ctx, target,
@@ -1475,9 +1586,21 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
                     "failure, make a minimal verified fix in the scoped "
                     "repository, and report honestly if the failure is not "
                     "resolved."),
-                prompt=prompt, scope=scope,
-                max_iters=int(getattr(ctx.settings, "review_max_iters", 40)))
-            result = {"done": not outcome.truncated,
+                prompt=(prompt + f"\nAFD checkout: {repo_root}\n"
+                        f"Read-only upstream: {paths.vllm_path}\n"
+                        "Use the rebase MCP tools for all edits and commands. "
+                        "Native shell writes are disabled. Return exactly one "
+                        'JSON object: {"status":"success|failed|blocked",'
+                        '"summary":"changes and validation"}.'), scope=scope,
+                max_iters=int(getattr(ctx.settings, "review_max_iters", 40)),
+                rebase_bridge=rebase_bridge_config(
+                    ctx, manifest, paths, defs, module=module,
+                    require_plan_review=False))
+            from ...llm import parse_json_reply
+
+            reply = parse_json_reply(outcome.text)
+            result = {"done": not outcome.truncated and isinstance(reply, dict)
+                              and reply.get("status") in ("success", "failed", "blocked"),
                       "text": outcome.text,
                       "turns": outcome.iterations,
                       "plan_done": True}
@@ -1603,9 +1726,18 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
         ctx, manifest, _task_params(ctx).get("rebase_mode", ""))
     if blocked is not None:
         return blocked
+    if ctx.state.get("upstream_origin_path"):
+        upstream = _ensure_upstream_scratch(ctx)
+        if isinstance(upstream, StepResult):
+            return upstream
     spec = ManifestSpec.from_manifest(manifest)
     built = build_manifest(Path(repo), spec)
     sub = _substate(ctx)
+    validation_snapshot = {
+        "head": _repo_revision(str(repo)), "worktree_digest": _worktree_digest(repo)}
+    if sub.get("phase3_progress.snapshot") != validation_snapshot:
+        tl.reset_progress(sub)
+    sub.update({"phase3_progress": {"snapshot": validation_snapshot}})
 
     jobs = built.to_dict()["jobs"]
     local_jobs = [j for j in jobs if j.get("source") != "nightly"]
@@ -1650,6 +1782,41 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
                          detail="adapter declares no runtime venv — test "
                                 "jobs run with the inherited environment")
     rb = manifest.get("rebase") or {}
+    local_config = rb.get("local_tests") or {}
+    pytest_junit = bool(local_config.get("pytest_junit"))
+    local_rebase = _task_params(ctx).get("rebase_mode") == "local_rebase"
+    required_jobs = [j for j in local_jobs if j.get("runtime_required")]
+    if local_rebase and local_config.get("require_runtime") and not required_jobs:
+        dropped_infra.append("adapter declares no required runtime validation job")
+    from ...rebase_engine.pytest_results import (
+        pytest_report_env, pytest_result, runtime_identity)
+    runtime_problem = ""
+    runtime = {}
+    if required_jobs:
+        if not pytest_junit:
+            runtime_problem = "required runtime validation needs pytest JUnit evidence"
+        else:
+            import subprocess
+            venv = _target_venv(manifest, extra=ctx.settings.expansion_env())
+            try:
+                if local_rebase and not (
+                        ctx.state.get("upstream_path") and
+                        (ctx.state.get("vllm_target_sha") or ctx.state.get("upstream_commit"))):
+                    raise ValueError("local rebase runtime source/commit is missing")
+                runtime = runtime_identity(
+                    str(Path(venv) / "bin" / "python"),
+                    str((rb.get("wheel") or {}).get("package") or ""),
+                    str((manifest.get("upstream") or {}).get("target_version") or ""),
+                    env=_target_test_env(ctx, manifest), cwd=Path(repo),
+                    upstream=str(ctx.state.get("upstream_path") or "")
+                    if local_rebase else "",
+                    commit=str(ctx.state.get("vllm_target_sha")
+                               or ctx.state.get("upstream_commit") or "")
+                    if local_rebase else "")
+            except (OSError, ValueError, subprocess.SubprocessError) as exc:
+                runtime_problem = str(exc)
+        sub.update({"tests": {"runtime": {
+            "identity": runtime, "error": runtime_problem}}})
     repo_slug = ((ctx.state.get("task_spec") or {}).get("repo", ""))
     adapter_dir = Path(ctx.settings.adapters_dir) / repo_slug.replace("-", "_")
     pat_file = adapter_dir / "testing" / "watchdog_patterns.yaml"
@@ -1679,12 +1846,19 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
     def _job(slug: str) -> TestJob:
         return manifest_job_to_test_job(jobs_by_slug[slug])
 
-    def _to_result(outcome) -> tl.TestRunResult:
-        infra = "timeout" if outcome.timed_out else \
-            ("watchdog kill" if outcome.watchdog_triggered else "")
-        return tl.TestRunResult(rc=outcome.rc, skipped=outcome.skipped,
-                                skip_reason=outcome.skip_reason,
-                                output=outcome.log_file, infra=infra)
+    job_results = dict(sub.get("tests.jobs", {}) or {})
+
+    def _run_job(test_runner, slug: str, env: dict, *, baseline: bool = False):
+        job = _job(slug)
+        report = (ctx.run_dir / "tests" /
+                  f"{slug}{'_baseline' if baseline else ''}.xml") if pytest_junit else None
+        if report is not None:
+            env = pytest_report_env({**env, **job.env}, report)
+            job.env["PYTEST_ADDOPTS"] = env["PYTEST_ADDOPTS"]
+        outcome = test_runner.run(job, env, baseline=baseline)
+        return pytest_result(
+            outcome, report,
+            runtime_required=bool(jobs_by_slug[slug].get("runtime_required")))
 
     def run_fn(slug: str) -> tl.TestRunResult:
         # a non-RUNNABLE command (empty or comment-only) must NEVER read as
@@ -1699,8 +1873,18 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
         # the credential scrub applies to agent shells only) with the
         # TARGET venv + CUDA + HF_HOME overlay — raw manifest commands
         # must resolve inside the target repo's runtime, never ours
-        return _to_result(runner.run(_job(slug),
-                                     _target_test_env(ctx, manifest)))
+        if jobs_by_slug[slug].get("runtime_required") and runtime_problem:
+            result = tl.TestRunResult(rc=1, infra=runtime_problem)
+        else:
+            result = _run_job(runner, slug, _target_test_env(ctx, manifest))
+        job_results[slug] = {
+            "status": ("infra" if result.infra else "skipped" if result.skipped
+                       else "passed" if result.rc == 0 else "failed"),
+            "runtime_required": bool(jobs_by_slug[slug].get("runtime_required")),
+            "rc": result.rc, "infra": result.infra, "counts": dict(result.counts),
+        }
+        sub.update({"tests": {"jobs": {slug: job_results[slug]}}})
+        return result
 
     worktree_path = ctx.run_dir / "main_worktree"
 
@@ -1721,10 +1905,12 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
         # outcomes propagate (a baseline timeout must never read as "fails
         # on main too")
         env = _target_test_env(ctx, manifest, pythonpath_prepend=str(wt))
-        return _to_result(wt_runner.run(_job(slug), env, baseline=True))
+        return _run_job(wt_runner, slug, env, baseline=True)
 
     async def debug_fn(slug: str, label: str, rc: int,
                        output: str) -> bool | str:
+        if ctx.params.get("validation_only"):
+            return False
         tier = _tier_client(ctx)
         if isinstance(tier, StepResult):
             ctx.trace.record("capability_gap",
@@ -1769,30 +1955,52 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
         local_jobs, substate=sub, run_fn=run_fn,
         baseline_fn=baseline_fn, debug_fn=debug_fn,
         visible_gpus=len([d for d in runner.cuda.split(",") if d.strip()
-                          and not d.strip().startswith("-")]))
+                          and not d.strip().startswith("-")]),
+        allow_preexisting=not local_rebase)
     tl.remove_main_worktree(Path(repo), worktree_path)
+    final_snapshot = {
+        "head": _repo_revision(str(repo)), "worktree_digest": _worktree_digest(repo)}
+    if final_snapshot != validation_snapshot:
+        if ctx.params.get("validation_only"):
+            return StepResult(False, FailureKind.BLOCKED,
+                              "test verification changed the checked tree")
+        # A later job's accepted debug fix may invalidate an earlier pass.
+        # Verify the final tree once without further agent edits; failure
+        # stays red instead of starting another repair/recheck cycle.
+        from dataclasses import replace
+        ctx.trace.record("test_revalidation", reason="validation content changed")
+        return await _v3_test_loop(replace(
+            ctx, params={**ctx.params, "validation_only": True}))
     infra = result["infra_failures"] + dropped_infra
-    sub.update({"tests": {
+    test_counts = {key: sum(j.get("counts", {}).get(key, 0)
+                           for slug, j in job_results.items() if slug in jobs_by_slug)
+                   for key in ("collected", "passed", "failed", "errors", "skipped")}
+    sub.update({"manifest_empty": False, "tests": {
         "pipeline": {
+            "complete": not dropped_infra and all(
+                j["slug"] in job_results for j in local_jobs),
             "passed": result["passed"], "failed": result["failed"],
             "failed_tests": result["failed_tests"],
-            "skipped": len(result["skipped_tests"])},
+            "skipped": len(result["skipped_tests"]),
+            "test_counts": test_counts},
         "infra_failures": infra}})
     validation_sha = _repo_revision(str(repo))
     if not validation_sha:
         return StepResult(False, FailureKind.BLOCKED,
                           "could not resolve the AFD revision validated by "
                           "the local test loop")
+    validation_state = {
+        "phase3_failed": result["failed_tests"],
+        "afd_validation_sha": validation_sha,
+        "afd_validation_worktree_digest": _worktree_digest(repo),
+    }
+    sub.update(validation_state)
     return StepResult(True,
                       summary=f"{result['passed']} passed, "
                               f"{result['failed']} failed "
                               f"({len(infra)} infra), "
                               f"{len(result['skipped_tests'])} skipped",
-                      outputs={"state_updates": {
-                          "phase3_failed": result["failed_tests"],
-                          "afd_validation_sha": validation_sha,
-                          "afd_validation_worktree_digest":
-                              _worktree_digest(repo)}})
+                      outputs={"state_updates": validation_state})
 
 
 def _halt_on_phase3(ctx: StepContext, sub: Substate) -> StepResult | None:
@@ -1905,6 +2113,10 @@ async def _v3_precommit(ctx: StepContext) -> StepResult:
         ctx, manifest, _task_params(ctx).get("rebase_mode", ""))
     if blocked is not None:
         return blocked
+    if ctx.state.get("upstream_origin_path"):
+        upstream = _ensure_upstream_scratch(ctx)
+        if isinstance(upstream, StepResult):
+            return upstream
     sub = _substate(ctx)
     pc = (manifest.get("rebase") or {}).get("precommit") or {}
     command = str(pc.get("command") or "")
@@ -1926,6 +2138,9 @@ async def _v3_precommit(ctx: StepContext) -> StepResult:
     job = TestJob(key="__precommit__", command=command,
                   timeout_sec=float(pc.get("timeout_sec") or 600),
                   min_gpus=0, gpu_lock=False)
+    tested_digest = (ctx.state.get("afd_validation_worktree_digest")
+                     or sub.get("afd_validation_worktree_digest")
+                     or _worktree_digest(repo))
     outcome = runner.run(job, _target_test_env(ctx, manifest))
     attempt = 0
     if outcome.rc != 0 and pc.get("retry_once", True):
@@ -1954,15 +2169,37 @@ async def _v3_precommit(ctx: StepContext) -> StepResult:
     sub.update({"tests": {"precommit": {
         "result": result, "attempt": attempt, "baseline_rc": baseline_rc,
         "last_log": outcome.log_file or None}}})
+    final_digest = _worktree_digest(repo)
+    revalidation_state = {}
+    if final_digest != tested_digest:
+        # Auto-fix hooks can change imports and executable source. The old
+        # test result describes the pre-hook tree; do not merely stamp the
+        # new digest onto it. Recheck these small local jobs without agent
+        # edits, so a recheck cannot invalidate the completed precommit run.
+        from dataclasses import replace
+        tl.reset_progress(sub)
+        ctx.trace.record("precommit_revalidation", reason="validated content changed")
+        rechecked = await _v3_test_loop(replace(
+            ctx, params={**ctx.params, "validation_only": True}))
+        if not rechecked.ok:
+            return rechecked
+        revalidation_state = rechecked.outputs.get("state_updates") or {}
+        sub.update({"tests": {"precommit": {"tests_rechecked": True}}})
+        if _worktree_digest(repo) != final_digest:
+            sub.update({"tests": {"precommit": {"result": "failed"}}})
+            return StepResult(False, FailureKind.BLOCKED,
+                              "test revalidation changed the precommit-checked tree")
     validation_sha = _repo_revision(str(repo))
     if not validation_sha:
         return StepResult(False, FailureKind.BLOCKED,
                           "could not resolve the AFD revision validated by "
                           "pre-commit")
     validation_state = {
+        **revalidation_state,
         "afd_validation_sha": validation_sha,
-        "afd_validation_worktree_digest": _worktree_digest(repo),
+        "afd_validation_worktree_digest": final_digest,
     }
+    sub.update(validation_state)
     halted = _halt_on_phase3(ctx, sub)
     if halted is not None:
         return halted
@@ -1992,6 +2229,24 @@ async def _v3_push_gate(ctx: StepContext) -> StepResult:
     if not decision.allowed:
         return StepResult(False, FailureKind.FORBIDDEN,
                           "push gate: " + "; ".join(decision.reasons))
+    if _task_params(ctx).get("rebase_mode") == "local_rebase":
+        manifest = _adapter_manifest(ctx)
+        if isinstance(manifest, StepResult):
+            return manifest
+        lock = (manifest.get("rebase") or {}).get("dependency_lock")
+        if lock:
+            from ...rebase_engine.dependency_lock import check_uv_dependency
+            repo = require_repo(ctx)
+            if isinstance(repo, StepResult):
+                return repo
+            if lock["format"] != "uv":
+                return StepResult(False, FailureKind.BLOCKED,
+                                  "unsupported dependency lock format")
+            problem = check_uv_dependency(
+                Path(repo), package=lock["package"], extra=lock["extra"],
+                version=manifest["upstream"]["target_version"])
+            if problem:
+                return StepResult(False, FailureKind.BLOCKED, problem)
     summary = "push gate open"
     if decision.flagged:
         summary += f" ({len(decision.flagged)} flagged test failure(s))"
@@ -2001,12 +2256,155 @@ async def _v3_push_gate(ctx: StepContext) -> StepResult:
         # indistinguishable from a genuinely clean gate
         ctx.trace.record("push_gate_override",
                          reasons=list(decision.reasons))
-        summary += (f"; OVERRIDDEN structural failure(s): "
+        summary += ("; OVERRIDDEN structural failure(s): "
                     + "; ".join(decision.reasons))
     return StepResult(True, summary=summary,
                       outputs={"state_updates": {
                           "push_gate_flagged": list(decision.flagged),
                           "push_gate_overrides": list(decision.reasons)}})
+
+
+@step("rebase.v3_publish", "script", "push",
+      "Commit validated content and push the configured work branch.")
+async def _v3_publish(ctx: StepContext) -> StepResult:
+    """Publish through the existing Git policy/WAL; failed pushes stay resumable.
+
+    A saved Git tree binds a local result commit to the content checked before
+    publication, including recovery after a commit or transport interruption.
+    ALLOW_PUSH and the adapter's destination policy authorize the remote step.
+    """
+    import subprocess
+    from ...rebase_engine import push_to_ci
+
+    repo = require_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
+    manifest = _adapter_manifest(ctx)
+    if isinstance(manifest, StepResult):
+        return manifest
+    mode = _task_params(ctx).get("rebase_mode", "")
+    if mode != "local_rebase":
+        return StepResult(False, FailureKind.BLOCKED,
+                          "rebase.v3_publish is only valid in local_rebase")
+    blocked = _ensure_checkout_locks(ctx, manifest, mode)
+    if blocked is not None:
+        return blocked
+    sub = _substate(ctx)
+    data = sub.read()
+    gate = await _v3_push_gate(ctx)
+    if not gate.ok:
+        return gate
+
+    push_cfg = manifest.get("push") or {}
+    rb = manifest.get("rebase") or {}
+    remote = str(push_cfg.get("default_remote") or "").strip()
+    remote_url = str(push_cfg.get("remote_url") or "").strip()
+    branch = str(push_cfg.get("rebase_branch") or "").strip()
+    if not remote or not remote_url or not branch:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "adapter must declare push.default_remote, "
+                          "push.remote_url, and push.rebase_branch")
+
+    def git(*args: str) -> str:
+        result = subprocess.run(["git", "-C", str(repo), *args],
+                                capture_output=True, text=True,
+                                errors="replace", timeout=60, check=False)
+        if result.returncode != 0:
+            raise push_to_ci.gitio.GitIOError(result.stderr.strip())
+        return result.stdout.strip()
+
+    protected = sorted({*(push_cfg.get("protected_branches") or []),
+                        *ctx.settings.protected_branches})
+    try:
+        current_branch = git("rev-parse", "--abbrev-ref", "HEAD")
+        if (current_branch != branch or branch in protected
+                or not push_cfg.get("allowed")
+                or not push_cfg.get("rebase_branch_allowed")):
+            return StepResult(False, FailureKind.FORBIDDEN,
+                              f"publication is not allowed for {current_branch!r}")
+        signoff = push_cfg.get("signoff") or {}
+        author_name = str(signoff.get("name") or "").strip()
+        author_email = str(signoff.get("email") or "").strip()
+        if not author_name or not author_email:
+            return StepResult(False, FailureKind.BLOCKED,
+                              "adapter must declare push.signoff identity")
+        upstream_commit = str(ctx.state.get("vllm_target_sha")
+                              or data.get("upstream_commit") or "")
+        pin_data = (rb.get("wheel") or {}).get("pin")
+        pin = wheel_mod.PinSpec.from_manifest(pin_data) if pin_data else None
+        message_template = str((rb.get("push") or {})
+                               .get("commit_message_template")
+                               or "rebase: align with upstream {short}")
+        unstage = list((rb.get("push") or {}).get("unstage_globs") or [])
+        head = git("rev-parse", "HEAD")
+        saved_tree = str(data.get("publish_validated_tree") or "")
+        validation_sha = str(ctx.state.get("afd_validation_sha")
+                             or data.get("afd_validation_sha") or "")
+        resumed_commit = bool(saved_tree and not git("status", "--porcelain")
+                              and git("rev-parse", "HEAD^{tree}") == saved_tree)
+        resumed_staging = bool(saved_tree and head == validation_sha
+                               and not git("diff", "--name-only")
+                               and not git("ls-files", "--others", "--exclude-standard")
+                               and git("write-tree") == saved_tree)
+        if not (resumed_commit or resumed_staging):
+            validation_digest = str(ctx.state.get("afd_validation_worktree_digest")
+                                    or data.get("afd_validation_worktree_digest") or "")
+            if (head != validation_sha or not validation_digest
+                    or _worktree_digest(repo) != validation_digest):
+                return StepResult(False, FailureKind.BLOCKED,
+                                  "checkout changed since validation; rerun local checks")
+            push_to_ci.gitio.stage_commit_changes(Path(repo), unstage)
+            saved_tree = git("write-tree")
+            sub.update({"publish_validated_tree": saved_tree})
+        local = push_to_ci.commit_local_changes(
+            Path(repo), upstream_commit=upstream_commit, pin=pin,
+            message_template=message_template, unstage_globs=unstage,
+            author_name=author_name, author_email=author_email)
+        if local.reason or not local.commit:
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"local commit failed: {local.reason}")
+        if (git("rev-parse", "HEAD^{tree}") != saved_tree
+                or git("status", "--porcelain")):
+            return StepResult(False, FailureKind.BLOCKED,
+                              "commit hooks changed validated content; rerun local checks")
+        target = f"{remote_url}#{branch}"
+        updates = {"push_result": "not_authorized", "push_remote": remote_url,
+                   "push_branch": branch, "push_sha": local.commit,
+                   "push_target": target, "push_committed": local.committed,
+                   "afd_validation_sha": local.commit,
+                   "afd_validation_worktree_digest": _worktree_digest(repo)}
+        sub.update(updates)
+        ctx.state.update(updates)
+        if not ctx.settings.allow_push:
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"validated local commit {local.commit[:12]} retained; "
+                              "set ALLOW_PUSH=true and resume to publish",
+                              outputs={"state_updates": updates})
+        outcome = push_to_ci.commit_and_push(
+            Path(repo), upstream_commit=upstream_commit, pin=pin,
+            branch=branch, message_template=message_template,
+            unstage_globs=unstage, author_name=author_name,
+            author_email=author_email, protected_branches=protected,
+            wal_dir=ctx.run_dir / "push_wal",
+            op_id=f"{ctx.state.get('run_id') or ctx.run_dir.name}-local-publish",
+            allowed=True, allow_push=True, remote=remote,
+            token=ctx.settings.github_token, allowed_remote_url=remote_url,
+            fast_forward_only=True)
+    except (push_to_ci.PushPreflightError, push_to_ci.gitio.GitIOError) as exc:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"publication could not complete: {exc}")
+    updates.update(push_result="pushed" if outcome.pushed else "failed",
+                   push_sha=outcome.pushed_commit or local.commit,
+                   push_reason=outcome.reason)
+    sub.update(updates)
+    ctx.state.update(updates)
+    ctx.trace.record("publish_result", result=updates["push_result"],
+                     target=target, commit=updates["push_sha"], reason=outcome.reason)
+    return StepResult(
+        outcome.pushed, None if outcome.pushed else FailureKind.BLOCKED,
+        (f"published {target} at {updates['push_sha'][:12]}" if outcome.pushed
+         else f"publication failed; validated local commit retained: {outcome.reason}"),
+        outputs={"state_updates": updates})
 
 
 @step("rebase.v3_finalize", "deterministic", "read",
@@ -2098,8 +2496,13 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
     data = ModulePromptData.load(adapter_dir / "rebase")
     defs = load_tool_schemas(adapter_dir / "rebase" / "tool_schemas.json")
     repo_root = ctx.state.get("repo_path", "")
+    upstream_path = ctx.state.get("upstream_path", "")
+    if ctx.state.get("upstream_origin_path"):
+        upstream_path = _ensure_upstream_scratch(ctx)
+        if isinstance(upstream_path, StepResult):
+            return upstream_path
     paths = RebasePaths(omni_path=repo_root,
-                        vllm_path=ctx.state.get("upstream_path", ""),
+                        vllm_path=upstream_path,
                         env=_agent_shell_env(ctx, manifest, repo_root,
                                              adapter_dir),
                         baseline_ref=_baseline_ref(manifest),
@@ -2155,6 +2558,7 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
     harness_runner = None
     if target.kind == "harness":
         from ...providers import run_harness_step
+        from ...rebase_engine.harness_bridge import rebase_bridge_config
 
         module_scope = _module_scope(repo_root, module, manifest,
                                      run_dir=ctx.run_dir)
@@ -2173,7 +2577,10 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
                     "make the smallest semantic adaptation, and report "
                     "honestly when validation cannot complete."),
                 prompt=prompt, scope=module_scope,
-                max_iters=config.max_turns)
+                max_iters=config.max_turns,
+                rebase_bridge=rebase_bridge_config(
+                    ctx, manifest, paths, defs, module=module,
+                    require_plan_review=require_plan_review))
 
         harness_runner = _run_harness
     async with _serial_lock(ctx.run_dir):

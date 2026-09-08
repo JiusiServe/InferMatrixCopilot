@@ -157,7 +157,7 @@ def test_pick_resets_diverged_local_branch(upstream_pair):
 
 def test_missing_remote_branch_raises(upstream_pair):
     _, clone, _ = upstream_pair
-    with pytest.raises(WheelPickError, match="origin/nope does not exist"):
+    with pytest.raises(WheelPickError, match="target ref 'origin/nope' does not exist"):
         wheel.pick_wheel_commit(clone, "nope", SPEC, probe=lambda r: True)
 
 
@@ -811,7 +811,7 @@ def test_drift_guard_pooling_entry_names_actual_upstream_class():
     tree = _ast.parse(src)
     entries = []
     for node in _ast.walk(tree):
-        if (isinstance(node, ast_assign := _ast.Assign)
+        if (isinstance(node, _ast.Assign)
                 and any(isinstance(t, _ast.Name)
                         and t.id == "constructor_call_checks"
                         for t in node.targets)):
@@ -914,9 +914,9 @@ def test_phase1_partial_e2e(settings, trace, tmp_path, monkeypatch):
     # 2. upstream: pick the newest commit with a wheel (fixture: c3)
     src = _make_repo(tmp_path / "up-src")
     c1 = _commit(src, {"vllm/config/x.py": "1"}, "c1")
-    c2 = _commit(src, {"vllm/v1/worker/y.py": "1"}, "c2")
+    _commit(src, {"vllm/v1/worker/y.py": "1"}, "c2")
     c3 = _commit(src, {"vllm/config/x.py": "2"}, "c3")
-    c4 = _commit(src, {"README.md": "r"}, "c4")
+    _commit(src, {"README.md": "r"}, "c4")
     up = tmp_path / "up"
     subprocess.run(["git", "clone", "-q", str(src), str(up)], check=True)
     found = wheel.pick_wheel_commit(up, "main", SPEC,
