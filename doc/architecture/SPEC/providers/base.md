@@ -1,6 +1,6 @@
 # providers/base.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-09-08 -->
 
 `LOC ~161 · provider 层契约 + 子进程环境白名单 · refactor-status: ok`
 
@@ -20,6 +20,8 @@
 `sanitized_env()`、`flatten_messages()`。
 
 ## 不变量（**C1**、**C4**、**E2**）
+- `AgentSessionRequest.bridge_managed_writes` 表示写操作由受控工具桥负责；
+  transport 不得因此开放原生命令写权限，桥自身仍执行 scope 和计划闸。
 - **环境是白名单，不是黑名单**（`_ENV_KEEP` + `LC_`/`XDG_` 前缀）。厂商 CLI 必须保住
   自己的订阅认证（HOME 状态），但**绝不能继承我们的模型端点**：在这类机器上，被继承的
   `ANTHROPIC_BASE_URL` 指向一个网关，会**悄悄把厂商流量改道**。API key、gh token 和

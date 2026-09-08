@@ -1,6 +1,6 @@
 # engine/steps/rebase_v3.py —— 规范
 
-<!-- verified-against: 2026-09-06 -->
+<!-- verified-against: 2026-09-08 -->
 
 `LOC ~2204 · step 库（v3 rebase 装配层） · refactor-status: oversized`
 
@@ -8,11 +8,13 @@
 把 `rebase_engine` 包接进 executor：locked playbook `repo-rebase-v3` 的全部
 step —— 薄的受治理 wrapper，substate-first、类型化失败、发布被消费的键。
 
-## Steps（12 个）
+## Steps（14 个）
 | step | kind/risk | 发布（`state_updates`）/ 裁决 |
 |---|---|---|
 | `rebase.v3_prelude` | deterministic/read | `mode_*` 标志、`run_id`、`upstream_origin_path`、`last_rebase_upstream_commit`、(remote_ci) `upstream_commit`、(full) `upstream_path`；注册终局报告 finalizer；知识开账 attest |
 | `rebase.v3_guard` | deterministic/write_workspace | 无发布 —— 幂等重取 checkout flock（首取在 prelude），再注入 adapter `rebase.guard` 策略委托 `workspace._guard_clean_rebase` |
+| `rebase.v3_sync_target` | script/write_workspace | adapter 显式启用源分支同步；固定输入、继承已发布成果、继续冲突 merge |
+| `rebase.v3_publish` | script/push | local_rebase 验证内容绑定提交；失败可恢复；禁止分叉覆盖 |
 | `rebase.v3_scan` | deterministic/read | `manifest_jobs`；`test_manifest.json` 产物 |
 | `rebase.v3_wheel` | deterministic/write_workspace | `upstream_commit`（选 commit → 装进目标 venv → **最后**才 pin Dockerfile：装失败绝不留脏树） |
 | `rebase.v3_assign` | deterministic/read | `active_modules`、`wave1_modules`、`wave2_modules`（path-sync 后按 wave 分派） |
@@ -30,7 +32,12 @@ step —— 薄的受治理 wrapper，substate-first、类型化失败、发布�
 测试）、`_make_ci_client`（模块级工厂，测试注入 fake 客户端）。
 
 ## 不变量
-- **A4**：12 个 step 全部 `@step(...)` 就地自注册；`when:` 门**只**读
+- local_rebase：CPU/JUnit 与必需 runtime 检查完成后才能发布；pre-commit 或 Debug 修改内容后必须重验。
+- latest_wheel：首次显式基线，后续从已发布历史读取基线；选定 SHA 固定到本轮结束。
+  版本来自选定源码的实际安装；安装变量、依赖模块和索引名称由 adapter 提供。
+  通用目标键为 `upstream_target_sha/ref/version`。
+- 失败的 local_rebase 保留上游 scratch 和 editable 构建产物；成功后清理。
+- **A4**：14 个 step 全部 `@step(...)` 就地自注册；`when:` 门**只**读
   prelude 发布的 `mode_*` 标志（**B3** 已知键，复合标志预算于
   `rebase_engine/modes`）。**B2**：被消费的键都经 `state_updates` 发布
   （上表），substate 同时落盘 —— 两份都写。

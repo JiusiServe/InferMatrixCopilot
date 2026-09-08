@@ -133,7 +133,7 @@ def build_server(spec_path: Path):
 
     mcp = FastMCP("infermatrix-tool-bridge")
     if "rebase" in spec:
-        from .rebase_engine.harness_bridge import register_rebase_tools
+        from .engine.agent_runtime.rebase_bridge import register_rebase_tools
 
         register_rebase_tools(mcp, scope, spec, trace)
         return mcp

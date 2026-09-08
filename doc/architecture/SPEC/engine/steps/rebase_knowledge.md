@@ -1,6 +1,6 @@
 # engine/steps/rebase_knowledge.py —— 规范
 
-<!-- verified-against: 2026-09-06 -->
+<!-- verified-against: 2026-09-08 -->
 
 `LOC ~354 · step 库（v3 知识尾段） · refactor-status: ok`
 
@@ -17,6 +17,9 @@ v3 playbook 的 Rev 8 §2.2 流水线尾段（`phase5_report → curate → comp
 | `rebase.v3_compare` | report/read | 关账知识 attest + `COMPARISON.md`；substate `knowledge.close/drift`、`comparison` |
 
 ## 不变量
+- phase5 报告保留 Copilot revision、目标仓库同步与验证记录、通用
+  `upstream_target_ref/version/sha` 和实际 push 结果；缺少事实写 not recorded。
+  本地测试通过不能被描述为远端发布或硬件验收完成。
 - **A4**：四个 step 全部 `@step(...)` 就地自注册；**B2**：`knowledge_prep`
   经 `state_updates` 发布 `knowledge_prepped`。
 - `ensure_schema_v2()` 只有**三个**受认可的可写维护入口：知识迁移 CLI、

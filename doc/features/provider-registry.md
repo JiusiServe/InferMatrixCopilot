@@ -265,7 +265,8 @@ STRICT_BACKEND_TIMEOUT_S=1800  # 单会话墙钟上限
   <仅桥工具> --max-turns <预算> --model <m>`；**最守规矩的 harness 公民**
   （内置工具可完全关闭、原生 max-turns、支持 system prompt、输出含用量 + 成本）。
 - `codex exec --json --sandbox <read-only|workspace-write>` + 配置里的 MCP
-  server；sandbox 模式跟随 ToolScope，适配步骤才允许 workspace-write，仍不
+  server；普通会话的 sandbox 跟随 ToolScope，bridge-managed rebase 原生命令
+  保持 read-only，受控 MCP 工具负责修改；仍不
   开启 danger-full-access。**没有 system-prompt 通道**（契约前置到 prompt
   里）；预算靠超时。
 

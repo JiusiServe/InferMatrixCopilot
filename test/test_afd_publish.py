@@ -57,7 +57,7 @@ def publication(tmp_path, settings, monkeypatch):
                      "failed_tests": []},
         "precommit": {"result": "passed"}, "infra_failures": []}})
     ctx = StepContext(settings, {"run_id": "publication", "repo_path": str(repo),
-                      "vllm_target_sha": "a" * 40,
+                      "upstream_target_sha": "a" * 40,
                       "afd_validation_sha": git(repo, "rev-parse", "HEAD"),
                       "afd_validation_worktree_digest": rebase_v3._worktree_digest(repo),
                       "task_spec": {"params": {"rebase_mode": "local_rebase"}}},

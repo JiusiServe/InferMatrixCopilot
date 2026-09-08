@@ -14,12 +14,12 @@ from dataclasses import asdict
 from pathlib import Path
 from types import SimpleNamespace
 
-from ..adapters.base import expand_path
-from ..config import Settings
-from ..run_trace import RunTrace
-from ..scopes import ToolScope
-from ..tools import dispatch
-from .rebase_tools import RebasePaths, build_rebase_tools
+from ...adapters.base import expand_path
+from ...config import Settings
+from ...run_trace import RunTrace
+from ...scopes import ToolScope
+from ...tools import dispatch
+from ...rebase_engine.rebase_tools import RebasePaths, build_rebase_tools
 
 
 def rebase_bridge_config(ctx, manifest: dict, paths: RebasePaths,
@@ -63,7 +63,7 @@ def rebase_dispatcher(scope: ToolScope, spec: dict, trace: RunTrace):
     """Return the real tool pack and its plan-gated dispatch function."""
     # Imported lazily because engine steps import this bridge when dispatching
     # a module; the standalone MCP process reconstructs only the backend pack.
-    from ..engine.steps.rebase_v3 import _build_backends
+    from ..steps.rebase_v3 import _build_backends
 
     data = spec["rebase"]
     settings = Settings(_env_file=None, **data["settings"])

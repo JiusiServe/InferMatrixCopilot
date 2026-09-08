@@ -59,7 +59,9 @@ def bridge_env(tmp_path):
                "task_spec": {"repo": "afd-plugin", "mode": "eco"}})
     manifest = {"repo": {"venv": str(target_venv)},
                 "modules": {"plugin_boundary": {"local_paths": ["subject.py"]}},
-                "rebase": {"testing": {"pytest_command": "python -m pytest"}}}
+                "rebase": {"testing": {"pytest_command": "python -m pytest"},
+                           "dependency_lock": {"package": "vllm", "extra": "vllm",
+                                               "module": "plugin_boundary", "index_name": "vllm-upstream"}}}
     target_env = {"PATH": str(target_venv / "bin") + os.pathsep + os.environ["PATH"],
                   "HOME": str(tmp_path), "PYTHONPATH": str(repo), "VIRTUAL_ENV": str(target_venv),
                   "CUDA_VISIBLE_DEVICES": ""}

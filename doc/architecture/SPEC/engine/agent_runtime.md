@@ -1,6 +1,6 @@
 # engine/agent_runtime/ —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-09-08 -->
 
 `LOC ~1690（7 个文件） · 引擎（受治理的 agent 运行时） · refactor-status: ok`
 
@@ -24,6 +24,10 @@
   归约。
 - `moa.py` —— Mixture-of-Agents（2026-07 新增）：lens/draft 提案可以跑在异构的
   `LLM_MIXTURE` 成员上，而 verify-and-merge reducer 仍留在本次 run 的档位模型上。
+
+- `rebase_bridge.py` —— MCP 进程中的 rebase 组合层：重建 adapter 工具、
+  目标环境和计划审查后端；它调用 step 的后端工厂，因此不属于叶子 rebase_engine。
+  通过旧 RebasePaths 字段接收路径，仓库专用值仍来自 adapter。
 
 ## 公开契约（可从 `engine.agent_runtime` import）
 `run_agent_step(...) -> (StepResult, output)`；`run_agent_step_ensemble(...)`；

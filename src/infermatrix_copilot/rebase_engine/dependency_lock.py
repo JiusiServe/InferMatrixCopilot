@@ -31,12 +31,12 @@ def check_uv_dependency(repo: Path, *, package: str, extra: str,
                            if entry.get("name") == source.get("index")), {})
         if (not configured.get("explicit") or
                 str(configured.get("url", "")).rstrip("/") != index_url.rstrip("/")):
-            return "vLLM source must use the selected commit's explicit uv index"
+            return "the dependency source must use the selected commit's explicit uv index"
         registry = (unquote(index_url.removeprefix("file://"))
                     if index_url.startswith("file://") else index_url).rstrip("/")
         if any(str(entry.get("source", {}).get("registry", "")).rstrip("/")
                != registry for entry in pinned):
-            return "uv.lock resolves vLLM from a different commit/index"
+            return "uv.lock resolves the dependency from a different commit/index"
     project_name = project.get("project", {}).get("name")
     root = next((entry for entry in distributions
                  if entry.get("name") == project_name), {})
@@ -47,5 +47,5 @@ def check_uv_dependency(repo: Path, *, package: str, extra: str,
         return f"uv.lock project metadata is stale for {requirement}; regenerate the lock"
     if index_url and any(str(entry.get("index", "")).rstrip("/")
                          != index_url.rstrip("/") for entry in matching):
-        return "uv.lock project metadata is stale for the selected vLLM index"
+        return "uv.lock project metadata is stale for the selected the dependency index"
     return ""

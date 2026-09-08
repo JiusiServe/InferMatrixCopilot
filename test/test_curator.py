@@ -461,9 +461,9 @@ def test_phase5_report_and_compare_steps(settings, trace, tmp_path):
                    "afd_branch_start_sha": "c" * 40,
                    "afd_sync_result_sha": "d" * 40,
                    "afd_main_merge_performed": True,
-                   "vllm_target_ref": "v0.28.0",
-                   "vllm_target_version": "0.28.0",
-                   "vllm_target_sha": "e" * 40,
+                   "upstream_target_ref": "v0.28.0",
+                   "upstream_target_version": "0.28.0",
+                   "upstream_target_sha": "e" * 40,
                    "afd_validation_sha": "f" * 40,
                    "afd_validation_worktree_digest": "sha256:test",
                    "push_result": "pushed",
@@ -482,7 +482,7 @@ def test_phase5_report_and_compare_steps(settings, trace, tmp_path):
     assert "Copilot SHA: " + "a" * 40 in summary
     assert "AFD main SHA: " + "b" * 40 in summary
     assert "AFD result branch: codex/vllm-0.28-sync" in summary
-    assert "vLLM target SHA: " + "e" * 40 in summary
+    assert "upstream target SHA: " + "e" * 40 in summary
     assert "push result: pushed" in summary
 
     # The generic report is the canonical user-facing artifact; for a rebase

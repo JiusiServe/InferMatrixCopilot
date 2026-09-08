@@ -203,7 +203,9 @@ def test_wheel_step_resumes_selected_commit_and_uses_its_runtime_version(upstrea
     commit(repo, {"module.py": "True\n"}, "afd")
     manifest = {"upstream": {"tracking": "latest_wheel", "target_branch": "main"},
                 "repo": {"venv": str(env.root / "venv")},
-                "rebase": {"wheel": asdict(SPEC),
+                "rebase": {"wheel": {**asdict(SPEC), "selected_install_env": {
+                    "VLLM_PRECOMPILED_WHEEL_COMMIT": "{commit}",
+                    "VLLM_PRECOMPILED_WHEEL_VARIANT": "{variant}"}},
                            "test_manifest": {"yaml_dir": ".ci", "pipelines": {}}}}
     monkeypatch.setattr(rebase_v3, "_adapter_manifest", lambda ctx: manifest)
     monkeypatch.setattr(rebase_v3, "_ensure_checkout_locks", lambda *args: None)
@@ -241,19 +243,34 @@ def test_wheel_step_resumes_selected_commit_and_uses_its_runtime_version(upstrea
     assert calls == [selected, selected]
     assert identities[0][0][2] == "0.29.0.dev7"
     assert identities[0][1]["commit"] == selected
-    assert resumed.outputs["state_updates"]["vllm_target_version"] == "0.29.0.dev7"
+    assert resumed.outputs["state_updates"]["upstream_target_version"] == "0.29.0.dev7"
 
 
 def test_module_prompt_carries_dynamic_dependency_contract():
     target = {"main_sha": "a" * 40, "selected_sha": "b" * 40,
               "version": "0.29.0.dev7", "index_url": "https://wheels.example/commit/cu130/"}
     data = replace(ModulePromptData.load(ROOT / "adapters/afd_plugin/rebase"),
-                   runtime_contract=tracking.runtime_contract(target))
+                   runtime_contract=tracking.runtime_contract(target, {
+                       "package": "vllm", "extra": "vllm",
+                       "module": "plugin_boundary", "index_name": "vllm-upstream"}))
     prompt = build_module_prompt(
         "plugin_boundary", data, vllm_path="/upstream", omni_path="/afd",
         script_dir="/scripts", run_git=lambda *args: "fixture")
     assert "vllm==0.29.0.dev7" in prompt
     assert target["index_url"] in prompt and "regenerate uv.lock" in prompt
+
+
+def test_runtime_contract_uses_adapter_package_and_module():
+    target = {"main_sha": "a" * 40, "selected_sha": "b" * 40,
+              "version": "1.2.0.dev3", "index_url": "https://packages.example/build/"}
+    prompt = tracking.runtime_contract(target, {
+        "package": "widget-runtime", "extra": "engine",
+        "module": "package_boundary", "index_name": "widget-nightly"})
+    assert "widget-runtime==1.2.0.dev3" in prompt
+    assert "The package_boundary module" in prompt
+    assert "tool.uv.sources.widget-runtime" in prompt
+    assert "index = 'widget-nightly'" in prompt
+    assert "vllm" not in prompt.lower() and "plugin_boundary" not in prompt
 
 
 def test_report_only_selects_available_wheel_without_moving_canonical(upstream, monkeypatch):

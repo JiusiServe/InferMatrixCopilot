@@ -1,10 +1,10 @@
 """Codex CLI harness transport — Strict on a ChatGPT subscription (M3).
 
 ``codex exec --json`` emits JSONL events; the final agent message is the
-session's answer and ``turn.completed`` events carry token usage. Probed on
-codex-cli 0.145.0 (auth was absent on the dev machine, so unlike cursor/
-claude-code this transport is exercised offline against recorded shapes —
-the readiness path reports the login gap before any run starts).
+session's answer and ``turn.completed`` events carry token usage. Offline
+fixtures cover transport shapes and errors; a real bounded rebase fixture
+also exercised the actor, reviewer, MCP edits and tests. Readiness still
+checks the selected executable and login before each run.
 
 Governance posture (disclosed, per doc/features/provider-registry.md): codex
 uses ``--sandbox read-only`` for read-only scopes and rebase sessions whose

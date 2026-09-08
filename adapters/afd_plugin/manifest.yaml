@@ -320,7 +320,7 @@ push:
 
 rebase:
   lock_name: afd-plugin
-  dependency_lock: {format: uv, package: vllm, extra: vllm}
+  dependency_lock: {format: uv, package: vllm, extra: vllm, module: plugin_boundary, index_name: vllm-upstream}
   precommit:
     command: pre-commit run --all-files
     timeout_sec: 600
@@ -338,6 +338,9 @@ rebase:
     arch: ${VLLM_WHEEL_ARCH}
     import_check_modules: [vllm]
     install_env: {VLLM_USE_PRECOMPILED: "1"}
+    selected_install_env:
+      VLLM_PRECOMPILED_WHEEL_COMMIT: "{commit}"
+      VLLM_PRECOMPILED_WHEEL_VARIANT: "{variant}"
     reinstall_retries: 3
   local_tests:
     source: adapter

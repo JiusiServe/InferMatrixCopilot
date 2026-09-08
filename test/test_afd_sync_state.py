@@ -211,7 +211,7 @@ def test_scratch_recreation_restores_target_and_keeps_surviving_edits(sync_env):
     target = env.base
     commit(env.source, {"newer.txt": "beyond target"}, "newer canonical HEAD")
     ctx = env.context()
-    ctx.state.update(upstream_origin_path=str(env.source), vllm_target_sha=target)
+    ctx.state.update(upstream_origin_path=str(env.source), upstream_target_sha=target)
     scratch = Path(rebase_v3._ensure_upstream_scratch(ctx))
     assert git(scratch, "rev-parse", "HEAD") == target
     (scratch / "afd_plugin/config.py").write_text("temporary analysis edit\n")
@@ -226,7 +226,7 @@ def test_scratch_recreation_restores_target_and_keeps_surviving_edits(sync_env):
 def test_scratch_missing_fixed_target_blocks_instead_of_adopting_head(sync_env):
     env = sync_env
     ctx = env.context()
-    ctx.state.update(upstream_origin_path=str(env.source), vllm_target_sha="f" * 40)
+    ctx.state.update(upstream_origin_path=str(env.source), upstream_target_sha="f" * 40)
     result = rebase_v3._ensure_upstream_scratch(ctx)
     assert isinstance(result, StepResult) and not result.ok
     again = rebase_v3._ensure_upstream_scratch(ctx)
@@ -247,7 +247,7 @@ def test_failed_local_run_keeps_editable_runtime_for_resume(
                         _register_scratch_teardown)
     ctx = env.context()
     ctx.state["task_spec"]["params"]["rebase_mode"] = mode
-    ctx.state.update(upstream_origin_path=str(env.source), vllm_target_sha=env.base)
+    ctx.state.update(upstream_origin_path=str(env.source), upstream_target_sha=env.base)
     scratch = Path(rebase_v3._ensure_upstream_scratch(ctx))
     artifact = scratch / "native-artifact.so"
     artifact.write_bytes(b"run-owned native artifact")
@@ -309,7 +309,7 @@ def test_assignment_keeps_deleted_or_renamed_upstream_paths(sync_env, change):
     ctx = env.context()
     ctx.state.update(upstream_origin_path=str(env.source),
                      last_rebase_upstream_commit=baseline,
-                     vllm_target_sha=git(env.source, "rev-parse", "HEAD"))
+                     upstream_target_sha=git(env.source, "rev-parse", "HEAD"))
     result = asyncio.run(rebase_v3._v3_assign(ctx))
     assert result.ok, result.summary
     assert result.outputs["state_updates"]["active_modules"] == ["runtime"]

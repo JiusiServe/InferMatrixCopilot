@@ -65,6 +65,9 @@ _FORBIDDEN_CEILINGS = {
 _VOCAB_RX = re.compile(r"(?<![A-Za-z])(omni|vllm)(?![A-Za-z])",
                        re.IGNORECASE)
 _VOCAB_CEILINGS = {
+    # The MCP composition bridge consumes the existing RebasePaths ABI.
+    # These four references are legacy field accesses, not repository values.
+    "engine/agent_runtime/rebase_bridge.py": 4,
     # delegation (PR7 sunset)
     # parity vocabulary: parent-verbatim tool/handler names, prompt prose
     # locked by byte-parity goldens, imx-omni-pytest env contract

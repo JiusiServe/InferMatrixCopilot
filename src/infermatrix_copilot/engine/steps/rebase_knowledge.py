@@ -144,7 +144,7 @@ async def _v3_phase5_report(ctx: StepContext) -> StepResult:
     pipeline = tests.get("pipeline") or {}
     ci = data.get("ci") or {}
     target_sha = _provenance_value(
-        ctx, data, "vllm_target_sha",
+        ctx, data, "upstream_target_sha",
         fallback=str(data.get("upstream_commit") or ""))
     lines = ["# FINAL_SUMMARY — repo-rebase v3", "",
              f"- run: {ctx.state.get('run_id', ctx.run_dir.name)}",
@@ -160,11 +160,11 @@ async def _v3_phase5_report(ctx: StepContext) -> StepResult:
              f"{_provenance_value(ctx, data, 'afd_sync_result_sha')}",
              f"- AFD main merge performed: "
              f"{_provenance_value(ctx, data, 'afd_main_merge_performed')}",
-             f"- vLLM target ref: "
-             f"{_provenance_value(ctx, data, 'vllm_target_ref')}",
-             f"- vLLM target version: "
-             f"{_provenance_value(ctx, data, 'vllm_target_version')}",
-             f"- vLLM target SHA: {target_sha}",
+             f"- upstream target ref: "
+             f"{_provenance_value(ctx, data, 'upstream_target_ref')}",
+             f"- upstream target version: "
+             f"{_provenance_value(ctx, data, 'upstream_target_version')}",
+             f"- upstream target SHA: {target_sha}",
              f"- AFD validation SHA: "
              f"{_provenance_value(ctx, data, 'afd_validation_sha')}",
              f"- AFD validation worktree digest: "

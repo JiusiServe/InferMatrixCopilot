@@ -1,6 +1,6 @@
 # rebase_engine/ —— 规范
 
-<!-- verified-against: 2026-09-06 -->
+<!-- verified-against: 2026-09-08 -->
 
 `LOC ~7500（26 个模块） · repo-rebase-v3 的原生 rebase 引擎 · refactor-status: ok`
 
@@ -19,6 +19,9 @@
 | `agent_loop.py` | rebase agent 循环（流式、`.decision.md` 计划闸、150 轮预算，cache-parity） |
 | `assign.py` | commit→模块 确定性归类 + 路径漂移检查 + 报告渲染 |
 | `ci_loop.py` | CI 构建生命周期：受守卫的创建/恢复、monitor、日志分类器、round 编排 |
+| `dependency_lock.py` | 核对声明、uv lock 包版本及提交专属索引和 metadata |
+| `pytest_results.py` | JUnit 计数、失败身份、必需 runtime 的版本/源码身份检查 |
+| `upstream_tracking.py` | 固定每轮目标、选择可用 wheel、读取已发布基线和渲染 adapter 依赖契约 |
 | `debug_patch_policy.py` | 自动 CI debug 补丁策略：禁止 oracle 弱化，未本地验证时禁止 test 编辑 |
 | `gitio.py` | git 机械层：暂存纪律、签名提交重试、token 头传输、执行已授权 decision |
 | `hooks.py` | `RebaseHooks` —— adapter 可定制的窄行为面，fail-closed 加载 |
@@ -54,6 +57,12 @@
 runner/LLM/CI client 全部可注入 —— 每个模块都能离线测试。
 
 ## 不变量
+- local_rebase 的结构错误、测试失败、必需 runtime skip 和未完成验证都阻止发布；
+  baseline 同样失败不能整体豁免。其他模式只接受明确匹配的失败身份。
+- 滚动目标从真实上游远端的固定快照选择；不回退到成功基线之前，探测有界。
+  已发布提交中的上游尾注用于下一轮基线；本地未推送结果不能推进发布基线。
+- 运行时依赖提示来自 adapter；MCP 工具重建属于 engine.agent_runtime.rebase_bridge，
+  本叶子包不导入 engine 的后端工厂。
 - **C4** —— `commit_and_push` **从不自我授权**：`allowed` 与 `allow_push`
   （ALLOW_PUSH）由调用方传入，`push.guard_push` 裁决；无 `allow_push` 在
   WAL 前就停为 dry-run；执行参数**只**从已授权的 `decision.command` 推导

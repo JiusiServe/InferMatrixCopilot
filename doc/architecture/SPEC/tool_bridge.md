@@ -1,6 +1,6 @@
 # tool_bridge.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-09-08 -->
 
 `LOC ~308 · 面向 harness 会话的 scoped 工具 MCP server · refactor-status: ok`
 
@@ -13,6 +13,10 @@
 一个由 harness 从它的 MCP 配置里拉起的 server。它提供本次 run 的内置工具、
 `doc_search`/`doc_read`、按需的 `repo_map`，以及只读的变更考古工具组
 （`diff_stat`、`file_at_base`、`show_commit`、`search_history`、`calc`）。
+
+spec 含显式 `rebase` 配置时，委托 `engine.agent_runtime.rebase_bridge`
+重建该 adapter 的工具包及目标环境。该路径保留独立 bridge trace、scope
+和计划审查决策闸；模块与 Debug 共用此入口。
 
 ## 公开契约
 `write_bridge_spec(...)`、`load_bridge_spec(path)`、`make_dispatcher(...)`、
@@ -28,13 +32,15 @@
 - **独立的 trace 文件。** 工具事件追加到 spec 旁边的 `bridge_trace.jsonl`；
   第二个进程**绝不能**与父进程的 `run_trace.jsonl` 交错。
 - **`repo_map` 失败只降级，绝不崩溃** —— 记一条 `capability_gap`（`bridge.repo_map`）。
-- **skill/memory 检索刻意不桥接。** 那两个工具会提出知识 candidate；
+- **通用 bridge 的 skill/memory 检索刻意不桥接。** 那两个工具会提出知识 candidate；
   开一条跨进程写入路径的方案**已被否决**。harness 会话可以**读**本仓库的知识，
   **永远不能往里加**。
+- 显式 rebase bridge 复用既有 rebase 工具协议；知识工具仅允许其已有的
+  runtime store/candidate 写入，adapter seed 与父知识层保持只读。
 
 ## 边界 —— 不属于这里
 不调用 transport（那归各 `providers/<id>.py`）；不构造 scope（那归 step）；
-**永不写知识**。
+通用路径不写知识；rebase 路径的 runtime 工具行为由其后端契约约束。
 
 ## 依赖（允许）
 stdlib + `mcp`（`[mcp]` extra）+ `..tools` + `..scopes` + `..run_trace` +

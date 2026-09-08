@@ -103,19 +103,21 @@ def index_root(spec: WheelSpec, commit: str) -> str:
         commit=commit, variant=spec.variant, package=spec.package), "../")
 
 
-def runtime_contract(tracking: dict) -> str:
+def runtime_contract(tracking: dict, dependency: dict) -> str:
     if not tracking.get("version"):
         return ""
+    package, extra = dependency["package"], dependency["extra"]
+    module, index_name = dependency["module"], dependency["index_name"]
     return (
-        "\n## This run's rolling vLLM target\n"
+        "\n## This run's rolling upstream target\n"
         f"Main snapshot: {tracking['main_sha']}\n"
         f"Selected commit: {tracking['selected_sha']}\n"
         f"Required runtime base version: {tracking['version']}\n"
         f"Commit-specific uv index: {tracking['index_url']}\n"
-        "The plugin_boundary module must update pyproject.toml's optional vllm "
-        f"dependency to vllm=={tracking['version']}, use an explicit tool.uv.index "
-        "named vllm-upstream with the URL above and tool.uv.sources.vllm = "
-        "{index = 'vllm-upstream'}, then regenerate uv.lock. "
-        "The lock's vllm package must resolve from that commit-specific index. "
+        f"The {module} module must update pyproject.toml's optional {extra} "
+        f"dependency to {package}=={tracking['version']}, use an explicit tool.uv.index "
+        f"named {index_name} with the URL above and tool.uv.sources.{package} = "
+        f"{{index = '{index_name}'}}, then regenerate uv.lock. "
+        f"The lock's {package} package must resolve from that commit-specific index. "
         "Do not keep the old release pin, disable lock checks, or change the "
         "selected upstream checkout. Other modules must preserve this pin.\n")

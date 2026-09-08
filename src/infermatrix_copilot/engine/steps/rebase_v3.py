@@ -198,8 +198,8 @@ def _classify_target_main_changes(repo: str, base: str, head: str,
 
     Compare the common main ancestor to the incoming main tree so previously
     adapted files on the result branch are not counted as new main changes.
-    The vLLM assignment and the target-repo assignment are independent: a
-    vLLM range with zero commits must not hide new AFD code. Unmapped
+    The upstream assignment and the target-repo assignment are independent: a
+    upstream range with zero commits must not hide new AFD code. Unmapped
     documentation is reported but ignored; an unmapped source/config/test path
     is returned to the caller so the run can stop rather than silently skip it.
     """
@@ -724,7 +724,7 @@ def _ensure_upstream_scratch(ctx: StepContext) -> str | StepResult:
     import subprocess
     scratch = Path(ctx.state.get("upstream_path", "") or "")
     origin = ctx.state.get("upstream_origin_path", "")
-    target = (ctx.state.get("vllm_target_sha")
+    target = (ctx.state.get("upstream_target_sha")
               or ctx.state.get("upstream_commit") or "")
     # only a path INSIDE the run dir counts as an existing scratch — a
     # canonical path in `upstream_path` (older state, manual seeding) must
@@ -1181,7 +1181,7 @@ async def _v3_sync_target(ctx: StepContext) -> StepResult:
             baseline = baseline or bootstrap
             if not baseline:
                 return StepResult(False, FailureKind.BLOCKED,
-                                  "first tracking run needs last_rebase_commit=<vLLM SHA>; "
+                                  "first tracking run needs last_rebase_commit=<upstream SHA>; "
                                   "no published baseline exists yet")
             sync["upstream_baseline"] = baseline
         sub.update({"target_sync": sync})
@@ -1447,8 +1447,8 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
             found = tracking["selected_sha"]
             wheel_spec = replace(wheel_spec, install_env={
                 **wheel_spec.install_env,
-                "VLLM_PRECOMPILED_WHEEL_COMMIT": found,
-                "VLLM_PRECOMPILED_WHEEL_VARIANT": wheel_spec.variant})
+                **{name: value.format(commit=found, variant=wheel_spec.variant)
+                   for name, value in (wheel_data.get("selected_install_env") or {}).items()}})
         else:
             found = wheel_mod.pick_wheel_commit(
                 Path(upstream), branch, wheel_spec,
@@ -1504,10 +1504,10 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
                                  else "(install healthy, skipped)"),
                       outputs={"state_updates": {
                           "upstream_commit": found,
-                          "vllm_target_sha": found,
-                          "vllm_target_ref": str(
+                          "upstream_target_sha": found,
+                          "upstream_target_ref": str(
                               target_cfg.get("target_ref") or ""),
-                          "vllm_target_version": _runtime_version(ctx, manifest),
+                          "upstream_target_version": _runtime_version(ctx, manifest),
                       }})
 
 
@@ -1554,9 +1554,10 @@ async def _v3_assign(ctx: StepContext) -> StepResult:
         problem = check_uv_dependency(
             Path(repo), package=lock["package"], extra=lock["extra"],
             version=tracking["version"], index_url=tracking["index_url"])
-        if problem and "plugin_boundary" not in active:
-            active.append("plugin_boundary")
-            _substate(ctx).update({"modules": {"plugin_boundary": {"skip": False}}})
+        boundary = lock["module"]
+        if problem and boundary not in active:
+            active.append(boundary)
+            _substate(ctx).update({"modules": {boundary: {"skip": False}}})
     target_main_assignment = {
         "changed_paths": [], "affected_modules": [],
         "unmapped_paths": [], "ignored_paths": []}
@@ -1664,7 +1665,8 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
     prompt = build_debug_prompt(module or slug, traceback_text,
                                 data.debug_prompt_template, slug)
     prompt += upstream_tracking.runtime_contract(
-        _substate(ctx).get("upstream_tracking", {}))
+        _substate(ctx).get("upstream_tracking", {}),
+        (manifest.get("rebase") or {}).get("dependency_lock") or {})
     agent_log = ctx.run_dir / "agents" / f"debug-{slug}.log"
     agent_log.parent.mkdir(parents=True, exist_ok=True)
     ctx.trace.record("debug_attempt", slug=slug, module=module,
@@ -1674,7 +1676,7 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
                               run_dir=ctx.run_dir)
         if target.kind == "harness":
             from ...providers import run_harness_step
-            from ...rebase_engine.harness_bridge import rebase_bridge_config
+            from ..agent_runtime.rebase_bridge import rebase_bridge_config
 
             outcome = await asyncio.to_thread(
                 run_harness_step, ctx, target,
@@ -1685,7 +1687,7 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
                     "repository, and report honestly if the failure is not "
                     "resolved."),
                 prompt=(prompt + f"\nAFD checkout: {repo_root}\n"
-                        f"Read-only upstream: {paths.vllm_path}\n"
+                        f"Read-only upstream: {upstream_path}\n"
                         "Use the rebase MCP tools for all edits and commands. "
                         "Native shell writes are disabled. Return exactly one "
                         'JSON object: {"status":"success|failed|blocked",'
@@ -1899,7 +1901,7 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
             try:
                 if local_rebase and not (
                         ctx.state.get("upstream_path") and
-                        (ctx.state.get("vllm_target_sha") or ctx.state.get("upstream_commit"))):
+                        (ctx.state.get("upstream_target_sha") or ctx.state.get("upstream_commit"))):
                     raise ValueError("local rebase runtime source/commit is missing")
                 runtime = runtime_identity(
                     str(Path(venv) / "bin" / "python"),
@@ -1908,7 +1910,7 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
                     env=_target_test_env(ctx, manifest), cwd=Path(repo),
                     upstream=str(ctx.state.get("upstream_path") or "")
                     if local_rebase else "",
-                    commit=str(ctx.state.get("vllm_target_sha")
+                    commit=str(ctx.state.get("upstream_target_sha")
                                or ctx.state.get("upstream_commit") or "")
                     if local_rebase else "")
             except (OSError, ValueError, subprocess.SubprocessError) as exc:
@@ -2427,7 +2429,7 @@ async def _v3_publish(ctx: StepContext) -> StepResult:
         if not author_name or not author_email:
             return StepResult(False, FailureKind.BLOCKED,
                               "adapter must declare push.signoff identity")
-        upstream_commit = str(ctx.state.get("vllm_target_sha")
+        upstream_commit = str(ctx.state.get("upstream_target_sha")
                               or data.get("upstream_commit") or "")
         pin_data = (rb.get("wheel") or {}).get("pin")
         pin = wheel_mod.PinSpec.from_manifest(pin_data) if pin_data else None
@@ -2600,7 +2602,8 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
     adapter_dir = Path(ctx.settings.adapters_dir) / repo_name.replace("-", "_")
     data = ModulePromptData.load(adapter_dir / "rebase")
     data = replace(data, runtime_contract=upstream_tracking.runtime_contract(
-        _substate(ctx).get("upstream_tracking", {})))
+        _substate(ctx).get("upstream_tracking", {}),
+        (manifest.get("rebase") or {}).get("dependency_lock") or {}))
     defs = load_tool_schemas(adapter_dir / "rebase" / "tool_schemas.json")
     repo_root = ctx.state.get("repo_path", "")
     upstream_path = ctx.state.get("upstream_path", "")
@@ -2665,7 +2668,7 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
     harness_runner = None
     if target.kind == "harness":
         from ...providers import run_harness_step
-        from ...rebase_engine.harness_bridge import rebase_bridge_config
+        from ..agent_runtime.rebase_bridge import rebase_bridge_config
 
         module_scope = _module_scope(repo_root, module, manifest,
                                      run_dir=ctx.run_dir)

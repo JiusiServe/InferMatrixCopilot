@@ -1,6 +1,6 @@
 # playbooks/*.yaml —— 规范
 
-<!-- verified-against: 2026-08-31 -->
+<!-- verified-against: 2026-09-08 -->
 
 `9 个文件 · 声明式编排数据 · refactor-status: ok`
 
@@ -20,7 +20,7 @@ success, steps[]`。
 - `repo-rebase-v3` —— **locked**，L0，仓库中立（`repos: []`、
   `requires: [modules, upstream.fork_tracking, ci.provider]`）。全仓库
   rebase 引擎（2026-08-25 切换；委托版 v2 与 native-v1 已删除）——
-  **不要改它的 step 列表**。
+  经用户授权扩展了 `local_rebase` 路径；修改仍需明确授权和回归验证。
 - `pr-rebase`/`pr-debug`/`pr-review`/`pr-quality`/`issue-answer`/`issue-triage` —— active，
   仓库中立（`repos: []`、`requires: [repo.path]`）。
 - `repo-profile` —— active，仓库中立（用于接入第二个仓库）。
@@ -28,6 +28,9 @@ success, steps[]`。
   （planner 不可见；只能经 `--playbook` 运行）。
 
 ## 不变量
+- local_rebase：sync_target → wheel → assign → 模块 waves → tests → precommit
+  → push_gate → publish → 报告/收尾。此路径不执行远端 CI，不合并 main。
+  publish 未完成必须返回 blocked，不能 checkpoint 为成功后跳过。
 - 每个 step id 唯一；每个 `step` 名字都必须已注册（由 `store.validate` 强制）。
 - 写/推送 step **只**出现在已审核（非生成）的 playbook 里。
 - locking 面向会改代码/会推送的 playbook；晋升 candidate→active→locked
