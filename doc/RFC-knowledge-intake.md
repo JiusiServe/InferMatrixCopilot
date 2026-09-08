@@ -208,11 +208,19 @@ adopted by pinning a new wheel version.
 2. ReviewBot: `KNOWLEDGE_INTAKE_ENABLED=true` — merged-PR recording plus daily
    shadow batches; inspect typed curation results, artifacts and
    `knowledge-batch` output.
-3. Wire the bugfix channel: point this repo's `KNOWLEDGE_INTAKE_DIR` and
-   the reviewbot's `COPILOT_INTAKE_DIR` at the **same directory** (v1
-   assumes a shared host). Without this pair, everything else works but
-   `pr_debug` learnings are silently absent from batches — both values
-   default to empty/off.
+3. Wire the bugfix channel. Same host: point this repo's
+   `KNOWLEDGE_INTAKE_DIR` and the reviewbot's `COPILOT_INTAKE_DIR` at the
+   **same directory**. Different hosts (the production case): set this
+   repo's `KNOWLEDGE_INTAKE_ISSUE` (plus `ALLOW_POST=1`, the outward-write
+   flag every post needs) and the reviewbot's
+   `KNOWLEDGE_INTAKE_ISSUE` to the same locked, pinned mailbox issue
+   (`owner/repo#N`, JiusiServe/InferMatrixCopilot#135 in production); the
+   harvest step posts each drop record there as a comment carrying
+   `<!-- infermatrix-copilot:bugfix-record:v1 -->` and one fenced JSON
+   block, and the reviewbot records collaborator-authored comments whose
+   `repo` names its watched repository. Without one of these pairs,
+   everything else works but `pr_debug` learnings are silently absent from
+   batches — all values default to empty/off.
 4. Create the bot's fork of this repo; set `KNOWLEDGE_FORK_SLUG`.
 5. `KNOWLEDGE_PR_ENABLED=true` under `POST_MODE=review` — PRs start; every
    one is reviewed like any other knowledge edit.

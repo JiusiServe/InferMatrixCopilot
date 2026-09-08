@@ -89,13 +89,148 @@ def test_landed_fix_writes_one_record(registry, settings, trace, tmp_path):
     assert list((tmp_path / "intake").iterdir()) == [path]
 
 
+def _capture_gh(monkeypatch, *, code=0, out=None):
+    import infermatrix_copilot.engine.steps.pr.debug as debug_module
+    calls = []
+
+    def fake_gh(args, cwd=None):
+        calls.append(list(args))
+        return code, (json.dumps({"html_url": "https://github.com/c/copilot/"
+                                  "issues/135#issuecomment-9"})
+                      if out is None else out)
+
+    monkeypatch.setattr(debug_module, "_gh", fake_gh)
+    return calls
+
+
+def test_landed_fix_is_posted_to_the_mailbox_issue(
+    registry, settings, trace, tmp_path, monkeypatch
+):
+    settings.knowledge_intake_dir = str(tmp_path / "intake")
+    settings.knowledge_intake_issue = "c/copilot#135"
+    settings.allow_post = True
+    settings.repo_full_names = {"demo": "owner/demo"}
+    calls = _capture_gh(monkeypatch)
+    result = _run(registry, settings, tmp_path=tmp_path, trace=trace,
+                  state=_state())
+    assert result.ok and "via drop file and mailbox issue" in result.summary
+    assert result.outputs["intake_comment"].endswith("#issuecomment-9")
+    assert calls == [["api", "repos/c/copilot/issues/135/comments", "-X", "POST",
+                      "-F", f"body=@{tmp_path / 'run-x' / 'knowledge-intake-comment.md'}"]]
+    body = (tmp_path / "run-x" / "knowledge-intake-comment.md").read_text(
+        encoding="utf-8"
+    )
+    assert body.startswith("<!-- infermatrix-copilot:bugfix-record:v1 -->\n```json\n")
+    posted = json.loads(body.split("```json\n", 1)[1].rsplit("```", 1)[0])
+    # The comment carries exactly the record the drop file carries.
+    dropped = json.loads((tmp_path / "intake" / "run-x.json").read_text(encoding="utf-8"))
+    assert posted == dropped and posted["repo"] == "owner/demo"
+    assert list(trace.events("knowledge_intake_published"))
+
+
+def test_mailbox_post_failure_is_swallowed(
+    registry, settings, trace, tmp_path, monkeypatch
+):
+    settings.knowledge_intake_dir = str(tmp_path / "intake")
+    settings.knowledge_intake_issue = "c/copilot#135"
+    settings.allow_post = True
+    _capture_gh(monkeypatch, code=1, out="HTTP 403: locked")
+    result = _run(registry, settings, tmp_path=tmp_path, trace=trace,
+                  state=_state())
+    assert result.ok  # the landed fix and its drop file are not undone
+    assert (tmp_path / "intake" / "run-x.json").is_file()
+    assert "via drop file" in result.summary
+    assert result.outputs["intake_publish_error"] == "HTTP 403: locked"
+    assert "intake_comment" not in result.outputs
+    assert list(trace.events("knowledge_intake_publish_failed"))
+
+
+def test_mailbox_publisher_exception_is_swallowed(
+    registry, settings, trace, tmp_path, monkeypatch
+):
+    import subprocess
+
+    import infermatrix_copilot.engine.steps.pr.debug as debug_module
+
+    def hanging_gh(args, cwd=None):
+        raise subprocess.TimeoutExpired(cmd=["gh", *args], timeout=120)
+
+    monkeypatch.setattr(debug_module, "_gh", hanging_gh)
+    settings.knowledge_intake_dir = str(tmp_path / "intake")
+    settings.knowledge_intake_issue = "c/copilot#135"
+    settings.allow_post = True
+    result = _run(registry, settings, tmp_path=tmp_path, trace=trace,
+                  state=_state())
+    assert result.ok and "via drop file" in result.summary
+    assert result.outputs["intake_publish_error"].startswith("TimeoutExpired")
+    assert list(trace.events("knowledge_intake_publish_failed"))
+
+
+def test_mailbox_post_is_dry_run_without_allow_post(
+    registry, settings, trace, tmp_path, monkeypatch
+):
+    """Invariant 5: an outward write needs the env flag too."""
+    settings.knowledge_intake_dir = str(tmp_path / "intake")
+    settings.knowledge_intake_issue = "c/copilot#135"
+    settings.allow_post = False
+    calls = _capture_gh(monkeypatch)
+    result = _run(registry, settings, tmp_path=tmp_path, trace=trace,
+                  state=_state())
+    assert result.ok and calls == []
+    assert "via drop file" in result.summary
+    assert result.outputs["intake_publish_skipped"].startswith("ALLOW_POST=0")
+    assert list(trace.events("knowledge_intake_publish_skipped"))
+
+
+def test_mailbox_is_off_without_configuration(
+    registry, settings, trace, tmp_path, monkeypatch
+):
+    settings.knowledge_intake_dir = str(tmp_path / "intake")
+    calls = _capture_gh(monkeypatch)
+    result = _run(registry, settings, tmp_path=tmp_path, trace=trace,
+                  state=_state())
+    assert result.ok and calls == []
+    assert "intake_comment" not in result.outputs
+
+
+def test_mailbox_only_configuration_posts_without_a_drop_dir(
+    registry, settings, trace, tmp_path, monkeypatch
+):
+    """The production shape: no local consumer, only the mailbox."""
+    settings.knowledge_intake_issue = "c/copilot#135"
+    settings.allow_post = True
+    calls = _capture_gh(monkeypatch)
+    result = _run(registry, settings, tmp_path=tmp_path, trace=trace,
+                  state=_state())
+    assert result.ok and "via mailbox issue" in result.summary
+    assert len(calls) == 1 and "intake_comment" in result.outputs
+    assert "intake_path" not in result.outputs
+    assert not (tmp_path / "intake").exists()
+
+
+def test_drop_failure_does_not_suppress_the_mailbox(
+    registry, settings, trace, tmp_path, monkeypatch
+):
+    blocker = tmp_path / "intake"
+    blocker.write_text("a file where the directory should be")
+    settings.knowledge_intake_dir = str(blocker)
+    settings.knowledge_intake_issue = "c/copilot#135"
+    settings.allow_post = True
+    calls = _capture_gh(monkeypatch)
+    result = _run(registry, settings, tmp_path=tmp_path, trace=trace,
+                  state=_state())
+    assert result.ok and "via mailbox issue" in result.summary
+    assert "intake_error" in result.outputs and "intake_comment" in result.outputs
+    assert len(calls) == 1
+
+
 def test_write_failure_is_swallowed(registry, settings, trace, tmp_path):
     blocker = tmp_path / "intake"
     blocker.write_text("a file where the directory should be")
     settings.knowledge_intake_dir = str(blocker)
     result = _run(registry, settings, trace, tmp_path, _state())
     assert result.ok  # the landed fix must never be failed by the drop
-    assert "intake drop failed" in result.summary
+    assert "intake delivery failed" in result.summary
     assert "intake_error" in result.outputs
 
 
