@@ -171,6 +171,7 @@ async def rebase_module(
         debug_prompt = build_debug_prompt(
             module, result.get("text", ""),
             prompt_data.debug_prompt_template, "")
+        debug_prompt += prompt_data.runtime_contract
         result = await _attempt(debug_prompt,
                                 require_plan_review=not gate_passed)
         gate_passed = gate_passed or bool(result.get("plan_done"))

@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import shlex
 import weakref
+from dataclasses import replace
 from pathlib import Path
 from typing import Mapping
 
@@ -20,6 +21,7 @@ import yaml
 from ...rebase_engine import test_loop as tl
 from ...rebase_engine import assign as assign_mod
 from ...rebase_engine import wheel as wheel_mod
+from ...rebase_engine import upstream_tracking
 from ...rebase_engine.debug_patch_policy import (capture_patch_policy,
                                                  evaluate_debug_patch)
 from ...rebase_engine.modes import MODES, MUTATING_MODES, mode_state_flags
@@ -52,6 +54,16 @@ def _adapter_manifest(ctx: StepContext) -> dict | StepResult:
 def _substate(ctx: StepContext) -> Substate:
     return Substate(ctx.run_dir, ctx.state.get("run_id")
                     or ctx.run_dir.name)
+
+
+def _tracking_enabled(manifest: dict) -> bool:
+    return (manifest.get("upstream") or {}).get("tracking") == "latest_wheel"
+
+
+def _runtime_version(ctx: StepContext, manifest: dict) -> str:
+    if _tracking_enabled(manifest):
+        return str(_substate(ctx).get("upstream_tracking.version", ""))
+    return str((manifest.get("upstream") or {}).get("target_version") or "")
 
 
 def _parse_env_pairs(env_str: str) -> dict[str, str]:
@@ -841,6 +853,9 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
         return StepResult(False, FailureKind.BLOCKED,
                           "adapter is not active — v3 refuses inactive "
                           "adapters")
+    if _tracking_enabled(manifest) and mode not in ("local_rebase", "report_only"):
+        return StepResult(False, FailureKind.BLOCKED,
+                          "latest_wheel tracking uses local_rebase (or report_only preview)")
 
     # transition-table row 3 (Rev 8 §3.1): a run that ends blocked at ANY
     # later step still owes RUN_REPORT — the report step never runs on the
@@ -976,7 +991,7 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
                               f"{mode} needs the upstream checkout — set "
                               "the manifest upstream.repo_path (env var "
                               "unset?)")
-        if not baseline:
+        if not baseline and not _tracking_enabled(manifest):
             return StepResult(False, FailureKind.BLOCKED,
                               f"{mode} needs the last-rebase baseline — "
                               "pass --task-param last_rebase_commit=<sha>")
@@ -1153,6 +1168,22 @@ async def _v3_sync_target(ctx: StepContext) -> StepResult:
                 "main_base_sha": main_base.stdout.strip(),
                 "source_remote": source_remote, "source_branch": source_branch,
                 "result_branch": result_branch, "remote_sha": remote_sha}
+        if _tracking_enabled(manifest):
+            try:
+                baseline = upstream_tracking.published_baseline(Path(repo), remote_sha)
+            except wheel_mod.WheelPickError as exc:
+                return StepResult(False, FailureKind.BLOCKED, str(exc))
+            bootstrap = str(_task_params(ctx).get("last_rebase_commit") or "")
+            if baseline and bootstrap and baseline != bootstrap:
+                return StepResult(False, FailureKind.BLOCKED,
+                                  "explicit baseline differs from the published baseline; "
+                                  "omit last_rebase_commit after the first successful run")
+            baseline = baseline or bootstrap
+            if not baseline:
+                return StepResult(False, FailureKind.BLOCKED,
+                                  "first tracking run needs last_rebase_commit=<vLLM SHA>; "
+                                  "no published baseline exists yet")
+            sync["upstream_baseline"] = baseline
         sub.update({"target_sync": sync})
 
     source_sha = sync["source_sha"]
@@ -1251,6 +1282,8 @@ async def _v3_sync_target(ctx: StepContext) -> StepResult:
             "afd_main_base_sha": sync["main_base_sha"],
             "afd_sync_result_sha": result_sha,
             "afd_main_merge_performed": result_sha != start_sha,
+            **({"last_rebase_upstream_commit": sync["upstream_baseline"]}
+               if "upstream_baseline" in sync else {}),
         }})
 
 
@@ -1290,11 +1323,30 @@ async def _v3_scan(ctx: StepContext) -> StepResult:
             name: tuple((spec or {}).get("upstream_paths") or ())
             for name, spec in modules.items()}
         try:
+            head_ref = str(_task_params(ctx).get("force_upstream_commit")
+                           or (manifest.get("upstream") or {}).get("target_ref")
+                           or "HEAD")
+            if _tracking_enabled(manifest):
+                ctx.state.setdefault("upstream_origin_path", upstream)
+                scratch = _ensure_upstream_scratch(ctx)
+                if isinstance(scratch, StepResult):
+                    return scratch
+                wheel_data = dict(manifest["rebase"]["wheel"])
+                for key in ("package", "index_url_template", "variant", "arch"):
+                    wheel_data[key] = expand_path(str(wheel_data.get(key) or ""),
+                                                  extra=ctx.settings.expansion_env())
+                    if not wheel_data[key]:
+                        raise wheel_mod.WheelPickError(f"wheel.{key} is unset")
+                selected = upstream_tracking.select_target(
+                    Path(scratch), Path(upstream),
+                    remote=str(manifest["upstream"].get("remote") or "origin"),
+                    branch=manifest["upstream"]["target_branch"], baseline=baseline,
+                    spec=wheel_mod.WheelSpec.from_manifest(wheel_data),
+                    sub=_substate(ctx))
+                upstream, head_ref = scratch, selected["selected_sha"]
             assignment = assign_mod.assign_commits(
                 Path(upstream), str(baseline), module_paths,
-                head_ref=str(_task_params(ctx).get("force_upstream_commit")
-                             or (manifest.get("upstream") or {})
-                             .get("target_ref") or "HEAD"),
+                head_ref=head_ref,
                 target_branch=str((manifest.get("upstream") or {})
                                   .get("target_ref") or
                                   (manifest.get("upstream") or {})
@@ -1382,12 +1434,28 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
         force_commit = _task_params(ctx).get("force_upstream_commit", "")
         if not force_commit and target_cfg.get("require_exact_target"):
             force_commit = target_ref
-        found = wheel_mod.pick_wheel_commit(
-            Path(upstream), branch, wheel_spec,
-            probe=wheel_mod.make_arch_probe(wheel_spec),
-            baseline=ctx.state.get("last_rebase_upstream_commit", ""),
-            force_commit=force_commit,
-            target_ref=target_ref)
+        tracking = {}
+        if _tracking_enabled(manifest):
+            if force_commit or target_ref:
+                raise wheel_mod.WheelPickError(
+                    "latest_wheel tracking cannot also specify a fixed target")
+            tracking = upstream_tracking.select_target(
+                Path(upstream), Path(ctx.state["upstream_origin_path"]),
+                remote=str(target_cfg.get("remote") or "origin"), branch=branch,
+                baseline=ctx.state.get("last_rebase_upstream_commit", ""),
+                spec=wheel_spec, sub=_substate(ctx))
+            found = tracking["selected_sha"]
+            wheel_spec = replace(wheel_spec, install_env={
+                **wheel_spec.install_env,
+                "VLLM_PRECOMPILED_WHEEL_COMMIT": found,
+                "VLLM_PRECOMPILED_WHEEL_VARIANT": wheel_spec.variant})
+        else:
+            found = wheel_mod.pick_wheel_commit(
+                Path(upstream), branch, wheel_spec,
+                probe=wheel_mod.make_arch_probe(wheel_spec),
+                baseline=ctx.state.get("last_rebase_upstream_commit", ""),
+                force_commit=force_commit,
+                target_ref=target_ref)
         # the selection contract ends with the package INSTALLED at the
         # picked commit in the TARGET venv — otherwise stale extensions or
         # a different installed version drive every later module check.
@@ -1403,6 +1471,20 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
             install_log=ctx.run_dir / "wheel_install.log",
             import_check_log=ctx.run_dir / "wheel_import_check.log",
             pre_checkout_head=pre_head)
+        if tracking:
+            from ...rebase_engine.pytest_results import runtime_identity
+
+            version = wheel_mod.read_installed_version(
+                wheel_spec, python=str(Path(venv) / "bin" / "python")).split("+", 1)[0]
+            runtime_identity(
+                str(Path(venv) / "bin" / "python"), wheel_spec.package, version,
+                env=_target_test_env(ctx, manifest), cwd=Path(repo),
+                upstream=upstream, commit=found)
+            if tracking.get("version") and tracking["version"] != version:
+                raise wheel_mod.WheelInstallError("target version changed during resume")
+            tracking.update(version=version,
+                            index_url=upstream_tracking.index_root(wheel_spec, found))
+            _substate(ctx).update({"upstream_tracking": tracking})
         if pin is not None:
             wheel_mod.pin_dockerfile(Path(repo), found, pin)
     except wheel_mod.WheelPickError as exc:
@@ -1411,6 +1493,9 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
     except wheel_mod.WheelInstallError as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "target runtime could not be verified: " + str(exc))
     _substate(ctx).set_field("upstream_commit", found)
     target_cfg = manifest.get("upstream") or {}
     return StepResult(True,
@@ -1422,8 +1507,7 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
                           "vllm_target_sha": found,
                           "vllm_target_ref": str(
                               target_cfg.get("target_ref") or ""),
-                          "vllm_target_version": str(
-                              target_cfg.get("target_version") or ""),
+                          "vllm_target_version": _runtime_version(ctx, manifest),
                       }})
 
 
@@ -1461,6 +1545,18 @@ async def _v3_assign(ctx: StepContext) -> StepResult:
     except AssignError as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
     active = [m for m, s in result.skip.items() if not s]
+    if _tracking_enabled(manifest):
+        # Dependency/index changes belong to the package boundary even when
+        # the corresponding upstream commit touches no mapped source path.
+        from ...rebase_engine.dependency_lock import check_uv_dependency
+        tracking = _substate(ctx).get("upstream_tracking", {})
+        lock = (manifest.get("rebase") or {}).get("dependency_lock") or {}
+        problem = check_uv_dependency(
+            Path(repo), package=lock["package"], extra=lock["extra"],
+            version=tracking["version"], index_url=tracking["index_url"])
+        if problem and "plugin_boundary" not in active:
+            active.append("plugin_boundary")
+            _substate(ctx).update({"modules": {"plugin_boundary": {"skip": False}}})
     target_main_assignment = {
         "changed_paths": [], "affected_modules": [],
         "unmapped_paths": [], "ignored_paths": []}
@@ -1567,6 +1663,8 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
         defs, paths, _build_backends(ctx, manifest, repo_root, target))
     prompt = build_debug_prompt(module or slug, traceback_text,
                                 data.debug_prompt_template, slug)
+    prompt += upstream_tracking.runtime_contract(
+        _substate(ctx).get("upstream_tracking", {}))
     agent_log = ctx.run_dir / "agents" / f"debug-{slug}.log"
     agent_log.parent.mkdir(parents=True, exist_ok=True)
     ctx.trace.record("debug_attempt", slug=slug, module=module,
@@ -1806,7 +1904,7 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
                 runtime = runtime_identity(
                     str(Path(venv) / "bin" / "python"),
                     str((rb.get("wheel") or {}).get("package") or ""),
-                    str((manifest.get("upstream") or {}).get("target_version") or ""),
+                    _runtime_version(ctx, manifest),
                     env=_target_test_env(ctx, manifest), cwd=Path(repo),
                     upstream=str(ctx.state.get("upstream_path") or "")
                     if local_rebase else "",
@@ -2244,7 +2342,8 @@ async def _v3_push_gate(ctx: StepContext) -> StepResult:
                                   "unsupported dependency lock format")
             problem = check_uv_dependency(
                 Path(repo), package=lock["package"], extra=lock["extra"],
-                version=manifest["upstream"]["target_version"])
+                version=_runtime_version(ctx, manifest),
+                index_url=str(_substate(ctx).get("upstream_tracking.index_url", "")))
             if problem:
                 return StepResult(False, FailureKind.BLOCKED, problem)
     summary = "push gate open"
@@ -2335,6 +2434,8 @@ async def _v3_publish(ctx: StepContext) -> StepResult:
         message_template = str((rb.get("push") or {})
                                .get("commit_message_template")
                                or "rebase: align with upstream {short}")
+        if _tracking_enabled(manifest):
+            message_template += f"\n\n{upstream_tracking.UPSTREAM_TRAILER}: {{commit}}"
         unstage = list((rb.get("push") or {}).get("unstage_globs") or [])
         head = git("rev-parse", "HEAD")
         saved_tree = str(data.get("publish_validated_tree") or "")
@@ -2359,7 +2460,10 @@ async def _v3_publish(ctx: StepContext) -> StepResult:
         local = push_to_ci.commit_local_changes(
             Path(repo), upstream_commit=upstream_commit, pin=pin,
             message_template=message_template, unstage_globs=unstage,
-            author_name=author_name, author_email=author_email)
+            author_name=author_name, author_email=author_email,
+            allow_empty=(_tracking_enabled(manifest) and
+                         upstream_tracking.published_baseline(Path(repo), "HEAD")
+                         != upstream_commit))
         if local.reason or not local.commit:
             return StepResult(False, FailureKind.BLOCKED,
                               f"local commit failed: {local.reason}")
@@ -2390,7 +2494,8 @@ async def _v3_publish(ctx: StepContext) -> StepResult:
             allowed=True, allow_push=True, remote=remote,
             token=ctx.settings.github_token, allowed_remote_url=remote_url,
             fast_forward_only=True)
-    except (push_to_ci.PushPreflightError, push_to_ci.gitio.GitIOError) as exc:
+    except (push_to_ci.PushPreflightError, push_to_ci.gitio.GitIOError,
+            wheel_mod.WheelPickError) as exc:
         return StepResult(False, FailureKind.BLOCKED,
                           f"publication could not complete: {exc}")
     updates.update(push_result="pushed" if outcome.pushed else "failed",
@@ -2494,6 +2599,8 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
     repo_name = (ctx.state.get("task_spec") or {}).get("repo", "")
     adapter_dir = Path(ctx.settings.adapters_dir) / repo_name.replace("-", "_")
     data = ModulePromptData.load(adapter_dir / "rebase")
+    data = replace(data, runtime_contract=upstream_tracking.runtime_contract(
+        _substate(ctx).get("upstream_tracking", {})))
     defs = load_tool_schemas(adapter_dir / "rebase" / "tool_schemas.json")
     repo_root = ctx.state.get("repo_path", "")
     upstream_path = ctx.state.get("upstream_path", "")

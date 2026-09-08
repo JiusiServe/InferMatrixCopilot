@@ -95,6 +95,7 @@ def commit_local_changes(repo: Path, *,
                          message_template: str,
                          unstage_globs: Sequence[str],
                          author_name: str, author_email: str,
+                         allow_empty: bool = False,
                          commit_retries: int = 3,
                          precommit_fix: Callable[[], None] | None = None,
                          run: gitio.RunFn = gitio._run,
@@ -114,11 +115,12 @@ def commit_local_changes(repo: Path, *,
         preflight_dockerfile_pin(repo, commit, pin)
     gitio.stage_commit_changes(repo, unstage_globs, run=run)
     committed = False
-    if gitio.has_staged_changes(repo, run=run):
+    if gitio.has_staged_changes(repo, run=run) or allow_empty:
         message = message_template.format(commit=commit, short=commit[:12])
         if not gitio.run_signed_commit(
                 repo, message, author_name=author_name,
                 author_email=author_email, retries=commit_retries,
+                extra_flags=("--allow-empty",) if allow_empty else (),
                 unstage_patterns=unstage_globs, precommit_fix=precommit_fix,
                 run=run, log=log):
             return LocalCommitOutcome(

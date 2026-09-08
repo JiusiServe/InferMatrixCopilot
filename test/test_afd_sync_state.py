@@ -277,6 +277,9 @@ def test_report_only_uses_target_tag_without_changing_checkout(sync_env):
     git(env.source, "tag", "v0.28.0", target)
     head = commit(env.source, {"vllm/config.py": "BASE = 3\n"}, "later upstream")
     env.manifest.update(yaml.safe_load((ROOT / "adapters/afd_plugin/manifest.yaml").read_text()))
+    env.manifest["upstream"].pop("tracking", None)
+    env.manifest["upstream"].update(target_ref="v0.28.0", target_version="0.28.0",
+                                    require_exact_target=True)
     env.manifest["upstream"]["repo_path"] = str(env.source)
     env.manifest["modules"] = {"boundary": {"upstream_paths": ["vllm/config.py"]}}
     ctx = env.context()

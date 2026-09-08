@@ -36,6 +36,7 @@ class ModulePromptData:
     # the historical module wrapper accepts both shapes itself.
     import_command: str = ""
     debug_prompt_template: str = ""
+    runtime_contract: str = ""
     module_vllm_paths: Mapping[str, str] = field(default_factory=dict)
     module_omni_files: Mapping[str, str] = field(default_factory=dict)
     module_test_map: Mapping[str, Sequence[str]] = field(default_factory=dict)
@@ -272,7 +273,7 @@ def build_module_prompt(
     }
     for key, value in vars_map.items():
         template = template.replace("{" + key + "}", value)
-    return template
+    return template + data.runtime_contract
 
 
 def build_debug_prompt(module: str, traceback: str,

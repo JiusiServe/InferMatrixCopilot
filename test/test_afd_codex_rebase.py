@@ -87,6 +87,9 @@ def test_module_completion_uses_real_mcp_tools_and_target_runtime(bridge_env, mo
     types = pytest.importorskip("mcp.types")
     ctx, manifest, paths, definitions, scope = bridge_env
     review_prompts = []
+    Substate(ctx.run_dir, "offline-bridge").update({"upstream_tracking": {
+        "main_sha": "a" * 40, "selected_sha": "b" * 40,
+        "version": "0.29.0.dev7", "index_url": "https://wheels.example/commit/cu130/"}})
     monkeypatch.setattr(rebase_v3, "_adapter_manifest", lambda _: manifest)
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
 
@@ -115,6 +118,7 @@ def test_module_completion_uses_real_mcp_tools_and_target_runtime(bridge_env, mo
             sessions.append(request)
             assert request.bridge_managed_writes
             assert '"status":"success|failed|blocked"' in request.prompt
+            assert "vllm==0.29.0.dev7" in request.prompt
             server = build_server(request.bridge_spec_path)
             if len(sessions) == 2:
                 # A bounded first session ended after the decision. Its

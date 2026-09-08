@@ -20,9 +20,7 @@ upstream:
   repo_path: ${VLLM_UPSTREAM_REPO}
   remote: origin
   target_branch: main
-  target_ref: v0.28.0
-  target_version: 0.28.0
-  require_exact_target: true
+  tracking: latest_wheel
 
 knowledge:
   source: vllm-project/afd-plugin@44de75e
