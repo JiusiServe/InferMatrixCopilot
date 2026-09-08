@@ -341,6 +341,7 @@ zero（`vllm-omni`），可传任何已接入仓库的短名、别名或 owner/n
 | 安装细节，或接入其他 MCP 客户端 | [MCP 安装](doc/guide/mcp.md) |
 | 让 Strict 跑在订阅或别的模型上 | [后端](doc/guide/backends.md) |
 | 独立执行 issue / CI / rebase 任务 | [独立工作流](doc/guide/autonomous-workflow.md) |
+| 配置 AFD Copilot、维护分支并跟进 vLLM / AFD main | [AFD 使用指南](doc/guide/afd-local-rebase.md) |
 | 维护这个仓库本身 | [开发者入口](DEVELOPMENT.md) |
 
 > **宿主 ≠ 后端**：`claude-code` / `codex` / `cursor` 这三个名字两边都出现，
