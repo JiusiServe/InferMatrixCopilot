@@ -30,6 +30,10 @@ export VLLM_WHEEL_ARCH=x86_64
 export STRICT_BACKEND=codex
 ```
 
+If the `codex` launcher on PATH cannot start, set `STRICT_BACKEND_CLI` to an
+existing working Codex executable. Verify that executable with `--version` and
+`login status`; this setting does not require changing the system installation.
+
 The wheel variant and architecture must match the target environment. Codex
 uses the current CLI login; no Anthropic API key is required. Set
 `STRICT_BACKEND_MODEL` only to override the CLI's configured model.

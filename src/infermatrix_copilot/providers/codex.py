@@ -34,6 +34,9 @@ from .base import (
 from .registry import PROVIDERS
 
 _BRIDGE_SERVER = "infermatrix-tools"
+_PROCESS_EVENT = "codex_transport.process_result"
+_STDERR_MAX_CHARS = 2000
+_ERROR_MAX_CHARS = 4000
 
 
 class CodexTransport(HarnessTransport):
@@ -93,17 +96,24 @@ class CodexTransport(HarnessTransport):
             cmd += self._mcp_overrides(mcp_spec, timeout_s)
         cmd += ["-"]
         timed_out = False
+        exit_code = None
+        stderr = ""
         try:
             proc = subprocess.run(
                 cmd, input=text, cwd=cwd, env=sanitized_env(),
                 capture_output=True, text=True, encoding="utf-8",
                 errors="replace", timeout=timeout_s, check=False)
             stdout = proc.stdout or ""
+            stderr = proc.stderr or ""
+            exit_code = proc.returncode
         except subprocess.TimeoutExpired as exc:
             timed_out = True
             raw = exc.stdout or b""
             stdout = raw.decode("utf-8", "replace") if isinstance(raw, bytes) \
                 else str(raw)
+            raw_stderr = exc.stderr or b""
+            stderr = (raw_stderr.decode("utf-8", "replace")
+                      if isinstance(raw_stderr, bytes) else str(raw_stderr))
         events: list[dict] = []
         for line in stdout.splitlines():
             line = line.strip()
@@ -113,7 +123,53 @@ class CodexTransport(HarnessTransport):
                 events.append(json.loads(line))
             except json.JSONDecodeError:
                 continue
+        # Keep the existing (events, timed_out) contract, including CLI
+        # failures which emit no JSONL at all. Local process metadata is not
+        # a model/tool event and is ignored by the usage/activity parsers.
+        events.append({"type": _PROCESS_EVENT, "exit_code": exit_code,
+                       "stderr": stderr[-_STDERR_MAX_CHARS:]})
         return events, timed_out
+
+    @staticmethod
+    def _diagnostics(events: list[dict]) -> dict:
+        """Bounded errors from the CLI and the supported JSONL error shapes."""
+        errors: list[str] = []
+        exit_code = None
+        stderr = ""
+        terminal_failure = False
+        for event in events:
+            kind = event.get("type", "")
+            if kind == _PROCESS_EVENT:
+                exit_code = event.get("exit_code")
+                stderr = str(event.get("stderr") or "")[-_STDERR_MAX_CHARS:]
+                if exit_code not in (None, 0):
+                    terminal_failure = True
+                    errors.append(f"Codex CLI exited with code {exit_code}"
+                                  + (f": {stderr}" if stderr else ""))
+                continue
+            item = event.get("item")
+            item = item if isinstance(item, dict) else {}
+            item_kind = item.get("item_type") or item.get("type") or ""
+            if kind not in ("error", "turn.failed", "item.error") and item_kind != "error":
+                continue
+            terminal_failure = terminal_failure or kind == "turn.failed"
+            payload = (event.get("error") or event.get("message") or event.get("text")
+                       or item.get("error") or item.get("message") or item.get("text") or kind)
+            if isinstance(payload, dict):
+                payload = payload.get("message") or payload.get("text") or json.dumps(payload)
+            detail = f"{kind or item_kind}: {payload}"
+            if detail not in errors:
+                errors.append(detail)
+        return {"exit_code": exit_code, "stderr": stderr,
+                "error": "\n".join(errors)[-_ERROR_MAX_CHARS:],
+                "terminal_failure": terminal_failure}
+
+    @staticmethod
+    def _failed_text(error: str) -> str:
+        # Never reuse an earlier success-shaped model message after the
+        # process/turn failed. This is an explicit transport failure result.
+        return json.dumps({"status": "blocked", "failure_kind": "blocked",
+                           "summary": f"Codex session failed: {error}"}, ensure_ascii=False)
 
     @staticmethod
     def _final_text(events: list[dict]) -> str:
@@ -169,13 +225,20 @@ class CodexTransport(HarnessTransport):
                       else "workspace-write"))
         usage = self._usage(events)
         used = self._tool_activity(events)
+        diagnostics = self._diagnostics(events)
+        final_text = self._final_text(events)
+        failed = diagnostics["terminal_failure"] or (diagnostics["error"] and not final_text)
+        if failed:
+            final_text = self._failed_text(diagnostics["error"])
         if req.trace is not None:
             req.trace.record(
                 "harness_session", provider=self.spec.id, step=req.step_name,
                 timed_out=timed_out, item_count=len(events),
-                tool_items=len(used), served_model=usage.served_model)
+                tool_items=len(used), served_model=usage.served_model,
+                exit_code=diagnostics["exit_code"], stderr=diagnostics["stderr"],
+                error=diagnostics["error"])
         return AgentOutcome(
-            text=self._final_text(events),
+            text=final_text,
             iterations=0,  # codex does not expose a turn budget/counter
             tool_calls=len(used),
             truncated=timed_out,
@@ -197,6 +260,9 @@ class CodexTransport(HarnessTransport):
                 timeout_s=self.settings.strict_backend_timeout_s, model=model)
         usage = self._usage(events)
         text = self._final_text(events)
+        diagnostics = self._diagnostics(events)
+        if diagnostics["terminal_failure"] or (diagnostics["error"] and not text):
+            raise RuntimeError(f"Codex session failed: {diagnostics['error']}")
         return Reply(
             blocks=[Block(type="text", text=text)] if text else [],
             stop_reason="max_tokens" if timed_out else "end_turn",

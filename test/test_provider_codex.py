@@ -7,6 +7,8 @@ import json
 import stat
 from pathlib import Path
 
+import pytest
+
 from infermatrix_copilot.config import Settings
 from infermatrix_copilot.providers.base import AgentSessionRequest
 from infermatrix_copilot.providers.codex import CodexTransport
@@ -26,6 +28,14 @@ with open(os.path.join(here, "capture.json"), "w") as f:
                "env_key": os.environ.get("OPENAI_API_KEY", "")}, f)
 if os.path.exists(os.path.join(here, "sleep")):
     time.sleep(10)
+failure_path = os.path.join(here, "failure.json")
+if os.path.exists(failure_path):
+    with open(failure_path) as f:
+        failure = json.load(f)
+    for event in failure.get("events", []):
+        print(json.dumps(event))
+    sys.stderr.write(failure.get("stderr", ""))
+    sys.exit(failure.get("exit_code", 0))
 print(json.dumps({"type": "thread.started", "thread_id": "t1"}))
 print(json.dumps({"type": "item.completed", "item": {
     "item_type": "command_execution", "command": "ls"}}))
@@ -128,6 +138,60 @@ def test_run_session_timeout_is_truncated(tmp_path):
     outcome = transport.run_session(req)
 
     assert outcome.truncated is True and outcome.text == ""
+
+
+def test_nonzero_cli_stderr_survives_in_trace_and_outcome(tmp_path):
+    transport = _transport(tmp_path)
+    req = _request(tmp_path)
+    (tmp_path / "bin" / "failure.json").write_text(json.dumps({
+        "events": [{"item": {"type": "agent_message", "text": '{"status":"success"}'}}],
+        "stderr": "worker startup failed: missing runtime dependency", "exit_code": 42,
+    }))
+
+    outcome = transport.run_session(req)
+
+    result = json.loads(outcome.text)
+    assert result["status"] == "blocked"
+    assert "code 42" in result["summary"] and "missing runtime dependency" in result["summary"]
+    assert req.trace.events[-1]["exit_code"] == 42
+    assert req.trace.events[-1]["stderr"] == "worker startup failed: missing runtime dependency"
+    with pytest.raises(RuntimeError, match="missing runtime dependency"):
+        transport.complete(system="offline", messages=[])
+
+
+@pytest.mark.parametrize("event", [
+    {"type": "error", "message": "model request rejected"},
+    {"type": "turn.failed", "error": {"message": "model request rejected"}},
+    {"type": "item.error", "error": {"message": "model request rejected"}},
+    {"type": "item.completed", "item": {"type": "error", "message": "model request rejected"}},
+])
+def test_error_event_text_is_exposed_without_a_final_message(tmp_path, event):
+    transport = _transport(tmp_path)
+    req = _request(tmp_path)
+    (tmp_path / "bin" / "failure.json").write_text(json.dumps({"events": [event]}))
+
+    outcome = transport.run_session(req)
+
+    assert json.loads(outcome.text)["status"] == "blocked"
+    assert "model request rejected" in outcome.text
+    assert "model request rejected" in req.trace.events[-1]["error"]
+    assert req.trace.events[-1]["exit_code"] == 0
+
+
+def test_error_diagnostics_are_bounded(tmp_path):
+    transport = _transport(tmp_path)
+    req = _request(tmp_path)
+    (tmp_path / "bin" / "failure.json").write_text(json.dumps({
+        "events": [{"type": "error", "message": "x" * 20000}],
+        "stderr": "y" * 20000 + " final cause", "exit_code": 1,
+    }))
+
+    outcome = transport.run_session(req)
+
+    assert "final cause" in outcome.text
+    assert len(outcome.text) < 8192
+    assert len(req.trace.events[-1]["stderr"]) <= 2000
+    assert len(req.trace.events[-1]["error"]) <= 4000
 
 
 def test_complete_runs_in_scratch(tmp_path):
