@@ -1,7 +1,7 @@
 ---
 title: "Qwen-Omni 规则"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-09
 type: rule
 tags: [vllm-omni, models, qwen-omni]
 sources: ["PR #5687", "PR #6284", "PR #6449", "PR #4322", "PR #6748", "PR #6886", "PR #7019", vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/engine/stage_init_utils.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni.py, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py, tests/engine/test_stage_engine_args.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_quantization.py]
@@ -78,3 +78,10 @@ confidence: high
 - 强制：仅当 `model_arch` 为 `Qwen3OmniMoeForConditionalGeneration` 且已解析的 `moe_backend` 为缺失或 `auto` 时，finalization 才默认写入 `triton`；任何显式 backend 必须原样保留。随仓库发布的 `qwen3_omni_moe.yaml` 必须在 Thinker stage 0 和 Talker stage 1 都显式 pin `moe_backend: triton`；Code2Wav 不继承该模型专属 MoE 设置。
 - 禁止：通过 `VLLM_USE_FLASHINFER_MOE_FP16` 或其他 process-wide 环境变量选择 backend；把默认值写成覆盖用户/deploy 显式选择；只改 deploy YAML 却不覆盖 legacy 与 typed builder 的最终 engine args。
 - 验收：以 Qwen3-Omni default 和一个显式 backend control，分别经 `build_legacy_engine_args_dict` 与 `build_engine_args_dict_from_omni_stage_config` 断言最终 `moe_backend`；默认两路径均为 `triton`，显式值不变。helper 单测只能补充分支覆盖，不能代替 builder-level assertion。PR 只提供 compile/Ruff/diff 检查及因缺少 `torch` 未运行的 targeted pytest，故不构成 GPU 稳定性、性能或音频质量证据。^[PR #7019]
+
+## QOMNI-1g — 共享 code predictor 的 RoPE theta 必须先读 rope_parameters
+
+- 触发：修改 `qwen3_code_predictor._RotaryEmbedding`、Qwen3-Omni Talker code predictor config 反序列化，或 Transformers 对 `rope_theta`/`rope_parameters` 的布局。
+- 强制：构造 `inv_freq` 时优先 `config.rope_parameters["rope_theta"]`（若 mapping 存在），否则回退 top-level `rope_theta`，再默认 `10000.0`。Qwen3-Omni（Transformers 5.10+ 常把 checkpoint 的 `1_000_000` 只放在 nested 字段）与仍带 top-level 的 Qwen3-TTS/legacy 必须共用该顺序。
+- 禁止：只读 top-level 导致静默回退 `10000`；把 nested 优先写成破坏 TTS top-level 兼容的唯一来源。
+- 验收：参数化覆盖 nested-only、nested 优先于冲突 top-level、默认 `10000`，以及 TTS/legacy top-level（含删除 `rope_parameters`）重建正确 `inv_freq`。^[PR #7228]

@@ -1,7 +1,7 @@
 ---
 title: "Diffusion LoRA 规则"
 created: 2026-09-02
-updated: 2026-09-05
+updated: 2026-09-09
 type: rule
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/lora/layers/base_linear.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/diffusion/lora/test_lora_manager.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/lora.py, "PR #6268", benchmarks/kernels/benchmark_diffusion_lora_expand.py, tests/diffusion/lora/test_base_linear.py]
@@ -127,3 +127,10 @@ confidence: high
 - 强制：DLO owns base-weight streaming only。DLO-enabled manager 在 wrapper replacement 时必须要求可用的 resident-buffer protocol、将 request-switchable A/B sidecars 放在 compute device，且 wrapper 因更大 rank 重新分配后必须重放该 device placement；缺 protocol fail closed。非 DLO path 不得获得此 placement side effect。
 - 禁止：将已识别的专用 artifact 悄悄退回 generic loader；按名称而非真实绑定确认成功；将一个模型的 packed layout/scale 规则泛化给所有 diffusion 模型；失败后继续声明旧 adapter active；把 sidecars 加入 DLO host shards/collective，或靠每 block transfer 伪装为 DLO support。
 - 验收：CPU regressions 覆盖 model hook/fallback、binding completeness、mid-loop failure 后 reset 与旧 adapter retry；DLO mock 覆盖 replacement 的 compute-device placement、缺 resident protocol 的 fail-closed 以及 rank-driven reallocation 后 A/B buffer 仍在该 device。模型 integration 另覆盖 artifact identity、target/shape rejection、packed QKV/FFN binding 和实际 request sampling contract。^[PR #6476] ^[PR #6550]
+
+## DIFF-2ae — PEFT 去激活必须 suspend 切片掩码并保留 uploaded 权重
+
+- 触发：修改 `DiffusionLoRAManager` 的 deactivate/activate、`DiffusionBaseLinearLayerWithLoRA` 的 active-slice mask，或混合 base/adapted 请求切换路径。
+- 强制：deactivate 只 `suspend_lora()`（保存并清零 `_diffusion_lora_active_slices`），保留 stacked A/B；同一 adapter_id 与同一 rounded scale 再激活时 `resume_lora()` 复原掩码，禁止整层 `reset_lora`+rebind。`_suspended_adapter_id` 在真实 reset、rank 驱动的 `create_lora_weights`、新 bind 开始、以及 remove 被 suspend 的 adapter 时必须清空；不同 adapter 或不同 scale 仍走完整 rebind。
+- 禁止：把 suspend 当成可丢弃的 upload；resume 覆盖后注册的新 layer 的 inactive mask；在失败 bind 后仍保留旧 suspended 身份。
+- 验收：CPU 覆盖 suspend/resume、同 id+scale 不 re-upload、不同 scale/id 走 rebind、remove suspended 触发 reset、中途失败后 inactive，以及 add_adapter 后新 layer 不被错误 resume。^[PR #7195]
