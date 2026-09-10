@@ -24,7 +24,7 @@ confidence: high
 
 | component、multi-DiT、LoRA、request cache lifecycle | [component lifecycle](rules-component-lifecycle.md)、[LoRA](rules-lora.md) |
 | quality evidence、distributed VAE | `DIFF-3a`、`DIFF-3b` |
-| paged KV、attention backend/parallel、platform、admission、AR-Diffusion K/V pool 与 stepwise rollout | `DIFF-4a`–`DIFF-4x`、`DIFF-4aa`–`DIFF-4ac`；[system runtime](rules-system-runtime.md)；equal-rank SP auto-pad `DIFF-1ah` [attention](rules-attention.md) |
+| paged KV、attention backend/parallel、platform、admission、AR-Diffusion K/V pool 与 stepwise rollout | `DIFF-4a`–`DIFF-4x`、`DIFF-4aa`–`DIFF-4ac`；[system runtime](rules-system-runtime.md)；equal-rank SP auto-pad `DIFF-1ah`、等长 batch mask 省略 `DIFF-1af` [attention](rules-attention.md) |
 
 | worker reply、shutdown、final output/formatter、mid-stream interaction | `DIFF-1s`、`DIFF-1aa`、`DIFF-1ag`、`DIFF-4z`；[output/runtime](rules-output-lifecycle.md) |
 

@@ -12,7 +12,7 @@ confidence: high
 
 只有 `OMNI-CI-数字字母` 是可审计规则 ID。
 
-相关专题：[CI 并行测试与 engine fixture 合同](rules-test-fixtures.md)（`OMNI-CI-2b`, `OMNI-CI-2c`, `OMNI-CI-2d`）。
+相关专题：[CI 并行测试与 engine fixture 合同](rules-test-fixtures.md)（`OMNI-CI-2b`, `OMNI-CI-2c`, `OMNI-CI-2d`, `OMNI-CI-2h`）。
 
 ## Direct 代码快速入口
 
@@ -23,7 +23,7 @@ confidence: high
 | `NIGHTLY`/`WEEKLY`/`NON_CRITICAL`、L1/L4/L5、coverage、scheduled bootstrap | `OMNI-CI-1c` | `upload_pipeline.py` → bootstrap YAML → ready/merge/nightly/weekly YAML → coverage helper |
 | Qwen3-TTS Base/CustomVoice ready/merge collection 或 source dependencies | [OMNI-CI-1d](rules-tts.md#omni-ci-1d-qwen3-tts-base-的-dummy-ready-oracle-与-real-weight-merge-coverage-必须分离) | CUDA/AMD ready+merge YAML → Qwen3-TTS e2e markers |
 | pre-commit、SPDX、shellcheck、stability marker | `OMNI-CI-2a` | `.pre-commit-config.yaml`、`.buildkite/**`、`tools/**` |
-| xdist、共享 worker、helper 拆分/启动回滚、下载 fixture、进程池 | `OMNI-CI-2b` | `tests/conftest.py`、`tests/helpers/{client,clean,runtime,stage_config}.py`、`tests/model_tests/**` |
+| xdist、共享 worker、helper 拆分/启动回滚、下载 fixture、进程池、后台 retry 回归 | `OMNI-CI-2b`、`OMNI-CI-2h` | `tests/conftest.py`、`tests/helpers/{client,clean,runtime,stage_config}.py`、`tests/model_tests/**` |
 | 重模型 cold start、共享 engine/server fixture、sleep/wake | `OMNI-CI-2c` | `tests/entrypoints/test_omni_sleep_mode.py`、OmniServer fixture scope/lock |
 | diffusion tiny builder、model settings、alignment exclusion、重模型 OOM | `OMNI-CI-2d` | `tests/model_tests/diffusion/{diff_model_builders,model_settings,test_alignment}.py` → common offline tests |
 | perf baseline、hardware label、DFX result artifact、assert-baseline | `OMNI-CI-3a` | `tests/dfx/conftest.py`、`tests/dfx/perf/scripts/run_benchmark.py`、`run_diffusion_benchmark.py`、`tests/dfx/perf/tests/**` |
@@ -31,7 +31,7 @@ confidence: high
 | Qwen3-TTS perf/CI task↔checkpoint 配对、Base speaker-embedding miss-EOS retry | [OMNI-CI-3g](rules-tts.md)、[OMNI-CI-3f](rules-tts.md) | `tests/dfx/perf/tests/**` TTS JSON → serving validation；`test_qwen3_tts_speaker_embedding` |
 | scheduled CUDA mirror secret env、`HF_TOKEN` alias、GPU preset expansion | `OMNI-CI-1f` | `upload_pipeline.py` GPU preset expansion → pod env / step commands |
 
-| AMD/ROCm CI timeout、quarantine、diagnostic hang、memory assertion、Qwen3-TTS argv 或 Qwen3-Omni sleep/abort control plane | [OMNI-CI-2f](rules-amd.md#omni-ci-2f-amd-ci-stabilization-必须保留有界执行与测量信号) | `.buildkite/amd/**` → `tests/buildkite/test_amd_pipeline.py` / `ci/qwen3_omni_moe_colocate_async.yaml` → target test |
+| AMD/ROCm CI timeout、quarantine、diagnostic hang、memory assertion、Qwen3-TTS argv 或 Qwen3-Omni sleep/abort control plane | [OMNI-CI-2f](rules-amd.md#omni-ci-2f-amd-ci-stabilization-必须保留有界执行与测量信号)、[OMNI-CI-2g](rules-amd.md) | `.buildkite/amd/**` → `tests/buildkite/test_amd_pipeline.py` / `ci/qwen3_omni_moe_colocate_async.yaml` → target test |
 
 ## OMNI-CI-1a — 硬件 lane 必须真实收集并执行目标路径
 

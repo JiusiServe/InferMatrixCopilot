@@ -35,13 +35,13 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解配置从 deploy、CLI、默认 factory 到 structured/legacy config 的稳定边界 | [配置构造架构](architecture.md) |
-| 根据 PR 描述直达 strict schema、pipeline sampling constraints、deploy/topology、composable strategy、global engine args 的 owner 校验或显存配置的规则组与第一批源码 | [配置开发门禁与代码地图](rules.md) |
+| 根据 PR 描述直达 strict schema、pipeline sampling constraints、deploy/topology、composable strategy、global engine args 的 owner 校验、CLI-only 负向 alias 或显存配置的规则组与第一批源码 | [配置开发门禁与代码地图](rules.md) |
 
 | 对象存储 URI、HF cache snapshot 或空 `config.json` 的模型名称回退与 pipeline 路由 | [模型引用路由规则](rules-model-reference-routing.md) |
 | stage full-payload transport capability、topology-owned projection 或 deploy/CLI override rejection | [stage transport capability](rules-stage-transport.md) |
 | diffusion Ulysses SymmMem transport flag 的 deploy/CLI/default-stage projection | [diffusion parallel transport rules](rules-diffusion-parallel-transport.md) |
 | diffusion attention shorthand、structured config 与 global override 的优先级和最终规范表示 | [diffusion attention precedence](rules-diffusion-attention-precedence.md) |
-| legacy stage engine args 的 copy boundary、connector/default injection 或 repeated build mutation | [legacy engine-args isolation](rules-legacy-engine-args.md) |
+| legacy stage engine args 的 copy boundary、connector/default injection、repeated build mutation、global engine args 的 owner 校验或 CLI-only 负向 alias | [legacy engine-args isolation](rules-legacy-engine-args.md) |
 | 审计配置来源和多层加工 | [config audit](config-audit-plain-language.md) |
 | 设计配置归一化与 parity 验证 | [config normalization parity](config-normalization-parity.md) |
 | 查询 `Omni()` 初始化参数 | [Omni init args](omni-init-args.md) |
@@ -52,4 +52,4 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 | 添加新模型和注册点 | [adding a model](adding-a-model.md) |
 | composable strategy 的 axis、并行拓扑、load balancing owner 与 resolve_omni_config 统一解析 | [并行拓扑合同](rules-parallel-topology.md) |
 
-| 冻结 topology、辅助 stage 注入与模型专用 deploy profile | [topology 与部署 profile](rules-topology-profiles.md) |
+| 冻结 topology、辅助 stage 注入、模型专用 deploy profile 与 LLM `additional_config` 投影 | [topology 与部署 profile](rules-topology-profiles.md) |

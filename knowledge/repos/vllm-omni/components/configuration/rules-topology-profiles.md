@@ -1,10 +1,10 @@
 ---
 title: "topology 与部署 profile 合同"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-10
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_runtime.py, tests/engine/test_async_omni_engine_stage_init.py, vllm_omni/deploy/, "PR #6186", "PR #6813", "PR #6291", "PR #6829", vllm_omni/config/pipeline_registry.py, tests/config/test_config_factory.py, tests/config/test_omni_config.py, tests/config/test_pipeline_registry.py, tests/utils/test_tracking_parser.py, "PR #6230", vllm_omni/entrypoints/utils.py, tests/entrypoints/test_serve.py, tests/entrypoints/test_utils.py]
+sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_runtime.py, tests/engine/test_async_omni_engine_stage_init.py, vllm_omni/deploy/, "PR #6186", "PR #6813", "PR #6291", "PR #6829", vllm_omni/config/pipeline_registry.py, tests/config/test_config_factory.py, tests/config/test_omni_config.py, tests/config/test_pipeline_registry.py, tests/utils/test_tracking_parser.py, "PR #6230", vllm_omni/entrypoints/utils.py, tests/entrypoints/test_serve.py, tests/entrypoints/test_utils.py, "PR #7272"]
 confidence: high
 ---
 
@@ -117,3 +117,10 @@ confidence: high
   registered stage merge 的既有 owner、surviving `stage_<id>_<key>` 到 `cli_overrides` 的
   forwarding 均未被 parser 截断；未知 `OmniEngineArgs` field 仅在
   `filter_dataclass_kwargs` 被 drop 并留下命名该 field 的 WARNING。^[PR #6230]
+
+## CONF-5l — LLM `additional_config` 必须经 runtime owner 投影，且不侵占 diffusion owner
+
+- 触发：deploy/`engine_extras`/CLI 为 stage 传入 `additional_config`，或修改 `_RUNTIME_ENGINE_FIELDS`、`OmniStageRuntimeConfig`、`build_engine_args_dict_from_omni_stage_config`。
+- 强制：LLM/AR stage 把 `additional_config` 纳入 runtime typed owner，深拷贝投影到最终 engine args；diffusion stage 继续只由 diffusion config projection 拥有该字段，runtime 侧保持 `None`。未知字段校验与跨 stage 隔离不变。
+- 禁止：因 diffusion 已有同名字段就拒绝 LLM stage；让 LLM 与 diffusion 共享同一 mutable dict；在 projection 静默丢弃 NPU Code2Wav 等已声明的 LLM `additional_config`。
+- 验收：LLM stage round-trip 非默认值到 engine args 且 mutation 不回写 source/邻 stage；MiniCPM-o NPU profile 读回 graph keys；diffusion stage 断言值只在 `diffusion_config.additional_config`。^[PR #7272]
