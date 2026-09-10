@@ -1,10 +1,10 @@
 ---
 title: "MiniMax H3 缓存与任务生命周期规则"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-08
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", "PR #6666", "PR #6714", "PR #6909", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/fasth3.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/npu/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/entrypoints/openai/video_api_utils.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_fasth3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_native_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py, tests/entrypoints/openai_api/test_video_api_utils.py]
+sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", "PR #6666", "PR #6714", "PR #6909", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/fasth3.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/npu/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/entrypoints/openai/video_api_utils.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_fasth3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_native_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #7162", "PR #7062"]
 confidence: high
 ---
 
@@ -186,11 +186,15 @@ Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期�
 ## MMH3-2j — Turbo LoRA 只接受精确发布 artifact，并与 H3 task、sampling 和 offload lifecycle 共同门禁
 
 - 触发：MiniMax-H3 LightX2V Turbo 的 dynamic LoRA loader、artifact conversion、request task/steps/flow shift，或与 CPU、standard layerwise、distributed layerwise offload (DLO) 的组合。
-- 强制：仅识别声明文件名的 LightX2V Turbo v1.0 safetensors，且 metadata 必须为 `key_format=minimax-h3-diffusers`、rank/alpha `128/128`；任何未知 tensor、重复/不完整 A/B pair、unsupported target 或不精确的 global A/B shape 都在 binding 前失败。转换必须把 Diffusers token-refiner/main-block names 映射为 native H3 names，恢复 FC1 `[gate; up]` 行序为 model-owned packed weights，并通过 `stacked_params_mapping` 将独立 Q/K/V 接到 packed QKV。
-- 强制：Turbo 仅在非零 scale 的实际 active recognized adapter 时限制请求；只支持 FL2VA/T2VA，要求五个 sigma points（四次 denoiser evaluation）、video `flow_shift=6` 与 audio `audio_flow_shift=3`。每次真实 load 都替换该 client ID 的 Turbo classification，避免 eviction 后同 ID generic adapter 被误分类。
+- 强制：只识别文件名可解析为 `TurboSpec` 的 LightX2V Turbo safetensors（artifact 矩阵、alpha 解析与目录选择由 MMH3-2p 定义：不再要求单一 v1.0 文件名或 `alpha==128`），metadata 必须为 `key_format=minimax-h3-diffusers`、rank `128`；任何未知 tensor
+、重复/不完整 A/B pair、unsupported target 或不精确的 global A/B shape 都在 binding 前失败。转换必须把 Diffusers token-refiner/main-block names 映射为 native H3 names，恢复 FC1 `[gate; up]` 行序为 model-owned packed weights，并通过 `stacked_params_mapping` 将独立 Q/K/V 接到 packed QKV。
+- 强制：Turbo 仅在非零 scale 的实际 active recognized adapter 时限制请求；task、sigma points 与 video/audio flow shift 按**实际加载** artifact 的 `TurboSpec` 校验（`fl2v` 服务 FL2VA/T2VA，`ref2v` 只在 Ref2VA-only server 服务 Ref2VA，见 MMH3-2p；PR #6550 的 v1.0 4-step/768p artifact 对应五个 sigma points、`flow_shift=6`、`audio_flow_shift=3`）。每次真实 load
+ 都替换该 client ID 的 Turbo classification，避免 eviction 后同 ID generic adapter 被误分类。
 - 强制：DLO + active Turbo 可用时，DLO 只 stream base blocks；manager 注入的 request-switchable A/B sidecars 必须留在 compute device，且任何因更大 LoRA rank 触发的 wrapper reallocation 后仍重放该 placement。固定 sidecar HBM 是此组合的预算，不得把它算作 base-block DLO lifecycle 或 collective payload。
-- 禁止：将 exact Turbo artifact 的损坏 metadata 静默交给 generic fallback；将任意 H3 PEFT checkpoint、prefusion、multi-LoRA composition 或 Ref2VA 宣称为此功能支持；在 model-level CPU 或 standard layerwise offload 下激活 Turbo。不得为动态 sidecar 重建 DLO host shards、随每个 block/denoise step stream A/B，或让 LoRA 进入 DLO AllGather；没有 active LoRA 的 DLO 不得进入此 loader path。现有 HWR eligibility 仍拒绝 `lora_path`，AllGather 也不走该 BF16 HWR path，不能将 DLO+Turbo evidence 扩展为 HWR support。
-- 验收：覆盖 file/metadata/alpha/target/pair/shape rejection、QKV and FC1 packing、scale-zero/generic same-ID/Ref2VA lifecycle、steps/shifts errors、CPU/standard-layerwise rejection，以及 DLO admission、resident A/B device placement 和 rank-driven reallocation 后的 placement；真实 artifact evidence 必须另绑定 exact checkpoint、task、topology、sampling 和 video/audio output。DP validation 至少以同 wave 的并发 request 覆盖所声称 DP topology；DLO no-AllGather/AllGather evidence 只证明对应 base-weight transport，sidecars 不参与 collective。PR #6550 报告的 0.911 GiB/TP2-rank 与 1.355 GiB/TP1-rank 只绑定 rank-128、312-target 的该 Turbo artifact，不是任意 adapter 的容量保证。转换后的 native mixed-rank PEFT artifact 不属于本 PR 的 supported contract；其 generic fallback rank/scale mismatch 是 post-merge follow-up，不可用本页的 Turbo success 证明安全。^[PR #6476] ^[PR #6550]
+- 禁止：将 exact Turbo artifact 的损坏 metadata 静默交给 generic fallback；将任意 H3 PEFT checkpoint、prefusion、multi-LoRA composition，或 combined/`transformers_ref` 拓扑下的 Ref2VA 宣称为此功能支持（Ref2VA-only server 上的 `ref2v` artifact 准入见 MMH3-2p）；
+在 model-level CPU 或 standard layerwise offload 下激活 Turbo。不得为动态 sidecar 重建 DLO host shards、随每个 block/denoise step stream A/B，或让 LoRA 进入 DLO AllGather；没有 active LoRA 的 DLO 不得进入此 loader path。现有 HWR eligibility 仍拒绝 `lora_path`，AllGather 也不走该 BF16 HWR path，不能将 DLO+Turbo evidence 扩展为 HWR support。
+- 验收：覆盖 file/metadata/alpha/target/pair/shape rejection、QKV and FC1 packing、scale-zero/generic same-ID/Ref2VA lifecycle、steps/shifts errors、CPU/standard-layerwise rejection，以及 DLO admission、resident A/B device placement 和 rank-driven reallocation 后的 placement；真实 artifact evidence 必须另绑定 exact checkpoint、task、topology、sampling 和 video/audio output。DP validation 至少以同 wave 的并发 request 覆盖所声称 DP topology；DLO no-AllGather/AllGather evidence 只证明对应 base-weight transport，sidecars 不参与 collective。PR #6550 报告的 0.911 GiB/TP2-rank 与 1.355 GiB/TP1-rank 只绑定 rank-128、312-target 的该 Turbo artifact，不是任意 adapter 的容量保证。转换后的 native mixed-rank PEFT artifact 不属于本 PR 的 supported contract；其 generic fallback rank/scale mismatch 是 post-merge follow-up，不可用本页的 Turbo success 证明安全。^[PR #6476] ^[PR #6550] ^[PR #7062]
+
 
 ## MMH3-2k — H3 step execution 必须保持请求状态、attention 文档和 rank-0 prepare 隔离
 
@@ -212,3 +216,18 @@ Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期�
 [Diffusion rules](../../components/diffusion/rules.md)。
 
 部署与容量证据见 [部署与证据规则](rules-deployment.md)；共享 diffusion 缓存机制见 [diffusion 规则](../../components/diffusion/rules.md)。
+
+## MMH3-2o — modular alias metadata 必须与 canonical H3 implementation 全字段同构
+
+- 触发：新增或修改 MiniMax-H3 的 alias class、`model_index.json` root routing、`DiffusionModelMetadata` 能力字段，或 recipe 依赖 repo-id 与 partition path 等价。
+- 强制：凡是解析到同一 `MiniMaxH3Pipeline` 实现的 alias，都必须与 canonical entry 保持所有 runtime-selected capability 字段同构，不只 admission 上限，还包括 backend default gate 会读取的字段（如 `attention_mask_free`）以及 packed-sequence / mixed-reference 相关能力。repo root index 若解析到 alias，则 reviewer/debugger 必须先按 alias metadata 检查默认 backend 与 request contract，而不能假设它自动继承 canonical row。
+- 禁止：只复制 review 点名的单个字段；把“同一 Python pipeline class”当成 metadata 自动等价；或用 partition-specific smoke 证明 repo-root serving 行为。
+- 验收：对 root repo id、partition subdir 和 modular alias 分别断言 metadata parity、默认 attention backend resolution 与 supported task/admission contract 一致；任一字段 drift 都应在 contract test 中直接暴露。^[PR #7162]
+
+## MMH3-2p — Turbo filename 编码 sampler 合同，目录不得静默挑文件
+
+- 触发：修改 MiniMax-H3 LightX2V Turbo LoRA loader、artifact 选择、`TurboSpec`、request task/steps/`flow_shift`/`audio_flow_shift`、alpha 解析，或 Ref2VA/combined topology 下的 Turbo 准入。
+- 强制：只服务 Diffusers-PEFT 布局；从文件名解析 `TurboSpec`（`fl2v`/`ref2v`、denoise steps、768p 与否决定 video shift 6.0/12.0、audio shift 3.0、rank 128）。`num_inference_steps`、`flow_shift`、`audio_flow_shift` 与 `_resolve_task` 必须按**实际加载**的 artifact 校验：`fl2v` 只服务 `t2va`/`fl2va`，`ref2v` 只服务 `ref2va`；`sigma_points = denoise_steps + 1`。alpha 以 safetensors metadata 为准；缺省时用 LightX2V 参考默认 `8` 并 warning，不得硬钉 `128`。
+- 强制：`--lora-path` 指向单文件，或只含一个可解析 Turbo artifact 的目录；多候选必须 fail closed。`ref2v` 只能挂在 Ref2VA-only server；combined/`transformers_ref` 拓扑不得绑定只注入 `transformer` 的 Turbo adapter。ComfyUI 融合 QKV/SwiGLU 导出按名拒绝。
+- 禁止：继续要求单一 `4step_v1.0_768p` 文件名或 `alpha==128`；在目录里静默挑选；把未声明 alpha 当 rank；或让 Ref2VA 请求跑到未蒸馏 DiT 的 few-step schedule。
+- 验收：覆盖多 artifact 文件名矩阵、缺/错 alpha、多文件目录拒绝、task/steps/shift 负向门禁、Ref2VA-only vs combined 拒绝，以及 Diffusers-layout packing；不得把单一 artifact 通过外推为全矩阵质量证据。^[PR #7062]

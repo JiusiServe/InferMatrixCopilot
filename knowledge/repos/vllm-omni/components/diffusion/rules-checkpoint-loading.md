@@ -1,10 +1,10 @@
 ---
 title: "Checkpoint、加载与量化合同"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-08
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6162", "PR #6234", "PR #6279", "PR #6445", "PR #6486", "PR #6591", "PR #6651", "PR #6573", vllm_omni/diffusion/model_loader/, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/quantization/, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, vllm_omni/quantization/svdquant_config.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/offloader/, tests/diffusion/model_loader/test_diffusers_loader.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #6722", "PR #4061"]
+sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5544", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6162", "PR #6234", "PR #6279", "PR #6445", "PR #6486", "PR #6591", "PR #6651", "PR #6573", vllm_omni/diffusion/model_loader/, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/quantization/, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, vllm_omni/quantization/svdquant_config.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/offloader/, tests/diffusion/model_loader/test_diffusers_loader.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, "PR #5531", "PR #6722", "PR #4061", "PR #6925"]
 confidence: high
 ---
 
@@ -236,3 +236,10 @@ confidence: high
   上比较真实 kernel 输出。当前合入测试未执行真实 kernel 或 released checkpoint E2E，故仅证明
   loader contract；PR review 所要求的 frozen-head BF16-vs-SVDQuant quality/performance comparison
   没有随本提交提供。^[PR #6162]
+
+## DIFF-2af — Diffusers loader 在无 safetensors index 时才解析 `.bin` TorchAO 清单
+
+- 触发：修改 `diffusers_loader` 的 index discovery、`pt_weights_iterator`、TorchAO serialized checkpoint 路径，或 `allow_patterns_overrides` 与 load-format 选择。
+- 强制：无显式 override 时先解析 safetensors index（`diffusion_pytorch_model.safetensors.index.json` / `model.safetensors.index.json`），仅当二者都缺失才解析 `diffusion_pytorch_model.bin.index.json`。命中序列化 TorchAO（`quant_config.get_name()=="torchao"` 且 `is_checkpoint_torchao_serialized`）且非 safetensors 时，用自然序排序的 `pt_weights_iterator` 加载；safetensors 路径保持原 multithread/safetensors 合同。
+- 禁止：让 `.bin` index 抢在 safetensors 之前；对序列化 TorchAO `.bin` 开 multithread；或把该路径当成任意 PyTorch bin checkpoint 的通用 loader。
+- 验收：覆盖 safetensors 优先、bin index fallback、自然序 shard、TorchAO iterator 选择与非 TorchAO 负向对照。^[PR #6925]

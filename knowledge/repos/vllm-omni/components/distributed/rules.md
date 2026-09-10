@@ -1,10 +1,10 @@
 ---
 title: "Distributed 传输规则"
 created: 2026-08-05
-updated: 2026-09-05
+updated: 2026-09-08
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", "PR #6834", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626", "PR #6529"]
+sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", "PR #6834", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626", "PR #6529", "PR #7136"]
 confidence: high
 ---
 
@@ -135,3 +135,10 @@ confidence: high
 - 强制：当前 `OmniRequestOutput` 按其 dataclass 字段重建，不能落入基类 `RequestOutput` 的动态属性编码路径；decoder 只构造已知字段，并在旧 wire format 含嵌套 `request_output` 时完成一次向扁平对象的内容合并。基类 `RequestOutput` 的字段集合必须跟随 pinned upstream 合同。
 - 禁止：让 subclass 走基类序列化而丢失 diffusion/stage 字段或形成递归；不得把未知 key 直接传给 `RequestOutput`/dataclass 构造器；upstream 已移除的 `multi_modal_placeholders` 不得仅为旧动态属性重新作为当前字段恢复。
 - 验收：msgpack round-trip 分别覆盖 pipeline 文本输出和 diffusion 图像输出，保持 request metadata、prompt、token、outputs、finished、stage 字段及图像内容；旧嵌套 wire payload 能解码为扁平对象，编码不递归且解码后的字段可被直接消费。^[PR #5146]
+
+## DIST-1k — Mooncake TCP write completion 必须表示目的端已应用
+
+- 触发：升级 `mooncake-transfer-engine`、修改 TCP `batch_transfer_sync_write`/completion 语义，或让零拷贝 consumer 在 write completion 后立即读取 destination buffer。
+- 强制：CUDA Mooncake 依赖必须钉在包含 acknowledged TCP writes 的版本（`0.3.12` 起）；`batch_transfer_sync_write` 返回成功后，destination 内存必须已更新到可读状态，不能只表示本地 send 入队。回归必须在 receiver 被挂起时证明 completion 不会提前返回，恢复后再断言目的端字节一致。
+- 禁止：降级到无 ACK 的 TCP 实现却不更新测试合同；把 RDMA 路径的 completion 语义外推到 TCP；或在 completion 前启动依赖 destination 内容的零拷贝消费。
+- 验收：强制 TCP 的挂起-恢复测试覆盖「停止期间不完成、恢复后成功且字节匹配」；依赖声明与该测试同步变更。^[PR #7136]

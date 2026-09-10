@@ -1,10 +1,10 @@
 ---
 title: "Boogu-Image 规则"
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-08
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #6701", "PR #6571", "PR #6786", "PR #6968", docs/models/supported_models.md, recipes/Boogu/Boogu-Image.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/models/boogu_image/pipeline_boogu_image.py, vllm_omni/diffusion/models/boogu_image/boogu_image_transformer.py, vllm_omni/entrypoints/utils.py, tests/diffusion/models/boogu_image/test_pipeline_boogu_image.py, tests/diffusion/models/boogu_image/test_boogu_image_transformer.py, tests/entrypoints/test_utils.py, tests/e2e/online_serving/test_boogu_image_edit.py]
+sources: ["PR #6701", "PR #6571", "PR #6786", "PR #6968", docs/models/supported_models.md, recipes/Boogu/Boogu-Image.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/models/boogu_image/pipeline_boogu_image.py, vllm_omni/diffusion/models/boogu_image/boogu_image_transformer.py, vllm_omni/entrypoints/utils.py, tests/diffusion/models/boogu_image/test_pipeline_boogu_image.py, tests/diffusion/models/boogu_image/test_boogu_image_transformer.py, tests/entrypoints/test_utils.py, tests/e2e/online_serving/test_boogu_image_edit.py, "PR #6699", "PR #6925"]
 confidence: high
 ---
 
@@ -15,6 +15,8 @@ confidence: high
 | PR 描述信号 | 规则 |
 |---|---|
 | revision、RoPE、Edit CFG/rank/VAE、request batching | `BOOGU-1a`–`BOOGU-1d` |
+| Turbo DMD few-step schedule/renoise、TorchAO FP8 DiT-only quantization | `BOOGU-1e`、`BOOGU-1f` |
+
 
 ## BOOGU-1a — global revision 必须填入每个未显式设 revision 的 stage
 
@@ -66,3 +68,18 @@ confidence: high
   batched TI2I raise、B=2/N=2 distinct-mask 行序、request-major generators 和每请求 output slice；
   CFG B=2 isolation 至少分别改变 partner 的 positive prompt、negative prompt 和 seed。CPU/mock
   tests 不证明 GPU CFG、TI2I batch safety、吞吐或 QPS/perf claim。^[PR #6968]
+
+## BOOGU-1e — Turbo DMD student 路径必须与 Base/Edit scheduler 路径严格分流
+
+- 触发：新增或修改 `BooguImageTurboPipeline`、Turbo few-step sampling、explicit `timesteps`/sigmas、renoise loop，或 request batching。
+- 强制：Turbo 必须走独立的 DMD student contract，而不是复用 Base/Edit 的 regular scheduler+CFG path。其 sigma schedule 只能来自两种来源：显式 1D finite sequence（接受 `[0,1]` 或 `0..1000` 训练 timestep 归一化后形式），或由 `conditioning_sigma..1.0` 线性生成的 `num_inference_steps` 个 ascending sigma points；任一非法 shape、空序列、越界值或非正 step count 都必须 fail closed。
+- 强制：每个 Turbo step 执行 upstream `x + (1-sigma) * velocity` 预测，并在非末步以同一 request RNG renoise 到下一 sigma；解码输出与 Base/Edit 共用 VAE/postprocess，但 Turbo request batching 必须保持 `batch=1`，因为其额外 schedule/request args 不在现有 compatibility key 中。
+- 禁止：把 Turbo 混进 regular scheduler、接受 batched Turbo requests、从 mask/CFG state 猜测 sigmas，或把 few-step path 的通过外推到 Edit/Base quality parity。
+- 验收：覆盖 explicit sigma normalization、default four-step schedule、predict/renoise step math、batch>1 rejection，以及 Turbo/Base 两条路径互不串用；真实质量结论仍需独立的 upstream-reference 与硬件 E2E 证据。^[PR #6699]
+
+## BOOGU-1f — 预量化 TorchAO FP8 只量化 DiT，且不走 online 量化
+
+- 触发：修改 Boogu-Image 的 TorchAO/`torchao_float8_weight_only` 配置、transformer `quant_config`/layer prefix、pipeline 组件量化 scope，或官方 Base-fp8/Edit-fp8 checkpoint 加载。
+- 强制：只支持加载已序列化的 TorchAO float8_weight_only checkpoint，不在运行时把 BF16/FP16 量化成 FP8。`quant_config` 与 fully-qualified prefix 必须传到可量化 `ReplicatedLinear`/`ColumnParallelLinear` 等层；量化范围隔离在 DiT transformer，不得波及 MLLM、VAE、scheduler。
+- 禁止：宣称 online FP8；对序列化 `.bin`/`.pt` TorchAO 权重启用 multithread load；或因 shorthand 配置而量化非 DiT 组件。
+- 验收：覆盖 serialized TorchAO config、shorthand、prefix 传播，以及 DiT-only scope；真实权重 smoke 另绑 checkpoint 与硬件。^[PR #6925]

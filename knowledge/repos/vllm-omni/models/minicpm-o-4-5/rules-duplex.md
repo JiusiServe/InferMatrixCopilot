@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5 native duplex 规则"
 created: 2026-09-04
-updated: 2026-09-06
+updated: 2026-09-08
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #6318", "PR #6346", "PR #6404", "PR #6458", "PR #6619", "PR #6630", "PR #6678", "PR #6626", "PR #6767", "PR #6821", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, vllm_omni/model_executor/stage_input_processors/minicpmo_4_5_omni.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/deploy/minicpmo_4_5_2gpu.yaml, vllm_omni/deploy/minicpmo_4_5_3gpu.yaml, vllm_omni/deploy/minicpmo_4_5_8x4090.yaml, examples/online_serving/minicpmo/realtime_duplex_demo.py, vllm_omni/experimental/fullduplex/client.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/adapter.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/session.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/stage0.py, vllm_omni/entrypoints/duplex/realtime_input.py, vllm_omni/entrypoints/duplex/runtime_adapter.py, vllm_omni/entrypoints/duplex/runtime_bridge.py, vllm_omni/entrypoints/duplex/serving.py, vllm_omni/entrypoints/duplex/session_runner.py, vllm_omni/experimental/fullduplex/video_stacking.py, tests/config/test_config_factory.py, tests/engine/duplex/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py, tests/examples/test_minicpmo_realtime_duplex_simple_demo.py, "PR #6529", vllm_omni/entrypoints/duplex/protocol.py, vllm_omni/entrypoints/duplex/realtime_state.py, tests/entrypoints/openai/test_duplex_protocol.py]
+sources: ["PR #6318", "PR #6346", "PR #6404", "PR #6458", "PR #6619", "PR #6630", "PR #6678", "PR #6626", "PR #6767", "PR #6821", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, vllm_omni/model_executor/stage_input_processors/minicpmo_4_5_omni.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/deploy/minicpmo_4_5_2gpu.yaml, vllm_omni/deploy/minicpmo_4_5_3gpu.yaml, vllm_omni/deploy/minicpmo_4_5_8x4090.yaml, examples/online_serving/minicpmo/realtime_duplex_demo.py, vllm_omni/experimental/fullduplex/client.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/adapter.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/session.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/stage0.py, vllm_omni/entrypoints/duplex/realtime_input.py, vllm_omni/entrypoints/duplex/runtime_adapter.py, vllm_omni/entrypoints/duplex/runtime_bridge.py, vllm_omni/entrypoints/duplex/serving.py, vllm_omni/entrypoints/duplex/session_runner.py, vllm_omni/experimental/fullduplex/video_stacking.py, tests/config/test_config_factory.py, tests/engine/duplex/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py, tests/examples/test_minicpmo_realtime_duplex_simple_demo.py, "PR #6529", vllm_omni/entrypoints/duplex/protocol.py, vllm_omni/entrypoints/duplex/realtime_state.py, tests/entrypoints/openai/test_duplex_protocol.py, "PR #6799"]
 confidence: high
 ---
 
@@ -106,3 +106,10 @@ confidence: high
   把此 ordering fix 外推为通用 realtime/reliability guarantee。
 - 验收：zero-audio reserve、partial ACK→commit→response-end→later ACK 原位扩展、unreserved stale reject、
   delete cleanup、两种 truncate cap 与 checkpoint-before-commit 顺序均须覆盖。^[PR #6529] ^[PR #6821]
+
+## MCPMO-4i — full_attention Talker 必须保留上下文直至容量溢出才 rollover
+
+- 触发：修改 MiniCPM-o Talker `attention_type`、Stage 1 streaming session update、`meta.next_stage_prompt_len`、condition sequence metadata，或 shipping `minicpmo_4_5.yaml` 的默认 attention 策略。
+- 强制：默认遵循 checkpoint 声明的 `full_attention`；在该模式下，只要「下一 condition + codec-generation reserve」仍落在由 runtime `max_model_len` 与 `tts_config.max_position_embeddings` 导出的有效上限内，就必须保留已累积的 Talker KV/history 并追加；仅在严格溢出时才重建受支持的 one-previous-condition 窗口，释放旧 KV/encoder 与 connector watermark，重置异步 replacement state，并让请求重新进入 admission。精确贴合上限时允许 append，之后继续累积直至下次溢出。显式 `sliding_recompute` 仍在每个 condition 边界重算；正整数 `meta.next_stage_prompt_len` 是 scheduler 的权威 placeholder 长度，合法 Talker condition 即使缺少 legacy `ids.prompt` 也必须先 append 真实 prompt 再推进 sequence/lifecycle。
+- 禁止：把无条件 per-condition recompute 当作生产默认；硬编码 `4096` 当作有效上限；在未溢出时丢弃可保留的 Talker history；或把本路径写成已支持物理 KV preemption 后的增量 full-attention replay。
+- 验收：覆盖 fit/exact-fit/overflow、producer-owned 与 receiver-owned sequencing 兼容、`next_stage_prompt_len` 驱动的 append，以及显式 `sliding_recompute` 仍按边界重算；不得用 capacity-triggered rollover 的通过外推为已修复无关 perf 回归。^[PR #6799]

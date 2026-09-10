@@ -154,9 +154,11 @@ execution，不能代替 retained accuracy gate、Buildkite H100 result 或其�
 ## 审查入口
 
 H3 input matrix/media ingress，以及 text-encoder completeness、online FP8 的 component namespace、loader 顺序、joint quality 与 offload 边界见
-[media rules](rules-media.md) 与 [MiniMax H3 rules](rules.md#direct-代码快速入口)；checkpoint transform、quantized loader 与
+[media rules](rules-media.md)（含 `text_conditioning/v1` schema）与 [MiniMax H3 rules](rules.md#direct-代码快速入口)
+；checkpoint transform、quantized loader 与
 text-encoder fused-source 完整性正文见 [loading rules](rules-loading.md)；DLO、consumer/H100/ROCm
-部署和硬件证据正文见 [deployment rules](rules-deployment.md)；conditioned VAE 确定性、modular task 选择与 request 级 Cache-DiT/TeaCache/sigma schedule/Turbo LoRA 生命周期见 [缓存与任务生命周期规则](rules-cache-task.md)。
+部署和硬件证据正文见 [deployment rules](rules-deployment.md)；conditioned VAE 确定性、modular task 选择与 request 级 Cache-DiT/TeaCache/sigma schedule/Turbo LoRA 生命周期、alias metadata 同构与 Turbo artifact 合同见 [缓存与任务生命周期规则](rules-cache-task.md)。
+
 
 H3 VAE decoder 的 model-local eager dispatch、remote-code eligibility、exactness guards、selective
 FP16 materialization、keyframe encode 的 cuDNN/TF32 pin 与 compile/spatial-parallel fallback 见 [VAE eager-ops rules](rules-vae-ops.md)

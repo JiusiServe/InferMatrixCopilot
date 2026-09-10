@@ -1,10 +1,10 @@
 ---
 title: "运行时热路径合同"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-08
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048", "PR #6424", "PR #6454", vllm_omni/data_entry_keys.py, "vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py", "vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py", "vllm_omni/model_executor/stage_input_processors/cosyvoice3.py", "PR #6458", "PR #6317"]
+sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048", "PR #6424", "PR #6454", vllm_omni/data_entry_keys.py, "vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py", "vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py", "vllm_omni/model_executor/stage_input_processors/cosyvoice3.py", "PR #6458", "PR #6317", "PR #7136"]
 confidence: high
 ---
 
@@ -94,3 +94,10 @@ confidence: high
   不得被拿来与旧 `torch.multinomial` 比较。当前实现把 `+inf` 也排除，并在整行无 finite candidate
   时从 `sample()` 抛错、可能终止整个 EngineCore；这两项是 review 接受的 follow-up 风险，不能描述成
   per-request 隔离或通用正无穷采样语义。^[PR #6424]
+
+## EXEC-4f — 单 token prefill 尾块必须保留 preprocess，不得当 decode/MTP
+
+- 触发：修改 runner `_preprocess` 的 `_omni_prompt_len` / `_omni_num_computed_tokens` / `_omni_is_prefill`、phase 路由、normal/batched MTP eligibility，或自定义 AR talker 的 chunked-prefill 行为。
+- 强制：上述字段为 Python `int`/`bool`，按真实 prompt 进度逐行生产。长度为 1 的 **prefill** 行（含 chunked prefill 的最后一 token）必须保留 preprocess embedding，且不得进入 runner-managed MTP；只有单 token **decode** 行才可走 MTP。out-of-tree 模型虽见下划线前缀，仍按公开 contract 消费。
+- 禁止：用当前 span 长度把 one-token prefill 当成 decode；只在模型 helper 手喂 metadata 却不测 runner producer；或把该合同当成已为所有模型开启 chunked prefill。
+- 验收：直接调用生产 `_preprocess`，在 mixed batch 中对照应/不应进入 MTP 的行，覆盖单 token prompt/tail、cached progress、normal/batched hooks；真实权重 E2E 至少锁一条 one-token prefill tail。^[PR #7136]

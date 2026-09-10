@@ -24,7 +24,8 @@ sources: ["PR #5541", "PR #6563", "PR #4048", vllm_omni/diffusion/models/hunyuan
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 修改公开入口、prompt、AR→DiT、`model_extras`、shared task examples、条件图、size 或 seed | [开发快速入口和 rules](rules.md#direct-开发快速入口) |
+| 修改公开入口、prompt、AR→DiT、`model_extras`、shared task examples、条件图、size、seed 或 MoE expert mapping | [开发快速入口和 rules](rules.md#direct-开发快速入口) |
+
 | Scheduler-managed paged KV、prepared layout、CFG logical prefix、Hunyuan Q/K/V spans 或空 hash 边界 | [shared paged KV control plane](../../components/diffusion/paged-kv-control-plane.md) |
 | 理解模型和 vLLM-Omni 代码地图 | [architecture](architecture.md) |
 | HF 接入常见偏差 | [HF alignment pitfalls](hf-alignment-pitfalls.md) |

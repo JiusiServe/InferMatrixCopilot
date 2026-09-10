@@ -40,5 +40,6 @@ sources: []
 | loader 的 dtype/config 获取、fused shard 与多模块 checkpoint 载入 | [loader 合同](rules-loader-contract.md) |
 | shared image example envelope 与 model_extras 参数声明 | [image task envelope 合同](rules-image-task-envelope.md) |
 | Omni 输出类型与字段/复制合同 | [输出类型合同](rules-output-contract.md) |
-| 采样循环不变量、热路径缓存、AR 音频侧路 | [运行时热路径合同](rules-runtime-hot-paths.md) |
+| 采样循环不变量、热路径缓存、AR 音频侧路、preprocess phase/one-token prefill | [运行时热路径合同](rules-runtime-hot-paths.md) |
+
 | NPU runner、ROCm 分页注意力、NPU 模型补丁 | [平台后端合同](rules-platform-backends.md) |

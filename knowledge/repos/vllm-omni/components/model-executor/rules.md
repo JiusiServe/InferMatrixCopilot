@@ -22,7 +22,8 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | async output、MTP graph、output types | `EXEC-4c`、`EXEC-5a`–`5b`、`EXEC-7a`–`7b` |
 | NPU/ROCm/MUSA/XPU runner/backend | `EXEC-10a`–`EXEC-13h`；[platform backends](rules-platform-backends.md) |
 | image/video task envelope、`model_extras` | `EXEC-6a`–`EXEC-6d`；[image task envelope](rules-image-task-envelope.md) |
-| sampling/codec hot path | `EXEC-8a`、`EXEC-9a`、`EXEC-11a`–`11h`；[runtime hot paths](rules-runtime-hot-paths.md) |
+| preprocess phase/one-token prefill、sampling/codec hot path | `EXEC-4f`、`EXEC-8a`、`EXEC-9a`、`EXEC-11a`–`11h`；[runtime hot paths](rules-runtime-hot-paths.md) |
+
 
 ## 完整代码路由
 
