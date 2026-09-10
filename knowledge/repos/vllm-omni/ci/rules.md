@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni CI 规则"
 created: 2026-08-23
-updated: 2026-09-05
+updated: 2026-09-08
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6311", "PR #6339", "PR #6343", "PR #6468", "PR #6523", "PR #6613", "PR #6555", "PR #6650", .buildkite/common/scripts/run_cov_split.sh, pyproject.toml, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py, .buildkite/common/scripts/upload_pipeline.py, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/clean.py, tests/helpers/client.py, tests/helpers/mark.py, tests/helpers/runtime.py, tests/helpers/stage_config.py, tests/buildkite/test_upload_pipeline.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/dfx/stability/, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/nightly/run_nightly_jobs.sh, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py, .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, "PR #6704", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", "PR #6696", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/benchmarks/patch/patch.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, "PR #6674", docker/Dockerfile.npu, docker/Dockerfile.npu.a3, docker/Dockerfile.npu.ci, docker/Dockerfile.npu.ci.a3, "PR #6818", "PR #6830", "PR #6884", tests/diffusion/conftest.py, tests/diffusion/attention/test_flash_attn.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #6947"]
+sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6311", "PR #6339", "PR #6343", "PR #6468", "PR #6523", "PR #6613", "PR #6555", "PR #6650", .buildkite/common/scripts/run_cov_split.sh, pyproject.toml, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py, .buildkite/common/scripts/upload_pipeline.py, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/clean.py, tests/helpers/client.py, tests/helpers/mark.py, tests/helpers/runtime.py, tests/helpers/stage_config.py, tests/buildkite/test_upload_pipeline.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/dfx/stability/, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/nightly/run_nightly_jobs.sh, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py, .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, "PR #6704", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", "PR #6696", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/benchmarks/patch/patch.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, "PR #6674", docker/Dockerfile.npu, docker/Dockerfile.npu.a3, docker/Dockerfile.npu.ci, docker/Dockerfile.npu.ci.a3, "PR #6818", "PR #6830", "PR #6884", tests/diffusion/conftest.py, tests/diffusion/attention/test_flash_attn.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #6947", "PR #7118"]
 confidence: high
 ---
 
@@ -12,7 +12,7 @@ confidence: high
 
 只有 `OMNI-CI-数字字母` 是可审计规则 ID。
 
-相关专题：[CI 并行测试与 engine fixture 合同](rules-test-fixtures.md)（`OMNI-CI-2b`, `OMNI-CI-2c`, `OMNI-CI-2d`）。
+相关专题：[CI 并行测试与 engine fixture 合同](rules-test-fixtures.md)（`OMNI-CI-2b`, `OMNI-CI-2c`, `OMNI-CI-2d`, `OMNI-CI-2h`）。
 
 ## Direct 代码快速入口
 
@@ -23,12 +23,15 @@ confidence: high
 | `NIGHTLY`/`WEEKLY`/`NON_CRITICAL`、L1/L4/L5、coverage、scheduled bootstrap | `OMNI-CI-1c` | `upload_pipeline.py` → bootstrap YAML → ready/merge/nightly/weekly YAML → coverage helper |
 | Qwen3-TTS Base/CustomVoice ready/merge collection 或 source dependencies | [OMNI-CI-1d](rules-tts.md#omni-ci-1d-qwen3-tts-base-的-dummy-ready-oracle-与-real-weight-merge-coverage-必须分离) | CUDA/AMD ready+merge YAML → Qwen3-TTS e2e markers |
 | pre-commit、SPDX、shellcheck、stability marker | `OMNI-CI-2a` | `.pre-commit-config.yaml`、`.buildkite/**`、`tools/**` |
-| xdist、共享 worker、helper 拆分/启动回滚、下载 fixture、进程池 | `OMNI-CI-2b` | `tests/conftest.py`、`tests/helpers/{client,clean,runtime,stage_config}.py`、`tests/model_tests/**` |
+| xdist、共享 worker、helper 拆分/启动回滚、下载 fixture、进程池、后台 retry 回归 | `OMNI-CI-2b`、`OMNI-CI-2h` | `tests/conftest.py`、`tests/helpers/{client,clean,runtime,stage_config}.py`、`tests/model_tests/**` |
 | 重模型 cold start、共享 engine/server fixture、sleep/wake | `OMNI-CI-2c` | `tests/entrypoints/test_omni_sleep_mode.py`、OmniServer fixture scope/lock |
 | diffusion tiny builder、model settings、alignment exclusion、重模型 OOM | `OMNI-CI-2d` | `tests/model_tests/diffusion/{diff_model_builders,model_settings,test_alignment}.py` → common offline tests |
 | perf baseline、hardware label、DFX result artifact、assert-baseline | `OMNI-CI-3a` | `tests/dfx/conftest.py`、`tests/dfx/perf/scripts/run_benchmark.py`、`run_diffusion_benchmark.py`、`tests/dfx/perf/tests/**` |
 | ASR transcript、文本相似度或词汇归一化 | `OMNI-CI-3d` | `tests/helpers/media.py::{preprocess_text, cosine_similarity_text}` → `tests/helpers/tests/test_media.py` |
-| AMD/ROCm CI timeout、quarantine、diagnostic hang、memory assertion、Qwen3-TTS argv 或 Qwen3-Omni sleep/abort control plane | [OMNI-CI-2f](rules-amd.md#omni-ci-2f-amd-ci-stabilization-必须保留有界执行与测量信号) | `.buildkite/amd/**` → `tests/buildkite/test_amd_pipeline.py` / `ci/qwen3_omni_moe_colocate_async.yaml` → target test |
+| Qwen3-TTS perf/CI task↔checkpoint 配对、Base speaker-embedding miss-EOS retry | [OMNI-CI-3g](rules-tts.md)、[OMNI-CI-3f](rules-tts.md) | `tests/dfx/perf/tests/**` TTS JSON → serving validation；`test_qwen3_tts_speaker_embedding` |
+| scheduled CUDA mirror secret env、`HF_TOKEN` alias、GPU preset expansion | `OMNI-CI-1f` | `upload_pipeline.py` GPU preset expansion → pod env / step commands |
+
+| AMD/ROCm CI timeout、quarantine、diagnostic hang、memory assertion、Qwen3-TTS argv 或 Qwen3-Omni sleep/abort control plane | [OMNI-CI-2f](rules-amd.md#omni-ci-2f-amd-ci-stabilization-必须保留有界执行与测量信号)、[OMNI-CI-2g](rules-amd.md) | `.buildkite/amd/**` → `tests/buildkite/test_amd_pipeline.py` / `ci/qwen3_omni_moe_colocate_async.yaml` → target test |
 
 ## OMNI-CI-1a — 硬件 lane 必须真实收集并执行目标路径
 
@@ -260,3 +263,11 @@ PR 报告的 collection=1 和 local two-card B300 184.97 s 是该精确 workload
 - 验收：`"eight kilohertz"` 与 `"8 kHz"` 归一化后一致，且
   `cosine_similarity_text(...)` 约等于 `1.0`；焦点 helper 回归测试在 CPU 上通过。
   ^[PR #6947]
+
+## OMNI-CI-1f — scheduled CUDA mirror jobs 的 secret env 必须避开 Buildkite 同名覆盖
+
+- 触发：修改 CUDA mirror hardware preset、scheduled build env、Hugging Face token 注入，或 `upload_pipeline.py` 对 GPU preset 的 command expansion。
+- 强制：Kubernetes secret 不得直接以 `HF_TOKEN` 注入 CUDA pod env；必须使用 collision-proof alias，并在 job shell 开头恢复导出到 `HF_TOKEN`，这样 scheduled build 级 env merge 也不会把 secret-backed token 覆盖成空值或低权限值。该恢复只适用于实际消费 HF_TOKEN 的 CUDA mirror preset；NPU lane 保持原合同。
+- 强制：preset expansion tests 必须同时断言 pod env 中存在 alias、不再存在裸 `HF_TOKEN`，并验证 L4/H100/B200 全部 CUDA mirror preset 的 commands 都 prepend 同一恢复语句；非 CUDA preset 不得无故注入该 wrapper。
+- 禁止：依赖 Buildkite/Kubernetes 的 env merge 顺序碰巧正确；只修一个 GPU family；或把本地 shell/export 成功外推为 secret 已进入 pod env。
+- 验收：render 后的每个 CUDA mirror step 都保留 secret alias 和 runtime export，scheduled build 的同名 `HF_TOKEN` 不再导致 gated-model jobs 401；NPU steps 的 env 与 commands 保持不变。^[PR #7118]

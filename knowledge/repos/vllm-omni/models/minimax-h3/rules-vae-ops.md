@@ -1,10 +1,10 @@
 ---
 title: "MiniMax H3 VAE eager-ops rules"
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-09
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #6607", vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/models/minimax_h3/ops/README.md, vllm_omni/diffusion/models/minimax_h3/ops/vae/__init__.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/dispatch.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/qk_norm_rope.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/scaled_residual.py, tests/diffusion/models/minimax_h3/test_minimax_h3_vae_ops.py]
+sources: ["PR #6607", vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/models/minimax_h3/ops/README.md, vllm_omni/diffusion/models/minimax_h3/ops/vae/__init__.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/dispatch.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/qk_norm_rope.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/scaled_residual.py, tests/diffusion/models/minimax_h3/test_minimax_h3_vae_ops.py, "PR #7191"]
 confidence: high
 ---
 
@@ -34,3 +34,10 @@ confidence: high
   rejection、idempotence、selective FP16 and FP16 SwiGLU path、compile/SP/original-forward fallback；
   target GPU 另以 direct Q/K、residual 与 complete decoded tensor 的 `torch.equal` 对 reference
   验 exactness。性能报告必须绑定 exact device/software/workload，不能代替持续 CI gate。^[PR #6607]
+
+## MMH3-4d — GPU keyframe VAE encode 必须 pin 并恢复 deterministic cuDNN TF32
+
+- 触发：修改 `MiniMaxH3VideoVAE.encode_image`、keyframe encode 的 cuDNN/TF32 设置，或该路径与后续 denoiser 的数值敏感边界。
+- 强制：仅在 CUDA 设备上进入 scoped context：`cudnn.enabled=True`、`benchmark=False`、`deterministic=True`、`allow_tf32=True`；成功与异常退出都必须恢复调用方原 backend 状态。非 CUDA 设备 no-op。该 pin 只包裹 keyframe encode，不改变非 keyframe 路径或 accuracy 阈值。
+- 禁止：依赖进程 ambient cuDNN algorithm 选择；把 pin 做成进程级永久开关；把单次卡组差异描述成已证明的跨 SKU/driver 完全确定性。
+- 验收：CPU/mock 覆盖 enter/exit 四标志 pin 与 restore、encode 成功与失败路径都离开 context；真实 GPU accuracy gate 另绑定固定拓扑与 workload，不得用本 context 单测代替。^[PR #7191]

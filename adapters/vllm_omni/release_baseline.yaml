@@ -2,7 +2,7 @@ schema_version: 1
 
 upstream:
   repository: vllm-project/vllm-omni
-  previous_audited_sha: 1015b1ced073195ed19f0610264dfdf8a8150e6c
+  previous_audited_sha: 66bbebd9d3ef669b93fd7e39587672b20efc5933
   audited_ref: main
   audited_sha: 44d3ae100afa8411770b8b4d9442318bc5e897b3
 

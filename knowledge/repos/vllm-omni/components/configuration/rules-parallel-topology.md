@@ -1,10 +1,10 @@
 ---
 title: "并行拓扑合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-09
 type: rule
 tags: [vllm-omni, components, config]
-sources: [vllm_omni/config/composable_parallel/, vllm_omni/config/config_factory.py, vllm_omni/config/stage_config.py, "PR #5531"]
+sources: [vllm_omni/config/composable_parallel/, vllm_omni/config/config_factory.py, vllm_omni/config/stage_config.py, "PR #5531", "PR #5140"]
 confidence: high
 ---
 
@@ -64,3 +64,10 @@ confidence: high
 - 禁止：在配置解析期把省略的 DP 固定为 1 后据此生成不足的设备列表；接受与 WORLD 推导值不一致的显式 DP；允许 HSDP 与 TP、普通 DP、PP 或 EP 组合；只用 `num_gpus` 做校验却不传播到 stage 配置。
 - 验收：覆盖 direct、structured 和 async stage 路径；`num_gpus=8`、TP=2、SP=2 必须得到 DP=2、WORLD=8 和 devices `0`–`7`，省略 DP 的配置在运行时解析前仍保持未指定；覆盖 HSDP mesh 不匹配及不支持组合，并确认都在进程组创建前失败。^[PR #5531]
 
+
+## CONF-4f — 生产启动必须经 resolve_omni_config 统一解析
+
+- 触发：修改 `AsyncOmniEngine`、headless stage 启动、`StageConfigFactory` 公开入口，或 registry/deploy/CLI 到最终 stage 的 source selection。
+- 强制：标准与 headless 生产路径只调用 `resolve_omni_config()` 获得 `OmniConfigResolution`（structured config、runtime compatibility stages、strategy-derived LB、effective deploy path）；factory 的 create/legacy 方法是 resolver 与测试的下层 primitive，engine/entrypoint 不得绕过 resolver 直接选源。通用单 stage diffusion 仅在 registry 解析失败后作为 fallback；legacy `stage_configs_path`/`stage_configs` 必须显式报错。
+- 禁止：engine 侧二次合成 default diffusion stage 或重复 merge LoRA/attention/quant/cache/profiler；把 OmegaConf-compatible stages 宣传为稳定公共 ABI；静默恢复已删除的 stage-configs-path 行为。
+- 验收：同一 model+deploy+override 在标准与 headless 路径得到等价 topology 与 LB policy；覆盖 registry 命中、generic diffusion fallback、以及拒绝已删除 legacy 参数。^[PR #5140]

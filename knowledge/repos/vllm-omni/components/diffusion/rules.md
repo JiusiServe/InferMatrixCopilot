@@ -20,11 +20,14 @@ confidence: high
 | PR 描述信号 | 规则入口 |
 |---|---|
 | graph/eager、compile、solver、RNG、dtype/device | `DIFF-1a`–`DIFF-1j` |
-| checkpoint remap、HWR、HSDP、offload、quantization | `DIFF-2a`–`DIFF-2z`；[checkpoint/loading](rules-checkpoint-loading.md) |
+| checkpoint remap、HWR、HSDP、offload、quantization、TorchAO `.bin` index fallback | `DIFF-2a`–`DIFF-2z`、`DIFF-2af`；[checkpoint/loading](rules-checkpoint-loading.md) |
+
 | component、multi-DiT、LoRA、request cache lifecycle | [component lifecycle](rules-component-lifecycle.md)、[LoRA](rules-lora.md) |
 | quality evidence、distributed VAE | `DIFF-3a`、`DIFF-3b` |
-| paged KV、attention backend/parallel、platform、admission | `DIFF-4a`–`DIFF-4x`；[system runtime](rules-system-runtime.md) |
-| worker reply、shutdown、final output/formatter | `DIFF-1s`、`DIFF-1aa`、`DIFF-4z`；[output/runtime](rules-output-lifecycle.md) |
+| paged KV、attention backend/parallel、platform、admission、AR-Diffusion K/V pool 与 stepwise rollout | `DIFF-4a`–`DIFF-4x`、`DIFF-4aa`–`DIFF-4ac`；[system runtime](rules-system-runtime.md)；equal-rank SP auto-pad `DIFF-1ah`、等长 batch mask 省略 `DIFF-1af` [attention](rules-attention.md) |
+
+| worker reply、shutdown、final output/formatter、mid-stream interaction | `DIFF-1s`、`DIFF-1aa`、`DIFF-1ag`、`DIFF-4z`；[output/runtime](rules-output-lifecycle.md) |
+
 | service/forward/step metrics | `DIFF-5a`、`DIFF-5b`；[metrics](rules-metrics.md) |
 | worker title/rank observability | `DIFF-4w`；[worker observability](rules-worker-observability.md) |
 

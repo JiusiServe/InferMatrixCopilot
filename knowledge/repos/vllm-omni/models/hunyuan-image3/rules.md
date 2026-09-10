@@ -1,10 +1,10 @@
 ---
 title: "HunyuanImage3 开发规则"
 created: 2026-07-13
-updated: 2026-09-05
+updated: 2026-09-08
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
-sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py", "PR #6306", "PR #6102", "PR #6563", "PR #4048", vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_tokenizer.py, vllm_omni/diffusion/models/hunyuan_image3/request_layout.py, tests/diffusion/models/hunyuan_image3/test_hunyuan_image3_step_execution.py, tests/diffusion/models/hunyuan_image3/test_image_kv_cache_manager.py]
+sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py", "PR #6306", "PR #6102", "PR #6563", "PR #4048", vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_tokenizer.py, vllm_omni/diffusion/models/hunyuan_image3/request_layout.py, tests/diffusion/models/hunyuan_image3/test_hunyuan_image3_step_execution.py, tests/diffusion/models/hunyuan_image3/test_image_kv_cache_manager.py, "PR #7021"]
 ---
 
 # HunyuanImage3 开发规则
@@ -44,6 +44,8 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
 | `layering` | shared serving 或模型 adapter 分层 | `HY3-1g`, `HY3-2f`, `HY3-6i` |
 | `image` | 图片数量、processor、VAE、条件图 | `HY3-2b`, `HY3-2c`, `HY3-2d`, `HY3-5a`, `HY3-5b`, `HY3-5c`, `HY3-6c`, `HY3-6d` |
 | `size-ratio` | size=auto、ratio、batch ratio | `HY3-4a`, `HY3-4b`, `HY3-4c`, `HY3-4d`, `HY3-6g` |
+| `moe-loader` | `get_expert_mapping`、expert remapping、fused-MoE loader 对接 | `HY3-9a` |
+
 | `randomness` | seed、RNG、复现 | `HY3-5d`, `HY3-5e`, `HY3-5f`, `HY3-6h` |
 | `alignment-residual` | prompt、token、stop 已验证后仍有真实输出差异 | `HY3-3d`, `HY3-5b`, `HY3-7a`, `HY3-7b`, `HY3-7c`, `HY3-7d`, `HY3-7e` |
 | `paged-kv` | Hunyuan scheduler-paged KV、Q/K/V layout、prefill/denoise span 或 mixed attention | `HY3-5h`, `HY3-5i` |
@@ -161,3 +163,10 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
   - 强制：model 仅提供 32Q/8KV Q/K/V layout 与每 sequence 的 `full_attn_spans`；runner 从 Scheduler snapshot 激活 rows。first prefill 写整个 allocated sequence，后续 denoise 只从 prefix offset 写 target；paged forward 前清除 model-owned dense prompt state。
   - 禁止：model 分配 Scheduler blocks、激活 Worker runtime、复用 cross-request prefix，或在 paged path 接受 imported AR KV/negative CFG；不得把 request-mode 覆盖外推为 `denoise_step`、Ring 或 AllGather。
   - 验收：覆盖 full-allocation prefill、prefix-offset target update、32Q/8KV、full-attention spans 与 dense prompt-state clear；正式证据限 GPU/NPU request execution，其他 execution/parallel contracts另测。^[PR #6563]
+
+## HY3-9a — `get_expert_mapping` 只返回上游 flat list，本地 remapping 必须分方法
+
+- 触发：修改 HunyuanImage3 AR 或 DiT loader 的 `get_expert_mapping`、MoE expert params mapping、checkpoint `gate_proj`/`up_proj` remapping，或与 vLLM fused-MoE loader 的对接。
+- 强制：公开 `get_expert_mapping()` 必须返回 flat `list[tuple[str, str, int, str]]`（非 MoE 返回 `[]`），供上游 loader 消费；Hunyuan checkpoint 的 `gate_proj`/`up_proj` → `gate_and_up_proj` 分片 remapping 只能放在独立的 `_get_expert_weights_remapping()`，由 `load_weights` 显式取用。AR 与 diffusion transformer 两侧同一合同。
+- 禁止：让 `get_expert_mapping()` 再返回 `(mapping, remapping)` 二元组，或把 Omni-local remapping 塞进上游期望的 public API。
+- 验收：对 `HunyuanModel` 与 `HunyuanImage3Model` 断言 public mapping 为 flat list、local remapping 字典独立，并覆盖非 MoE 空返回。^[PR #7021]

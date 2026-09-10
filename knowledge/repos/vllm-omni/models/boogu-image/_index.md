@@ -51,4 +51,5 @@ confidence: high
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| revision/component loader、Edit-Turbo checkpoint、real RoPE/platform selection、Edit CFG branch/rank/VAE decode 合同，或 request-level T2I batching、TI2I batch=1 gate、request-major mask/generator/output mapping | [Boogu rules](rules.md) |
+| revision/component loader、Edit-Turbo checkpoint、real RoPE/platform selection、Edit CFG branch/rank/VAE decode 合同，或 request-level T2I batching、TI2I batch=1 gate、request-major mask/generator/output mapping、Turbo DMD schedule 或 TorchAO FP8 scope | [Boogu rules](rules.md) |
+
