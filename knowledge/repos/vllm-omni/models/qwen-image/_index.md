@@ -48,5 +48,6 @@ sources: ["PR #2783", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/mo
 - 审查 qwen_image 任一变体的 CFG-parallel、分布式 VAE 或 DMD2 改动——五变体
   共栈,单变体改动先扫其余四个;共享 mixin 见
   [Diffusion 组件](../../components/diffusion/_index.md)。
-- 审查 accuracy、regional compile 或 FlashAttention 确定性时见
+- 审查 accuracy、regional compile、FlashAttention 确定性或 Edit `txt_seq_lens` 时见
+
   [Qwen-Image 规则](rules.md)。

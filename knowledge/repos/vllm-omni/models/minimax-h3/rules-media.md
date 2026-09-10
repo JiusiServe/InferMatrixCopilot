@@ -1,10 +1,10 @@
 ---
 title: "MiniMax H3 媒体输入与精度规则"
 created: 2026-09-02
-updated: 2026-09-05
+updated: 2026-09-08
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/engine/stage_runtime.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_async_omni_engine_stage_init.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #6064", "PR #6813", "PR #6824"]
+sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/engine/stage_runtime.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_async_omni_engine_stage_init.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #6064", "PR #6813", "PR #6824", "PR #6720"]
 confidence: high
 ---
 
@@ -133,3 +133,10 @@ confidence: high
   hits; chunked/prefix-cache token tags; malformed bridge payload/request mismatch; artifact reuse and cleanup;
   resolver/local partition paths; Stage 0-only TP alias precedence/rejection; encoder-free DLO; explicit inline
   isolation; and regular/Turbo default sampling profiles. ^[PR #5885]
+
+## MMH3-2q — `minimax_h3.text_conditioning/v1` 必须在 Stage 0→1 边界 fail closed
+
+- 触发：修改 MiniMax-H3 `MiniMaxH3TextConditioning`、`text_encoder2diffusion` bridge、`OmniPayload` handoff，或 Stage 0/1 对 hidden states / token roles 的消费。
+- 强制：公开 schema id 为 `minimax_h3.text_conditioning/v1`。语义载荷：`hidden_states` 为 contiguous strided `[tokens, 5120]` `bfloat16`；`token_tags` 为 contiguous strided `[tokens]` `int64` 且仅含 `0/1`。Stage-wire `OmniPayload` 路径必须经 `from_omni_payload`：从 `hidden_states.output` 取 tensor，从 `meta.token_role_ids` 取 `[tokens, 1]` `int64` contiguous strided，再 squeeze 成语义 tags；任一类型/shape/dtype/layout 不符都在 adapter 边界失败。
+- 禁止：放宽为任意 float/int dtype 或非 contiguous layout；绕过 schema validator 直接塞 positional tensors；把该 H3-only hardening 写成已落地的通用 `StagePortSpec`。
+- 验收：CPU 测试覆盖合法 payload、错误 dtype/layout/shape、缺失字段，以及 encoder ownership（仅 owning replica 持有，disaggregated diffusion stage 缺席）；不改动既有 serializer 与 launch path 时仍须保持负向门禁。^[PR #6720]

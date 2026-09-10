@@ -35,7 +35,8 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解配置从 deploy、CLI、默认 factory 到 structured/legacy config 的稳定边界 | [配置构造架构](architecture.md) |
-| 根据 PR 描述直达 strict schema、pipeline sampling constraints、deploy/topology、composable strategy 或显存配置的规则组与第一批源码 | [配置开发门禁与代码地图](rules.md) |
+| 根据 PR 描述直达 strict schema、pipeline sampling constraints、deploy/topology、composable strategy、global engine args 的 owner 校验或显存配置的规则组与第一批源码 | [配置开发门禁与代码地图](rules.md) |
+
 | 对象存储 URI、HF cache snapshot 或空 `config.json` 的模型名称回退与 pipeline 路由 | [模型引用路由规则](rules-model-reference-routing.md) |
 | stage full-payload transport capability、topology-owned projection 或 deploy/CLI override rejection | [stage transport capability](rules-stage-transport.md) |
 | diffusion Ulysses SymmMem transport flag 的 deploy/CLI/default-stage projection | [diffusion parallel transport rules](rules-diffusion-parallel-transport.md) |

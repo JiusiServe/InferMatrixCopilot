@@ -18,8 +18,9 @@ confidence: high
 |---|---|
 | component quantization、weight loading、HWR | `MMH3-1a`、`MMH3-1f`；[loading](rules-loading.md) |
 | attention/RoPE/backend、encoder process state | `MMH3-1c`–`MMH3-1e`、`MMH3-1g`、`MMH3-1k`、`MMH3-1n` |
-| media ingress、reference tasks、split text encoder | `MMH3-2a`、`MMH3-2b`、`MMH3-2l`；[media](rules-media.md) |
-| modular task、cache policy、schedules、LoRA/FastH3 | `MMH3-2c`–`MMH3-2n`；[cache/task](rules-cache-task.md) |
+| media ingress、reference tasks、split text encoder、text-conditioning schema | `MMH3-2a`、`MMH3-2b`、`MMH3-2l`、`MMH3-2q`；[media](rules-media.md) |
+| modular task、cache policy、schedules、LoRA/FastH3、alias metadata、Turbo artifact | `MMH3-2c`–`MMH3-2p`；[cache/task](rules-cache-task.md) |
+
 | DLO、hardware recipes、CI/perf evidence | `MMH3-3a`–`MMH3-3m`；[deployment](rules-deployment.md) |
 | VAE kernels、materialization、keyframe encode determinism、fallback | `MMH3-4c`、`MMH3-4d`；[VAE ops](rules-vae-ops.md) |
 | NPU text-MLP packed SwiGLU、quant dispatch、DiT activation | `MMH3-4a`、`MMH3-4b` |

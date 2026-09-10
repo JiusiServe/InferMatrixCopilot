@@ -53,4 +53,5 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
 | 已修过的 connector/端口产品坑 | [connector pitfalls](connector-pitfalls.md) |
 | 选择和配置 connector backend | [connector backends](connector-backends.md) |
 | 跨 stage `async_chunk` 流式语义 | [async chunk](async-chunk.md) |
-| TP KV receive consensus、chunk boundary 与 active-window 合同 | [distributed rules](rules.md) |
+| TP KV receive consensus、chunk boundary、active-window 合同与 Mooncake TCP write completion | [distributed rules](rules.md) |
+

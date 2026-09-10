@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni 配置开发门禁"
 created: 2026-07-16
-updated: 2026-09-05
+updated: 2026-09-08
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182", "PR #4820", "PR #6619", "PR #6680", "PR #6422", vllm_omni/deploy/higgs_multimodal_qwen3.yaml]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182", "PR #4820", "PR #6619", "PR #6680", "PR #6422", vllm_omni/deploy/higgs_multimodal_qwen3.yaml, "PR #5929"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -28,6 +28,8 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | pipeline `sampling_constraints`、`StageConfig.to_omegaconf()`、runtime stage config | `stage-config-propagation`：`VOMNI-CFG-1o` | `merge_pipeline_deploy` → `StageConfig.to_omegaconf()` → `engine.stage_configs` |
 | stage transport、`requires_full_payload_input`、topology projection 或 override rejection | `stage-transport`：`VOMNI-CFG-1p` | `stage_config.py::{StagePipelineConfig,_build_engine_args}` → `omni_config.py::_build_model_config` → `engine/arg_utils.py::OmniEngineArgs` |
 | SymmMem Ulysses transport | [VOMNI-CFG-1q](rules-diffusion-parallel-transport.md) + `DIFF-4x` | deploy → parallel config → Ulysses |
+| global stage engine args 的 owner 校验、`diffusion_offload_config` 跨进程 mapping、compile/offload gate | `strict-normalization`：`VOMNI-CFG-1s` | `stage_config.py` 规范化 → ownership 校验 → 按 stage `execution_type` 投影 → offload parser |
+
 | HF cache snapshot path、空 `config.json`、name-based pipeline fallback | [`model-reference-routing`](rules-model-reference-routing.md#conf-7a-模型引用解析必须物化对象存储配置并只从受控名称组件匹配)：`CONF-7a` | `config_factory.py::{_name_match_candidate,StageConfigFactory._try_infer_model_type}` → `pipeline_registry.py::OMNI_PIPELINES` → `tests/config/test_config_factory.py::TestNameMatchCandidateSnapshotPaths` |
 
 ## 配置归一化与新老路径一致性
@@ -220,3 +222,11 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 验收：覆盖有效非默认值的 CLI、deploy/structured 和 direct attention-config 路径，断言最终
   `backend_kwargs`；覆盖错误 backend、非正值，以及 Top-K 超过 runtime block count 的回退。
   `WanDMDPipeline` 一类 checkpoint alias 还必须由 `model_index.json` 自动发现。^[PR #4820]
+
+## VOMNI-CFG-1s — global stage engine args 必须先验 owner，再按执行类型投影
+
+- 触发：新增或修改全局 stage CLI 字段、stage-scoped alias、`diffusion_offload_config`，或调整 structured/legacy 的 stage runtime overrides。
+- 强制：先对完整规范化后的 stage CLI 映射做 ownership 校验，再按每个 stage 的 `execution_type` 投影到该 stage；显式 stage 覆盖优先，全局字段只有在目标 stage 实际拥有该字段时才可透传。任何 pipeline 中没有 owner 的显式全局 engine arg 都必须在构造前 fail closed，不能静默丢给无关 stage 或靠默认值吞掉。
+- 强制：`diffusion_offload_config` 这类跨进程序列化的 public mapping 必须保留 raw dict 进入 dataclass/config serialization，同时在 stage 构造前调用其专属 parser 做一次结构校验；兼容 alias 只能 materialize 成同一份内部策略，不能让 compile/offload 约束只检查旧布尔字段。
+- 禁止：先按 execution type 过滤再做 unknown/owner 校验；只在 direct path 校验而让 deploy/structured 漏检；把 raw mapping 先转成内部对象后再跨进程传输；或让 `full` compile compatibility 继续只识别 legacy offload flags。
+- 验收：覆盖 global 与 stage-specific override precedence、unowned global field rejection、`diffusion_offload_config` 的 direct/deploy/structured reachability，以及 compile-mode 对 module/layer/distributed-layer 三种 offload strategy 的统一 incompatibility gate。^[PR #5929]

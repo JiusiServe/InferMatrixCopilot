@@ -24,7 +24,8 @@ confidence: high
 
 | TTS/Code2Wav/TRT、CUDA Graph | `MCPMO-1b`–`MCPMO-1e`；[CUDA graphs](rules-cuda-graphs.md) |
 | batch、runtime info、reference-audio handoff | `MCPMO-3a`–`MCPMO-3e`；[Code2Wav batching](rules-code2wav-batching.md) |
-| native duplex、sampling budget、shipping profile、playback ACK | `MCPMO-4a`–`MCPMO-4h`；[duplex](rules-duplex.md) |
+| native duplex、sampling budget、shipping profile、playback ACK、Talker full-attention rollover | `MCPMO-4a`–`MCPMO-4i`；[duplex](rules-duplex.md) |
+
 | accuracy/performance/online-serving evidence | `MCPMO-5a`、`MCPMO-5b` |
 
 ## 完整代码路由

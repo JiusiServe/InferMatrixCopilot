@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-09
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", "PR #6814", "PR #6563", "PR #5716", "PR #6786", vllm_omni/diffusion/attention/, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/attention/parallel/ring_kernels.py, vllm_omni/diffusion/diffusion_kv/, vllm_omni/diffusion/distributed/cfg_parallel.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/npu/platform.py, tests/diffusion/diffusion_kv/, tests/diffusion/distributed/test_cfg_parallel.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_ulysses_uaa.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py", "PR #7041"]
+sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", "PR #6814", "PR #6563", "PR #5716", "PR #6786", vllm_omni/diffusion/attention/, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/attention/parallel/ring_kernels.py, vllm_omni/diffusion/diffusion_kv/, vllm_omni/diffusion/distributed/cfg_parallel.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/npu/platform.py, tests/diffusion/diffusion_kv/, tests/diffusion/distributed/test_cfg_parallel.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_ulysses_uaa.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py", "PR #7041", "PR #6463", "PR #6844"]
 confidence: high
 ---
 
@@ -212,3 +212,17 @@ confidence: high
 - 强制：字段声明为 `str` 且 canonical “无 cache” sentinel 为 `"none"` 时，key 缺失才允许走 env/`"none"` 默认；调用方传入显式 `None`（如 CLI `default=None`）必须在 kwargs 边界规范成 `"none"`，且不得回落到 `DIFFUSION_CACHE_BACKEND` 查找。下游校验可把残留 `None` 当 `"none"` 作 defense-in-depth，但不能代替边界规范化。
 - 禁止：只在 key 缺失时默认、让显式 `None` 泄漏成 typed `str` 字段上的 `None`；把 `"none"` 与 env 覆盖混为一谈；把某一 pipeline 的 `None` 特判当成唯一修复点。
 - 验收：`from_kwargs`/`create_default_diffusion` 对 `cache_backend=None` 断言最终为 `"none"`；至少一个严格 `("none", …)` 校验路径覆盖 `None` 与 `"none"` 均可通过，未知 backend 仍拒绝。^[PR #7041]
+
+## DIFF-4aa — AR-Diffusion paged K/V 必须分存储分配，禁止共享 `(2, …)` 视图
+
+- 触发：修改 AR-Diffusion `allocate_kv_pool_with_views`、paged-write custom op 的 `mutates_args`、compiled graph 下的 key/value pool，或把 K/V 重新合并为单一 allocation。
+- 强制：每层 K 与 V 各自 `torch.empty` 独立 storage，布局仍为 `(num_blocks, block_size, num_kv_heads, head_dim)`；`kv_pools[layer][0]/[1]` 与 flat slot view 继续寻址，但不共享 `untyped_storage`。paged-write 若同时 mutate K 与 V，共享 storage 会让 Inductor reinplace 只重写第一个参数，并使 `auto_functionalized_v2` 克隆整份 V pool。
+- 禁止：恢复 `empty(2, num_blocks, …)` 再 `kv[0]`/`kv[1]` 切片；或把“eager 能跑”当成 compiled 路径无整池拷贝的证明。
+- 验收：断言各层 K/V `data_ptr` 不同且写 V 不扰动 K；编译生成代码不得出现 pool-sized clone；有界硬件证明 compiled 路径可运行且无 per-step 整池拷贝。^[PR #6463]
+
+## DIFF-4ab — AR-Diffusion stepwise 必须以一次 request 驱动整段 rollout
+
+- 触发：修改 `SupportsStepExecution`、`ARDiffusionModelRunner` 的 stepwise 绑定、AR block/`post_decode` chunk 提交、`step_execution`+`streaming_output` deploy，或把外部 tick 循环重新当作 session 边界。
+- 强制：一次 `generate()` 驱动整段 rollout：`prepare_encode` 只跑一次，随后多轮 `denoise_step`/`step_scheduler`，由 `post_decode` 产出每个 AR chunk。request-mode 与 stepwise 必须共用同一份 block/DMD math，禁止维护两套可漂移实现。runner 仅为实现该合同的 pipeline 打开 `step_execution`；绑定 runner-owned KV 时 `session_id == request_id`；错误路径 fail-closed 释放 session，完成或 scheduler abort 时退役。持有 AR-Diffusion paged KV 的 stage 必须保持 `max_num_seqs=1`。
+- 禁止：用多次 `generate()`/tick 冒充同一 session；在 denoise step 内提交本应属于 `post_decode` 的 clean-x0 KV commit；或把逐步 camera/prompt mid-request interaction 写成已由本合同覆盖。
+- 验收：覆盖 stepwise 与 request-mode 的共享 math 边界、session bind/release、abort/completion 退役，以及 `max_num_seqs=1` 拓扑；request-scoped camera script 等模型字段另由模型 owner 验收，不得外推为通用 mid-request interaction。^[PR #6844]

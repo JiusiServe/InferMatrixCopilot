@@ -41,9 +41,11 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 
 | PEFT 与 distilled LoRA、startup fusion、delta/key/alpha、Qwen/Wan transformer mapping、PEFT suspend/resume | [LoRA rules](rules-lora.md) |
 
-| Blackwell FA4、显式/auto CUDA backend、per-role mask/SP pad；local FlashAttention deterministic opt-in、role-aware masked cross-attention、NPU packed mask-free/laser fallback、TRTLLM packed-padding 与 config propagation | [attention rules](rules-attention.md) |
+| Blackwell FA4、显式/auto CUDA backend、per-role mask/SP pad；local FlashAttention deterministic opt-in、role-aware masked cross-attention、NPU packed mask-free/laser fallback、TRTLLM packed-padding 与 config propagation、equal-rank SP auto-pad fast path | [attention rules](rules-attention.md) |
+
 | SP auto-padding、`mask_sp_padding`、dense/varlen 与 advanced UAA 边界 | [SP padding rules](rules-sp-padding.md) |
-| video/audio mux、DLO DP wave、RPC reply ownership/result release、result queue、async pump、SHM ownership、async-output wait 与 shutdown | [output/runtime rules](rules-output-lifecycle.md) |
+| video/audio mux、DLO DP wave、RPC reply ownership/result release、result queue、async pump、SHM ownership、async-output wait 与 shutdown、mid-stream interaction handler | [output/runtime rules](rules-output-lifecycle.md) |
+
 | distilled continuous sigma schedule、boundary/step 语义与 modality shift | [sigma schedule rules](sigma-schedules.md) |
 | HunyuanImage3 Distil CFG、MeanFlow special-token / scheduler-r 合同 | [HunyuanImage3 HY3-8d](../../models/hunyuan-image3/rules.md) |
 | diffusion step 与 request/continuous batching；DIFF-1af BAGEL image step wave、packed state、geometry/CFG admission 与 fallback cleanup | [step and batching](step-and-batching.md) |
@@ -54,6 +56,7 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 | Cache-DiT、TeaCache 和 prefix cache | [cache acceleration](cache-acceleration.md) |
 | TP/PP/SP/CFG/VAE/HSDP 等并行策略 | [parallelism](parallelism.md) |
 | 实验性 world-model session 生命周期、LRU 与内存统计边界 | [session state](session-state.md) |
-| checkpoint remap、HSDP/FSDP、final-layout HWR、registered HWR mmap DLO transport、component quantization 与在线量化加载 | [checkpoint 与加载合同](rules-checkpoint-loading.md) |
+| checkpoint remap、HSDP/FSDP、final-layout HWR、registered HWR mmap DLO transport、component quantization、在线量化加载与 TorchAO `.bin` index fallback | [checkpoint 与加载合同](rules-checkpoint-loading.md) |
+
 
 - [Diffusion 平台 kernel 与设备合同](rules-platform-kernels.md)：`DIFF-1t`, `DIFF-1u`, `DIFF-1v`, `DIFF-1w`。
