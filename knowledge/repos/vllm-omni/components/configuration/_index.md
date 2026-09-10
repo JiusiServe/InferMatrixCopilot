@@ -49,5 +49,6 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 | 审查或新增 process 环境变量、stage `env` 和安全诊断输出 | [environment-variable contract](environment-variable-contract.md) |
 | 计算多 stage 显存预算 | [deployment memory budget](deployment-memory-budget.md) |
 | 添加新模型和注册点 | [adding a model](adding-a-model.md) |
-| composable strategy 的 axis、并行拓扑与 load balancing owner | [并行拓扑合同](rules-parallel-topology.md) |
+| composable strategy 的 axis、并行拓扑、load balancing owner 与 resolve_omni_config 统一解析 | [并行拓扑合同](rules-parallel-topology.md) |
+
 | 冻结 topology、辅助 stage 注入与模型专用 deploy profile | [topology 与部署 profile](rules-topology-profiles.md) |

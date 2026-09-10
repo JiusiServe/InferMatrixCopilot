@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5 规则"
 created: 2026-07-20
-updated: 2026-09-06
+updated: 2026-09-09
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", "PR #6828", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_realtime_duplex_drivers.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/run_minicpmo_realtime_duplex_soft_interrupt.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/entrypoints/duplex/chat_fallback.py, vllm_omni/entrypoints/duplex/realtime_input.py, vllm_omni/entrypoints/duplex/session_runner.py, vllm_omni/entrypoints/duplex/serving.py, vllm_omni/entrypoints/duplex/vad.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/adapter.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, vllm_omni/model_executor/stage_input_processors/minicpmo_4_5_omni.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082", "PR #5604", "PR #6274", "PR #6346", "PR #6397", "PR #6406", "PR #6458", "PR #6587", "PR #6619", "PR #6757", "PR #6529", "PR #6772", vllm_omni/entrypoints/duplex/protocol.py]
+sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", "PR #6828", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_realtime_duplex_drivers.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/run_minicpmo_realtime_duplex_soft_interrupt.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/entrypoints/duplex/chat_fallback.py, vllm_omni/entrypoints/duplex/realtime_input.py, vllm_omni/entrypoints/duplex/session_runner.py, vllm_omni/entrypoints/duplex/serving.py, vllm_omni/entrypoints/duplex/vad.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/adapter.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, vllm_omni/model_executor/stage_input_processors/minicpmo_4_5_omni.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082", "PR #5604", "PR #6274", "PR #6346", "PR #6397", "PR #6406", "PR #6458", "PR #6587", "PR #6619", "PR #6757", "PR #6529", "PR #6772", vllm_omni/entrypoints/duplex/protocol.py, "PR #7071"]
 confidence: high
 ---
 
@@ -20,6 +20,8 @@ confidence: high
 |---|---|
 | version/registry、processor、remote code | `MCPMO-1a`、`MCPMO-2a` |
 | Whisper/APM 或 SigLIP attention | `MCPMO-2b`、`MCPMO-2c` |
+| audio_feature_lens ragged slices、encoder batch TensorShape | `MCPMO-2e` |
+
 | TTS/Code2Wav/TRT、CUDA Graph | `MCPMO-1b`–`MCPMO-1e`；[CUDA graphs](rules-cuda-graphs.md) |
 | batch、runtime info、reference-audio handoff | `MCPMO-3a`–`MCPMO-3e`；[Code2Wav batching](rules-code2wav-batching.md) |
 | native duplex、sampling budget、shipping profile、playback ACK | `MCPMO-4a`–`MCPMO-4h`；[duplex](rules-duplex.md) |
@@ -283,3 +285,10 @@ confidence: high
 
 共享 bridge/batch 规则见 [Model Executor rules](../../components/model-executor/rules.md)；
 公开入口完整性见 [model adaptation guardrails](../../review/guides/model-adaptation-guardrails.md)。
+
+## MCPMO-2e — audio_feature_lens 的切片维必须允许跨样本 ragged
+
+- 触发：修改 `MiniCPMOAudioFeatureInputs.audio_feature_lens` 的 `TensorShape`、encoder batch 合批，或 `get_audio_hidden_states`/`get_audio_embedding_streaming` 对 per-audio lens 的消费。
+- 强制：`audio_feature_lens` 声明 `TensorShape("bn", "s", dynamic_dims={"s"})`，允许同一 encoder batch 内不同音频有不同 slice 数（如 >30s 与 ≤30s）；消费侧继续 `hstack` + 按 `len(audio_feature_lens_raw[i])` 逐音频处理。仅放松 `"s"`；`"bn"` 与其他非动态维仍严格校验。
+- 禁止：因 list 内 lens 长度不一致在 schema 层抛 `inconsistent shapes` 并拖垮 Stage-0 engine；把 ragged 误当成非法输入。
+- 验收：直接构造混合 slice 数（如 3 vs 2）与同 slice 数两例，断言均可构造且不改变既有同长路径。^[PR #7071]
