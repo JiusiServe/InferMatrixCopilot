@@ -138,3 +138,8 @@ explicit blocking / non-blocking finding — never silence.
   benchmark-rationale ask.
 - Duplicated machinery gets a CONCRETE shared-helper proposal naming both
   files — never a hedged "should we unify?" question.
+- Non-test additions past ~1,000 lines get a split ask naming the largest
+  contributing files, or a stated exemption (vendored sync, generated
+  code). Tests, docs, lock files and pure renames are outside the budget;
+  deletions never count. Size stays non-blocking and never raises another
+  finding's severity.
