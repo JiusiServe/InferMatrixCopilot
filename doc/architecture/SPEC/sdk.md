@@ -1,6 +1,7 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-09-08 -->
+<!-- verified-against: 2026-09-10 -->
+
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
 
@@ -56,12 +57,17 @@
   `free_bytes`/`free_lines`，与 `check_knowledge_tree.py` 的拆分门对齐）；prompt 把
   事件放进唯一 `<untrusted_data>` fence（`KnowledgeEvidenceEvent.diff_excerpt` 是宿主
   选取的 diff 片段，SDK 以每事件 8 KiB、每批 160 KiB 截断，先到先得），proposal shape、rule ID、heading、source
-  citation、目标页、重复 ID 与页面剩余容量都由 SDK 机械校验——超出目标页剩余容量的
+  citation、目标页、重复 ID 与页面剩余容量都由 SDK 机械校验——rule ID 全树唯一：
+  任何 catalog 页（所有仓库与 general）、任何 heading 层级已使用的 ID，以及 section
+  内嵌套 heading 携带的 ID，都被拒绝，同批两个 proposal 也不得共用 ID；超出目标页剩余容量的
+
   proposal 以 `page full` 在 validator 之前被拒绝，宿主据此改路由而不是整批回滚。
   `proposal_id` 同时绑定 batch、输入下标、repository、section、sources 与目标页
   SHA，宿主不能在 model call 后静默改写已接纳 proposal。
 - **知识 apply 是 append-only transaction**：只追加完整 rule section 并更新唯一
-  `updated:` frontmatter；写前复核 page SHA。固定且按序执行
+  `updated:` frontmatter；写前复核 page SHA，并在锁内再次全树复核 rule ID 唯一性
+  （并行校验的两批不能把同一新 ID 落到不同页）。固定且按序执行
+
   `knowledge/tools/check_knowledge_tree.py`、`knowledge/tools/check_wiki_lint.py`；
   validator 缺失则写前 fail closed，执行失败/超时则逐 byte rollback 全部目标页。
   同一 work checkout 的 writer 以 process 内 mutex 与位于系统临时目录的
