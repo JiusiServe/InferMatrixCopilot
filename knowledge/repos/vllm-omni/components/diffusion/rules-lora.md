@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-09
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/lora/layers/base_linear.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/diffusion/lora/test_lora_manager.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/lora.py, "PR #6268", benchmarks/kernels/benchmark_diffusion_lora_expand.py, tests/diffusion/lora/test_base_linear.py]
+sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/lora/layers/base_linear.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/diffusion/lora/test_lora_manager.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/lora.py, "PR #6268", benchmarks/kernels/benchmark_diffusion_lora_expand.py, tests/diffusion/lora/test_base_linear.py, "PR #7195"]
 confidence: high
 ---
 
@@ -22,10 +22,13 @@ confidence: high
 | Wan dual transformer、high/low-noise file order、partial load | `DIFF-2n` | `WanLoraLoaderMixin` → `get_transformer_from_pipeline(name)` → `transformer`/`transformer_2` |
 | LoRA linear active output slices、inference expand accumulation、autograd/dtype fallback | `DIFF-2ab` | `diffusion/lora/layers/base_linear.py::DiffusionBaseLinearLayerWithLoRA.apply` |
 | legacy dynamic adapter hook、packed/stacked binding、DLO sidecar residency、activation rollback | `DIFF-2x` | `DiffusionLoRAManager::{_load_adapter,_bind_adapter_weights,_activate_adapter}` → model pipeline hook |
+| PEFT deactivate/suspend、slice-mask resume、同 adapter+scale 再激活不 re-upload | `DIFF-2ae` | `DiffusionLoRAManager` deactivate/activate → `DiffusionBaseLinearLayerWithLoRA::{suspend_lora,resume_lora}` |
+
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
-| `checkpoint-distributed` | diffusion LoRA backend、checkpoint、融合与 transformer mapping | `DIFF-2l`, `DIFF-2m`, `DIFF-2n`, `DIFF-2x` |
+| `checkpoint-distributed` | diffusion LoRA backend、checkpoint、融合与 transformer mapping | `DIFF-2l`, `DIFF-2m`, `DIFF-2n`, `DIFF-2x`, `DIFF-2ae` |
+
 
 ## DIFF-2l — backend 是 startup 配置，不是 request 字段
 

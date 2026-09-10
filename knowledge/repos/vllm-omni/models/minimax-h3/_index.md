@@ -159,6 +159,7 @@ text-encoder fused-source 完整性正文见 [loading rules](rules-loading.md)�
 部署和硬件证据正文见 [deployment rules](rules-deployment.md)；conditioned VAE 确定性、modular task 选择与 request 级 Cache-DiT/TeaCache/sigma schedule/Turbo LoRA 生命周期见 [缓存与任务生命周期规则](rules-cache-task.md)。
 
 H3 VAE decoder 的 model-local eager dispatch、remote-code eligibility、exactness guards、selective
-FP16 materialization 与 compile/spatial-parallel fallback 见 [VAE eager-ops rules](rules-vae-ops.md)。
+FP16 materialization、keyframe encode 的 cuDNN/TF32 pin 与 compile/spatial-parallel fallback 见 [VAE eager-ops rules](rules-vae-ops.md)
+。
 Qwen3-VL text encoder 的 cuDNN SDPA process-global-state restore、encoder-rank/VAE boundary 和
 CPU-only validation limit 见 [encoder state rules](rules-encoder-state.md)。

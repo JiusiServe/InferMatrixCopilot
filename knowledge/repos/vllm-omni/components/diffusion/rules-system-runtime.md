@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-09
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", "PR #6814", "PR #6563", "PR #5716", "PR #6786", vllm_omni/diffusion/attention/, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/attention/parallel/ring_kernels.py, vllm_omni/diffusion/diffusion_kv/, vllm_omni/diffusion/distributed/cfg_parallel.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/npu/platform.py, tests/diffusion/diffusion_kv/, tests/diffusion/distributed/test_cfg_parallel.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_ulysses_uaa.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py"]
+sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", "PR #6814", "PR #6563", "PR #5716", "PR #6786", vllm_omni/diffusion/attention/, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/attention/parallel/ring_kernels.py, vllm_omni/diffusion/diffusion_kv/, vllm_omni/diffusion/distributed/cfg_parallel.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/npu/platform.py, tests/diffusion/diffusion_kv/, tests/diffusion/distributed/test_cfg_parallel.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_ulysses_uaa.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py", "PR #7041"]
 confidence: high
 ---
 
@@ -206,7 +206,7 @@ confidence: high
 - 禁止：Worker 自行分配或释放 Scheduler-owned logical blocks；把部分 row 安装、native append/apply 异常或 stale snapshot 当作成功；从 padding 猜异构 prefix 的逻辑布局；在清理或 wake refresh 后继续复用旧的 native metadata/buffer view。
 - 验收：CPU/mock 覆盖 rank-local config、请求/上下文 row mapping、重复/过期/冲突 generation、非法 block 与容量、append/apply rollback、幂等清理和 wake refresh；GPU/NPU 另验证非连续 BlockTables、32Q/8KV GQA、异构 prefix 与 piecewise attention。Hunyuan paged request execution 不证明 `denoise_step`、cross-request prefix reuse、AR KV、negative CFG、Ring 或 AllGather。^[PR #6102] ^[PR #6563]
 
-## DIFF-4w — 声明为 str 的 diffusion cache_backend 必须在 kwargs 边界把显式 None 规范成 none
+## DIFF-4ac — 声明为 str 的 diffusion cache_backend 必须在 kwargs 边界把显式 None 规范成 none
 
 - 触发：修改 `normalize_omni_diffusion_kwargs`、`OmniDiffusionConfig.cache_backend`，或 pipeline/runner 对 cache backend 的 admission 校验。
 - 强制：字段声明为 `str` 且 canonical “无 cache” sentinel 为 `"none"` 时，key 缺失才允许走 env/`"none"` 默认；调用方传入显式 `None`（如 CLI `default=None`）必须在 kwargs 边界规范成 `"none"`，且不得回落到 `DIFFUSION_CACHE_BACKEND` 查找。下游校验可把残留 `None` 当 `"none"` 作 defense-in-depth，但不能代替边界规范化。

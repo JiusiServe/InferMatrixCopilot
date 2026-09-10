@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-09
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5720", "PR #5853", "PR #5882", "PR #5884", "PR #6486", "PR #6591", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/offloader/startup.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/models/sana_video/test_cache_offload.py, tests/diffusion/test_diffusion_model_runner.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072"]
+sources: ["PR #5720", "PR #5853", "PR #5882", "PR #5884", "PR #6486", "PR #6591", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/offloader/startup.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/models/sana_video/test_cache_offload.py, tests/diffusion/test_diffusion_model_runner.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072", "PR #7078"]
 confidence: high
 ---
 
@@ -120,7 +120,7 @@ residency 留在模型 owner。规则入口与其他共享机制仍见 [Diffusio
   HWR and checkpoint mmap；另注入 unregistration failure，断言 retryable retention、backend drop 和
   distributed teardown ordering。^[PR #6486] ^[PR #6591]
 
-## DIFF-2y — batch-first sampling gate 的 provided 标志必须进入 RequestBatchSamplingParamsKey
+## DIFF-2ad — batch-first sampling gate 的 provided 标志必须进入 RequestBatchSamplingParamsKey
 
 - 触发：修改 `RequestBatchSamplingParamsKey`、`_build_sampling_params_key`，或 pipeline 从 batch 首请求读取 `*_provided` 再决定 guidance/image-guidance 行为。
 - 强制：凡 pipeline 用 “omitted vs explicit” provided 标志做 batch-local gate 的字段，都必须进入 request-mode 与 step-mode 的 sampling-params key；数值相等但 provided 不同的请求不得合批。当前合同要求 `guidance_scale_2_provided` 与数值 `guidance_scale_2` 一并参与 key。

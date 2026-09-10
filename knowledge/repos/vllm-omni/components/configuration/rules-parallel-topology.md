@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-09
 type: rule
 tags: [vllm-omni, components, config]
-sources: [vllm_omni/config/composable_parallel/, vllm_omni/config/config_factory.py, vllm_omni/config/stage_config.py, "PR #5531"]
+sources: [vllm_omni/config/composable_parallel/, vllm_omni/config/config_factory.py, vllm_omni/config/stage_config.py, "PR #5531", "PR #5140"]
 confidence: high
 ---
 

@@ -60,4 +60,5 @@ sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", "PR #4322"
 | 遇到什么 | 查看哪里 |
 |---|---|
 | stage 拓扑、代际差异与官方性能优化结论 | [architecture](architecture.md) |
-| Qwen3-Omni Thinker MRoPE、CUDA compilation custom-op boundary、AWQ/compressed-tensors 名称映射、MoE backend default/override、固定种子音频回归、audio-encoder head/TP divisibility，或 Qwen2.5 code2wav soft-fail/旧 speech helper | [Qwen-Omni rules](rules.md) |
+| Qwen3-Omni Thinker MRoPE、CUDA compilation custom-op boundary、AWQ/compressed-tensors 名称映射、MoE backend default/override、固定种子音频回归、audio-encoder head/TP divisibility、Qwen2.5 code2wav soft-fail/旧 speech helper，或 code predictor 的 RoPE theta/rope_parameters 读取
+ | [Qwen-Omni rules](rules.md) |

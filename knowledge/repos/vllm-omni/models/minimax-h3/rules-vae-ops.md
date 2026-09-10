@@ -4,7 +4,7 @@ created: 2026-09-05
 updated: 2026-09-09
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #6607", vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/models/minimax_h3/ops/README.md, vllm_omni/diffusion/models/minimax_h3/ops/vae/__init__.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/dispatch.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/qk_norm_rope.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/scaled_residual.py, tests/diffusion/models/minimax_h3/test_minimax_h3_vae_ops.py]
+sources: ["PR #6607", vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/models/minimax_h3/ops/README.md, vllm_omni/diffusion/models/minimax_h3/ops/vae/__init__.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/dispatch.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/qk_norm_rope.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/scaled_residual.py, tests/diffusion/models/minimax_h3/test_minimax_h3_vae_ops.py, "PR #7191"]
 confidence: high
 ---
 
