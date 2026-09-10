@@ -478,13 +478,24 @@ class KnowledgeCurator:
 
     @staticmethod
     def _section_rule_ids(section: str) -> tuple[str, ...]:
-        """The rule IDs every heading in a section carries, the declared
-        one first: a nested ``###`` heading is a rule heading too."""
-        ids: list[str] = []
-        for match in _RULE_HEADING_ID.finditer(section):
-            if match.group("rule") not in ids:
-                ids.append(match.group("rule"))
-        return tuple(ids)
+        """The rule IDs every heading in a section carries, in order, the
+        declared one first: a nested ``###`` heading is a rule heading too.
+        Repeats are kept so callers can reject a section that heads one ID
+        twice (``## X-2`` over ``### X-2``, or two ``### X-3``)."""
+        return tuple(
+            match.group("rule") for match in _RULE_HEADING_ID.finditer(section)
+        )
+
+    @classmethod
+    def _repeated_section_rule_id(cls, section: str) -> str:
+        """The first rule ID a section heads more than once, else ''."""
+        seen: set[str] = set()
+        for heading_id in cls._section_rule_ids(section):
+            if heading_id in seen:
+                return heading_id
+            seen.add(heading_id)
+        return ""
+
 
     @staticmethod
     def _rule_exists(page_text: str, rule_id: str) -> bool:
@@ -643,11 +654,18 @@ class KnowledgeCurator:
                             "rule_id duplicates an earlier proposal on "
                             f"{proposed_ids[rule_id]}"
                         )
+                    if not reason and self._repeated_section_rule_id(section):
+                        reason = (
+                            "section heads rule_id "
+                            f"{self._repeated_section_rule_id(section)} more "
+                            "than once"
+                        )
                     if not reason:
                         # Every rule heading the section introduces, not
                         # only the declared one: a nested heading carrying
                         # another page's ID would otherwise land unchecked.
                         for heading_id in self._section_rule_ids(section):
+
                             owner = existing_ids.get(heading_id)
                             nested = heading_id != rule_id
                             if owner is None and nested and heading_id in proposed_ids:
@@ -948,6 +966,8 @@ class KnowledgeCurator:
                     r"^##\s+", proposal.section_markdown, re.MULTILINE
                 )) != 1
                 or not 80 <= len(proposal.section_markdown) <= _MAX_SECTION_CHARS
+                or self._repeated_section_rule_id(proposal.section_markdown)
+
                 or not proposal.sources
                 or len(proposal.sources) > 10
                 or any(

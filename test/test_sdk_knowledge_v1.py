@@ -788,3 +788,40 @@ def test_nested_headings_inside_a_section_are_checked_too(workspace):
     assert result.rejected[0].reason == (
         "nested rule heading X-2 already exists on knowledge/repos/x/rules.md"
     )
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        "\n\n### X-2 — the declared ID repeated in a nested heading\n\n- Required: reject. ^[PR #7]",
+        "\n\n### X-4 — first nested\n\n- Required: a. ^[PR #7]\n\n### X-4 — second nested\n\n- Required: b. ^[PR #7]",
+    ],
+    ids=["parent-and-nested", "two-nested"],
+)
+def test_section_heading_one_rule_id_twice_is_rejected(workspace, extra):
+    """A section may not head one ID twice, whether it repeats its own
+    declared ID under ``###`` or two nested headings share an ID: the
+    validators downstream do not enforce ID uniqueness."""
+    curator = KnowledgeCurator(workspace)
+    result = curator.validate_proposals(
+        _document(_rule(section=SECTION + extra)), _batch()
+    )
+
+    assert result.accepted == ()
+    repeated = "X-2" if "X-2 — the declared" in extra else "X-4"
+    assert result.rejected[0].reason == (
+        f"section heads rule_id {repeated} more than once"
+    )
+
+
+def test_apply_refuses_a_section_that_repeats_a_rule_id(workspace):
+    curator = KnowledgeCurator(workspace)
+    validation = curator.validate_proposals(_document(_rule()), _batch())
+    smuggled = replace(
+        validation.accepted[0],
+        section_markdown=SECTION + "\n\n### X-2 — repeated\n\n- Required: reject. ^[PR #7]",
+    )
+    tampered = replace(validation, accepted=(smuggled,))
+
+    with pytest.raises(KnowledgeCurationError, match="apply-time integrity"):
+        curator.apply(tampered, updated_on="2026-08-29")
