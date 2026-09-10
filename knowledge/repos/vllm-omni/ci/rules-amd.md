@@ -1,7 +1,7 @@
 ---
 title: "AMD/ROCm CI 规则"
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-10
 type: rule
 tags: [vllm-omni, ci]
 sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py]
@@ -35,3 +35,10 @@ confidence: high
   sampling/cleanup 与 model assertion。PR #6884 必须 parse argv 与 platform overlay，断言 marker/run-level、
   CUDA preserve、ROCm-only clear/pin；最终需 exact final-head real MI300 L3 跑完两个 target jobs。该 PR
   未提供该 run，现有证据仅 author-reported local/static validation。^[PR #6704] ^[PR #6830] ^[PR #6884]
+
+## OMNI-CI-2g — 单卡 AMD diffusion model job 必须排除全部 multi-card marker
+
+- 触发：修改 `.buildkite/amd` 的 Diffusion Model Test、sequence-parallel/`mi300_2` 任务，或给 diffusion 模型测试加 `cards_N` / ROCm hardware marker。
+- 强制：`mi300_1` 一类单卡 model job 的 pytest marker 必须 `not (cards_2 or … or cards_8)`，同时保留无 `cards_1` 的 legacy 单卡用例；真正需要双卡的用例（如 LTX2 Ulysses parity）改到已有双卡 lane，并声明 `rocm` 资源与 `device_count >= world_size` 早失败。
+- 禁止：让 `cards_2+` 测试在单卡 worker 上 spawn rank1→GPU1 导致 `invalid device ordinal`；用邻近 green shard 宣称 multi-GPU routing 已修好。
+- 验收：pipeline argv/collection 断言单卡 job 排除 multi-card markers、双卡 job 收集目标文件；硬件 marker helper 覆盖 ROCm 声明。^[PR #7234]

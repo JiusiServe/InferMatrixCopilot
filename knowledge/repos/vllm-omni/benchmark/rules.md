@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni Benchmark 规则"
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-10
 type: rule
 tags: [vllm-omni, benchmark]
 sources: ["PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py]
@@ -46,3 +46,17 @@ confidence: high
 - 禁止：让已提交的性能 workload 跟随 Hub 默认分支，或只测试不带 revision 的 fallback。
 - 验收：配置中的 dataset 标识含 revision；fallback unit coverage 覆盖 plain 与 revision
   两种输入；每个固定 subset 的 case 数、并发与 warmup 设置可由 JSON 直接审计。 ^[PR #6817]
+
+## BENCH-1d — omni bench 共享 session 必须有界 per-request total timeout
+
+- 触发：修改 `vllm bench serve` / `benchmarks/patch` 的 `aiohttp.ClientSession`、`--omni-request-timeout-s` 或请求失败记账。
+- 强制：默认 per-request `ClientTimeout.total` 为 900s；显式正值覆盖默认；`<= 0` 才恢复 legacy 6h。超时必须经既有 request-func 记为 `failed`，使挂起的 server 结束 run 并写出结果 JSON，而不是占满 concurrency slot。
+- 禁止：把 6h 当默认“无超时”；只改打印文案不改 session timeout；用 warmup 成功推断测量请求不会 hang。
+- 验收：默认/显式/`<=0` 三态与 session `timeout.total`；对 accept-then-silence 的假 server 断言 `success is False` 且 run 在 deadline 内返回。^[PR #7130]
+
+## BENCH-1e — `/v1/videos` 轮询预算可配置，失败请求必须计入进度与报告
+
+- 触发：修改 diffusion serving benchmark 的 video job POST/poll/cleanup、`--video-job-timeout` 或失败汇总。
+- 强制：轮询 deadline 来自 per-request `video_job_timeout`（默认 900s，可 CLI 加大），从 job 创建后起算含排队；仅当 status 仍非 `completed`/`failed` 且超时才判失败。progress/latency 在 cleanup 路径更新，使失败请求也推进进度条；报告打印失败数与样例错误，JSON 写入全部 `request_errors`。
+- 禁止：硬编码 600s 后删除仍可能完成的 job；成功路径才 `pbar.update`；只报告成功计数而隐藏失败原因。
+- 验收：覆盖默认/加大 timeout、deadline 时已 `completed` 仍取回、混合成功/失败时进度与 `failed_requests`/`request_errors` 一致。^[PR #7259]

@@ -1,7 +1,7 @@
 ---
 title: "Diffusion attention 规则"
 created: 2026-09-02
-updated: 2026-09-05
+updated: 2026-09-10
 type: rule
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5543", "PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6037", "PR #6518", "PR #6563", "PR #6724", "PR #6909", docs/design/feature/skip_softmax.md, docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/trtllm.md, docs/user_guide/diffusion/attention_backends/fastvideo_vsa.md, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/diffusion_kv/paged_attention_adapter.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/cuda/platform.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_fastvideo_vsa.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/diffusion_kv/test_paged_attention_adapter.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py"]
@@ -202,3 +202,10 @@ confidence: high
 - 强制：以被 hook 的实际 `forward` 签名作为参数合同；extractor 必须兼容真实调用的可选字段，CFG 正负分支必须传递全部 required conditioning kwargs，尤其是 `guidance`，并保持对应 tensor 的语义与形状一致。
 - 禁止：只让正分支携带 extractor 所需参数；假设 negative branch 可以省略 `guidance`；用宽泛 `**kwargs` 或不启用 CFG 的测试掩盖 hook 与 model `forward` 的签名漂移。
 - 验收：TeaCache 启用且 `guidance_scale > 1` 时分别覆盖 LongCat T2I 与 Edit 的正/负分支，断言 extractor 两次均收到 `guidance` 且不抛 `TypeError`；再以固定输入、seed 和 checkpoint 对照无缓存输出。^[PR #6181]
+
+## DIFF-1af — 等长 batch 的 padding mask 必须省略为 None
+
+- 触发：diffusion 模型为 joint/image/self-attention 构造 boolean padding mask，或修改共享 `make_attention_mask` / FlashAttention dense-vs-masked 选择。
+- 强制：仅当 `seq_lengths` 存在真实 padding（至少一档短于 `max(seq_lengths)`）时才物化 `(batch, max_len)` bool mask；单样本或全员等长 batch 必须返回 `None`，让 backend 直接走 dense path。all-true CUDA mask 会触发 `torch.any(~mask)` 的 device→host sync，不能当作“无害 no-op”。
+- 禁止：无条件 `new_zeros` + 填 True；把 all-true device mask 交给 FlashAttention 只为“形状完整”；把省略 mask 说成改变了可变长 batch 的有效 token 集合。
+- 验收：等长与单样本断言 helper/`forward` 得到 `None`；可变长断言 mask shape 与 True/False 边界；不得用一次端到端加速数字代替 sync 合同。^[PR #6871]

@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 配置开发门禁"
 created: 2026-07-16
-updated: 2026-09-05
+updated: 2026-09-10
 type: rule
 tags: [vllm-omni, components, config]
 sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182", "PR #4820", "PR #6619", "PR #6680", "PR #6422", vllm_omni/deploy/higgs_multimodal_qwen3.yaml]
@@ -220,3 +220,10 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 验收：覆盖有效非默认值的 CLI、deploy/structured 和 direct attention-config 路径，断言最终
   `backend_kwargs`；覆盖错误 backend、非正值，以及 Top-K 超过 runtime block count 的回退。
   `WanDMDPipeline` 一类 checkpoint alias 还必须由 `model_index.json` 自动发现。^[PR #4820]
+
+## VOMNI-CFG-1s — CLI-only 负向 alias 不得进入 stage ownership 校验
+
+- 触发：继承 upstream CLI 负向开关（如 `--disable-log-stats`），或修改 `_NON_STAGE_ENGINE_CLI_FIELDS`、`AsyncOmniEngine._resolve_stage_configs`、headless `cli_overrides`。
+- 强制：把该 alias 标为非 stage 字段；在 `log_stats` 等 canonical 值已由 launcher/`__init__` 消费后，于 resolver 边界 `pop` 残余 alias，使 structured ownership 看不到它。标准与 headless 启动都必须消费。
+- 禁止：让 residual `disable_log_stats` 落入 `resolve_omni_config` / `VllmOmniConfig` 并报 “no structured config owner”；为通过校验而放宽真正的 stage engine-arg ownership。
+- 验收：断言字段在 `_NON_STAGE_ENGINE_CLI_FIELDS` 且不在 global stage CLI fields；engine 与 headless 解析后 kwargs/`cli_overrides` 不含该 alias；带 alias 的 TTS/structured pipeline 仍能构造。^[PR #7237]
