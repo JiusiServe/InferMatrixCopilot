@@ -107,8 +107,13 @@ def test_review_checklist_resolves_from_adapter_knowledge(settings, trace,
     escapes the knowledge root is ignored."""
     kroot = tmp_path / "knowledge"
     (kroot / "repos" / "repo_x").mkdir(parents=True)
+    # The marker sits past the old 7k cap, which the vllm-omni checklist was
+    # already flush against, and the tail sits past the current one.
     (kroot / "repos" / "repo_x" / "checklist.md").write_text(
-        "REPO-X-CHECKLIST-MARKER: check the frobnicator")
+        "filler line\n" * 600
+        + "REPO-X-CHECKLIST-MARKER: check the frobnicator\n"
+        + "pad\n" * 300
+        + "REPO-X-BEYOND-BUDGET")
     settings.knowledge_dir = kroot
     adir = settings.adapters_dir / "repo_x"
     adir.mkdir(parents=True)
@@ -126,6 +131,7 @@ def test_review_checklist_resolves_from_adapter_knowledge(settings, trace,
     assert result.ok, result.summary
     prompt = llm.calls[0]["messages"][0]["content"]
     assert "REPO-X-CHECKLIST-MARKER" in prompt
+    assert "REPO-X-BEYOND-BUDGET" not in prompt
 
     # escape guard: a traversal path is ignored, not read
     (adir / "manifest.yaml").write_text(

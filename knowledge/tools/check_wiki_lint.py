@@ -34,7 +34,7 @@ ADAPTER_KNOWLEDGE_KEYS = {
     "briefing_docs_extra",
     "performance_briefing_docs",
     # single knowledge page injected as the Strict reviewer's repo-specific
-    # checklist (first 4k chars); resolved relative to the knowledge root
+    # checklist (first 8k chars); resolved relative to the knowledge root
     "review_checklist",
 }
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

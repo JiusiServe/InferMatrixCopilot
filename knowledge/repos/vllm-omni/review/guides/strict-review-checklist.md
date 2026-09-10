@@ -1,7 +1,7 @@
 ---
 title: "Strict 审查触发式检查单"
 created: 2026-08-12
-updated: 2026-08-25
+updated: 2026-09-10
 type: guide
 tags: [vllm-omni, review]
 sources: []
@@ -10,7 +10,7 @@ sources: []
 # Strict 审查触发式检查单
 
 Train-distilled trigger→check lines (20-PR campaign + teacher traces
-2026-08-15). The Strict reviewer injects the first 7,000 chars
+2026-08-15). The Strict reviewer injects the first 8,000 chars
 (`knowledge.review_checklist`); keep the core inside that budget.
 
 ## Streaming / TTS serving
@@ -105,6 +105,13 @@ Train-distilled trigger→check lines (20-PR campaign + teacher traces
   loads that config; propose the single most plausible in-diff mechanism.
 - L2 covers CPU/mock plumbing only; serving/entrypoints tests may not collect
   under the installed vLLM — classify as environment, not defect.
+- PR body vs lane: a `.buildkite/**` step's `commands` are what CI runs and
+  its `source_file_dependencies` say which changed paths it guards. Compare
+  the Test Plan/Test Result against them by SELECTOR (targets, `-m`
+  expression, run-level), never by literal text — `timeout`, `--cov*` and
+  container prefixes differ by design. A guard step never run, a command
+  that drops the lane's marker, or no test evidence at all is a blocking
+  finding naming the step label and both commands.
 
 ## Benchmarks / audio numerics
 

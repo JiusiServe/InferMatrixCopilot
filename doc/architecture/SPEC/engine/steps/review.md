@@ -1,6 +1,6 @@
 # engine/steps/review/ —— 规范
 
-<!-- verified-against: 2026-08-31 -->
+<!-- verified-against: 2026-09-10 -->
 
 `LOC ~900（6 个文件） · step 库（评审） · refactor-status: ok`
 
@@ -40,7 +40,8 @@
   `_EXPECTED_PLANNER_CAUSES`（`unavailable` / `rejected_depth:`）时记
   trace 缺口 —— 配置了的 planner 答非所问（transport / 空回复 / 不可解析）
   与"没配"和"守卫在履职"是三件事（见 `review/planner.md` 的 5 种 cause）。
-- 评审：领域 checklist 由 profile 的 `review.md` 扩展；`_sweep_targets` 以
+- 评审：领域 checklist 由 adapter 的 `knowledge.review_checklist` 或 profile 的
+  `review.md` 扩展，**注入上限 8k 字符**（页面写满上限时新增门禁会被静默截断）；`_sweep_targets` 以
   `repo.language` 为键，**诚实降级**；裁决自洽（任何 ≥minor 的评论 ⇒ REQUEST CHANGES）；
   确定性的按严重度排序的评论上限。
 - prompt 是仓库中立的（**A5**）。

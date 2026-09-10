@@ -1,7 +1,7 @@
 ---
 title: "代码审查"
 created: 2026-07-10
-updated: 2026-07-30
+updated: 2026-09-10
 type: index
 tags: [general, review]
 sources: []
@@ -22,6 +22,6 @@ sources: []
 
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
-| 检查同族实现覆盖和条件分支对称性 | [通用设计审查规则](rules.md) | 由代码结构触发的跨仓库设计门禁 |
+| 检查同族实现覆盖、条件分支对称性，或 PR 测试证据是否对齐 CI | [通用设计审查规则](rules.md) | 由代码结构和测试证据触发的跨仓库门禁 |
 | 从维护者视角审查当前改动，或只拿到 PR 链接 | [独立审查执行合同](guides/review-execution-contract.md) | 一次 Direct 审查复用同一证据，同时完成正确性和设计减法，只输出一篇评论 |
 | 查找其他审查专项 | [guides 索引](guides/_index.md) | 只继续读取当前风险命中的专项 |

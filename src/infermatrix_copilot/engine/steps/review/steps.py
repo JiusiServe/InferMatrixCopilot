@@ -672,8 +672,11 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         for review_md in candidates:
             try:
                 if review_md.exists() and ctx.settings.profile_briefing_enabled:
+                    # budget: the largest checklist in the tree sat at
+                    # 6,991 chars, flush against the old 7k cap, so a
+                    # newly added gate was silently cut off mid-page
                     guidance += ("\n\n## Repo-specific review checklist\n"
-                                 + review_md.read_text(encoding="utf-8")[:7_000])
+                                 + review_md.read_text(encoding="utf-8")[:8_000])
                     break
             except OSError:
                 continue
