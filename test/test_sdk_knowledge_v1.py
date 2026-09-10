@@ -655,3 +655,136 @@ def test_curator_surface_has_no_orchestration_operations(workspace):
         "clone", "commit", "push", "publish", "create_pull", "schedule", "run_daily"
     ):
         assert not hasattr(curator, operation)
+
+
+def test_rule_id_used_on_another_catalog_page_is_rejected(workspace):
+    """IDs are auditable tree-wide (Direct routes by exact ID) and an
+    owner's topic pages share its prefix, so an ID that heads a section on
+    any catalog page is taken, whichever page a proposal targets."""
+    (workspace / TOPIC_PAGE).write_text(
+        PAGE_TEXT.replace("X-1", "X-7"), encoding="utf-8"
+    )
+    curator = KnowledgeCurator(workspace)
+    duplicate = _rule(
+        page=TOPIC_PAGE,
+        rule_id="X-1",
+        section=SECTION.replace("X-2", "X-1"),
+    )
+    result = curator.validate_proposals(_document(duplicate), _batch())
+
+    assert result.accepted == ()
+    assert result.rejected[0].reason == (
+        "rule_id already exists on knowledge/repos/x/rules.md"
+    )
+    assert "on ANY catalog page" in curator.build_prompt(_batch())
+
+
+def test_one_batch_cannot_propose_one_rule_id_on_two_pages(workspace):
+    (workspace / TOPIC_PAGE).write_text(
+        PAGE_TEXT.replace("X-1", "X-7"), encoding="utf-8"
+    )
+    curator = KnowledgeCurator(workspace)
+    result = curator.validate_proposals(
+        _document(_rule(), _rule(page=TOPIC_PAGE)), _batch()
+    )
+
+    assert tuple(item.input_index for item in result.accepted) == (0,)
+    assert result.rejected[0].reason == (
+        "rule_id duplicates an earlier proposal on knowledge/repos/x/rules.md"
+    )
+
+
+def test_rule_id_of_another_repository_is_rejected_on_a_general_page(workspace):
+    """The scan is not repository-scoped: an x batch may target the general
+    pages, and `Y-1` already heads a section under knowledge/repos/y."""
+    curator = KnowledgeCurator(workspace)
+    result = curator.validate_proposals(
+        _document(_rule(
+            page=GENERAL_PAGE, rule_id="Y-1",
+            section=SECTION.replace("X-2", "Y-1"),
+        )),
+        _batch(),
+    )
+
+    assert result.accepted == ()
+    assert result.rejected[0].reason == (
+        "rule_id already exists on knowledge/repos/y/rules.md"
+    )
+
+
+def test_nested_rule_headings_count_for_uniqueness(workspace):
+    """Owner pages nest some rules under ``###``; those IDs are taken too."""
+    (workspace / TOPIC_PAGE).write_text(
+        PAGE_TEXT.replace("## X-1", "### X-7"), encoding="utf-8"
+    )
+    curator = KnowledgeCurator(workspace)
+    result = curator.validate_proposals(
+        _document(_rule(rule_id="X-7", section=SECTION.replace("X-2", "X-7"))),
+        _batch(),
+    )
+
+    assert result.accepted == ()
+    assert result.rejected[0].reason == (
+        "rule_id already exists on knowledge/repos/x/rules-topic.md"
+    )
+
+
+def test_apply_rechecks_uniqueness_under_the_lock(workspace):
+    """Two batches validated against the same tree may both carry one new
+    ID for sibling pages; the second apply must refuse before writing."""
+    (workspace / TOPIC_PAGE).write_text(
+        PAGE_TEXT.replace("X-1", "X-7"), encoding="utf-8"
+    )
+    curator = KnowledgeCurator(workspace)
+    first = curator.validate_proposals(_document(_rule()), _batch())
+    second = curator.validate_proposals(
+        _document(_rule(page=TOPIC_PAGE)),
+        replace(_batch(), batch_id="batch-20260830"),
+    )
+    assert first.accepted and second.accepted
+
+    assert curator.apply(first, updated_on="2026-08-29").success
+    topic_before = (workspace / TOPIC_PAGE).read_bytes()
+    with pytest.raises(
+        KnowledgeCurationError,
+        match="rule_id X-2 already exists on knowledge/repos/x/rules.md",
+    ):
+        curator.apply(second, updated_on="2026-08-29")
+    assert (workspace / TOPIC_PAGE).read_bytes() == topic_before
+
+
+def test_nested_headings_inside_a_section_are_checked_too(workspace):
+    """A section may nest ``###`` headings; each is a rule heading whose
+    ID must be free, or a proposal could smuggle another page's ID past
+    the declared-ID check."""
+    curator = KnowledgeCurator(workspace)
+    smuggled = SECTION + (
+        "\n\n### Y-1 — nested heading reusing another owner's ID\n\n"
+        "- Required: nothing, this heading must be rejected. ^[PR #7]"
+    )
+    result = curator.validate_proposals(
+        _document(_rule(section=smuggled)), _batch()
+    )
+
+    assert result.accepted == ()
+    assert result.rejected[0].reason == (
+        "nested rule heading Y-1 already exists on knowledge/repos/y/rules.md"
+    )
+    # ... and a nested heading may not reuse an ID accepted earlier in the
+    # same batch either.
+    result = curator.validate_proposals(
+        _document(
+            _rule(),
+            _rule(
+                rule_id="X-3",
+                section=SECTION.replace("X-2", "X-3")
+                + "\n\n### X-2 — nested reuse of the first proposal\n\n"
+                "- Required: reject. ^[PR #7]",
+            ),
+        ),
+        _batch(),
+    )
+    assert tuple(item.input_index for item in result.accepted) == (0,)
+    assert result.rejected[0].reason == (
+        "nested rule heading X-2 already exists on knowledge/repos/x/rules.md"
+    )
