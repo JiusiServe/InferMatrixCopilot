@@ -1,6 +1,6 @@
 # engine/steps/review/ —— 规范
 
-<!-- verified-against: 2026-09-10 -->
+<!-- verified-against: 2026-09-11 -->
 
 `LOC ~900（6 个文件） · step 库（评审） · refactor-status: ok`
 
@@ -30,6 +30,16 @@
 ## 不变量
 - patch 门：廉价摘要**常开**，只有触发时才跑 LLM 评审；**fail-closed**（**C6**）；
   高风险模块来自 adapter，settings 只作兜底（**A5**）。
+- **取舍是字段，不是句子**：每条候选评论带 `disposition`
+  （`publish` | `excluded` | `duplicate` | `resolved` | `no_issue`）。
+  `finalize_review_dispositions` 在**评论预算之前**执行——被撤下的候选
+  因此占不掉八个可发布名额——也在**任何渲染器之前**执行，于是 summary、
+  正文、行内评论三者都由同一个终局集合渲染。缺字段=发布（该字段是增量的）；
+  无法识别的取值也发布，但记进 `finding_dispositions.declared`，
+  让异常可见而不是静默丢掉真实发现。`no_issue` 走 summary 的
+  「Checked, no defect found」注记：保留证据，去掉诉求，不带优先级。
+  在此之前取舍只活在模型的 `summary` 散文里，而发布读的是列表，于是
+  summary 说要丢弃的请求照样行内发出（#141）。
 - **`review_verdict` 是发布的 state 字段，不是散文**：由
   `_review_verdict(review_comments, pr_state)` 计算（**与渲染器同一个
   helper，绝不第二份校准规则**），随 `review_text`/`review_summary`/

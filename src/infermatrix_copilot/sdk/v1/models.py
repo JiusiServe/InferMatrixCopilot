@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 SDK_API_VERSION = "1.0.0"
 DIRECT_API_VERSION = "1.0.0"
-STRICT_API_VERSION = "1.0.0"
+STRICT_API_VERSION = "1.1.0"   # + finding_dispositions (#141)
 QUALITY_API_VERSION = "1.0.0"
 KNOWLEDGE_API_VERSION = "1.1.0"
 

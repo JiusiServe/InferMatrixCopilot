@@ -252,6 +252,17 @@ review is lost to truncation. Findings: at most 30 one-line entries — on large
 diffs collapse per-file sweep notes into grouped lines; evidence: at most 3 quoted \
 lines per comment (quote the ONE decisive line, not the region). If running long, \
 drop the least decisive findings lines first — never a comment.
+- SELECTION IS A FIELD, NOT A SENTENCE. Every comment carries `disposition`. Use \
+`publish` for a finding you are actually raising; `excluded` for a candidate you \
+decided against; `duplicate` for one you consolidated into another comment here; \
+`resolved` for a concern this change already answers; `no_issue` for a check that \
+found the code correct. Only `publish` comments are published — the other four are \
+kept as the review's record of what it decided. A decision written only as prose in \
+`summary` is NOT applied: if you say a request should be dropped, mark that comment \
+`excluded` or it ships to the contributor anyway, contradicting your own summary.
+- A CONFIRMATION IS NOT A FINDING. "I checked X and it is correct" is `no_issue`, \
+never a severity-carrying comment. A finding asks the contributor to do something; if \
+there is nothing to do, there is nothing to rank.
 - Only if the sweep truly surfaces nothing that belongs in this PR: empty review_comments \
 with a one-line summary."""
 
