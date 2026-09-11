@@ -242,3 +242,168 @@ def test_review_without_snippets_is_untouched(settings, trace, tmp_path, git_rep
         _ctx(settings, trace, tmp_path, state, llm=llm)))
     comment = result.outputs["review_comments"][0]
     assert comment["line"] == 2 and "_anchor_unverified" not in comment
+
+
+def _dispositions(result):
+    return {r["anchor"]: r["disposition"]
+            for r in result.outputs["state_updates"]["review_finding_dispositions"]}
+
+
+def test_an_excluded_candidate_reaches_no_published_surface(
+        settings, trace, tmp_path, git_repo):
+    """vllm-project/vllm-omni#6959: the summary said to drop the repo-id
+    validation request because the evidence packet already covered it, and the
+    request was published inline as a P2 anyway. The decision lived in prose
+    while publication read the list."""
+    diff = ("diff --git a/mod_a.py b/mod_a.py\n--- a/mod_a.py\n+++ b/mod_a.py\n"
+            "@@ -1,1 +1,3 @@\n A = 1\n+B = 2\n+C = 3\n")
+    llm = ScriptedLLM([_contract_reply([
+        {"file": "mod_a.py", "line": 2, "severity": "major",
+         "comment": "lock scope is too narrow", "evidence": "read mod_a.py",
+         "disposition": "publish"},
+        {"file": "mod_a.py", "line": 3, "severity": "minor",
+         "comment": "validate the repo id before use",
+         "evidence": "read mod_a.py", "disposition": "excluded"},
+    ])])
+    state = {"diff_text": diff, "task_spec": {"pr": 6959},
+             "repo_path": str(git_repo)}
+
+    result = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+
+    assert result.ok
+    published = result.outputs["review_comments"]
+    assert [c["comment"] for c in published] == ["lock scope is too narrow"]
+    # Not in the inline comments, not in the body, not in the summary.
+    assert "validate the repo id" not in result.outputs["review_text"]
+    assert "validate the repo id" not in result.outputs["review_summary"]
+    assert _dispositions(result)["mod_a.py:3"] == "excluded"
+
+
+def test_a_no_issue_confirmation_never_carries_a_finding_priority(
+        settings, trace, tmp_path, git_repo):
+    """vllm-project/vllm-omni#6959 again: a confirmation that the inspected
+    SPDX headers left no stale comments was published as a P2 finding. It
+    reports no defect and asks for nothing, so it cannot be ranked — but the
+    check itself is worth keeping, as a note."""
+    diff = ("diff --git a/mod_a.py b/mod_a.py\n--- a/mod_a.py\n+++ b/mod_a.py\n"
+            "@@ -1,1 +1,3 @@\n A = 1\n+B = 2\n+C = 3\n")
+    llm = ScriptedLLM([_contract_reply([
+        {"file": "mod_a.py", "line": 2, "severity": "minor",
+         "comment": "the SPDX headers leave no stale docstrings",
+         "evidence": "read mod_a.py", "disposition": "no_issue"},
+    ])])
+    state = {"diff_text": diff, "task_spec": {"pr": 6959},
+             "repo_path": str(git_repo)}
+
+    result = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+
+    assert result.ok
+    assert result.outputs["review_comments"] == []
+    summary = result.outputs["review_summary"]
+    assert "Checked, no defect found:" in summary
+    assert "no stale docstrings" in summary
+    # A review that collected observations but has nothing to ask for is a
+    # valid zero-finding result, not a REQUEST CHANGES.
+    assert summary.rstrip().endswith("**Verdict:** APPROVE")
+
+
+def test_withheld_candidates_do_not_consume_the_comment_budget(
+        settings, trace, tmp_path, git_repo):
+    """Finalization runs before the eight-comment cut, so an excluded
+    candidate cannot push a real finding out of the published set."""
+    diff = ("diff --git a/mod_a.py b/mod_a.py\n--- a/mod_a.py\n+++ b/mod_a.py\n"
+            "@@ -1,1 +1,12 @@\n A = 1\n" + "".join(
+                f"+L{n} = {n}\n" for n in range(2, 13)))
+    comments = [
+        {"file": "mod_a.py", "line": n, "severity": "nit",
+         "comment": f"withheld {n}", "evidence": "e", "disposition": "duplicate"}
+        for n in range(2, 10)
+    ] + [
+        {"file": "mod_a.py", "line": 11, "severity": "nit",
+         "comment": "the surviving finding", "evidence": "e"},
+    ]
+    llm = ScriptedLLM([_contract_reply(comments)])
+    state = {"diff_text": diff, "task_spec": {"pr": 1},
+             "repo_path": str(git_repo)}
+
+    result = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+
+    assert result.ok
+    published = [c["comment"] for c in result.outputs["review_comments"]]
+    assert published == ["the surviving finding"]
+
+
+def test_a_review_without_dispositions_publishes_exactly_as_before(
+        settings, trace, tmp_path, git_repo):
+    """The field is additive: an older run that carries none is unchanged."""
+    diff = ("diff --git a/mod_a.py b/mod_a.py\n--- a/mod_a.py\n+++ b/mod_a.py\n"
+            "@@ -1,1 +1,2 @@\n A = 1\n+B = 2\n")
+    llm = ScriptedLLM([_contract_reply([
+        {"file": "mod_a.py", "line": 2, "severity": "major",
+         "comment": "unguarded index", "evidence": "e"},
+    ])])
+    state = {"diff_text": diff, "task_spec": {"pr": 1},
+             "repo_path": str(git_repo)}
+
+    result = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+
+    assert result.ok
+    assert [c["comment"] for c in result.outputs["review_comments"]] == [
+        "unguarded index"]
+    assert _dispositions(result) == {"mod_a.py:2": "publish"}
+
+
+def test_an_unreadable_disposition_publishes_and_is_recorded(
+        settings, trace, tmp_path, git_repo):
+    """Losing a real finding to a typo is worse than publishing one whose
+    bookkeeping we cannot read; the declared value is kept so it is visible."""
+    diff = ("diff --git a/mod_a.py b/mod_a.py\n--- a/mod_a.py\n+++ b/mod_a.py\n"
+            "@@ -1,1 +1,2 @@\n A = 1\n+B = 2\n")
+    llm = ScriptedLLM([_contract_reply([
+        {"file": "mod_a.py", "line": 2, "severity": "major",
+         "comment": "unguarded index", "evidence": "e", "disposition": "drop"},
+    ])])
+    state = {"diff_text": diff, "task_spec": {"pr": 1},
+             "repo_path": str(git_repo)}
+
+    result = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+
+    assert result.ok
+    assert len(result.outputs["review_comments"]) == 1
+    record = result.outputs["state_updates"]["review_finding_dispositions"][0]
+    assert record["disposition"] == "publish"
+    assert record["declared"] == "drop"
+
+
+def test_a_budget_cut_is_not_recorded_as_a_review_decision(
+        settings, trace, tmp_path, git_repo):
+    """Nine publishable findings, eight slots. The ninth was not withheld by
+    the review, so a consumer checking that nothing withheld got published
+    must not trip over it."""
+    diff = ("diff --git a/mod_a.py b/mod_a.py\n--- a/mod_a.py\n+++ b/mod_a.py\n"
+            "@@ -1,1 +1,11 @@\n A = 1\n" + "".join(
+                f"+L{n} = {n}\n" for n in range(2, 12)))
+    llm = ScriptedLLM([_contract_reply([
+        {"file": "mod_a.py", "line": n, "severity": "nit",
+         "comment": f"finding {n}", "evidence": "e"}
+        for n in range(2, 11)
+    ])])
+    state = {"diff_text": diff, "task_spec": {"pr": 1},
+             "repo_path": str(git_repo)}
+
+    result = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+
+    assert result.ok
+    assert len(result.outputs["review_comments"]) == 8
+    recorded = [r["disposition"]
+                for r in result.outputs["state_updates"][
+                    "review_finding_dispositions"]]
+    assert recorded.count("publish") == 8
+    assert recorded.count("over_budget") == 1
+    assert "excluded" not in recorded

@@ -1,6 +1,6 @@
 # contract.py —— 规范
 
-<!-- verified-against: 2026-08-31 -->
+<!-- verified-against: 2026-09-11 -->
 
 `LOC ~185 · 旧版跨仓库契约兼容层 · refactor-status: compatibility-shim`
 
@@ -22,8 +22,8 @@ revision、supported repositories，以及 `supports_expected_head`、
 `supports_idempotent_strict_start`、`supports_knowledge_curation`、
 `max_strict_workers`。其余兼容导出包括 `build_review_result(run_dir) -> dict`（结构化评审
 结果：`contract_version`、`run_id`、`state`、`reviewed_head_sha`、`verdict`、
-`summary_markdown`、`comments`、`stale`/`expected_head_sha`/
-`actual_head_sha`、`diagnostics`）；`unknown_run_result(run_id)`（显式
+`summary_markdown`、`comments`、`finding_dispositions`、
+`stale`/`expected_head_sha`/`actual_head_sha`、`diagnostics`）；`unknown_run_result(run_id)`（显式
 `state: unknown`，绝不抛错 —— 丢响应和还在跑必须可区分）；
 `sanitize_comments` 与 `COMMENT_FIELDS`；以及从 `direct_routing` 再导出的
 `direct_knowledge_routes` / `direct_execution_budget` /
@@ -46,6 +46,11 @@ revision、supported repositories，以及 `supports_expected_head`、
 - `sanitize_comments` 按 `COMMENT_FIELDS` 白名单
   （file/line/severity/comment/evidence/suggestion）——内部记账键
   （`_verified`、`corroborated_by` 等）绝不泄进消费方输出。
+- `comments` 是**终局集合**，不是候选集合：评审自己的取舍已在评审步
+  应用完毕（见 `engine/steps/review` 页）。`finding_dispositions` 是这件事的
+  凭据——每个候选一条 `{anchor, disposition, declared}`，按
+  `DISPOSITION_FIELDS` 白名单投影，被撤下的评论正文本身绝不过界。
+  消费方因此无需把散文里的取舍和手上的列表对账（#141）。
 - 本模块自身保持仓库中立；仓库专属的 Direct 路由表住在
   `direct_routing.py`（见其页）。
 - 能力身份的权威实现在 `sdk.v1.get_capabilities`；这里不维护第二份版本或

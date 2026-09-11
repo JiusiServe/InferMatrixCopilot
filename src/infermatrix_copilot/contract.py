@@ -62,6 +62,7 @@ __all__ = [
     "direct_mandatory_review_guides",
     "direct_review_plan",
     "sanitize_comments",
+    "sanitize_dispositions",
     "unknown_run_result",
     "unknown_quality_result",
 ]
@@ -72,6 +73,12 @@ __all__ = [
 # new internal key is excluded by default rather than by remembering to.
 COMMENT_FIELDS: frozenset[str] = frozenset({
     "file", "line", "severity", "comment", "evidence", "suggestion",
+})
+
+# One record per candidate the review considered: where it was anchored, and
+# what the review decided to do with it.
+DISPOSITION_FIELDS: frozenset[str] = frozenset({
+    "anchor", "disposition", "declared",
 })
 
 # Trace events the assembler surfaces as diagnostics.
@@ -117,6 +124,20 @@ def _state_updates(run_dir: Path) -> dict:
             if isinstance(updates, dict):
                 merged.update(updates)
     return merged
+
+
+def sanitize_dispositions(records: Any) -> list[dict]:
+    """Project disposition records onto `DISPOSITION_FIELDS`.
+
+    Same allow-list discipline as `sanitize_comments`: the withheld prose
+    itself never crosses the boundary, only the anchor and what was decided.
+    """
+    out: list[dict] = []
+    for record in records if isinstance(records, list) else []:
+        if isinstance(record, dict):
+            out.append({k: v for k, v in record.items()
+                        if k in DISPOSITION_FIELDS})
+    return out
 
 
 def sanitize_comments(comments: Any) -> list[dict]:
@@ -170,6 +191,12 @@ def build_review_result(run_dir: Path | str) -> dict[str, Any]:
         "verdict": str(updates.get("review_verdict") or ""),
         "summary_markdown": str(updates.get("review_summary") or ""),
         "comments": sanitize_comments(updates.get("review_comments")),
+        # Every candidate this review considered and what became of it. The
+        # published `comments` above are the finalized set; this is the proof,
+        # so a consumer never has to reconcile the summary's prose against the
+        # list it was handed (#141).
+        "finding_dispositions": sanitize_dispositions(
+            updates.get("review_finding_dispositions")),
         "stale": bool(mismatch),
         "expected_head_sha": str((mismatch or {}).get("expected") or ""),
         "actual_head_sha": str((mismatch or {}).get("actual") or ""),
@@ -234,6 +261,7 @@ def unknown_run_result(run_id: str) -> dict[str, Any]:
     return {"contract_version": STRICT_API_VERSION, "run_id": run_id,
             "state": "unknown", "note": "", "reviewed_head_sha": "",
             "verdict": "", "summary_markdown": "", "comments": [],
+            "finding_dispositions": [],
             "stale": False, "expected_head_sha": "", "actual_head_sha": "",
             "diagnostics": {}}
 

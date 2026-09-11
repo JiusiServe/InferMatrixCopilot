@@ -478,6 +478,104 @@ def _review_summary_parts(output: dict) -> list[str]:
     return parts
 
 
+# One review emits candidates AND the decisions it took about them. Before
+# this existed the decisions lived only in the model's `summary` prose while
+# publication read `review_comments`, so a request the summary said to drop
+# was still posted inline, and a confirmation that nothing was wrong was
+# posted with a severity (JiusiServe/InferMatrixCopilot#141). Selection is
+# data now: every output form renders from the set this function returns.
+PUBLISH_DISPOSITION = "publish"
+WITHHOLDING_DISPOSITIONS = frozenset({
+    "excluded",    # the review decided against raising it
+    "duplicate",   # consolidated into another finding in this same review
+    "resolved",    # the change already answers it; nothing is being asked
+    "no_issue",    # checked and found correct — a negative check, not a defect
+})
+
+
+def _disposition_of(comment: dict) -> str:
+    return str(comment.get("disposition") or "").strip().lower()
+
+
+def finalize_review_dispositions(output: dict) -> tuple[list[dict], list[dict]]:
+    """Split candidates into what publishes and what was withheld.
+
+    Runs BEFORE the comment budget, so a withheld candidate cannot occupy one
+    of the eight publishable slots.
+
+    An absent disposition publishes: the field is additive and most runs will
+    not carry one. An UNRECOGNIZED value also publishes rather than being
+    dropped — losing a real finding to a typo is worse than publishing one
+    whose bookkeeping we cannot read — but it is recorded so the anomaly is
+    visible instead of silent. Only the four explicit withholding values
+    withhold, which is why this is not a keyword filter over prose.
+    """
+    published: list[dict] = []
+    withheld: list[dict] = []
+    for comment in output.get("review_comments") or []:
+        if not isinstance(comment, dict):
+            continue
+        if _disposition_of(comment) in WITHHOLDING_DISPOSITIONS:
+            withheld.append(comment)
+        else:
+            published.append(comment)
+    return published, withheld
+
+
+# Not offered to the model: a candidate the review chose to publish, cut by
+# the deterministic comment budget rather than by any review decision. A
+# consumer must be able to tell "we decided against this" from "it did not
+# fit", or the count of publish records and of published comments disagree
+# for a perfectly healthy review.
+OVER_BUDGET_DISPOSITION = "over_budget"
+
+
+def disposition_records(candidates: list[dict],
+                        published: list[dict]) -> list[dict]:
+    """The audit trail: one record per candidate, whatever became of it.
+
+    Published as `finding_dispositions` so a consumer can prove the published
+    set is the finalized set, without carrying the withheld prose itself.
+    """
+    survived = {id(comment) for comment in published}
+    records = []
+    for comment in candidates:
+        if not isinstance(comment, dict):
+            continue
+        declared = _disposition_of(comment)
+        if declared in WITHHOLDING_DISPOSITIONS:
+            disposition = declared
+        elif id(comment) in survived:
+            disposition = PUBLISH_DISPOSITION
+        else:
+            disposition = OVER_BUDGET_DISPOSITION
+        records.append({
+            "anchor": _anchor(comment),
+            "disposition": disposition,
+            "declared": declared,
+        })
+    return records
+
+
+def negative_check_notes(withheld: list[dict]) -> list[str]:
+    """`no_issue` candidates as concise evidence notes.
+
+    #141 asks that a statement confirming no problem exists never carry a
+    finding priority or request contributor action, while allowing the check
+    itself to remain visible. A note keeps the evidence and drops the ask.
+    """
+    notes = []
+    for comment in withheld:
+        if _disposition_of(comment) != "no_issue":
+            continue
+        text = str(comment.get("comment") or "").strip()
+        if not text:
+            continue
+        anchor = _anchor(comment)
+        notes.append(f"`{anchor}` — {text}" if anchor else text)
+    return notes
+
+
 def _render_review_summary(output: dict, pr_state: str = "") -> str:
     """Render a concise review body; individual findings are posted inline."""
     comments = output.get("review_comments") or []
@@ -489,6 +587,13 @@ def _render_review_summary(output: dict, pr_state: str = "") -> str:
         parts.append(f"{len(comments)} actionable finding(s).")
     else:
         parts.append("No actionable findings.")
+    # A negative check keeps its evidence and loses its ask: it is reported
+    # here as a note, never among the findings where it would carry a
+    # severity and read as work to do (#141).
+    notes = negative_check_notes(output.get("_withheld_findings") or [])
+    if notes:
+        parts.append("**Checked, no defect found:**\n"
+                     + "\n".join(f"- {note}" for note in notes))
     parts.append(f"**Verdict:** {_review_verdict(comments, pr_state)}")
     return "\n\n".join(parts)
 

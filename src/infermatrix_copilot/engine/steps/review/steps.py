@@ -44,6 +44,8 @@ from .utils import (
     _render_review_md,
     _render_review_summary,
     _review_verdict,
+    disposition_records,
+    finalize_review_dispositions,
     _same_finding,
     _sweep_targets,
 )
@@ -687,7 +689,8 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                 "grounded, specific, useful findings.",
         guidance=guidance,
         expected="review_comments with file/line/anchor_snippet/severity/comment/"
-                 "evidence; APPROVE-equivalent = empty review_comments with a summary.",
+                 "evidence/disposition; APPROVE-equivalent = empty "
+                 "review_comments with a summary.",
         evidence={"pr_diff": str(diff),
                   "pr_context": ctx.state.get("pr_context", ""),
                   "gate_report": ctx.state.get("gate_report", ""),
@@ -698,7 +701,9 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                           "list of {file, line, anchor_snippet, severity: "
                           "blocker|major|minor|nit, comment, evidence, "
                           "suggestion: optional replacement code for the "
-                          "cited lines — the concrete edit, no prose}"},
+                          "cited lines — the concrete edit, no prose, "
+                          "disposition: publish|excluded|duplicate|resolved|"
+                          "no_issue — only publish is published}"},
         extra_tools={**_gh_read_tools(_repo_path(ctx)),
                      **review_repo_tools(_repo_path(ctx))},
     )
@@ -850,6 +855,15 @@ async def _review_diff(ctx: StepContext) -> StepResult:
     # major/blocker) or for individually verify-confirmed cut comments — a
     # quiet PR with an unverified tail stays terse (a thin-GT val item
     # rendering 12 findings lost 3/3 on noise).
+    # Apply the review's OWN selection before anything else reads the list.
+    # It runs ahead of the budget below so a withheld candidate cannot occupy
+    # one of the eight publishable slots, and ahead of every renderer so the
+    # summary, the body and the inline comments are all made from the same
+    # finalized set (#141).
+    all_candidates = list(output.get("review_comments") or [])
+    published, withheld = finalize_review_dispositions(output)
+    output["review_comments"] = published
+    output["_withheld_findings"] = withheld
     comments = sorted(output.get("review_comments") or [],
                       key=lambda c: (_SEVERITY_ORDER.get(
                           str(c.get("severity", "minor")).lower(), 2),
@@ -857,6 +871,20 @@ async def _review_diff(ctx: StepContext) -> StepResult:
     for c in comments:
         c.pop("corroborated_by", None)
     output["review_comments"] = comments[:8]
+    # Recorded AFTER the cut: a candidate the review chose to publish but the
+    # budget dropped is `over_budget`, never `excluded`. A consumer checking
+    # that no withheld finding was published must not trip over a healthy
+    # review whose ninth comment simply did not fit.
+    output["_finding_dispositions"] = disposition_records(
+        all_candidates, output["review_comments"])
+    if withheld:
+        ctx.trace.record(
+            "finding_dispositions",
+            withheld=len(withheld),
+            published=len(output["review_comments"]),
+            dispositions=[r["disposition"]
+                          for r in output["_finding_dispositions"]],
+        )
     rich = sum(1 for c in comments[:8]
                if _SEVERITY_ORDER.get(str(c.get("severity", "minor")).lower(),
                                       2) <= _SEVERITY_ORDER["major"]) >= 2
@@ -909,6 +937,9 @@ async def _review_diff(ctx: StepContext) -> StepResult:
             "review_summary": review_summary,
             "review_comments": review_comments,
             "review_verdict": review_verdict,
+            # The audit trail crosses the contract with the result: a
+            # consumer can prove the published set IS the finalized set.
+            "review_finding_dispositions": output.get("_finding_dispositions") or [],
         })
         depth_note = f"; depth={plan.depth} via {plan.planner}" if plan else ""
         result.summary = (f"review produced ({len(output.get('review_comments') or [])} "
