@@ -1,7 +1,7 @@
 ---
 title: "Pi0 模型硬门禁"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-11
 type: rule
 tags: [vllm-omni, models, diffusion, serving]
 sources: ["PR #4222", "vllm_omni/diffusion/models/pi0/config.py", "vllm_omni/diffusion/models/pi0/modeling_pi0.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "vllm_omni/diffusion/models/pi0/processor_pi0.py", "vllm_omni/deploy/pi0.yaml", "tests/diffusion/models/pi0/test_pi0_units.py", "tests/diffusion/models/pi0/test_pi0_parity.py", "tests/e2e/online_serving/test_pi0_expansion.py"]
@@ -26,3 +26,10 @@ confidence: high
 - 验收：CPU unit tests 覆盖 config、camera padding、mask、normalization 与 loader remap；固定 noise 的 CPU/float32 LeRobot parity 保持 `max|Δ| < 1e-4`，pipeline e2e 返回有限的 `[50, 32]` actions，OpenPI websocket handshake 与动作 chunk 通过独立验证。^[PR #4222]
 
 相关页面：[Pi0 目录](./_index.md)；[Diffusion 输出与 multiprocess runtime 规则](../../components/diffusion/rules-output-lifecycle.md)；[配置开发门禁](../../components/configuration/rules.md)。
+
+## PI0-2a — OpenPI `nd` 标记必须同时接受 vLLM-native 与 msgpack-numpy 的 `kind`
+
+- 触发：修改 `entrypoints/openpi/connection.py` 的 `_decode_vllm_numpy_marker` / `_unpack_numpy`，或 OpenPI/DreamZero 观测 payload 解码。
+- 强制：`kind` 仍为区分 array marker 与普通 mapping 的必填字段。plain ndarray 的 `kind` 接受 `""`（msgpack-numpy 包）或 dtype kind 字符（vLLM-native）；二者任一匹配即通过。`kind == "V"`（structured）必须在调用 `np.dtype(type)` 之前拒绝，因该方言的 `type` 是 descriptor list。outbound 仍发 openpi-client 标记。
+- 禁止：要求 `kind == dtype.kind` 而拒绝空 kind；对 structured marker 让 `np.dtype` 抛出不透明 `TypeError`；把 msgpack-numpy **标量**（可省略 `kind`）误当成必须解码的 ndarray marker。
+- 验收：分别覆盖 vLLM-native `kind`、手写 `kind=b""`、真实 `msgpack_numpy.packb` 观测 round-trip、structured `kind=V` 拒绝，以及无 `kind` 的用户 dict 原样保留。^[PR #6051]

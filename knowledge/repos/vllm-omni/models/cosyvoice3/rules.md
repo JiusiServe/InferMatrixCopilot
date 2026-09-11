@@ -1,7 +1,7 @@
 ---
 title: "CosyVoice3 规则"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-11
 type: rule
 tags: [vllm-omni, models]
 sources: ["PR #5673", "PR #6955", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/cfm.py, vllm_omni/model_executor/models/cosyvoice3/flow_estimator_trt.py, tests/model_executor/models/cosyvoice3/test_cosyvoice3_components.py, benchmarks/tts/benchmark_cosyvoice3_trt_streams.py]
@@ -50,3 +50,10 @@ confidence: high
   证明 replace 失败保留旧 plan、cleanup 失败保留 replace error、partial write 清理 owned tmp、
   collision 保留 foreign tmp，以及两条同步 publisher 使用不同 source path 且仅留下完整 final plan。
   ^[PR #6955]
+
+## COSYVOICE3-2a — deploy 必须在 name 推断失败时显式绑定 `pipeline: cosyvoice3`
+
+- 触发：修改 `vllm_omni/deploy/cosyvoice3.yaml`、CosyVoice3 的 `StageConfigFactory` / deploy 解析，或依赖 HF cache `models--…/snapshots/<hash>` 且 root `config.json` 无识别元数据的启动路径。
+- 强制：shipping deploy 必须声明 `pipeline: cosyvoice3`（或等价显式 pipeline key），使 hash-named snapshot 在 `try_infer_model_type` / name-fallback 失败时仍解析为已注册的两 LLM stage（talker + code2wav），而不是 default diffusion stage。
+- 禁止：仅依赖 basename/hash 推断；让空 `config.json` snapshot 落入 Diffusers `model_index.json` 查找并在启动时报 `Diffusers pipeline index not found`。
+- 验收：以空 `config.json` 的 `snapshots/<40-hex>` 布局回归 `create_from_model` 与 legacy stage 路径，断言 `pipeline_config.model_type == "cosyvoice3"`、两 stage 均为 LLM（非 DIFFUSION）且 model 路径保留。^[PR #6896]
