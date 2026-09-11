@@ -37,6 +37,7 @@
 | [`features/review-recall.md`](features/review-recall.md) | 已实现（默认开）——v14/v15 召回攻坚 |
 | [`features/auto-run.md`](features/auto-run.md) | **draft，未实现**——GitHub 事件触发 |
 | [`RFC-knowledge-intake.md`](RFC-knowledge-intake.md) | 已实现（默认关，shadow 起步）——Copilot typed SDK 唯一拥有知识规则，ReviewBot 只编排 evidence/model/Git/fork PR，人审合并即晋升 |
+| [`RFC-knowledge-outdating.md`](RFC-knowledge-outdating.md) | **提案，未实现**——规则失效后必须停止被引用：写入即对账、以「符号消失」而非「代码改动」为触发、生命周期归档回收页面容量 |
 
 ## architecture/ —— 维护者
 
