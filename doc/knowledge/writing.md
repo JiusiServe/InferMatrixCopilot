@@ -94,7 +94,7 @@ baseline、catalog、source map、SHA pin 和 manifest，不做 owner 归属判�
   - `briefing_docs_extra` —— 所有档位都加载的扩展切片，vllm-omni 目前是
     `repos/vllm-omni/review/guides/maintainer-pattern-routing.md`；
   - 强模型额外的 `performance_briefing_docs`（精简版评审模式）；
-  - `review_checklist` —— 单页仓库评审清单，前 4k 字符注入 Strict reviewer 的
+  - `review_checklist` —— 单页仓库评审清单，前 8k 字符注入 Strict reviewer 的
     system prompt，vllm-omni 指向
     `repos/vllm-omni/review/guides/strict-review-checklist.md`。
 - **按需** —— `doc_search` / `doc_read` 工具可递归到达 `general/` 里每一页更深的

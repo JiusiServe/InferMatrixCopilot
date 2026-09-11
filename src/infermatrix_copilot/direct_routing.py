@@ -182,6 +182,7 @@ DIRECT_REVIEW_CHECKLIST = (
     "After preflight passes, run targeted tests and low-cost static checks alongside source review.",
     "When the diff adds or changes a test, check the assertions bind to real behavior and not to values the fixture, mock, or fake injected.",
     "When the PR is a bugfix (title, labels, or linked issue), require a regression test that pins the original failure path; happy-path-only additions do not count, and a missing pin becomes an explicit blocking or non-blocking finding, never silence.",
+    "Check the PR body's Test Plan and Test Result against the CI definition at the frozen head: name the guard steps whose declared source dependencies cover the changed paths, then compare their commands with what the PR reports running by selector — test targets, marker expression, run level — not by literal text. A guard step never run, a dropped marker, or absent test evidence is a blocking finding naming the step and both commands.",
     "When the diff passes a new argument to a dependency, check it against the lowest version the project's own constraints still permit, not the version installed here.",
     "For resource or cache changes, trace budget measurement through reservation and physical consumption, including warmup/profile/activation ordering and low-resource behavior.",
     "For runtime changes, trace exception propagation, partial-allocation cleanup, cancellation, timeout, shutdown, and concurrent scheduling to the terminal user-visible signal.",

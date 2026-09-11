@@ -1,10 +1,10 @@
 ---
 title: "通用设计审查规则"
 created: 2026-07-30
-updated: 2026-07-31
+updated: 2026-09-10
 type: rule
 tags: [general, review]
-sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "vllm-project/vllm-omni PR #5394", "zuiho-kai/claude-workflow-starter@c217fc6"]
+sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "vllm-project/vllm-omni PR #5394", "zuiho-kai/claude-workflow-starter@c217fc6", "owner review-rule request 2026-09-10", "JiusiServe/omni-reviewbot PR #56"]
 confidence: high
 ---
 
@@ -77,6 +77,24 @@ confidence: high
   后继续无上限等待“完整结果”。
 - 验收：10 分钟内给用户 actionable findings 或明确的 `partial review`；更深验证作为
   后续可选任务，不阻塞本轮答复。 ^[InferMatrixCopilot Issue #24]
+
+## 测试证据
+
+### REV-3a — PR 的测试证据必须对齐 CI 实际执行的命令
+
+- 触发：PR 描述声称已验证（Test Plan / Test Result、贴出命令或结果），或改动落在有
+  CI 看护用例的特性、模型或硬件路径上。
+- 强制：以冻结 head 的 CI 定义为准反查看护 step —— pipeline step 的 `commands` 是 CI
+  真正执行的命令，`source_file_dependencies` 声明它看护哪些改动路径，marker 语义以
+  `pyproject.toml` 为准。逐条比对 lane 命令与 PR 报告的命令是否选中同一组用例：test
+  target、`-m` 表达式、run-level 或等价门必须一致。
+- 禁止：把"跑过某个测试文件"当成该用例在 lane 内被执行的证据 —— marker 会把它
+  deselect；用 `timeout`、`--cov*`、容器或环境前缀的字面差异判定不一致；PR 完全没有
+  测试证据时保持沉默。
+- 验收：审查记录列出命中的看护 step、其 lane 命令、PR 报告的命令和等价结论。缺测试
+  证据、看护 step 未执行或 selector 不一致时给出阻断级 finding，点名 step label 与两条
+  命令；只跑子集时必须写明未覆盖部分。
+  ^[owner review-rule request 2026-09-10] ^[JiusiServe/omni-reviewbot PR #56]
 
 具体审查执行顺序见[独立审查执行合同](guides/review-execution-contract.md)，输入、输出与
 边界矩阵写法见[Reviewer Lens Contracts](guides/reviewer-lens-contracts.md)。
