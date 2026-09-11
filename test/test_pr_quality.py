@@ -79,6 +79,33 @@ def test_quality_step_downgrades_unsupported_rejection(settings, trace,
     assert updates["quality_confidence"] == "low"
 
 
+
+def test_quality_prompt_keeps_size_a_concerns_reason_only(settings, trace,
+                                                          tmp_path):
+    """The line budget and the review-readiness prompt must not contradict
+    each other: non-test volume is a recordable concern, while the code path
+    still refuses needs_rework on one reason."""
+    _, llm = _run(settings, trace, tmp_path, {
+        "verdict": "ready", "confidence": "high", "summary": "ok",
+        "reasons": [],
+    })
+
+    system = llm.calls[0]["system"]
+    assert "budgeted at 1,000 per PR" in system
+    assert "Size alone never reaches" in system
+    # the assessor never reads rules.md, so the exclusions and the
+    # already-justified exemption have to travel in the prompt or a
+    # docs-only PR collects a size concern it cannot exceed
+    assert "OUTSIDE tests" in system
+    assert "documentation, lock files and pure renames" in system
+    assert "deletions never count toward it" in system
+    # deletions not counting is not the same as a deletion-heavy PR
+    # being exempt: 1,500 added lines are over budget beside any
+    # number of removed ones
+    assert "does not excuse additions above the budget" in system
+    assert "split plan or a concrete exemption" in system
+
+
 def test_quality_step_fails_closed_on_invalid_output(settings, trace, tmp_path):
     result, _ = _run(settings, trace, tmp_path, {
         "verdict": "reject", "confidence": "certain", "reasons": [],

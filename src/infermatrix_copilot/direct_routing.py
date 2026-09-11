@@ -193,6 +193,7 @@ DIRECT_REVIEW_CHECKLIST = (
     "Classify every candidate finding as new, duplicate, extends_existing, or resolved_or_outdated. Suppress duplicates; for extensions, point to the existing thread instead of opening a parallel inline comment. Reverify resolved/outdated concerns at the pinned head and suppress them only when fixed. Use disabled only for PR_CONTEXT_MODE=no_discussion evaluation, record unavailable feedback as a validation gap, and use not_applicable only for local/worktree reviews.",
     "Run subtraction only when the diff adds or expands a helper, class, fallback, compatibility branch, or public behavior; otherwise mark no subtraction signal.",
     "When subtraction is triggered, read the mandatory simplification guide and prove consumers, trust boundaries, and lifecycle ownership before calling code dead or over-defensive.",
+    "Report the non-test added-line count the host supplies rather than counting the diff yourself; above the stated budget, ask for a split plan or a concrete exemption on the largest contributing file, and record the reason instead when the PR body already gives one. Size is never a correctness finding and never raises another finding's severity.",
     "Plan exactly one consolidated final review comment.",
 )
 

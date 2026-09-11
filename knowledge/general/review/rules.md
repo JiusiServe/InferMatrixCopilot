@@ -4,7 +4,7 @@ created: 2026-07-30
 updated: 2026-09-10
 type: rule
 tags: [general, review]
-sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "vllm-project/vllm-omni PR #5394", "zuiho-kai/claude-workflow-starter@c217fc6", "owner review-rule request 2026-09-10", "JiusiServe/omni-reviewbot PR #56"]
+sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "vllm-project/vllm-omni PR #5394", "zuiho-kai/claude-workflow-starter@c217fc6", "owner review-rule request 2026-09-10", "JiusiServe/omni-reviewbot PR #56", "JiusiServe/omni-reviewbot PR #57"]
 confidence: high
 ---
 
@@ -95,6 +95,22 @@ confidence: high
   证据、看护 step 未执行或 selector 不一致时给出阻断级 finding，点名 step label 与两条
   命令；只跑子集时必须写明未覆盖部分。
   ^[owner review-rule request 2026-09-10] ^[JiusiServe/omni-reviewbot PR #56]
+
+## 变更体量
+
+### REV-3b — 单个 PR 的非测试代码增量必须留在可审阅预算内
+
+- 触发：任何 PR 进入审查。
+- 强制：以 host 提供的确定性行数为准 —— 非测试文件的新增与修改行，删除不计。超过
+  1000 行时要求拆分计划，或写明豁免理由（上游 vendored 同步、生成代码），并点名贡献
+  最大的文件。
+- 禁止：自己去数 diff 行数 —— patch 对大文件会被截断，而那正是超预算 PR 的常态；把
+  体量本身当成正确性问题或用它抬高其他 finding 的严重度；把测试、文档、lock 文件和纯
+  rename 算进预算 —— 那会逼作者少写测试。
+- 验收：审查记录写出非测试新增行数、预算和最大贡献文件。超预算时给出一条提醒级
+  finding，落在贡献最大的文件上；PR 描述已经给出拆分计划或豁免理由时记录该理由，不再
+  重复开单。
+  ^[owner review-rule request 2026-09-10] ^[JiusiServe/omni-reviewbot PR #57]
 
 具体审查执行顺序见[独立审查执行合同](guides/review-execution-contract.md)，输入、输出与
 边界矩阵写法见[Reviewer Lens Contracts](guides/reviewer-lens-contracts.md)。
