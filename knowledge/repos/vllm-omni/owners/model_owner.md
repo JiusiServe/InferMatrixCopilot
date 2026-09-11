@@ -1,10 +1,11 @@
 ---
 title: "关键模型与 Owner"
 created: 2026-08-11
-updated: 2026-08-11
+updated: 2026-09-11
 type: guide
 tags: [vllm-omni, models]
-sources: []
+sources:
+  - https://github.com/JiusiServe/InferMatrixCopilot/issues/139
 ---
 
 # 关键模型与 Owner
@@ -18,7 +19,7 @@ benchmark 时快速路由到正确的人。模型清单以 [models 目录](../mo
 | 模型 | Owner | 备注 |
 |---|---|---|
 | minicpm | y-null | 杨楠心 |
-| qwen-omni | amy-why-3459/psv666 | 吴海燕/彭思危 |
+| qwen-omni | amy-why-3459 | 吴海燕 |
 | qwen-tts | FayeSpica | 廖伟明 |
 | qwen-image | NumberWan | 温梓健 |
 | HunyuanImage | Bounty-hunter | 邓运洋 |
