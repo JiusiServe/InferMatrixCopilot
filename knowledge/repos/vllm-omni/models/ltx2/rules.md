@@ -1,7 +1,7 @@
 ---
 title: "LTX-2.5 DiffVAE 规则"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-11
 type: rule
 tags: [vllm-omni, models, ltx2, diffusion]
 sources: ["PR #6189", "PR #7000", "PR #7020", recipes/LTX/LTX-2.5.md, requirements/common.txt, docs/user_guide/diffusion/attention_backends/huggingface_hub.md, vllm_omni/diffusion/models/ltx2/ltx2_components.py, vllm_omni/diffusion/models/ltx2/ltx2_conditioning.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder_distributed.py, vllm_omni/diffusion/models/ltx2/ltx2_latents.py, vllm_omni/diffusion/models/ltx2/ltx2_request.py, vllm_omni/diffusion/models/ltx2/ltx2_runtime.py, tests/diffusion/models/ltx2/test_ltx25_pipeline.py, tests/diffusion/models/ltx2/test_ltx2_output_cuda.py, tests/diffusion/models/ltx2/test_ltx2_pipeline.py, tests/diffusion/models/ltx2/test_ltx2_vae.py]
@@ -71,3 +71,10 @@ confidence: high
   对比。有效 `[0, 1]` 的 `do_normalize=False` 输入须与 unclipped legacy path 比较；另测 intentional
   out-of-range defensive clamp。FP32 presentation bytes 必须 exact，BF16/FP16 相对 legacy FP32
   presentation 最多相差一个 uint8 level；官方 similarity 仅是本 PR 所报 LTX matrix 的限定证据。^[PR #7000]
+
+## LTX-4 — LTX vocoder 的 CUDA 路径必须 scoped 启用并恢复 `cudnn.deterministic`
+
+- 触发：修改 `ltx2_runtime._run_ltx_vocoder` / `_deterministic_ltx_vocoder`、BWE vocoder 调用，或 accuracy reference runner 的官方 vocoder forward。
+- 强制：仅在 `device_type == "cuda"` 时进入 context：将 `torch.backends.cudnn.deterministic` 设为 `True`，成功与异常退出都恢复调用前值；不得改动其他 cuDNN 开关。保留既有 BWE FP32 autocast / MPS float 合同。官方 reference runner 对 pinned BWE vocoder 施加同一 scoped pin，使两侧音频可稳定对照。
+- 禁止：把 process-wide deterministic 永久打开；假设并发 worker 可安全争用该全局 flag；把偶发相对-L2 过线当作已消除算法漂移。
+- 验收：CPU 覆盖初始 True/False 与注入异常后均恢复，且 `enabled`/`benchmark`/`allow_tf32` 等其他设置不变；相似度/固定 mel 实验只作有界证据，须在相同硬件与序列化执行假设下解读。^[PR #7231]

@@ -1,7 +1,7 @@
 ---
 title: "Higgs-Audio 规则"
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-11
 type: rule
 tags: [vllm-omni, models, model-executor]
 sources: ["PR #6422", "PR #7065", vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.py, vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_tokenizer.py, vllm_omni/worker/gpu_model_runner.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/model_executor/models/higgs_audio_v3/test_higgs_audio_v3.py, tests/e2e/online_serving/test_higgs_audio_v3.py]
@@ -54,3 +54,10 @@ confidence: high
   一部分的 chunked prefill 和 legacy `-100` caller 注入正确 code rows；serving smoke 证明相同
   路径重写时 cache salt 仍变化。H100 voice-clone E2E 未在该 PR 的 lanes 运行，不能把 unit
   coverage 宣称为 end-to-end 证据。^[PR #7065]
+
+## HIGGS-3a — 共享 reference-code encode 必须屏蔽请求取消并以 task 身份退休
+
+- 触发：修改 Higgs-Audio V3 `_resolve_higgs_audio_v3_ref_codes`、artifact-keyed inflight map，或其他 TTS adapter 的 single-flight reference encode。
+- 强制：同一 `artifact_key` 的 cold encode 只创建一个共享 `asyncio.Task`；creator 与 waiter 都必须 `await asyncio.shield(task)`，请求取消不得取消共享 encode。inflight 条目只能在 task `done_callback` 里用 identity guard 弹出；未取消任务须 `t.exception()` 消费失败以免 “exception never retrieved”。成功路径仍 clone 后返回，cache 写入保持既有合同。
+- 禁止：直接 `await task` 让 caller cancellation 传入共享 flight；在 creator 的 `finally` 里按请求退出撤销 inflight（会让仍在跑的 task 失位并可能重复 encode）。
+- 验收：确定性 CPU 回归覆盖 creator+waiter 取消后幸存者仍从同一 encode 完成、全取消后失败路径无 loop exception handler 且 inflight 清空；与 MOSS single-flight 生命周期对齐但不改 cache key/容量/API。^[PR #7076]
