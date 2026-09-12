@@ -1,7 +1,7 @@
 ---
 title: "Qwen-Omni 规则"
 created: 2026-09-04
-updated: 2026-09-09
+updated: 2026-09-12
 type: rule
 tags: [vllm-omni, models, qwen-omni]
 sources: ["PR #5687", "PR #6284", "PR #6449", "PR #4322", "PR #6748", "PR #6886", "PR #7019", vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/engine/stage_init_utils.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni.py, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py, tests/engine/test_stage_engine_args.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_quantization.py, "PR #7228"]
@@ -86,3 +86,10 @@ confidence: high
 - 强制：构造 `inv_freq` 时优先 `config.rope_parameters["rope_theta"]`（若 mapping 存在），否则回退 top-level `rope_theta`，再默认 `10000.0`。Qwen3-Omni（Transformers 5.10+ 常把 checkpoint 的 `1_000_000` 只放在 nested 字段）与仍带 top-level 的 Qwen3-TTS/legacy 必须共用该顺序。
 - 禁止：只读 top-level 导致静默回退 `10000`；把 nested 优先写成破坏 TTS top-level 兼容的唯一来源。
 - 验收：参数化覆盖 nested-only、nested 优先于冲突 top-level、默认 `10000`，以及 TTS/legacy top-level（含删除 `rope_parameters`）重建正确 `inv_freq`。^[PR #7228]
+
+## QOMNI-1h — Qwen3-Omni 的 moe_backend 覆盖只认显式字段，字面 auto 不算隐式
+
+- 触发：修改 `_maybe_set_qwen3_omni_moe_backend`、`OmniStageModelConfig` 的 `_TrackExplicitConfigFields`/`_omni_explicit_fields`，量化/NVFP4 deploy，或 stage engine-args 投影时机。
+- 强制：仅当 `moe_backend` 不在显式字段集合（typed 读 `_omni_explicit_fields`；dict 路径 key 缺失）时才默认写入 `triton`；deploy/CLI 显式写出的 `moe_backend: auto` 必须原样保留，交给 vLLM 量化 backend 选择。覆盖应在 stage projection 时带上 explicitness，不得仅靠 finalize 再猜字面值。
+- 禁止：用 `get("moe_backend", "auto") == "auto"` 把显式 `auto` 当成未设置；在 finalize 二次覆盖时丢弃 `_omni_explicit_fields`；只测 helper 不测 legacy+typed builder。
+- 验收：显式 `auto`、显式非 auto、未设置三路径分别经 legacy 与 typed builder；NVFP4 CI stage 0 最终为 `auto`，未量化默认 stage 仍为 `triton`。^[PR #7200]

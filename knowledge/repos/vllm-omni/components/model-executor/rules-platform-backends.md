@@ -1,7 +1,7 @@
 ---
 title: "平台后端合同"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-12
 type: rule
 tags: [vllm-omni, components, model-executor]
 sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102", "PR #6563", "PR #6054", vllm_omni/platforms/npu/platform.py, tests/platforms/npu/test_diffusion_platform.py, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6674", vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_generation_model_runner.py, vllm_omni/platforms/npu/worker/npu_model_runner.py]
@@ -114,3 +114,10 @@ confidence: high
   state；只在 start 处 gate、却无条件同步/导出，或将 gate 本身当作 NPU 性能结果。
 - 验收：AR/generation 都覆盖 enabled+timed、disabled+timed、enabled+not-timed 及 per-output disable，
   断言 start/sync/export 一致。PR #6674 没有这些专项测试，属于后续验收要求。^[PR #6674]
+
+## EXEC-10f — XPU W8A16 FP8 linear 必须 flatten-then-reshape 恢复 N-D 输出
+
+- 触发：修改 `vllm_omni/platforms/xpu/patch.py`、`XPUOmniPlatform` 初始化补丁，或 XPU 上 diffusion `--quantization fp8` 的 ScaledMM 路径。
+- 强制：对 `XPUW8A16FP8LinearKernel.apply_weights` 在平台 init 幂等 patch：先按 `(*x.shape[:-1], out_features)` 记录输出形，把 activation reshape 为 2-D 再调用原实现，最后 `.view` 回 N-D。与其他 ScaledMM/W8A8 合同一致；kernel 不可用时 skip。
+- 禁止：把 3-D diffusion activation 直接交给 fake 恒返回 2-D 的 `fp8_gemm_w8a16`；把该 patch 宣称为 LLM 2-D 路径修复或上游永久替代（upstream 修好后应变 no-op）。
+- 验收：XPU 上 FLUX/Qwen-Image 等 FP8 diffusion 能完成 dummy warmup 与生成；2-D LLM 路径不受影响。^[PR #7301]
