@@ -1,7 +1,7 @@
 ---
 title: "Serving metrics 生命周期规则"
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-13
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #3576", "PR #4755", "PR #6549", vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, tests/metrics/test_prometheus.py]
@@ -38,3 +38,19 @@ confidence: high
 - 禁止：把 orchestrator 已 dispatch、但仍在 stage scheduler queue 的请求报作 running；分散复制公式；让负值、过期/竞态 snapshot 或 engine waiting 大于 dispatched 产生负 gauge；在 final request 仍在 `request_states` 时丢掉既有 `total - 1` 防止 waiting 卡为 1 的语义。
 - 限制：该实现求的是各 `(stage, replica)` 最新 waiting snapshot 的**和**，并不按 request ID 去重；代码和 PR #6549 的 3-dispatched/2-queued 测试只证明单一 queue 的拆分，未证明同一 pipeline request 不会同时落在多个 snapshot。因此该值是受 clamp 保护的 scheduler-queue occupancy，不应声称是精确的全局唯一请求数。PR #6549 唯一 review thread 仅确认 `engines_` 名称用于区分 frontend 与 engine waiting，未处理该 cardinality 问题。
 - 验收：用真实 Prometheus scrape 覆盖 3 个已 dispatch、其中 2 个 engine scheduler waiting，精确断言 running=1、waiting=2；同时覆盖 arrival、普通/最终 stage result、cleanup、replica removal 和 snapshot 的负值/超 dispatched 值，确认既有 finalization race 语义不变。^[PR #6549]
+
+## SERV-2g — metrics 去重集合必须挂在请求 state 并随其释放
+
+- 触发：修改 `OmniBase` 的 result/message metrics 去重、`ClientRequestState`、abort 后
+  request state 保留，或 `_log_summary_and_cleanup`。
+- 强制：`id(msg)` / `id(result)` 去重集合必须是每个 `ClientRequestState` 上的
+  `consumed_metric_message_ids`，由 `_handle_output_message` / `_process_single_result`
+  写入；不得再维护与 request 并行的实例级 `dict[request_id, set]`。abort 可按既有合同
+  暂时保留 `request_states`，但去重集合只能活在该 state 上，并由 `generate()` 正常
+  cleanup / `_log_summary_and_cleanup` 与 state 一并释放。
+- 禁止：在 `OmniBase` 上保留 request-keyed metrics 旁路 map；abort 路径留下跨请求生命周期
+  的去重条目；让同一 message 在 abort-then-cleanup 前后被累计两次，或 cleanup 后实例上仍
+  能按 request_id 读到残留 map。
+- 验收：生产 handler 写入 state 集合后 abort，断言实例属性无独立 request-keyed metrics
+  map；cleanup 后 `request_states` 与任何 request-keyed map 均无该 id；同一 message 重放
+  只累计一次。^[PR #6561]

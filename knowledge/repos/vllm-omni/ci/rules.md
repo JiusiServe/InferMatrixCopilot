@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni CI 规则"
 created: 2026-08-23
-updated: 2026-09-08
+updated: 2026-09-13
 type: rule
 tags: [vllm-omni, ci]
 sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6311", "PR #6339", "PR #6343", "PR #6468", "PR #6523", "PR #6613", "PR #6555", "PR #6650", .buildkite/common/scripts/run_cov_split.sh, pyproject.toml, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py, .buildkite/common/scripts/upload_pipeline.py, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/clean.py, tests/helpers/client.py, tests/helpers/mark.py, tests/helpers/runtime.py, tests/helpers/stage_config.py, tests/buildkite/test_upload_pipeline.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/dfx/stability/, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/nightly/run_nightly_jobs.sh, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py, .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, "PR #6704", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", "PR #6696", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/benchmarks/patch/patch.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, "PR #6674", docker/Dockerfile.npu, docker/Dockerfile.npu.a3, docker/Dockerfile.npu.ci, docker/Dockerfile.npu.ci.a3, "PR #6818", "PR #6830", "PR #6884", tests/diffusion/conftest.py, tests/diffusion/attention/test_flash_attn.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #6947", "PR #7118"]
@@ -271,3 +271,18 @@ PR 报告的 collection=1 和 local two-card B300 184.97 s 是该精确 workload
 - 强制：preset expansion tests 必须同时断言 pod env 中存在 alias、不再存在裸 `HF_TOKEN`，并验证 L4/H100/B200 全部 CUDA mirror preset 的 commands 都 prepend 同一恢复语句；非 CUDA preset 不得无故注入该 wrapper。
 - 禁止：依赖 Buildkite/Kubernetes 的 env merge 顺序碰巧正确；只修一个 GPU family；或把本地 shell/export 成功外推为 secret 已进入 pod env。
 - 验收：render 后的每个 CUDA mirror step 都保留 secret alias 和 runtime export，scheduled build 的同名 `HF_TOKEN` 不再导致 gated-model jobs 401；NPU steps 的 env 与 commands 保持不变。^[PR #7118]
+
+## OMNI-CI-1g — post-merge CUDA L3 必须按 commit diff 做 source 过滤
+
+- 触发：修改 `upload_pipeline.py` 的 `_changed_files_for_source_filter`、Upload Merge
+  Pipeline bootstrap、`test-merge.yml` 上传参数，或 `source_file_dependencies` /
+  `source_filter_fallback` 行为。
+- 强制：PR-label 与 post-merge `main` 的 L3（merge pipeline）都必须对 commit/PR diff 应用
+  `source_file_dependencies`；只有显式 `--all`（scheduled NIGHTLY 等）或 `--e2e`
+  （`main+WEEKLY`）才 keep-all。Upload Merge Pipeline 不得在普通 `main` 上默认传
+  `--all`。无 job-key 命中时，被上传的 pipeline YAML 或 `source_filter_fallback` 命中仍可
+  keep-all；一旦有 job-key 命中，正常过滤优先。
+- 禁止：仅因 `BUILDKITE_BRANCH=main` 就禁用 source 过滤；把 post-merge L3 跑成全量 E2E
+  却声称仍是 diff-aware；把 scheduled full upload 与 post-merge L3 混为同一策略。
+- 验收：单测断言 `main` 且 `force_all=False/e2e_only=False` 返回 diff；`force_all`/`e2e`
+  返回 `None`；bootstrap 在非 WEEKLY 的 main merge 上传不带 `--all`。^[PR #7371]
