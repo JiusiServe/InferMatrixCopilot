@@ -1,7 +1,7 @@
 ---
 title: "legacy engine args 投影隔离"
 created: 2026-09-05
-updated: 2026-09-10
+updated: 2026-09-14
 type: rule
 tags: [vllm-omni, components, config]
 sources: ["PR #6783", vllm_omni/engine/stage_init_utils.py, tests/engine/test_build_engine_args_no_mutate.py, "PR #5929", "PR #7237"]
@@ -31,3 +31,10 @@ confidence: high
 - 强制：把该 alias 标为非 stage 字段；在 `log_stats` 等 canonical 值已由 launcher/`__init__` 消费后，于 resolver 边界 `pop` 残余 alias，使 structured ownership 看不到它。标准与 headless 启动都必须消费。
 - 禁止：让 residual `disable_log_stats` 落入 `resolve_omni_config` / `VllmOmniConfig` 并报 “no structured config owner”；为通过校验而放宽真正的 stage engine-arg ownership。
 - 验收：断言字段在 `_NON_STAGE_ENGINE_CLI_FIELDS` 且不在 global stage CLI fields；engine 与 headless 解析后 kwargs/`cli_overrides` 不含该 alias；带 alias 的 TTS/structured pipeline 仍能构造。^[PR #7237]
+
+## VOMNI-CFG-1u — 用户可见的 upstream ModelConfig CLI 必须有 typed stage owner
+
+- 触发：文档/示例使用的全局 ModelConfig CLI（如 `served_model_name`、`allowed_local_media_path`、`allowed_media_domains`、`max_logprobs`、`logprobs_mode`、`mm_processor_kwargs`、`mm_processor_cache_type`、`hf_token`、`hf_config_path`、`generation_config`、`override_generation_config`、`enable_prompt_embeds`）在 `from_pipeline_config` 报无 owner，或新增同类 upstream ModelConfig 输入。
+- 强制：把字段同时加入 `_ModelEngineOverrides` 与 `OmniStageModelConfig`，类型跟随 vLLM `EngineArgs`，默认 `None`，使 `_project_omni_config_fields` 只投影用户显式值，并经 typed/legacy engine-args 到达各 stage。不得把这些 ModelConfig 输入塞进 `_NON_STAGE_ENGINE_CLI_FIELDS` 来绕过 ownership。
+- 禁止：仅因 legacy `build_stage_runtime_overrides` 仍能透传就让 structured ownership 拒绝文档命令；把尚未归属的非 ModelConfig 开关（如 `enable_lora`/`speculative_config`）一并放行。
+- 验收：对至少两个 pipeline key 参数化断言显式全局值进入每个 stage 的 `model_config`，并用 typed `build_engine_args_dict_from_omni_stage_config` 读回同一集合；字段集合 census 必须包含这些 owner。^[PR #7390]

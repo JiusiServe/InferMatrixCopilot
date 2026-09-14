@@ -1,7 +1,7 @@
 ---
 title: "请求输入合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-14
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #3805", "PR #5374", "PR #5885", "PR #6598", vllm_omni/data_entry_keys.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/engine/orchestrator.py, vllm_omni/inputs/, tests/engine/test_async_omni_engine_input.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_invalid_audio_speech.py, tests/entrypoints/openai_api/test_serving_speech.py, "PR #5181", "PR #6182"]
@@ -139,3 +139,10 @@ engine 生命周期见 [engine 生命周期规则](rules-engine-lifecycle.md)；
 - 强制：transform 只操作 Stage-0 copy；原始 prompt 保留给 downstream，并在 transform 前后保持同一 global request ID。只把已处理的 metadata 合并回原始视图，先移除 transform-owned stale keys。临时目录只通过内部 `REQUEST_ARTIFACT_DIRS_KEY` 交给 request state；preprocess、companion build、enqueue 前失败立即回收，admit 后由 orchestrator 在所有 terminal cleanup 路径回收，且内部 key 不得进入 stage payload。
 - 禁止：把 transformed prompt 当作 downstream 原始媒体、让旧 prepared descriptor 跨请求复用、在 ownership 已交给 orchestrator 后由 frontend 提前删除，或让异常路径泄漏转码目录。
 - 验收：覆盖 transform replacement/copy、request ID 与 metadata merge、成功 terminal/abort、preprocess/companion/enqueue 异常以及无 artifact control；断言 downstream 看见原始媒体+允许的 processed meta，目录恰好由当前 owner 回收，内部 key 未传输。^[PR #5885]
+
+## SERV-4r — `vllm serve --omni` 必须在校验期要求显式 model
+
+- 触发：修改 `OmniServeCommand.validate`、`--omni` 启动路径、`model`/`model_tag`/`explicit_keys`，或部署 YAML 与 checkpoint 来源关系。
+- 强制：`--omni` 下 model 只能来自非空 positional `model_tag`，或出现在 `explicit_keys` 中的非空 `--model`。`--deploy-config` / stage YAML 只携带 per-stage engine args，checkpoint 始终由 `args.model` 注入，不得凭 YAML 存在判定“已提供 model”。空/空白 model 视为未提供，并在 validate 期以明确 `ValueError` 失败。
+- 禁止：依赖 vLLM `ModelConfig` 默认 `Qwen/Qwen3-0.6B` 进入 Omni/diffusion 路由；把默认模型缺失伪装成深层 diffusion-registry `Model class … not found`；让仅 `--deploy-config` 或空 `--model "$MODEL"` 绕过守卫。
+- 验收：`["serve","--omni"]`、仅 deploy-config、空/空白 positional/`--model` 均 raise “requires an explicit model”；positional、`--model`、以及显式 model+deploy-config 不得触发该守卫。^[PR #4167]

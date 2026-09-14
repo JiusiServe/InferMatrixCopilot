@@ -1,7 +1,7 @@
 ---
 title: "Distributed 传输规则"
 created: 2026-08-05
-updated: 2026-09-08
+updated: 2026-09-14
 type: rule
 tags: [vllm-omni, components, distributed]
 sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", "PR #6834", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626", "PR #6529", "PR #7136"]
@@ -142,3 +142,10 @@ confidence: high
 - 强制：CUDA Mooncake 依赖必须钉在包含 acknowledged TCP writes 的版本（`0.3.12` 起）；`batch_transfer_sync_write` 返回成功后，destination 内存必须已更新到可读状态，不能只表示本地 send 入队。回归必须在 receiver 被挂起时证明 completion 不会提前返回，恢复后再断言目的端字节一致。
 - 禁止：降级到无 ACK 的 TCP 实现却不更新测试合同；把 RDMA 路径的 completion 语义外推到 TCP；或在 completion 前启动依赖 destination 内容的零拷贝消费。
 - 验收：强制 TCP 的挂起-恢复测试覆盖「停止期间不完成、恢复后成功且字节匹配」；依赖声明与该测试同步变更。^[PR #7136]
+
+## DIST-1l — parked async-chunk sender 收到终态 update 必须先投递 terminal chunk
+
+- 触发：修改 `OmniSchedulerMixin.add_request`、`OmniChunkTransferAdapter.save_async` / sender cleanup，或 realtime/async-chunk 在 `WAITING_FOR_STREAMING_REQ` 上的终态竞态。
+- 强制：当终态 update（`resumable=False`）落在已 parked 且 `has_active_sender` 的 session 上时，不得只走 upstream 的本地 `FINISHED_ABORTED`。必须先 `force_request_finished` 入队携带 `finished` 的 request-terminal chunk（必要时推进 `_omni_segment_generation` 以通过 dedup），再本地 finish。`terminal_pending` 必须挡住丢弃该 chunk 的 cleanup，直到 connector 接受。
+- 禁止：假设 orchestrator 的一次性 StreamingUpdate 对下游 receiver 足够；在 `finish_requests` 之后才尝试 enqueue terminal；让 cleanup 在 terminal 上线前回收 generation，导致下游卡在 `WAITING_FOR_CHUNK` 直至输入超时。
+- 验收：覆盖 parked+active-sender 终态、非 sender/非 parked 回退、`force_request_finished` 顺序、terminal_pending 与 deferred cleanup；证明下游经 payload `finished` 结束，而不是仅靠 600s stall。^[PR #6889]
