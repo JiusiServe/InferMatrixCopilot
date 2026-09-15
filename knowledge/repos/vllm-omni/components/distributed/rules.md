@@ -1,7 +1,7 @@
 ---
 title: "Distributed 传输规则"
 created: 2026-08-05
-updated: 2026-09-08
+updated: 2026-09-15
 type: rule
 tags: [vllm-omni, components, distributed]
 sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", "PR #6834", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626", "PR #6529", "PR #7136"]
@@ -142,3 +142,10 @@ confidence: high
 - 强制：CUDA Mooncake 依赖必须钉在包含 acknowledged TCP writes 的版本（`0.3.12` 起）；`batch_transfer_sync_write` 返回成功后，destination 内存必须已更新到可读状态，不能只表示本地 send 入队。回归必须在 receiver 被挂起时证明 completion 不会提前返回，恢复后再断言目的端字节一致。
 - 禁止：降级到无 ACK 的 TCP 实现却不更新测试合同；把 RDMA 路径的 completion 语义外推到 TCP；或在 completion 前启动依赖 destination 内容的零拷贝消费。
 - 验收：强制 TCP 的挂起-恢复测试覆盖「停止期间不完成、恢复后成功且字节匹配」；依赖声明与该测试同步变更。^[PR #7136]
+
+## DIST-1l — NIXL connector 超时后必须保留 native 资源直到终端态
+
+- 触发：新增/修改 `NixlConnector`、NIXL READ、ZMQ claim/`XFER_DONE`、lease 或 receive timeout。
+- 强制：NIXL 无远端 READ 取消时，超时/放弃后仍保留 buffer、registration、descriptor、transfer handle 与 remote agent，直到 native 终端态；`close()` 等待后再释放。源 registration 有界 lease（`lease_seconds` / `VLLM_OMNI_NIXL_LEASE_S`）并由 reaper 回收。跨 stage 请求须把 producer endpoint/`payload_sender_info` 经 scheduler handle 传到 consumer。
+- 禁止：超时后立刻 deregister 或丢弃仍可能被 DMA 写入的内存；把 vLLM P/D block-table NIXL 接口当作 Omni 任意 payload connector；依赖未声明的固定 `zmq_port` 却不经 resolver。
+- 验收：覆盖超时保留、lease 回收、metadata claim/ack，以及 `OmniChunkRecvHandle.payload_sender_info` 贯通；缺 NIXL 依赖时 lazy import 为 None。^[PR #6093]

@@ -1,7 +1,7 @@
 ---
 title: "AMD/ROCm CI 规则"
 created: 2026-09-05
-updated: 2026-09-10
+updated: 2026-09-15
 type: rule
 tags: [vllm-omni, ci]
 sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234"]
@@ -42,3 +42,10 @@ confidence: high
 - 强制：`mi300_1` 一类单卡 model job 的 pytest marker 必须 `not (cards_2 or … or cards_8)`，同时保留无 `cards_1` 的 legacy 单卡用例；真正需要双卡的用例（如 LTX2 Ulysses parity）改到已有双卡 lane，并声明 `rocm` 资源与 `device_count >= world_size` 早失败。
 - 禁止：让 `cards_2+` 测试在单卡 worker 上 spawn rank1→GPU1 导致 `invalid device ordinal`；用邻近 green shard 宣称 multi-GPU routing 已修好。
 - 验收：pipeline argv/collection 断言单卡 job 排除 multi-card markers、双卡 job 收集目标文件；硬件 marker helper 覆盖 ROCm 声明。^[PR #7234]
+
+## OMNI-CI-2i — AMD nightly suite 必须可显式选中且不受 L2/L3 skip-ci 误杀
+
+- 触发：修改 AMD bootstrap/`select_test_suites`、`NIGHTLY_TESTS` YAML、`nightly-test` label，或 skip-ci 对 suite spec 的过滤。
+- 强制：`nightly` 映射 `NIGHTLY_TESTS:test-amd-nightly.yml`；`main+NIGHTLY=1` 或 PR `nightly-test` 选中它；可与 ready/merge 组合共享一次 image build。`NIGHTLY_TESTS:*` 在 skip-ci 过滤中原样保留，docs-only 也不得剥掉显式/scheduled nightly。burn-in 叶子保持 `NonBlocking` 直至另有 gate。
+- 禁止：把 `nightly-test` 当成无 suite 的噪声 label；用 L2/L3 diff gate 静默丢掉已选 nightly；把实验 nightly 阈值外推为 CUDA H100 基线。
+- 验收：渲染 `DEBUG_TEST_YAML=nightly`、`NIGHTLY=1`、组合 label 与 docs-only+nightly，断言 suite spec 与子 pipeline 叶子集合。^[PR #6978]

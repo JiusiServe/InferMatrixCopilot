@@ -1,7 +1,7 @@
 ---
 title: "LingBot-Video 规则"
 created: 2026-08-10
-updated: 2026-09-04
+updated: 2026-09-15
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/diffusion/models/lingbot_video/image_condition.py, vllm_omni/diffusion/models/lingbot_video/pipeline_lingbot_video.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/model_extras/lingbot_video.py, vllm_omni/model_extras/registry.py, examples/offline_inference/text_to_image/text_to_image.py, examples/offline_inference/image_to_video/image_to_video.py, tests/diffusion/models/lingbot_video/test_request_utils.py, tests/diffusion/models/lingbot_video/test_image_condition.py, tests/diffusion/models/lingbot_video/test_pipeline_lingbot_video.py, tests/entrypoints/openai_api/test_image_server.py, tests/entrypoints/openai_api/test_video_server.py, "PR #5311", "PR #5976", "PR #6049", "Issue #5883"]
@@ -97,3 +97,10 @@ sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/d
 - 验收：同时覆盖 formatter 的 image/video key、T2I 单帧 shape、TI2V input cardinality、最终
   image size limit、frame-count precedence 和 n>1 的 400。PR 所报 H200 单次耗时、峰值显存与
   bitwise parity 缺少本知识树可复跑的命令/产物，不能作为性能或精度 gate。
+
+## LBV-3a — AR 流式 VAE decode 状态必须按 session 持有并计入 admission
+
+- 触发：修改 LingBot/Wan 系 AR-Diffusion `post_decode`、streaming VAE decode、`SupportsStreamingDecode`，或 `model_owned_state_bytes_per_session`。
+- 强制：每个 `session_id`（与 `request_id` 同键）持有独立 `StreamingDecodeState`；chunk 间复用同一 temporal cache；`reset_ar_diffusion_session`/`close_ar_diffusion_session` 一并释放。`model_owned_state_bytes_per_session` 必须计入 decoder 按分辨率声明的常驻字节，不能只算 image condition。会走 VAE tiled decode 的 shape 不得冒充可跨 chunk 线程 cache。
+- 禁止：把 temporal cache 留在共享 VAE 模块上跨 session 覆写；块级独立 decode 却声称 timeline 连续；漏报 decode state 导致 admission 低估显存。
+- 验收：覆盖跨 chunk 连续性、session 隔离、release、非流式/tiling fallback，以及 admission 字节随 H×W 缩放不随 session 长度增长。^[PR #6533]
