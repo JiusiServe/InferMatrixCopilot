@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 文档指南"
 created: 2026-09-07
-updated: 2026-09-07
+updated: 2026-09-15
 type: index
 tags: [vllm-omni, docs]
 sources: []
@@ -23,3 +23,4 @@ sources: []
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 编写或评审 RAT 需求文档 | [RAT 需求文档模板](rat-requirement-template.md) |
+| 对已基线需求发起 CCB 变更申请 | [CCB 需求变更申请模板](ccb-change-request-template.md) |
