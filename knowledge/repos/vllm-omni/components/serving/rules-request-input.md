@@ -1,7 +1,7 @@
 ---
 title: "请求输入合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-15
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #3805", "PR #5374", "PR #5885", "PR #6598", vllm_omni/data_entry_keys.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/engine/orchestrator.py, vllm_omni/inputs/, tests/engine/test_async_omni_engine_input.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_invalid_audio_speech.py, tests/entrypoints/openai_api/test_serving_speech.py, "PR #5181", "PR #6182"]
@@ -139,3 +139,17 @@ engine 生命周期见 [engine 生命周期规则](rules-engine-lifecycle.md)；
 - 强制：transform 只操作 Stage-0 copy；原始 prompt 保留给 downstream，并在 transform 前后保持同一 global request ID。只把已处理的 metadata 合并回原始视图，先移除 transform-owned stale keys。临时目录只通过内部 `REQUEST_ARTIFACT_DIRS_KEY` 交给 request state；preprocess、companion build、enqueue 前失败立即回收，admit 后由 orchestrator 在所有 terminal cleanup 路径回收，且内部 key 不得进入 stage payload。
 - 禁止：把 transformed prompt 当作 downstream 原始媒体、让旧 prepared descriptor 跨请求复用、在 ownership 已交给 orchestrator 后由 frontend 提前删除，或让异常路径泄漏转码目录。
 - 验收：覆盖 transform replacement/copy、request ID 与 metadata merge、成功 terminal/abort、preprocess/companion/enqueue 异常以及无 artifact control；断言 downstream 看见原始媒体+允许的 processed meta，目录恰好由当前 owner 回收，内部 key 未传输。^[PR #5885]
+
+## SERV-4r — 图片 generations 与 edits 的 `output_compression` 必须同一闭环
+
+- 触发：修改 `/v1/images/generations` 或 edits 的协议字段、handler 到 `encode_image_base64_with_compression` 的转发。
+- 强制：`ImageGenerationRequest` 声明 `output_compression`（0–100，默认 100）并原样传入 encoder；PNG 映射为 compress_level（100→0，1→9），jpeg/webp 映射为 quality。缺省字节合同与 edits 一致。
+- 禁止：只在 edits/`Form` 接受该字段而 generations 静默丢弃；用 HTTP 200 或非默认 format 冒充 compression 已生效。
+- 验收：L1 断言 PNG 100/1 与等价 compress_level 同大小且 1 更小，JPEG 高低 compression 体积方向正确；handler 用非默认值断言 encoder kwargs。^[PR #7447]
+
+## SERV-4s — 内存中的 image `file` 响应必须按固定块异步产出
+
+- 触发：修改 `ImageGenerationResponse.stream_response`、`response_format=file`，或把已物化 PNG/ZIP 交给 Starlette `StreamingResponse`。
+- 强制：对已在内存中的单图/ZIP 使用异步迭代器按固定块（如 64 KiB）`memoryview` 切片产出；保留既有 headers/`Content-Length` 与完整 body 字节。
+- 禁止：把 `io.BytesIO` 直接交给 `StreamingResponse`（按行/`0x0A` 切分且同步 iterable 会触发 per-fragment threadpool）；为“流式”再无意义地按换行拆二进制。
+- 验收：构造含多处 `0x0A` 的 PNG/ZIP，断言 ASGI body 哈希不变、非空 frame 数约为 `ceil(size/chunk)` 而非 newline 次数。^[PR #7459]

@@ -1,7 +1,7 @@
 ---
 title: "MiniCPM-o 4.5 规则"
 created: 2026-07-20
-updated: 2026-09-10
+updated: 2026-09-15
 type: rule
 tags: [vllm-omni, models, model-executor]
 sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", "PR #6828", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_realtime_duplex_drivers.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/run_minicpmo_realtime_duplex_soft_interrupt.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/entrypoints/duplex/chat_fallback.py, vllm_omni/entrypoints/duplex/realtime_input.py, vllm_omni/entrypoints/duplex/session_runner.py, vllm_omni/entrypoints/duplex/serving.py, vllm_omni/entrypoints/duplex/vad.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/adapter.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, vllm_omni/model_executor/stage_input_processors/minicpmo_4_5_omni.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082", "PR #5604", "PR #6274", "PR #6346", "PR #6397", "PR #6406", "PR #6458", "PR #6587", "PR #6619", "PR #6757", "PR #6529", "PR #6772", vllm_omni/entrypoints/duplex/protocol.py, "PR #7071", "PR #5730"]
@@ -300,3 +300,10 @@ confidence: high
 - 强制：embedding items 的 `modality` 必须是 `"audio"`（不得从 image 类 copy 成 `"image"`）。单条 `audio_embeds` 张量为 `(s, h)` 时，placeholder 长度取 `len(single_audio_embeds)` / 前导维 `s`，再经 `get_audio_len_by_num_chunks`；不得 `sum(map(len, …))` 把 hidden size 累进 token 数。
 - 禁止：以 `modality="image"` 注册 audio embedding；让 `(10, 4096)` 请求约 40960 个 placeholder 并撞 `max_model_len`。
 - 验收：modality 断言为 audio；经真实 `_get_prompt_updates` 覆盖 1s/3s/30s 与不同 `h`，placeholder 只随 `s` 变化。^[PR #5730]
+
+## MCPMO-3f — Thinker forward 必须返回裸 hidden_states tensor
+
+- 触发：修改 `MiniCPMO45OmniLLMForConditionalGeneration.forward`、Omni wrapper 的 shape 归一化，或 AR/`GPUModelRunner` 对 thinker 输出的消费。
+- 强制：thinker `forward` 只返回裸 `hidden_states` `torch.Tensor`；`inputs_embeds is None` 时只构建一次 embeddings。wrapper 仅当 `ndim==3 and shape[0]==1` 时 squeeze batch 维，得到 `(seq_len, H)`，并保留 2D `(1, H)` decode 行。
+- 禁止：返回 `(text_inputs_embeds, hidden_states)` tuple；用 `added_batch_dim` 误 squeeze 单 token 的 `(1, H)`；让 runner 用 `[0]` 把 embeddings 当最终 hidden 算 logits。
+- 验收：断言返回类型/值、单次 embedding 构建，以及 `(1,H)/(N,H)/(1,1,H)/(1,N,H)` 归一化。^[PR #7517]

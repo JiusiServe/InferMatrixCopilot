@@ -1,7 +1,7 @@
 ---
 title: "Diffusion attention 规则"
 created: 2026-09-02
-updated: 2026-09-10
+updated: 2026-09-15
 type: rule
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5543", "PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6037", "PR #6518", "PR #6563", "PR #6724", "PR #6909", docs/design/feature/skip_softmax.md, docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/trtllm.md, docs/user_guide/diffusion/attention_backends/fastvideo_vsa.md, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/diffusion_kv/paged_attention_adapter.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/cuda/platform.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_fastvideo_vsa.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/diffusion_kv/test_paged_attention_adapter.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py", "PR #5717", "PR #6871"]
@@ -217,3 +217,10 @@ confidence: high
 - 强制：仅当 `seq_lengths` 存在真实 padding（至少一档短于 `max(seq_lengths)`）时才物化 `(batch, max_len)` bool mask；单样本或全员等长 batch 必须返回 `None`，让 backend 直接走 dense path。all-true CUDA mask 会触发 `torch.any(~mask)` 的 device→host sync，不能当作“无害 no-op”。
 - 禁止：无条件 `new_zeros` + 填 True；把 all-true device mask 交给 FlashAttention 只为“形状完整”；把省略 mask 说成改变了可变长 batch 的有效 token 集合。
 - 验收：等长与单样本断言 helper/`forward` 得到 `None`；可变长断言 mask shape 与 True/False 边界；不得用一次端到端加速数字代替 sync 合同。^[PR #6871]
+
+## DIFF-1aj — NPU dense FlashAttention 在 `causal=True` 时必须物化因果掩码
+
+- 触发：修改 `FlashAttentionImpl.forward_fa_npu`、NPU MindIE-SD / `npu_fusion_attention` dense path，或 `self.causal` 语义。
+- 强制：`causal=True` 且无显式 mask 时，必须走 bottom-right 对齐的压缩/物化因果 mask（`Sq!=Skv` 时按 `key_pos <= query_pos + (Skv-Sq)`），不能把 `attn_mask=None` 交给非因果 dense op。显式 keep-mask 须与因果条件组合后 contiguous 下发；`causal=False` 保持原无 mask 行为。
+- 禁止：依赖 MindIE-SD 隐式因果参数；让因果请求静默变成双向 attention；只靠“推理未崩”证明因果语义。
+- 验收：CPU/mock 覆盖 `Sq==Skv`、更短/更长 query、显式 mask 组合与非因果 `None`；目标 NPU 用已知因果模型对照。^[PR #7324]
