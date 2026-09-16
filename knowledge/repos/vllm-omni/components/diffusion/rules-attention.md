@@ -1,7 +1,7 @@
 ---
 title: "Diffusion attention 规则"
 created: 2026-09-02
-updated: 2026-09-10
+updated: 2026-09-16
 type: rule
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5543", "PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6037", "PR #6518", "PR #6563", "PR #6724", "PR #6909", docs/design/feature/skip_softmax.md, docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/trtllm.md, docs/user_guide/diffusion/attention_backends/fastvideo_vsa.md, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/diffusion_kv/paged_attention_adapter.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/cuda/platform.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_fastvideo_vsa.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/diffusion_kv/test_paged_attention_adapter.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py", "PR #5717", "PR #6871"]
@@ -217,3 +217,11 @@ confidence: high
 - 强制：仅当 `seq_lengths` 存在真实 padding（至少一档短于 `max(seq_lengths)`）时才物化 `(batch, max_len)` bool mask；单样本或全员等长 batch 必须返回 `None`，让 backend 直接走 dense path。all-true CUDA mask 会触发 `torch.any(~mask)` 的 device→host sync，不能当作“无害 no-op”。
 - 禁止：无条件 `new_zeros` + 填 True；把 all-true device mask 交给 FlashAttention 只为“形状完整”；把省略 mask 说成改变了可变长 batch 的有效 token 集合。
 - 验收：等长与单样本断言 helper/`forward` 得到 `None`；可变长断言 mask shape 与 True/False 边界；不得用一次端到端加速数字代替 sync 合同。^[PR #6871]
+
+## DIFF-1ai — Ring Attention 的 `valid_kv_length` 是全局前缀，且不得与 causal 并用
+
+- 触发：修改 Ring Flash/PyTorch attention、`AttentionMetadata.valid_kv_length`、`ring_kv_block_valid_length`，或向 ring forward 传入前缀裁剪语义。
+- 强制：`valid_kv_length` 表示整条全局 K/V 序列的 contiguous 有效前缀（`0 < L <= block_size * world_size`）；每个 circulated block 按全局 `block_rank` 映射为本地 `max(0, min(block_size, L - block_start))`，再 `k/v[:, :local]`。`None` 表示整块有效。本地长度为 0 时跳过该 step 的 FA/LSE 更新，不得对空 K/V 调 kernel。
+- 强制：`causal=True` 且 `valid_kv_length is not None` 必须立即 `ValueError`。裁短 circulated K/V 会缩短 `seqlen_k` 而 query 仍是 padded 长度，FlashAttention causal 对角线 bottom-right 对齐会静默错位；caller 须先 unpad 再进 ring，或使用 `causal=False`。
+- 禁止：把 `valid_kv_length` 当成“本 rank 本地长度”直接切片；在 causal ring 路径上静默 trim；用 bool/非 int 冒充长度；或把 trim 当成慢路径而不是 unsupported 组合。
+- 验收：覆盖全局前缀落在首块/中块/末块、越界/非 int fail-closed、零长 block 跳过，以及 causal+valid_kv_length 拒绝；local dense backend 仍可直接消费同一全局前缀语义。^[PR #7047]

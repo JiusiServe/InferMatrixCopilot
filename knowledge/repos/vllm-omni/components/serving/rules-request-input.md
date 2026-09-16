@@ -1,7 +1,7 @@
 ---
 title: "请求输入合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-16
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #3805", "PR #5374", "PR #5885", "PR #6598", vllm_omni/data_entry_keys.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/engine/orchestrator.py, vllm_omni/inputs/, tests/engine/test_async_omni_engine_input.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_invalid_audio_speech.py, tests/entrypoints/openai_api/test_serving_speech.py, "PR #5181", "PR #6182"]
@@ -139,3 +139,10 @@ engine 生命周期见 [engine 生命周期规则](rules-engine-lifecycle.md)；
 - 强制：transform 只操作 Stage-0 copy；原始 prompt 保留给 downstream，并在 transform 前后保持同一 global request ID。只把已处理的 metadata 合并回原始视图，先移除 transform-owned stale keys。临时目录只通过内部 `REQUEST_ARTIFACT_DIRS_KEY` 交给 request state；preprocess、companion build、enqueue 前失败立即回收，admit 后由 orchestrator 在所有 terminal cleanup 路径回收，且内部 key 不得进入 stage payload。
 - 禁止：把 transformed prompt 当作 downstream 原始媒体、让旧 prepared descriptor 跨请求复用、在 ownership 已交给 orchestrator 后由 frontend 提前删除，或让异常路径泄漏转码目录。
 - 验收：覆盖 transform replacement/copy、request ID 与 metadata merge、成功 terminal/abort、preprocess/companion/enqueue 异常以及无 artifact control；断言 downstream 看见原始媒体+允许的 processed meta，目录恰好由当前 owner 回收，内部 key 未传输。^[PR #5885]
+
+## SERV-4r — pipeline 要求的 `stop_token_ids` 必须与 caller/deploy 停止集相加去重
+
+- 触发：修改 `merge_sampling_constraints`、`OmniBase._apply_sampling_constraints`、pipeline `sampling_constraints.stop_token_ids`，或 deploy `default_sampling_params.stop_token_ids`。
+- 强制：标量约束仍由 pipeline 覆盖同名 caller/deploy 字段；惟 `stop_token_ids` 例外——先取 caller/deploy 列表，再追加 pipeline 要求的 ID，并以 `dict.fromkeys` 保序去重。legacy `yaml_extras` 与 structured config、以及 request 期重建 `SamplingParams`，必须共用同一 merge helper，且不 mutate 调用方对象。
+- 禁止：用整表 `constraints` 覆盖把 caller 自定义 stop 抹掉；只在 YAML merge 或只在 request apply 一侧实现相加；或让模型必需 terminator（如 MiniCPM-o TTS 边界）依赖重复 YAML/环境变量拷贝。
+- 验收：覆盖 deploy 已有 stop + pipeline 新增 stop 的并集、caller mapping/dataclass/msgspec 重建、immutability，以及至少一条真实 pipeline 的 Stage-0 必需 stop 进入全部 shipping deploy。^[PR #7463]

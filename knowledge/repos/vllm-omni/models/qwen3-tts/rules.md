@@ -1,7 +1,7 @@
 ---
 title: "Qwen3-TTS 规则"
 created: 2026-07-20
-updated: 2026-09-05
+updated: 2026-09-16
 type: rule
 tags: [vllm-omni, models, serving, qwen-omni]
 sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", "PR #6113", "PR #6523", "PR #6728", "PR #6861", vllm_omni/deploy/aura_omni.yaml, vllm_omni/deploy/qwen3_tts.yaml, vllm_omni/deploy/qwen3_tts_high_concurrency.yaml, vllm_omni/model_executor/models/aura_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/prompt_embeds_builder.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_speech_stream.py, vllm_omni/entrypoints/openai/speech_usage.py, vllm_omni/entrypoints/openai/tts_adapters/qwen3_tts.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, tests/e2e/online_serving/test_qwen3_tts_base.py, tests/e2e/online_serving/test_qwen3_tts_base_expansion.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/entrypoints/openai_api/test_serving_speech_stream.py, tests/entrypoints/openai_api/test_tts_adapter.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_code2wav.py, tests/model_executor/models/qwen3_tts/test_qwen3_tts_incremental_decode.py, tests/model_executor/stage_input_processors/test_qwen3_tts_async_chunk.py, "PR #5048"]
@@ -222,3 +222,11 @@ Qwen 家族入口见 [Qwen-Omni](../qwen-omni/_index.md)。
   Ready CI 的 dummy-weight Base 即使到 192 tokens 仍可无 EOS 并返回 500，因而不是该 guard 的
   Ready oracle；此事实不改变 runtime、YAML、EOS 或音质合同，也没有 real-weight merge pass log。
   ^[PR #6861] ^[issue #6855]
+
+## Q3TTS-5a — 共享 code predictor 的 FP32 fallback 排除 NPU，且禁止外层 capture 时重放内层图
+
+- 触发：修改 `qwen3_code_predictor` 的 FP16→FP32 stability fallback、NPUGraph/`_device_graphs` replay，或 Qwen3-TTS/Qwen3-Omni Talker 在 `enforce_eager=False` 下的外层 `talker_mtp` capture。
+- 强制：`use_fp32` 仅当 `input_dtype == float16` 且 `device.type not in ("cpu", "npu")`；CUDA/XPU/MUSA 等其它 accelerator 保留既有 FP32 upcast。Ascend fused RMSNorm 要求 activation 与 weight dtype 一致，不得在 NPU 上形成 FP32 activation + FP16 gamma。
+- 强制：每个 forward 采样一次 `is_npu_capturing = current_omni_platform.is_npu() and torch.npu.is_current_stream_capturing()`；存在 device graph 时，仅当**未**在外层 NPU capture 中才 `replay()`，capture 期间走普通/`compiled` forward 让外层图录制。无外层 capture 时仍使用内层 replay 快路径。
+- 禁止：把“非 CPU 即 FP32”重新扩到 NPU；在外层 capture 中嵌套 replay 内层 NPUGraph；或仅靠 stage 级 `PIECEWISE` workaround 声称已修复嵌套 replay 根因。
+- 验收：参数化断言 cpu/npu 不 upcast、cuda/xpu/musa upcast；`is_capturing` true/false 分别断言 skip/do replay。该合同属于共享 predictor，不证明每个 Qwen3 stage 已全图安全。^[PR #6639]
