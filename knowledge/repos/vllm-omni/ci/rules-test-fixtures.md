@@ -1,7 +1,7 @@
 ---
 title: "CI 并行测试与 engine fixture 合同"
 created: 2026-08-23
-updated: 2026-09-10
+updated: 2026-09-16
 type: rule
 tags: [vllm-omni, ci]
 sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6311", "PR #6339", "PR #6343", "PR #6468", "PR #6523", "PR #6613", "PR #6555", "PR #6650", .buildkite/common/scripts/run_cov_split.sh, pyproject.toml, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py, .buildkite/common/scripts/upload_pipeline.py, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/clean.py, tests/helpers/client.py, tests/helpers/mark.py, tests/helpers/runtime.py, tests/helpers/stage_config.py, tests/buildkite/test_upload_pipeline.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/dfx/stability/, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/nightly/run_nightly_jobs.sh, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py, .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, "PR #6704", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", "PR #6696", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/benchmarks/patch/patch.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, "PR #6674", docker/Dockerfile.npu, docker/Dockerfile.npu.a3, docker/Dockerfile.npu.ci, docker/Dockerfile.npu.ci.a3, "PR #6818", "PR #6830", "PR #6884", tests/diffusion/conftest.py, tests/diffusion/attention/test_flash_attn.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #6947", "PR #7225"]
@@ -83,3 +83,10 @@ confidence: high
 - 强制：由成功重试路径设置 `asyncio.Event`（或等价信号），以有界 `wait_for` 等待恢复；在 `finally` 发 shutdown 并有界 await 任务。对 immediate 与 delayed 首次失败做参数化，使 delayed 超过旧观察窗口仍稳定。
 - 禁止：`sleep(35ms)` 后断言 `calls >= 2`；依赖日志或调度速度填满重试窗口；漏关后台 task。
 - 验收：immediate/delayed 均在超时前看到第二次成功调用；禁用 retry 时测试应 timeout 而非假绿。^[PR #7225]
+
+## OMNI-CI-2i — xdist online 测试不得用全局 GPU 占用做跨 worker 屏障
+
+- 触发：修改 `tests/model_tests/diffusion` 等 online/xdist suite、`cleanup_test_environment`，或在并行 worker 上等待“整卡显存回落阈值”。
+- 强制：`cleanup_test_environment` 观察的是整卡占用，不是当前 worker 自有分配。在 `is_xdist_worker` 下，online diffusion 等并行 suite 必须禁用/no-op 该全局 cleanup，避免 server teardown 变成跨 worker 屏障；`OmniServer` 仍拆除自己的子进程树。非 xdist 运行保留更广的 cleanup。
+- 禁止：在 xdist 下等待 sibling worker 的分配消失才结束 teardown；把全局阈值等待说成单测资源隔离；或删除非 xdist 路径上仍需要的环境清理。
+- 验收：xdist worker 断言 cleanup 被 monkeypatch 为 no-op；非 worker 控制路径仍调用真实 cleanup；并行 online lane 不因全局 GPU wait 放大 wall time。^[PR #7534]
