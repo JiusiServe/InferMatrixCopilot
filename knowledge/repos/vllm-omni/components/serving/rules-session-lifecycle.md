@@ -1,7 +1,7 @@
 ---
 title: "Serving session lifecycle 规则"
 created: 2026-09-05
-updated: 2026-09-06
+updated: 2026-09-13
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #6537", "PR #6354", vllm_omni/config/stage_config.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/engine/duplex/adapter.py, vllm_omni/engine/duplex/runtime.py, vllm_omni/experimental/fullduplex/mage_vl/adapter.py, vllm_omni/experimental/fullduplex/mage_vl/serving/backend.py, vllm_omni/experimental/fullduplex/mage_vl/serving/server.py, tests/e2e/features/fullduplex/test_mage_vl_adapter.py, tests/e2e/features/fullduplex/test_mage_vl_serving.py, tests/e2e/online_serving/nemotron_voicechat_realtime_duplex.py]
@@ -44,3 +44,17 @@ confidence: high
   slot；因 warmup failure 拒绝服务或永久阻塞 real client；或在 shutdown 遗留 background warmup task。
 - 验收：覆盖 disabled、health-then-self-WS ordering、warmup tag 绕过 admission gate、explicit close、
   success/failure 均 set event、real-client 120-second escape hatch，以及 shutdown cancellation。^[PR #6354]
+
+## SERV-6j — 视频预热缓存不得在帧被逐出后回写，取消重启不得插入固定延迟
+
+- 触发：修改 streaming video WebSocket 的 `frame_pil_cache` / prewarm decode、有界
+  `frame_buffer` 逐出，或 cancel-then-restart 上一 query 后的等待逻辑。
+- 强制：prewarm 完成（成功 PIL 或 `_BAD_FRAME`）写入缓存前，必须再次确认该 b64 仍在
+  当前 `frame_buffer`；已逐出则丢弃结果，不得把帧重新插入 cache。取消上一 query 并
+  await task/`abort()` 后，不得再 `asyncio.sleep(0.1)`；Orchestrator abort ACK 已是完成
+  信号，墙钟等待不是额外 completion 证明。
+- 禁止：让 decode 竞态把已逐出帧钉回 cache 造成会话期泄漏；用固定 sleep 冒充 abort
+  排空；把去掉 sleep 说成已消除更深的 EngineCore GPU race。
+- 验收：`max_frames=1` 下延迟 decode 时，被逐出帧的 PIL 在会话仍打开时可被回收；
+  `max_frames=2` 时仍缓存到 teardown。中断连续 query 时记录的 sleep 请求为空，且旧
+  generator 关闭与 abort 完成发生在下一次 generate 之前。^[PR #7363]

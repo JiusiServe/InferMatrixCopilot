@@ -1,7 +1,7 @@
 ---
 title: "Diffusion output 与 multiprocess runtime 规则"
 created: 2026-09-02
-updated: 2026-09-08
+updated: 2026-09-13
 type: rule
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5550", "PR #5864", "PR #5885", "PR #5978", "PR #6750", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/io_support.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/output_formatter.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/stage_diffusion_proc.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_timeout.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/diffusion/test_stage_diffusion_proc.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6255", "PR #6288", "PR #6308", "PR #6499", "PR #6749", "PR #6847", "PR #6953", vllm_omni/diffusion/data.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, tests/diffusion/test_diffusion_output_formatter.py, tests/diffusion/test_diffusion_plugin_hooks.py, tests/entrypoints/openai_api/test_video_pipeline_capability.py, "PR #6294"]
@@ -176,3 +176,37 @@ confidence: high
 - 强制：runner 与 pipeline 共有同一 `InteractionCoordinator`；仅对已注册 modality 构造 handler；`enqueue` 按 modality 路由；`apply_at_chunk_boundary` 以稳定顺序推进（prompt 优先，再及其他 modality）；per-request session 落在 `StepRequestState.interaction_sessions`，chunk ACK 元数据写入 `interaction_chunk_metadata`。未注册 modality 必须 fail closed。当前公开行为保持 prompt-only，直到另有 PR 注册并验收非 prompt handler。
 - 禁止：在 denoise 中途旁路 coordinator 直接改 `prompt_embeds`；在非 chunk 边界静默应用 interaction；未注册就接受 camera/`multi_modal_data`；或把内部 handler 重构当成用户 API 已扩展。
 - 验收：覆盖 prompt enqueue→chunk-boundary apply→ACK event id、未注册 modality 拒绝，以及无 session 的 modality 跳过；不得用本框架落地证明 camera/MM 路径已可用。^[PR #6294]
+
+## DIFF-1ai — 迁移后的视频输出必须以 typed `media` 为唯一能力信号
+
+- 触发：修改 `DiffusionOutput`、device-side video postprocess、`video_output_transport`、
+  runner 预 D2H 准备、worker IPC media envelope 或 engine finalizer 路由。
+- 强制：迁移动画输出以 `DiffusionOutput.media`（`DiffusionMediaOutput`）为唯一能力信号，
+  与 legacy `output` 以及 model-specific `post_process_func` 互斥。runner 在 normalize/
+  request-split 之后、异步 D2H 之前完成 request-owned 准备：合格视频转 contiguous uint8
+  `BTHWC`，或按策略保留已标 transport-ready 的 float；IPC 只接受 transport-ready 的
+  版本化 `diffusion_media_v1` envelope；engine 走通用 media finalizer，绕过 legacy
+  model postprocessor。`to_cpu=True` 前 media 必须已 prepared。feature 默认关闭，经
+  `video_output_transport.enable_device_postprocess` 显式开启。合同违规 fail loud；
+  OOM 可回退到 owned float 并告警，其他 runtime 错误仍传播。未迁移模型保持 legacy path。
+- 禁止：对已迁移路径同时填充 `media` 与 legacy `output`；未准备就 D2H/to_cpu；把 HTTP
+  sink、codec 策略或未迁移模型静默当作同一 Phase-1 合同。
+- 验收：正负覆盖互斥字段、未 prepared `to_cpu`、IPC 拒收未就绪 media、opt-in 开关与
+  OOM float fallback；至少一条迁移模型（如 WAN2.2 非 latent）走 typed path，一条未迁移
+  模型仍走 legacy。^[PR #6615]
+
+## DIFF-1aj — multiproc worker shutdown 必须升至 SIGKILL 并保留幸存者供重试
+
+- 触发：修改 `_ExecutorShutdownCleaner`、diffusion worker process join/terminate/kill、
+  worker monitor 与显式 `shutdown()` 的竞态，或 cleaner 持有的 process 引用生命周期。
+- 强制：cleanup 按有界三阶段推进：cooperative join → `terminate`+join → `kill`+join；
+  信号/join 的 `OSError` 不得中断 peer cleanup。最终仍存活的进程必须记 error（含 name/pid）
+  并保留在 cleaner 上，供下一次显式 shutdown 重试，不得在第一次失败后丢弃引用。
+  cleaner 用非阻塞锁，防止 monitor 与显式 shutdown 并发操作同一批 `Process`；二次进入
+  直接返回。`broadcast_mq` 在 enqueue 成败后都要清空；result-pump/pending-future 清理
+  仍在 `finally`。
+- 禁止：只做 graceful+SIGTERM 后假定已退出；失败后清空 process 列表导致无法再 reap；
+  把存活进程当作 GPU 内存已回收或 HWR/服务自动重启已完成。
+- 验收：真实 CPU child（含忽略 SIGTERM）在 queue 失败时经 SIGKILL 退出并被 reap；合作
+  退出路径 exit 0；覆盖 shared deadline、signal/join OSError 续跑、幸存者保留与并发
+  cleaner。^[PR #7126]

@@ -1,7 +1,7 @@
 ---
 title: "MiniMax H3 媒体输入与精度规则"
 created: 2026-09-02
-updated: 2026-09-08
+updated: 2026-09-13
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/engine/stage_runtime.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_async_omni_engine_stage_init.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #6064", "PR #6813", "PR #6824", "PR #6720"]
@@ -140,3 +140,16 @@ confidence: high
 - 强制：公开 schema id 为 `minimax_h3.text_conditioning/v1`。语义载荷：`hidden_states` 为 contiguous strided `[tokens, 5120]` `bfloat16`；`token_tags` 为 contiguous strided `[tokens]` `int64` 且仅含 `0/1`。Stage-wire `OmniPayload` 路径必须经 `from_omni_payload`：从 `hidden_states.output` 取 tensor，从 `meta.token_role_ids` 取 `[tokens, 1]` `int64` contiguous strided，再 squeeze 成语义 tags；任一类型/shape/dtype/layout 不符都在 adapter 边界失败。
 - 禁止：放宽为任意 float/int dtype 或非 contiguous layout；绕过 schema validator 直接塞 positional tensors；把该 H3-only hardening 写成已落地的通用 `StagePortSpec`。
 - 验收：CPU 测试覆盖合法 payload、错误 dtype/layout/shape、缺失字段，以及 encoder ownership（仅 owning replica 持有，disaggregated diffusion stage 缺席）；不改动既有 serializer 与 launch path 时仍须保持负向门禁。^[PR #6720]
+
+## MMH3-2r — Ref2VA 视频声轨与独立音频必须分账 15 秒预算
+
+- 触发：修改 MiniMax-H3 Ref2VA 的 reference audio 时长校验、embedded/standalone audio
+  latent 拼接，或 `_prepare_request_inputs` 在编码后的 `audio_lengths` 检查。
+- 强制：视频声轨与 standalone audio 各自遵守本模态的 2–15 秒（及既有编码后单段长度）
+  预算，并在 encoding 前分别校验。拼接 conditioning rows 之后，不得再对
+  `sum(audio_lengths)` 施加单一 15 秒/600 latent-frame 总预算。各 `ref_blocks` 种类
+  （如 `video_audio` 与 `audio`）与长度列表必须原样保留。
+- 禁止：把“各 ≤15 s”误读成“embedded+standalone 合计 ≤15 s”；在合法分账输入上因合计
+  超限拒绝请求。
+- 验收：约 2–3 s 视频声轨 + 满 15 s standalone WAV 的 Ref2VA 请求必须被接受，并断言两段
+  audio condition 都进入上下文；继续覆盖单段越界与 audio-only 拒绝。^[PR #7281]
