@@ -1,7 +1,7 @@
 ---
 title: "AMD/ROCm CI 规则"
 created: 2026-09-05
-updated: 2026-09-10
+updated: 2026-09-17
 type: rule
 tags: [vllm-omni, ci]
 sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234"]
@@ -42,3 +42,10 @@ confidence: high
 - 强制：`mi300_1` 一类单卡 model job 的 pytest marker 必须 `not (cards_2 or … or cards_8)`，同时保留无 `cards_1` 的 legacy 单卡用例；真正需要双卡的用例（如 LTX2 Ulysses parity）改到已有双卡 lane，并声明 `rocm` 资源与 `device_count >= world_size` 早失败。
 - 禁止：让 `cards_2+` 测试在单卡 worker 上 spawn rank1→GPU1 导致 `invalid device ordinal`；用邻近 green shard 宣称 multi-GPU routing 已修好。
 - 验收：pipeline argv/collection 断言单卡 job 排除 multi-card markers、双卡 job 收集目标文件；硬件 marker helper 覆盖 ROCm 声明。^[PR #7234]
+
+## OMNI-CI-2i — AMD entrypoints GPU ready job 必须单次 pytest、有界超时并检测进程泄漏
+
+- 触发：修改 `.buildkite/amd/test-amd-ready.yml` 的 entrypoints/R2-02 GPU coverage、artifact 根路径，或 teardown 进程快照比较。
+- 强制：`mi300_1` NonBlocking job 设 `VLLM_WORKER_MULTIPROC_METHOD=spawn`，marker 排除 `cards_2`–`cards_8`，只跑一次 verbose pytest（禁止第二趟 `--collect-only`）。内层 `timeout` 短于 Buildkite step，为 teardown/artifact 留窗口。artifact 根在 Buildkite checkout；前后 `ps` 快照用 PID+start-time 身份比较，泄漏则 fail closed。零 collection 不得被允许通过。
+- 禁止：依赖 PID-only 比较掩盖 reuse；把 CUDA pipeline 定义当作 ROCm ready 覆盖；用邻近 green shard 宣称本 job 合同已满足。
+- 验收：结构断言单次 pytest、超时信封、marker、六类 artifact 与 `process-cleanup` PASS；真实 MI300 跑通 selected node。^[PR #7398]

@@ -1,7 +1,7 @@
 ---
 title: "Qwen-Omni 规则"
 created: 2026-09-04
-updated: 2026-09-09
+updated: 2026-09-17
 type: rule
 tags: [vllm-omni, models, qwen-omni]
 sources: ["PR #5687", "PR #6284", "PR #6449", "PR #4322", "PR #6748", "PR #6886", "PR #7019", vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/engine/stage_init_utils.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni.py, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py, tests/engine/test_stage_engine_args.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_quantization.py, "PR #7228"]
@@ -86,3 +86,10 @@ confidence: high
 - 强制：构造 `inv_freq` 时优先 `config.rope_parameters["rope_theta"]`（若 mapping 存在），否则回退 top-level `rope_theta`，再默认 `10000.0`。Qwen3-Omni（Transformers 5.10+ 常把 checkpoint 的 `1_000_000` 只放在 nested 字段）与仍带 top-level 的 Qwen3-TTS/legacy 必须共用该顺序。
 - 禁止：只读 top-level 导致静默回退 `10000`；把 nested 优先写成破坏 TTS top-level 兼容的唯一来源。
 - 验收：参数化覆盖 nested-only、nested 优先于冲突 top-level、默认 `10000`，以及 TTS/legacy top-level（含删除 `rope_parameters`）重建正确 `inv_freq`。^[PR #7228]
+
+## QOMNI-1h — 混合长度 streaming batch 的 crop 必须用整窗 trim，不得把 padding 当有效未来帧
+
+- 触发：修改 `Qwen3OmniMoeCode2Wav.chunked_decode_streaming` 的 start/end 切片、`seq_token_counts`、left context，或混长 batch 的 decoder trim 计算。
+- 强制：decoder 对整批共享同一 right-edge trim。`tail` 必须由 `codes.shape[-1]*total_upsample - batch_wav.shape[-1]` 相对整窗测量，再对每行用 `start = max(0, left_context*up - tail)` 与 `end = max(0, code_seq_len*up - tail)`。padding 不提供有效未来 codec 上下文。
+- 禁止：按单行 `code_seq_len` 相对整窗波形长度算 per-row tail（短请求会 clamp 到 0 并保留 padding 样本）；只用时长/长度相等证明 crop 正确。
+- 验收：独立单请求 oracle 对比混长 batch 的值与长度；覆盖 eager/cudagraph、多种短帧/left-context、batch 顺序，以及 singleton→mixed→singleton 连续流无 skip/repeat。^[PR #7340]
