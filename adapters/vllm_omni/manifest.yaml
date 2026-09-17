@@ -25,9 +25,11 @@ upstream:
   kind: fork_tracking
   repo_path: ${VLLM_UPSTREAM_REPO}
   remote: origin
-  # v0.29.0 alignment campaign (audited 2026-09-05): wheel pick and
-  # commit assignment target the release branch, not upstream main
-  target_branch: releases/v0.29.0
+  # v0.30.0 alignment campaign (2026-09-17): wheel pick and commit
+  # assignment target the release branch, not upstream main. The branch
+  # is cut but NOT yet tagged, so this tracks the branch head and is
+  # re-pinned to the tag commit once v0.30.0 is released.
+  target_branch: releases/v0.30.0
 
 # Repo-specific slice of the SHARED, human-curated knowledge base (the vendored
 # community docs at the repo-root `knowledge/` = settings.knowledge_dir;
