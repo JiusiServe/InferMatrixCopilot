@@ -1,7 +1,7 @@
 ---
 title: "Diffusion paged cache 与系统运行时规则"
 created: 2026-09-03
-updated: 2026-09-09
+updated: 2026-09-17
 type: rule
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", "PR #6340", "PR #6714", "PR #6814", "PR #6563", "PR #5716", "PR #6786", vllm_omni/diffusion/attention/, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/attention/parallel/ring_kernels.py, vllm_omni/diffusion/diffusion_kv/, vllm_omni/diffusion/distributed/cfg_parallel.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/npu/platform.py, tests/diffusion/diffusion_kv/, tests/diffusion/distributed/test_cfg_parallel.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_ulysses_uaa.py, "PR #5491", "PR #5194", "vllm_omni/diffusion/data.py", "vllm_omni/diffusion/utils/hf_utils.py", "PR #7041", "PR #6463", "PR #6844"]
@@ -226,3 +226,10 @@ confidence: high
 - 强制：一次 `generate()` 驱动整段 rollout：`prepare_encode` 只跑一次，随后多轮 `denoise_step`/`step_scheduler`，由 `post_decode` 产出每个 AR chunk。request-mode 与 stepwise 必须共用同一份 block/DMD math，禁止维护两套可漂移实现。runner 仅为实现该合同的 pipeline 打开 `step_execution`；绑定 runner-owned KV 时 `session_id == request_id`；错误路径 fail-closed 释放 session，完成或 scheduler abort 时退役。持有 AR-Diffusion paged KV 的 stage 必须保持 `max_num_seqs=1`。
 - 禁止：用多次 `generate()`/tick 冒充同一 session；在 denoise step 内提交本应属于 `post_decode` 的 clean-x0 KV commit；或把逐步 camera/prompt mid-request interaction 写成已由本合同覆盖。
 - 验收：覆盖 stepwise 与 request-mode 的共享 math 边界、session bind/release、abort/completion 退役，以及 `max_num_seqs=1` 拓扑；request-scoped camera script 等模型字段另由模型 owner 验收，不得外推为通用 mid-request interaction。^[PR #6844]
+
+## DIFF-4ad — AR 条件编码历史必须会话持有、双份计入并在终止边界释放
+
+- 触发：修改 AR-Diffusion realtime/stepwise 条件编码、Wan VAE encoder cache、session admission 字节预算，或 temporal RoPE 超出预计算表。
+- 强制：跨 block 推进时保留 causal encoder history（committed + in-flight），每 session 只驻留当前 condition block 与有界 cache；admission 必须计入两份 encoder history 与 streaming-decode 字节。reset/close 必须释放 encoder cache。超出预计算 RoPE 表的 temporal 位置按绝对位置即时算 cos/sin，不得扩张常驻表。条件编码要求 unpatched、非 tiled Wan encoder。
+- 禁止：用固定像素/latent 帧上限冒充无界 realtime；只预算 self-KV 而漏算 encoder cache；在失败 block 后提交 pending history；把本变更写成已解决共享 paged-KV 长度上限。
+- 验收：因果条件递进、session 隔离/清理、失败不提交、内存会计、tick/stepwise 一致，以及 RoPE 越界且 cache 尺寸固定。^[PR #6838]

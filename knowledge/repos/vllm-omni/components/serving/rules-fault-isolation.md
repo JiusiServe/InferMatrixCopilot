@@ -1,7 +1,7 @@
 ---
 title: "Serving replica fault-isolation 规则"
 created: 2026-09-02
-updated: 2026-09-05
+updated: 2026-09-17
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #4583", "PR #6170", vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py]
@@ -59,3 +59,10 @@ confidence: high
   发送 error 后以 abort/close-duplex-session cleanup 回收该 request；普通非-duplex 路径继续抛出，
   不能扩大 catch 范围而吞没共享 orchestrator 的编程错误。验收要证明坏 duplex handoff 不终止
   orchestrator，且同一 engine 的后续 request 仍可完成。^[PR #6170]
+
+## SERV-5u — 异步 video job 必须等 scheduler 准入才标 in_progress，DELETE 须先有界 abort engine
+
+- 触发：修改 `POST /v1/videos` 异步 job 状态机、`DELETE /v1/videos/{id}`，或 diffusion `emit_request_lifecycle` / request-started 控制面事件。
+- 强制：job 保持 `queued`，直到 scheduler 首次准入并经 opt-in lifecycle marker 通知；不得在 background task 启动时就标 `in_progress`。DELETE 先对 engine request 做有界 abort（`VLLM_OMNI_ABORT_TIMEOUT`，默认 2s），再取消 frontend task，并再等一小段 cleanup 以免 orchestrator 卡住；abort 后重读 job，使并发完成的 artifact 仍被删除。
+- 禁止：只取消 asyncio task 而留下 engine 侧扩散；把 task 启动当作已开始推理；让 DELETE 在 abort 上无限挂起。
+- 验收：queued-until-admission、in-progress DELETE abort、abort timeout、完成后 DELETE 清 artifact，以及 `generate()` cancel 的有界 cleanup。^[PR #6759]
