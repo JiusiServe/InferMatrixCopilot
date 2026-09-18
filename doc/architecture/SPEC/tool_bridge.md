@@ -1,6 +1,6 @@
 # tool_bridge.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-09-19 -->
 
 `LOC ~308 · 面向 harness 会话的 scoped 工具 MCP server · refactor-status: ok`
 
@@ -48,3 +48,10 @@ knowledge/repo-map 工厂。
 因为它捆绑的运行时不带 MCP client，拿到无法履约的 spec 时会记一条 `capability_gap`。
 任何"这次 run 走了工具桥"的说法，都必须**对照那个标志核实**，
 而不是从"后端是 harness"推定。
+
+## 向 harness 会话提供 rebase 工具面（2026-09-19）
+
+bridge 把 run 的 20 工具面 + `doc_search`/`doc_read` 暴露给 harness 会话。
+生成的 MCP 工具函数必须是 **keyword-only**（schema 会交错 required/optional），
+零属性工具不能带裸 `*`，且必须**丢掉**未设置的 optional——传 None 会打断
+每一次 `read_file`。失败的 bridged 调用记录失败**原因**。

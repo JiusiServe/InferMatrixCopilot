@@ -9,6 +9,8 @@ RUN_REPORT always exists when the run terminates needs-human)."""
 
 from __future__ import annotations
 
+from dataclasses import asdict as _dc_asdict
+
 import asyncio
 import shlex
 import weakref
@@ -137,7 +139,7 @@ def _test_roots(manifest: dict) -> tuple:
     return tuple(tm.get("test_change_roots") or ("tests/",))
 
 
-def _target_test_env(ctx: StepContext, manifest: dict,
+def _target_test_env(settings, manifest: dict,
                      *, pythonpath_prepend: str | None = None) -> dict:
     """The env for TARGET-repo subprocesses (tests, precommit, wheel
     installs): inherit-plus-overlay with the target venv on PATH, the
@@ -146,7 +148,7 @@ def _target_test_env(ctx: StepContext, manifest: dict,
     copilot's own virtualenv."""
     import os
     from ...testing.env_plan import build_subprocess_env
-    venv = _target_venv(manifest, extra=ctx.settings.expansion_env())
+    venv = _target_venv(manifest, extra=settings.expansion_env())
     return build_subprocess_env(
         venv=Path(venv) if venv else None,
         cuda_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES"),
@@ -197,7 +199,9 @@ def _agent_shell_env(ctx: StepContext, manifest: dict, repo_root: str,
     return env
 
 
-def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
+def build_backends(*, settings, state, run_dir: Path, trace,
+                   manifest: dict, repo: str, model: str,
+                   base_url: str = "", api_key: str = ""):
     """The PRODUCTION `RebaseBackends`: plan review on the run's resolved
     tier backend, pytest/reproduce/precommit through the PR1 runner in the
     TARGET env, and the knowledge tools on the copilot stores (agents may
@@ -205,21 +209,26 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
     `_unwired` defaults for live module/debug agents; an unavailable
     collaborator still answers with an explicit error dict, never a
     silent success. All handlers are SYNC (tool dispatch is synchronous
-    inside the agent loop) — the reviewer uses its own sync client."""
+    inside the agent loop) — the reviewer uses its own sync client.
+
+    Takes EXPLICIT serializable inputs rather than a `StepContext` so the
+    harness tool bridge can rebuild the identical production backends in its
+    own process from a bridge spec (see `tool_bridge`). `_build_backends`
+    below is the thin in-process adapter."""
     from ...memory import SkillStore
     from ...memory.debug_memory import DebugMemory
     from ...rebase_engine.plan_review import review_plan
     from ...rebase_engine.rebase_tools import RebaseBackends
     from ...testing.runner import TestJob, TestRunner
-    repo_name = (ctx.state.get("task_spec") or {}).get("repo", "")
-    reviewer_model = getattr(ctx.settings, "rebase_reviewer_model", "") \
-        or target.model
+    repo_name = (state.get("task_spec") or {}).get("repo", "")
+    reviewer_model = getattr(settings, "rebase_reviewer_model", "") \
+        or model
 
     def request_plan_review(**kw) -> dict:
         from anthropic import Anthropic
-        ckw: dict = {"api_key": target.api_key}
-        if target.base_url:
-            ckw["base_url"] = target.base_url
+        ckw: dict = {"api_key": api_key}
+        if base_url:
+            ckw["base_url"] = base_url
         return review_plan(
             Anthropic(**ckw), reviewer_model,
             plan_json_path=str(kw.get("plan_json_path", "")),
@@ -239,13 +248,13 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
         if markers:
             cmd += f" -m '{markers}'"
         runner = TestRunner(repo_root=Path(repo),
-                            tests_dir=ctx.run_dir / "tests",
-                            gpu_lock_dir=ctx.run_dir / "gpu_lock")
+                            tests_dir=run_dir / "tests",
+                            gpu_lock_dir=run_dir / "gpu_lock")
         outcome = runner.run(
             TestJob(key=f"{key}_{abs(hash(cmd)) % 10 ** 8}", command=cmd,
                     timeout_sec=float(kw.get("timeout") or 1800),
                     min_gpus=0, gpu_lock=True),
-            _target_test_env(ctx, manifest))
+            _target_test_env(settings, manifest))
         tail = ""
         try:
             if outcome.log_file and Path(outcome.log_file).is_file():
@@ -282,20 +291,20 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
             command = _re.sub(r"\s(?:--all-files|-a)\b", "", command)
             command += " --files " + " ".join(str(f) for f in files)
         runner = TestRunner(repo_root=Path(repo),
-                            tests_dir=ctx.run_dir / "tests",
-                            gpu_lock_dir=ctx.run_dir / "gpu_lock")
+                            tests_dir=run_dir / "tests",
+                            gpu_lock_dir=run_dir / "gpu_lock")
         outcome = runner.run(
             TestJob(key="agent_precommit", command=command,
                     timeout_sec=float(pc.get("timeout_sec") or 600),
                     min_gpus=0, gpu_lock=False),
-            _target_test_env(ctx, manifest))
+            _target_test_env(settings, manifest))
         return {"exit_code": outcome.rc, "passed": outcome.rc == 0,
                 "log_file": outcome.log_file}
 
     from ...memory.paths import KnowledgePaths
     kpaths = KnowledgePaths.resolve(
-        ctx.settings, repo_name,
-        adapter_root=Path(ctx.settings.adapters_dir)
+        settings, repo_name,
+        adapter_root=Path(settings.adapters_dir)
         / repo_name.replace("-", "_"))
 
     def _memory() -> DebugMemory:
@@ -308,7 +317,7 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
     # kill a run the gate already provenance-stamped.
     from ...adapters.base import expand_path
     _knowledge_cfg = (manifest.get("rebase") or {}).get("knowledge") or {}
-    _kn_extra = ctx.settings.expansion_env()
+    _kn_extra = settings.expansion_env()
     parent_db_path = expand_path(str(_knowledge_cfg.get("parent_debug_db")
                                      or ""), extra=_kn_extra)
     parent_skills_path = expand_path(
@@ -325,7 +334,7 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
                 upstream_column=str(_knowledge_cfg.get(
                     "parent_upstream_column") or "")).search(query, k=k)
         except Exception as exc:  # noqa: BLE001 — degrade open, traced
-            ctx.trace.record("capability_note",
+            trace.record("capability_note",
                              capability="rebase.knowledge.parent_debug_db",
                              detail=f"parent layer degraded mid-run: {exc}")
             return []
@@ -375,7 +384,7 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
 
     def record_debug_memory(**kw) -> dict:
         try:
-            run_id = str(ctx.state.get("run_id", ""))
+            run_id = str(state.get("run_id", ""))
             # additive v2 fields land in their OWN columns (round-4 F4 —
             # the old key-inside-verification packing lost every one of
             # them to curation and migration); v3_knowledge_prep
@@ -393,7 +402,7 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
                 tags=kw.get("tags", ""),
                 watch_outs=str(kw.get("watch_outs", "") or ""),
                 upstream_commit=str(
-                    ctx.state.get("upstream_commit", "") or ""),
+                    state.get("upstream_commit", "") or ""),
                 last_seen_run=run_id,
                 source="v3-agent")
             return {"ok": True, "id": entry_id}
@@ -429,7 +438,7 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
                 found = store.find(query=query, module=module_q,
                                    k=len(store.load_all()) or 1)
             except Exception as exc:  # noqa: BLE001 — degrade open, traced
-                ctx.trace.record(
+                trace.record(
                     "capability_note",
                     capability="rebase.knowledge.parent_skills_dir",
                     detail=f"skill layer {store_dir} degraded: {exc}")
@@ -506,6 +515,19 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
         request_plan_review=request_plan_review,
         run_pytest=run_pytest, reproduce=reproduce,
         run_precommit=run_precommit)
+
+
+
+
+def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
+    """In-process adapter: the same production backends, built from a
+    `StepContext`. Kept so existing callers are untouched."""
+    return build_backends(
+        settings=ctx.settings, state=ctx.state, run_dir=ctx.run_dir,
+        trace=ctx.trace, manifest=manifest, repo=repo,
+        model=target.model,
+        base_url=getattr(target, "base_url", "") or "",
+        api_key=getattr(target, "api_key", "") or "")
 
 
 def _module_scope(repo_root: str, module: str, manifest: dict,
@@ -1348,7 +1370,7 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
         # TARGET venv + CUDA + HF_HOME overlay — raw manifest commands
         # must resolve inside the target repo's runtime, never ours
         return _to_result(runner.run(_job(slug),
-                                     _target_test_env(ctx, manifest)))
+                                     _target_test_env(ctx.settings, manifest)))
 
     worktree_path = ctx.run_dir / "main_worktree"
 
@@ -1368,7 +1390,7 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
         # baseline PYTHONPATH override) — same TARGET env otherwise; infra
         # outcomes propagate (a baseline timeout must never read as "fails
         # on main too")
-        env = _target_test_env(ctx, manifest, pythonpath_prepend=str(wt))
+        env = _target_test_env(ctx.settings, manifest, pythonpath_prepend=str(wt))
         return _to_result(wt_runner.run(_job(slug), env, baseline=True))
 
     async def debug_fn(slug: str, label: str, rc: int,
@@ -1507,7 +1529,7 @@ def _precommit_baseline(ctx: StepContext, repo: str, pc: dict,
         job = TestJob(key="__precommit_baseline__", command=command,
                       timeout_sec=float(pc.get("timeout_sec") or 600),
                       min_gpus=0, gpu_lock=False)
-        outcome = runner.run(job, _target_test_env(ctx, manifest))
+        outcome = runner.run(job, _target_test_env(ctx.settings, manifest))
         if outcome.timed_out:
             # a timed-out probe proves nothing about the baseline - treat
             # it as unavailable so the original red stays STRUCTURAL
@@ -1566,14 +1588,14 @@ async def _v3_precommit(ctx: StepContext) -> StepResult:
     job = TestJob(key="__precommit__", command=command,
                   timeout_sec=float(pc.get("timeout_sec") or 600),
                   min_gpus=0, gpu_lock=False)
-    outcome = runner.run(job, _target_test_env(ctx, manifest))
+    outcome = runner.run(job, _target_test_env(ctx.settings, manifest))
     attempt = 0
     if outcome.rc != 0 and pc.get("retry_once", True):
         # parity: many hooks fix files in place; a second run then passes.
         # NO `git add -A` here (parent-documented: indiscriminate staging is
         # how stray artifacts ended up in rebase commits)
         attempt = 1
-        outcome = runner.run(job, _target_test_env(ctx, manifest))
+        outcome = runner.run(job, _target_test_env(ctx.settings, manifest))
     passed = outcome.rc == 0 and not outcome.timed_out
     result = "passed" if passed else "failed"
     baseline_rc = None
@@ -1777,7 +1799,18 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
         hf_home=os.environ.get("HF_HOME", "/model"),
         model_aliases=ctx.settings.model_aliases,
         model_mismatch_policy=ctx.settings.model_mismatch_policy,
-        baseline_ref=_baseline_ref(manifest))
+        baseline_ref=_baseline_ref(manifest),
+        # harness delegation: "api" (default) keeps the in-process loop
+        backend=getattr(ctx.settings, "rebase_backend", "api") or "api",
+        backend_model=getattr(ctx.settings, "rebase_backend_model", "") or "",
+        settings=ctx.settings,
+        manifest_path=str(adapter_dir / "manifest.yaml"),
+        paths_spec={k: val for k, val in _dc_asdict(paths).items()
+                    if k != "env"},
+        repo=str((ctx.state.get("task_spec") or {}).get("repo") or ""),
+        state_slice={"task_spec": ctx.state.get("task_spec") or {},
+                     "run_id": ctx.state.get("run_id", ""),
+                     "upstream_commit": ctx.state.get("upstream_commit", "")})
     async with _serial_lock(ctx.run_dir):
         outcome = await rebase_module(
             module, client=client, config=config,
@@ -2068,7 +2101,7 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
                                 .get("artifact_globs") or []),
             cuda_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES", ""))
         outcome = runner.run(manifest_job_to_test_job(job),
-                             _target_test_env(ctx, manifest))
+                             _target_test_env(ctx.settings, manifest))
         if outcome.timed_out or outcome.watchdog_triggered:
             return "failed"
         if outcome.skipped:

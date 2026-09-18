@@ -1,6 +1,6 @@
 # config.py —— 规范
 
-<!-- verified-against: 2026-09-08 -->
+<!-- verified-against: 2026-09-19 -->
 
 `LOC ~658 · 配置 · refactor-status: oversized`
 
@@ -79,3 +79,13 @@ provider 的缺省模型必须在**这一处**解析，否则 `ResolvedTarget.mo
 如果再增长，请分组成嵌套 settings 模型（`LLMSettings` / `PushSettings` /
 `ReviewSettings` / `BackendSettings`），**而不是拆文件** —— 调用点依赖"一个 `Settings`
 对象到达每个 `StepContext`"。
+
+## rebase 后端抽象（2026-09-19）
+
+`rebase_backend`（默认 `api`）选择跑 rebase **module agent** 的 provider：
+`api` 为进程内 Anthropic tool-use 循环，其余为 harness provider id
+（`cursor` / `claude-code` / `codex`）。`rebase_backend_model` 是 harness
+**内部**的模型 id（如 `cursor-grok-4.6-high-fast`）。
+
+注意：tier 模型名指向 RAW-API 模型，对 harness CLI 无意义，**绝不**转发过去；
+为空时回落到 `strict_backend_model`，再回落到 harness 自身默认值。

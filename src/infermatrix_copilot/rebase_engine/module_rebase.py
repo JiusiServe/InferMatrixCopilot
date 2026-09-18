@@ -10,13 +10,13 @@ the adaptive-guidance knowledge layer is best-effort via hooks."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
 from ..run_trace import RunTrace
 from ..scopes import ToolScope
-from .agent_loop import run_agent_loop
+from .agent_loop import GATED_TOOL_NAMES, run_agent_loop
 from .hooks import RebaseHooks
 from .prompt_builder import (ModulePromptData, build_debug_prompt,
                              build_module_prompt)
@@ -37,6 +37,21 @@ class ModuleRunConfig:
     cuda_devices: str = "0,1"
     hf_home: str = "/model"
     max_turns: int = 150
+    # Harness backend selection (doc/features/provider-registry.md). "api"
+    # keeps the in-process Anthropic tool-use loop; any other provider id
+    # delegates the whole module step to that harness, with the SAME 20-tool
+    # surface served through the MCP tool bridge.
+    backend: str = "api"
+    backend_model: str = ""       # model INSIDE the harness; see config
+    settings: Any = None          # Settings — transport construction
+    manifest_path: str = ""       # adapter manifest, rebuilt inside the bridge
+    paths_spec: Mapping = field(default_factory=dict)  # serialized RebasePaths
+    state_slice: Mapping = field(default_factory=dict)  # run state the backends read
+    repo: str = ""                # repo name recorded in the bridge spec
+    # Harness session bound. `max_iters` maps to a native turn cap only where
+    # the harness HAS one (claude --max-turns); cursor/codex have none, so the
+    # real bound there is this timeout plus the prompt's budget discipline.
+    harness_timeout_s: float = 7200.0
     max_debug_retries: int = 3
     plan_review_max_rounds: int = 2
     model_aliases: Mapping[str, str] | None = None
@@ -44,6 +59,168 @@ class ModuleRunConfig:
     # adapter baseline ref (repo.remote/default_branch) — reaches the
     # LIVE prompt's test-plan prose (2026-08-01 neutrality audit)
     baseline_ref: str = "origin/main"
+
+
+def _plan_gate_opened(run_dir: Path) -> bool:
+    """Read `plan_done` back out of the bridge trace.
+
+    The gate runs in the bridge process, so the parent cannot observe it
+    directly; `PlanGate` records `plan_gate_opened` when a decision file is
+    successfully written. Absent/unreadable trace ⇒ NOT opened (the same
+    fail-closed default the in-process loop starts from)."""
+    import json as _json
+    tp = Path(run_dir) / "bridge_trace.jsonl"
+    try:
+        for line in tp.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                if _json.loads(line).get("kind") == "plan_gate_opened":
+                    return True
+            except ValueError:
+                continue
+    except OSError:
+        return False
+    return False
+
+
+def _changed_files(root: str) -> dict[str, int]:
+    """{path: mtime_ns} for every file git reports as changed under `root`."""
+    import subprocess
+    try:
+        proc = subprocess.run(["git", "-C", root, "status", "--porcelain"],
+                              capture_output=True, text=True, timeout=120,
+                              check=False)
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    out: dict[str, int] = {}
+    for line in (proc.stdout or "").splitlines():
+        rel = line[3:].strip().strip('"')
+        if " -> " in rel:                      # rename: take the destination
+            rel = rel.split(" -> ", 1)[1]
+        fp = Path(root) / rel
+        try:
+            out[str(fp)] = fp.stat().st_mtime_ns
+        except OSError:
+            continue
+    return out
+
+
+def _native_writes(root: str, run_dir: Path, before: dict[str, int],
+                   since_ts: float) -> tuple[list[str], list[str]]:
+    """Files the harness wrote WITHOUT going through the bridge.
+
+    A harness that keeps its own built-in file tools (cursor has no
+    `builtin_tools_off`) can edit the checkout without touching the bridge,
+    which means those writes miss BOTH the scope guard's out-of-scope
+    recording and the plan gate. Sandboxing would prevent it, but needs user
+    namespaces; where that is unavailable, detection is the honest ceiling.
+
+    Returns (native, pre_gate): every natively-written file, and the subset
+    that landed BEFORE the plan gate opened — the ones that broke the
+    contract rather than merely bypassing the bookkeeping.
+    """
+    import json as _json
+
+    bridged: set[str] = set()
+    gate_ts: float | None = None
+    tp = Path(run_dir) / "bridge_trace.jsonl"
+    try:
+        for line in tp.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                d = _json.loads(line)
+            except ValueError:
+                continue
+            if d.get("ts", 0) < since_ts:
+                continue
+            if d.get("kind") == "plan_gate_opened" and gate_ts is None:
+                gate_ts = float(d.get("ts") or 0) or None
+            if d.get("kind") == "tool_call" and d.get("path"):
+                bridged.add(str(d["path"]))
+    except OSError:
+        pass
+
+    native, pre_gate = [], []
+    for path, mtime_ns in _changed_files(root).items():
+        if path in bridged or before.get(path) == mtime_ns:
+            continue
+        native.append(path)
+        if gate_ts is not None and mtime_ns / 1e9 < gate_ts:
+            pre_gate.append(path)
+    return sorted(native), sorted(pre_gate)
+
+
+async def _harness_attempt(prompt: str, *, module: str, config,
+                           scope: ToolScope, trace: RunTrace,
+                           tool_defs: list[dict], plan_prefix: str,
+                           require_plan_review: bool) -> dict:
+    """Delegate one module attempt to a harness backend.
+
+    The harness runs its OWN loop, so the pieces `run_agent_loop` owns
+    in-process move into the bridge: the 20-tool surface (rebuilt there from
+    the spec) and the plan gate (enforced at dispatch, which a harness cannot
+    bypass). Returns the same dict shape the in-process attempt does so
+    `rebase_module`'s retry/debug logic is untouched.
+    """
+    import asyncio
+
+    from ..providers import AgentSessionRequest
+    from ..providers.registry import transport_for_id
+    from ..tool_bridge import write_bridge_spec
+
+    run_dir = Path(config.log_dir)
+    transport = transport_for_id(config.settings, config.backend)
+    spec_path = write_bridge_spec(
+        run_dir=run_dir, step_name=f"rebase.module.{module}", scope=scope,
+        repo=config.repo,
+        rebase={
+            "tool_schemas": str(Path(config.script_dir) / "tool_schemas.json"),
+            "manifest_path": config.manifest_path,
+            "model": config.model,
+            # prebuilt upstream: serializing the checkout paths HERE would
+            # add repo-specific vocabulary to a neutral core module
+            "paths": dict(config.paths_spec or {}),
+            "state": dict(config.state_slice or {}),
+            "plan_write_prefix": plan_prefix if require_plan_review else "",
+            "gated_tools": list(GATED_TOOL_NAMES),
+        })
+    # NEVER forward the tier model: it names a raw-API model the harness
+    # does not have. Empty lets the transport fall back to its own setting.
+    req = AgentSessionRequest(
+        system=prompt, prompt="", scope=scope,
+        model=config.backend_model or "",
+        max_iters=config.max_turns, timeout_s=config.harness_timeout_s,
+        run_dir=run_dir, step_name=f"rebase.module.{module}",
+        bridge_spec_path=spec_path, trace=trace)
+    import time as _time
+
+    before = _changed_files(scope.root)
+    started = _time.time()
+    outcome = await asyncio.to_thread(transport.run_session, req)
+
+    native, pre_gate = _native_writes(scope.root, run_dir, before, started)
+    if native and trace is not None:
+        trace.record("harness_native_writes", step=f"rebase.module.{module}",
+                     count=len(native), pre_gate=len(pre_gate),
+                     files=[str(f) for f in native[:20]],
+                     pre_gate_files=[str(f) for f in pre_gate[:20]])
+    if pre_gate:
+        # product code changed before a decision existed: the plan gate's
+        # whole contract. Fail the module rather than let the wave gate
+        # accept work the contract never covered.
+        return {"done": False, "turns": 0, "plan_done": False,
+                "text": ("harness wrote product files BEFORE the plan-review "
+                         "decision, bypassing the bridge: "
+                         + ", ".join(pre_gate[:10]))}
+    return {"done": not getattr(outcome, "truncated", False),
+            "text": getattr(outcome, "text", "") or "",
+            "turns": int(getattr(outcome, "iterations", 0) or 0),
+            "plan_done": (not require_plan_review
+                          or _plan_gate_opened(run_dir))}
 
 
 async def rebase_module(
@@ -91,6 +268,11 @@ async def rebase_module(
 
     async def _attempt(p: str, *, require_plan_review: bool = True) -> dict:
         try:
+            if config.backend and config.backend != "api":
+                return await _harness_attempt(
+                    p, module=module, config=config, scope=scope, trace=trace,
+                    tool_defs=tool_defs, plan_prefix=plan_prefix,
+                    require_plan_review=require_plan_review)
             return await run_agent_loop(
                 client, p, model=config.model, tool_defs=tool_defs,
                 extra_tools=extra_tools, scope=scope, trace=trace,

@@ -229,6 +229,17 @@ class Settings(BaseSettings):
     # v3 module-agent plan reviewer (rebase_engine/plan_review.py): empty =
     # review on the run's own tier model — never silently skipped
     rebase_reviewer_model: str = ""
+    # Which provider runs the rebase MODULE agents: "api" (default, the
+    # in-process Anthropic tool-use loop) or a harness provider id
+    # ("cursor", "claude-code", "codex"). Harness runs serve the same
+    # 20-tool surface through the MCP tool bridge; see
+    # doc/features/provider-registry.md.
+    rebase_backend: str = "api"
+    # Model id INSIDE the harness for rebase module agents (e.g.
+    # "cursor-grok-4.6-high-fast"). The tier model names a RAW-API model and
+    # is meaningless to a harness CLI, so it is never forwarded there; empty
+    # falls back to `strict_backend_model`, then the harness's own default.
+    rebase_backend_model: str = ""
     # v3 remote CI (rebase_engine/ci_loop.run_ci_rounds) — neutral knobs;
     # pipeline identities live in the adapter. Defaults are the parent's.
     rebase_ci_retries: int = 2          # push/rebuild rounds after the first
