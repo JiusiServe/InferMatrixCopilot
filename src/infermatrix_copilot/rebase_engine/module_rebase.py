@@ -10,13 +10,13 @@ the adaptive-guidance knowledge layer is best-effort via hooks."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
 from ..run_trace import RunTrace
 from ..scopes import ToolScope
-from .agent_loop import run_agent_loop
+from .agent_loop import GATED_TOOL_NAMES, run_agent_loop
 from .hooks import RebaseHooks
 from .prompt_builder import (ModulePromptData, build_debug_prompt,
                              build_module_prompt)
@@ -37,6 +37,19 @@ class ModuleRunConfig:
     cuda_devices: str = "0,1"
     hf_home: str = "/model"
     max_turns: int = 150
+    # Harness backend selection (doc/features/provider-registry.md). "api"
+    # keeps the in-process Anthropic tool-use loop; any other provider id
+    # delegates the whole module step to that harness, with the SAME 20-tool
+    # surface served through the MCP tool bridge.
+    backend: str = "api"
+    settings: Any = None          # Settings — transport construction
+    manifest_path: str = ""       # adapter manifest, rebuilt inside the bridge
+    paths_spec: Mapping = field(default_factory=dict)  # serialized RebasePaths
+    repo: str = ""                # repo name recorded in the bridge spec
+    # Harness session bound. `max_iters` maps to a native turn cap only where
+    # the harness HAS one (claude --max-turns); cursor/codex have none, so the
+    # real bound there is this timeout plus the prompt's budget discipline.
+    harness_timeout_s: float = 7200.0
     max_debug_retries: int = 3
     plan_review_max_rounds: int = 2
     model_aliases: Mapping[str, str] | None = None
@@ -44,6 +57,76 @@ class ModuleRunConfig:
     # adapter baseline ref (repo.remote/default_branch) — reaches the
     # LIVE prompt's test-plan prose (2026-08-01 neutrality audit)
     baseline_ref: str = "origin/main"
+
+
+def _plan_gate_opened(run_dir: Path) -> bool:
+    """Read `plan_done` back out of the bridge trace.
+
+    The gate runs in the bridge process, so the parent cannot observe it
+    directly; `PlanGate` records `plan_gate_opened` when a decision file is
+    successfully written. Absent/unreadable trace ⇒ NOT opened (the same
+    fail-closed default the in-process loop starts from)."""
+    import json as _json
+    tp = Path(run_dir) / "bridge_trace.jsonl"
+    try:
+        for line in tp.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                if _json.loads(line).get("kind") == "plan_gate_opened":
+                    return True
+            except ValueError:
+                continue
+    except OSError:
+        return False
+    return False
+
+
+async def _harness_attempt(prompt: str, *, module: str, config,
+                           scope: ToolScope, trace: RunTrace,
+                           tool_defs: list[dict], plan_prefix: str,
+                           require_plan_review: bool) -> dict:
+    """Delegate one module attempt to a harness backend.
+
+    The harness runs its OWN loop, so the pieces `run_agent_loop` owns
+    in-process move into the bridge: the 20-tool surface (rebuilt there from
+    the spec) and the plan gate (enforced at dispatch, which a harness cannot
+    bypass). Returns the same dict shape the in-process attempt does so
+    `rebase_module`'s retry/debug logic is untouched.
+    """
+    import asyncio
+
+    from ..providers import AgentSessionRequest
+    from ..providers.registry import transport_for_id
+    from ..tool_bridge import write_bridge_spec
+
+    run_dir = Path(config.log_dir)
+    transport = transport_for_id(config.settings, config.backend)
+    spec_path = write_bridge_spec(
+        run_dir=run_dir, step_name=f"rebase.module.{module}", scope=scope,
+        repo=config.repo,
+        rebase={
+            "tool_schemas": str(Path(config.script_dir) / "tool_schemas.json"),
+            "manifest_path": config.manifest_path,
+            "model": config.model,
+            # prebuilt upstream: serializing the checkout paths HERE would
+            # add repo-specific vocabulary to a neutral core module
+            "paths": dict(config.paths_spec or {}),
+            "plan_write_prefix": plan_prefix if require_plan_review else "",
+            "gated_tools": list(GATED_TOOL_NAMES),
+        })
+    req = AgentSessionRequest(
+        system=prompt, prompt="", scope=scope, model=config.model,
+        max_iters=config.max_turns, timeout_s=config.harness_timeout_s,
+        run_dir=run_dir, step_name=f"rebase.module.{module}",
+        bridge_spec_path=spec_path, trace=trace)
+    outcome = await asyncio.to_thread(transport.run_session, req)
+    return {"done": not getattr(outcome, "truncated", False),
+            "text": getattr(outcome, "text", "") or "",
+            "turns": int(getattr(outcome, "iterations", 0) or 0),
+            "plan_done": (not require_plan_review
+                          or _plan_gate_opened(run_dir))}
 
 
 async def rebase_module(
@@ -91,6 +174,11 @@ async def rebase_module(
 
     async def _attempt(p: str, *, require_plan_review: bool = True) -> dict:
         try:
+            if config.backend and config.backend != "api":
+                return await _harness_attempt(
+                    p, module=module, config=config, scope=scope, trace=trace,
+                    tool_defs=tool_defs, plan_prefix=plan_prefix,
+                    require_plan_review=require_plan_review)
             return await run_agent_loop(
                 client, p, model=config.model, tool_defs=tool_defs,
                 extra_tools=extra_tools, scope=scope, trace=trace,

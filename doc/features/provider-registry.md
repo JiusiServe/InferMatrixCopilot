@@ -283,6 +283,38 @@ STRICT_BACKEND_TIMEOUT_S=1800  # 单会话墙钟上限
 **M2 —— claude-code** · **M3 —— codex**：同样的验收形状（离线假 CLI 测试 + 各一次实网
 冒烟）；M2 另外要证明在净化环境下**嵌套 CC**（Strict 宿主 = Claude Code）能工作。
 
+**M4 —— rebase 模块 agent 走 harness（2026-09-18）**
+
+rebase 模块 agent 此前**硬接**在 API transport 上（`rebase_v3._tier_client` →
+`Anthropic`），provider 注册表只服务 `STRICT_BACKEND`/评审侧。M4 把它接到同一套
+抽象上：`ModuleRunConfig.backend`（默认 `api`，保持进程内循环逐字节不变）非 `api`
+时，整个模块步骤交给该 harness 的 `run_session`。
+
+两件进程内循环独有的东西必须跟着搬进桥里，否则 harness 后端等于没有它们：
+
+1. **20 个 adapter 工具**（不是共享注册表里的 6 个）。桥收到带 `rebase` 段的 spec 时，
+   在**自己的进程内**用同一个 `build_rebase_tools` 重建工具包，经 `dispatch(..., extra=)`
+   下发——scope 守卫、越界记录、结果上限与进程内一致。`build_backends`（原
+   `_build_backends`）改为吃显式可序列化入参，正是为了能在桥进程里重建同一套生产 backends。
+2. **计划闸门**。`PlanGate` 在 **dispatch 处**拒绝 `edit_file`/`run_pytest`/
+   `run_precommit`，并在闸门关闭时把 `write_file` 限制在计划目录内；开闸条件与
+   `agent_loop` 完全一致：**成功**写出 `.decision.md`。这比"只是不广告工具"更强——
+   harness 即使自己发出调用也会被拒。闸门开启会记 `plan_gate_opened`，父进程据此回读
+   `plan_done`。
+
+spec 只携带路径与模型标识：**不含 api_key，不含子进程 env**，凭证与 env 由桥进程自己的
+环境提供，`run_dir/bridge/` 下不落任何机密。
+
+已知缺口（明示）：`_PATH_ARGS` 只认识共享工具，因此对带路径参数的 adapter 工具，
+读包含性预检是 no-op（写仍由 `ToolScope` 在 dispatch 内守住）。另外 cursor/codex
+**没有原生轮次上限**，`max_iters` 只在 claude-code（`--max-turns`）上生效，其余靠
+`harness_timeout_s` 与提示词里的预算纪律兜底。
+
+**策略变更，需记录**：本仓库原先明确规定知识/记忆检索**不过桥**（"harness 会话可以读
+本仓库的知识，但永远不能写入"）。owner 于 2026-09-18 决定 rebase 走 harness 时要求
+**全量平价**，因此 `search_debug_memory`/`record_debug_memory`/`skill_manage`/
+`search_skills` 一并经桥重建——这是对既有决策的**反转**，不是顺带实现。
+
 ## 测试计划（离线优先，本仓库纪律）
 
 - `test_providers.py` —— 注册表解析；Strict 与 CLI 在空选择下的行为差异；

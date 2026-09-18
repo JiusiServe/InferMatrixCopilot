@@ -1,0 +1,140 @@
+"""Rebase module agents over a harness backend (provider-registry M1).
+
+The in-process loop owns two things a harness cannot inherit: the 20-tool
+adapter surface and the plan gate. These tests pin that both survive the move
+into the bridge process, and that the gate's semantics are IDENTICAL to
+`agent_loop`'s — refuse gated tools, confine writes to the plan dir, and open
+only on a successful decision-file write.
+"""
+from __future__ import annotations
+
+import inspect
+import json
+
+import pytest
+
+from infermatrix_copilot.scopes import PathScope, ToolScope
+from infermatrix_copilot.tool_bridge import (PlanGate, _fn_from_schema,
+                                             load_bridge_spec, make_dispatcher,
+                                             write_bridge_spec)
+from infermatrix_copilot.tools import ToolDef
+
+GATED = ("edit_file", "run_pytest", "run_precommit")
+
+
+def _scope(root):
+    return ToolScope(name="module-worker_runner",
+                     allowed_tools=frozenset({"read_file", "write_file",
+                                              "edit_file"}),
+                     path_scope=PathScope(writable=(f"{root}/*",),
+                                          primary=(f"{root}/*",)),
+                     read_only=False, root=str(root))
+
+
+def _rebase_section(plan_prefix):
+    return {"tool_schemas": "/adapter/rebase/tool_schemas.json",
+            "manifest_path": "/adapter/manifest.yaml",
+            "model": "some-model",
+            "paths": {"omni_path": "/omni", "vllm_path": "/vllm"},
+            "plan_write_prefix": str(plan_prefix),
+            "gated_tools": list(GATED)}
+
+
+def test_spec_carries_rebase_section_and_no_credentials(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    path = write_bridge_spec(run_dir=run_dir, step_name="rebase.module.x",
+                             scope=_scope(tmp_path), repo="vllm-omni",
+                             rebase=_rebase_section(tmp_path / "plans"))
+    _, raw = load_bridge_spec(path)
+    assert raw["rebase"]["paths"]["omni_path"] == "/omni"
+    # credentials and the child env stay in the bridge process's environment
+    blob = json.dumps(raw).lower()
+    assert "api_key" not in blob and "sk-" not in blob
+
+
+def test_spec_without_rebase_section_is_unchanged(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    path = write_bridge_spec(run_dir=run_dir, step_name="agent.review",
+                             scope=_scope(tmp_path), repo="vllm-omni")
+    _, raw = load_bridge_spec(path)
+    assert "rebase" not in raw
+
+
+@pytest.mark.parametrize("name", GATED)
+def test_gate_refuses_every_gated_tool_until_decision(name):
+    gate = PlanGate("/plans", GATED)
+    assert gate.refusal(name, {}) is not None
+    gate.observe("write_file", {"file_path": "/plans/p.decision.md"},
+                 json.dumps({"ok": True}))
+    assert gate.open is True
+    assert gate.refusal(name, {}) is None
+
+
+def test_gate_confines_writes_to_plan_dir_while_closed():
+    gate = PlanGate("/plans", GATED)
+    assert gate.refusal("write_file", {"file_path": "/repo/prod.py"}) is not None
+    assert gate.refusal("write_file",
+                        {"file_path": "/plans/p.decision.md"}) is None
+    # traversal out of the plan dir must not open a back door
+    assert gate.refusal("write_file",
+                        {"file_path": "/plans/../repo/prod.py"}) is not None
+
+
+def test_failed_decision_write_leaves_gate_shut():
+    gate = PlanGate("/plans", GATED)
+    gate.observe("write_file", {"file_path": "/plans/p.decision.md"},
+                 json.dumps({"error": "disk full"}))
+    assert gate.open is False
+    assert gate.refusal("edit_file", {}) is not None
+
+
+def test_gate_records_opening_for_the_parent(tmp_path):
+    from infermatrix_copilot.rebase_engine.module_rebase import _plan_gate_opened
+    from infermatrix_copilot.run_trace import RunTrace
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    assert _plan_gate_opened(run_dir) is False
+    trace = RunTrace(run_dir / "bridge_trace.jsonl")
+    gate = PlanGate("/plans", GATED, trace=trace)
+    gate.observe("write_file", {"file_path": "/plans/p.decision.md"},
+                 json.dumps({"ok": True}))
+    assert _plan_gate_opened(run_dir) is True
+
+
+def test_dispatcher_serves_extra_tools_and_enforces_gate(tmp_path):
+    from infermatrix_copilot.run_trace import RunTrace
+
+    calls = []
+    extra = {"reproduce": ToolDef(
+        name="reproduce", description="d", input_schema={},
+        handler=lambda **kw: (calls.append(kw) or json.dumps({"ok": True})))}
+    trace = RunTrace(tmp_path / "t.jsonl")
+    gate = PlanGate(str(tmp_path / "plans"), GATED)
+    call = make_dispatcher(_scope(tmp_path), (str(tmp_path),), trace,
+                           extra=extra, gate=gate)
+
+    # an adapter tool that is NOT gated runs even before the decision
+    assert call("reproduce", {"x": 1})
+    assert calls == [{"x": 1}]
+    # a gated one is refused at dispatch, not merely unadvertised
+    with pytest.raises(RuntimeError, match="locked until the plan-review"):
+        call("run_pytest", {})
+
+
+def test_generated_signature_matches_schema():
+    fn = _fn_from_schema(
+        "run_shell",
+        {"type": "object",
+         "properties": {"command": {"type": "string"},
+                        "timeout": {"type": "integer", "default": 60},
+                        "workdir": {"type": "string"}},
+         "required": ["command"]},
+        lambda name, args: json.dumps({"name": name, "args": args}))
+    sig = inspect.signature(fn)
+    assert sig.parameters["command"].default is inspect.Parameter.empty
+    assert sig.parameters["timeout"].default == 60
+    assert sig.parameters["workdir"].default is None
+    assert json.loads(fn("ls"))["args"]["command"] == "ls"
