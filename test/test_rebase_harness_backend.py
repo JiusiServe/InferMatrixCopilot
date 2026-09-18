@@ -188,3 +188,39 @@ def test_unset_optionals_are_omitted_not_passed_as_none():
     seen.clear()
     fn(file_path="x", offset=5)
     assert seen["offset"] == 5           # explicit value -> forwarded
+
+
+def test_tier_model_is_never_forwarded_to_a_harness(monkeypatch):
+    """The tier model names a RAW-API model (e.g. deepseek-flash) that a
+    harness CLI does not have; forwarding it would override the harness's
+    own model selection with an invalid id."""
+    import asyncio
+    import types as _types
+
+    from infermatrix_copilot import tool_bridge
+    from infermatrix_copilot.providers import registry
+    from infermatrix_copilot.rebase_engine.module_rebase import _harness_attempt
+
+    seen = {}
+
+    class _T:
+        def run_session(self, req):
+            seen["model"] = req.model
+            return _types.SimpleNamespace(truncated=False, text="ok",
+                                          iterations=0)
+
+    monkeypatch.setattr(registry, "transport_for_id", lambda *a, **k: _T())
+    monkeypatch.setattr(tool_bridge, "write_bridge_spec", lambda **k: None)
+
+    cfg = _types.SimpleNamespace(
+        log_dir="/tmp", backend="cursor", backend_model="", settings=None,
+        model="deepseek-flash", script_dir="/tmp", manifest_path="",
+        repo="r", max_turns=10, harness_timeout_s=1.0, paths_spec={},
+        baseline_ref="origin/main")
+    scope = ToolScope(name="s", allowed_tools=frozenset(), path_scope=None,
+                      read_only=True, root="/tmp")
+    asyncio.run(_harness_attempt(
+        "p", module="m", config=cfg, scope=scope, trace=None, tool_defs=[],
+        plan_prefix="/tmp/plans", require_plan_review=False))
+
+    assert seen["model"] == "", seen            # empty, NOT "deepseek-flash"

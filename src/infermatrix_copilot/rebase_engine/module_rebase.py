@@ -42,6 +42,7 @@ class ModuleRunConfig:
     # delegates the whole module step to that harness, with the SAME 20-tool
     # surface served through the MCP tool bridge.
     backend: str = "api"
+    backend_model: str = ""       # model INSIDE the harness; see config
     settings: Any = None          # Settings — transport construction
     manifest_path: str = ""       # adapter manifest, rebuilt inside the bridge
     paths_spec: Mapping = field(default_factory=dict)  # serialized RebasePaths
@@ -116,8 +117,11 @@ async def _harness_attempt(prompt: str, *, module: str, config,
             "plan_write_prefix": plan_prefix if require_plan_review else "",
             "gated_tools": list(GATED_TOOL_NAMES),
         })
+    # NEVER forward the tier model: it names a raw-API model the harness
+    # does not have. Empty lets the transport fall back to its own setting.
     req = AgentSessionRequest(
-        system=prompt, prompt="", scope=scope, model=config.model,
+        system=prompt, prompt="", scope=scope,
+        model=config.backend_model or "",
         max_iters=config.max_turns, timeout_s=config.harness_timeout_s,
         run_dir=run_dir, step_name=f"rebase.module.{module}",
         bridge_spec_path=spec_path, trace=trace)

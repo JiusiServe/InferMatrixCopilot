@@ -1760,6 +1760,7 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
         baseline_ref=_baseline_ref(manifest),
         # harness delegation: "api" (default) keeps the in-process loop
         backend=getattr(ctx.settings, "rebase_backend", "api") or "api",
+        backend_model=getattr(ctx.settings, "rebase_backend_model", "") or "",
         settings=ctx.settings,
         manifest_path=str(adapter_dir / "manifest.yaml"),
         paths_spec={k: val for k, val in _dc_asdict(paths).items()
