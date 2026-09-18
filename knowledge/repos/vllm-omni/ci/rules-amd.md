@@ -1,7 +1,7 @@
 ---
 title: "AMD/ROCm CI 规则"
 created: 2026-09-05
-updated: 2026-09-10
+updated: 2026-09-14
 type: rule
 tags: [vllm-omni, ci]
 sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234"]
@@ -42,3 +42,10 @@ confidence: high
 - 强制：`mi300_1` 一类单卡 model job 的 pytest marker 必须 `not (cards_2 or … or cards_8)`，同时保留无 `cards_1` 的 legacy 单卡用例；真正需要双卡的用例（如 LTX2 Ulysses parity）改到已有双卡 lane，并声明 `rocm` 资源与 `device_count >= world_size` 早失败。
 - 禁止：让 `cards_2+` 测试在单卡 worker 上 spawn rank1→GPU1 导致 `invalid device ordinal`；用邻近 green shard 宣称 multi-GPU routing 已修好。
 - 验收：pipeline argv/collection 断言单卡 job 排除 multi-card markers、双卡 job 收集目标文件；硬件 marker helper 覆盖 ROCm 声明。^[PR #7234]
+
+## OMNI-CI-2i — ROCm Dockerfile 必须与 CI 的 vLLM release 对齐并在构建期 canary
+
+- 触发：修改 `docker/Dockerfile.rocm` 的 `BASE_IMAGE` / `VLLM_VERSION_OR_COMMIT_HASH` / `USE_NIGHTLY_BUILD`、`.buildkite/amd` 的 image build 命令，或 AMD 运行时因缺失 vLLM API 失败。
+- 强制：默认 `BASE_IMAGE` tag 与可选 source rebuild 的 `VLLM_VERSION_OR_COMMIT_HASH` 都必须等于 `docker/Dockerfile.ci` 的 `VLLM_BASE_TAG`；AMD build 不得 `--build-arg` 覆盖这两个默认。可选 nightly 重装之后、业务层拷贝之前，必须用当前 Omni 依赖的 vLLM API 做 image-build canary，构建失败优于整 lane runtime 失败。
+- 禁止：只升 Omni 代码而留下过期 ROCm base；把 canary 推到测试阶段；用自定义 source pin 却不更新 `tests/buildkite/test_rocm_dockerfile.py`；把 Docker pin 误当成非 Docker 安装会自动装上匹配 vLLM。
+- 验收：静态回归断言 ROCm base/source ref 跟踪 CI tag、默认 `USE_NIGHTLY_BUILD=0`、AMD build 不覆盖上述 arg、canary 位于 nightly 块之后；故意错位 pin 必须失败。^[PR #7395]

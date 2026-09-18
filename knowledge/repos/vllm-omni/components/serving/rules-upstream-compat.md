@@ -1,7 +1,7 @@
 ---
 title: "Serving upstream 兼容规则"
 created: 2026-09-02
-updated: 2026-09-05
+updated: 2026-09-14
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #5976", "PR #5957", vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, tests/config/test_endpoint_policy.py, "PR #5036", "PR #6642", "PR #6773", "PR #6707", vllm_omni/config/endpoint_policy.py]
@@ -55,3 +55,10 @@ confidence: high
   `tests/config/test_endpoint_policy.py`；API-server 路径仍仅为其 `ImportError` fallback 的静态合同。
   PR 描述报告该 suite `4 passed`，批准 review 的边界是 static review、merge tree 与 CI，且明确未执行
   untrusted fork code；因此不能扩展为完整 vLLM 版本兼容或端到端声明。^[PR #6707, merged 2026-09-02]
+
+## SERV-7e — realtime/video-stream 音频事件必须使用 `response.output_audio.*`
+
+- 触发：修改 realtime WebSocket、video stream serving、示例客户端或协议文档中的音频 delta/done 事件名。
+- 强制：服务端发出的增量与终态音频事件类型必须是 `response.output_audio.delta` / `response.output_audio.done`（及配套 transcript 命名），与已迁移的 OpenAI realtime 合同一致；示例与测试断言同一集合。
+- 禁止：在任一生产发送路径残留 legacy `response.audio.delta` / `response.audio.done`；只改文档/示例而漏改 `realtime_connection` 或 `serving_video_stream`/`video_stream_base`。
+- 验收：duplex/realtime/video-stream 测试收集到的音频事件类型集合等于 `response.output_audio.*`，且不接受仅 legacy 名作为成功合同。^[PR #7426]
