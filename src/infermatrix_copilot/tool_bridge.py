@@ -162,7 +162,7 @@ class PlanGate:
                               decision=str(args.get("file_path", "")))
 
 
-def _rebase_extra(spec: dict, trace: RunTrace) -> dict:
+def _rebase_extra(spec: dict, trace: RunTrace, scope: ToolScope) -> dict:
     """Rebuild the adapter's rebase tool pack in the bridge process.
 
     Credentials are NOT in the spec: `api_key` comes from this process's
@@ -187,10 +187,20 @@ def _rebase_extra(spec: dict, trace: RunTrace) -> dict:
     if mpath and Path(mpath).is_file():
         import yaml
         manifest = yaml.safe_load(Path(mpath).read_text(encoding="utf-8")) or {}
+    # `repo` here is the repo ROOT PATH — build_backends feeds it to
+    # TestRunner(repo_root=...). The spec's "repo" is the repo NAME and
+    # belongs in `state.task_spec.repo`; passing the name here made every
+    # TestRunner-backed tool (run_pytest/run_precommit/reproduce) die with
+    # FileNotFoundError on a relative path.
+    state = dict(rb.get("state") or {})
+    state.setdefault("task_spec", {"repo": spec.get("repo", "")})
     backends = build_backends(
-        settings=settings, state=rb.get("state", {}),
+        settings=settings, state=state,
         run_dir=Path(spec["run_dir"]), trace=trace, manifest=manifest,
-        repo=spec.get("repo", ""), model=rb.get("model", ""),
+        # the module scope's root IS the repo root (see `_module_scope`);
+        # no repo-specific fallback, so a missing root fails loudly
+        repo=scope.root,
+        model=rb.get("model", ""),
         base_url=rb.get("base_url", ""),
         api_key=getattr(settings, "anthropic_api_key", "") or "",
     )
@@ -300,7 +310,7 @@ def build_server(spec_path: Path):
     gate = None
     if spec.get("rebase"):
         rb = spec["rebase"]
-        rebase_extra, rebase_defs = _rebase_extra(spec, trace)
+        rebase_extra, rebase_defs = _rebase_extra(spec, trace, scope)
         if rb.get("plan_write_prefix"):
             gate = PlanGate(rb["plan_write_prefix"],
                             tuple(rb.get("gated_tools")

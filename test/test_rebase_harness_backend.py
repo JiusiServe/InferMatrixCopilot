@@ -216,7 +216,7 @@ def test_tier_model_is_never_forwarded_to_a_harness(monkeypatch):
         log_dir="/tmp", backend="cursor", backend_model="", settings=None,
         model="deepseek-flash", script_dir="/tmp", manifest_path="",
         repo="r", max_turns=10, harness_timeout_s=1.0, paths_spec={},
-        baseline_ref="origin/main")
+        state_slice={}, baseline_ref="origin/main")
     scope = ToolScope(name="s", allowed_tools=frozenset(), path_scope=None,
                       read_only=True, root="/tmp")
     asyncio.run(_harness_attempt(
@@ -224,3 +224,43 @@ def test_tier_model_is_never_forwarded_to_a_harness(monkeypatch):
         plan_prefix="/tmp/plans", require_plan_review=False))
 
     assert seen["model"] == "", seen            # empty, NOT "deepseek-flash"
+
+
+def test_bridge_passes_repo_ROOT_not_repo_name(tmp_path, monkeypatch):
+    """`build_backends(repo=...)` is a filesystem path — it becomes
+    TestRunner(repo_root=Path(repo)). The spec's "repo" is the repo NAME and
+    belongs in state.task_spec.repo. Passing the name made run_pytest,
+    run_precommit and reproduce die with FileNotFoundError('vllm-omni')."""
+    from infermatrix_copilot import tool_bridge
+    from infermatrix_copilot.run_trace import RunTrace
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    root = tmp_path / "checkout"
+    root.mkdir()
+    seen = {}
+
+    def _fake_build_backends(**kw):
+        seen.update(kw)
+        return object()
+
+    monkeypatch.setattr(tool_bridge, "_rebase_extra",
+                        tool_bridge._rebase_extra)  # keep real
+    monkeypatch.setattr("infermatrix_copilot.engine.steps.rebase_v3."
+                        "build_backends", _fake_build_backends)
+    monkeypatch.setattr(tool_bridge, "build_rebase_tools",
+                        lambda defs, paths, backends: {}, raising=False)
+
+    scope = ToolScope(name="m", allowed_tools=frozenset(), path_scope=None,
+                      read_only=False, root=str(root))
+    spec = {"run_dir": str(run_dir), "repo": "vllm-omni",
+            "rebase": {"tool_schemas": "", "manifest_path": "", "model": "m",
+                       "paths": {"omni_path": str(root),
+                                 "vllm_path": str(root)}}}
+    try:
+        tool_bridge._rebase_extra(spec, RunTrace(run_dir / "t.jsonl"), scope)
+    except Exception:
+        pass  # load_tool_schemas("") fails after build_backends is called
+
+    assert seen.get("repo") == str(root), seen.get("repo")
+    assert seen["state"]["task_spec"]["repo"] == "vllm-omni"

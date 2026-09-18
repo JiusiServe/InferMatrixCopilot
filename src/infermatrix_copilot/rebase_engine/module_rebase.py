@@ -46,6 +46,7 @@ class ModuleRunConfig:
     settings: Any = None          # Settings — transport construction
     manifest_path: str = ""       # adapter manifest, rebuilt inside the bridge
     paths_spec: Mapping = field(default_factory=dict)  # serialized RebasePaths
+    state_slice: Mapping = field(default_factory=dict)  # run state the backends read
     repo: str = ""                # repo name recorded in the bridge spec
     # Harness session bound. `max_iters` maps to a native turn cap only where
     # the harness HAS one (claude --max-turns); cursor/codex have none, so the
@@ -114,6 +115,7 @@ async def _harness_attempt(prompt: str, *, module: str, config,
             # prebuilt upstream: serializing the checkout paths HERE would
             # add repo-specific vocabulary to a neutral core module
             "paths": dict(config.paths_spec or {}),
+            "state": dict(config.state_slice or {}),
             "plan_write_prefix": plan_prefix if require_plan_review else "",
             "gated_tools": list(GATED_TOOL_NAMES),
         })

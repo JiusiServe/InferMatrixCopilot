@@ -1765,7 +1765,10 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
         manifest_path=str(adapter_dir / "manifest.yaml"),
         paths_spec={k: val for k, val in _dc_asdict(paths).items()
                     if k != "env"},
-        repo=str((ctx.state.get("task_spec") or {}).get("repo") or ""))
+        repo=str((ctx.state.get("task_spec") or {}).get("repo") or ""),
+        state_slice={"task_spec": ctx.state.get("task_spec") or {},
+                     "run_id": ctx.state.get("run_id", ""),
+                     "upstream_commit": ctx.state.get("upstream_commit", "")})
     async with _serial_lock(ctx.run_dir):
         outcome = await rebase_module(
             module, client=client, config=config,
