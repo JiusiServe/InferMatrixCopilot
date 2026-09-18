@@ -36,7 +36,14 @@ class ModuleRunConfig:
     last_rebase_vllm_commit: str = ""
     cuda_devices: str = "0,1"
     hf_home: str = "/model"
-    max_turns: int = 150
+    # Raised from 150 for the v0.30.0 campaign: a flash-class module agent
+    # needs ~2.3x the turns of the pro tier on the same module (140+ vs 62),
+    # mostly shell exploration before the first edit. Exhausting the budget
+    # is NOT fatal — the engine restarts the agent loop — but a restart
+    # discards accumulated context, so too low a ceiling makes the agent
+    # re-explore from scratch. Bounds the in-process loop; a harness session
+    # is bounded by `harness_timeout_s` instead (see below).
+    max_turns: int = 400
     # Harness backend selection (doc/features/provider-registry.md). "api"
     # keeps the in-process Anthropic tool-use loop; any other provider id
     # delegates the whole module step to that harness, with the SAME 20-tool
