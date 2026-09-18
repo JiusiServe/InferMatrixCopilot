@@ -137,4 +137,54 @@ def test_generated_signature_matches_schema():
     assert sig.parameters["command"].default is inspect.Parameter.empty
     assert sig.parameters["timeout"].default == 60
     assert sig.parameters["workdir"].default is None
-    assert json.loads(fn("ls"))["args"]["command"] == "ls"
+    # keyword-only by construction (see the interleaved-schema test below)
+    assert json.loads(fn(command="ls"))["args"]["command"] == "ls"
+
+
+def test_schema_may_interleave_required_and_optional():
+    """`record_debug_memory` declares an optional property BEFORE a required
+    one. Emitted as positionals that is a SyntaxError, so the generated
+    parameters are keyword-only (MCP calls by name regardless)."""
+    fn = _fn_from_schema(
+        "record_debug_memory",
+        {"type": "object",
+         "properties": {"module": {"type": "string"},
+                        "root_cause": {"type": "string"},
+                        "fix": {"type": "string"}},
+         "required": ["module", "fix"]},
+        lambda name, args: json.dumps(args))
+    got = json.loads(fn(module="worker_runner", fix="patched"))
+    assert got["module"] == "worker_runner" and got["fix"] == "patched"
+    assert all(p.kind is inspect.Parameter.KEYWORD_ONLY
+               for p in inspect.signature(fn).parameters.values())
+
+
+def test_tool_with_no_parameters_generates():
+    """A zero-property schema (git_diff_tests_upstream) must not emit a bare
+    `*` — "named arguments must follow bare *"."""
+    fn = _fn_from_schema("git_diff_tests_upstream",
+                         {"type": "object", "properties": {}},
+                         lambda name, args: name)
+    assert inspect.signature(fn).parameters == {}
+    assert fn() == "git_diff_tests_upstream"
+
+
+def test_unset_optionals_are_omitted_not_passed_as_none():
+    """A schema optional with no default must be DROPPED when unset, not
+    forwarded as None: the handler has its own Python default, and
+    `read_file` did `offset + int` on the None (caught in live smoke)."""
+    seen = {}
+    fn = _fn_from_schema(
+        "read_file",
+        {"type": "object",
+         "properties": {"file_path": {"type": "string"},
+                        "offset": {"type": "integer"},
+                        "limit": {"type": "integer", "default": 200}},
+         "required": ["file_path"]},
+        lambda name, args: seen.update(args) or "ok")
+    fn(file_path="x")
+    assert "offset" not in seen          # unset, no schema default -> dropped
+    assert seen["limit"] == 200          # schema default -> forwarded
+    seen.clear()
+    fn(file_path="x", offset=5)
+    assert seen["offset"] == 5           # explicit value -> forwarded

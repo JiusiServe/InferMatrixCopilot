@@ -206,7 +206,7 @@ def _fn_from_schema(name: str, schema: dict, call):
              "boolean": "bool", "array": "list", "object": "dict"}
     props = (schema.get("properties") or {})
     required = set(schema.get("required") or ())
-    params, names = [], []
+    params, names, omit_if_none = [], [], []
     for pname, pspec in props.items():
         if not pname.isidentifier():
             continue
@@ -216,12 +216,29 @@ def _fn_from_schema(name: str, schema: dict, call):
             params.append(f"{pname}: {ann}")
         else:
             default = (pspec or {}).get("default")
-            params.append(f"{pname}: {ann} = {default!r}"
-                          if default is not None else
-                          f"{pname}: {ann} | None = None")
-    src = (f"def _tool({', '.join(params)}) -> str:\n"
-           f"    return _call({name!r}, {{"
-           + ", ".join(f"{n!r}: {n}" for n in names) + "})\n")
+            if default is not None:
+                params.append(f"{pname}: {ann} = {default!r}")
+            else:
+                # no schema default: sentinel None, and DROP it below rather
+                # than forwarding None into a handler that expects its own
+                # Python default (read_file's `offset` did `None + int`)
+                params.append(f"{pname}: {ann} | None = None")
+                omit_if_none.append(pname)
+    # KEYWORD-ONLY: a schema may interleave required and optional properties
+    # (record_debug_memory does), which as positionals is a SyntaxError —
+    # "parameter without a default follows parameter with a default". MCP
+    # calls tools by name, so keyword-only costs nothing and keeps the
+    # schema's own property order.
+    # a no-parameter tool (git_diff_tests_upstream) must not emit a bare "*"
+    sig = f"*, {', '.join(params)}" if params else ""
+    body_args = "{" + ", ".join(f"{n!r}: {n}" for n in names) + "}"
+    drop = "{" + ", ".join(repr(n) for n in omit_if_none) + "}"
+    src = (f"def _tool({sig}) -> str:\n"
+           f"    _a = {body_args}\n"
+           f"    _drop = {drop}\n"
+           "    _a = {k: v for k, v in _a.items()"
+           "         if not (k in _drop and v is None)}\n"
+           f"    return _call({name!r}, _a)\n")
     ns: dict = {"_call": call}
     exec(compile(src, f"<bridge:{name}>", "exec"), ns)  # noqa: S102
     fn = ns["_tool"]
