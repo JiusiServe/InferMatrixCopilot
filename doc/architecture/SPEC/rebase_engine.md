@@ -137,3 +137,10 @@ choke-point 编号（agent_loop/rebase_tools 写"C5"）落后于 `_CONSTRAINTS.m
 
 `module_rebase` 既可跑进程内 agent 循环，也可把一个 module 交给 harness
 provider；两条路径共用同一 prompt、同一工具面与同一 plan gate。
+
+## module agent 轮次预算（2026-09-19）
+
+`RebaseModuleConfig.max_turns` = 400。耗尽预算不致命：引擎会**重启** agent
+循环而不是判 module 失败——但重启会丢掉已积累的上下文，所以预算过低时
+agent 会反复从头探索。flash 级模型在同一 module 上约需 pro 级 2.3 倍轮次
+（140+ vs 62），150 的旧上限会被截断三次仍未完成。
