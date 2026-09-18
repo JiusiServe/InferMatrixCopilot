@@ -1,7 +1,7 @@
 ---
 title: "请求输入合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-11
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #3805", "PR #5374", "PR #5885", "PR #6598", vllm_omni/data_entry_keys.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/engine/orchestrator.py, vllm_omni/inputs/, tests/engine/test_async_omni_engine_input.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_invalid_audio_speech.py, tests/entrypoints/openai_api/test_serving_speech.py, "PR #5181", "PR #6182"]
@@ -139,3 +139,10 @@ engine 生命周期见 [engine 生命周期规则](rules-engine-lifecycle.md)；
 - 强制：transform 只操作 Stage-0 copy；原始 prompt 保留给 downstream，并在 transform 前后保持同一 global request ID。只把已处理的 metadata 合并回原始视图，先移除 transform-owned stale keys。临时目录只通过内部 `REQUEST_ARTIFACT_DIRS_KEY` 交给 request state；preprocess、companion build、enqueue 前失败立即回收，admit 后由 orchestrator 在所有 terminal cleanup 路径回收，且内部 key 不得进入 stage payload。
 - 禁止：把 transformed prompt 当作 downstream 原始媒体、让旧 prepared descriptor 跨请求复用、在 ownership 已交给 orchestrator 后由 frontend 提前删除，或让异常路径泄漏转码目录。
 - 验收：覆盖 transform replacement/copy、request ID 与 metadata merge、成功 terminal/abort、preprocess/companion/enqueue 异常以及无 artifact control；断言 downstream 看见原始媒体+允许的 processed meta，目录恰好由当前 owner 回收，内部 key 未传输。^[PR #5885]
+
+## SERV-4r — video 参考图必须在 RGB 转换前执行像素上限并映射解码器炸弹
+
+- 触发：修改 `/v1/videos` 的 `image_reference` / `input_reference(s)`、MiniMax H3 multipart 图片上传，或 `video_api_utils._decode_image_bytes` / `_validate_image_pixel_limit`。
+- 强制：`Image.open` 后、`convert("RGB")` 前按 header 尺寸检查 `width * height`；当 `VLLM_MAX_IMAGE_PIXELS > 0` 且超出时拒绝。`=0` 禁用检查，恰等于上限放行。Pillow `DecompressionBombError` 必须映射为专用像素上限 client error（HTTP 400），不得落入泛化 “not a valid image” 后再当 video 重试。H3 multipart 与共享 decode helper 共用同一合同。
+- 禁止：先全量 decode/convert 再检像素；把 decoder bomb 误判为可 video-fallback 的无效图；用 500 或静默接受放大资源占用。
+- 验收：覆盖超限在 convert 前失败、disabled/inclusive 边界、bomb→专用 400、以及 H3 multipart 字段拒绝。^[PR #6963]

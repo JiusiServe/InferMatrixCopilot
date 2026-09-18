@@ -1,7 +1,7 @@
 ---
 title: "OmniVoice 规则"
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-11
 type: rule
 tags: [vllm-omni, models, model-executor, attention-runtime, ffn-runtime]
 sources: ["PR #6317", vllm_omni/model_executor/models/omnivoice/omnivoice_generator.py, vllm_omni/model_executor/models/omnivoice/fused_qkv_rope.py, tests/model_executor/models/omnivoice/test_cuda_graph_generator.py, tests/model_executor/models/omnivoice/test_fused_projection_load.py, tests/model_executor/models/omnivoice/test_fused_qkv_rope.py, tests/model_executor/models/omnivoice/test_mask_dtype.py, tests/model_executor/models/omnivoice/test_triton_kernels.py]
@@ -30,3 +30,10 @@ confidence: high
 - 强制：checkpoint pack 顺序固定为 `qkv=[q,k,v]`、`gate_up=[gate,up]`；一旦某层开始 pack，缺少或仅出现部分 source shards 必须拒绝，不能让 fused parameter 保持随机初始化；未进入任何 fused-source group 的 shard 保持 generic loader 处理。attention prologue 只以 fp32 进行 Q/K RMSNorm、Q/K 权重计算与 Q/K RoPE，V 保持原 projection 值；随后按 GQA repeat K/V，并产出 contiguous `[batch, heads, sequence, head_dim]`（BHSD）。Triton 仅在 Triton 可用、CUDA tensor、QKV contiguous、head dim 为正的 2 的幂、Q 与 KV head 数都可被 8 整除且 GQA 可整除时启用；其他情况走 eager reference。residual 的加法/归一化代数不变，SwiGLU 保持 `silu(gate) * up` 的顺序。
 - 禁止：改变 source shard packing 次序、接受 partial/missing pack group，或把没有 fused source 的整组 shards 误判为 partial；对 V 应用 Q/K norm 或 RoPE；重排 GQA 的 K/V 映射、返回非 contiguous BHSD；把 Triton 的存在或 CUDA 单项条件当作充分资格，或删除 eager fallback；为方便而给 generator mask 重新引入 fp32 默认。不得把本 PR 的 A800、CPU 或 CUDA 测试/性能证据外推为其他硬件、shape、后端或普遍 serving support。
 - 验收：CPU 覆盖 pack order、全缺 source group 不触发 pack、任一 partial/missing 或错误 shape 拒绝，以及 eager 输出；CUDA+Triton 仅在上述 geometry 下对 eager reference 覆盖 fp32/fp16/bf16、Q/K norm+RoPE、未经变换的 V、正确 GQA index 与 contiguous BHSD；无 Triton、CPU、non-contiguous 或不合资格 geometry 必须回退。mask 测试覆盖 `model_dtype` 的 bool True→`0.0`、False→`-inf`、float 原样保留和 graph replay；graph/eager 及 residual/SwiGLU 回归保持既有精度合同。A800 上的 float16/float32 性能和 CPU/CUDA 单测只构成该 PR 的有界证据，不构成广泛性能或支持承诺。 ^[PR #6317]
+
+## OMNIVOICE-2a — OmniVoice 请求批必须使用 packed varlen CFG 布局并按请求解码
+
+- 触发：修改 OmniVoice pipeline/generator 的 request batch、step execution、CFG 输入布局、`cu_seqs`、CUDA Graph 键，或 codec decoder 批处理。
+- 强制：声明 `supports_request_batch` 与 `supports_step_execution` 时，Generator 使用 token-major packed 布局 `[cond0, uncond0, cond1, uncond1, …]`，以 `cu_seqs` 表达 `2B` 条独立序列的累积边界，序列内双向、序列间互不可见；position id 按 `cu_seqs` 每段从 0 重置。CUDA Graph 键为 `(request_batch_size, token_bucket)`，静态输入按 token bucket 与 `2B+2` `cu_seqs` 捕获。每请求保留独立 RNG，避免 Gumbel 流交叉。完成请求用**精确长度** codec token **逐条** decode；不得为迁就 Decoder 批处理而把已 exact-length 的 token 再 pad 到 longest。
+- 禁止：把 cond/uncond 或跨请求 pad 成 `[batch, codebook, max_seq]` 当作默认热路径；共享 batch 级 RNG；在未证明 pad-Decoder 更快前恢复 padded Decoder batching。不得把注意力/layout 变更后的输出宣称为与旧 padded 路径 bit-exact。
+- 验收：覆盖 packed `cu_seqs` 边界、per-request seed 隔离、graph key/bucket、step lifecycle，以及 exact-length 单请求 decode；WER/parity 报告须标明 layout 变更。deploy 批参数（如 `max_num_seqs` / `request_batch_max_wait_ms`）只证明该配置，不构成通用吞吐保证。^[PR #6408]

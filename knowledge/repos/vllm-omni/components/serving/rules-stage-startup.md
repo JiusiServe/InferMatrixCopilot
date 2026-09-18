@@ -1,7 +1,7 @@
 ---
 title: "Stage 启动与设备布局规则"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-11
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #6050", "PR #5445", "Issue #5003", "PR #5742", vllm_omni/engine/stage_init_utils.py, tests/engine/test_stage_device_layout.py]
@@ -33,3 +33,10 @@ confidence: high
 - 强制：对声明 `runtime.devices` 的每个 LLM stage，在 `create_engine_config` 或 worker/executor 创建前，以同一公式验证并拆分设备：每个本地 replica 需要 `tensor_parallel_size × data_parallel_size_local × pipeline_parallel_size`；`data_parallel_size_local` 未设置时才回退到全局 DP，值为 `0` 的 head process 不做本地设备验证。显式列表可为单 replica template（恰为每副本大小）或完整 pool（该大小 × `num_replicas`）；未声明 `devices` 时保留 launcher 分配语义。仅当去掉 TP 后设备数恰好有效，错误才说明 top-level TP 会广播到全部 stage，并要求在每个 stage override 中一并设置 TP 与 `devices`；其他 TP/DP/PP/replica 不匹配给通用维度说明。
 - 禁止：按集群全局 DP 校验本地 `runtime.devices`；让 guard 与 replica splitter 使用不同的每副本宽度；在 engine config/worker 启动后才暴露 `local rank ... out of bounds`；把 PP 或其他布局错误一律归因于 top-level TP；因为没有显式 devices 而拒绝 vLLM 的设备分配。
 - 验收：覆盖 TP 广播的单卡 stage 在 engine-config/executor 前失败、匹配 TP/device 通过、未声明 devices 跳过、local-DP 小于 global-DP 与 local-DP=0、PP/local-DP 加多副本的 template 和 full-pool 拆分，以及 PP-only mismatch 不含 TP 专属 workaround。^[Issue #5003] ^[PR #5742]
+
+## SERV-12c — 串行 LLM 副本初始化必须按物理 GPU 重叠连通分量分组
+
+- 触发：修改 `stage_runtime` 的 replica init group、`parse_physical_device_ids`、`device_overlap_group_keys`、`acquire_device_locks` / `spawn_device_lock`，或多 stage 共享/重叠 `runtime.devices` 的启动路径。
+- 强制：本地串行 LLM replica 按已解析物理 device **集合**的连通分量分组：集合相交（含 `{0,1}` 与 `{0}`、`"1,0"` 与 `"0,1"`、传递链）共用同一 `device-group:<sorted union>` 并顺序初始化；不相交集合才并行。非整数 visibility（UUID/MIG）或 unresolved 解析为 `None` 时，该批串行 LLM 收拢为单一 `device-group:*`。diffusion / remote / `parallel_stage_init` 保持既有 per-replica override key。
+- 禁止：仅用精确 device **字符串**分组，使重叠但不等的集合进入并行线程后，同进程对已持有 inode 的 `flock(LOCK_EX|LOCK_NB)` 自相争并在仍持有 `spawn_device_lock` 时空转到 `stage_init_timeout`。
+- 验收：覆盖重叠/传递重叠同组、不相交异组、非整数 devices 收拢；多 stage `0,1`+`0` 启动不得因 device-lock timeout 无锁继续。^[PR #7328]
