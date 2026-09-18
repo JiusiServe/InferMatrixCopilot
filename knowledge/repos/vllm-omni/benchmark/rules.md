@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni Benchmark 规则"
 created: 2026-09-05
-updated: 2026-09-10
+updated: 2026-09-18
 type: rule
 tags: [vllm-omni, benchmark]
 sources: ["PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py, "PR #7130", "PR #7259"]
@@ -60,3 +60,10 @@ confidence: high
 - 强制：轮询 deadline 来自 per-request `video_job_timeout`（默认 900s，可 CLI 加大），从 job 创建后起算含排队；仅当 status 仍非 `completed`/`failed` 且超时才判失败。progress/latency 在 cleanup 路径更新，使失败请求也推进进度条；报告打印失败数与样例错误，JSON 写入全部 `request_errors`。
 - 禁止：硬编码 600s 后删除仍可能完成的 job；成功路径才 `pbar.update`；只报告成功计数而隐藏失败原因。
 - 验收：覆盖默认/加大 timeout、deadline 时已 `completed` 仍取回、混合成功/失败时进度与 `failed_requests`/`request_errors` 一致。^[PR #7259]
+
+## BENCH-1f — benchmark 结果必须始终导出样本计数，包括零
+
+- 触发：修改 `benchmarks/patch` 的 result dict，或 DFX 对 `num_tpot_samples` 等计数字段的读取。
+- 强制：`calculate_metrics()` 已经产出的 `num_ttft_samples`、`num_tpot_samples`、`num_itl_samples`、`num_audio_ttfp_samples`、`num_audio_rtf_samples` 必须写入结果，包括 0，且与 percentile 是否被选中无关。JSON 往返后字段仍在。缺键是 `None`，不是 0；DFX 在 finite `mean_tpot_ms` 下仍会因 `isinstance(None, int)` 失败。
+- 禁止：只在选中 TPOT/ITL percentile 时写出计数；用均值存在代替样本数字段；改 DFX 判定去迁就缺字段的 JSON。
+- 验收：真实聚合加 JSON round-trip，分别覆盖 measured/unmeasured TPOT 与选中/未选中 percentile；省略 `num_tpot_samples` 而保留 finite mean 的结果必须被 baseline 拒绝。^[PR #7624]
