@@ -1,6 +1,6 @@
 # rebase_engine/ —— 规范
 
-<!-- verified-against: 2026-09-06 -->
+<!-- verified-against: 2026-09-19 -->
 
 `LOC ~7500（26 个模块） · repo-rebase-v3 的原生 rebase 引擎 · refactor-status: ok`
 
@@ -35,7 +35,7 @@
 | `push_gate.py` | 推送闸裁决：结构性 vs 断言失败的确定性分类（Rev 8 §2.3） |
 | `push_to_ci.py` | commit+push-to-CI 编排：preflight、WAL 卫生、C4 双闸、单一传输 |
 | `push_wal.py` | 推送 WAL：先落盘的 intent、精确 OID 三分对账、回滚数据 |
-| `rebase_tools.py` | 父级 20 工具作为 `ToolDef`；未接线后端**可见地**失败 |
+| `rebase_tools.py` | 父级 20 工具 + `doc_search`/`doc_read`（追加在父级顺序之后）作为 `ToolDef`；未接线后端**可见地**失败 |
 | `runctx.py` | `RebaseRuntime` + `CheckoutLock`（flock+卫生盾）+ 按事件循环的注册表 |
 | `substate.py` | 可持久、单写者、merge-not-overwrite 的 `state.json`（run_id 戳） |
 | `test_loop.py` | 本地测试环：逐测试恢复、baseline 复跑分流回归、类型化 skip |
