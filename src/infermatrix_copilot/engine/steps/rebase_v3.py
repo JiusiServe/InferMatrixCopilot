@@ -457,7 +457,49 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
         except Exception as exc:  # noqa: BLE001
             return {"error": f"skill proposal failed: {exc}"}
 
+    def doc_search(**kw) -> dict:
+        """Curated knowledge base, repo-scoped like the review flows.
+
+        The rebase agents previously saw only debug_memory (past FIXES) and
+        skills; the human-written pages under the adapter's knowledge slice
+        — component maps, model notes, CI and git lore — were unreachable,
+        so a module agent rediscovered by shell what a page already stated.
+        """
+        try:
+            from ...knowledge_docs import KnowledgeDocs
+            kn = manifest.get("knowledge") or {}
+            docs = KnowledgeDocs(ctx.settings.knowledge_dir,
+                                 kn.get("repo_subdir"))
+            query = str(kw.get("query") or kw.get("keyword") or "").strip()
+            if not query:
+                return {"error": "doc_search requires a non-empty query"}
+            limit = max(1, min(int(kw.get("limit") or 20), 40))
+            hits = docs.search(query, limit=limit)
+            return {"query": query, "repo": repo, "matches": hits,
+                    "truncated": len(hits) >= limit}
+        except Exception as exc:  # noqa: BLE001
+            return {"error": f"doc_search failed: {exc}"}
+
+    def doc_read(**kw) -> dict:
+        """Read one knowledge page by the path doc_search returned."""
+        try:
+            from ...knowledge_docs import KnowledgeDocs
+            kn = manifest.get("knowledge") or {}
+            docs = KnowledgeDocs(ctx.settings.knowledge_dir,
+                                 kn.get("repo_subdir"))
+            path = str(kw.get("path") or "").strip()
+            if not path:
+                return {"error": "doc_read requires a path from doc_search"}
+            page = docs.read(path, offset=int(kw.get("offset") or 0))
+            return {"repo": repo, **page}
+        except FileNotFoundError:
+            return {"error": f"no such document: {kw.get('path')!r} "
+                             "(use a path returned by doc_search)"}
+        except Exception as exc:  # noqa: BLE001
+            return {"error": f"doc_read failed: {exc}"}
+
     return RebaseBackends(
+        doc_search=doc_search, doc_read=doc_read,
         search_debug_memory=search_debug_memory,
         record_debug_memory=record_debug_memory,
         skill_manage=skill_manage, search_skills=search_skills,

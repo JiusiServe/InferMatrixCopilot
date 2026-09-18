@@ -168,7 +168,7 @@
  },
  {
   "name": "git_show_test_baseline",
-  "description": "Show the origin/main version of a test file. Use this FIRST when a test fails — compare origin/main's test with omni's test before changing any product code.",
+  "description": "Show the origin/main version of a test file. Use this FIRST when a test fails \u2014 compare origin/main's test with omni's test before changing any product code.",
   "input_schema": {
    "type": "object",
    "properties": {
@@ -184,7 +184,7 @@
  },
  {
   "name": "reproduce",
-  "description": "Hermetically reproduce a failing test on a CLEAN GPU. This is the ONLY sanctioned way to run a GPU test — it kills leaked stage/API processes, clears dead device locks, asserts free VRAM, and runs with CUDA_LAUNCH_BLOCKING=1 so a device-side assert points at the true kernel. Prefer this over raw run_shell pytest, which corrupts shared GPU state and produces phantom failures. Returns a structured outcome including whether the failure looks environmental (env_dirty) vs a real code bug.",
+  "description": "Hermetically reproduce a failing test on a CLEAN GPU. This is the ONLY sanctioned way to run a GPU test \u2014 it kills leaked stage/API processes, clears dead device locks, asserts free VRAM, and runs with CUDA_LAUNCH_BLOCKING=1 so a device-side assert points at the true kernel. Prefer this over raw run_shell pytest, which corrupts shared GPU state and produces phantom failures. Returns a structured outcome including whether the failure looks environmental (env_dirty) vs a real code bug.",
   "input_schema": {
    "type": "object",
    "properties": {
@@ -309,7 +309,7 @@
  },
  {
   "name": "request_plan_review",
-  "description": "Submit your plan for L4 review BEFORE making any code edits. You MUST call this after writing plan JSON + MD files and before editing any code. Pass the exact paths you just wrote to — the reviewer only reads those files, so there is no ambiguity. The L4 reviewer is a fresh, independent session — it has no access to your conversation history. It will critique your plan and return a verdict (lgtm/revise/block). The review is advisory — you retain final authority but MUST write a decision file per critique before editing code.",
+  "description": "Submit your plan for L4 review BEFORE making any code edits. You MUST call this after writing plan JSON + MD files and before editing any code. Pass the exact paths you just wrote to \u2014 the reviewer only reads those files, so there is no ambiguity. The L4 reviewer is a fresh, independent session \u2014 it has no access to your conversation history. It will critique your plan and return a verdict (lgtm/revise/block). The review is advisory \u2014 you retain final authority but MUST write a decision file per critique before editing code.",
   "input_schema": {
    "type": "object",
    "properties": {
@@ -346,7 +346,7 @@
  },
  {
   "name": "search_debug_memory",
-  "description": "Search past debug memory for similar failures and their proven fixes. Use this FIRST when you encounter an error — someone may have already fixed it in a previous run. Returns matching entries with symptom, root cause, and the exact fix applied.",
+  "description": "Search past debug memory for similar failures and their proven fixes. Use this FIRST when you encounter an error \u2014 someone may have already fixed it in a previous run. Returns matching entries with symptom, root cause, and the exact fix applied.",
   "input_schema": {
    "type": "object",
    "properties": {
@@ -386,15 +386,15 @@
     },
     "symptom": {
      "type": "string",
-     "description": "What went wrong — error message, traceback summary"
+     "description": "What went wrong \u2014 error message, traceback summary"
     },
     "root_cause": {
      "type": "string",
-     "description": "Why it went wrong — upstream change, missing API, etc."
+     "description": "Why it went wrong \u2014 upstream change, missing API, etc."
     },
     "fix": {
      "type": "string",
-     "description": "How you fixed it — what code was changed and why"
+     "description": "How you fixed it \u2014 what code was changed and why"
     },
     "tags": {
      "type": "string",
@@ -406,7 +406,7 @@
     },
     "watch_outs": {
      "type": "string",
-     "description": "Things to watch for — similar issues in other places"
+     "description": "Things to watch for \u2014 similar issues in other places"
     }
    },
    "required": [
@@ -419,7 +419,7 @@
  },
  {
   "name": "skill_manage",
-  "description": "Create or update a reusable SKILL — a distilled runbook for a recurring rebase/debug pattern. Use this AFTER you confirm a fix that is likely to recur (e.g. an upstream API drift you had to port). Skills are injected into future runs' prompts for the matching module. Prefer editing an existing skill (action=update) over creating near-duplicates.",
+  "description": "Create or update a reusable SKILL \u2014 a distilled runbook for a recurring rebase/debug pattern. Use this AFTER you confirm a fix that is likely to recur (e.g. an upstream API drift you had to port). Skills are injected into future runs' prompts for the matching module. Prefer editing an existing skill (action=update) over creating near-duplicates.",
   "input_schema": {
    "type": "object",
    "properties": {
@@ -441,7 +441,7 @@
     },
     "trigger": {
      "type": "string",
-     "description": "When this skill applies — the symptom/condition to match."
+     "description": "When this skill applies \u2014 the symptom/condition to match."
     },
     "modules": {
      "type": "string",
@@ -486,6 +486,46 @@
     }
    },
    "required": []
+  }
+ },
+ {
+  "name": "doc_search",
+  "description": "Search the repo's CURATED KNOWLEDGE BASE \u2014 human-written pages on components, models, CI, git workflow and debugging lore. Use this BEFORE exploring with shell: a page often states the design intent or the owning component outright, which grep cannot tell you. Complements search_debug_memory (past failures and their fixes) \u2014 this is documented design, not incident history. Returns matching pages with paths to open via doc_read.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Free text: component, model, symbol, subsystem or concept."
+    },
+    "limit": {
+     "type": "integer",
+     "description": "Max matches (default 20, max 40)."
+    }
+   },
+   "required": [
+    "query"
+   ]
+  }
+ },
+ {
+  "name": "doc_read",
+  "description": "Read one knowledge page returned by doc_search. Pass the path exactly as doc_search reported it. Use offset to page through a long document.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "Document path from a doc_search match."
+    },
+    "offset": {
+     "type": "integer",
+     "description": "Character offset for long pages."
+    }
+   },
+   "required": [
+    "path"
+   ]
   }
  }
 ]
