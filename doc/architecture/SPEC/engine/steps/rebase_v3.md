@@ -1,6 +1,6 @@
 # engine/steps/rebase_v3.py —— 规范
 
-<!-- verified-against: 2026-09-06 -->
+<!-- verified-against: 2026-09-19 -->
 
 `LOC ~2204 · step 库（v3 rebase 装配层） · refactor-status: oversized`
 
@@ -26,7 +26,7 @@ step —— 薄的受治理 wrapper，substate-first、类型化失败、发布�
 
 ## 公开契约（注册的 step 之外）
 `_adapter_manifest/_substate/_task_params`（被 `rebase_knowledge` import）、
-`manifest_job_to_test_job`（golden 测试）、`_build_backends`（read-compat
+`manifest_job_to_test_job`（golden 测试）、`_build_backends`（含 `doc_search`/`doc_read`：复用 review 流程同一套 `KnowledgeDocs` 视图，按 adapter manifest 的 `knowledge.repo_subdir` 限定仓库）（read-compat
 测试）、`_make_ci_client`（模块级工厂，测试注入 fake 客户端）。
 
 ## 不变量

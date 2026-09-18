@@ -189,6 +189,10 @@ def test_tool_schemas_load_in_parent_dispatcher_order():
         "git_diff", "git_diff_tests_upstream",
         "request_plan_review", "search_debug_memory", "record_debug_memory",
         "skill_manage", "search_skills",
+        # appended AFTER the parent's 20 (2026-09-18): the knowledge-base
+        # tools the parent dispatcher never had. Parent order above is the
+        # intact prefix, so this still pins it.
+        "doc_search", "doc_read",
     ]
     with pytest.raises(ValueError, match="has no handler"):
         build_rebase_tools([{"name": "mystery", "description": "?",

@@ -166,6 +166,30 @@ def _format_module_test_plan(plan: dict,
     return "\n".join(lines) + "\n"
 
 
+_KNOWLEDGE_GUIDANCE = (
+    "**Knowledge base.** Before exploring an unfamiliar component, model or CI\n"
+    "behaviour with shell, run `doc_search` with the component/model/symbol name\n"
+    "and `doc_read` the best match by its reported path. A curated page often\n"
+    "states design intent or the owning component outright, which grep cannot\n"
+    "tell you. This is documented design; `search_debug_memory` is incident\n"
+    "history — consult both. Cite the page path in your plan when it informed a\n"
+    "decision. If a page and the code disagree, the CODE is authoritative for\n"
+    "this rebase: say so in your decision file rather than editing to match."
+)
+
+
+def _with_knowledge_guidance(adaptive_guidance: str) -> str:
+    """Render the ADAPTIVE_GUIDANCE slot with the knowledge-base instruction.
+
+    Carried here rather than in the templates on purpose: the shipped templates
+    are DATA held byte-identical to the parent agent's copies (enforced by
+    test_adapter_knowledge.test_templates_are_parent_verbatim), so behaviour
+    changes belong in builder-supplied tokens.
+    """
+    rest = (adaptive_guidance or "").strip()
+    return f"{_KNOWLEDGE_GUIDANCE}\n\n{rest}" if rest else _KNOWLEDGE_GUIDANCE
+
+
 def build_module_prompt(
     module: str,
     data: ModulePromptData,
@@ -249,7 +273,7 @@ def build_module_prompt(
         "SIGNAL_DIR":        signal_dir,
         "MAX_DEBUG_RETRIES": str(max_debug_retries),
         "PROMPT_SOURCE":     "",
-        "ADAPTIVE_GUIDANCE": adaptive_guidance.strip() or "(No adaptive rules yet.)",
+        "ADAPTIVE_GUIDANCE": _with_knowledge_guidance(adaptive_guidance),
         "KILL_TEST_SCRIPT":  f"{script_dir}/lib/kill_test_tree.sh",
         "REMOTE_CONTEXT":    "### Execution mode: LOCAL",
         "DEBUG_MEMORY":      "Use the `search_debug_memory` tool to query past fixes. Do NOT read the debug_memory.md file directly.",

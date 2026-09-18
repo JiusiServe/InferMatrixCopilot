@@ -61,6 +61,8 @@ class RebaseBackends:
     """Injected implementations for the knowledge-plane + plan-review tools.
     Each takes the tool's kwargs and returns the parent-shaped dict."""
 
+    doc_search: Handler = field(default_factory=lambda: _unwired("doc_search"))
+    doc_read: Handler = field(default_factory=lambda: _unwired("doc_read"))
     search_debug_memory: Handler = field(
         default_factory=lambda: _unwired("search_debug_memory"))
     record_debug_memory: Handler = field(
@@ -293,6 +295,8 @@ def build_rebase_tools(tool_defs: list[dict], paths: RebasePaths,
         "git_diff": (handle_git_diff, None),
         "git_diff_tests_upstream": (handle_git_diff_tests_upstream, None),
         "request_plan_review": (backends.request_plan_review, None),
+        "doc_search": (backends.doc_search, None),
+        "doc_read": (backends.doc_read, None),
         "search_debug_memory": (backends.search_debug_memory, None),
         "record_debug_memory": (backends.record_debug_memory, None),
         "skill_manage": (backends.skill_manage, None),
