@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import inspect
 import json
+from pathlib import Path
 
 import pytest
 
@@ -343,3 +344,33 @@ def test_unchanged_files_are_not_reported_as_native(tmp_path, monkeypatch):
     native, pre_gate = mr._native_writes(str(root), run_dir,
                                          {str(stale): 777}, time.time() - 60)
     assert native == [] and pre_gate == []
+
+
+def test_stale_self_written_mcp_config_is_replaced(tmp_path):
+    """A killed session skips the transport's `finally`, leaving OUR
+    .cursor/mcp.json behind. Honouring it binds the next session to a DEAD
+    run's spec — wrong scope, wrong plan-gate prefix, traces appended to the
+    old run. A repo-committed config must still be left alone."""
+    from infermatrix_copilot.config import Settings
+    from infermatrix_copilot.providers.cursor import CursorTransport
+
+    t = CursorTransport(Settings())
+    cwd = tmp_path / "checkout"
+    (cwd / ".cursor").mkdir(parents=True)
+    config = cwd / ".cursor" / "mcp.json"
+
+    # ours, pointing at a dead run
+    config.write_text(json.dumps({"mcpServers": {"infermatrix-tools": {
+        "command": "python",
+        "args": ["-m", "infermatrix_copilot.tool_bridge", "--spec",
+                 "/runs/DEAD/bridge/old.json"]}}}))
+    assert t._is_our_stale_config(config) is True
+    t._write_mcp_config(cwd, Path("/runs/LIVE/bridge/new.json"))
+    assert "/runs/LIVE/bridge/new.json" in config.read_text()
+
+    # someone else's config: untouched
+    foreign = json.dumps({"mcpServers": {"their-tool": {"command": "x"}}})
+    config.write_text(foreign)
+    assert t._is_our_stale_config(config) is False
+    t._write_mcp_config(cwd, Path("/runs/LIVE/bridge/new.json"))
+    assert config.read_text() == foreign

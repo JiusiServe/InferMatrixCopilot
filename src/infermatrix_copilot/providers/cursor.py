@@ -118,6 +118,19 @@ class CursorTransport(HarnessTransport):
         return usage
 
     # -- MCP bridge wiring ---------------------------------------------------
+    @staticmethod
+    def _is_our_stale_config(config: Path) -> bool:
+        """True when an existing mcp.json is one WE wrote (it launches our
+        tool bridge) and is therefore safe to replace."""
+        try:
+            existing = json.loads(config.read_text(encoding="utf-8"))
+            entry = (existing.get("mcpServers") or {}).get(
+                "infermatrix-tools") or {}
+        except (OSError, ValueError, AttributeError):
+            return False
+        return "infermatrix_copilot.tool_bridge" in " ".join(
+            str(a) for a in (entry.get("args") or ()))
+
     def _write_mcp_config(self, cwd: Path, spec_path: Path) -> list[Path]:
         """Project-scope `.cursor/mcp.json` in the session cwd pointing at the
         tool bridge. Returns the paths WE created (and only those) so the
@@ -131,7 +144,13 @@ class CursorTransport(HarnessTransport):
             cursor_dir.mkdir()
             created.append(cursor_dir)
         config = cursor_dir / "mcp.json"
-        if config.exists():  # never clobber a repo-committed config
+        if config.exists() and not self._is_our_stale_config(config):
+            # Never clobber a REPO-COMMITTED config. A config WE wrote and
+            # failed to clean up (a killed session skips the `finally`) is a
+            # different case and must be replaced: leaving it silently binds
+            # this session to a DEAD run's spec -- wrong ToolScope, wrong
+            # plan-gate prefix, and tool events appended to the old run's
+            # bridge trace. Observed 2026-09-18, 27 minutes of a module run.
             return created
         package_root = Path(__file__).resolve().parents[2]
         config.write_text(json.dumps({"mcpServers": {"infermatrix-tools": {
