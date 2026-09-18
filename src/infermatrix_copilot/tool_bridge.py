@@ -287,7 +287,13 @@ def make_dispatcher(scope: ToolScope, roots: tuple[str, ...], trace: RunTrace,
                 raise RuntimeError(f"refused: {refusal}")
         out = dispatch(name, args, scope=scope, trace=trace, extra=extra)
         if not out["ok"]:
-            raise RuntimeError(str(out.get("error") or "tool error"))
+            # `dispatch` traces the call with ok=False but not WHY. Without
+            # the reason, "agent read a path that does not exist" and "this
+            # tool is broken" look identical in bridge_trace.jsonl and have
+            # to be reproduced by hand to tell apart.
+            err = str(out.get("error") or "tool error")
+            trace.record("tool_error", tool=name, error=err[:500])
+            raise RuntimeError(err)
         result = str(out["result"])
         if gate is not None:
             gate.observe(name, args, result)

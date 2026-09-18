@@ -264,3 +264,22 @@ def test_bridge_passes_repo_ROOT_not_repo_name(tmp_path, monkeypatch):
 
     assert seen.get("repo") == str(root), seen.get("repo")
     assert seen["state"]["task_spec"]["repo"] == "vllm-omni"
+
+
+def test_failed_tool_records_the_reason(tmp_path):
+    """A failed bridge call must trace WHY: without it a missing path and a
+    broken tool are indistinguishable in bridge_trace.jsonl."""
+    from infermatrix_copilot.run_trace import RunTrace
+
+    trace = RunTrace(tmp_path / "bridge_trace.jsonl")
+    extra = {"reproduce": ToolDef(
+        name="reproduce", description="d", input_schema={},
+        handler=lambda **kw: (_ for _ in ()).throw(RuntimeError("boom")))}
+    call = make_dispatcher(_scope(tmp_path), (str(tmp_path),), trace,
+                           extra=extra)
+    with pytest.raises(RuntimeError):
+        call("reproduce", {})
+    kinds = [json.loads(l) for l in
+             (tmp_path / "bridge_trace.jsonl").read_text().splitlines() if l.strip()]
+    errs = [d for d in kinds if d.get("kind") == "tool_error"]
+    assert errs and "boom" in errs[0]["error"]
