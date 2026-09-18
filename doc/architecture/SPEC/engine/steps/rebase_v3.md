@@ -1,6 +1,6 @@
 # engine/steps/rebase_v3.py —— 规范
 
-<!-- verified-against: 2026-09-06 -->
+<!-- verified-against: 2026-09-19 -->
 
 `LOC ~2204 · step 库（v3 rebase 装配层） · refactor-status: oversized`
 
@@ -90,3 +90,11 @@ import（见重构备注）。
 违例；对 `.workspace._guard_clean_rebase` 的直接 import 是另一条。拆分时
 substate + `state_updates` 双写、模块短路/串行锁的 crash-window 契约**必须**
 原样保留（resume 完整性测试护住）。
+
+## harness 后端派发（2026-09-19）
+
+module agent 可派发到 harness provider（`settings.rebase_backend`）。
+harness 会话通过 MCP tool bridge 拿到同一套工具面，plan gate 在派发处强制。
+`build_backends(repo=)` 收的是仓库 **ROOT 路径**（→ `TestRunner(repo_root=)`），
+不是仓库名：传名字会让 run_pytest/run_precommit/reproduce 以
+`FileNotFoundError` 静默失效，module 却报告完成。

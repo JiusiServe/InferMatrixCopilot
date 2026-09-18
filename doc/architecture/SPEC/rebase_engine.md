@@ -1,6 +1,6 @@
 # rebase_engine/ —— 规范
 
-<!-- verified-against: 2026-09-06 -->
+<!-- verified-against: 2026-09-19 -->
 
 `LOC ~7500（26 个模块） · repo-rebase-v3 的原生 rebase 引擎 · refactor-status: ok`
 
@@ -132,3 +132,8 @@ worktree）、`test_assembly.py`（tools/loop/module/prompt/wheel）、
 是 PR4d 执行后的退役候补（"无永久双 store 世界"）。docstring 里的
 choke-point 编号（agent_loop/rebase_tools 写"C5"）落后于 `_CONSTRAINTS.md`
 目录（工具 choke point = C3）—— 值得统一，改注释不改行为。
+
+## module_rebase 的 harness 路径（2026-09-19）
+
+`module_rebase` 既可跑进程内 agent 循环，也可把一个 module 交给 harness
+provider；两条路径共用同一 prompt、同一工具面与同一 plan gate。

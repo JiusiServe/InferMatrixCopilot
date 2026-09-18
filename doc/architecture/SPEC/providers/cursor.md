@@ -1,6 +1,6 @@
 # providers/cursor.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-09-19 -->
 
 `LOC ~207 · harness transport（Cursor 订阅） · refactor-status: ok`
 
@@ -38,3 +38,10 @@ stdlib + `.base` + `.registry` + `..agent_loop.AgentOutcome` + `..llm` 的类型
 ## 重构备注
 这套调用形状是由 Composer 评测臂（`eval/dataset/run_cursor_arm.py`）验证出来的；
 **如果那个脚本和这个 transport 发生漂移，评测臂就不再是在测量产品了。**
+
+## 作为 rebase module-agent 后端（2026-09-19）
+
+`REBASE_BACKEND=cursor` 时，cursor-agent 承担 rebase module agent。
+registry 给 cursor 的能力是 `{mcp_tools, usage_reporting}`——**没有**
+`builtin_tools_off`，所以 cursor 自带工具会绕过 bridge：bridged 调用受
+scope 约束，native 调用只被**记录**。
