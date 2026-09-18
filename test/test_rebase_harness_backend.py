@@ -283,3 +283,63 @@ def test_failed_tool_records_the_reason(tmp_path):
              (tmp_path / "bridge_trace.jsonl").read_text().splitlines() if l.strip()]
     errs = [d for d in kinds if d.get("kind") == "tool_error"]
     assert errs and "boom" in errs[0]["error"]
+
+
+def test_native_writes_detected_and_pre_gate_ones_are_fatal(tmp_path,
+                                                            monkeypatch):
+    """A harness keeping its built-in file tools can edit the checkout
+    without touching the bridge, missing BOTH the scope guard and the plan
+    gate. Where sandboxing is unavailable, detection is the ceiling: report
+    every native write, and treat a PRE-GATE one as a contract breach."""
+    import time
+
+    from infermatrix_copilot.rebase_engine import module_rebase as mr
+
+    root = tmp_path / "repo"
+    run_dir = tmp_path / "run"
+    root.mkdir()
+    run_dir.mkdir()
+    now = time.time()
+    gate_ts = now - 5
+    bridged = root / "via_bridge.py"
+    after = root / "native_after.py"
+    before_gate = root / "native_before.py"
+
+    (run_dir / "bridge_trace.jsonl").write_text("\n".join(json.dumps(d) for d in [
+        {"ts": gate_ts, "kind": "plan_gate_opened", "decision": "d"},
+        {"ts": gate_ts + 1, "kind": "tool_call", "tool": "edit_file",
+         "path": str(bridged)},
+    ]))
+
+    # mtimes: bridged + one native AFTER the gate, one native BEFORE it
+    monkeypatch.setattr(mr, "_changed_files", lambda r: {
+        str(bridged): int((gate_ts + 1) * 1e9),
+        str(after): int((gate_ts + 2) * 1e9),
+        str(before_gate): int((gate_ts - 2) * 1e9),
+    })
+
+    native, pre_gate = mr._native_writes(str(root), run_dir, {}, now - 60)
+    assert str(bridged) not in native          # went through the bridge
+    assert str(after) in native                # native, but post-gate
+    assert str(before_gate) in native
+    assert pre_gate == [str(before_gate)]      # only this one breaks the gate
+
+
+def test_unchanged_files_are_not_reported_as_native(tmp_path, monkeypatch):
+    """A file already dirty before the session (same mtime) is not a write
+    by this harness."""
+    import time
+
+    from infermatrix_copilot.rebase_engine import module_rebase as mr
+
+    root = tmp_path / "repo"
+    run_dir = tmp_path / "run"
+    root.mkdir()
+    run_dir.mkdir()
+    stale = root / "already_dirty.py"
+    (run_dir / "bridge_trace.jsonl").write_text("")
+    monkeypatch.setattr(mr, "_changed_files", lambda r: {str(stale): 777})
+
+    native, pre_gate = mr._native_writes(str(root), run_dir,
+                                         {str(stale): 777}, time.time() - 60)
+    assert native == [] and pre_gate == []

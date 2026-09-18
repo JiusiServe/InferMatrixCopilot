@@ -85,6 +85,75 @@ def _plan_gate_opened(run_dir: Path) -> bool:
     return False
 
 
+def _changed_files(root: str) -> dict[str, int]:
+    """{path: mtime_ns} for every file git reports as changed under `root`."""
+    import subprocess
+    try:
+        proc = subprocess.run(["git", "-C", root, "status", "--porcelain"],
+                              capture_output=True, text=True, timeout=120,
+                              check=False)
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    out: dict[str, int] = {}
+    for line in (proc.stdout or "").splitlines():
+        rel = line[3:].strip().strip('"')
+        if " -> " in rel:                      # rename: take the destination
+            rel = rel.split(" -> ", 1)[1]
+        fp = Path(root) / rel
+        try:
+            out[str(fp)] = fp.stat().st_mtime_ns
+        except OSError:
+            continue
+    return out
+
+
+def _native_writes(root: str, run_dir: Path, before: dict[str, int],
+                   since_ts: float) -> tuple[list[str], list[str]]:
+    """Files the harness wrote WITHOUT going through the bridge.
+
+    A harness that keeps its own built-in file tools (cursor has no
+    `builtin_tools_off`) can edit the checkout without touching the bridge,
+    which means those writes miss BOTH the scope guard's out-of-scope
+    recording and the plan gate. Sandboxing would prevent it, but needs user
+    namespaces; where that is unavailable, detection is the honest ceiling.
+
+    Returns (native, pre_gate): every natively-written file, and the subset
+    that landed BEFORE the plan gate opened — the ones that broke the
+    contract rather than merely bypassing the bookkeeping.
+    """
+    import json as _json
+
+    bridged: set[str] = set()
+    gate_ts: float | None = None
+    tp = Path(run_dir) / "bridge_trace.jsonl"
+    try:
+        for line in tp.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                d = _json.loads(line)
+            except ValueError:
+                continue
+            if d.get("ts", 0) < since_ts:
+                continue
+            if d.get("kind") == "plan_gate_opened" and gate_ts is None:
+                gate_ts = float(d.get("ts") or 0) or None
+            if d.get("kind") == "tool_call" and d.get("path"):
+                bridged.add(str(d["path"]))
+    except OSError:
+        pass
+
+    native, pre_gate = [], []
+    for path, mtime_ns in _changed_files(root).items():
+        if path in bridged or before.get(path) == mtime_ns:
+            continue
+        native.append(path)
+        if gate_ts is not None and mtime_ns / 1e9 < gate_ts:
+            pre_gate.append(path)
+    return sorted(native), sorted(pre_gate)
+
+
 async def _harness_attempt(prompt: str, *, module: str, config,
                            scope: ToolScope, trace: RunTrace,
                            tool_defs: list[dict], plan_prefix: str,
@@ -127,7 +196,26 @@ async def _harness_attempt(prompt: str, *, module: str, config,
         max_iters=config.max_turns, timeout_s=config.harness_timeout_s,
         run_dir=run_dir, step_name=f"rebase.module.{module}",
         bridge_spec_path=spec_path, trace=trace)
+    import time as _time
+
+    before = _changed_files(scope.root)
+    started = _time.time()
     outcome = await asyncio.to_thread(transport.run_session, req)
+
+    native, pre_gate = _native_writes(scope.root, run_dir, before, started)
+    if native and trace is not None:
+        trace.record("harness_native_writes", step=f"rebase.module.{module}",
+                     count=len(native), pre_gate=len(pre_gate),
+                     files=[str(f) for f in native[:20]],
+                     pre_gate_files=[str(f) for f in pre_gate[:20]])
+    if pre_gate:
+        # product code changed before a decision existed: the plan gate's
+        # whole contract. Fail the module rather than let the wave gate
+        # accept work the contract never covered.
+        return {"done": False, "turns": 0, "plan_done": False,
+                "text": ("harness wrote product files BEFORE the plan-review "
+                         "decision, bypassing the bridge: "
+                         + ", ".join(pre_gate[:10]))}
     return {"done": not getattr(outcome, "truncated", False),
             "text": getattr(outcome, "text", "") or "",
             "turns": int(getattr(outcome, "iterations", 0) or 0),
