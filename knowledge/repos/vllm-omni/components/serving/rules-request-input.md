@@ -1,7 +1,7 @@
 ---
 title: "请求输入合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-12
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #3805", "PR #5374", "PR #5885", "PR #6598", vllm_omni/data_entry_keys.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/engine/orchestrator.py, vllm_omni/inputs/, tests/engine/test_async_omni_engine_input.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_invalid_audio_speech.py, tests/entrypoints/openai_api/test_serving_speech.py, "PR #5181", "PR #6182"]
@@ -139,3 +139,10 @@ engine 生命周期见 [engine 生命周期规则](rules-engine-lifecycle.md)；
 - 强制：transform 只操作 Stage-0 copy；原始 prompt 保留给 downstream，并在 transform 前后保持同一 global request ID。只把已处理的 metadata 合并回原始视图，先移除 transform-owned stale keys。临时目录只通过内部 `REQUEST_ARTIFACT_DIRS_KEY` 交给 request state；preprocess、companion build、enqueue 前失败立即回收，admit 后由 orchestrator 在所有 terminal cleanup 路径回收，且内部 key 不得进入 stage payload。
 - 禁止：把 transformed prompt 当作 downstream 原始媒体、让旧 prepared descriptor 跨请求复用、在 ownership 已交给 orchestrator 后由 frontend 提前删除，或让异常路径泄漏转码目录。
 - 验收：覆盖 transform replacement/copy、request ID 与 metadata merge、成功 terminal/abort、preprocess/companion/enqueue 异常以及无 artifact control；断言 downstream 看见原始媒体+允许的 processed meta，目录恰好由当前 owner 回收，内部 key 未传输。^[PR #5885]
+
+## SERV-4r — `/v1/audio/generate` 必须在协议层拒绝空 prompt 与越界采样字段
+
+- 触发：修改 `OpenAICreateAudioGenerateRequest`、audio generate invalid-param 可靠性测试，或该入口的 prompt/采样字段限界。
+- 强制：`input` 以 field validator 拒绝空串与纯空白；`audio_length` 要求 `gt=0`；`guidance_scale` 限界 `ge=0, le=1000`；`num_inference_steps` 限界 `ge=1, le=1000`。非法值必须在 entrypoint Pydantic 校验失败，不得拖到 engine 超时或 HTTP 200。
+- 禁止：依赖 engine-level 检查代替协议拒绝；把越界 steps/guidance 留在 `_INT64_MAX` 一类无业务上界；用 skip mark 掩盖未接线的 invalid-param case。
+- 验收：空/空白 input、负/零 `audio_length`、负/过大 guidance、零/负/过大 steps 均返回字段定位的 4xx，并与 invalid-param 测试期望一致。^[PR #4741]

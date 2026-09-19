@@ -1,7 +1,7 @@
 ---
 title: "LTX-2.5 DiffVAE 规则"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-12
 type: rule
 tags: [vllm-omni, models, ltx2, diffusion]
 sources: ["PR #6189", "PR #7000", "PR #7020", recipes/LTX/LTX-2.5.md, requirements/common.txt, docs/user_guide/diffusion/attention_backends/huggingface_hub.md, vllm_omni/diffusion/models/ltx2/ltx2_components.py, vllm_omni/diffusion/models/ltx2/ltx2_conditioning.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder_distributed.py, vllm_omni/diffusion/models/ltx2/ltx2_latents.py, vllm_omni/diffusion/models/ltx2/ltx2_request.py, vllm_omni/diffusion/models/ltx2/ltx2_runtime.py, tests/diffusion/models/ltx2/test_ltx25_pipeline.py, tests/diffusion/models/ltx2/test_ltx2_output_cuda.py, tests/diffusion/models/ltx2/test_ltx2_pipeline.py, tests/diffusion/models/ltx2/test_ltx2_vae.py]
@@ -71,3 +71,10 @@ confidence: high
   对比。有效 `[0, 1]` 的 `do_normalize=False` 输入须与 unclipped legacy path 比较；另测 intentional
   out-of-range defensive clamp。FP32 presentation bytes 必须 exact，BF16/FP16 相对 legacy FP32
   presentation 最多相差一个 uint8 level；官方 similarity 仅是本 PR 所报 LTX matrix 的限定证据。^[PR #7000]
+
+## LTX25-3 — DiffVAE pointwise fusion 与 TileLang FNA 必须按 SM 独立门禁
+
+- 触发：修改 `resolve_ltx2_vae_operators`、fusion/FNA compute-capability allowlist，或 LTX DiffVAE 加速准入。
+- 强制：pointwise fusion 与 TileLang FNA 分两个 capability 集合独立判定；已验证的 SM100/SM103 可开自校验 fusion（首用 bit-exact，失败回退普通数学），FNA 在未单独验证前保持 SM90-only。不得用单一 allowlist 绑死两条路径。
+- 禁止：因 FNA 未验证而关闭已合格 SM 上的 fusion；或把 fusion 资格静默推广成 FNA/NATTEN schedule 已验证。
+- 验收：平台单测覆盖 SM90 fusion+FNA、SM100/103 fusion-only、以及更低/未列 SM 全关。^[PR #7350]

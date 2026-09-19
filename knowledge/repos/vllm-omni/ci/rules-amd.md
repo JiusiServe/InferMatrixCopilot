@@ -1,7 +1,7 @@
 ---
 title: "AMD/ROCm CI 规则"
 created: 2026-09-05
-updated: 2026-09-10
+updated: 2026-09-12
 type: rule
 tags: [vllm-omni, ci]
 sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234"]
@@ -42,3 +42,10 @@ confidence: high
 - 强制：`mi300_1` 一类单卡 model job 的 pytest marker 必须 `not (cards_2 or … or cards_8)`，同时保留无 `cards_1` 的 legacy 单卡用例；真正需要双卡的用例（如 LTX2 Ulysses parity）改到已有双卡 lane，并声明 `rocm` 资源与 `device_count >= world_size` 早失败。
 - 禁止：让 `cards_2+` 测试在单卡 worker 上 spawn rank1→GPU1 导致 `invalid device ordinal`；用邻近 green shard 宣称 multi-GPU routing 已修好。
 - 验收：pipeline argv/collection 断言单卡 job 排除 multi-card markers、双卡 job 收集目标文件；硬件 marker helper 覆盖 ROCm 声明。^[PR #7234]
+
+## OMNI-CI-2i — AMD bootstrap 必须按 ready/merge-test 标签选择 L2/L3 suite
+
+- 触发：修改 `.buildkite/amd` bootstrap、`select_test_suites.py`、AMD PR label 路由，或 skip-ci 对 AMD suite 的过滤。
+- 强制：`ready` 选 L2（ready suite），`merge-test` 选 L3（merge suite）；两标签同时存在时合并多 suite 且共享一次 image build；`DEBUG_TEST_YAML` 优先；main 继续 L3；无 tier 标签的 PR 可保留 legacy ready fallback。PR labels 精确匹配且失败时 fail closed；skip-ci 必须对已选 L2/L3 独立过滤。
+- 禁止：凡 PR 一律上传 ready suite；用子串匹配 labels；在仓库侧假装已改变 Buildkite 外部 trigger 条件；把 `nightly-test` 当成已有 AMD L4 覆盖。
+- 验收：selector/bootstrap 单测覆盖 ready-only、merge-only、both、debug override、main、label fetch failure 与 per-suite skip-ci；日志报告实际 `TEST_SPECS`。^[PR #6966]
