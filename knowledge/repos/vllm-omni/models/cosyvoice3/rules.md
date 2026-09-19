@@ -1,7 +1,7 @@
 ---
 title: "CosyVoice3 规则"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-18
 type: rule
 tags: [vllm-omni, models]
 sources: ["PR #5673", "PR #6955", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/cfm.py, vllm_omni/model_executor/models/cosyvoice3/flow_estimator_trt.py, tests/model_executor/models/cosyvoice3/test_cosyvoice3_components.py, benchmarks/tts/benchmark_cosyvoice3_trt_streams.py]
@@ -50,3 +50,10 @@ confidence: high
   证明 replace 失败保留旧 plan、cleanup 失败保留 replace error、partial write 清理 owned tmp、
   collision 保留 foreign tmp，以及两条同步 publisher 使用不同 source path 且仅留下完整 final plan。
   ^[PR #6955]
+
+## COSYVOICE3-1c — 流式 HiFT 必须在有界 mel 窗上增量计算并携带相位
+
+- 触发：修改 CosyVoice3 `_stream_hift_from_feat`、`CausalHiFTGenerator`、`SineGen`/`SineGen2` 的 `phase_acc`，或 streaming chunk 的 noise/F0 cache。
+- 强制：每个 chunk 只在有界 mel 窗上计算（末 64 帧再加上 F0 感受野历史），不得对累积全谱重跑。谐波相位用共享的边界 `phase_acc` 带入下一窗。noise 必须是固定、按位置索引的 buffer，不能用随 chunk 变化的 `torch.randn_like`。F0 predictor 的左因果卷积要吃 window 左侧的真实历史，不能零填充；这段 margin 属于 `cache_state`，在进入 SineGen/decode 前切掉，且短于感受野的 chunk 不得饿死下一次调用。finalize 除 `conv_pre_look_right` 外还要释放 predictor 自己扣下的 `trim`，否则流末约 3 个 mel 帧丢失。
+- 禁止：用 PCM16 逐字节相等当正确性门槛（亚 LSB 的再结合误差会翻边界样本）；只测未触发 voiced 的随机权重；把 `scipy`/`s3tokenizer` 放回 dev extra——它们是 base install 的硬依赖，scipy 下限保持 `>=1.11.0`。
+- 验收：相对全量重算，float64 应逐位一致；float32 用 `assert_close(atol=1e-6, rtol=1e-5)`。同时覆盖 SineGen（22050 Hz）与 SineGen2（24000 Hz）、强制 voiced，以及均匀 chunk 和单 mel 帧的小块。^[PR #7521]
