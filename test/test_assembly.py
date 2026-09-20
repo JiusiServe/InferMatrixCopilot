@@ -263,6 +263,108 @@ def test_test_loop_infra_is_structural(tmp_path):
     assert result2["infra_failures"] == ["timeout: timeout"]
 
 
+def test_infra_failure_surfaces_assertions_it_already_reported(tmp_path):
+    """A structural end does not mean the run found nothing.
+
+    A suite can report assertion failures and THEN be killed. The loop must
+    keep the STRUCTURAL classification (out of `failed_tests`, push gate
+    blocks) while still naming the ids in the record -- otherwise the report
+    reads "1 infra failure" and real regressions stay invisible.
+
+    Regression test for 2026-09-19: simple_diffusion_test timed out after
+    reporting 10 quantization assertion failures; all 10 were dropped with
+    the output and only CI re-found them.
+    """
+    sub = Substate(tmp_path, "run-surface")
+    jobs = [{"slug": "killed", "label": "killed", "min_gpus": 1}]
+    output = (
+        "FAILED tests/diffusion/models/glm_image/test_q.py::TestA::test_one\n"
+        "FAILED tests/diffusion/models/glm_image/test_q.py::TestB::test_two\n"
+        "[watchdog/kill] tier=1 test=killed\n"
+    )
+    runs = {"killed": tl.TestRunResult(1, output=output, infra="timeout")}
+
+    async def debug_fn(slug, label, rc, out):
+        return False
+
+    result = asyncio.run(tl.run_test_loop(
+        jobs, substate=sub, run_fn=lambda s: runs[s],
+        baseline_fn=lambda s: tl.TestRunResult(0), debug_fn=debug_fn))
+
+    # classification is unchanged: still structural, still not an assertion
+    assert result["failed_tests"] == []
+    assert result["failed"] == 1
+    record = result["infra_failures"][0]
+    assert record.startswith("killed: timeout")
+    # ...but the findings it DID produce are now named
+    assert "2 assertion failure(s)" in record
+    assert "TestA::test_one" in record and "TestB::test_two" in record
+
+
+def test_infra_failure_reads_assertions_from_a_log_PATH(tmp_path):
+    """The production caller passes a PATH, not log text.
+
+    `engine/steps/rebase_v3._to_result` sets TestRunResult.output to
+    `outcome.log_file`. Parsing the pathname finds nothing, so the loop must
+    read the file -- otherwise this surfacing never fires for the real
+    timeout/watchdog runs it exists for.
+    """
+    sub = Substate(tmp_path, "run-path")
+    log_file = tmp_path / "simple_diffusion_test.log"
+    log_file.write_text(
+        "collected 5802 items\n"
+        "FAILED tests/diffusion/models/glm_image/test_q.py::TestA::test_one\n"
+        "FAILED tests/diffusion/models/minimax_h3/test_c.py::test_two\n"
+        "[watchdog/kill] tier=1 test=simple_diffusion_test\n"
+    )
+    jobs = [{"slug": "killed", "label": "killed", "min_gpus": 1}]
+    runs = {"killed": tl.TestRunResult(1, output=str(log_file), infra="timeout")}
+
+    async def debug_fn(slug, label, rc, out):
+        return False
+
+    result = asyncio.run(tl.run_test_loop(
+        jobs, substate=sub, run_fn=lambda s: runs[s],
+        baseline_fn=lambda s: tl.TestRunResult(0), debug_fn=debug_fn))
+    record = result["infra_failures"][0]
+    assert "2 assertion failure(s)" in record
+    assert "TestA::test_one" in record
+    assert result["failed_tests"] == []          # still structural
+
+
+def test_infra_failure_unreadable_log_stays_structural(tmp_path):
+    """An unreadable/missing log must not change the classification."""
+    sub = Substate(tmp_path, "run-unreadable")
+    jobs = [{"slug": "gone", "label": "gone", "min_gpus": 1}]
+    missing = str(tmp_path / "does_not_exist.log")
+    runs = {"gone": tl.TestRunResult(1, output=missing, infra="timeout")}
+
+    async def debug_fn(slug, label, rc, out):
+        return False
+
+    result = asyncio.run(tl.run_test_loop(
+        jobs, substate=sub, run_fn=lambda s: runs[s],
+        baseline_fn=lambda s: tl.TestRunResult(0), debug_fn=debug_fn))
+    assert result["infra_failures"] == ["gone: timeout"]
+    assert result["failed_tests"] == []
+
+
+def test_infra_failure_without_assertions_is_unchanged(tmp_path):
+    """A genuine infra-only failure keeps the original terse record."""
+    sub = Substate(tmp_path, "run-terse")
+    jobs = [{"slug": "oom", "label": "oom", "min_gpus": 1}]
+    runs = {"oom": tl.TestRunResult(1, output="Killed\n", infra="timeout")}
+
+    async def debug_fn(slug, label, rc, out):
+        return False
+
+    result = asyncio.run(tl.run_test_loop(
+        jobs, substate=sub, run_fn=lambda s: runs[s],
+        baseline_fn=lambda s: tl.TestRunResult(0), debug_fn=debug_fn))
+    assert result["infra_failures"] == ["oom: timeout"]
+
+
+
 # -- CI build ledger + monitor -------------------------------------------------
 
 class FakeCI:
