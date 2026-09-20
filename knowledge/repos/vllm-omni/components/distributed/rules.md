@@ -1,7 +1,7 @@
 ---
 title: "Distributed 传输规则"
 created: 2026-08-05
-updated: 2026-09-08
+updated: 2026-09-20
 type: rule
 tags: [vllm-omni, components, distributed]
 sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", "PR #6834", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626", "PR #6529", "PR #7136"]
@@ -142,3 +142,10 @@ confidence: high
 - 强制：CUDA Mooncake 依赖必须钉在包含 acknowledged TCP writes 的版本（`0.3.12` 起）；`batch_transfer_sync_write` 返回成功后，destination 内存必须已更新到可读状态，不能只表示本地 send 入队。回归必须在 receiver 被挂起时证明 completion 不会提前返回，恢复后再断言目的端字节一致。
 - 禁止：降级到无 ACK 的 TCP 实现却不更新测试合同；把 RDMA 路径的 completion 语义外推到 TCP；或在 completion 前启动依赖 destination 内容的零拷贝消费。
 - 验收：强制 TCP 的挂起-恢复测试覆盖「停止期间不完成、恢复后成功且字节匹配」；依赖声明与该测试同步变更。^[PR #7136]
+
+## DIST-1l — NIXL 所有权测试必须用 reliable_claim_queries 隔离 claim 查询
+
+- 触发：修改 NIXL connector 中断言 terminal 或 deferred read ownership、`_wait_for_transfer` 或 `entered.wait` 的测试，或改变 metadata claim 的获取方式。
+- 强制：这类所有权用例必须挂上 `reliable_claim_queries`。fixture 仍覆盖 metadata 解析、wire 编解码、claim 生成和 producer claim 状态机，但不得用一次有界（10 ms）真实 ZMQ query 取得 claim。真实 ZMQ discovery 只由同模块 handshake 测试覆盖。
+- 禁止：让所有权断言依赖 CI 下可能超时的短 query，使 `consumer.get()` 在进入 transfer wait 前返回；或放宽 `entered.wait` 来掩盖未挂 fixture。
+- 验收：`direct` 与 `done`/`error`/`timeout`/`unknown` 在 fixture 下重复通过；所有权用例源码不再走有界 claim query。handshake 测试仍覆盖真实 ZMQ discovery。^[PR #7870]

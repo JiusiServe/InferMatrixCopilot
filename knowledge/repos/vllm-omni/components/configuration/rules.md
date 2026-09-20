@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 配置开发门禁"
 created: 2026-07-16
-updated: 2026-09-10
+updated: 2026-09-20
 type: rule
 tags: [vllm-omni, components, config]
 sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182", "PR #4820", "PR #6619", "PR #6680", "PR #6422", vllm_omni/deploy/higgs_multimodal_qwen3.yaml]
@@ -222,3 +222,10 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 验收：覆盖有效非默认值的 CLI、deploy/structured 和 direct attention-config 路径，断言最终
   `backend_kwargs`；覆盖错误 backend、非正值，以及 Top-K 超过 runtime block count 的回退。
   `WanDMDPipeline` 一类 checkpoint alias 还必须由 `model_index.json` 自动发现。^[PR #4820]
+
+## CONF-3e — 已删除的 dots.tts 与 Dynin-Omni 不得残留注册面
+
+- 触发：改 `pipeline_registry.py`、`environment_variable_inventory.py` 或 `vllm_omni/deploy/`，或试图恢复 `dots_tts` / `dynin_omni`。
+- 强制：pipeline import 与 `OMNI_PIPELINES` key、各 inventory 桶中的 `DOTS_TTS_*` / `DYNIN_*`，以及默认、CI、multiconnector deploy YAML 必须同时缺席。共享注释不得指向已删实现。
+- 禁止：只删模型代码却留下 key、env 名或 YAML；rebase 时恢复 `DOTS_TTS_PIPELINE` 或 `DYNIN_OMNI_PIPELINE`；再把已删除模型的旧 deploy pin 当作在运合同。
+- 验收：registry 无这两项 key，deploy 目录无对应 YAML，inventory 无上述名称。^[PR #7655]
