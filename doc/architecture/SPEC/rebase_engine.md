@@ -1,6 +1,6 @@
 # rebase_engine/ —— 规范
 
-<!-- verified-against: 2026-09-19 -->
+<!-- verified-against: 2026-09-21 -->
 
 `LOC ~7500（26 个模块） · repo-rebase-v3 的原生 rebase 引擎 · refactor-status: ok`
 
@@ -144,3 +144,13 @@ provider；两条路径共用同一 prompt、同一工具面与同一 plan gate�
 循环而不是判 module 失败——但重启会丢掉已积累的上下文，所以预算过低时
 agent 会反复从头探索。flash 级模型在同一 module 上约需 pro 级 2.3 倍轮次
 （140+ vs 62），150 的旧上限会被截断三次仍未完成。
+
+## 结构性失败仍要报告已产生的断言（2026-09-21）
+
+`test_loop` 把 timeout / watchdog kill / harness crash 归为**结构性**失败：
+不进 `failed_tests`、不做 baseline 对比、push gate 直接阻断——这部分不变。
+但结构性结束**不等于**这次运行什么都没发现：一个 suite 可能先报了断言失败
+再被杀掉。那些 node id 过去随 output 一起丢弃，报告只剩"1 个 infra 失败"。
+现在 infra 记录里会带上已报告的断言 id（复用 `ci_loop.extract_failed_test_ids`）。
+实例：2026-09-19 `simple_diffusion_test` 超时前已报 10 个量化断言失败，全部不可见，
+直到 Buildkite #3055 重新发现。

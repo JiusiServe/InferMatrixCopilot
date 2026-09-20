@@ -27,7 +27,32 @@ from typing import Awaitable, Callable, Mapping, Sequence
 
 from .substate import Substate
 
+
+from .ci_loop import extract_failed_test_ids
+
 log = logging.getLogger(__name__)
+
+def _log_text(output: str) -> str:
+    """Return the log CONTENTS for `TestRunResult.output`.
+
+    `output` carries either the log text or a PATH to the log file — the
+    production caller (`engine/steps/rebase_v3._to_result`) passes
+    `outcome.log_file`. Parsing the pathname finds nothing, so read the file
+    when it is one. A read failure must never change the structural
+    classification, so it degrades to "no ids found".
+    """
+    if not output:
+        return ""
+    if "\n" not in output and len(output) < 4096:
+        try:
+            candidate = Path(output)
+            if candidate.is_file():
+                return candidate.read_text(errors="replace")
+        except OSError:
+            return ""
+    return output
+
+
 
 
 @dataclass(frozen=True)
@@ -141,9 +166,27 @@ async def run_test_loop(
             # STRUCTURAL (Rev 8 §2.3): timeouts / watchdog kills / harness
             # crashes never enter the baseline-vs-regression split or the
             # assertion pass-through — the push gate blocks on these
+            #
+            # A structural end does NOT mean the run produced no findings: a
+            # suite can report assertion failures and THEN be killed. Those
+            # ids were previously discarded with the output, so the report
+            # read "1 infra failure" while the log held real regressions
+            # (observed 2026-09-19: simple_diffusion_test timed out after 10
+            # quantization assertions, all invisible until CI re-found them).
+            # Surface them in the record; the classification is unchanged.
+            found = sorted(extract_failed_test_ids(_log_text(result.output)))
+            detail = f"{slug}: {result.infra}"
+            if found:
+                shown = ", ".join(found[:5])
+                more = f" (+{len(found) - 5} more)" if len(found) > 5 else ""
+                detail += (f" — {len(found)} assertion failure(s) reported "
+                           f"before the structural end: {shown}{more}")
+                log.warning("  INFRA FAILURE (%s) with %d assertion "
+                            "failure(s) already reported: %s", result.infra,
+                            len(found), shown)
             log.warning("  INFRA FAILURE (%s): %s (rc=%d)", result.infra,
                         label, result.rc)
-            infra_failures.append(f"{slug}: {result.infra}")
+            infra_failures.append(detail)
             infra_slugs.add(slug)
             failed += 1
             checkpoint()
