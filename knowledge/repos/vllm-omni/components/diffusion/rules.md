@@ -1,10 +1,10 @@
 ---
 title: "Diffusion 共享规则"
 created: 2026-07-20
-updated: 2026-09-05
+updated: 2026-09-21
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5255", "PR #5344", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5838", "PR #5839", "PR #5848", "PR #5872", "PR #5881", "PR #5896", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", "PR #6651", "PR #6722", "PR #5831", "PR #6989", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, tests/diffusion/attention/test_attention_sp.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py, tests/diffusion/test_diffusion_config_propagation.py, tests/diffusion/test_multiproc_engine_concurrency.py, "PR #4755", "PR #5990", "vllm_omni/diffusion/layers/fused_qk_norm_rope.py", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py", "tests/diffusion/layers/test_fused_qk_norm_rope.py", "PR #6165", "PR #5677", "vllm_omni/diffusion/quantization/hsdp_fp8.py", "tests/diffusion/quantization/test_hsdp_fp8.py", "PR #4845", "PR #6173", "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_components.py", "vllm_omni/diffusion/model_loader/hub_prefetch.py", "PR #5910", "PR #5676", "PR #6125", "PR #6320", "PR #5877", "vllm_omni/diffusion/vllm_config.py", "PR #6283", "vllm_omni/diffusion/layers/activation.py", "PR #6281", "vllm_omni/diffusion/attention/ops/minimax_h3_modulation.py", "PR #6130", "PR #6364", "PR #6073", "PR #4820", vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, "PR #6150", "PR #6410", tests/diffusion/layers/test_activation.py, tests/diffusion/layers/test_fused_qk_norm_rope_npu.py]
+sources: ["PR #7648", "PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5255", "PR #5344", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5838", "PR #5839", "PR #5848", "PR #5872", "PR #5881", "PR #5896", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", "PR #6651", "PR #6722", "PR #5831", "PR #6989", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, tests/diffusion/attention/test_attention_sp.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py, tests/diffusion/test_diffusion_config_propagation.py, tests/diffusion/test_multiproc_engine_concurrency.py, "PR #4755", "PR #5990", "vllm_omni/diffusion/layers/fused_qk_norm_rope.py", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py", "tests/diffusion/layers/test_fused_qk_norm_rope.py", "PR #6165", "PR #5677", "vllm_omni/diffusion/quantization/hsdp_fp8.py", "tests/diffusion/quantization/test_hsdp_fp8.py", "PR #4845", "PR #6173", "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_components.py", "vllm_omni/diffusion/model_loader/hub_prefetch.py", "PR #5910", "PR #5676", "PR #6125", "PR #6320", "PR #5877", "vllm_omni/diffusion/vllm_config.py", "PR #6283", "vllm_omni/diffusion/layers/activation.py", "PR #6281", "vllm_omni/diffusion/attention/ops/minimax_h3_modulation.py", "PR #6130", "PR #6364", "PR #6073", "PR #4820", vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, "PR #6150", "PR #6410", tests/diffusion/layers/test_activation.py, tests/diffusion/layers/test_fused_qk_norm_rope_npu.py]
 confidence: high
 ---
 
@@ -19,6 +19,7 @@ confidence: high
 
 | PR 描述信号 | 规则入口 |
 |---|---|
+| custom-op mutable schema | `DIFF-10c` |
 | graph/eager、compile、solver、RNG、dtype/device | `DIFF-1a`–`DIFF-1j` |
 | checkpoint remap、HWR、HSDP、offload、quantization、TorchAO `.bin` index fallback | `DIFF-2a`–`DIFF-2z`、`DIFF-2af`；[checkpoint/loading](rules-checkpoint-loading.md) |
 
@@ -216,3 +217,16 @@ async output readiness、per-worker result channel、shutdown 与 constructor cl
 - 验收：unit 覆盖每个关键拒绝条件及 SDPA fallback，并以真实 Wan grid metadata 覆盖 tile/
   untile 回排。`topk == num_blocks` 的 native Wan 走 SDPA，FastVideo DMD checkpoint 可显式
   保留 all-block VSA；两条路由都须在日志或测试中可辨。^[PR #4820]
+
+### DIFF-10c — custom op 的可选 mutable 参数必须兼容 CI dispatcher
+
+- 触发：共享 diffusion custom op 声明可选 mutable tensor、staging buffer，或在
+  `adinplaceorview_impl` 的 `increment_version(args[idx])` 出现越界。
+- 强制：核对注册 schema 的默认值与 `mutates_args`。dispatcher 可裁掉等于默认值的尾部
+  参数；若支持的 Torch mutation handler 不补齐 defaults，则将相关尾部 schema 参数设为
+  必传，caller 显式传 `None`/开关/偏移，保留真实 mutation 声明。
+- 禁止：以 Python caller 已显式传参证明 dispatcher 参数完整；移除 mutation 声明绕过错误；
+  用已补齐 defaults 的新 Torch 本地成功替代失败 CI 版本的兼容证据。
+- 验收：schema 回归断言 mutable 参数无默认值；staging 关闭/开启均执行 eager 与
+  `fullgraph=True`。验证 tensor 内容变化不重编译时固定 host scalar 和 history phase，
+  将空历史→满历史引发的合法 scalar specialization 与 tensor recompile 分开。 ^[PR #7648]

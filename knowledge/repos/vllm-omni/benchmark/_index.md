@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 性能与 Profiling"
 created: 2026-07-10
-updated: 2026-09-05
+updated: 2026-09-21
 type: index
 tags: [vllm-omni, benchmark]
 sources: [benchmarks/tts/bench_tts.py, benchmarks/tts/model_configs.yaml, "PR #6522", "PR #6634", "PR #6818", vllm_omni/benchmarks/data_modules/omniinteract_dataset.py, vllm_omni/benchmarks/omniinteract.py, vllm_omni/benchmarks/patch/patch.py, tests/benchmarks/patch/test_patch.py, vllm_omni/benchmarks/duplex/, vllm_omni/entrypoints/cli/benchmark/omni_duplex_eval.py, vllm_omni/experimental/fullduplex/client.py]
@@ -21,7 +21,7 @@ sources: [benchmarks/tts/bench_tts.py, benchmarks/tts/model_configs.yaml, "PR #6
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 新增/审查 perf JSON、warmup 覆盖、realtime artifact、Hub dataset fallback、per-request timeout 或 `/v1/videos` 轮询预算 | [benchmark rules](rules.md) |
+| 新增/审查 perf JSON、warmup 覆盖、realtime artifact、Hub dataset fallback、per-request timeout 或 `/v1/videos` 轮询预算、最终性能复测与控制漂移 | [benchmark rules](rules.md) |
 | 查看旧 benchmark 总览 | [overview](overview.md) |
 | 运行 AR graph、Hunyuan 或 MiniCPM-o Omni-DuplexEval benchmark | [benchmark guides](guides/_index.md) |
 | 调查 profiling、模型加载和性能验证错误 | [benchmark incidents](incidents/_index.md) |

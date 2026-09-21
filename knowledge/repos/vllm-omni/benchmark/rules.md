@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni Benchmark 规则"
 created: 2026-09-05
-updated: 2026-09-10
+updated: 2026-09-21
 type: rule
 tags: [vllm-omni, benchmark]
-sources: ["PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py, "PR #7130", "PR #7259"]
+sources: ["PR #7648", "PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py, "PR #7130", "PR #7259"]
 confidence: high
 ---
 
@@ -60,3 +60,15 @@ confidence: high
 - 强制：轮询 deadline 来自 per-request `video_job_timeout`（默认 900s，可 CLI 加大），从 job 创建后起算含排队；仅当 status 仍非 `completed`/`failed` 且超时才判失败。progress/latency 在 cleanup 路径更新，使失败请求也推进进度条；报告打印失败数与样例错误，JSON 写入全部 `request_errors`。
 - 禁止：硬编码 600s 后删除仍可能完成的 job；成功路径才 `pbar.update`；只报告成功计数而隐藏失败原因。
 - 验收：覆盖默认/加大 timeout、deadline 时已 `completed` 仍取回、混合成功/失败时进度与 `failed_requests`/`request_errors` 一致。^[PR #7259]
+
+## BENCH-1f — realtime 优化复测必须绑定实际加载源码并量化控制漂移
+
+- 触发：修复或 rebase 后重新判断 realtime chunk latency/RTF 是否回归，尤其差值接近噪声时。
+- 强制：每个 arm 用独立服务启动并核对实际模块路径、head、依赖和模型 revision；固定
+  workload、GPU 拓扑、compile/graph、优化开关及 instrumentation。用 baseline→candidate→
+  baseline 控制漂移，逐 arm 独立 warmup，明确 steady chunk 索引条件、样本数与 RTF 的 FPS。
+- 禁止：仅设置 PYTHONPATH 就假设从目标 checkout 加载；混用不同 warmup 截断或 FPS 的
+  指标；把小于控制漂移的差异称为确定改善/回归；把单次视频哈希相等当作 compiled bitwise
+  determinism 或 eager 数值等价证明。
+- 验收：产物能追溯各 arm 的真实 source/config/environment，报告候选差值和控制漂移；
+  稳态统计可从相同筛选重算，正确性另由对应 parity 测试支持。 ^[PR #7648]

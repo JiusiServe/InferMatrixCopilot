@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni 配置开发门禁"
 created: 2026-07-16
-updated: 2026-09-10
+updated: 2026-09-21
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182", "PR #4820", "PR #6619", "PR #6680", "PR #6422", vllm_omni/deploy/higgs_multimodal_qwen3.yaml]
+sources: ["PR #7648", "claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182", "PR #4820", "PR #6619", "PR #6680", "PR #6422", vllm_omni/deploy/higgs_multimodal_qwen3.yaml]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -20,6 +20,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
+| 环境变量 inventory | `VOMNI-CFG-3a` | 失败路径对应源码与测试 |
 | strict schema、unknown field、alias、flat→nested、structured/legacy/direct parity、typed projection | `strict-normalization`：`VOMNI-CFG-1a`–`1h`；[1s/1t](rules-legacy-engine-args.md) | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,strip_parent_engine_args}` → `vllm_omni/config/omni_config.py::{_build_diffusion_config_projection,VllmOmniConfig.from_pipeline_config}` → `vllm_omni/engine/stage_init_utils.py::{build_engine_args_dict,build_engine_args_dict_from_omni_stage_config}` |
 | deploy YAML、`base_config`、pipeline/stage overlay、pipeline-owned alias/hook、headless/offline parity、最终逐 stage config | `deploy-topology`：`CONF-3a`, `CONF-4b`, `CONF-5a`, [CONF-5i](rules-topology-profiles.md#conf-5i-pipeline-专属-alias-与-hook-必须在通用配置层声明归一并消费), [CONF-5j](rules-topology-profiles.md#conf-5j-pipelineconfig-在构造时必须验证终端-topology) | `vllm_omni/config/stage_config.py::{resolve_deploy_yaml,load_deploy_config,normalize_pipeline_cli_overrides,merge_pipeline_deploy,build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/config_factory.py::StageConfigFactory.create_from_model` → `vllm_omni/engine/stage_init_utils.py::_resolve_model_path` |
 | composable strategy、axis、routing、load balancing、`strategy-config` | `composable-strategy`：`CONF-4a` | `vllm_omni/config/composable_parallel/strategy_loader.py::{parse_strategy_specs,load_strategy_specs}` → `translator.py::translate_strategy_stack` → `apply.py::apply_strategy_specs` → `config_factory.py::{StageConfigFactory._apply_strategy_specs,StageConfigFactory._reconcile_strategy_with_cli}` |
@@ -222,3 +223,14 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 验收：覆盖有效非默认值的 CLI、deploy/structured 和 direct attention-config 路径，断言最终
   `backend_kwargs`；覆盖错误 backend、非正值，以及 Top-K 超过 runtime block count 的回退。
   `WanDMDPipeline` 一类 checkpoint alias 还必须由 `model_index.json` 自动发现。^[PR #4820]
+
+## VOMNI-CFG-3a — 环境变量 consumer、分类和公开合同同步
+
+- 触发：新增、重命名或删除环境变量读取，包括实验性优化开关。
+- 强制：同批核对 consumer 与 `environment_variable_inventory.py` 分类；公开变量同步
+  `docs/configuration/environment_variables.md`，写明默认值、精确启用值、读取时机和依赖
+  开关。分类数量快照只能在逐项核对新增/删除集合后更新。
+- 禁止：因为变量是 experimental 就省略分类；只改数量断言，或把 consumer 的精确字符串
+  比较描述为接受任意 truthy 值。
+- 验收：`tests/config/test_environment_variables.py` 的静态读取分类、文档和数量检查通过，
+  并确认启用值到达真实 consumer；重命名后旧名称无未解释读取。 ^[PR #7648]
