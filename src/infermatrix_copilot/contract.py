@@ -25,7 +25,9 @@ servers import *down* into this one. `test_contract.py` pins that.
 
 from __future__ import annotations
 
+import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +63,8 @@ __all__ = [
     "direct_knowledge_routes",
     "direct_mandatory_review_guides",
     "direct_review_plan",
+    "build_findings",
+    "finding_id",
     "sanitize_comments",
     "sanitize_dispositions",
     "unknown_run_result",
@@ -80,6 +84,20 @@ COMMENT_FIELDS: frozenset[str] = frozenset({
 DISPOSITION_FIELDS: frozenset[str] = frozenset({
     "anchor", "disposition", "declared",
 })
+
+# One record per PUBLISHED finding, head-bound and identified, so a consumer
+# can follow the same finding across heads instead of re-deciding what "the
+# same finding" means from prose. The review bot's ready gate carries open
+# blocker/major findings forward on this identity (RFC-pr-state-machine).
+#
+# Deliberately only what this pipeline actually produces today. An explicit
+# per-finding recheck ("was the blocker I saw last head fixed?") needs the
+# review step to be given the carried findings and the model to answer about
+# each one; until that exists, a field for it would be a promise the
+# producer cannot keep.
+FINDING_FIELDS: tuple[str, ...] = (
+    "finding_id", "severity", "anchor", "head_sha",
+)
 
 # Trace events the assembler surfaces as diagnostics.
 _DIAGNOSTIC_EVENTS = ("review_plan", "capability_gap", "expected_head_mismatch",
@@ -124,6 +142,63 @@ def _state_updates(run_dir: Path) -> dict:
             if isinstance(updates, dict):
                 merged.update(updates)
     return merged
+
+
+def finding_id(path: str, text: str) -> str:
+    """A finding's identity: stable across heads, distinct across files.
+
+    Deliberately excludes the line number. A finding survives an unrelated
+    edit above it, and a consumer carrying blockers forward must not lose one
+    because the diff moved it three lines down. Two findings in the same file
+    whose text differs are different findings; the same text in another file
+    is another finding.
+    """
+    normalized = " ".join(str(text or "").split()).casefold()
+    digest = hashlib.sha256(f"{str(path or '').strip()}\0{normalized}".encode())
+    return digest.hexdigest()[:16]
+
+
+def _anchor_parts(comment: Mapping[str, Any]) -> dict[str, Any] | None:
+    """``{path, line}`` for a published finding, or None for a fileless one."""
+    path = str(comment.get("file") or "").strip()
+    if not path:
+        return None
+    line = comment.get("line")
+    return {"path": path, "line": int(line) if isinstance(line, int) else None}
+
+
+def build_findings(comments: Any, head_sha: str) -> list[dict]:
+    """The published findings, identified and bound to the head they were
+    found on.
+
+    One entry per published comment, in publication order. No join with the
+    disposition audit: those records are keyed by anchor, and an anchor is
+    not unique — a withheld candidate and a published one can share it, and
+    anchor resolution can move a line after the records are written — so a
+    join would mislabel findings rather than inform a consumer. Identity,
+    severity and position are what a consumer carrying blockers forward
+    needs, and all three are exact.
+
+    Duplicate identities are kept, not collapsed: two findings the pipeline
+    chose to publish separately are two findings, and silently dropping one
+    could drop a blocker.
+    """
+    out: list[dict] = []
+    for comment in comments if isinstance(comments, list) else []:
+        if not isinstance(comment, Mapping):
+            continue
+        anchor = _anchor_parts(comment)
+        out.append({
+            "finding_id": finding_id(
+                (anchor or {}).get("path") or "", comment.get("comment")
+            ),
+            # Post-demotion: `review_comments` is the finalized set, so this
+            # is the severity the finding was actually published with.
+            "severity": str(comment.get("severity") or "minor").casefold(),
+            "anchor": anchor,
+            "head_sha": str(head_sha or ""),
+        })
+    return out
 
 
 def sanitize_dispositions(records: Any) -> list[dict]:
@@ -182,6 +257,9 @@ def build_review_result(run_dir: Path | str) -> dict[str, Any]:
     # prose: it means "your snapshot is gone", not "the review found nothing".
     mismatch = (diagnostics.get("expected_head_mismatch") or [None])[0]
 
+    reviewed_head = str(updates.get("pr_head_sha") or "")
+    findings = build_findings(updates.get("review_comments"), reviewed_head)
+
     return {
         "contract_version": STRICT_API_VERSION,
         "run_id": status.get("run_id") or run_dir.name,
@@ -197,6 +275,10 @@ def build_review_result(run_dir: Path | str) -> dict[str, Any]:
         # list it was handed (#141).
         "finding_dispositions": sanitize_dispositions(
             updates.get("review_finding_dispositions")),
+        # The same published set, one entry each, identified and bound to the
+        # head it was found on, so a consumer can carry an open blocker to the
+        # next head rather than re-deriving "the same finding" from prose.
+        "findings": findings,
         "stale": bool(mismatch),
         "expected_head_sha": str((mismatch or {}).get("expected") or ""),
         "actual_head_sha": str((mismatch or {}).get("actual") or ""),
