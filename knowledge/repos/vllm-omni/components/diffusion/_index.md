@@ -1,7 +1,7 @@
 ---
 title: "Diffusion"
 created: 2026-07-10
-updated: 2026-09-06
+updated: 2026-09-21
 type: index
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/attention/backends/flashinfer_attn.py]
@@ -29,7 +29,7 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解共享职责和数据流 | [architecture](architecture.md) |
-| 根据 PR 描述直达 execution parity、checkpoint/artifact identity、quality evidence 或 system-runtime 异常清理规则组与第一批源码 | [rules 与代码地图](rules.md) |
+| 根据 PR 描述直达 execution parity、checkpoint/artifact identity、quality evidence 或 system-runtime 异常清理规则组与第一批源码、custom-op mutable schema | [rules 与代码地图](rules.md) |
 | image/diffusion timing、step normalization、missing-versus-zero 与 benchmark 解释边界 | [metrics evidence rules](rules-metrics.md) |
 | vLLM/torch rebase、MoE/quant helper 漂移、kernel backend capability 与 matched accuracy | [upstream 兼容规则](rules-upstream-compat.md) |
 | worker process title、拓扑局部 rank 与日志前缀 | [worker observability rules](rules-worker-observability.md) |
