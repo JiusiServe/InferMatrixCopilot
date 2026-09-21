@@ -1,7 +1,7 @@
 ---
 title: "MiniMax H3 缓存与任务生命周期规则"
 created: 2026-09-04
-updated: 2026-09-08
+updated: 2026-09-21
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", "PR #6666", "PR #6714", "PR #6909", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/fasth3.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/npu/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/entrypoints/openai/video_api_utils.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_fasth3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_native_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #7162", "PR #7062"]
@@ -231,3 +231,10 @@ Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期�
 - 强制：`--lora-path` 指向单文件，或只含一个可解析 Turbo artifact 的目录；多候选必须 fail closed。`ref2v` 只能挂在 Ref2VA-only server；combined/`transformers_ref` 拓扑不得绑定只注入 `transformer` 的 Turbo adapter。ComfyUI 融合 QKV/SwiGLU 导出按名拒绝。
 - 禁止：继续要求单一 `4step_v1.0_768p` 文件名或 `alpha==128`；在目录里静默挑选；把未声明 alpha 当 rank；或让 Ref2VA 请求跑到未蒸馏 DiT 的 few-step schedule。
 - 验收：覆盖多 artifact 文件名矩阵、缺/错 alpha、多文件目录拒绝、task/steps/shift 负向门禁、Ref2VA-only vs combined 拒绝，以及 Diffusers-layout packing；不得把单一 artifact 通过外推为全矩阵质量证据。^[PR #7062]
+
+## MMH3-2r — 长视频 continuation 必须按全局时间线切窗并同步 AV 边界
+
+- 触发：修改 MiniMax-H3 `long_video`/`continuation_*`、`audio_mode=lock_source`、窗口 RoPE `temporal_offset`、`continuation_prompts`，或 fused QK-norm 的 token 索引宽度。
+- 强制：默认 latent-tail continuation 只在 Ref2VA request execution（非 step）下启用；window/overlap 必须落在 `17n+5` 网格且 window∈[107,345]、overlap<window。每窗 denoise 新鲜目标，用上一窗 AV latent 尾作 guide 条件行（共享新目标时间原点），丢弃新采样 overlap，只追加后缀。媒体时间按全局帧起点偏移（保留小数），文本/静图/空间位不变；多窗 prompt 独立编码，媒体原点锚定最长 text 前缀之后。音频边界用累积帧时间线的 `_audio_t`，避免逐窗取整漂移。长序列 QK-norm 扁平偏移使用 int64。
+- 禁止：在 step execution 上开 continuation；用 per-window 舍入累积 A/V 漂移；让 prompt 长度推动 AV 时间轴；把 guide 写成 masked target 前缀；把全局偏移承诺为精确镜头切换。
+- 验收：窗口规划、overlap discard/append、全局 temporal offset、多 prompt 同源媒体时钟、lock_source 与 int64 QK 偏移。^[PR #7838]

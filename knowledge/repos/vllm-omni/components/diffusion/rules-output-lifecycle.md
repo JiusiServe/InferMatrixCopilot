@@ -1,7 +1,7 @@
 ---
 title: "Diffusion output 与 multiprocess runtime 规则"
 created: 2026-09-02
-updated: 2026-09-08
+updated: 2026-09-21
 type: rule
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5550", "PR #5864", "PR #5885", "PR #5978", "PR #6750", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/io_support.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/output_formatter.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/stage_diffusion_proc.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_timeout.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/diffusion/test_stage_diffusion_proc.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6255", "PR #6288", "PR #6308", "PR #6499", "PR #6749", "PR #6847", "PR #6953", vllm_omni/diffusion/data.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, tests/diffusion/test_diffusion_output_formatter.py, tests/diffusion/test_diffusion_plugin_hooks.py, tests/entrypoints/openai_api/test_video_pipeline_capability.py, "PR #6294"]
@@ -176,3 +176,10 @@ confidence: high
 - 强制：runner 与 pipeline 共有同一 `InteractionCoordinator`；仅对已注册 modality 构造 handler；`enqueue` 按 modality 路由；`apply_at_chunk_boundary` 以稳定顺序推进（prompt 优先，再及其他 modality）；per-request session 落在 `StepRequestState.interaction_sessions`，chunk ACK 元数据写入 `interaction_chunk_metadata`。未注册 modality 必须 fail closed。当前公开行为保持 prompt-only，直到另有 PR 注册并验收非 prompt handler。
 - 禁止：在 denoise 中途旁路 coordinator 直接改 `prompt_embeds`；在非 chunk 边界静默应用 interaction；未注册就接受 camera/`multi_modal_data`；或把内部 handler 重构当成用户 API 已扩展。
 - 验收：覆盖 prompt enqueue→chunk-boundary apply→ACK event id、未注册 modality 拒绝，以及无 session 的 modality 跳过；不得用本框架落地证明 camera/MM 路径已可用。^[PR #6294]
+
+## DIFF-1ai — 复合 mid-stream interaction 必须原子入队，非懒会话在 chunk0 前物化
+
+- 触发：修改 `InteractionCoordinator.enqueue_parts`、`lazy_initialize_session`、camera/`multi_modal_data` 与 prompt 同事件入队、`synchronized_monotonic_time`，或 chunk-boundary apply 的 media/latent 计数。
+- 强制：含多 modality 的同一事件先全部 `validate_payload`，再入队；任一路不支持或非法不得部分改队列。`received_at`/boundary 时钟经 rank 同步，使 USP/SP 分片共享同一到达时刻。`lazy_initialize_session=False` 的 handler（如 camera）必须在首个 denoise chunk 前 `maybe_prepare_initial_session`，即使尚无 client enqueue。chunk apply 区分 `num_media_frames` 与 `num_latent_frames`，需要者才 `peek_chunk_media`。
+- 禁止：先入队再校验导致半更新；把未注册 camera 当已可用；懒会话与必须预创建会话混用同一 skip 逻辑；用未同步的 per-rank `time.monotonic()` 驱动跨分片时间线。
+- 验收：复合 prompt+camera 原子成功/失败、未注册拒绝、非懒会话在 chunk0 前存在、介质计数字段传播。^[PR #7198]

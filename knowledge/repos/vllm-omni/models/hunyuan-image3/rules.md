@@ -1,7 +1,7 @@
 ---
 title: "HunyuanImage3 开发规则"
 created: 2026-07-13
-updated: 2026-09-08
+updated: 2026-09-21
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
 sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py", "PR #6306", "PR #6102", "PR #6563", "PR #4048", vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_tokenizer.py, vllm_omni/diffusion/models/hunyuan_image3/request_layout.py, tests/diffusion/models/hunyuan_image3/test_hunyuan_image3_step_execution.py, tests/diffusion/models/hunyuan_image3/test_image_kv_cache_manager.py, "PR #7021"]
@@ -170,3 +170,10 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
 - 强制：公开 `get_expert_mapping()` 必须返回 flat `list[tuple[str, str, int, str]]`（非 MoE 返回 `[]`），供上游 loader 消费；Hunyuan checkpoint 的 `gate_proj`/`up_proj` → `gate_and_up_proj` 分片 remapping 只能放在独立的 `_get_expert_weights_remapping()`，由 `load_weights` 显式取用。AR 与 diffusion transformer 两侧同一合同。
 - 禁止：让 `get_expert_mapping()` 再返回 `(mapping, remapping)` 二元组，或把 Omni-local remapping 塞进上游期望的 public API。
 - 验收：对 `HunyuanModel` 与 `HunyuanImage3Model` 断言 public mapping 为 flat list、local remapping 字典独立，并覆盖非 MoE 空返回。^[PR #7021]
+
+## HY3-10a — 文本-only chat 必须按请求标为 comprehension，不得走图像 stage 强制
+
+- 触发：修改 HunyuanImage3 AR `sample()`、`engine_output_type="latent"` 的 generation 部署上的 chat completions、`SamplingParams.extra_args["ar_task_mode"]`，或 AR runner 向 custom sampler 转发 `extra_args`。
+- 强制：任务模式是 per-request 属性。serving 对 modalities 仅为 text 的 chat 在普通 `SamplingParams` 上 `setdefault("ar_task_mode", "comprehension")`，不覆盖调用方显式值，也不标记 image/audio/video 输出请求。声明 `model_sampler_wants_extra_args` 的模型必须经共享 dispatcher 按 `req_ids` 顺序收到每行 `extra_args`。comprehension 行只做无状态图像脚手架 token 屏蔽（含 `<cfg>`/`<img>`/`<timestep>`/`<joint_img_sep>` 等），禁止 `</think>→<recaption>` 等 generation stage 强制。
+- 禁止：仅凭引擎级 `engine_output_type` 让文本答案走图像 stage 转移；把 DiT scaffold token 漏进文本答案；破坏既有两参数 custom sampler 合同。
+- 验收：混合 comprehension/generation batch、生产 chat 入口的 text-only 路由、GPU/NPU 转发与未标记行的 generation 行为保持不变。^[PR #6111]

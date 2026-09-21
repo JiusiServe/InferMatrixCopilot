@@ -1,7 +1,7 @@
 ---
 title: "运行时热路径合同"
 created: 2026-09-04
-updated: 2026-09-08
+updated: 2026-09-21
 type: rule
 tags: [vllm-omni, components, model-executor]
 sources: ["PR #4765", "PR #5068", "PR #5174", "PR #5666", vllm_omni/worker/, "PR #5452", "vllm_omni/worker/sparse_audio.py", "vllm_omni/worker/sampling_utils.py", "PR #5048", "PR #6424", "PR #6454", vllm_omni/data_entry_keys.py, "vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py", "vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py", "vllm_omni/model_executor/stage_input_processors/cosyvoice3.py", "PR #6458", "PR #6317", "PR #7136"]
@@ -101,3 +101,10 @@ confidence: high
 - 强制：上述字段为 Python `int`/`bool`，按真实 prompt 进度逐行生产。长度为 1 的 **prefill** 行（含 chunked prefill 的最后一 token）必须保留 preprocess embedding，且不得进入 runner-managed MTP；只有单 token **decode** 行才可走 MTP。out-of-tree 模型虽见下划线前缀，仍按公开 contract 消费。
 - 禁止：用当前 span 长度把 one-token prefill 当成 decode；只在模型 helper 手喂 metadata 却不测 runner producer；或把该合同当成已为所有模型开启 chunked prefill。
 - 验收：直接调用生产 `_preprocess`，在 mixed batch 中对照应/不应进入 MTP 的行，覆盖单 token prompt/tail、cached progress、normal/batched hooks；真实权重 E2E 至少锁一条 one-token prefill tail。^[PR #7136]
+
+## EXEC-11i — 请求 seed 必须驱动模型内 CFM/噪声流，且与 batch 位置无关
+
+- 触发：TTS/talker 在 `forward()` 内绘制 CFM、flow-matching 或同类噪声，且公开协议声称 `seed` 可复现；修改 `_omni_seed`、`SamplingParams.seed`、per-request `torch.Generator` 或 `deterministic_cfm_noise`。
+- 强制：`SamplingParams.seed` 到达 vLLM sampler 不等于到达模型内噪声点。有 seed 的请求必须在首次 prefill 从 runner 的 `_omni_seed` 构造请求私有 `Generator`，并在每个噪声 fill 站点（eager、cuda-graph、batched prefill/decode、unified replay）对 shape `(1, …)` 的行切片使用该 generator。同 text+seed 的噪声流必须与 batch 组成、request id 无关；无 seed 保持全局 RNG；`deterministic_cfm_noise` 的 request-id 哈希只服务 replay，且请求 seed 优先。
+- 禁止：仅依赖 `SamplingParams.seed` 或全局 `normal_()` 宣称 speech seed 合同；用 request-id 哈希冒充用户 seed；让 seeded 行的噪声依赖同 batch 其他请求。
+- 验收：跨 request 同 seed 字节一致、异 seed 敏感、batch 位次无关、seed 优先于 replay 哈希；覆盖所有噪声站点。^[PR #7866]

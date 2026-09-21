@@ -1,7 +1,7 @@
 ---
 title: "Distributed 传输规则"
 created: 2026-08-05
-updated: 2026-09-08
+updated: 2026-09-21
 type: rule
 tags: [vllm-omni, components, distributed]
 sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", "PR #6834", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626", "PR #6529", "PR #7136"]
@@ -142,3 +142,10 @@ confidence: high
 - 强制：CUDA Mooncake 依赖必须钉在包含 acknowledged TCP writes 的版本（`0.3.12` 起）；`batch_transfer_sync_write` 返回成功后，destination 内存必须已更新到可读状态，不能只表示本地 send 入队。回归必须在 receiver 被挂起时证明 completion 不会提前返回，恢复后再断言目的端字节一致。
 - 禁止：降级到无 ACK 的 TCP 实现却不更新测试合同；把 RDMA 路径的 completion 语义外推到 TCP；或在 completion 前启动依赖 destination 内容的零拷贝消费。
 - 验收：强制 TCP 的挂起-恢复测试覆盖「停止期间不完成、恢复后成功且字节匹配」；依赖声明与该测试同步变更。^[PR #7136]
+
+## DIST-1l — 原生 Mooncake AR→DiT KV 必须关 async_chunk 并按物理页序释放
+
+- 触发：部署或修改 `kv_transfer_config`/`MooncakeConnector`、AR→DiT 原生 KV handoff、`OmniARScheduler` 的 block free，或与 legacy `OmniKVTransferManager` 并存的路径。
+- 强制：存在 stage `kv_transfer_config` 时必须 `async_chunk=False`。原生路径由 scheduler 拥有 diffusion KV 页；connector 失败 fail-close diffusion engine 后再拆页。非 caching P/D 池释放时按递增 `block_id` 归还，便于相邻页合并；deferred free 存逆序以匹配 vLLM drain。原生 transfer 边界用已确认 computed tokens，排除 async output placeholders；需要时短暂改写 request status/token 计数并在 `finally` 恢复。
+- 禁止：`async_chunk=True` 搭配原生 KV transfer；把 eviction-priority free 顺序当成无缓存池的物理布局；用含 placeholder 的 token 计数作为 transfer 边界；connector 失败后仍继续拆页当成功。
+- 验收：配置拒绝 async_chunk+kv_transfer；物理序 free；confirmed-token transfer 边界；失败 fail-close。^[PR #7166]

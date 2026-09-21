@@ -1,7 +1,7 @@
 ---
 title: "BAGEL 实现规则"
 created: 2026-09-02
-updated: 2026-09-05
+updated: 2026-09-21
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #5775", "PR #5884", "PR #6359", "PR #7049", vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/models/bagel/bagel_transformer.py, vllm_omni/diffusion/models/bagel/pipeline_bagel.py, vllm_omni/diffusion/models/lance/lance_transformer.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/test_diffusion_engine_dummy_run.py, tests/diffusion/models/bagel/test_step_execution.py]
@@ -93,3 +93,11 @@ step request abort/finish 后，runner 必须先清理 request state、paged dif
 step request finish/abort 后的 explicit text full-forward fallback。schedule regression 必须断言
 `N < 2` 在 complete 和 step image path 均被拒绝，且不将 denoise update 数写成 `N`；dummy-run
 regression 必须对 request 和 step 两种 mode 都断言两个 inference steps。^[PR #6359] ^[PR #7049]
+
+## BAGEL-4 — 显式输出画布优先于 KV image_shape 与源图尺寸
+
+**适用范围**：`/v1/images/edits` 与 BAGEL img2img/`get_bagel_pre_process_func`/`_forward_single` 的 height/width 决议，含 two-stage 的 `kv_metadata["image_shape"]`。
+
+**合同**：画布优先级为 **显式请求 > `kv_metadata["image_shape"]` > 输入图像推导**。`size=auto` 在 API 层解析为源尺寸后，必须用 `height_not_provided`/`width_not_provided` 标记非意图画布；preprocessor 对派生画布同样置位。显式边长按 latent stride 向下对齐并告警；超过 checkpoint 上限以 `OmniClientError`（HTTP 400）拒绝。源图仍可为 VAE/ViT prefill 做 stride 对齐，但不得覆盖已请求的输出画布。非流式 generation/edit 响应的 `size` 必须来自实际生成图像。
+
+**验收**：显式 `size` 不被源图或 AR 发布的 KV shape 覆盖；`size=auto` 与纯离线 img2img 保持派生对齐；越界拒绝；响应 `size` 与解码图像一致。^[PR #7287]

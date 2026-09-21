@@ -72,3 +72,10 @@ confidence: high
   determinism 或 eager 数值等价证明。
 - 验收：产物能追溯各 arm 的真实 source/config/environment，报告候选差值和控制漂移；
   稳态统计可从相同筛选重算，正确性另由对应 parity 测试支持。 ^[PR #7648]
+
+## BENCH-1g — duplex/eval 媒体解码必须用捆绑 PyAV，不得依赖 host ffmpeg
+
+- 触发：修改 `omni-duplex-eval` 或同类 benchmark 的视频时长、帧抽取、音频 PCM 解码，或重新引入 `ffmpeg`/`ffprobe` subprocess。
+- 强制：媒体路径经 PyAV（`av`）打开/seek/decode/resample；结果不得依赖主机安装的 ffmpeg 版本。帧抽取语义对齐“首个 PTS ≥ 目标时刻”；非 WAV 音频经 `AudioResampler` 并在循环后 `resample(None)` flush 尾部样本。
+- 禁止：`subprocess` 调用 host `ffmpeg`/`ffprobe` 作为默认路径；把“本机 ffmpeg 能跑”当作可复现证据；在已知会挂起的旧 HEVC decoder 上无超时地阻塞 generate 阶段。
+- 验收：覆盖 duration/JPEG/PCM 合同与失败 raise；至少用曾触发 host ffmpeg 4.4.2 挂起的样本证明不再无限忙等。^[PR #7504]
