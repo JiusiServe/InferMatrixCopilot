@@ -17,8 +17,8 @@ sources: ["PR #7648", "claude-workflow-starter-private@296ea45", "PR #4281", "PR
 
 源码路径相对 `vllm_omni/`；测试路径相对仓库根。
 
-- **VOMNI-CFG-0a — PR 描述先选代码地图。** Direct review 先用 PR title/body 声明的配置语义命中下表，再一次性用 pinned changed files 验证真实范围。描述只负责导航；冲突时以 live diff 和 consumer 为准。
-- **VOMNI-CFG-0b — 命中函数后停止文档导航。** 打开命中行的第一批源码后，沿 live producer→consumer 审查；只有调用链跨 owner 或具体未知量阻塞时才增加一个 owner 或 guide。
+- **VOMNI-CFG-0a — 描述选图，diff 验证。** title/body 命中下表后用 pinned changed files 验证；冲突以 live diff/consumer 为准。
+- **VOMNI-CFG-0b — 命中后停止导航。** 沿 live producer→consumer 审查；仅跨 owner 或具体未知量阻塞时增加 owner/guide。
 
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
