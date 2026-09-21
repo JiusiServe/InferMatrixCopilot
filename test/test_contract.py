@@ -360,3 +360,145 @@ def test_get_result_still_refuses_a_malformed_run_id(settings, bad):
             core.get_result(bad)
     finally:
         core.close()
+
+
+# -- per-finding result (RFC-pr-state-machine, #174) ------------------------
+
+
+def _finding(file="vllm_omni/core/engine.py", line=42, severity="blocker",
+             comment="Null dereference when the sampler returns None"):
+    return {"file": file, "line": line, "severity": severity, "comment": comment}
+
+
+def test_findings_carry_identity_severity_and_the_head_they_were_found_on(tmp_path):
+    run_dir = _run(tmp_path, updates={
+        "pr_head_sha": "head-1",
+        "review_comments": [_finding()],
+    })
+
+    findings = contract.build_review_result(run_dir)["findings"]
+
+    assert len(findings) == 1
+    found = findings[0]
+    assert set(found) == set(contract.FINDING_FIELDS)
+    assert found["severity"] == "blocker"
+    assert found["anchor"] == {"path": "vllm_omni/core/engine.py", "line": 42}
+    assert found["head_sha"] == "head-1"
+    assert len(found["finding_id"]) == 16
+
+
+def test_a_findings_identity_survives_a_line_shift_but_not_a_new_file():
+    same = contract.finding_id("a/b.py", "Null deref when x is None")
+    # The same finding after an unrelated edit moved it down the file.
+    assert same == contract.finding_id("a/b.py", "Null  deref when  x is None")
+    assert same == contract.finding_id("a/b.py", "NULL DEREF WHEN X IS NONE")
+    assert same != contract.finding_id("a/c.py", "Null deref when x is None")
+    assert same != contract.finding_id("a/b.py", "Unrelated finding")
+
+
+def test_two_findings_sharing_a_long_prefix_are_not_the_same_finding():
+    """Identity hashes the whole text. Truncating it would merge a blocker
+    into a nit whenever a review opens two findings the same way."""
+    prefix = "The sampler path does not validate its input before use, " * 4
+    assert contract.finding_id("a/b.py", prefix + "and dereferences None.") != (
+        contract.finding_id("a/b.py", prefix + "and logs a misleading message.")
+    )
+
+
+def test_two_findings_published_separately_both_survive(tmp_path):
+    """Whatever the pipeline chose to publish separately is two findings;
+    collapsing them could drop a blocker."""
+    prefix = "The sampler path does not validate its input before use, " * 4
+    run_dir = _run(tmp_path, updates={
+        "pr_head_sha": "head-1",
+        "review_comments": [
+            _finding(comment=prefix + "and dereferences None."),
+            _finding(line=91, severity="nit",
+                     comment=prefix + "and logs a misleading message."),
+        ],
+    })
+
+    findings = contract.build_review_result(run_dir)["findings"]
+
+    assert [f["severity"] for f in findings] == ["blocker", "nit"]
+    assert findings[0]["finding_id"] != findings[1]["finding_id"]
+
+
+def test_the_published_severity_is_the_one_that_crosses_the_boundary(tmp_path):
+    """`review_comments` is the finalized set, so a demoted finding reports
+    the severity it was published with, not the one it was raised with."""
+    run_dir = _run(tmp_path, updates={
+        "pr_head_sha": "head-1",
+        "review_comments": [_finding(severity="Minor")],
+    })
+
+    assert contract.build_review_result(run_dir)["findings"][0]["severity"] == "minor"
+
+
+def test_a_fileless_finding_keeps_its_identity_without_an_anchor(tmp_path):
+    run_dir = _run(tmp_path, updates={
+        "pr_head_sha": "head-1",
+        "review_comments": [{"severity": "major", "comment": "No tests at all"}],
+    })
+
+    found = contract.build_review_result(run_dir)["findings"][0]
+
+    assert found["anchor"] is None and found["finding_id"]
+
+
+def test_findings_never_borrow_a_disposition_from_another_candidate(tmp_path):
+    """A withheld candidate and a published one can share an anchor, so the
+    audit trail is reported as itself and never joined onto a finding."""
+    run_dir = _run(tmp_path, updates={
+        "pr_head_sha": "head-1",
+        "review_comments": [_finding()],
+        "review_finding_dispositions": [
+            {"anchor": "vllm_omni/core/engine.py:42",
+             "disposition": "no_issue", "declared": "no_issue"},
+            {"anchor": "vllm_omni/core/engine.py:42",
+             "disposition": "published", "declared": "issue"},
+        ],
+    })
+
+    result = contract.build_review_result(run_dir)
+
+    assert result["findings"][0]["severity"] == "blocker"
+    assert set(result["findings"][0]) == set(contract.FINDING_FIELDS)
+    assert len(result["finding_dispositions"]) == 2
+
+
+def test_findings_do_not_change_the_aggregate_disposition_list(tmp_path):
+    run_dir = _run(tmp_path, updates={
+        "pr_head_sha": "head-1",
+        "review_comments": [_finding()],
+        "review_finding_dispositions": [{
+            "anchor": "vllm_omni/core/engine.py:42",
+            "disposition": "published",
+            "declared": "issue",
+            "secret": "withheld prose",
+        }],
+    })
+
+    result = contract.build_review_result(run_dir)
+
+    assert result["finding_dispositions"] == [
+        {"anchor": "vllm_omni/core/engine.py:42",
+         "disposition": "published", "declared": "issue"}
+    ]
+
+
+def test_the_contract_version_announces_the_new_field(tmp_path):
+    run_dir = _run(tmp_path, updates={"pr_head_sha": "h", "review_comments": []})
+    result = contract.build_review_result(run_dir)
+    assert result["contract_version"] >= "1.2.0"
+    assert result["findings"] == []
+
+
+def test_a_run_that_died_before_reviewing_still_reports_findings(tmp_path):
+    run_dir = tmp_path / "run-20260828-101010-dead02"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    rs.init_queued(run_dir, run_id=run_dir.name, owner_server_id="S1",
+                   owner_server_pid=1)
+    rs.mark(run_dir, rs.FAILED, note="died")
+
+    assert contract.build_review_result(run_dir)["findings"] == []
