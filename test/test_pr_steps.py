@@ -225,7 +225,7 @@ def test_review_payload_validates_diff_lines_and_preserves_fallbacks():
     }
     payload, downgraded = _review_payload(state)
 
-    assert payload["event"] == "REQUEST_CHANGES"
+    assert payload["event"] == "COMMENT"
     assert payload["commit_id"] == "a" * 40
     assert payload["comments"] == [{
         "path": "a.py",
@@ -259,9 +259,9 @@ def test_review_payload_downgrades_all_comments_when_head_changed():
 @pytest.mark.parametrize(
     ("comments", "pr_state", "review_text", "event"),
     [
-        ([_finding("a.py", 10, "major")], "OPEN", "", "REQUEST_CHANGES"),
+        ([_finding("a.py", 10, "major")], "OPEN", "", "COMMENT"),
         ([_finding("a.py", 10, "minor")], "OPEN", "", "COMMENT"),
-        ([], "OPEN", "**Verdict:** APPROVE", "APPROVE"),
+        ([], "OPEN", "**Verdict:** APPROVE", "COMMENT"),
         ([_finding("a.py", 10, "major")], "MERGED", "", "COMMENT"),
     ],
 )
@@ -312,7 +312,7 @@ def test_post_review_submits_one_review_with_inline_comments(
     assert len(captured["payload"]["comments"]) == 1
     assert result.outputs["inline"] == 1
     assert result.outputs["downgraded"] == 1
-    assert result.outputs["event"] == "REQUEST_CHANGES"
+    assert result.outputs["event"] == "COMMENT"
     assert result.outputs["url"].endswith("#review")
 
 
@@ -698,3 +698,17 @@ def test_fetch_diff_matching_expected_head_proceeds(settings, trace, tmp_path,
 
     assert result.ok, result.summary
     assert result.outputs["state_updates"]["pr_head_sha"] == sha
+
+
+@pytest.mark.parametrize("kind", ["pr_review", "pr_quality"])
+def test_review_tasks_cannot_push_even_with_allow_push(registry, settings, trace, tmp_path, monkeypatch, kind):
+    from infermatrix_copilot.engine.steps.pr import publish
+    settings.allow_push = True
+    state = {"repo_path": str(tmp_path), "task_spec": {"kind": kind},
+             "push_policy": PushPolicy(allowed=True, remote="origin", branch="feature")}
+    def unexpected(*args, **kwargs):
+        raise AssertionError("review task attempted a git command")
+    monkeypatch.setattr(publish.subprocess, "run", unexpected)
+    result = asyncio.run(registry.get("ci.push").handler(_ctx(settings, trace, tmp_path, state)))
+    assert not result.ok
+    assert "comment-only" in result.summary

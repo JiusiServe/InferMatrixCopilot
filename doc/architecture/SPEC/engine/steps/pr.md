@@ -1,6 +1,6 @@
 # engine/steps/pr/ —— 规范
 
-<!-- verified-against: 2026-09-08 -->
+<!-- verified-against: 2026-09-22 -->
 
 `LOC ~1390（6 个文件） · step 库（PR） · refactor-status: ok`
 
@@ -30,7 +30,7 @@
 `extract_signature`（由 `utils` 再导出；供测试使用）。
 
 ## 不变量
-- `ci.push` 把全部安全判断委托给 `guard_push`（**C4**）。
+- `ci.push` 对 `pr_review` / `pr_quality` 无条件拒绝推送；其他任务仍委托给 `guard_push`（**C4**）。
 - **`pr.fetch_diff`：一个 head 统治一切**（PR2 重构后）。head 由
   `_resolve_pr_head` **恰好解析一次**，stale 门、fetch、diff、worktree 全部
   从这一个答案推导（`_fetch_at_one_head`）。fetch 走 run 域强制目的 ref
@@ -49,6 +49,7 @@
   事件 `expected_head_mismatch`，`contract.build_review_result` 据此上报
   stale）；且每条"降级回 live checkout"的路径都变成硬 BLOCK —— 钉了快照
   还静默评错树，比停下更糟。
+- **`pr.post_review` 始终使用 `event="COMMENT"`**，模型 verdict 不授予批准或阻塞 PR 的权限。
 - **`pr.post_review` 只发一条 GitHub review + inline thread**，且先把每条发现的位置
   对照已抓取的 diff 校验过 —— **绝不是一串独立评论**。
 - `diff_text` 和 `gate_report` 都可以经 state 注入，因此网络之下的每条路径都可离线测试；
