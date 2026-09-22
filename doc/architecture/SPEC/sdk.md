@@ -108,3 +108,7 @@ fence、strict proposal shape/ID/source/page 校验、typed index accounting、a
 写入、固定 validator 顺序、missing-validator fail-closed、multi-page byte rollback、
 tamper/stale detection 与两个 curator 的 writer serialization；测试只创建临时
 knowledge checkout，不改仓库真实 `knowledge/`。
+
+## Carried finding rechecks
+
+Direct 1.1 / Strict 1.3 accept typed `CarriedFinding` inputs (unique IDs, source head, severity, location, title and evidence). Direct binds the carried set into its issued context and validates `FindingRecheck` answers. Strict passes the set through the policy allowlist, performs a read-only recheck against the frozen PR head, and persists answers for the public structured result. Every carried ID needs an explicit outcome: `fixed`, `still_affected`, or `unverified`. Missing evidence is never a fix.

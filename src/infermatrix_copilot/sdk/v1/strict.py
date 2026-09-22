@@ -38,12 +38,16 @@ class StrictRuntime:
         return tuple(self._core.strict_readiness(repo, repo_path))
 
     def reserve_review(self, request: StrictReviewRequest) -> StrictRunHandle:
+        from .rechecks import validate_carried
+
+        carried = [item.to_dict() for item in request.carried_findings]
+        validate_carried(carried)
         payload = {
             "kind": "pr_review",
             "repo": request.repository.alias,
             "pr": request.pr_number,
             "post": False,
-            "params": {"review_depth": request.review_depth},
+            "params": {"review_depth": request.review_depth, "carried_findings": carried},
             "expected_head_sha": request.expected_head_sha,
             "repo_path": request.repo_path,
             "idempotency_key": request.idempotency_key,
