@@ -9,6 +9,13 @@ sources: ["PR #6533", "PR #6838", vllm_omni/diffusion/models/lingbot_world/pipel
 
 # LingBot World session lifecycle 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批 live 源码 |
+|---|---|---|
+| streaming VAE、session reset/close、admission bytes | `session-decode`：`LBW-1a` | `lingbot_world/pipeline.py` session hooks → `experimental/ar_diffusion/streaming_decode.py` |
+| condition block、encoder history、temporal RoPE | `condition-history`：`LBW-1b` | `lingbot_world/pipeline.py` condition state → `lingbot_world/transformer.py` RoPE → model admission |
+
 ## LBW-1a — AR 流式 VAE decode 状态必须按 session 持有并计入 admission
 
 - 触发：修改 LingBot/Wan 系 AR-Diffusion `post_decode`、streaming VAE decode、`SupportsStreamingDecode`，或 `model_owned_state_bytes_per_session`。

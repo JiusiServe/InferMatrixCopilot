@@ -9,6 +9,12 @@ sources: ["PR #7866"]
 
 # VoxCPM2 请求噪声规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批 live 源码 |
+|---|---|---|
+| request seed、CFM noise、batched prefill/decode、graph replay | `request-noise`：`VOXCPM2-2a` | `worker/gpu_ar_model_runner.py` request seed → `model_executor/models/voxcpm2/` request generator 与各 noise fill 站点 |
+
 ## VOXCPM2-2a — 请求 seed 必须驱动模型内 CFM/噪声流，且与 batch 位置无关
 
 - 触发：TTS/talker 在 `forward()` 内绘制 CFM、flow-matching 或同类噪声，且公开协议声称 `seed` 可复现；修改 `_omni_seed`、`SamplingParams.seed`、per-request `torch.Generator` 或 `deterministic_cfm_noise`。
