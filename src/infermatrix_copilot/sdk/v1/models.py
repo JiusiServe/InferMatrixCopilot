@@ -6,8 +6,8 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 SDK_API_VERSION = "1.0.0"
-DIRECT_API_VERSION = "1.0.0"
-STRICT_API_VERSION = "1.2.0"   # + findings / findings_missing_carried (#174)
+DIRECT_API_VERSION = "1.1.0"
+STRICT_API_VERSION = "1.3.0"  # explicit carried-finding rechecks
 QUALITY_API_VERSION = "1.0.0"
 KNOWLEDGE_API_VERSION = "1.1.0"
 
@@ -196,6 +196,26 @@ class Capabilities(_Serializable):
 
 
 @dataclass(frozen=True)
+class CarriedFinding(_Serializable):
+    finding_id: str
+    source_head_sha: str
+    severity: str
+    path: str
+    title: str
+    body: str = ""
+    line: int | None = None
+    disputed: bool = False
+
+
+@dataclass(frozen=True)
+class FindingRecheck(_Serializable):
+    finding_id: str
+    head_sha: str
+    outcome: Literal["fixed", "still_affected", "unverified"]
+    evidence: str
+
+
+@dataclass(frozen=True)
 class DirectReviewRequest(_Serializable):
     review_id: str
     repository: RepositoryRef
@@ -204,6 +224,7 @@ class DirectReviewRequest(_Serializable):
     title: str
     body: str
     changed_paths: tuple[ChangedPath, ...]
+    carried_findings: tuple[CarriedFinding, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -224,6 +245,7 @@ class DirectReviewPlan(_Serializable):
     progress_update: dict[str, Any]
     completion_gate: dict[str, Any]
     diagnostics: dict[str, Any] = field(default_factory=dict)
+    carried_findings: tuple[CarriedFinding, ...] = ()
 
 FeedbackStatus = Literal[
     "checked", "disabled", "unavailable", "not_applicable"
@@ -241,6 +263,7 @@ class DirectCompletionRequest(_Serializable):
     final_comment_count: int = 1
     existing_feedback_status: FeedbackStatus = "not_applicable"
     finding_dispositions: tuple[dict[str, str], ...] = ()
+    finding_rechecks: tuple[FindingRecheck, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -260,6 +283,7 @@ class StrictReviewRequest(_Serializable):
     repo_path: str
     idempotency_key: str
     review_depth: str = "standard"
+    carried_findings: tuple[CarriedFinding, ...] = ()
 
 
 @dataclass(frozen=True)

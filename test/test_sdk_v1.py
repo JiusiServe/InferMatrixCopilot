@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import pytest
 import subprocess
 import sys
 from dataclasses import replace
@@ -13,6 +14,8 @@ from infermatrix_copilot.sdk import _resources as resource_module
 from infermatrix_copilot.sdk.v1 import (
     KNOWLEDGE_API_VERSION,
     ChangedPath,
+    CarriedFinding,
+    FindingRecheck,
     DirectClient,
     DirectCompletionRequest,
     DirectReviewRequest,
@@ -303,7 +306,7 @@ def test_strict_facade_preserves_idempotency_and_hides_private_paths():
     result = runtime.get_result(first.run_id, offset=12)
 
     assert first.created is True and retry.created is False
-    assert core.requests[0]["params"] == {"review_depth": "full"}
+    assert core.requests[0]["params"] == {"review_depth": "full", "carried_findings": []}
     assert "review_depth" not in core.requests[0]
     assert status.to_dict()["payload"]["progress"] == {"completed": {}}
     assert result.to_dict()["payload"]["result"] == {"verdict": "APPROVE"}
@@ -348,6 +351,44 @@ def test_strict_runtime_public_capabilities_smoke(tmp_path):
         caps = runtime.capabilities()
 
     assert caps.distribution_version == "0.2.0"
-    assert caps.strict_api_version == "1.2.0"
+    assert caps.strict_api_version == "1.3.0"
     assert caps.knowledge_api_version == KNOWLEDGE_API_VERSION
     assert caps.supports_knowledge_curation is True
+
+
+def _carried():
+    return CarriedFinding("finding-7", "b" * 40, "blocker", "mod_a.py", "Missing guard")
+
+
+@pytest.mark.parametrize("outcome", ["fixed", "still_affected", "unverified"])
+def test_direct_rechecks_are_explicit_and_bound_to_issued_findings(outcome):
+    client = DirectClient()
+    base = _request("vllm-omni", "vllm_omni/core/sched/scheduler.py")
+    plan = client.plan(replace(base, carried_findings=(_carried(),)))
+    plain = client.plan(base)
+    assert plain.review_context_id != plan.review_context_id
+    assert plan.to_dict()["carried_findings"][0]["finding_id"] == "finding-7"
+    request = DirectCompletionRequest(
+        plan.review_context_id, HEAD, HEAD, "none", existing_feedback_status="checked",
+        finding_rechecks=(FindingRecheck("finding-7", HEAD, outcome, "Read current guard"),),
+    )
+    assert client.validate(request).review_complete
+    assert not client.validate(replace(request, finding_rechecks=())).review_complete
+    assert not client.validate(replace(request, review_context_id=plain.review_context_id)).review_complete
+    assert not client.validate(replace(request, finding_rechecks=request.finding_rechecks * 2)).review_complete
+    wrong = replace(request.finding_rechecks[0], head_sha="c" * 40)
+    assert not client.validate(replace(request, finding_rechecks=(wrong,))).review_complete
+
+
+def test_strict_reservation_carries_evidence_through_policy(settings):
+    runtime = object.__new__(StrictRuntime)
+    runtime._core = _FakeStrictCore()
+    runtime.reserve_review(StrictReviewRequest(
+        RepositoryRef("vllm-omni"), 7, HEAD, "", "attempt-1",
+        carried_findings=(_carried(),),
+    ))
+    payload = runtime._core.requests[0]
+    assert payload["params"]["carried_findings"] == [_carried().to_dict()]
+    from infermatrix_copilot.mcp_policy import enforce_mcp_policy
+    spec = enforce_mcp_policy(payload, allowed_repos=["vllm-omni"])
+    assert spec.params["carried_findings"] == [_carried().to_dict()]

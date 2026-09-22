@@ -120,6 +120,7 @@ def get_capabilities(
 class _IssuedContext:
     expected_head_sha: str
     resource_revision: str
+    carried_findings: tuple[dict, ...] = ()
 
 
 class DirectClient:
@@ -232,11 +233,12 @@ class DirectClient:
             changed_files.append(path.as_posix())
         return alias, changed_files
 
-    def _remember_context(self, context_id: str, expected_head_sha: str) -> None:
+    def _remember_context(self, context_id: str, expected_head_sha: str, carried=()) -> None:
         with self._context_lock:
             self._issued_contexts[context_id] = _IssuedContext(
                 expected_head_sha=expected_head_sha,
                 resource_revision=self.resource_revision,
+                carried_findings=tuple(carried),
             )
             self._issued_contexts.move_to_end(context_id)
             while len(self._issued_contexts) > self._max_issued_contexts:
@@ -247,6 +249,10 @@ class DirectClient:
         # must not import server/config modules or initialize provider runtime.
         from ...direct_routing import direct_review_plan
 
+        from .rechecks import validate_carried
+
+        carried = tuple(item.to_dict() for item in request.carried_findings)
+        validate_carried(carried)
         alias, changed_files = self._request_values(request)
         expected_head = request.expected_head_sha.strip().casefold()
         raw = direct_review_plan(
@@ -281,6 +287,7 @@ class DirectClient:
             "title": request.title,
             "body": request.body,
             "changed_paths": [item.to_dict() for item in request.changed_paths],
+            "carried_findings": carried,
             "resource_revision": self.resource_revision,
         }
         review_context_id = _sha256(json.dumps(
@@ -318,8 +325,9 @@ class DirectClient:
             progress_update=dict(raw.get("progress_update") or {}),
             completion_gate=completion_gate,
             diagnostics=dict(raw.get("diagnostics") or {}),
+            carried_findings=request.carried_findings,
         )
-        self._remember_context(review_context_id, expected_head)
+        self._remember_context(review_context_id, expected_head, carried)
         return plan
 
     def validate(
@@ -363,6 +371,14 @@ class DirectClient:
             existing_feedback_status=request.existing_feedback_status,
             finding_dispositions=list(request.finding_dispositions),
         )
+        from .rechecks import checked_rechecks
+
+        rechecks, recheck_missing = checked_rechecks(
+            issued.carried_findings if issued else (),
+            [item.to_dict() for item in request.finding_rechecks], evidence_head,
+        )
+        details["finding_rechecks"] = rechecks
+        missing.extend(recheck_missing)
         missing.extend(str(item) for item in details.get("missing") or [])
         # Preserve order while avoiding duplicate explanations from overlapping
         # provider and SDK guards.

@@ -1,6 +1,6 @@
 # mcp_policy.py —— 规范
 
-<!-- verified-against: 2026-08-31 -->
+<!-- verified-against: 2026-09-22 -->
 
 `LOC ~254 · 安全原语（MCP 结构性门） · refactor-status: ok`
 
@@ -62,3 +62,7 @@ Strict 显式 post 被拒）；`test_contract.py`（repo_path 身份不符 / 圈
 ## 重构备注
 和 `push.guard_push`、`scopes` 一样，这是一个纯权限原语 —— 保持它无依赖。任何新的
 "MCP 可达能力"都必须表达为对 `READ_ONLY_KINDS` 的修改，**而不是这里的一个特例**。
+
+## Carried finding rechecks
+
+Direct 1.1 / Strict 1.3 accept typed `CarriedFinding` inputs (unique IDs, source head, severity, location, title and evidence). Direct binds the carried set into its issued context and validates `FindingRecheck` answers. Strict passes the set through the policy allowlist, performs a read-only recheck against the frozen PR head, and persists answers for the public structured result. Every carried ID needs an explicit outcome: `fixed`, `still_affected`, or `unverified`. Missing evidence is never a fix.

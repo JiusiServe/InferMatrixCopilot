@@ -1,6 +1,6 @@
 # engine/steps/review/ —— 规范
 
-<!-- verified-against: 2026-09-11 -->
+<!-- verified-against: 2026-09-22 -->
 
 `LOC ~900（6 个文件） · step 库（评审） · refactor-status: ok`
 
@@ -103,3 +103,7 @@
 `_sweep_targets` 消费 `profiles/languages.py::sweep_re` —— 那是"按语言规则"三份旧副本
 之一（另两份在 `profiles/establish`、`repo_map`），现已收敛到那个唯一来源。
 未知语言时的诚实降级（只做文件级 sweep）**被保留**。
+
+## Carried finding rechecks
+
+Direct 1.1 / Strict 1.3 accept typed `CarriedFinding` inputs (unique IDs, source head, severity, location, title and evidence). Direct binds the carried set into its issued context and validates `FindingRecheck` answers. Strict passes the set through the policy allowlist, performs a read-only recheck against the frozen PR head, and persists answers for the public structured result. Every carried ID needs an explicit outcome: `fixed`, `still_affected`, or `unverified`. Missing evidence is never a fix.

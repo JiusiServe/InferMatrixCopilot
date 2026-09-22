@@ -31,7 +31,7 @@ from .task_spec import FULL_SHA_RE, READ_ONLY_KINDS, TaskSpec
 # strictly value-validated below — a knob may modulate cost/depth, never widen
 # permissions.
 _ALLOWED_PARAMS: frozenset[str] = frozenset({
-    "review_depth", "deterministic_signals",
+    "review_depth", "deterministic_signals", "carried_findings",
 })
 _REVIEW_DEPTHS = ("auto", "light", "standard", "full")
 
@@ -157,6 +157,16 @@ def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str],
                 f"review_depth {params['review_depth']!r} is not one of "
                 f"{list(_REVIEW_DEPTHS)}")
         params["review_depth"] = str(params["review_depth"]).lower()
+    if "carried_findings" in params:
+        if kind != "pr_review":
+            params.pop("carried_findings")
+        else:
+            from .sdk.v1.rechecks import validate_carried
+            from .sdk.v1.models import InvalidRequestError
+            try:
+                validate_carried(params["carried_findings"])
+            except InvalidRequestError as exc:
+                raise PolicyError(str(exc)) from exc
     if "deterministic_signals" in params:
         if kind != "pr_quality":
             params.pop("deterministic_signals")

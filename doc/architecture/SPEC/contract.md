@@ -13,7 +13,7 @@
 
 ## 公开契约（`__all__`）
 `SDK_API_VERSION` / `DIRECT_API_VERSION` / `STRICT_API_VERSION` /
-`QUALITY_API_VERSION` / `KNOWLEDGE_API_VERSION`（SDK、Direct、Quality 为 `"1.0.0"`，Strict 为 `"1.2.0"`，Knowledge 为 `"1.1.0"`，且都从 `sdk.v1.models`
+`QUALITY_API_VERSION` / `KNOWLEDGE_API_VERSION`（SDK、Quality 为 `"1.0.0"`，Direct 为 `"1.1.0"`，Strict 为 `"1.3.0"`，Knowledge 为 `"1.1.0"`，且都从 `sdk.v1.models`
 取唯一值）。`capabilities(max_strict_workers=1,
 supports_file_locking=True) -> dict` 委托 SDK typed handshake 再投影为兼容
 dict；它包含 distribution/SDK/Direct/Strict/Quality/Knowledge 版本、resource
@@ -57,8 +57,9 @@ revision、supported repositories，以及 `supports_expected_head`、
   `{path, line}`，无文件时为 `None`。severity 使用最终发布值，head 绑定
   `pr_head_sha`。保留重复 identity，不与按 anchor 记账的 disposition 做 join，
   避免同位置的撤下候选污染已发布 finding。评审前失败的 run 返回空列表。
-- 当前没有 carried finding 的显式复查生产链，因此不返回 `carried_from`、
-  `head_recheck` 或 `findings_missing_carried`；不能把结果中缺少旧 finding 当作已修复。
+- `finding_rechecks` 独立返回每个 carried ID 的 `{finding_id, head_sha, outcome, evidence}`；
+  outcome 为 `fixed` / `still_affected` / `unverified`。缺失、重复、错 head 或无证据的结果
+  不构成修复，`rechecks_complete=false` 并在 `recheck_missing` 暴露缺口。
 - 本模块自身保持仓库中立；仓库专属的 Direct 路由表住在
   `direct_routing.py`（见其页）。
 - 能力身份的权威实现在 `sdk.v1.get_capabilities`；这里不维护第二份版本或

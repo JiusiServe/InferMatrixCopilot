@@ -90,11 +90,7 @@ DISPOSITION_FIELDS: frozenset[str] = frozenset({
 # same finding" means from prose. The review bot's ready gate carries open
 # blocker/major findings forward on this identity (RFC-pr-state-machine).
 #
-# Deliberately only what this pipeline actually produces today. An explicit
-# per-finding recheck ("was the blocker I saw last head fixed?") needs the
-# review step to be given the carried findings and the model to answer about
-# each one; until that exists, a field for it would be a promise the
-# producer cannot keep.
+# Explicit carried-finding rechecks travel separately from this published set.
 FINDING_FIELDS: tuple[str, ...] = (
     "finding_id", "severity", "anchor", "head_sha",
 )
@@ -259,6 +255,26 @@ def build_review_result(run_dir: Path | str) -> dict[str, Any]:
 
     reviewed_head = str(updates.get("pr_head_sha") or "")
     findings = build_findings(updates.get("review_comments"), reviewed_head)
+    from .sdk.v1.rechecks import checked_rechecks, validate_carried
+    from .sdk.v1.models import InvalidRequestError
+    request = _read_json(run_dir / "request.json")
+    params = request.get("params") or {}
+    carried = (params.get("carried_findings") or []) if isinstance(params, dict) else []
+    request_gaps = []
+    if "params" in request:
+        try:
+            validate_carried(carried)
+        except InvalidRequestError as exc:
+            request_gaps.append(str(exc))
+            carried = []
+    else:
+        carried = updates.get("review_carried_findings") or []
+    rechecks, recheck_missing = checked_rechecks(
+        carried,
+        updates.get("review_finding_rechecks") or [], reviewed_head,
+    )
+    recheck_missing.extend(request_gaps)
+    recheck_missing.extend(updates.get("review_recheck_missing") or [])
 
     return {
         "contract_version": STRICT_API_VERSION,
@@ -279,6 +295,9 @@ def build_review_result(run_dir: Path | str) -> dict[str, Any]:
         # head it was found on, so a consumer can carry an open blocker to the
         # next head rather than re-deriving "the same finding" from prose.
         "findings": findings,
+        "finding_rechecks": rechecks,
+        "rechecks_complete": not recheck_missing,
+        "recheck_missing": recheck_missing,
         "stale": bool(mismatch),
         "expected_head_sha": str((mismatch or {}).get("expected") or ""),
         "actual_head_sha": str((mismatch or {}).get("actual") or ""),
