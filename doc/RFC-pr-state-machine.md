@@ -831,9 +831,17 @@ The owner approved the implementation and staged rollout on 2026-09-22:
 
 ## Implementation checklist (2026-09-22)
 
-This is a source/CI checkpoint as of 10:24 UTC. Checked items identify merged
+This is a source/CI checkpoint as of 11:12 UTC. Checked items identify merged
 implementation, not enabled production behavior. The runtime acceptance
 checklist below stays open until deployment observations establish it.
+
+The tested target pair is ReviewBot
+`8b30efe9806d065a66c80ee4b1148315e751c3df` with Copilot
+`745f0a83e20ae3f5c5868b3504f4ef10c6284887`.
+[Release workflow 35718662268](https://github.com/JiusiServe/omni-reviewbot/actions/runs/35718662268)
+has passed `build-and-test`, including the exact-pair tests and release
+bundle build. At this checkpoint `canary-record` is waiting through the
+cooldown; production deployment and feature activation remain pending.
 
 - [x] Projection/transition ledger, initial nightly sweep, finding ledger,
       deadline-first visits, dispute scanning and independent PR snapshot
@@ -859,13 +867,15 @@ checklist below stays open until deployment observations establish it.
 - [x] Extend `stale.py` with the 14/30-day rungs, highest-passed backlog
       behavior, shared budget, uncertain-delivery recovery and re-enable
       coverage: [ReviewBot #87](https://github.com/JiusiServe/omni-reviewbot/pull/87).
-- [ ] Finish epoch/entry ready notifications and durable lifecycle cutover;
-      implementation is under review, with runtime validation still pending.
-- [ ] Finish independent evidence, next actor, pending delivery and queue
-      health on the board:
-      [ReviewBot #89](https://github.com/JiusiServe/omni-reviewbot/pull/89)
-      is under review at this checkpoint.
-- [ ] Deploy the tested provider/bot pair and verify representative states.
+- [x] Epoch/entry ready notifications, delivery recovery, cancellation and
+      durable lifecycle cutover:
+      [ReviewBot #90](https://github.com/JiusiServe/omni-reviewbot/pull/90).
+- [x] Independent evidence, next actor, pending delivery and queue health
+      on the board:
+      [ReviewBot #89](https://github.com/JiusiServe/omni-reviewbot/pull/89).
+- [ ] Deploy the tested provider/bot pair.
+- [ ] Enable the staged runtime features and verify representative live
+      states, delivery behavior and recovery against the deployed pair.
 - [ ] Record stage observations, enable stages only after their exit criteria
       pass, and observe at least three successful nights before increasing
       exposure. No runtime-acceptance item is satisfied by this checklist.
