@@ -346,26 +346,26 @@ recovery, orphan adoption after a crash). Nothing new is invented for writes.
 `ready_for_maintainer` requires all of, on the current head:
 
 1. not draft, not parked, not stale;
-2. every watched or required check green, `lifecycle.py` classification
-   `complete == True` (unknown required-set counts as not ready, as today);
+2. `lifecycle.py` supplies `ready_verified == True` for this head: the
+   required-check set is known, required and watched checks are present,
+   complete and passing, pagination is complete, and required app identities
+   match.
+   Missing or pending evidence never counts as green;
 3. `mergeable_state == "clean"`;
 4. a completed review attempt on this head;
-5. **no open blocker/major finding.** Blocker/major findings are carried
-   forward across heads: each one the bot posted stays on the PR's ledger of
-   open findings until it is explicitly closed. A finding closes only by one
-   of:
-   - a later head's re-review lists it in `finding_dispositions` as
-     `resolved_or_outdated` **with `head_recheck == "fixed"`**. The Direct
-     contract also allows `head_recheck == "still_affected"`
-     (`direct_routing.py:221`, `:893-900`); that value keeps the finding open.
-     A re-review that simply omits a carried finding does not close it — the
-     sweep's re-review prompt receives the carried list and must return a
-     disposition for every entry, and a missing entry counts as
-     `still_affected`;
-   - the author marked it disputed: a 👎 reaction on the bot's inline comment
-     or a reply in its thread. Disputed findings do not block; they are
-     counted and shown in the ready page ("2 findings disputed by the
-     author") so the maintainer arrives at exactly the disagreement.
+5. **no undisputed open blocker/major finding.** Published blockers remain
+   in the findings ledger across heads. Only a complete, head-bound recheck
+   of the carried set with `outcome == "fixed"` closes a finding. A
+   `still_affected` or `unverified` answer leaves it unresolved; omission,
+   malformed answers and incomplete coverage cannot resolve it. The request
+   and result shapes are defined in [the SDK contract below](#sdk-boundary).
+
+   An author can dispute a finding with a 👎 reaction on its bot comment
+   or a reply in its thread. A dispute removes that finding from the ready
+   gate without proving it fixed. Disputed findings stay in the ledger and
+   are counted on the ready page so the maintainer sees the disagreement.
+   Review evidence and dispute state are stored separately; withdrawing a
+   dispute restores blocking status unless a valid explicit fix remains.
 
    **Disputes are an evidence source with their own deadline, not a
    by-product of the next review.** Thread replies arrive through the
@@ -447,7 +447,16 @@ review attempt, and enqueues reviews in this priority order:
 2. PRs never reviewed, newest first;
 3. PRs pushed since their last review (re-reviews reuse thread dispositions,
    so they are the cheapest);
-4. legacy backlog (open before the flag turned on), oldest last.
+4. legacy backlog (open before the flag turned on), oldest first.
+
+To prevent lower bands from waiting indefinitely, the sweep reserves
+`max(1, budget // 5)` slots for eligible heads that have waited at least
+one day since first eligibility or their last allocation of review capacity.
+At the initial budget this is four slots. The remaining slots follow the
+priority bands, and legacy-band work still respects the backfill quota.
+The ledger preserves `first_eligible_at` and `last_selected_at` across
+restarts and retries; a new head starts a new queue age. Queue eligibility
+is refreshed outside the nightly window as well.
 
 Capacity, from the live step medians (`llm` 290 s in Direct mode, `strict`
 919 s in Strict mode, one Strict worker):
@@ -455,11 +464,11 @@ Capacity, from the live step medians (`llm` 290 s in Direct mode, `strict`
 | Setting | Default | Rationale |
 | --- | --- | --- |
 | `AUTO_REVIEW_ENABLED` | `false` | shadow first, like every #116 flag |
-| `AUTO_REVIEW_AT` | `04:00` (host TZ, UTC+8) | owner's choice; off-peak for CI and for people |
-| `AUTO_REVIEW_WINDOW_HOURS` | `6` | sweep must finish before the working day; leftovers carry to the next night at the same priority |
-| `AUTO_REVIEW_BUDGET` | `60` | ≈48 new PRs/day plus re-reviews; at 5 min each with 2 Direct workers this is ~2.5 h |
+| `AUTO_REVIEW_AT` | `04:00` (`Asia/Shanghai`) | fixed named timezone, independent of host timezone; off-peak for CI and for people |
+| `AUTO_REVIEW_WINDOW_HOURS` | `6` | bounded nightly scheduling; unfinished eligible work carries forward with its queue age |
+| `AUTO_REVIEW_BUDGET` | `20` | initial measured exposure; increase toward 60 only after at least three successful nights and review of queue, failure and latency measurements |
 | `AUTO_REVIEW_MODE` | `direct` | automatic reviews run Direct only; the 50/50 Strict split stays on mention-triggered reviews so the experiment's sample is not swamped |
-| `AUTO_REVIEW_BACKFILL_PER_NIGHT` | `10` | legacy backlog (1,037 non-draft open PRs today) drains slowly instead of flooding authors |
+| `AUTO_REVIEW_BACKFILL_PER_NIGHT` | `10` | legacy-band reviews are bounded independently; accepted configuration range is 0–10 |
 
 The mention trigger stays exactly as it is, as the immediate manual path, and
 a mention-triggered review counts against no nightly budget.
@@ -660,8 +669,10 @@ Reconciler contract:
   re-run on the same SHA re-derives the same keys and is a no-op.
 
 Existing evidence tables remain authoritative; additive migrations preserve claims and history. `workflow_jobs`, `review_attempts`,
-`lifecycle_notes`, `stale_windows` and `applied_labels` remain the evidence;
-`pr_state` is what the kanban, the pager and the clocks read.
+`lifecycle_notes`, `stale_windows`, `idle_ladder_windows` and historical
+`applied_labels` remain evidence. Current internal labels use
+`inferred_labels`, and `auto_review_queue` retains eligibility/service age;
+`pr_state` is the derived projection for the kanban, pager and clocks.
 
 ## Kanban
 
@@ -677,45 +688,67 @@ blocked, timed out, rerouted all land in a column).
 | Concern | Owner |
 | --- | --- |
 | projection, reconciler, sweep, clocks, our labels, notices, dashboard | `omni-reviewbot` |
-| review verdict, severities, `finding_dispositions`, quality verdict, head binding — the per-head facts | this repo, via the SDK (`build_review_result`, `build_quality_result`) |
+| review verdict, published `findings`, explicit `finding_rechecks`, quality verdict and head binding | this repo, via the SDK (`build_review_result`, `build_quality_result`) |
 | `open_findings` / `disputed_findings` counts | the bot, because they combine SDK per-finding results with reaction and reply data only the bot reads |
 
-**SDK change required (this repo, a contract version bump).** Today
-`build_review_result` projects each disposition record onto three fields —
-`anchor`, `disposition`, `declared` (`contract.py:81`, `sanitize_dispositions`)
-— and the Direct completion decision reports aggregate counts only. Neither
-carries what the ready gate needs to retire a carried blocker. The review
-result gains a head-bound, versioned per-finding list:
+### SDK boundary
+
+**Implemented SDK contract.** [Copilot #180](https://github.com/JiusiServe/InferMatrixCopilot/pull/180)
+ships Direct `1.1.0` and Strict `1.3.0` through the public
+`infermatrix_copilot.sdk.v1` surface. Published findings and carried-finding
+rechecks are separate data sets, defined by
+[`sdk/v1/models.py`](../src/infermatrix_copilot/sdk/v1/models.py),
+[`sdk/v1/rechecks.py`](../src/infermatrix_copilot/sdk/v1/rechecks.py) and
+[`contract.py`](../src/infermatrix_copilot/contract.py):
 
 ```text
-findings: [
-  { finding_id,            # stable across heads: hash(rule_id or normalized title, anchor path, symbol)
-    severity,              # blocker | major | minor | nit, after demotion
-    anchor,                # path + line range on head_sha, or null (general finding)
-    comment_id,            # GitHub inline comment the bot posted for it, when published
-    disposition,           # new | duplicate | extends_existing | resolved_or_outdated
-    head_recheck,          # fixed | still_affected | null (only for resolved_or_outdated)
-    carried_from,          # finding_id on the previous reviewed head, or null
-    head_sha }
+carried_findings: [          # DirectReviewRequest / StrictReviewRequest
+  { finding_id, source_head_sha, severity, path, title,
+    body, line, disputed }
+]
+finding_rechecks: [          # DirectCompletionRequest / Strict result
+  { finding_id, head_sha, outcome, evidence }
+]                           # outcome: fixed | still_affected | unverified
+findings: [                 # published findings in the Strict result
+  { finding_id, severity, anchor, head_sha }
 ]
 ```
 
-The sweep's re-review passes the carried open findings (id, severity,
-anchor, comment id) into the run's context, and the SDK result must return
-one entry per carried id; a missing entry is treated as `still_affected`
-by the bot. A contract test in this repo fixes a carried blocker on a new
-head and asserts the result closes it (`resolved_or_outdated` + `fixed`),
-and a second test asserts that `still_affected` and omission both leave it
-open. The existing aggregate `finding_dispositions` field stays for
-compatibility.
+Finding identity derives from path and normalized finding text, excluding
+line number and head. Publication comment IDs and consumer revision counters
+belong to ReviewBot's ledger, not the provider's finding records. The
+existing `finding_dispositions` audit remains separate and does not prove a
+carried finding fixed.
+
+Direct binds the issued review context to the carried set and expected
+head, then validates explicit rechecks at completion. Strict persists the
+carried request and rechecks the findings against its frozen checkout;
+`build_review_result` returns `finding_rechecks`, `rechecks_complete` and
+`recheck_missing`, including gaps when a run fails before review. Validation
+rejects unknown/duplicate IDs, wrong-head answers and empty evidence. Every
+carried ID needs a valid answer; `unverified` is an answer that leaves the
+finding unresolved, while omission is a coverage gap.
+
+[ReviewBot #85](https://github.com/JiusiServe/omni-reviewbot/pull/85) pins the
+provider to `745f0a83e20ae3f5c5868b3504f4ef10c6284887` and consumes this
+contract in Direct and Strict reviews. It retains a carried snapshot across
+Strict retries, independently validates coverage before accepting fixes,
+and guards fixes against stale review revisions. Unresolved answers remain
+conservative when reviews race. Its migration reopens findings previously
+closed by omission and invalidates that old readiness evidence. A dispute
+remains independent of the underlying recheck outcome.
 
 The copilot stays stateless per run. Re-review after a push is an ordinary
 `pr_review` run with the existing thread context; no new task kind.
 
 ## Rollout
 
-Every step is a flag flip on the host; nothing is posted to GitHub until the
-named flag is on. Each step runs at least three nights before the next.
+Every stage is enabled explicitly on the host; new feature comments require
+their named flag. Check each stage against its exit criteria before advancing,
+and keep the initial exposure until at least three successful nightly runs
+have been observed. Merged code and passing CI do not constitute rollout
+acceptance. Record the exact provider/bot pair, effective flags, observed
+results and pending criteria for every stage.
 
 1. **Shadow.** `PR_STATE_ENABLED=true`, everything else off. Tables fill, the
    kanban shows states, our labels are recorded. Exit criterion: the
@@ -726,18 +759,21 @@ named flag is on. Each step runs at least three nights before the next.
    here and no repository labels to create, because nothing is applied to
    GitHub. Exit: a maintainer reading the board agrees with the labels on
    20 sampled PRs.
-3. **Sweep.** `AUTO_REVIEW_ENABLED=true` at budget 20, then 60. Exit: sweep
-   finishes inside the window on three consecutive nights; review failure rate
-   no worse than mention-triggered reviews (today 14 failed of 105).
+3. **Sweep and disputes.** Enable `AUTO_REVIEW_ENABLED=true` at budget 20
+   and bounded `DISPUTE_SCAN_ENABLED=true`. Increase toward 60 only after
+   the three-night observation requirement and measured results justify it.
+   Exit: sweep finishes inside the window on three consecutive nights;
+   review failure rate is no worse than mention-triggered reviews, measured
+   over the same observation period.
 4. **Ready page.** `READY_PAGE_ENABLED=true`, baselined so the PRs already
    ready are recorded without paging, and with the lifecycle
    `ready_to_merge` cutover above in the same release — the old emitter
    retires as the new one starts, never both running. Exit: a maintainer sampling 20 ready
    pages finds ≤ 2 that should not have been paged (false-ready ≤ 10 %).
 5. **The idle ladder.** `IDLE_LADDER_ENABLED=true`; the 14- and 30-day
-   notices join the existing 7-day reminder. This is the only step that adds outward noise, so it goes last
-   and is announced first: 715 PRs are already past 7 days, they arrive at
-   10 per cycle, and each gets the highest rung only.
+   notices join the existing 7-day reminder. This adds follow-ups to the
+   inactive backlog, so it goes last. All rungs share the existing
+   10-comment cycle budget, and backlog PRs get only the highest passed rung.
 
 ### Rollback
 
@@ -795,24 +831,44 @@ The owner approved the implementation and staged rollout on 2026-09-22:
 
 ## Implementation checklist (2026-09-22)
 
-- [x] Projection/transition ledger and nightly review sweep shipped flag-off.
-- [x] Finding ledger, deadline-first visits, dispute scanning and independent
-      PR snapshot refresh shipped flag-off (ReviewBot #73–#76).
-- [x] Retry path recognizes the watcher's `timeout` status.
-- [ ] Remove all non-comment writes from both runtime surfaces, including
-      label writers, reaction acknowledgements and knowledge PR creation.
-- [ ] Correct projection: only GitHub facts produce draft/closed; day 30 is
-      a closure recommendation on an open idle PR.
-- [ ] Carry finding IDs through explicit rechecks; omission never fixes a
-      blocker. Reconcile previously omission-resolved rows before paging.
-- [ ] Validate bounded automatic reviews, retries, backlog fairness and
-      current-head publication against the pinned provider.
-- [ ] Implement epoch/entry ready notifications and the lifecycle cutover.
-- [ ] Extend `stale.py` with the 14/30-day rungs and crash-safe deduplication.
-- [ ] Surface independent evidence, next actor, pending delivery and queue
-      health on the board.
-- [ ] Deploy the tested provider/bot pair, then record rollout observations
-      and enable stages only after their exit criteria pass.
+This is a source/CI checkpoint as of 10:24 UTC. Checked items identify merged
+implementation, not enabled production behavior. The runtime acceptance
+checklist below stays open until deployment observations establish it.
+
+- [x] Projection/transition ledger, initial nightly sweep, finding ledger,
+      deadline-first visits, dispute scanning and independent PR snapshot
+      refresh merged flag-off (ReviewBot #73–#76).
+- [x] Retry path recognizes the watcher's `timeout` status; retained in the
+      automatic-sweep regression coverage.
+- [x] Comment-only runtime authority, including internal labels, removed
+      reactions and local-only knowledge exports:
+      [ReviewBot #82](https://github.com/JiusiServe/omni-reviewbot/pull/82) and
+      [Copilot #179](https://github.com/JiusiServe/InferMatrixCopilot/pull/179).
+- [x] Only GitHub facts produce draft/closed; day 30 remains a recommendation
+      on an open idle PR. Independent evidence and next actor are retained:
+      [ReviewBot #84](https://github.com/JiusiServe/omni-reviewbot/pull/84).
+- [x] Explicit carried-finding rechecks, omission migration, independent
+      disputes and compatible provider pin:
+      [Copilot #180](https://github.com/JiusiServe/InferMatrixCopilot/pull/180)
+      and [ReviewBot #85](https://github.com/JiusiServe/omni-reviewbot/pull/85).
+- [x] Current-head verified CI proof is required for readiness:
+      [ReviewBot #86](https://github.com/JiusiServe/omni-reviewbot/pull/86).
+- [x] Initial budget 20, explicit Asia/Shanghai window, bounded backlog,
+      durable queue ages and reserved service for older waiting work:
+      [ReviewBot #88](https://github.com/JiusiServe/omni-reviewbot/pull/88).
+- [x] Extend `stale.py` with the 14/30-day rungs, highest-passed backlog
+      behavior, shared budget, uncertain-delivery recovery and re-enable
+      coverage: [ReviewBot #87](https://github.com/JiusiServe/omni-reviewbot/pull/87).
+- [ ] Finish epoch/entry ready notifications and durable lifecycle cutover;
+      implementation is under review, with runtime validation still pending.
+- [ ] Finish independent evidence, next actor, pending delivery and queue
+      health on the board:
+      [ReviewBot #89](https://github.com/JiusiServe/omni-reviewbot/pull/89)
+      is under review at this checkpoint.
+- [ ] Deploy the tested provider/bot pair and verify representative states.
+- [ ] Record stage observations, enable stages only after their exit criteria
+      pass, and observe at least three successful nights before increasing
+      exposure. No runtime-acceptance item is satisfied by this checklist.
 
 ## Risks
 
@@ -927,10 +983,13 @@ The owner approved the implementation and staged rollout on 2026-09-22:
   finding's original comment from an older head is found after a push
   because the scan follows the stored comment
   id.
-- Contract tests in this repo: the per-finding result carries `finding_id`,
-  `severity`, `head_recheck` and `carried_from` across the SDK boundary; a
-  carried blocker closes only with `resolved_or_outdated` + `fixed`, and
-  stays open on `still_affected` or omission.
+- Contract tests in this repo: Direct and Strict carry typed finding IDs
+  and source heads; rechecks carry the current head, an explicit outcome
+  and evidence. Cover complete `fixed`, `still_affected`, `unverified`,
+  omission, duplicate/unknown IDs, wrong-head answers and early run failure.
+  Consumer tests prove only complete explicit fixes close carried blockers
+  and that concurrent reviews or dispute changes cannot erase unresolved
+  evidence.
 
 ## Metrics for success
 
