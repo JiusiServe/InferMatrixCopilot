@@ -37,6 +37,7 @@
 | [`features/review-recall.md`](features/review-recall.md) | 已实现（默认开）——v14/v15 召回攻坚 |
 | [`features/auto-run.md`](features/auto-run.md) | **draft，未实现**——GitHub 事件触发 |
 | [`RFC-knowledge-intake.md`](RFC-knowledge-intake.md) | 已实现（默认关，shadow 起步）——Copilot typed SDK 唯一拥有知识规则，ReviewBot 只编排 evidence/model/Git/fork PR，人审合并即晋升 |
+| [`RFC-auto-roadmap.md`](RFC-auto-roadmap.md) | **proposed，未实现**——路线图的分类由人写、状态由 agent 维护：高频状态只写 bot 自己的评论（issue body 无条件写，抢不过人工编辑），附着只做提案，人在管理 bot 服务上确认 |
 
 ## architecture/ —— 维护者
 
