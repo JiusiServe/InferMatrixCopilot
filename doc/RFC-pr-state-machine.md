@@ -1,6 +1,6 @@
 # RFC — PR state machine: maintainers join when the PR is almost ready
 
-- Status: proposed — design only, nothing implemented
+- Status: implementation in progress; comment-only plan approved 2026-09-22
 - Owner: the management bot (`omni-reviewbot`) owns the state of record, the
   reconciler, the nightly sweep, every GitHub write and the dashboard; this
   repo owns the per-head verdict contract it consumes (review verdict,
@@ -11,12 +11,12 @@
   #117 owner routing, #120 stale reminder, #121 CI closed loop, #122 perf
   questions — all four are live on `vllm-project/vllm-omni` behind flags.
   This RFC is the layer that turns those four independent loops into one
-  lifecycle, and it deliberately overrides two of #116's boundaries
-  (no auto-close, mention-only routing). Those overrides are listed under
-  [Decisions that need repo-owner sign-off](#decisions-that-need-repo-owner-sign-off).
+  lifecycle. It adds automatic reviews while preserving the prohibition
+  on automatic PR state changes. The comment-only constraint below governs
+  every runtime path.
 - Evidence: `vllm-project/vllm-omni` as of 2026-09-21 (GitHub search API and
   the bot's live `/api/status`). Every number is reproducible from those two
-  sources; the design has no tests yet because it has no code yet.
+  sources. These are historical counts, not rollout acceptance measurements.
 
 ## Motivation
 
@@ -60,9 +60,42 @@ Three structural gaps produce that table:
    park it, or close it, so every PR that stops moving waits for a human to
    notice.
 
+## Constraint: the bot has no GitHub write authority
+
+Decided 2026-09-22, and it governs everything below. **The bot never writes
+GitHub's label field, never converts a PR to draft, never closes or reopens
+one, and never posts a blocking review.** It may post comments and
+`COMMENT` reviews; that is its whole outward surface.
+
+This is not a permission GitHub can express. Posting a review requires
+`pull_requests: write`, and that same permission grants labelling, draft
+conversion and closing — there is no setting that allows one and forbids the
+others. So the constraint is ours to keep, which means it has to be
+structural: the write methods are removed from the client rather than
+hidden behind a flag, because a flag is a thing somebody can turn on.
+
+**Every label in this document still exists — in our ledger, not on GitHub.**
+The projection keeps computing each state, the labeler keeps inferring the
+repository's content labels (`new model`, `diffusion`, `tts`, `omni`, `VLA`)
+from changed files, and both are stored and shown on our own board. What
+changes is only where they are written down. A maintainer reading GitHub
+sees no state from us; they see comments, and the board has the rest.
+
+What this costs, plainly: **the bot can no longer act on a PR, only talk
+about it.** Parking and closing become recommendations a person carries out.
+The goal below — one maintainer touch per merged PR — is not reachable under
+this constraint, because every state change is now a human action. What
+survives is the part that was always the most valuable: a maintainer is told
+exactly when a PR is worth their attention, instead of finding out by
+reading the list.
+
 ## Goals and non-goals
 
-Goal: **one maintainer touch per merged PR — the merge decision.** Everything
+Goal, as originally written and now bounded by the constraint above:
+**one maintainer touch per merged PR — the merge decision.** Under no write
+authority this is the ceiling rather than the target, since parking and
+closing are human actions; the reachable goal is that a maintainer is paged
+once, at the right moment, and never has to scan the list. Everything
 before that (routing, review, CI nudges, re-review after pushes, inactivity
 handling) is automatic, and a maintainer is paged exactly once, when the PR
 passes a defined ready gate.
@@ -72,7 +105,11 @@ Non-goals:
 - The bot never merges. Ever. Not behind a flag.
 - The bot never approves. A bot `APPROVE` reads as a merge recommendation and
   GitHub counts it toward required approvals; the bot's positive signal is the
-  `bot:ready-for-maintainer` label and the page, nothing else.
+  ready page and the board, nothing else.
+- The bot never posts `REQUEST_CHANGES` either. A blocking verdict changes
+  what a person is allowed to do with their PR, which is the same kind of
+  authority as closing it, and clearing a wrong one would need a dismissal
+  write the bot no longer has.
 - No new model calls beyond the reviews the sweep schedules. The state
   projection is pure bookkeeping over ledgers the bot already keeps.
 - Other adapters stay opted out until they ask (`LIFECYCLE_REPOS` semantics).
@@ -85,7 +122,7 @@ A PR has exactly one state at a time. The state is a **projection of the
 current head**: the reconciler recomputes it every cycle from evidence and
 writes it down (see [Storage](#storage)). A push re-enters `under_review`.
 
-| # | State | Meaning | Who acts | Label |
+| # | State | Meaning | Who acts | Our label (ledger, not GitHub) |
 | --- | --- | --- | --- | --- |
 | 1 | `new` | Seen; owner routing not yet run (≤ 1 cycle, 120 s) | bot | — |
 | 2 | `needs_owner` | Routing found no owner and no review has run yet | bot (review still proceeds) | `bot:needs-owner` |
@@ -93,36 +130,37 @@ writes it down (see [Storage](#storage)). A push re-enters `under_review`.
 | 4 | `under_review` | Current head has no completed review, or CI is still pending on a reviewed head | bot | `bot:under-review` |
 | 5 | `changes_requested` | Completed review on this head has an open blocker/major finding, or the PR has merge conflicts | author | `bot:changes-requested` |
 | 6 | `ci_failing` | A watched/required check is red on this head | author | `bot:ci-failing` |
-| 7 | `ready_for_maintainer` | Ready gate passed; the owner has been paged | maintainer | `bot:ready-for-maintainer` |
+| 7 | `ready_for_maintainer` | Ready gate passed; delivery is tracked separately | maintainer | `bot:ready-for-maintainer` |
 | 8 | `stale` | ≥ 7 days without human activity | author | `bot:stale` |
-| 9 | `parked` | ≥ 14 days without human activity; the bot converts the PR to draft on entry | author | `bot:parked` |
-| 10 | `draft` | Author's own draft; unmanaged, no clocks (today's behaviour) | author | — |
-| — | `closed` | Merged or closed on GitHub (terminal for a human close; a bot close is re-openable and stays watched) | — | — |
+| 9 | `parked` | ≥ 14 days without human activity; draft/closure suggestions may be due | author | `bot:parked` |
+| 10 | `draft` | Any GitHub draft; unmanaged, no clocks (today's behaviour) | author | — |
+| — | `closed` | Merged or closed on GitHub. Always a human act now, so terminal while GitHub reports it closed | — | — |
 
-Ten live states plus the terminal one. `draft` exists so that an author's
-draft and a bot-parked PR are never confused: the former has no clock, the
-latter is on its way to closure.
+Ten live states plus the terminal one.
+
+`parked` and `draft` no longer differ by who drafted the PR, because the bot
+drafts nothing. `parked` means "idle for at least 14 days" whether or not a notice has
+been delivered; if a person does convert it, GitHub reports a draft and
+the PR leaves the clocked states the same way an author's draft does. The
+`parked_at` column records when we said so, not when anything happened.
 
 ### Projection order
 
 First match wins. The order encodes "what is the most urgent thing a person
 must do", so it is also the kanban column order. The projection reads
 **evidence only** (GitHub facts, ledger rows, the clock); it never reads its
-own previous output or whether an action was posted. Whether the reminder,
-the draft conversion or the close has actually happened is a *sub-status*
-(`action_pending` / `action_done`), so a failed write cannot hide a state.
+own previous output or whether an action was posted. Whether the notice for a
+boundary has actually been posted is a *sub-status* (`action_pending` /
+`action_done`), so a failed post cannot hide a state. The actions themselves
+— drafting, closing — are no longer ours, so `action_done` means the notice
+went out, never that the PR moved.
 
 ```text
-closed            GitHub state is MERGED or CLOSED,
-                  OR clock ≥ CLOSE_DAYS (30) on a managed PR   -- entry action: close
-draft             GitHub isDraft and the bot did not convert it (no parked_at)
-parked            managed AND parked_at set, GitHub isDraft, clock ≥ PARK_DAYS (14)
-                  OR managed AND no parked_at AND clock ≥ PARK_DAYS
-                                                               -- entry action: convert to draft
-under_review      parked_at set, GitHub isDraft, AND (clock < PARK_DAYS OR NOT managed)
-  (resume_pending)                                             -- entry action: mark ready for review, clear parked_at
-                                                               -- (an exempt label un-parks regardless of clock age)
-stale             managed AND clock ≥ STALE_PR_DAYS (7)       -- entry action: reminder
+closed            GitHub state is MERGED or CLOSED                (always a human act)
+draft             GitHub isDraft                                (whoever drafted it)
+parked            managed AND clock ≥ PARK_DAYS (14)           -- entry action: 14-day notice
+                                                               -- and at clock ≥ CLOSE_DAYS (30): 30-day notice
+stale             managed AND clock ≥ STALE_PR_DAYS (7)        -- entry action: 7-day reminder
 new               no assignment outcome recorded for this PR   (≤ 1 cycle)
 needs_owner       no review attempt on any head, sweep has not claimed this head, assignment = no_owner
 owner_routed      no review attempt on any head, sweep has not claimed this head, owner assigned
@@ -143,10 +181,11 @@ under_review      (fallback) any evidence combination not matched above
 where `clock = now − last_human_activity_at`, and "managed" means open,
 not an author draft, not carrying any `STALE_EXEMPT_LABELS` label. The
 guard applies to the clock states and to their artifacts alike: an exempt
-PR with 14 idle days is not `parked`, is never drafted, and keeps flowing
+PR with 14 idle days is not `parked`, is never notified, and keeps flowing
 through the head-bound states (it is reviewed by the sweep and can reach
-`ready_for_maintainer`); an exempt PR that *was* parked before the label was
-added projects `resume_pending` and is un-drafted. The three discovery
+`ready_for_maintainer`); an exempt PR that was `parked` before the label was
+added simply stops being `parked` on the next projection, with nothing to
+undo, because nothing was done to it. The three discovery
 states are mutually exclusive with `under_review` by construction: they hold
 only while no review attempt exists on any head *and* the sweep has not
 claimed the current head; the sweep's claim is the event that moves a PR out
@@ -157,30 +196,21 @@ table keys nudges on head, not on state).
 Two rules make the projection total and keep the clock states consistent
 with GitHub:
 
-- **`closed` is projected from the clock, not only from GitHub.** At day 30
-  a parked PR *changes state* to `closed` with sub-status `action_pending`,
-  and the entry action closes it on GitHub. A state that could only be
-  entered after its own action had run would never be entered.
-- **`parked_at` means "the current draft state is the bot's", nothing
-  more, and it is verified every visit.** Like the closure watch, the
-  parking obligation is bound to the bot's own event: the reconciler stores
-  the timestamp of its `convertPullRequestToDraft` call, and on each visit
-  checks the PR's timeline for the latest `convert_to_draft` /
-  `ready_for_review` pair. If GitHub reports not-draft, or the latest
-  `convert_to_draft` event is not the bot's, or a `ready_for_review` event
-  follows the bot's conversion — a human marked it ready, even if the
-  author re-drafted it before the next poll — `parked_at` is cleared in
-  that cycle and a transition row records "parking retired by <actor>".
-  From then on a draft is an author draft: exempt from clocks, never
-  un-drafted, never auto-closed.
-- **A resumed PR is `under_review` with sub-status `resume_pending`.** When
-  an author comments on a bot-parked PR without pushing, the clock resets
-  but GitHub still says draft and `parked_at` is still set. That
-  combination is a state of its own, whose entry action is the un-draft
-  mutation and clearing `parked_at`; from then on the normal rules apply.
-  The same shape handles a bot-closed PR that gets activity: it stays
-  `closed` (GitHub says so) and the reopen is a *scheduled* action of that
-  state (next section).
+- **`closed` comes from GitHub alone.** A PR is closed when a person closes
+  it. The day-30 boundary is a notice, not a state: the PR stays `parked`
+  and the board shows that its close notice went out. An earlier draft
+  projected `closed` from the clock and closed the PR as the entry action;
+  with no close authority that state would describe something that never
+  happens.
+- **`parked_at` means "we said this should be parked", not "it is drafted".**
+  Nothing verifies a draft state against the timeline any more, because the
+  bot no longer owns any draft. If a person does convert the PR, GitHub
+  reports `isDraft` and it leaves the clocked states exactly as an author's
+  own draft does.
+- **There is no resume path.** A parked PR that gets human activity simply
+  has its clock reset and re-enters `under_review` on the next projection.
+  The `resume_pending` sub-status existed to carry an un-draft mutation, and
+  there is no mutation to carry.
 - **A final fallback** maps anything unmatched to `under_review` with
   sub-status `unclassified` and increments a dashboard counter, so an
   unforeseen evidence combination is visible instead of stateless.
@@ -201,53 +231,80 @@ Desired artifacts, each with the evidence that wants it and its dedupe key:
 | Artifact | Wanted while | Key | When no longer wanted |
 | --- | --- | --- | --- |
 | owner @-mention | PR seen, routing done | PR + head + routing digest (existing) | never retracted |
-| `REQUEST_CHANGES` review | completed review on current head has ≥ 1 open blocker/major | PR + head + `block_generation` | head moved → dismiss with "superseded by <sha>"; all findings closed or disputed on the same head → dismiss with "resolved" |
-
-**One review per blocking interval.** The key deliberately excludes the
-finding set. While the open-finding set on a head stays non-empty, the
-same review stays active and its *body* is edited in place (the reviews
-API allows a body update) to list the currently open findings, so a
-partial dispute `{A,B} → {A}` and its withdrawal `{A} → {A,B}` change the
-text and never the key. The review is dismissed only when the set becomes
-empty or the head moves. `block_generation` is a counter on the `pr_state`
-row that increments only when the wanted condition turns from false to
-true on the same head (a dispute withdrawn after *every* blocker had been
-disputed). GitHub cannot un-dismiss a review, so that case needs a new
-review, and the generation makes its key distinct while a same-SHA re-run
-still derives the same key and is a no-op. Ordering: a new generation is
-posted only after the previous review's dismissal is confirmed, so the
-live set never holds two active `REQUEST_CHANGES` reviews for one PR.
 | conflict comment | `mergeable_state == dirty` on current head | PR + head + `conflict` | head moved → superseded; clean again on same head → retracted |
 | CI-failed comment | required/watched check red on current head | PR + head + `ci_failed` (existing) | head moved → superseded; green on same head → retracted (existing) |
-| ready page | ready gate true on current head | PR + head + `ready_to_merge` (existing) | any gate condition false on same head → retracted; head moved → superseded (existing) |
-| stale reminder | clock ≥ 7 d | PR + window start (existing) | never retracted; a new window gets a new key |
-| draft conversion + parked comment | clock ≥ 14 d, bot-managed | PR + window start + `park` | human activity → un-draft (`resume`, same window key) |
-| close + closing comment | clock ≥ 30 d, bot-managed | PR + window start + `close` | author comment or new head within `REOPEN_WATCH_DAYS` → reopen, key PR + `closed_by_bot_at` + `reopen`; a bystander's comment never reopens |
+| ready page | a `ready_entry_seq` has been entered and its page has not been delivered | PR + `pr_state_epoch` + `ready_entry_seq` | delivered → no longer wanted; never retracted once sent |
+| 7-day reminder | clock ≥ 7 d | PR + window start (existing) | never retracted; a new window gets a new key |
+| 14-day park notice | clock ≥ 14 d, managed | PR + window start + `park` | never retracted; a new window gets a new key |
+| 30-day close notice | clock ≥ 30 d, managed | PR + window start + `close` | never retracted; a new window gets a new key |
 | review job on current head | head unreviewed, sweep time reached, budget left | PR + head + `review` (existing attempt uniqueness) | head moved → attempt `superseded` (existing) |
-| exactly one `bot:*` label | always, equal to the projected state | PR + state | state changed → swap; human removed it → 24 h hold, then re-apply if the state still holds |
+| exactly one state label **in our ledger** | always, equal to the projected state | PR + state | state changed → the row is updated; nothing is written to GitHub, so nothing can be fought over |
+
+Two things are gone from this table and are worth naming, because earlier
+drafts turned on them. There is no `REQUEST_CHANGES` review, so none of the
+machinery it needed survives either — no `block_generation` counter, no
+body-edit-in-place, no dismissal ordering, no "one review per blocking
+interval". And there is no draft conversion, close or reopen, so the
+`park`/`close` rows are notices rather than actions: nothing is retracted
+because a sentence already said to somebody cannot be unsaid, and the un-park
+and reopen paths do not exist.
+
+**The ready page is keyed on the entry, not the head.** `ready_entry_seq` is
+a counter on the `pr_state` row that increments when the projection moves
+into `ready_for_maintainer` from anything else. Keying on the head would
+page again for every push to a finished PR; keying on the PR alone would
+never page again after CI broke and was fixed. The entry is the event a
+maintainer actually cares about.
+
+**The page is wanted while the entry is undelivered *and* the PR is still
+ready.** The entry is a moment and the transition row is written
+immediately, so a wanting condition phrased as "entered ready this cycle"
+would evaporate before a post that failed on budget could be retried, and
+that page would be lost silently — the one message this design exists to
+send. `ready_paged_seq` records the last sequence actually delivered, and a
+page is wanted while `ready_entry_seq > ready_paged_seq` **and the
+projection still says `ready_for_maintainer`**.
+
+Both halves are needed. Without the first, a budget failure loses the page.
+Without the second, a page that failed on Monday could be sent on Tuesday
+for a PR that has since been pushed to or blocked — announcing "ready for a
+maintainer look" about an unreviewed or failing PR, which is exactly the
+false-ready the gate exists to prevent. When readiness is lost with a page
+still pending, the entry is **cancelled**: `ready_paged_seq` is advanced to
+`ready_entry_seq` and a transition row records "page cancelled: no longer
+ready". Should the PR become ready again later, that is a new entry and a
+new sequence. A restart mid-post is covered by the claim protocol as
+elsewhere.
+
+**A rung already passed is skipped.** The three idle notices share one
+ladder, and on any given pass only the highest rung whose clock has passed
+is wanted. A PR idle 40 days when the ladder turns on wants the 30-day
+notice and not the other two; without this, enabling the feature walks 715
+PRs up three rungs each.
 
 Consequences the reviewer's two sequences must satisfy, and which are
 acceptance cases below:
 
 - A PR sitting in `changes_requested` for a conflict whose nightly review
-  then finds a blocker: the state does not change, but the desired set now
-  contains a `REQUEST_CHANGES` review keyed on that head and the current
-  `block_generation`, so it is posted.
+  then finds a blocker: the state does not change and no new artifact is
+  wanted, because the findings are published by the review itself. The
+  blocker shows on the board and holds the ready gate; nothing is posted
+  twice.
 - A `ready_for_maintainer` PR whose CI turns red on the same head: the
-  projection goes straight to `ci_failing`, and independently the ready
-  page is retracted because its wanting condition is false, while the
-  CI-failed comment is posted because its condition is true.
+  projection goes straight to `ci_failing` and the CI-failed comment is
+  posted. The ready page is not retracted — it was a notification, and it
+  was true when sent. If CI is fixed and the PR returns to ready,
+  `ready_entry_seq` advances and a second page is sent, which is the
+  behaviour a maintainer wants.
 - A PR that is `stale` and then pushed: the reminder is kept (never
-  retracted), the label swaps, and the review job for the new head is
+  retracted), our state label changes in the ledger, and the review job for the new head is
   desired at the next sweep.
 
-Every write, and every retraction, goes through the claim protocol with the
-key in the table; a key includes the *event* it answers (window start,
-`closed_by_bot_at`, head SHA, `block_generation`), never just the PR, so a
-PR that is closed and reopened twice gets two distinct reopen claims, and
-a head gets a second `REQUEST_CHANGES` claim only when a full dispute is
-withdrawn and the generation advances — never because the open-finding set
-changed while non-empty.
+Every post, and every retraction, goes through the claim protocol with the
+key in the table; a key includes the *event* it answers (window start, head
+SHA, `ready_entry_seq`), never just the PR, so a PR that goes ready, breaks
+and goes ready again gets two distinct page claims, while a re-run against
+the same evidence derives the same key and is a no-op.
 
 Note the asymmetry: `stale` and `parked` win over everything below them
 because time-based states describe the *author*, not the head. A stale PR that
@@ -260,23 +317,25 @@ a push is human activity.
 | --- | --- | --- | --- |
 | `new` → `owner_routed` / `needs_owner` | first cycle after discovery | owner @-mention comment (existing #117 loop) | PR + head + routing digest (existing) |
 | `owner_routed` / `needs_owner` / any → `under_review` | nightly sweep claims the head, or a push lands | none | — |
-| `under_review` → `changes_requested` | review completes with open blocker/major | bot review `REQUEST_CHANGES` on this head; findings inline (existing publisher) | PR + head + `request_changes` |
+| `under_review` → `changes_requested` | review completes with open blocker/major | none beyond the review the publisher already posts, as a `COMMENT` with findings inline | — |
 | `under_review` → `changes_requested` | `mergeable_state == dirty` | one comment asking for a rebase, with base SHA | PR + head + `conflict` |
 | any → `ci_failing` | required check red | one comment @author (+ distinct last pusher) with job, SHA, link (existing #121) | PR + head + `ci_failed` (existing) |
-| `changes_requested` / `ci_failing` → `under_review` | push | bot dismisses its own stale `REQUEST_CHANGES` with "superseded by <sha>"; lifecycle note superseded (existing) | — |
-| `under_review` → `ready_for_maintainer` | ready gate passes | one comment @owner: "ready for a maintainer look", verdict badge, disputed-finding count | PR + head + `ready_to_merge` (existing) |
-| `ready_for_maintainer` → `under_review` | push, or CI turns red, or a new blocker | ready note retracted (existing lifecycle retract) | — |
+| `changes_requested` / `ci_failing` → `under_review` | push | lifecycle note superseded (existing) | — |
+| `under_review` → `ready_for_maintainer` | ready gate passes | one comment to the routed owner, or down the fallback chain when there is none: "ready for a maintainer look", verdict badge, disputed-finding count | PR + `pr_state_epoch` + `ready_entry_seq` |
+| `ready_for_maintainer` → `under_review` | push, or CI turns red, or a new blocker | none; the page stands as sent | — |
 | any managed → `stale` | day 7, no human activity | one reminder @author (+ coordinator) (existing #120) | PR + inactivity window start (existing) |
-| `stale` → `parked` | day 14, still no human activity | GraphQL `convertPullRequestToDraft` (the REST update endpoint has no `draft` field); one comment: "parked; push or comment to resume" | PR + window start + `park` |
-| `parked` → `closed` | day 30, still no human activity (projected from the clock; the close is the entry action) | REST `PATCH state: closed`; one comment: "closed for inactivity; push or comment reopens" | PR + window start + `close` |
-| `stale` / `parked` → `under_review` | any human commit, comment or review | GraphQL `markPullRequestReadyForReview` if the bot parked it (never on an author's own draft); sub-status `resume_pending` until it succeeds | PR + window start + `resume` |
-| `closed` (by bot) → `under_review` | scheduled action of `closed`: author comment, or the branch head differs from `close_head_sha` | REST `PATCH state: open`, then `markPullRequestReadyForReview`; if the fork branch is gone the reopen fails and one comment says so | PR + `closed_by_bot_at` + `reopen` |
+| `stale` → `parked` | day 14, still no human activity | one comment: "no activity for 14 days; consider converting this to a draft" | PR + window start + `park` |
+| `parked`, day 30 | day 30, still no human activity | one comment: "no activity for 30 days; consider closing this" — the state does not change, because only a person can close | PR + window start + `close` |
+| `stale` / `parked` → `under_review` | any human commit, comment or review | none; the clock resets and the ladder starts over on the next window | — |
 
-The two draft mutations are the first GraphQL calls the bot makes; the client
-gains one `graphql(query, variables)` method with the same retry, budget and
-identity handling as the REST path, and the PR's `node_id` is stored on the
-`pr_state` row when it is first seen so no extra read is needed at action
-time.
+Every row's side effect is a comment or nothing. The bot converts no drafts,
+closes nothing, reopens nothing and dismisses nothing, so the rows that used
+to describe those actions are gone rather than flag-gated.
+
+No GraphQL client is needed. It was in this design only for
+`convertPullRequestToDraft` and `markPullRequestReadyForReview`, neither of
+which the bot may call, so the REST path remains the whole of it and
+`node_id` need not be stored.
 
 Everything the table posts goes through the existing claim protocol
 (`comment_claims.py`: shadow → claimed → posted / failed / withdrawn, lease
@@ -321,13 +380,14 @@ recovery, orphan adoption after a crash). Nothing new is invented for writes.
    posts a new one), one request per comment, counted against
    `PR_STATE_REQUEST_BUDGET`; the existing daily feedback scan is too slow
    for this and is left as is. Either source updates `open_findings` /
-   `disputed_findings` on the `pr_state` row locally, with no model call;
-   the desired-set diff then dismisses the `REQUEST_CHANGES` review when
-   nothing blocking remains and the projection can move to
-   `ready_for_maintainer` in the same cycle. Because disputed findings stay
-   in the scan set, a 👎 removed later re-opens the finding on the next
-   scan and the ready page is retracted. Reactions and replies from anyone
-   other than the PR author are ignored for this purpose.
+   `disputed_findings` on the `pr_state` row locally, with no model call, so
+   the projection can move to `ready_for_maintainer` in the same cycle once
+   nothing blocking remains. Because disputed findings stay in the scan set,
+   a 👎 removed later re-opens the finding on the next scan and the PR
+   leaves ready — the page already sent is not retracted, and a later return
+   to ready advances `ready_entry_seq` and pages again. Reactions and
+   replies from anyone other than the PR author are ignored for this
+   purpose.
 
 The quality-readiness verdict (`ready` / `concerns` / `needs_rework`) is
 attached to the page as a badge and never gates: it has no calibration data
@@ -340,8 +400,17 @@ The same owner the routing loop mentioned at open (the module or model owner
 from the #117 scorer; module signal wins over model signal). The page records
 the routing reason exactly as the assignment ledger does. If routing produced
 no owner, the page falls back to `MERGE_NOTIFY_LOGINS`, and if that is empty
-the PR is `ready_for_maintainer` with sub-status `unrouted` and only the
-dashboard shows it (today's `ready_unrouted` behaviour).
+to `STALE_COORDINATOR_LOGIN` — the login the stale reminders already copy,
+so it is a person who has agreed to hear from the bot about neglected PRs.
+The PR carries sub-status `unrouted` either way, and the board marks it, but
+**the page is still sent**: 128 open PRs have no routed owner today, and
+leaving those to the dashboard alone would mean the state machine never
+pages anyone about the PRs least likely to have someone watching them.
+
+Only if both fallbacks are unset is the page skipped, and that is a
+misconfiguration rather than a designed path: the projection still reaches
+`ready_for_maintainer`, the board shows `unrouted`, and the dashboard raises
+it as `attention` so the empty configuration is visible instead of silent.
 
 The owner is a reviewer, not necessarily a committer, so the page may bounce.
 That is accepted for now; a derived committer catalog (who merged PRs
@@ -353,18 +422,18 @@ follow-up and is named under open questions.
 One clock per PR: `last_human_activity_at = max(last non-bot commit,
 comment, review)` — the #120 definition, including its rule that an
 `updated_at` bump the fetched events cannot explain counts as activity.
-The bot's own comments, reviews, labels, draft conversions and closes never
-move it.
+The bot's own comments and reviews never move it.
 
-| Day | Transition | Reversible by |
-| --- | --- | --- |
-| 7 | reminder, `stale` | any human activity |
-| 14 | draft, `parked` | any human activity (bot un-drafts) |
-| 30 | close, `closed_by_bot` | author comment or push (bot reopens) |
+| Day | State | Notice | Cleared by |
+| --- | --- | --- | --- |
+| 7 | `stale` | reminder | any human activity |
+| 14 | `parked` | "consider converting this to a draft" | any human activity |
+| 30 | `parked` | "consider closing this" | any human activity |
 
-The window is keyed by the last *confirmed* human activity, so a reminder, a
-park or a close can never open a new window by itself. PRs carrying any of
-`STALE_EXEMPT_LABELS` are never reminded, parked or closed.
+All three are notices; none of them changes the PR. The window is keyed by
+the last *confirmed* human activity, so a notice can never open a new window
+by itself, and only the highest rung whose clock has passed is sent on any
+given pass. PRs carrying any of `STALE_EXEMPT_LABELS` are never notified.
 
 ## Triggers
 
@@ -428,59 +497,99 @@ At most one transition per PR per cycle. Bounded by
 both fail closed (skip the rest of the list, log, retry next cycle) — the
 same shape as the #120/#121 budgets.
 
-### Watching bot-closed PRs
+### Closed PRs
 
-A PR the bot closed leaves the open set on GitHub but not the reconciler's.
-Its `pr_state` row keeps `closed_by_bot_at` and the head SHA at close time,
-and for `REOPEN_WATCH_DAYS` (default 90) the row stays in the deadline set
-with a daily deadline. On each visit the reconciler re-reads the PR (one
-request) and checks two things: a comment **by the PR author** since the
-close (the repo-wide comment feed already covers closed PRs, so this is
-usually free), and a head SHA different from the one recorded at close (a
-push to a closed PR's branch updates the PR's head, and only people with
-write access to that branch can do it). Either one plans the reopen action.
-A comment by anyone else, maintainer included, does not reopen: the author
-is the person whose absence closed the PR, so only the author's return
-reopens it, and a maintainer who wants it back reopens it by hand, which the
-bot never undoes.
+A closed PR is closed by a person, so there is nothing to watch and no
+obligation to honour. It leaves the open set on GitHub and the reconciler
+drops it: the `pr_state` row records `closed`, the transition log keeps the
+history, and nothing reopens it.
 
-The watch is bound to **the closure event the bot caused, not to the PR.**
-On every visit the reconciler first confirms that the PR's current closure
-is still the bot's: GitHub's `closed_at` must equal the timestamp the bot
-recorded at close (the closing comment id is stored beside it as a second
-witness). If the PR has been reopened by anyone since, `closed_by_bot_at`,
-`close_head_sha` and the watch deadline are cleared in the same cycle — the
-watch is retired, and the PR is projected from live evidence again. If it is
-later closed by a human, `closed_at` no longer matches any bot close, so no
-watch exists and nothing reopens it, whatever the author does. The sequence
-"bot closes → maintainer reopens → maintainer closes → author comments"
-therefore ends with the PR closed.
-After the watch window the row is frozen; a later comment gets no automatic
-reopen, and the closing comment says so ("reopens automatically within 90
-days").
+The previous draft had a 90-day reopen watch here, with `closed_by_bot_at`,
+`close_head_sha`, a rule about whose comment counts as the author's, and a
+sequence for "bot closes → maintainer reopens → maintainer closes". All of
+it existed to make the bot's own closures recoverable. The bot closes
+nothing, so none of it is needed, and the columns behind it are dropped
+rather than left unwritten.
 
 ## Bot powers
 
-New GitHub writes, each behind its own flag, each shadow-first:
+The bot writes to GitHub in exactly one way: it posts comments, and reviews
+with `event="COMMENT"`. There is no second kind of write, now or behind a
+flag. `add_labels`, `remove_label`, `close_pull`, `reopen_pull`,
+`dismiss_review` and the draft mutations are removed from the client, so the
+constraint cannot be undone by configuration — only by a commit, which is
+reviewable.
 
-| Power | Flag | Default | Notes |
+| Message | Where it comes from | Flag | Default |
 | --- | --- | --- | --- |
-| state labels `bot:*` (7) | `PR_STATE_LABELS_ENABLED` | `false` | labels must pre-exist in the repo (the labeler already refuses to create); the reconciler swaps exactly one `bot:*` label at a time; a human removing a label is treated as a request to hold — no re-apply for 24 h, and the removal is logged |
-| `REQUEST_CHANGES` on its own review | `REQUEST_CHANGES_ENABLED` | `false` | only for blocker/major, only on the head it reviewed; dismissed by the bot itself when the head moves; never `APPROVE` |
-| convert to draft | `PARK_ENABLED` | `false` | day 14; un-drafts on human activity |
-| close | `AUTO_CLOSE_ENABLED` | `false` | day 30; reopens on author activity; overrides #116 "no auto-close" and needs repo-owner sign-off before the flag is ever set |
-| reopen | part of `AUTO_CLOSE_ENABLED` | — | only PRs with `closed_by_bot_at` set; a human close is never reopened |
+| ready page: one comment @-mentioning the routed owner | new emitter driven by the projection | `READY_PAGE_ENABLED` | `false` |
+| 7-day reminder | `stale.py`, shipped and running (505 posted) | `STALE_PR_ENABLED` | today's value, unchanged |
+| 14-day "should be parked" notice | `stale.py`, new rung | `IDLE_LADDER_ENABLED` | `false` |
+| 30-day "should be closed" notice | `stale.py`, new rung | `IDLE_LADDER_ENABLED` | `false` |
 
-Existing safety gates stay in front of all of them: `POST_MODE=review`,
-`ALLOW_POST`, the write budget, and the claim protocol. In shadow mode the
-reconciler writes the would-be action to `state/artifacts/pr-state/` and
-promotes it exactly once when the flag turns on, as #120 and #121 do.
+The 14- and 30-day notices extend the existing stale reminder rather than
+forming a second emitter, because that module already has everything a
+second one would have to rebuild: a write budget (10 per cycle, so the 715
+PRs already past 7 days drip instead of arriving at once), idempotency keyed
+by the inactivity window so its own comment cannot retrigger it, a
+timeline-verified human-activity watermark, suspension when evidence is
+partial, and ledger-backed note rows. Two modules commenting about idleness
+on the same PRs would be the worst outcome, so there is one ladder.
+
+**The new rungs need their own switch.** `STALE_PR_ENABLED` is already on;
+hanging the 14- and 30-day notices off it would turn them on the moment the
+code shipped, with no shadow period and no way back to today's behaviour.
+`IDLE_LADDER_ENABLED` defaults to `false`, and with it off `stale.py` does
+exactly what it does now.
+
+**A rung already passed is skipped, not replayed.** A PR idle 40 days on the
+day the ladder turns on gets the 30-day notice only. Without this, enabling
+the feature would walk every one of those PRs up three rungs.
+
+**The ready page fires once per entry into `ready_for_maintainer`**, not once
+per head and not once per lifetime. It stays silent while a PR remains
+ready, and pages again only if the PR leaves ready — CI breaks, a new
+blocker, a conflict — and later returns, which is exactly when a maintainer
+needs telling a second time. On enable it records the PRs that are already
+ready without paging anyone, the same first-run baseline the assignment and
+stale scanners use, so turning it on is not an event.
+
+**This emitter replaces the one already running.** `lifecycle.py` publishes
+a `ready_to_merge` note today — 20 are live on the watched repo — and it
+pages on `mergeable_state == "clean"` alone, with no requirement that the
+head was reviewed or that findings are closed. That is the false-ready the
+gate in this RFC exists to remove, so the two must not coexist: left
+running, the old path would page unreviewed PRs and double-page eligible
+ones.
+
+Cutover, in the same release that enables the new emitter:
+
+1. `ready_to_merge` leaves the lifecycle reconciler's desired set. The
+   module keeps its other kinds (`ci_failed` and the rest) unchanged, and
+   any `ready_to_merge` claim still pending is withdrawn through the
+   existing recovery path rather than left to expire.
+2. Every live `ready_to_merge` note is judged against the new gate. A PR
+   that passes it **keeps its note**, and the baseline sets
+   `ready_paged_seq = ready_entry_seq` so the new emitter does not say the
+   same thing twice. A PR that fails it has the note **retracted** through
+   the existing retract path, because it was posted under a weaker rule and
+   is precisely the false-ready this design promises to stop.
+3. After cutover the gated emitter is the only code path that can post a
+   ready page. An acceptance case asserts it.
+
+**PRs with no routed owner are still paged.** 128 of them exist today. The
+fallback chain is owner → `MERGE_NOTIFY_LOGINS` → `STALE_COORDINATOR_LOGIN`,
+as [Who is paged](#who-is-paged) sets out; the board marks them `unrouted`,
+and only an entirely unset configuration skips the page, which the dashboard
+raises as `attention`.
+
+Existing safety gates stay in front of all of this: `POST_MODE=review`,
+`ALLOW_POST`, the write budget, and the claim protocol.
 
 ## Storage
 
-Two new tables in the bot ledger. They hold obligations the bot has taken
-on toward contributors (which drafts it made, which PRs it closed and
-promised to reopen), so rollback is a sequence, not a drop; see
+The bot ledger stores projected evidence, notification obligations and
+transition history. Pending comments must be settled before tables retire; see
 [Rollback](#rollback).
 
 ```sql
@@ -490,18 +599,25 @@ CREATE TABLE pr_state (
   sub_status TEXT,                  -- awaiting_sweep | queued | running | ci_pending | unrouted | legacy | conflict
                                     -- | action_pending | action_done
   head_sha TEXT NOT NULL,
-  node_id TEXT NOT NULL,            -- GraphQL id, needed for the draft mutations
   since_at TEXT NOT NULL,           -- when this state was entered
   reason TEXT NOT NULL,             -- one line, human readable, shown on the kanban
   pager_login TEXT,                 -- who was paged for ready_for_maintainer
   last_human_activity_at TEXT,      -- the single clock
-  next_deadline_at TEXT,            -- earliest of clock day 7/14/30, next sweep, label hold, reopen watch
-  parked_at TEXT, closed_by_bot_at TEXT,
-  close_head_sha TEXT,              -- head at bot close; a different head means a push → reopen
-  label_applied TEXT,               -- the bot:* label the bot believes is on the PR
+  next_deadline_at TEXT,            -- earliest of clock day 7/14/30 and the next sweep
+  parked_at TEXT,                   -- when we SAID it should be parked, not when anything happened
+  state_label TEXT,                 -- our state label for this PR; ledger only, never written to GitHub
+  content_labels_json TEXT,         -- inferred taxonomy (new model / diffusion / tts / omni / VLA), ledger only
   open_findings INTEGER NOT NULL DEFAULT 0,
   disputed_findings INTEGER NOT NULL DEFAULT 0,
-  block_generation INTEGER NOT NULL DEFAULT 0,   -- bumps each time REQUEST_CHANGES becomes wanted again on the same head
+  ready_entry_seq INTEGER NOT NULL DEFAULT 0,    -- bumps on each entry into ready_for_maintainer; keys the page
+  ready_paged_seq INTEGER NOT NULL DEFAULT 0,    -- last sequence delivered OR cancelled; a page is due while entry > paged AND the PR is still ready
+  -- ready_entry_seq counts from 0 in a fresh table, but comment claims
+  -- OUTLIVE the table: after a rollback that retires pr_state and a later
+  -- re-enable, entry 1 would present the same page key as the entry 1 that
+  -- was already posted, and the claim would suppress a real page. So the
+  -- key carries pr_state_epoch, a single integer in ledger metadata that
+  -- the migration increments every time these tables are created. Metadata
+  -- is not part of the retirement, so the epoch never goes backwards.
   updated_at TEXT NOT NULL,
   PRIMARY KEY (repo, pr_number)
 );
@@ -512,7 +628,7 @@ CREATE TABLE pr_state_transitions (
   head_sha TEXT NOT NULL,
   reason TEXT NOT NULL,
   evidence_json TEXT NOT NULL,      -- the inputs the projection saw (check states, attempt id, findings, clock)
-  actions_json TEXT NOT NULL,       -- comment/review/label ids written, or the shadow artifact path
+  actions_json TEXT NOT NULL,       -- comment/review ids written, or the shadow artifact path
   created_at TEXT NOT NULL
 );
 CREATE INDEX pr_state_transitions_pr ON pr_state_transitions (repo, pr_number, id);
@@ -532,18 +648,18 @@ Reconciler contract:
 - **Dedupe keys are per artifact, never per state.** The authoritative key
   for every write is the one in the
   [artifact table](#actions-desired-set-versus-live-set): artifact kind plus
-  the event it answers (head SHA and `block_generation` for a
-  `REQUEST_CHANGES`, head SHA for a conflict / CI / ready note, window
-  start for reminder / park / close, `closed_by_bot_at` for reopen). The
+  the event it answers (head SHA for a conflict or CI note,
+  `pr_state_epoch` + `ready_entry_seq` for the ready page, window start for
+  the 7/14/30 notices). The
   transition row stores
   the keys of the writes it caused in `actions_json`, and a write that
   happens without a transition gets its own row with `from_state ==
   to_state`. Two artifacts on the same head and in the same state (a
-  conflict comment, then a `REQUEST_CHANGES` after the nightly review)
+  conflict comment, then a CI-failed note after a push)
   therefore have distinct keys and both are posted; a restart or a CI
   re-run on the same SHA re-derives the same keys and is a no-op.
 
-The existing tables are not changed. `workflow_jobs`, `review_attempts`,
+Existing evidence tables remain authoritative; additive migrations preserve claims and history. `workflow_jobs`, `review_attempts`,
 `lifecycle_notes`, `stale_windows` and `applied_labels` remain the evidence;
 `pr_state` is what the kanban, the pager and the clocks read.
 
@@ -551,7 +667,7 @@ The existing tables are not changed. `workflow_jobs`, `review_attempts`,
 
 The dashboard gains one board: one column per state in projection order, one
 card per PR showing head, `reason`, `since_at`, open/disputed findings, pager,
-and the next scheduled automatic action ("parks in 3 days", "in tonight's
+and the next scheduled automatic action ("draft suggestion due in 3 days", "in tonight's
 sweep #12"). The existing "resolved / attention" buckets are replaced by
 state counts, which also fixes the invisible-status gap (queued, running,
 blocked, timed out, rerouted all land in a column).
@@ -560,7 +676,7 @@ blocked, timed out, rerouted all land in a column).
 
 | Concern | Owner |
 | --- | --- |
-| projection, reconciler, sweep, clocks, labels, draft/close/reopen, dashboard | `omni-reviewbot` |
+| projection, reconciler, sweep, clocks, our labels, notices, dashboard | `omni-reviewbot` |
 | review verdict, severities, `finding_dispositions`, quality verdict, head binding — the per-head facts | this repo, via the SDK (`build_review_result`, `build_quality_result`) |
 | `open_findings` / `disputed_findings` counts | the bot, because they combine SDK per-finding results with reaction and reply data only the bot reads |
 
@@ -598,90 +714,115 @@ The copilot stays stateless per run. Re-review after a push is an ordinary
 
 ## Rollout
 
-Every step is a flag flip on the host; nothing changes on GitHub until the
+Every step is a flag flip on the host; nothing is posted to GitHub until the
 named flag is on. Each step runs at least three nights before the next.
 
 1. **Shadow.** `PR_STATE_ENABLED=true`, everything else off. Tables fill, the
-   kanban shows states, would-be actions land in artifacts. Exit criterion:
-   the projection agrees with a hand check on 30 PRs sampled across columns,
-   and no PR flips state more than twice a day without a push.
-2. **Labels.** Repo owner creates the seven `bot:*` labels;
-   `PR_STATE_LABELS_ENABLED=true`. Exit: no label churn complaints for a
-   week; label removals by humans are logged and honoured.
+   kanban shows states, our labels are recorded. Exit criterion: the
+   projection agrees with a hand check on 30 PRs sampled across columns, and
+   no PR flips state more than twice a day without a push.
+2. **Our labels.** The state label and the inferred content labels are
+   written to the ledger and shown on the board. There is no GitHub step
+   here and no repository labels to create, because nothing is applied to
+   GitHub. Exit: a maintainer reading the board agrees with the labels on
+   20 sampled PRs.
 3. **Sweep.** `AUTO_REVIEW_ENABLED=true` at budget 20, then 60. Exit: sweep
    finishes inside the window on three consecutive nights; review failure rate
    no worse than mention-triggered reviews (today 14 failed of 105).
-4. **Request changes + ready page** `REQUEST_CHANGES_ENABLED=true`. Exit: a
-   maintainer sampling 20 ready pages finds ≤ 2 that should not have been
-   paged (false-ready ≤ 10 %).
-5. **Park.** `PARK_ENABLED=true`, after repo-owner sign-off.
-6. **Close.** `AUTO_CLOSE_ENABLED=true`, after repo-owner sign-off, with a
-   two-week announcement comment on the repo's discussion/issue.
+4. **Ready page.** `READY_PAGE_ENABLED=true`, baselined so the PRs already
+   ready are recorded without paging, and with the lifecycle
+   `ready_to_merge` cutover above in the same release — the old emitter
+   retires as the new one starts, never both running. Exit: a maintainer sampling 20 ready
+   pages finds ≤ 2 that should not have been paged (false-ready ≤ 10 %).
+5. **The idle ladder.** `IDLE_LADDER_ENABLED=true`; the 14- and 30-day
+   notices join the existing 7-day reminder. This is the only step that adds outward noise, so it goes last
+   and is announced first: 715 PRs are already past 7 days, they arrive at
+   10 per cycle, and each gets the highest rung only.
 
 ### Rollback
 
-Turning a flag back to `false` stops *new* actions of that kind at once.
-It does not by itself undo what the bot already did to contributors' PRs,
-and the ledger rows that record those obligations must outlive the
-feature. The full unwind, run by the existing `lifecycle-retract` command
-extended to the new artifact kinds, is:
+Turning a flag back to `false` stops *new* posts of that kind at once, and
+under this design that is very nearly the whole of it: the bot holds no
+state on anyone's PR, so there is nothing to unwind on GitHub except live
+notes that the existing retract path already handles.
 
-1. **Freeze.** All `PR_STATE_*`, `AUTO_REVIEW_*`, `REQUEST_CHANGES_*`,
-   `PARK_*` and `AUTO_CLOSE_*` flags off. The reconciler keeps running in
-   *unwind mode*: it computes no new desired artifacts, but it still
-   visits rows with a pending obligation.
-2. **Unwind live artifacts**, in this order, each through the claim
-   protocol and logged as a transition row: dismiss every active
-   `REQUEST_CHANGES` review ("withdrawn: automation disabled"); retract
-   every live ready / CI / conflict note (existing retract path); remove
-   every `bot:*` label; un-draft every **open** PR with `parked_at` set
-   (never an author's own draft — that is exactly why `parked_at` is
-   stored). A PR that was parked and then closed cannot be marked ready
-   while closed (GitHub rejects it), so its `parked_at` is left in place
-   and handled by step 3.
-3. **Honour reopen obligations.** Rows with `closed_by_bot_at` keep their
-   watch for the remainder of `REOPEN_WATCH_DAYS`, still bound to the
-   bot's own closure event and still answering only to the author. No
-   PR is bulk-reopened: the closing comment promised "reopens on your
-   push or comment", and that promise is kept, not replaced. When the
-   author does return, the reopen action reopens, marks ready and clears
-   `parked_at` in one step, as it always does. When the watch expires
-   with no return, the row's obligations are retired together: the PR
-   stays closed and draft (GitHub already shows it as closed; the draft
-   flag is unreachable and immaterial), and the row is marked
-   `obligations_expired` so step 4 no longer waits on it.
-4. **Retire the tables** only when step 2 has confirmed every live
-   artifact withdrawn and step 3 has no row left inside its watch window.
-   Until then `pr_state` and `pr_state_transitions` stay, read-only for
-   everything but the unwind. Nothing is ever dropped while an open PR
-   has `parked_at` set or a `closed_by_bot_at` row is inside its watch
-   window; an expired row blocks nothing.
+1. **Freeze.** All `PR_STATE_*`, `AUTO_REVIEW_*` and `READY_PAGE_*` flags
+   off, and `IDLE_LADDER_ENABLED=false`, which returns `stale.py` to the
+   7-day reminder it sends today. The reconciler keeps running in
+   unwind mode: it computes no new desired artifacts but still visits rows
+   with a live note.
+2. **Retract the retractable notes** — CI and conflict — through the
+   existing `lifecycle-retract` path and the claim protocol, each logged as
+   a transition row. The ready page is *not* among them: it is a
+   notification, it was true when sent, and the artifact table says it is
+   never retracted. Retracting it here would contradict that and would tell
+   a maintainer their PR is no longer ready when nothing about the PR
+   changed.
+3. **Settle pending pages.** A page that is due but undelivered
+   (`ready_entry_seq > ready_paged_seq`) is cancelled rather than sent, by
+   setting `ready_paged_seq = ready_entry_seq` and logging it. Without this
+   the unwind could never finish: step 4 waits for no artifact to be
+   outstanding, and a page wanted-until-delivered is outstanding for ever
+   once posting is frozen.
+4. **Retire the tables** once step 2 confirms no live CI or conflict note
+   remains and step 3 has left no page due. Until then `pr_state` and
+   `pr_state_transitions` stay, read-only for everything but the unwind.
+   `pr_state_epoch` is **not** retired with them: it lives in ledger
+   metadata precisely so that a later re-enable starts on a fresh epoch and
+   cannot present a page key that the surviving comment claims have already
+   seen.
 
-Rollback of a single step (say, labels only) is steps 1 and 2 restricted
-to that artifact kind; the tables stay.
+Comments already posted are not retracted and cannot be: a reminder or a
+page is a thing said to a person, and the rollback does not pretend
+otherwise. Nothing else survives the freeze, because there are no labels to
+remove, no drafts to undo and no closures to honour — which is the one
+clear benefit of giving the bot no authority.
 
-## Decisions that need repo-owner sign-off
+## Accepted rollout choices
 
-1. **Auto-close at day 30** (overrides #116). Proposed mitigation: reopen on
-   any author activity, closing comment names the exact command, exempt
-   labels honoured.
-2. **Bot `REQUEST_CHANGES`.** With the main-branch ruleset disabled it does
-   not block a merge mechanically, but it is visible on every PR list.
-3. **Seven `bot:*` labels** created in the repo.
-4. **`MERGE_NOTIFY_LOGINS` fallback** stays a single login until a committer
-   catalog exists.
-5. **Automatic reviews run in Direct mode only**, keeping the Strict split on
-   mention-triggered reviews.
+The owner approved the implementation and staged rollout on 2026-09-22:
+
+1. Ready notification recipients use owner → `MERGE_NOTIFY_LOGINS` →
+   `STALE_COORDINATOR_LOGIN`. With no configured recipient, retain an
+   undelivered page and surface `attention`; never silently mark it delivered.
+2. Automatic reviews run in Direct mode. Mention-triggered reviews keep the
+   existing experiment routing.
+3. Extend the idle ladder at days 14 and 30 behind its own flag, share the
+   existing write budget, and send only the highest passed rung on backlog.
+4. Observe each rollout stage and at least three successful nights before
+   increasing exposure. Production monitor incident/rollback authority is a
+   separate decision and is not enabled by this feature.
+
+## Implementation checklist (2026-09-22)
+
+- [x] Projection/transition ledger and nightly review sweep shipped flag-off.
+- [x] Finding ledger, deadline-first visits, dispute scanning and independent
+      PR snapshot refresh shipped flag-off (ReviewBot #73–#76).
+- [x] Retry path recognizes the watcher's `timeout` status.
+- [ ] Remove all non-comment writes from both runtime surfaces, including
+      label writers, reaction acknowledgements and knowledge PR creation.
+- [ ] Correct projection: only GitHub facts produce draft/closed; day 30 is
+      a closure recommendation on an open idle PR.
+- [ ] Carry finding IDs through explicit rechecks; omission never fixes a
+      blocker. Reconcile previously omission-resolved rows before paging.
+- [ ] Validate bounded automatic reviews, retries, backlog fairness and
+      current-head publication against the pinned provider.
+- [ ] Implement epoch/entry ready notifications and the lifecycle cutover.
+- [ ] Extend `stale.py` with the 14/30-day rungs and crash-safe deduplication.
+- [ ] Surface independent evidence, next actor, pending delivery and queue
+      health on the board.
+- [ ] Deploy the tested provider/bot pair, then record rollout observations
+      and enable stages only after their exit criteria pass.
 
 ## Risks
 
 | Risk | Mitigation |
 | --- | --- |
 | Review volume ≈48/day exceeds what one host can finish by morning | budget + window, leftovers carry over, Direct-only for automatic reviews; if the carry-over queue grows three nights running, the dashboard raises it as `attention` |
-| Bot `REQUEST_CHANGES` on a false-positive blocker stalls a good PR | dispute path (👎 or reply) removes it from the gate immediately, and the ready page shows the dispute; false-ready and false-block rates are tracked per week |
-| Labels edited by humans fight the reconciler | 24 h hold after a human removal; hold is logged and visible on the card |
-| Parking/closing a PR whose author is on leave | 30 days total, three notices, exempt labels, reopen on one comment |
-| Fork branch deleted after auto-close | reopen impossible; comment says so; `closed_by_bot` stays for the record |
+| A false-positive blocker holds the ready gate | the finding never blocks a merge, only the page; the dispute path (👎) clears it from the gate immediately and the board shows the disagreement; false-ready rate tracked per week |
+| Three idle notices land on a PR whose author is on leave | they are notices and change nothing; exempt labels skip them entirely; only the highest rung is sent |
+| The day-14 and day-30 notices are noise on a repo the team does not own | one ladder, 10 posts per cycle, highest rung only, and the whole ladder is the last rollout step so it can be judged on the 7-day reminder's reception first |
+| The board is the only place PR state exists, so nobody looks at it | the ready page is a push, not a pull — a maintainer never has to open the board to learn a PR needs them |
 | A stuck lifecycle claim blocks a state (today 266 stale notes sit in `claimed`) | the transition row's `actions_json` is the audit; a claim older than its lease is withdrawn by the existing recovery path, and the kanban card shows "action pending since" |
 | Budget exhaustion silently freezes a column | fail closed *and* count it: `PR_STATE_BUDGET_EXHAUSTED` events are on the dashboard's reliability story |
 
@@ -692,83 +833,99 @@ to that artifact kind; the tables stay.
 - [ ] Same evidence in, same state out, zero new transition rows (property
       test over recorded evidence).
 - [ ] A push moves `changes_requested`, `ci_failing`, `ready_for_maintainer`,
-      `stale` and `parked` back to `under_review` within one cycle and the
-      bot's own `REQUEST_CHANGES` is dismissed.
+      `stale` and `parked` back to `under_review` within one cycle.
 - [ ] The ready page fires only when all five gate conditions hold, once per
-      head, and names the owner with the routing reason.
+      entry into ready, and names the owner with the routing reason.
+- [ ] A PR that goes ready, breaks and goes ready again is paged twice;
+      one that sits ready across many cycles is paged once; a re-run against
+      the same evidence pages nobody.
+- [ ] A PR with no routed owner is paged down the fallback chain (owner →
+      `MERGE_NOTIFY_LOGINS` → `STALE_COORDINATOR_LOGIN`) and flagged
+      `unrouted` on the board; the page is skipped only when every fallback
+      is unset, and that raises `attention`.
+- [ ] A ready page that fails on budget and whose PR is then pushed to is
+      **cancelled, not sent**: `ready_paged_seq` advances, a transition row
+      says "page cancelled: no longer ready", and no comment is posted. If
+      the PR becomes ready again it is a new entry and is paged.
 - [ ] Disputed findings never block and are counted on the page.
-- [ ] Dispute → undispute on one head yields exactly one active
-      `REQUEST_CHANGES` review at any time: the first is dismissed on the
-      dispute, a second with `block_generation + 1` is posted when the 👎
-      is removed, and a same-SHA re-run posts nothing more.
-- [ ] Partial dispute on one head, `{A,B} → {A} → {A,B}`, edits the body of
-      the single active review twice, never dismisses it, never bumps
-      `block_generation`, and never posts a second review.
-- [ ] Writes follow evidence, not transitions: a PR already in
-      `changes_requested` for a conflict gets a `REQUEST_CHANGES` review
-      when its review finds a blocker; a `ready_for_maintainer` PR whose CI
-      turns red on the same head has its ready page retracted and a
-      CI-failed comment posted in the same cycle.
-- [ ] Day-7 / 14 / 30 transitions each fire at most once per inactivity
-      window across restarts; bot activity never restarts the clock.
+- [ ] Disputing the last open blocker lets the PR enter
+      `ready_for_maintainer` and its page is sent; withdrawing that 👎
+      re-opens the finding and the PR leaves ready with nothing retracted;
+      neither direction dismisses or edits anything on GitHub.
+- [ ] Writes follow evidence, not transitions: a `ready_for_maintainer` PR
+      whose CI turns red on the same head gets a CI-failed comment in the
+      same cycle, and its ready page is left standing.
+- [ ] Day-7 / 14 / 30 notices each fire at most once per inactivity window
+      across restarts; only the highest passed rung is sent; bot activity
+      never restarts the clock.
+- [ ] **The client exposes no method that writes a label, a draft state or a
+      PR's open/closed state, and no review with an `event` other than
+      `COMMENT`.** A test asserts this over the client's public surface, so
+      the constraint fails the build rather than a review.
+- [ ] Every label the design names exists in the ledger for every open PR —
+      state and content both — and none of them is on GitHub.
 - [ ] The sweep never exceeds its budget or window; leftovers are visible.
 - [ ] Shadow mode writes nothing to GitHub; each flag promotes its own shadow
       artifacts exactly once.
-- [ ] Every new GitHub write is retractable by the reconciler and the
-      retraction is logged in `pr_state_transitions`.
-- [ ] The bot never merges, never approves, never reopens a human-closed PR.
-- [ ] Rollback fixture: with three PRs (one bot-parked, one bot-closed
-      inside its watch window, one with an active `REQUEST_CHANGES` and a
-      `bot:*` label), the unwind un-drafts the first, leaves the second
-      closed but reopens it on the author's later comment, dismisses and
-      unlabels the third, and refuses to drop the tables until the second
-      PR's watch window has passed.
-- [ ] Park → close → rollback → expiry: a PR parked at day 14 and closed at
-      day 30 is not touched by the unwind's un-draft step (it is closed);
-      an author comment inside the watch window reopens it, marks it ready
-      and clears `parked_at`; with no author return the watch expires, the
-      row is marked `obligations_expired`, the PR stays closed, and table
-      retirement proceeds.
-- [ ] A bot-closed PR reopens on the author's comment or on a new head, and
-      does not reopen on a comment from anyone else (bystander fixture).
-- [ ] A reopen watch is retired the cycle a PR is reopened by anyone; after
-      "bot closes → maintainer reopens → maintainer closes → author comments"
-      the PR stays closed.
-- [ ] A human marks a bot-parked PR ready: `parked_at` is cleared on the
-      next visit. If the author then converts it to draft again, even
-      between two polls, the PR is an author draft (`draft` state, no clock,
-      never un-drafted, never auto-closed), because the timeline's latest
-      `convert_to_draft` event is not the bot's.
-- [ ] An exempt-labelled PR idle for 14 days is neither `stale` nor `parked`,
-      is still swept and can reach `ready_for_maintainer`; a parked PR that
-      gains the exempt label is un-drafted.
+- [ ] Every retractable note (CI, conflict) is retractable by the
+      reconciler and the retraction is logged in `pr_state_transitions`.
+- [ ] A **delivered** ready page is never retracted: not when the PR leaves
+      `ready_for_maintainer`, not by the rollback unwind. Only an
+      undelivered entry is ever cancelled.
+- [ ] After cutover the lifecycle reconciler never posts a `ready_to_merge`
+      note again, and the gated emitter is the only path that can page: a
+      PR that is mergeable but whose head is unreviewed receives no ready
+      page from either.
+- [ ] Rollback → re-enable fixture: a PR paged at entry 1, then the unwind,
+      then the tables recreated and the PR becomes ready again. The epoch
+      has advanced, so the new entry presents a key the surviving claims
+      have not seen and the page is sent; without the epoch this page is
+      suppressed.
+- [ ] Cutover fixture: of two PRs carrying a live `ready_to_merge` note,
+      the one that passes the new gate keeps its note and is not paged
+      again, and the one that does not has its note retracted; no pending
+      `ready_to_merge` claim survives.
+- [ ] The bot never merges, never approves, never blocks, never labels on
+      GitHub, never drafts, never closes and never reopens.
+- [ ] Rollback fixture: with three PRs — one carrying a live CI note, one a
+      live conflict note, one with a ready page due but never delivered —
+      the unwind retracts the first two and logs each retraction, cancels
+      the third page instead of sending or retracting it, and only then
+      allows the tables to be dropped. Pages already delivered are left
+      alone. No PR is drafted, closed or relabelled by the unwind, because
+      none was by the feature.
 
 ## Tests
 
 - Projection unit tests: one fixture per state and per precedence pair
   (stale-but-green, conflict-and-red, reviewed-but-CI-pending, disputed-only),
-  plus the exhaustiveness fixtures: reviewed green PR, bot-parked, author
-  comment without push (→ `under_review` / `resume_pending`); parked PR at
-  day 30 with no evidence change (→ `closed` / `action_pending`); a
+  plus the exhaustiveness fixtures: reviewed green PR; a PR a person
+  converted to draft (→ `draft`, unmanaged, no clocks); a `parked` PR at day
+  30 with no evidence change (stays `parked`, close notice due); a
   randomly generated evidence table must never hit `unclassified` for the
   combinations the RFC names.
 - Reconciler tests with a fake GitHub client: crash between transition row
-  and action, restart, same-SHA CI re-run, human label removal, fork deleted,
-  a deadline visit with zero evidence change that still closes the PR.
-- Clock tests: reminder does not restart window; park then push un-drafts;
-  park then comment un-drafts; bot-closed then author comment reopens;
-  human-closed never reopens; bot-closed → human reopen → human close →
-  author comment stays closed; exempt label added to a parked PR un-drafts
-  it and exempt-but-idle never parks; **two consecutive close/reopen cycles
-  on one PR each get their own claim and both succeed**.
+  and post, restart, same-SHA CI re-run, a deadline visit with zero evidence
+  change, and **a ready page that fails on budget is still due on the next
+  cycle and is delivered exactly once**.
+- Client-surface test: the GitHub client exposes no method that writes a
+  label, a draft state or a PR's open/closed state, and no review with an
+  `event` other than `COMMENT`.
+- Clock tests: a notice does not restart the window; a PR idle 40 days when
+  the ladder is enabled gets the day-30 notice only; a person drafting a
+  `parked` PR moves it to `draft` and stops its clocks; an exempt label
+  added to a `parked` PR stops the notices with nothing to undo; human
+  activity at any rung resets the clock and the next window starts the
+  ladder over.
 - Sweep tests: budget, window, priority order, backfill quota, carry-over.
 - Dispute tests: a reaction-only dispute (author 👎, no reply, no push) is
-  picked up on the dispute-scan deadline, dismisses the `REQUEST_CHANGES`
-  review and lets the PR reach `ready_for_maintainer` without a model call;
-  a bystander's 👎 changes nothing; removing the sole 👎 on a PR whose
-  every blocker was disputed re-opens the finding and retracts the ready
-  page; a 👎 placed on a carried finding's original comment from an older
-  head is found after a push because the scan follows the stored comment
+  picked up on the dispute-scan deadline and lets the PR reach
+  `ready_for_maintainer` without a model call; a bystander's 👎 changes
+  nothing; removing the sole 👎 on a PR whose every blocker was disputed
+  re-opens the finding and the PR leaves ready, and a later return to ready
+  pages again on a new `ready_entry_seq`; a 👎 placed on a carried
+  finding's original comment from an older head is found after a push
+  because the scan follows the stored comment
   id.
 - Contract tests in this repo: the per-finding result carries `finding_id`,
   `severity`, `head_recheck` and `carried_from` across the SDK boundary; a
@@ -786,13 +943,14 @@ the GitHub API:
   first maintainer comment;
 - false-ready rate (maintainer requests changes after a ready page);
 - median time from open to `ready_for_maintainer`;
-- reopen rate after bot close, and reopened-then-merged count.
+- share of PRs that reached day 30 and what a human then did with them —
+  the honest measure of whether the idle ladder is worth its noise, since
+  the bot cannot act on the answer itself.
 
 ## Known defects to fix on the way
 
-- `retry_failed_review` filters on status `timed_out` (`ledger.py:1936,1947`)
-  but the writer records `timeout` (`watcher.py:895`), so timed-out reviews are
-  never retried; the sweep's carry-over depends on this working.
+- Timeout retry spelling has been fixed; keep the regression case when
+  validating the automatic sweep.
 - `notified` and its variants were migrated away in the ledger but survive in
   the dashboard label map and the resolved set (`dashboard.py:40`,
   `ledger.py:4195`); they go when the buckets are replaced by state counts.
@@ -808,6 +966,11 @@ the GitHub API:
 - Whether re-reviews should skip PRs whose diff since the last reviewed head
   is below the diff budget's floor (docs-only, whitespace) — cheap to add, not
   needed for correctness.
+- Whether the idle ladder should end in a person rather than a notice. With
+  no write authority the bot can say "this should be closed" 715 times and
+  nothing closes. A weekly digest to one coordinator — "these 12 crossed day
+  30 this week" — might close more PRs than 715 individual comments, and
+  would be quieter. Worth measuring once the ladder has run a month.
 - Whether `draft` PRs get a provisional review in the sweep. Declined for
   now: today's rule ("draft PR 不处理") stands, and drafts opt in by marking
   ready.
