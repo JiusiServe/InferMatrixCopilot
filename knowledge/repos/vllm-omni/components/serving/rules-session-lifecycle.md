@@ -58,3 +58,10 @@ confidence: high
 - 验收：`max_frames=1` 下延迟 decode 时，被逐出帧的 PIL 在会话仍打开时可被回收；
   `max_frames=2` 时仍缓存到 teardown。中断连续 query 时记录的 sleep 请求为空，且旧
   generator 关闭与 abort 完成发生在下一次 generate 之前。^[PR #7363]
+
+## SERV-6k — duplex client 只能在 `session.updated` 后刷新隐式音频默认
+
+- 触发：修改 `InlineDuplexClient` / 共享 duplex dispatcher 对 `session.created`/`resumed`/`updated` 的采纳，或 `_input_defaults()` 消费的 format/sample rate/speech 阈值。
+- 强制：dispatcher 在收到已确认的 `session.updated` 且 payload 含 `session` 时更新 `session_info`；随后 append 的解码与 RMS 门限读刷新后的配置。仅发送 `session.update`、或收到拒绝/error，不得改变 defaults。
+- 禁止：把 patch 发送当成 ACK；拒绝更新后仍按新 format 解码；只覆盖 flat 或只覆盖 nested `audio.input` 一种形状。
+- 验收：参数化 accepted/rejected 与 flat/nested patch；accepted 后 sample rate/format/is_speech 改变，rejected 保持创建时默认。^[PR #7784]
