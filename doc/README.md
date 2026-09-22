@@ -37,6 +37,7 @@
 | [`features/review-recall.md`](features/review-recall.md) | 已实现（默认开）——v14/v15 召回攻坚 |
 | [`features/auto-run.md`](features/auto-run.md) | **draft，未实现**——GitHub 事件触发 |
 | [`RFC-knowledge-intake.md`](RFC-knowledge-intake.md) | 已实现（默认关，shadow 起步）——Copilot typed SDK 唯一拥有知识规则，ReviewBot 只编排 evidence/model/Git/fork PR，人审合并即晋升 |
+| [`RFC-pr-state-machine.md`](RFC-pr-state-machine.md) | **proposed，未实现**——PR 单一状态机（10 态 + closed）、04:00 夜间自动评审、ready 门槛只在“几乎可合入”时呼叫维护者、7/14/30 天 stale→draft→close；两项越过 #116 边界需仓库 owner 签字 |
 
 ## architecture/ —— 维护者
 
