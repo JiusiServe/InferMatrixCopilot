@@ -1,7 +1,7 @@
 ---
 title: "BAGEL（统一模型多形态部署参照）"
 created: 2026-07-21
-updated: 2026-09-05
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #6359", "PR #7049", vllm_omni/model_executor/models/bagel/, vllm_omni/diffusion/models/bagel/, vllm_omni/deploy/bagel.yaml]
@@ -44,7 +44,7 @@ sources: ["PR #6359", "PR #7049", vllm_omni/model_executor/models/bagel/, vllm_o
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | KV 桥接、3 路 CFG、MoT、变体拓扑 | [architecture](architecture.md) | AR→DiT 数据流与 reviewer 陷阱 |
-| CFG 分支 position ID 打包、BAGEL-3 step wave | [rules](rules.md) | 1-D RoPE 与 Lance mRoPE 的序列轴合同；BAGEL 专有 step/packing、有效几何与 fallback 清理 |
+| CFG 分支 position ID 打包、BAGEL-3 step wave | [rules](rules.md) | 1-D RoPE 与 Lance mRoPE 的序列轴合同；BAGEL 专有 step/packing、有效几何与 fallback 清理   新增核对：BAGEL-4。 |
 
 ## 配置与 checkpoint 差异
 

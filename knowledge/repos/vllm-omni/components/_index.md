@@ -24,3 +24,5 @@ sources: []
 
 需要解释稳定数据流时再进入对应 owner 的 `architecture.md`，不要把 architecture 当成
 review 的默认前置阅读。
+
+- [comfyui](comfyui/_index.md)：comfyui owner 规则。

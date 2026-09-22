@@ -1,10 +1,10 @@
 ---
 title: "Host Weight Runtime 规则"
 created: 2026-08-23
-updated: 2026-09-04
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, components]
-sources: ["PR #6419", "PR #6427", "PR #6445", "PR #6486", "PR #6591", "PR #6692", vllm_omni/host_weight_runtime/]
+sources: ["PR #6419", "PR #6427", "PR #6445", "PR #6486", "PR #6591", "PR #6692", vllm_omni/host_weight_runtime/, "PR #7128"]
 confidence: high
 ---
 
@@ -124,3 +124,18 @@ confidence: high
   artifact miss。
 - 验收：覆盖 capability/budget gate、mid-registration rollback、PyTorch pinned-source verification、
   unregister retry 与 retained-owner GC，并断言 successful direct path 无 private staging allocation。^[PR #6591]
+
+## HWR-1f — domain-init 锁等待必须受 `WaitPolicy` 单调截止约束
+
+- 触发：修改 `FilesystemHostWeightStore` 构造、`domain-init.lock`、`WaitPolicy` 向 store
+  的传递，或 `HostWeightRuntime.from_config()` 的初始化路径。
+- 强制：store 构造必须把 runtime `WaitPolicy` 传入，并用 `time.monotonic() +
+  coordination_timeout_seconds` 作为 `domain-init.lock` 的 deadline；超时转为 retryable
+  `DOMAIN_UNAVAILABLE`，preferred 可 fallback，required 失败。超时 waiter 不得解锁 owner，
+  也不得改写 owner 的 domain metadata。初始化预算与 resolve/publish 协调预算分开；这不是
+  硬启动 deadline，也不取消进行中的 filesystem I/O/production。争用结束后新 runtime 可重试。
+- 禁止：构造期 `FileLock(..., deadline=None)` 无限阻塞，使 preferred 也无法 fallback；把
+  coordination timeout 说成可取消的同步 producer 总时限。
+- 验收：外部持锁下分别覆盖 preferred fallback 与 required failure、typed
+  `DOMAIN_UNAVAILABLE`、owner 锁与 metadata 保持、deadline 前释放可成功，以及释放后新
+  runtime 的 `LOCAL_HIT` 恢复。^[PR #7128]

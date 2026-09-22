@@ -1,8 +1,8 @@
 # contract.py —— 规范
 
-<!-- verified-against: 2026-09-11 -->
+<!-- verified-against: 2026-09-22 -->
 
-`LOC ~185 · 旧版跨仓库契约兼容层 · refactor-status: compatibility-shim`
+`旧版跨仓库契约兼容层 · refactor-status: compatibility-shim`
 
 ## 职责
 本 copilot 的**旧版对外消费契约兼容层**。新宿主只允许 import
@@ -13,7 +13,7 @@
 
 ## 公开契约（`__all__`）
 `SDK_API_VERSION` / `DIRECT_API_VERSION` / `STRICT_API_VERSION` /
-`QUALITY_API_VERSION` / `KNOWLEDGE_API_VERSION`（当前前四者为 `"1.0.0"`，Knowledge 为 `"1.1.0"`，且都从 `sdk.v1.models`
+`QUALITY_API_VERSION` / `KNOWLEDGE_API_VERSION`（SDK、Direct、Quality 为 `"1.0.0"`，Strict 为 `"1.2.0"`，Knowledge 为 `"1.1.0"`，且都从 `sdk.v1.models`
 取唯一值）。`capabilities(max_strict_workers=1,
 supports_file_locking=True) -> dict` 委托 SDK typed handshake 再投影为兼容
 dict；它包含 distribution/SDK/Direct/Strict/Quality/Knowledge 版本、resource
@@ -22,10 +22,10 @@ revision、supported repositories，以及 `supports_expected_head`、
 `supports_idempotent_strict_start`、`supports_knowledge_curation`、
 `max_strict_workers`。其余兼容导出包括 `build_review_result(run_dir) -> dict`（结构化评审
 结果：`contract_version`、`run_id`、`state`、`reviewed_head_sha`、`verdict`、
-`summary_markdown`、`comments`、`finding_dispositions`、
+`summary_markdown`、`comments`、`finding_dispositions`、`findings`、
 `stale`/`expected_head_sha`/`actual_head_sha`、`diagnostics`）；`unknown_run_result(run_id)`（显式
 `state: unknown`，绝不抛错 —— 丢响应和还在跑必须可区分）；
-`sanitize_comments` 与 `COMMENT_FIELDS`；以及从 `direct_routing` 再导出的
+`sanitize_comments` 与 `COMMENT_FIELDS`，以及 `finding_id` / `build_findings`；另有从 `direct_routing` 再导出的
 `direct_knowledge_routes` / `direct_execution_budget` /
 `direct_completion_result` / `direct_mandatory_review_guides` / 完整的
 `direct_review_plan`。
@@ -51,6 +51,14 @@ revision、supported repositories，以及 `supports_expected_head`、
   凭据——每个候选一条 `{anchor, disposition, declared}`，按
   `DISPOSITION_FIELDS` 白名单投影，被撤下的评论正文本身绝不过界。
   消费方因此无需把散文里的取舍和手上的列表对账（#141）。
+- `findings` 按发布顺序对每条最终评论输出
+  `{finding_id, severity, anchor, head_sha}`。identity 取文件路径与完整评论文本
+  （合并空白并 casefold）的 SHA-256 前 16 个 hex，不包含行号；anchor 是
+  `{path, line}`，无文件时为 `None`。severity 使用最终发布值，head 绑定
+  `pr_head_sha`。保留重复 identity，不与按 anchor 记账的 disposition 做 join，
+  避免同位置的撤下候选污染已发布 finding。评审前失败的 run 返回空列表。
+- 当前没有 carried finding 的显式复查生产链，因此不返回 `carried_from`、
+  `head_recheck` 或 `findings_missing_carried`；不能把结果中缺少旧 finding 当作已修复。
 - 本模块自身保持仓库中立；仓库专属的 Direct 路由表住在
   `direct_routing.py`（见其页）。
 - 能力身份的权威实现在 `sdk.v1.get_capabilities`；这里不维护第二份版本或
@@ -70,9 +78,9 @@ revision、supported repositories，以及 `supports_expected_head`、
 新的 Direct helper → 在 `direct_routing` 实现、在这里再导出。
 
 ## 测试
-`test_contract.py`（23 例：verdict 字段化、评论白名单、stale 即终局事实、
+`test_contract.py`（覆盖：verdict 字段化、评论白名单、stale 即终局事实、
 早死 run 的降级结果、unknown-run 显式化、能力上报、import 方向、
-本模块仓库中立）。
+本模块仓库中立、finding identity/最终 severity/head 绑定、重复保留与 disposition 隔离）。
 
 ## 重构备注
 新模块（PR2 mixed-mode contract 拆分）。保持它薄：任何"顺手在这里实现"

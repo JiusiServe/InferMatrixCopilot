@@ -1,10 +1,10 @@
 ---
 title: "AMD/ROCm CI 规则"
 created: 2026-09-05
-updated: 2026-09-10
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234"]
+sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234", "PR #6966", "PR #7395", "PR #6978", "PR #7398"]
 confidence: high
 ---
 
@@ -42,3 +42,31 @@ confidence: high
 - 强制：`mi300_1` 一类单卡 model job 的 pytest marker 必须 `not (cards_2 or … or cards_8)`，同时保留无 `cards_1` 的 legacy 单卡用例；真正需要双卡的用例（如 LTX2 Ulysses parity）改到已有双卡 lane，并声明 `rocm` 资源与 `device_count >= world_size` 早失败。
 - 禁止：让 `cards_2+` 测试在单卡 worker 上 spawn rank1→GPU1 导致 `invalid device ordinal`；用邻近 green shard 宣称 multi-GPU routing 已修好。
 - 验收：pipeline argv/collection 断言单卡 job 排除 multi-card markers、双卡 job 收集目标文件；硬件 marker helper 覆盖 ROCm 声明。^[PR #7234]
+
+## OMNI-CI-2i — AMD bootstrap 必须按 ready/merge-test 标签选择 L2/L3 suite
+
+- 触发：修改 `.buildkite/amd` bootstrap、`select_test_suites.py`、AMD PR label 路由，或 skip-ci 对 AMD suite 的过滤。
+- 强制：`ready` 选 L2（ready suite），`merge-test` 选 L3（merge suite）；两标签同时存在时合并多 suite 且共享一次 image build；`DEBUG_TEST_YAML` 优先；main 继续 L3；无 tier 标签的 PR 可保留 legacy ready fallback。PR labels 精确匹配且失败时 fail closed；skip-ci 必须对已选 L2/L3 独立过滤。
+- 禁止：凡 PR 一律上传 ready suite；用子串匹配 labels；在仓库侧假装已改变 Buildkite 外部 trigger 条件；把 `nightly-test` 当成已有 AMD L4 覆盖。
+- 验收：selector/bootstrap 单测覆盖 ready-only、merge-only、both、debug override、main、label fetch failure 与 per-suite skip-ci；日志报告实际 `TEST_SPECS`。^[PR #6966]
+
+## OMNI-CI-2i2 — ROCm Dockerfile 必须与 CI 的 vLLM release 对齐并在构建期 canary
+
+- 触发：修改 `docker/Dockerfile.rocm` 的 `BASE_IMAGE` / `VLLM_VERSION_OR_COMMIT_HASH` / `USE_NIGHTLY_BUILD`、`.buildkite/amd` 的 image build 命令，或 AMD 运行时因缺失 vLLM API 失败。
+- 强制：默认 `BASE_IMAGE` tag 与可选 source rebuild 的 `VLLM_VERSION_OR_COMMIT_HASH` 都必须等于 `docker/Dockerfile.ci` 的 `VLLM_BASE_TAG`；AMD build 不得 `--build-arg` 覆盖这两个默认。可选 nightly 重装之后、业务层拷贝之前，必须用当前 Omni 依赖的 vLLM API 做 image-build canary，构建失败优于整 lane runtime 失败。
+- 禁止：只升 Omni 代码而留下过期 ROCm base；把 canary 推到测试阶段；用自定义 source pin 却不更新 `tests/buildkite/test_rocm_dockerfile.py`；把 Docker pin 误当成非 Docker 安装会自动装上匹配 vLLM。
+- 验收：静态回归断言 ROCm base/source ref 跟踪 CI tag、默认 `USE_NIGHTLY_BUILD=0`、AMD build 不覆盖上述 arg、canary 位于 nightly 块之后；故意错位 pin 必须失败。^[PR #7395]
+
+## OMNI-CI-2i3 — AMD nightly suite 必须可显式选中且不受 L2/L3 skip-ci 误杀
+
+- 触发：修改 AMD bootstrap/`select_test_suites`、`NIGHTLY_TESTS` YAML、`nightly-test` label，或 skip-ci 对 suite spec 的过滤。
+- 强制：`nightly` 映射 `NIGHTLY_TESTS:test-amd-nightly.yml`；`main+NIGHTLY=1` 或 PR `nightly-test` 选中它；可与 ready/merge 组合共享一次 image build。`NIGHTLY_TESTS:*` 在 skip-ci 过滤中原样保留，docs-only 也不得剥掉显式/scheduled nightly。burn-in 叶子保持 `NonBlocking` 直至另有 gate。
+- 禁止：把 `nightly-test` 当成无 suite 的噪声 label；用 L2/L3 diff gate 静默丢掉已选 nightly；把实验 nightly 阈值外推为 CUDA H100 基线。
+- 验收：渲染 `DEBUG_TEST_YAML=nightly`、`NIGHTLY=1`、组合 label 与 docs-only+nightly，断言 suite spec 与子 pipeline 叶子集合。^[PR #6978]
+
+## OMNI-CI-2i4 — AMD entrypoints GPU ready job 必须单次 pytest、有界超时并检测进程泄漏
+
+- 触发：修改 `.buildkite/amd/test-amd-ready.yml` 的 entrypoints/R2-02 GPU coverage、artifact 根路径，或 teardown 进程快照比较。
+- 强制：`mi300_1` NonBlocking job 设 `VLLM_WORKER_MULTIPROC_METHOD=spawn`，marker 排除 `cards_2`–`cards_8`，只跑一次 verbose pytest（禁止第二趟 `--collect-only`）。内层 `timeout` 短于 Buildkite step，为 teardown/artifact 留窗口。artifact 根在 Buildkite checkout；前后 `ps` 快照用 PID+start-time 身份比较，泄漏则 fail closed。零 collection 不得被允许通过。
+- 禁止：依赖 PID-only 比较掩盖 reuse；把 CUDA pipeline 定义当作 ROCm ready 覆盖；用邻近 green shard 宣称本 job 合同已满足。
+- 验收：结构断言单次 pytest、超时信封、marker、六类 artifact 与 `process-cleanup` PASS；真实 MI300 跑通 selected node。^[PR #7398]

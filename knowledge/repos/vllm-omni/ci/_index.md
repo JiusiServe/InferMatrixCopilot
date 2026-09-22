@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni CI"
 created: 2026-07-10
-updated: 2026-09-21
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, ci]
 sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6170", "PR #6303", "PR #6390", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/run_minicpmo_realtime_duplex_server_vad.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349", .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, tests/helpers/clean.py, "PR #6704", tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/stage_input_processors/test_minicpmo_4_5_async_chunk.py, "PR #5464", "PR #6730", "PR #6745", "PR #6727", tests/diffusion/quantization/test_quantization_quality.py, "PR #5831", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, "PR #6742", "PR #6650", pyproject.toml, tests/helpers/mark.py, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py, "PR #6174", .buildkite/cuda/test-weekly.yml, tests/e2e/offline_inference/test_dots_tts_expansion.py, "PR #6556", tests/e2e/online_serving/minimax_h3/]
@@ -209,11 +209,15 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 审查硬件 lane（含 MiniMax-H3 DLO DP2 ready smoke 的证据边界）、回归 fence、CI 工具供应链、ASR 文本比较或 xdist/shared fixture、Buildkite 失败日志与运行时差异 | [CI rules](rules.md) |
-| AMD/ROCm timeout、quarantine、memory signal、single-card diffusion job 的 multi-card marker 排除、Qwen3-TTS argv 或 Qwen3-Omni control-plane fixture | [AMD/ROCm CI rules](rules-amd.md) |
+| 审查硬件 lane（含 MiniMax-H3 DLO DP2 ready smoke 的证据边界）、回归 fence、CI 工具供应链、ASR 文本比较或 xdist/shared fixture、Buildkite 失败日志与运行时差异 | [CI rules](rules.md)   新增核对：OMNI-CI-1g、OMNI-CI-1h。 |
+| AMD/ROCm timeout、quarantine、memory signal、single-card diffusion job 的 multi-card marker 排除、Qwen3-TTS argv 或 Qwen3-Omni control-plane fixture | [AMD/ROCm CI rules](rules-amd.md)   新增核对：OMNI-CI-2i、OMNI-CI-2i2、OMNI-CI-2i3、OMNI-CI-2i4。 |
 | CUDA L4 Kubernetes preset、GPU-count shard、resource/retry policy | [L4 Kubernetes CI rules](rules-l4-k8s.md) |
 | Whisper 转写 helper 的 GPU 首选、16 GiB 门槛、CPU fallback 或 CUDA ready/merge source dependency | [Whisper 转写 CI 规则](rules-whisper-transcription.md) |
 | 查看仓库特有 CI 陷阱 | [CI guides](guides/_index.md) |
 | 调查历史 CI 失败 | [CI incidents](incidents/_index.md) |
 
 - [CI 并行测试与 engine fixture 合同](rules-test-fixtures.md)：`OMNI-CI-2b`, `OMNI-CI-2c`, `OMNI-CI-2d`, `OMNI-CI-2h`。
+
+- [rules-review-validation](rules-review-validation.md) 新增核对：VOMNI-CI-1a、VOMNI-CI-1b。
+
+- [release-gates](release-gates.md)：维护者分工与发布政策。

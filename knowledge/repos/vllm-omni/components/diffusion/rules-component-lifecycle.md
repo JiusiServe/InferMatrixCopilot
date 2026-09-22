@@ -1,10 +1,10 @@
 ---
 title: "Diffusion component lifecycle 规则"
 created: 2026-09-02
-updated: 2026-09-09
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5720", "PR #5853", "PR #5882", "PR #5884", "PR #6486", "PR #6591", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/offloader/startup.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/models/sana_video/test_cache_offload.py, tests/diffusion/test_diffusion_model_runner.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072", "PR #7078"]
+sources: ["PR #5720", "PR #5853", "PR #5882", "PR #5884", "PR #6486", "PR #6591", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/offloader/startup.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/models/sana_video/test_cache_offload.py, tests/diffusion/test_diffusion_model_runner.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072", "PR #7078", "PR #7047"]
 confidence: high
 ---
 
@@ -126,3 +126,11 @@ residency 留在模型 owner。规则入口与其他共享机制仍见 [Diffusio
 - 强制：凡 pipeline 用 “omitted vs explicit” provided 标志做 batch-local gate 的字段，都必须进入 request-mode 与 step-mode 的 sampling-params key；数值相等但 provided 不同的请求不得合批。当前合同要求 `guidance_scale_2_provided` 与数值 `guidance_scale_2` 一并参与 key。
 - 禁止：只比较 auto-fill 后的数值；假设同数值即同语义；只更新 request scheduler 而漏掉 step scheduler；把 H3 等 single-request guard 当作可合批模型的例外模板。
 - 验收：用真实 key builder 覆盖 omitted `guidance_scale_2` 与显式同值、数值不同，以及两套 scheduler 的 key 分离；并断言 pipeline 首请求 gate 不会跨不同 provided 语义共享 batch。^[PR #7078]
+
+## DIFF-2ag — pipeline 自管 staging 的组件不得进入 always-resident discovery 列表
+
+- 触发：修改 `_vae_modules` / `ModuleDiscovery`、layerwise/HSDP/model-level offload 的 component 选择，或 pipeline 自己在 encode/decode 边界调用 `load_to_device`/`offload_to_cpu`。
+- 强制：`SupportsComponentDiscovery` 的 `_vae_modules` 语义是“VAE(s) always on GPU”。凡由 pipeline 自行互斥 staging、且不能交给 offloader/loader 搬迁的 VAE，必须从 discovery 列表省略（声明为空），使 layerwise/HSDP/model-level 路径都看不到它们；需要保留的 `pipeline.vae` 别名只服务 registry/patch，不算 discovery 声明。
+- 强制：因此退出 discovery 的组件，model-level CPU offload 入口不得再从 discovery 推导 stage 集，必须显式列出仍由 model-level 管理的 encoder/VAE 等；on-demand offload plan 同步丢掉已省略组件。
+- 禁止：一边在 pipeline 里互斥 staging，一边把同一 VAE 放进 `_vae_modules` 让 offloader/loader 再拉回 device；或用后端特殊分支掩盖 discovery 合同冲突。
+- 验收：discovery/offload plan 断言 pipeline-staged VAE 不出现；其余仍声明 VAE 的 pipeline 合同不变；model-level 显式 stage 列表仍覆盖应有组件。^[PR #7047]

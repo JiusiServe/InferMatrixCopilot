@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-09-11 -->
+<!-- verified-against: 2026-09-22 -->
 
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
@@ -51,6 +51,11 @@
 - **Strict created 语义真实**：SDK 从 core 的 `(run_id, created)` 读取；命中
   idempotency key 的重试返回 `created=False` 且绝不再次入队。review depth 只经
   policy allowlisted `params` 传入。
+- **Strict findings 绑定发布结果**：`get_result` 的 `findings` 对最终发布集合逐条返回
+  `finding_id`、最终 `severity`、`anchor` 与 `head_sha`，保持顺序及重复 identity。
+  identity 以文件路径与完整归一化文本生成，行号变动不改变 identity；它不与
+  `finding_dispositions` 按 anchor 拼接。当前没有 carried-finding recheck，缺失旧
+  finding 不代表已修复；不得承诺 `head_recheck` 或 `findings_missing_carried` 字段。
 - **知识规则由 provider 唯一定义**：catalog 只暴露当前仓库 owner 与 general 的
   owner rule page document ID —— 每个 owner 的 `rules.md` 入口页及其
   `type: rule` 的 `rules-<topic>.md` 专题页（`catalog_entries()` 附每页
@@ -76,8 +81,8 @@
   push、开 PR 或 schedule。ReviewBot 必须向 `KnowledgeCurator` 传 dedicated work
   checkout，并继续拥有重试、artifact 与 fork publication；SDK 也绝不写 packaged
   knowledge tree。
-- SDK、Direct、Quality API 版本常量为 `1.0.0`；Strict 为 `1.1.0`
-  （结果新增 `finding_dispositions`，#141），Knowledge 为 `1.1.0`
+- SDK、Direct、Quality API 版本常量为 `1.0.0`；Strict 为 `1.2.0`
+  （1.1 新增 `finding_dispositions`；1.2 新增 `findings`），Knowledge 为 `1.1.0`
   （1.1 向后兼容地新增 `catalog_entries()` / `KnowledgeCatalogEntry` 与容量预检），
   distribution 为 `0.2.0`；`Capabilities.knowledge_api_version` 与
   `supports_knowledge_curation` 组成 ReviewBot 的 paired-release 握手，避免只按

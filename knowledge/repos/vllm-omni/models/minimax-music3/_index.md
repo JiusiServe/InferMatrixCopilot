@@ -1,7 +1,7 @@
 ---
 title: "MiniMax Music3"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models, serving]
 sources: ["PR #6640", vllm_omni/model_executor/models/minimax_music3/, vllm_omni/deploy/minimax_music3.yaml, vllm_omni/deploy/minimax_music3_2gpu.yaml, vllm_omni/entrypoints/openai/tts_adapters/minimax_music3.py, vllm_omni/model_executor/stage_input_processors/minimax_music3.py, vllm_omni/transformers_utils/configs/minimax_music3.py]
@@ -50,4 +50,4 @@ confidence: high
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| composite checkpoint、stage subdir、snapshot revision/root | [rules](rules.md) |
+| composite checkpoint、stage subdir、snapshot revision/root | [rules](rules.md)   新增核对：MM3-1b。 |

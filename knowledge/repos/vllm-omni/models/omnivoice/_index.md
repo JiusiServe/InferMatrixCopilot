@@ -1,7 +1,7 @@
 ---
 title: "OmniVoice（离散扩散 TTS,AR/diffusion 双注册）"
 created: 2026-07-21
-updated: 2026-09-05
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #6317", vllm_omni/model_executor/models/omnivoice/, vllm_omni/model_executor/models/omnivoice/omnivoice_generator.py, vllm_omni/model_executor/models/omnivoice/fused_qkv_rope.py, vllm_omni/diffusion/models/omnivoice/, vllm_omni/deploy/omnivoice.yaml]

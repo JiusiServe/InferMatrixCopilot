@@ -1,10 +1,10 @@
 ---
 title: "平台后端合同"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102", "PR #6563", "PR #6054", vllm_omni/platforms/npu/platform.py, tests/platforms/npu/test_diffusion_platform.py, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6674", vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_generation_model_runner.py, vllm_omni/platforms/npu/worker/npu_model_runner.py]
+sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102", "PR #6563", "PR #6054", vllm_omni/platforms/npu/platform.py, tests/platforms/npu/test_diffusion_platform.py, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6674", vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_generation_model_runner.py, vllm_omni/platforms/npu/worker/npu_model_runner.py, "PR #7301", "PR #7393"]
 confidence: high
 ---
 
@@ -114,3 +114,17 @@ confidence: high
   state；只在 start 处 gate、却无条件同步/导出，或将 gate 本身当作 NPU 性能结果。
 - 验收：AR/generation 都覆盖 enabled+timed、disabled+timed、enabled+not-timed 及 per-output disable，
   断言 start/sync/export 一致。PR #6674 没有这些专项测试，属于后续验收要求。^[PR #6674]
+
+## EXEC-10f — XPU W8A16 FP8 linear 必须 flatten-then-reshape 恢复 N-D 输出
+
+- 触发：修改 `vllm_omni/platforms/xpu/patch.py`、`XPUOmniPlatform` 初始化补丁，或 XPU 上 diffusion `--quantization fp8` 的 ScaledMM 路径。
+- 强制：对 `XPUW8A16FP8LinearKernel.apply_weights` 在平台 init 幂等 patch：先按 `(*x.shape[:-1], out_features)` 记录输出形，把 activation reshape 为 2-D 再调用原实现，最后 `.view` 回 N-D。与其他 ScaledMM/W8A8 合同一致；kernel 不可用时 skip。
+- 禁止：把 3-D diffusion activation 直接交给 fake 恒返回 2-D 的 `fp8_gemm_w8a16`；把该 patch 宣称为 LLM 2-D 路径修复或上游永久替代（upstream 修好后应变 no-op）。
+- 验收：XPU 上 FLUX/Qwen-Image 等 FP8 diffusion 能完成 dummy warmup 与生成；2-D LLM 路径不受影响。^[PR #7301]
+
+## EXEC-10f2 — AR runner 在 async PP 下必须配对 sampled-token broadcast 的 send
+
+- 触发：修改 `GPUARModelRunner.sample_tokens`、async scheduling + `pipeline_parallel_size > 1`，或继承/覆盖上游 `_pp_receive_prev_sampled_token_ids_to_input_batch` / `_pp_broadcast_prev_sampled_token_ids`。
+- 强制：非最终 PP rank 在 connector-only 分支 posted 的 async broadcast receive，必须由最终 rank 在 `_update_states_after_model_execute` 之后立刻执行匹配 send。守卫与上游一致：`use_async_scheduling` 且 `not broadcast_pp_output` 且 `pp.world_size > 1` 且 `pp.is_last_rank`。
+- 禁止：只继承 receive 而不补 send；在 `broadcast_pp_output=True`（external_launcher 已广播 logits/输出）时重复发送 sampled ids；把死锁归因于必须关闭 Thinker `async_scheduling` 而不修复配对集体通信。
+- 验收：ledger 或真实多进程 PP group 证明非最终 rank 的 receive 仅因最终 rank 的 Omni send 完成；PP1 与 `broadcast_pp_output` 路径不变。缺 send 时不得把“设 `async_scheduling: false`”当作长期合同。^[PR #7393]

@@ -1,10 +1,10 @@
 ---
 title: "CosyVoice3 规则"
 created: 2026-09-04
-updated: 2026-09-05
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, models]
-sources: ["PR #5673", "PR #6955", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/cfm.py, vllm_omni/model_executor/models/cosyvoice3/flow_estimator_trt.py, tests/model_executor/models/cosyvoice3/test_cosyvoice3_components.py, benchmarks/tts/benchmark_cosyvoice3_trt_streams.py]
+sources: ["PR #5673", "PR #6955", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/cfm.py, vllm_omni/model_executor/models/cosyvoice3/flow_estimator_trt.py, tests/model_executor/models/cosyvoice3/test_cosyvoice3_components.py, benchmarks/tts/benchmark_cosyvoice3_trt_streams.py, "PR #6896", "PR #7521"]
 confidence: high
 ---
 
@@ -50,3 +50,17 @@ confidence: high
   证明 replace 失败保留旧 plan、cleanup 失败保留 replace error、partial write 清理 owned tmp、
   collision 保留 foreign tmp，以及两条同步 publisher 使用不同 source path 且仅留下完整 final plan。
   ^[PR #6955]
+
+## COSYVOICE3-2a — deploy 必须在 name 推断失败时显式绑定 `pipeline: cosyvoice3`
+
+- 触发：修改 `vllm_omni/deploy/cosyvoice3.yaml`、CosyVoice3 的 `StageConfigFactory` / deploy 解析，或依赖 HF cache `models--…/snapshots/<hash>` 且 root `config.json` 无识别元数据的启动路径。
+- 强制：shipping deploy 必须声明 `pipeline: cosyvoice3`（或等价显式 pipeline key），使 hash-named snapshot 在 `try_infer_model_type` / name-fallback 失败时仍解析为已注册的两 LLM stage（talker + code2wav），而不是 default diffusion stage。
+- 禁止：仅依赖 basename/hash 推断；让空 `config.json` snapshot 落入 Diffusers `model_index.json` 查找并在启动时报 `Diffusers pipeline index not found`。
+- 验收：以空 `config.json` 的 `snapshots/<40-hex>` 布局回归 `create_from_model` 与 legacy stage 路径，断言 `pipeline_config.model_type == "cosyvoice3"`、两 stage 均为 LLM（非 DIFFUSION）且 model 路径保留。^[PR #6896]
+
+## COSYVOICE3-1c — 流式 HiFT 必须在有界 mel 窗上增量计算并携带相位
+
+- 触发：修改 CosyVoice3 `_stream_hift_from_feat`、`CausalHiFTGenerator`、`SineGen`/`SineGen2` 的 `phase_acc`，或 streaming chunk 的 noise/F0 cache。
+- 强制：每个 chunk 只在有界 mel 窗上计算（末 64 帧再加上 F0 感受野历史），不得对累积全谱重跑。谐波相位用共享的边界 `phase_acc` 带入下一窗。noise 必须是固定、按位置索引的 buffer，不能用随 chunk 变化的 `torch.randn_like`。F0 predictor 的左因果卷积要吃 window 左侧的真实历史，不能零填充；这段 margin 属于 `cache_state`，在进入 SineGen/decode 前切掉，且短于感受野的 chunk 不得饿死下一次调用。finalize 除 `conv_pre_look_right` 外还要释放 predictor 自己扣下的 `trim`，否则流末约 3 个 mel 帧丢失。
+- 禁止：用 PCM16 逐字节相等当正确性门槛（亚 LSB 的再结合误差会翻边界样本）；只测未触发 voiced 的随机权重；把 `scipy`/`s3tokenizer` 放回 dev extra——它们是 base install 的硬依赖，scipy 下限保持 `>=1.11.0`。
+- 验收：相对全量重算，float64 应逐位一致；float32 用 `assert_close(atol=1e-6, rtol=1e-5)`。同时覆盖 SineGen（22050 Hz）与 SineGen2（24000 Hz）、强制 voiced，以及均匀 chunk 和单 mel 帧的小块。^[PR #7521]

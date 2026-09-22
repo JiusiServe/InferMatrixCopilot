@@ -1,10 +1,10 @@
 ---
 title: "MammothModa2 规则"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, models, model-executor, diffusion]
-sources: ["PR #6694", vllm_omni/model_extras/mammothmodal2_preview.py, vllm_omni/model_executor/models/mammoth_moda2/mammoth_moda2.py, vllm_omni/model_executor/stage_input_processors/mammoth_moda2.py, vllm_omni/diffusion/models/mammoth_moda2/pipeline_mammothmoda2_dit.py, tests/model_extras/test_model_extras.py, tests/e2e/offline_inference/test_mammoth_moda2_expansion.py]
+sources: ["PR #6694", vllm_omni/model_extras/mammothmodal2_preview.py, vllm_omni/model_executor/models/mammoth_moda2/mammoth_moda2.py, vllm_omni/model_executor/stage_input_processors/mammoth_moda2.py, vllm_omni/diffusion/models/mammoth_moda2/pipeline_mammothmoda2_dit.py, tests/model_extras/test_model_extras.py, tests/e2e/offline_inference/test_mammoth_moda2_expansion.py, "PR #7102"]
 confidence: high
 ---
 
@@ -50,3 +50,10 @@ confidence: high
   empty visual condition、extra-body 参数透传和 AR-only text control。PR 作者报告的 54 个 CPU tests
   与单次 L20X Preview T2I PNG smoke 只证明该提交环境的路径可运行；golden-image E2E 仍因既有 issue
   skip，不能据此声称质量、吞吐、Dev T2I 或跨硬件能力。^[PR #6694]
+
+## MAMMO-1c — AR→DiT `full_hidden_states` 必须保持源 FP16/BF16 直至 DiT 消费
+
+- 触发：修改 `ar2dit`、`serialize_additional_information` / EngineCore payload，或 DiT `_split_ar_conditions` 的条件行选取与最终 `.to(device, dtype)`。
+- 强制：跨 stage 传输保持 AR 源 dtype（FP16/BF16）的 contiguous `full_hidden_states`；EngineCore/OmniSerializer 以 raw bytes 保留 bfloat16，不得为“过 numpy 边界”无条件 `.float()` 扩成 FP32。DiT 在选完 text/image 条件行之后，才在既有最终转换点落到 model device/dtype。
+- 禁止：在 bridge 或 condition split 处提前 host-side float32 加倍 staging 与 H2D；把精度优化扩成 request-end streaming / Layer-2 lifecycle 设计；或假定旧 FP32 wire 注释仍有效。
+- 验收：FP16/BF16 经 serialize/deserialize 往返 dtype 与数值不变；condition split 输出保持 transfer dtype 直至最终 cast；connector 级 BF16 round-trip 覆盖。^[PR #7102]

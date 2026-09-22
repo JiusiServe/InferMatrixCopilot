@@ -1,10 +1,10 @@
 ---
 title: "Diffusion attention 规则"
 created: 2026-09-02
-updated: 2026-09-10
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5543", "PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6037", "PR #6518", "PR #6563", "PR #6724", "PR #6909", docs/design/feature/skip_softmax.md, docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/trtllm.md, docs/user_guide/diffusion/attention_backends/fastvideo_vsa.md, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/diffusion_kv/paged_attention_adapter.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/cuda/platform.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_fastvideo_vsa.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/diffusion_kv/test_paged_attention_adapter.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py", "PR #5717", "PR #6871"]
+sources: ["PR #5543", "PR #5866", "PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", "PR #6037", "PR #6518", "PR #6563", "PR #6724", "PR #6909", docs/design/feature/skip_softmax.md, docs/user_guide/diffusion/attention_backends.md, docs/user_guide/diffusion/attention_backends/trtllm.md, docs/user_guide/diffusion/attention_backends/fastvideo_vsa.md, docs/user_guide/diffusion/attention_backends/rainfusion.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/fastvideo_vsa.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/diffusion_kv/paged_attention_adapter.py, vllm_omni/diffusion/models/minimax_h3/denoise_loop.py, vllm_omni/diffusion/models/minimax_h3/packed_sequence.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/cuda/platform.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_fastvideo_vsa.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_attention_config.py, tests/diffusion/attention/test_piecewise_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/diffusion_kv/test_paged_attention_adapter.py, tests/diffusion/models/minimax_h3/test_minimax_h3_packing.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py", "PR #6070", "vllm_omni/diffusion/attention/backends/cudnn_attn.py", "PR #5614", "PR #5194", "vllm_omni/diffusion/models/hidream_o1_image/hidream_o1_image_transformer.py", "vllm_omni/diffusion/models/hidream_o1_image/pipeline_hidream_o1_image.py", "PR #6181", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image.py", "vllm_omni/diffusion/models/longcat_image/pipeline_longcat_image_edit.py", "PR #5717", "PR #6871", "PR #7185", "PR #7324", "PR #7047", "PR #5691"]
 confidence: high
 ---
 
@@ -217,3 +217,37 @@ confidence: high
 - 强制：仅当 `seq_lengths` 存在真实 padding（至少一档短于 `max(seq_lengths)`）时才物化 `(batch, max_len)` bool mask；单样本或全员等长 batch 必须返回 `None`，让 backend 直接走 dense path。all-true CUDA mask 会触发 `torch.any(~mask)` 的 device→host sync，不能当作“无害 no-op”。
 - 禁止：无条件 `new_zeros` + 填 True；把 all-true device mask 交给 FlashAttention 只为“形状完整”；把省略 mask 说成改变了可变长 batch 的有效 token 集合。
 - 验收：等长与单样本断言 helper/`forward` 得到 `None`；可变长断言 mask shape 与 True/False 边界；不得用一次端到端加速数字代替 sync 合同。^[PR #6871]
+
+## DIFF-1ai3 — 显式 Hub FlashAttention 必须在选择时解析构建并失败可见
+
+- 触发：修改 `FLASH_ATTN_HUB` / `FLASH_ATTN_3_HUB` 选择、`flash_attn_hub._load_hub_module` / `_get_hub_module`、`kernels` pin，或依赖 Hub FA 的 accuracy/serving 路径。
+- 强制：显式 Hub backend 在 platform 返回 path 前必须走与执行相同的 loader：对 `kernels-community/flash-attn2` 或 `flash-attn3` 依次尝试 `get_kernel(..., version=1)` 再 `version=2`；任一命中即缓存。variant miss 或加载失败必须 `RuntimeError`，说明无兼容 torch/CUDA build，并提示 `kernels>=0.16.1`（含 stable-ABI 匹配）或改选其他 backend。`requirements` 与 LTX/NATTEN remediation 文案中的 `kernels` / `transformers` floor 必须与该 loader 所需 companion pin 同步（当前为 `kernels==0.16.1` 与 `transformers>=5.13.0,<5.15`）。
+- 禁止：显式 Hub 选择在 miss 后静默落到 native/SDPA；preflight 只试 `version=1` 或再试无 version 的第三态；把 accuracy 探针在 Hub 不可用时双方改跑 SDPA 仍当作 FA3-vs-FA3 门禁；把 import/`has_flash_attn` 成功误当成 Hub build 已解析。
+- 验收：CPU 覆盖 v1 miss→v2 hit 的版本序列、双 Hub backend 的 variant miss 均 raise、显式选择无 silent fallback；真实 torch/CUDA 环境再证明 stable-ABI 或 exact-tag build 可加载。不得用 SDPA 噪声 SSIM 解释 Hub miss。^[PR #7185]
+
+## DIFF-1aj2 — NPU dense FlashAttention 在 `causal=True` 时必须物化因果掩码
+
+- 触发：修改 `FlashAttentionImpl.forward_fa_npu`、NPU MindIE-SD / `npu_fusion_attention` dense path，或 `self.causal` 语义。
+- 强制：`causal=True` 且无显式 mask 时，必须走 bottom-right 对齐的压缩/物化因果 mask（`Sq!=Skv` 时按 `key_pos <= query_pos + (Skv-Sq)`），不能把 `attn_mask=None` 交给非因果 dense op。显式 keep-mask 须与因果条件组合后 contiguous 下发；`causal=False` 保持原无 mask 行为。
+- 禁止：依赖 MindIE-SD 隐式因果参数；让因果请求静默变成双向 attention；只靠“推理未崩”证明因果语义。
+- 验收：CPU/mock 覆盖 `Sq==Skv`、更短/更长 query、显式 mask 组合与非因果 `None`；目标 NPU 用已知因果模型对照。^[PR #7324]
+
+## DIFF-1ai4 — Ring Attention 的 `valid_kv_length` 是全局前缀，且不得与 causal 并用
+
+- 触发：修改 Ring Flash/PyTorch attention、`AttentionMetadata.valid_kv_length`、`ring_kv_block_valid_length`，或向 ring forward 传入前缀裁剪语义。
+- 强制：`valid_kv_length` 表示整条全局 K/V 序列的 contiguous 有效前缀（`0 < L <= block_size * world_size`）；每个 circulated block 按全局 `block_rank` 映射为本地 `max(0, min(block_size, L - block_start))`，再 `k/v[:, :local]`。`None` 表示整块有效。本地长度为 0 时跳过该 step 的 FA/LSE 更新，不得对空 K/V 调 kernel。
+- 强制：`causal=True` 且 `valid_kv_length is not None` 必须立即 `ValueError`。裁短 circulated K/V 会缩短 `seqlen_k` 而 query 仍是 padded 长度，FlashAttention causal 对角线 bottom-right 对齐会静默错位；caller 须先 unpad 再进 ring，或使用 `causal=False`。
+- 禁止：把 `valid_kv_length` 当成“本 rank 本地长度”直接切片；在 causal ring 路径上静默 trim；用 bool/非 int 冒充长度；或把 trim 当成慢路径而不是 unsupported 组合。
+- 验收：覆盖全局前缀落在首块/中块/末块、越界/非 int fail-closed、零长 block 跳过，以及 causal+valid_kv_length 拒绝；local dense backend 仍可直接消费同一全局前缀语义。^[PR #7047]
+
+## DIFF-1d2 — packed varlen 边界是原子合同，所有并行路径都必须保留
+
+- 触发：producer 或 backend 读写 `cu_seqlens_q`、`cu_seqlens_k`、`max_seqlen_q`、
+  `max_seqlen_k`，或把带 padding 的 packed 输入送入 Ring/Ulysses/hybrid attention。
+- 强制：四个字段一起生产、转发和消费；每条启用的 parallel/backend 路径必须把相同
+  sequence boundary 交给 kernel，无法表达时在执行前明确拒绝。
+- 禁止：只提供部分 metadata；在 Ring 路径丢弃边界；假设已分配但 backend 忽略的
+  `attn_mask` 能阻止真实 token 关注 padding 或下一条 packed sequence。
+- 验收：缺任一字段立即失败；两个不同长度样本的 packed 结果分别与独立运行对齐且无
+  cross-sequence attention；local 与每个声明支持的 Ring/Ulysses 组合做数值 parity，
+  不支持的组合有 fail-fast 测试。 ^[PR #5691]

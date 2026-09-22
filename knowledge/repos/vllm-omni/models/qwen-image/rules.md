@@ -1,10 +1,10 @@
 ---
 title: "Qwen-Image 实现规则"
 created: 2026-09-02
-updated: 2026-09-08
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5887", tests/e2e/accuracy/test_qwen_image.py, "PR #6110", "vllm_omni/diffusion/models/qwen_image/qwen_image_transformer.py", "PR #5586"]
+sources: ["PR #5887", tests/e2e/accuracy/test_qwen_image.py, "PR #6110", "vllm_omni/diffusion/models/qwen_image/qwen_image_transformer.py", "PR #5586", "PR #7513"]
 confidence: high
 ---
 
@@ -44,3 +44,10 @@ confidence: high
 - 强制：有 negative prompt 且启用 true CFG 时，正负两侧都使用各自 embed width；无 negative prompt 时 negative length 必须是 `None`，不能伪造一个来自正分支 mask 的长度。
 - 禁止：在 Edit path 回退到 `mask.sum()`，即使别的 Qwen-Image pipeline 仍正确；或仅以 helper test 证明 RoPE table 正确而不锁定实际 `forward()` call site。
 - 验收：以 padded embeds 但较短 valid-token mask 的 request 覆盖 Edit `forward()`，精确断言传入 `diffuse()` 的长度等于 padded width；同时覆盖有/无 negative prompt 的 CFG 分支，防止单侧回归。^[PR #5586]
+
+## QWENIMG-1d — CUDA eager RoPE 必须走激活 dtype 的 RotaryEmbedding
+
+- 触发：修改 Qwen-Image `_qwen_image_qk_norm_rope` 的 CUDA/eager 分支、`RotaryEmbedding` 调用，或把 RoPE 放进 regional compile。
+- 强制：所有设备的 eager 路径在 RMSNorm 之后使用 `RotaryEmbedding`；`cos`/`sin` 由 `torch.real`/`torch.imag` 得到并 cast 到激活 dtype（BF16）。这是 pipeline 对 Diffusers 的路径。fused kernel 可以继续对照 FP32 complex multiply，但那不是 eager CUDA 路径。
+- 禁止：在 eager CUDA 上恢复 `_apply_qwen_image_rotary_emb` 或其它 FP32 复数乘。该 helper 能在单元测试里对齐 Diffusers `apply_rotary_emb_qwen(..., use_real=False)`，但 Inductor 不能 codegen 复数算子，且会把 Omni↔Diffusers pipeline PSNR 打到门限以下。不要用 `--enforce-eager` 掩盖，也不要为迁就 helper 去降 pipeline gate。
+- 验收：`use_fused=False` 对所有设备对照 `RotaryEmbedding`；fused 测试单独对照 FP32 complex reference。eager CUDA 与 fused reference 不得再共用同一个 expected。^[PR #7513]

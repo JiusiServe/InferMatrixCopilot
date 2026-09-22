@@ -1,10 +1,10 @@
 ---
 title: "Cosmos3 规则"
 created: 2026-07-20
-updated: 2026-09-05
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/diffusion/models/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107", "PR #5614", "PR #6325", "PR #6913", "PR #6920"]
+sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/diffusion/models/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107", "PR #5614", "PR #6325", "PR #6913", "PR #6920", "PR #7427"]
 confidence: high
 ---
 
@@ -159,3 +159,10 @@ confidence: high
   4×GB300 multi-chunk transfer（Ulysses 4、VAE patch parallelism 4、tiling，1280×720、101 frames、24 FPS、
   53-frame chunks、5 conditional frames、2 steps），确认完成且 metadata/video 为 101 frames at 24 FPS。
   该证据不构成广泛 parity、质量或性能声明。^[PR #6920]
+
+## COSMOS-1c — Distilled Cosmos3 必须在加载前拒绝 CFG parallel
+
+- 触发：scheduler `_class_name` 判定 distilled Cosmos3、修改 `cfg_parallel_size` admission，或 distilled 路径的 `guidance_scale` / `negative_prompt` 语义。
+- 强制：在加载 tokenizer/组件之前，若 distilled 且 `cfg_parallel_size > 1`，立即 `ValueError`，并指引 `--cfg-parallel-size 1` 与 `--ulysses-degree` 做多卡。distilled 路径强制 `guidance_scale=1.0`；调用方显式请求其他值时 `warning_once`，并说明 `negative_prompt` 不影响生成。
+- 禁止：静默忽略 CFGP 导致无收益的重复实例；先加载权重再报并行非法；把 distilled 的 guidance override 写成仍消费 negative branch。
+- 验收：参数化覆盖 distilled/non-distilled × `cfg_parallel_size`/`ulysses_degree`，断言 distilled+CFGP>1 在组件加载前失败；guidance resolver 覆盖显式非 1.0 的 warning 与强制 1.0。^[PR #7427]
