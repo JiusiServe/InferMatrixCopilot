@@ -1,5 +1,5 @@
 ---
-title: "rules-review-validation 验证规则"
+title: "CI 选择器与质量验证规则"
 created: 2026-09-22
 updated: 2026-09-22
 type: rule
@@ -7,7 +7,7 @@ tags: [vllm-omni, ci]
 sources: ["PR #5695", "PR #5696", "PR #5436"]
 ---
 
-# rules-review-validation 验证规则
+# CI 选择器与质量验证规则
 
 ## VOMNI-CI-1a — 选择器改动必须闭合到实际收集的测试集合
 

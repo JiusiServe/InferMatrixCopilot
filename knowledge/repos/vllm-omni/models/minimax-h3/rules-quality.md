@@ -1,5 +1,5 @@
 ---
-title: "rules-quality 验证规则"
+title: "MiniMax H3 质量验证规则"
 created: 2026-09-22
 updated: 2026-09-22
 type: rule
@@ -7,7 +7,7 @@ tags: [vllm-omni, models, diffusion]
 sources: ["PR #5709"]
 ---
 
-# rules-quality 验证规则
+# MiniMax H3 质量验证规则
 
 ## MMH3-4a2 — official-reference oracle 必须 immutable 且覆盖两个 modality
 
