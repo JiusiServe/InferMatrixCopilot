@@ -1,7 +1,7 @@
 ---
 title: "MammothModa2（Preview/Dev 的 AR→DiT 与 AR-only 拓扑）"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #6694", vllm_omni/model_executor/models/mammoth_moda2/, vllm_omni/diffusion/models/mammoth_moda2/, vllm_omni/model_executor/stage_input_processors/mammoth_moda2.py, vllm_omni/deploy/mammoth_moda2.yaml, vllm_omni/deploy/mammoth_moda2_ar.yaml]

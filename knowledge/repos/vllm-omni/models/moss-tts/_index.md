@@ -1,7 +1,7 @@
 ---
 title: "MOSS-TTS 家族（Delay/Realtime/Local/Nano,一族八 deploy）"
 created: 2026-07-21
-updated: 2026-09-05
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models]
 sources: ["PR #5635", "PR #6664", "PR #6543", "PR #4982", vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts/reference_encoder.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer_v2.py, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/]

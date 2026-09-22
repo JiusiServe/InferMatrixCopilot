@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni Configuration"
 created: 2026-07-16
-updated: 2026-09-21
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, components, config]
 sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
@@ -35,13 +35,13 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解配置从 deploy、CLI、默认 factory 到 structured/legacy config 的稳定边界 | [配置构造架构](architecture.md) |
-| 根据 PR 描述直达 strict schema、pipeline sampling constraints、deploy/topology、composable strategy、global engine args 的 owner 校验、CLI-only 负向 alias 或显存配置的规则组与第一批源码、环境变量 inventory | [配置开发门禁与代码地图](rules.md) |
+| 根据 PR 描述直达 strict schema、pipeline sampling constraints、deploy/topology、composable strategy、global engine args 的 owner 校验、CLI-only 负向 alias 或显存配置的规则组与第一批源码、环境变量 inventory | [配置开发门禁与代码地图](rules.md)   新增核对：CONF-3e。 |
 
 | 对象存储 URI、HF cache snapshot 或空 `config.json` 的模型名称回退与 pipeline 路由 | [模型引用路由规则](rules-model-reference-routing.md) |
 | stage full-payload transport capability、topology-owned projection 或 deploy/CLI override rejection | [stage transport capability](rules-stage-transport.md) |
 | diffusion Ulysses SymmMem transport flag 的 deploy/CLI/default-stage projection | [diffusion parallel transport rules](rules-diffusion-parallel-transport.md) |
 | diffusion attention shorthand、structured config 与 global override 的优先级和最终规范表示 | [diffusion attention precedence](rules-diffusion-attention-precedence.md) |
-| legacy stage engine args 的 copy boundary、connector/default injection、repeated build mutation、global engine args 的 owner 校验或 CLI-only 负向 alias | [legacy engine-args isolation](rules-legacy-engine-args.md) |
+| legacy stage engine args 的 copy boundary、connector/default injection、repeated build mutation、global engine args 的 owner 校验或 CLI-only 负向 alias | [legacy engine-args isolation](rules-legacy-engine-args.md)   新增核对：VOMNI-CFG-1u。 |
 | 审计配置来源和多层加工 | [config audit](config-audit-plain-language.md) |
 | 设计配置归一化与 parity 验证 | [config normalization parity](config-normalization-parity.md) |
 | 查询 `Omni()` 初始化参数 | [Omni init args](omni-init-args.md) |

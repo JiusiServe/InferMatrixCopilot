@@ -1,7 +1,7 @@
 ---
 title: "MiniMax H3"
 created: 2026-08-05
-updated: 2026-09-05
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5720", "PR #5723", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5824", "PR #5829", "PR #5837", "PR #5840", "PR #5850", "PR #5857", "PR #5881", "PR #5885", "PR #5891", "PR #5896", "PR #5914", "PR #5946", "PR #5972", "PR #5978", "PR #5991", "PR #5863", "PR #6476", "PR #6555", "PR #6556", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, .buildkite/cuda/test-merge.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/design/architecture_overview.md, docs/models/supported_models.md, docs/user_guide/quantization/fp8.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/model_executor/models/minimax_h3/, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/platforms/npu/platform.py, vllm_omni/platforms/rocm/platform.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, tests/e2e/online_serving/minimax_h3/, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, vllm_omni/entrypoints/openai/video_api_utils.py, "PR #6213", "PR #6742", "PR #6666", "PR #6824", "PR #6714"]
@@ -154,10 +154,10 @@ execution，不能代替 retained accuracy gate、Buildkite H100 result 或其�
 ## 审查入口
 
 H3 input matrix/media ingress，以及 text-encoder completeness、online FP8 的 component namespace、loader 顺序、joint quality 与 offload 边界见
-[media rules](rules-media.md)（含 `text_conditioning/v1` schema）与 [MiniMax H3 rules](rules.md#direct-代码快速入口)
+[media rules](rules-media.md)（含 `text_conditioning/v1` schema）与 [MiniMax H3 rules](rules.md#direct-代码快速入口) 新增核对：MMH3-2r、MMH3-2s、MMH3-2t。
 ；checkpoint transform、quantized loader 与
 text-encoder fused-source 完整性正文见 [loading rules](rules-loading.md)；DLO、consumer/H100/ROCm
-部署和硬件证据正文见 [deployment rules](rules-deployment.md)；conditioned VAE 确定性、modular task 选择与 request 级 Cache-DiT/TeaCache/sigma schedule/Turbo LoRA 生命周期、alias metadata 同构与 Turbo artifact 合同见 [缓存与任务生命周期规则](rules-cache-task.md)。
+部署和硬件证据正文见 [deployment rules](rules-deployment.md)；conditioned VAE 确定性、modular task 选择与 request 级 Cache-DiT/TeaCache/sigma schedule/Turbo LoRA 生命周期、alias metadata 同构与 Turbo artifact 合同见 [缓存与任务生命周期规则](rules-cache-task.md)。 新增核对：MMH3-2r2。
 
 
 H3 VAE decoder 的 model-local eager dispatch、remote-code eligibility、exactness guards、selective
@@ -165,3 +165,5 @@ FP16 materialization、keyframe encode 的 cuDNN/TF32 pin 与 compile/spatial-pa
 。
 Qwen3-VL text encoder 的 cuDNN SDPA process-global-state restore、encoder-rank/VAE boundary 和
 CPU-only validation limit 见 [encoder state rules](rules-encoder-state.md)。
+
+- [rules-quality](rules-quality.md) 新增核对：MMH3-4a2。

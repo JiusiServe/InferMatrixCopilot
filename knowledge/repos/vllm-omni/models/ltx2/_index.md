@@ -1,7 +1,7 @@
 ---
 title: "LTX-2 家族（含 LTX-2.3/2.5）"
 created: 2026-07-16
-updated: 2026-09-05
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models, ltx2]
 sources: ["PR #6847", vllm_omni/diffusion/models/ltx2/, vllm_omni/diffusion/registry.py, recipes/LTX/LTX-2.md, recipes/LTX/LTX-2.5.md]
@@ -38,4 +38,4 @@ sources: ["PR #6847", vllm_omni/diffusion/models/ltx2/, vllm_omni/diffusion/regi
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 模型结构、serving 方式与已有性能/精度证据 | [architecture](architecture.md) |
-| LTX-2.5 DiffVAE 选择、artifact、并行或最小几何约束 | [LTX-2.5 decoder rules](rules.md) |
+| LTX-2.5 DiffVAE 选择、artifact、并行或最小几何约束 | [LTX-2.5 decoder rules](rules.md)   新增核对：LTX-4、LTX25-3。 |

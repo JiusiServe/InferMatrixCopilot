@@ -1,7 +1,7 @@
 ---
 title: "Qwen-Image（base/Edit/Edit-Plus/Layered/DMD2 五变体）"
 created: 2026-07-21
-updated: 2026-09-02
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #2783", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/models/qwen_image/, vllm_omni/diffusion/registry.py, tests/diffusion/lora/test_loader.py]
@@ -50,4 +50,4 @@ sources: ["PR #2783", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/mo
   [Diffusion 组件](../../components/diffusion/_index.md)。
 - 审查 accuracy、regional compile、FlashAttention 确定性或 Edit `txt_seq_lens` 时见
 
-  [Qwen-Image 规则](rules.md)。
+  [Qwen-Image 规则](rules.md)。 新增核对：QWENIMG-1d。

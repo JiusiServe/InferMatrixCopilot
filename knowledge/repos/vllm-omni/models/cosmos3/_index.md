@@ -1,7 +1,7 @@
 ---
 title: "Cosmos3"
 created: 2026-07-20
-updated: 2026-09-05
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6920", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py]

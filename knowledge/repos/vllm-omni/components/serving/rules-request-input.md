@@ -1,10 +1,10 @@
 ---
 title: "请求输入合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3805", "PR #5374", "PR #5885", "PR #6598", vllm_omni/data_entry_keys.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/engine/orchestrator.py, vllm_omni/inputs/, tests/engine/test_async_omni_engine_input.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_invalid_audio_speech.py, tests/entrypoints/openai_api/test_serving_speech.py, "PR #5181", "PR #6182"]
+sources: ["PR #3805", "PR #5374", "PR #5885", "PR #6598", vllm_omni/data_entry_keys.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/omni_base.py, vllm_omni/engine/orchestrator.py, vllm_omni/inputs/, tests/engine/test_async_omni_engine_input.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_invalid_audio_speech.py, tests/entrypoints/openai_api/test_serving_speech.py, "PR #5181", "PR #6182", "PR #6963", "PR #4741", "PR #4167", "PR #7447", "PR #7459", "PR #7463", "PR #5691"]
 confidence: high
 ---
 
@@ -139,3 +139,58 @@ engine 生命周期见 [engine 生命周期规则](rules-engine-lifecycle.md)；
 - 强制：transform 只操作 Stage-0 copy；原始 prompt 保留给 downstream，并在 transform 前后保持同一 global request ID。只把已处理的 metadata 合并回原始视图，先移除 transform-owned stale keys。临时目录只通过内部 `REQUEST_ARTIFACT_DIRS_KEY` 交给 request state；preprocess、companion build、enqueue 前失败立即回收，admit 后由 orchestrator 在所有 terminal cleanup 路径回收，且内部 key 不得进入 stage payload。
 - 禁止：把 transformed prompt 当作 downstream 原始媒体、让旧 prepared descriptor 跨请求复用、在 ownership 已交给 orchestrator 后由 frontend 提前删除，或让异常路径泄漏转码目录。
 - 验收：覆盖 transform replacement/copy、request ID 与 metadata merge、成功 terminal/abort、preprocess/companion/enqueue 异常以及无 artifact control；断言 downstream 看见原始媒体+允许的 processed meta，目录恰好由当前 owner 回收，内部 key 未传输。^[PR #5885]
+
+## SERV-4r — video 参考图必须在 RGB 转换前执行像素上限并映射解码器炸弹
+
+- 触发：修改 `/v1/videos` 的 `image_reference` / `input_reference(s)`、MiniMax H3 multipart 图片上传，或 `video_api_utils._decode_image_bytes` / `_validate_image_pixel_limit`。
+- 强制：`Image.open` 后、`convert("RGB")` 前按 header 尺寸检查 `width * height`；当 `VLLM_MAX_IMAGE_PIXELS > 0` 且超出时拒绝。`=0` 禁用检查，恰等于上限放行。Pillow `DecompressionBombError` 必须映射为专用像素上限 client error（HTTP 400），不得落入泛化 “not a valid image” 后再当 video 重试。H3 multipart 与共享 decode helper 共用同一合同。
+- 禁止：先全量 decode/convert 再检像素；把 decoder bomb 误判为可 video-fallback 的无效图；用 500 或静默接受放大资源占用。
+- 验收：覆盖超限在 convert 前失败、disabled/inclusive 边界、bomb→专用 400、以及 H3 multipart 字段拒绝。^[PR #6963]
+
+## SERV-4r2 — `/v1/audio/generate` 必须在协议层拒绝空 prompt 与越界采样字段
+
+- 触发：修改 `OpenAICreateAudioGenerateRequest`、audio generate invalid-param 可靠性测试，或该入口的 prompt/采样字段限界。
+- 强制：`input` 以 field validator 拒绝空串与纯空白；`audio_length` 要求 `gt=0`；`guidance_scale` 限界 `ge=0, le=1000`；`num_inference_steps` 限界 `ge=1, le=1000`。非法值必须在 entrypoint Pydantic 校验失败，不得拖到 engine 超时或 HTTP 200。
+- 禁止：依赖 engine-level 检查代替协议拒绝；把越界 steps/guidance 留在 `_INT64_MAX` 一类无业务上界；用 skip mark 掩盖未接线的 invalid-param case。
+- 验收：空/空白 input、负/零 `audio_length`、负/过大 guidance、零/负/过大 steps 均返回字段定位的 4xx，并与 invalid-param 测试期望一致。^[PR #4741]
+
+## SERV-4r3 — `vllm serve --omni` 必须在校验期要求显式 model
+
+- 触发：修改 `OmniServeCommand.validate`、`--omni` 启动路径、`model`/`model_tag`/`explicit_keys`，或部署 YAML 与 checkpoint 来源关系。
+- 强制：`--omni` 下 model 只能来自非空 positional `model_tag`，或出现在 `explicit_keys` 中的非空 `--model`。`--deploy-config` / stage YAML 只携带 per-stage engine args，checkpoint 始终由 `args.model` 注入，不得凭 YAML 存在判定“已提供 model”。空/空白 model 视为未提供，并在 validate 期以明确 `ValueError` 失败。
+- 禁止：依赖 vLLM `ModelConfig` 默认 `Qwen/Qwen3-0.6B` 进入 Omni/diffusion 路由；把默认模型缺失伪装成深层 diffusion-registry `Model class … not found`；让仅 `--deploy-config` 或空 `--model "$MODEL"` 绕过守卫。
+- 验收：`["serve","--omni"]`、仅 deploy-config、空/空白 positional/`--model` 均 raise “requires an explicit model”；positional、`--model`、以及显式 model+deploy-config 不得触发该守卫。^[PR #4167]
+
+## SERV-4r4 — 图片 generations 与 edits 的 `output_compression` 必须同一闭环
+
+- 触发：修改 `/v1/images/generations` 或 edits 的协议字段、handler 到 `encode_image_base64_with_compression` 的转发。
+- 强制：`ImageGenerationRequest` 声明 `output_compression`（0–100，默认 100）并原样传入 encoder；PNG 映射为 compress_level（100→0，1→9），jpeg/webp 映射为 quality。缺省字节合同与 edits 一致。
+- 禁止：只在 edits/`Form` 接受该字段而 generations 静默丢弃；用 HTTP 200 或非默认 format 冒充 compression 已生效。
+- 验收：L1 断言 PNG 100/1 与等价 compress_level 同大小且 1 更小，JPEG 高低 compression 体积方向正确；handler 用非默认值断言 encoder kwargs。^[PR #7447]
+
+## SERV-4s — 内存中的 image `file` 响应必须按固定块异步产出
+
+- 触发：修改 `ImageGenerationResponse.stream_response`、`response_format=file`，或把已物化 PNG/ZIP 交给 Starlette `StreamingResponse`。
+- 强制：对已在内存中的单图/ZIP 使用异步迭代器按固定块（如 64 KiB）`memoryview` 切片产出；保留既有 headers/`Content-Length` 与完整 body 字节。
+- 禁止：把 `io.BytesIO` 直接交给 `StreamingResponse`（按行/`0x0A` 切分且同步 iterable 会触发 per-fragment threadpool）；为“流式”再无意义地按换行拆二进制。
+- 验收：构造含多处 `0x0A` 的 PNG/ZIP，断言 ASGI body 哈希不变、非空 frame 数约为 `ceil(size/chunk)` 而非 newline 次数。^[PR #7459]
+
+## SERV-4r5 — pipeline 要求的 `stop_token_ids` 必须与 caller/deploy 停止集相加去重
+
+- 触发：修改 `merge_sampling_constraints`、`OmniBase._apply_sampling_constraints`、pipeline `sampling_constraints.stop_token_ids`，或 deploy `default_sampling_params.stop_token_ids`。
+- 强制：标量约束仍由 pipeline 覆盖同名 caller/deploy 字段；惟 `stop_token_ids` 例外——先取 caller/deploy 列表，再追加 pipeline 要求的 ID，并以 `dict.fromkeys` 保序去重。legacy `yaml_extras` 与 structured config、以及 request 期重建 `SamplingParams`，必须共用同一 merge helper，且不 mutate 调用方对象。
+- 禁止：用整表 `constraints` 覆盖把 caller 自定义 stop 抹掉；只在 YAML merge 或只在 request apply 一侧实现相加；或让模型必需 terminator（如 MiniCPM-o TTS 边界）依赖重复 YAML/环境变量拷贝。
+- 验收：覆盖 deploy 已有 stop + pipeline 新增 stop 的并集、caller mapping/dataclass/msgspec 重建、immutability，以及至少一条真实 pipeline 的 Stage-0 必需 stop 进入全部 shipping deploy。^[PR #7463]
+
+## SERV-4i2 — multipart artifact 在 I/O 前验合同、在所有终态释放
+
+- 触发：公开请求接收一个或多个 `UploadFile`、URL media，或把输入物化后交给后台任务。
+- 强制：在 read/download/persist/decode 前完成 dispatcher、模型 capability 与
+  source/task matrix 校验；流式执行 count、per-file 和 aggregate byte 上限，超限返回
+  413；只清理由当前请求创建的 artifact，并保留输入顺序直到最终 consumer 完成。
+- 禁止：把无限 multipart 先复制到临时目录再校验；让非法组合进入 engine 后变成 sync
+  500 或 async failed job；只在成功路径或 audio 分支 cleanup。
+- 验收：sync/async 都覆盖冲突 400、超限中途 413、setup 失败、generation 失败、timeout、
+  cancellation、missing-job/early-return 与成功；无效请求未调用持久化或 engine，所有已创建
+  路径在每个终态消失，用户提供的非 owned 路径不被删除。MiniMax H3 的当前矩阵见
+  [MiniMax H3 media 规则](../../models/minimax-h3/rules-media.md)。 ^[PR #5691]

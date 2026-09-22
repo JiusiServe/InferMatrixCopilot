@@ -1,7 +1,7 @@
 ---
 title: "LingBot World"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: [vllm_omni/diffusion/models/lingbot_world/]
@@ -50,4 +50,4 @@ confidence: high
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 该模型的硬门禁规则 | 尚未沉淀；由逐 commit 同步命中该 owner 时在 `rules.md` 建立 |
+| 该模型的硬门禁规则 | [session lifecycle 规则](rules.md)：`LBW-1a`、`LBW-1b`  新增核对：LBW-1a、LBW-1b。 |

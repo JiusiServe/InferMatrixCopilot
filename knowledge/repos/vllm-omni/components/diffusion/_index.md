@@ -1,7 +1,7 @@
 ---
 title: "Diffusion"
 created: 2026-07-10
-updated: 2026-09-21
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/attention/backends/flashinfer_attn.py]
@@ -37,20 +37,20 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 | CustomOp XPU platform dispatch、PyTorch-native fallback、CUDA contract 与非同义 override 边界 | [CustomOp dispatch rules](rules-custom-op-dispatch.md) |
 | runtime temporary 与 loader-scoped parameter dtype、shared RMSNorm accuracy | [tensor dtype rules](rules-tensor-dtype.md) |
 | Wan VAE height/width spatial reshard、empty tail、attention extent | [Wan spatial-shard rules](rules-wan-spatial-shard.md) |
-| multi-DiT、dotted `_dit_modules`、loader-to-offloader handoff 与跨 Cache-DiT/compile/LoRA/offload lifecycle、batch sampling-key 的 provided 标志 | [component lifecycle rules](rules-component-lifecycle.md) |
+| multi-DiT、dotted `_dit_modules`、loader-to-offloader handoff 与跨 Cache-DiT/compile/LoRA/offload lifecycle、batch sampling-key 的 provided 标志 | [component lifecycle rules](rules-component-lifecycle.md)   新增核对：DIFF-2ag。 |
 
-| PEFT 与 distilled LoRA、startup fusion、delta/key/alpha、Qwen/Wan transformer mapping、PEFT suspend/resume | [LoRA rules](rules-lora.md) |
+| PEFT 与 distilled LoRA、startup fusion、delta/key/alpha、Qwen/Wan transformer mapping、PEFT suspend/resume | [LoRA rules](rules-lora.md)   新增核对：DIFF-2ag2、DIFF-2ag3。 |
 
-| Blackwell FA4、显式/auto CUDA backend、per-role mask/SP pad；local FlashAttention deterministic opt-in、role-aware masked cross-attention、NPU packed mask-free/laser fallback、TRTLLM packed-padding 与 config propagation、equal-rank SP auto-pad fast path、等长 batch padding mask 省略 | [attention rules](rules-attention.md) |
+| Blackwell FA4、显式/auto CUDA backend、per-role mask/SP pad；local FlashAttention deterministic opt-in、role-aware masked cross-attention、NPU packed mask-free/laser fallback、TRTLLM packed-padding 与 config propagation、equal-rank SP auto-pad fast path、等长 batch padding mask 省略 | [attention rules](rules-attention.md)   新增核对：DIFF-1ai3、DIFF-1aj2、DIFF-1ai4、DIFF-1d2。 |
 
 | SP auto-padding、`mask_sp_padding`、dense/varlen 与 advanced UAA 边界 | [SP padding rules](rules-sp-padding.md) |
-| video/audio mux、DLO DP wave、RPC reply ownership/result release、result queue、async pump、SHM ownership、async-output wait 与 shutdown、mid-stream interaction handler | [output/runtime rules](rules-output-lifecycle.md) |
+| video/audio mux、DLO DP wave、RPC reply ownership/result release、result queue、async pump、SHM ownership、async-output wait 与 shutdown、mid-stream interaction handler | [output/runtime rules](rules-output-lifecycle.md)   新增核对：DIFF-1ai、DIFF-1aj、DIFF-1ai2。 |
 
 | distilled continuous sigma schedule、boundary/step 语义与 modality shift | [sigma schedule rules](sigma-schedules.md) |
 | HunyuanImage3 Distil CFG、MeanFlow special-token / scheduler-r 合同 | [HunyuanImage3 HY3-8d](../../models/hunyuan-image3/rules.md) |
 | diffusion step 与 request/continuous batching；DIFF-1af BAGEL image step wave、packed state、geometry/CFG admission 与 fallback cleanup | [step and batching](step-and-batching.md) |
 | request-wave admission coalescing、stable window、deadline 与 finite config | [admission wait rules](rules-admission-wait.md) |
-| paged KV/cache 预算、native/backend/platform 闭环、GQA/Ring/Ulysses layout、FlashInfer plan、能力 metadata、cache_backend None 规范化 | [paged cache 与系统运行时规则](rules-system-runtime.md) |
+| paged KV/cache 预算、native/backend/platform 闭环、GQA/Ring/Ulysses layout、FlashInfer plan、能力 metadata、cache_backend None 规范化 | [paged cache 与系统运行时规则](rules-system-runtime.md)   新增核对：DIFF-4ad。 |
 
 | Scheduler-managed diffusion KV 的请求控制面、Hunyuan layout 与未实现边界 | [paged KV control plane](paged-kv-control-plane.md) |
 | Cache-DiT、TeaCache 和 prefix cache | [cache acceleration](cache-acceleration.md) |
@@ -59,4 +59,4 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 | checkpoint remap、HSDP/FSDP、final-layout HWR、registered HWR mmap DLO transport、component quantization、在线量化加载与 TorchAO `.bin` index fallback | [checkpoint 与加载合同](rules-checkpoint-loading.md) |
 
 
-- [Diffusion 平台 kernel 与设备合同](rules-platform-kernels.md)：`DIFF-1t`, `DIFF-1u`, `DIFF-1v`, `DIFF-1w`。
+- [Diffusion 平台 kernel 与设备合同](rules-platform-kernels.md) 新增核对：DIFF-1ai5。

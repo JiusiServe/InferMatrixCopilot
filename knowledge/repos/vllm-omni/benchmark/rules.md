@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni Benchmark 规则"
 created: 2026-09-05
-updated: 2026-09-21
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, benchmark]
-sources: ["PR #7648", "PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py, "PR #7130", "PR #7259"]
+sources: ["PR #7648", "PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py, "PR #7130", "PR #7259", "PR #7624", "PR #7504"]
 confidence: high
 ---
 
@@ -72,3 +72,17 @@ confidence: high
   determinism 或 eager 数值等价证明。
 - 验收：产物能追溯各 arm 的真实 source/config/environment，报告候选差值和控制漂移；
   稳态统计可从相同筛选重算，正确性另由对应 parity 测试支持。 ^[PR #7648]
+
+## BENCH-1f2 — benchmark 结果必须始终导出样本计数，包括零
+
+- 触发：修改 `benchmarks/patch` 的 result dict，或 DFX 对 `num_tpot_samples` 等计数字段的读取。
+- 强制：`calculate_metrics()` 已经产出的 `num_ttft_samples`、`num_tpot_samples`、`num_itl_samples`、`num_audio_ttfp_samples`、`num_audio_rtf_samples` 必须写入结果，包括 0，且与 percentile 是否被选中无关。JSON 往返后字段仍在。缺键是 `None`，不是 0；DFX 在 finite `mean_tpot_ms` 下仍会因 `isinstance(None, int)` 失败。
+- 禁止：只在选中 TPOT/ITL percentile 时写出计数；用均值存在代替样本数字段；改 DFX 判定去迁就缺字段的 JSON。
+- 验收：真实聚合加 JSON round-trip，分别覆盖 measured/unmeasured TPOT 与选中/未选中 percentile；省略 `num_tpot_samples` 而保留 finite mean 的结果必须被 baseline 拒绝。^[PR #7624]
+
+## BENCH-1g — duplex/eval 媒体解码必须用捆绑 PyAV，不得依赖 host ffmpeg
+
+- 触发：修改 `omni-duplex-eval` 或同类 benchmark 的视频时长、帧抽取、音频 PCM 解码，或重新引入 `ffmpeg`/`ffprobe` subprocess。
+- 强制：媒体路径经 PyAV（`av`）打开/seek/decode/resample；结果不得依赖主机安装的 ffmpeg 版本。帧抽取语义对齐“首个 PTS ≥ 目标时刻”；非 WAV 音频经 `AudioResampler` 并在循环后 `resample(None)` flush 尾部样本。
+- 禁止：`subprocess` 调用 host `ffmpeg`/`ffprobe` 作为默认路径；把“本机 ffmpeg 能跑”当作可复现证据；在已知会挂起的旧 HEVC decoder 上无超时地阻塞 generate 阶段。
+- 验收：覆盖 duration/JPEG/PCM 合同与失败 raise；至少用曾触发 host ffmpeg 4.4.2 挂起的样本证明不再无限忙等。^[PR #7504]

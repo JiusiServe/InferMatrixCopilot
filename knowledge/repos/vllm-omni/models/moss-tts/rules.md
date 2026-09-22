@@ -1,10 +1,10 @@
 ---
 title: "MOSS-TTS 规则"
 created: 2026-09-02
-updated: 2026-09-05
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #5635", "PR #6908", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, "PR #6241", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local_depth.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py", "PR #6543", "PR #4982", vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/moss_tts/reference_encoder.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, tests/entrypoints/openai_api/test_tts_adapter.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/model_executor/models/moss_tts/test_reference_encoder.py]
+sources: ["PR #5635", "PR #6908", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, "PR #6241", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local_depth.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py", "PR #6543", "PR #4982", vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/moss_tts/reference_encoder.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, tests/entrypoints/openai_api/test_tts_adapter.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/model_executor/models/moss_tts/test_reference_encoder.py, "PR #7885"]
 confidence: high
 ---
 
@@ -111,3 +111,10 @@ confidence: high
   两个 cache salt 保持 slot order，并证明二者进入同一 batch window。PR 的 A/B 只支持此
   preprocessing 的 content-addressed/single-flight/micro-batch/TTSD pair-encode 性能结论；同路径
   warm-hit parity 属于既有 speaker cache，不能归因于本规则。^[PR #4982]
+
+## MOSSTTS-4b — reference waveform LRU 必须缓存自有 float32 数组并释放完成批次
+
+- 触发：修改 `serving_speech` 的 `_ref_audio_resolve_cache`、`_finalize_fetched_ref_audio`、MOSS reference-encoder 数组/list 解析器，或 idle drainer 对完成 batch 的持有。
+- 强制：共享 resolve LRU 只存 owned、C-contiguous `float32` 数组，容量按 `nbytes` 记账；finalize 必须 `copy=True` 切断对更大 decode 缓冲的 view。list 接口仅在调用边界临时 `.tolist()`，不得保留第二份 list 缓存。server-side encoder 走 array resolver；tensor 构造仍 copy，隔离缓存数组。drainer 在 `finally` 中丢弃已完成的 `first`/`jobs` 引用后再等待下一项。
+- 禁止：把 `list[float]` 作为长期缓存存储；让完成 batch 在等下一队列项时继续持有；调用方原地 mutate 缓存数组。
+- 验收：覆盖数组所有权、list 兼容路径、cache hit 不保留第二 list，以及 completed-batch 生命周期释放。^[PR #7885]

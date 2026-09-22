@@ -1,10 +1,10 @@
 ---
 title: "MiniMax H3 媒体输入与精度规则"
 created: 2026-09-02
-updated: 2026-09-08
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/engine/stage_runtime.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_async_omni_engine_stage_init.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #6064", "PR #6813", "PR #6824", "PR #6720"]
+sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/engine/stage_runtime.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_async_omni_engine_stage_init.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #6064", "PR #6813", "PR #6824", "PR #6720", "PR #7281", "PR #5691", "PR #5699"]
 confidence: high
 ---
 
@@ -140,3 +140,41 @@ confidence: high
 - 强制：公开 schema id 为 `minimax_h3.text_conditioning/v1`。语义载荷：`hidden_states` 为 contiguous strided `[tokens, 5120]` `bfloat16`；`token_tags` 为 contiguous strided `[tokens]` `int64` 且仅含 `0/1`。Stage-wire `OmniPayload` 路径必须经 `from_omni_payload`：从 `hidden_states.output` 取 tensor，从 `meta.token_role_ids` 取 `[tokens, 1]` `int64` contiguous strided，再 squeeze 成语义 tags；任一类型/shape/dtype/layout 不符都在 adapter 边界失败。
 - 禁止：放宽为任意 float/int dtype 或非 contiguous layout；绕过 schema validator 直接塞 positional tensors；把该 H3-only hardening 写成已落地的通用 `StagePortSpec`。
 - 验收：CPU 测试覆盖合法 payload、错误 dtype/layout/shape、缺失字段，以及 encoder ownership（仅 owning replica 持有，disaggregated diffusion stage 缺席）；不改动既有 serializer 与 launch path 时仍须保持负向门禁。^[PR #6720]
+
+## MMH3-2r — Ref2VA 视频声轨与独立音频必须分账 15 秒预算
+
+- 触发：修改 MiniMax-H3 Ref2VA 的 reference audio 时长校验、embedded/standalone audio
+  latent 拼接，或 `_prepare_request_inputs` 在编码后的 `audio_lengths` 检查。
+- 强制：视频声轨与 standalone audio 各自遵守本模态的 2–15 秒（及既有编码后单段长度）
+  预算，并在 encoding 前分别校验。拼接 conditioning rows 之后，不得再对
+  `sum(audio_lengths)` 施加单一 15 秒/600 latent-frame 总预算。各 `ref_blocks` 种类
+  （如 `video_audio` 与 `audio`）与长度列表必须原样保留。
+- 禁止：把“各 ≤15 s”误读成“embedded+standalone 合计 ≤15 s”；在合法分账输入上因合计
+  超限拒绝请求。
+- 验收：约 2–3 s 视频声轨 + 满 15 s standalone WAV 的 Ref2VA 请求必须被接受，并断言两段
+  audio condition 都进入上下文；继续覆盖单段越界与 audio-only 拒绝。^[PR #7281]
+
+## MMH3-2s — timing、latent shape 和 condition pinning 属于 checkpoint 数值合同
+
+- 触发：修改 duration/frame 归一化、video/audio latent、spatial padding、VAE dtype、seeded
+  preprocessing 或 denoise condition row。
+- 强制：对原始 H3 checkpoint 的 24 FPS、frame 数 `17n+5`、video latent 长度 `5n+2`、audio latent 40 Hz、
+  spatial dimension 对齐 32 约定，video VAE 的 FP32 边界和每步重新 pin condition rows 必须由
+  明确 checkpoint 证据才能改变。
+- 禁止：用通用 `round()` 或相邻模型的公式替代 H3 对齐；为省显存静默降低 VAE 精度；
+  只在初始 step 固定 conditioning 后允许后续 denoise 漂移。
+- 验收：边界 duration/size 的 exact-vector 与 round-trip 测试覆盖 dtype 和 latent shape；固定
+  seed 逐步断言 condition rows，最终 MP4 同时验证 24 FPS 和 32 kHz audio metadata。
+  ^[PR #5691]
+
+## MMH3-2t — 所有 decoder backend 保持同一 audio VAE 输入合同
+
+- 触发：修改 H3 standalone/reference-video audio loading 或可选 media backend。
+- 强制：torchaudio、soundfile 和 ffmpeg-demux fallback 都返回
+  `(float32 waveform[C,T], native_sample_rate)`；soundfile 的 `[T,C]` 必须转置并 contiguous，
+  32 kHz resampling 只由 audio VAE owner 执行；standalone 与 video soundtrack 共用该入口。
+- 禁止：新增 direct `torchaudio.load` 旁路；泄漏 channels-last、在 loader 静默 resample，
+  或把 TorchCodec/CUDA 可用性当作 NPU/CPU 前提。
+- 验收：强制覆盖 torchaudio 成功、torchaudio 失败后 soundfile 成功、soundfile 失败后
+  ffmpeg 成功及 subprocess 失败；mono/stereo 的 dtype、channel order、rate 与临时目录
+  cleanup 都断言，direct audio 和 video-demux 路径结果一致。 ^[PR #5699]

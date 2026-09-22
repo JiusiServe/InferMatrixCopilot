@@ -1,10 +1,10 @@
 ---
 title: "Diffusion LoRA 规则"
 created: 2026-09-02
-updated: 2026-09-09
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/lora/layers/base_linear.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/diffusion/lora/test_lora_manager.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/lora.py, "PR #6268", benchmarks/kernels/benchmark_diffusion_lora_expand.py, tests/diffusion/lora/test_base_linear.py, "PR #7195"]
+sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/lora/layers/base_linear.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/diffusion/lora/test_lora_manager.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/lora.py, "PR #6268", benchmarks/kernels/benchmark_diffusion_lora_expand.py, tests/diffusion/lora/test_base_linear.py, "PR #7195", "PR #7349", "PR #5907"]
 confidence: high
 ---
 
@@ -137,3 +137,24 @@ confidence: high
 - 强制：deactivate 只 `suspend_lora()`（保存并清零 `_diffusion_lora_active_slices`），保留 stacked A/B；同一 adapter_id 与同一 rounded scale 再激活时 `resume_lora()` 复原掩码，禁止整层 `reset_lora`+rebind。`_suspended_adapter_id` 在真实 reset、rank 驱动的 `create_lora_weights`、新 bind 开始、以及 remove 被 suspend 的 adapter 时必须清空；不同 adapter 或不同 scale 仍走完整 rebind。
 - 禁止：把 suspend 当成可丢弃的 upload；resume 覆盖后注册的新 layer 的 inactive mask；在失败 bind 后仍保留旧 suspended 身份。
 - 验收：CPU 覆盖 suspend/resume、同 id+scale 不 re-upload、不同 scale/id 走 rebind、remove suspended 触发 reset、中途失败后 inactive，以及 add_adapter 后新 layer 不被错误 resume。^[PR #7195]
+
+## DIFF-2ag2 — 绑定零层的 diffusion LoRA adapter 必须失败而不是静默 no-op
+
+- 触发：修改 `DiffusionLoRAManager._bind_adapter_weights` / `_activate_adapter`、
+  binding 记账，或 pipeline 可选 `_validate_diffusion_lora_binding` hook。
+- 强制：无论 pipeline 是否提供 binding validator，绑定过程都必须无条件记录实际命中的
+  module 名；`bound_lora_names` 为空时立即 `ValueError`，错误信息同时列出 expected
+  target modules 与 adapter 收到的 module 名。既有 activate 的 try/except 必须 reset 全部
+  wrapper 并保持 inactive，不得留下“已激活但等于 base”的状态。
+- 禁止：仅在有 validator 时才记账；让零绑定激活返回成功或只打 DEBUG；把 diffusers 命名
+  checkpoint 对不上 engine layout 的情况当成有效 adapter。
+- 验收：CPU 回归用故意不匹配的 `target_modules` 断言激活抛错、消息含收到的模块名、
+  active id 仍为 `None` 且无 `set_lora`；有 validator 的模型路径仍覆盖完整 binding
+  completeness。^[PR #7349]
+
+## DIFF-2ag3 — LoRA/ModelOpt 默认只保留通用组件名与通用 fused 映射
+
+- 触发：修改 `DiffusionLoRAManager` 默认扫描组件、ModelOpt `DEFAULT_PACKED_MODULES_MAPPING`，或 pipeline/model 的 `_lora_components` / `_dit_modules` / `packed_modules_mapping`。
+- 强制：manager 默认只扫描通用 diffusers 名 `transformer`、`transformer_2`、`unet`；模型专用属性（如 Bagel 的 `bagel`）必须由 pipeline 经 `_dit_modules` 或 `_lora_components` 声明。ModelOpt 默认只保留通用 attention 融合（`to_qkv`、`add_kv_proj`）；模型专用融合（如 Z-Image `w13`）必须写在模型 `packed_modules_mapping` 并由 adapter 合并。
+- 禁止：把 `dit`/`bagel`/`w13` 等模型私有名硬编码进共享默认；在未扫描真实 denoiser 时宣称 adapter 已生效（零层绑定、输出等同 base）。
+- 验收：Bagel/同类测试 pipeline 必须显式 `_lora_components` 才能发现层；Z-Image 映射在模型侧声明后仍可解析；去掉声明后不得靠框架默认偷跑。^[PR #5907]

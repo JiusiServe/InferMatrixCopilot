@@ -1,7 +1,7 @@
 ---
 title: "Qwen-Omni 家族（Qwen2.5-Omni / Qwen3-Omni / Qwen3-TTS）"
 created: 2026-07-16
-updated: 2026-09-05
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models, qwen-omni]
 sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", "PR #4322", "PR #6886", "PR #7019", vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/registry.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/engine/stage_init_utils.py, vllm_omni/quantization/component_config.py, tests/engine/test_stage_engine_args.py, docs/design/qwen3_omni_tts_performance_optimization.md]
@@ -61,4 +61,4 @@ sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", "PR #4322"
 |---|---|
 | stage 拓扑、代际差异与官方性能优化结论 | [architecture](architecture.md) |
 | Qwen3-Omni Thinker MRoPE、CUDA compilation custom-op boundary、AWQ/compressed-tensors 名称映射、MoE backend default/override、固定种子音频回归、audio-encoder head/TP divisibility、Qwen2.5 code2wav soft-fail/旧 speech helper，或 code predictor 的 RoPE theta/rope_parameters 读取
- | [Qwen-Omni rules](rules.md) |
+ | [Qwen-Omni rules](rules.md)   新增核对：QOMNI-1h、QOMNI-1h2、QOMNI-1h3、QOMNI-1h4。 |

@@ -1,10 +1,10 @@
 ---
 title: "Omni 输出类型合同"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5146", "PR #6152", vllm_omni/outputs/]
+sources: ["PR #5146", "PR #6152", vllm_omni/outputs/, "PR #7448", "PR #7608"]
 confidence: high
 ---
 
@@ -27,3 +27,17 @@ confidence: high
 - 验收：用真实 `RequestOutput` 与 `OmniRequestOutput` 做属性 parity 测试；覆盖新字段默认值为 `None`，以及 `ec_transfer_params`、`num_cache_creation_tokens` 等非空值经 `from_stage_output()` 后保持不变。 ^[PR #6152]
 
 相关执行流见 [model-executor architecture](architecture.md)；跨 stage 合同见 [bridge/batch 规则](rules-bridge-batch.md)。
+
+## EXEC-7c — 已知 sample-rate 键必须按最新快照合并，不得当生成内容累积
+
+- 触发：修改 `MultimodalPayload.merged_with`、DELTA/CUMULATIVE 音频输出合并，或 `sr`/`sample_rate`/`audio_sample_rate` 的分区与巩固。
+- 强制：这三个键是 metadata 快照，不是 waveform 内容。合并前先从 incoming 捕获快照，再写入 metadata 分区一次；缺失键保留既有值。tensor/scalar 表示切换时必须从 tensors 分区移除同名残留。audio/latent 内容继续按既有策略累积。
+- 禁止：把 sample-rate 追加成 list 直到 consolidate；让非终态 DELTA 输出保留增长的标量历史；在两边分区同时留下陈旧值。
+- 验收：覆盖整数/标量/向量/metadata tensor、表示切换、缺键保留、self-merge、长 DELTA/CUMULATIVE 流与 abort 刷新；断言快照始终非 list 且 `payload[key] is payload.to_dict()[key]`。^[PR #7448]
+
+## EXEC-7d — 张量累积策略必须按 (modality, key) 解析，codec 键不得套用波形默认
+
+- 触发：修改 `get_accumulation_strategy`、`MultimodalPayload.consolidate_tensors`、`_consolidate_tensor_list`，或 AUDIO 模态下非波形键（如 `codes.audio`/`codes.ref`）的巩固。
+- 强制：`consolidate_tensors` 接收 modality，并对每个 key 调用 `get_accumulation_strategy(modality, key)`。流水线通过 `register_key_accumulation_strategy` 注册覆盖；Qwen3-TTS 必须将 `codes.audio`→`CONCAT_DIM0`、`codes.ref`→`REPLACE`。`CONCAT_LAST` 失败仍可 flatten 后拼接；其他策略失败必须带 key 名 raise，不得静默 keep-last。
+- 禁止：整 payload 共用单一 modality 默认；把 codec-frame 矩阵当 `CONCAT_LAST` 波形；把非 `audio` 键的 concat 失败吞成 keep-last。
+- 验收：合成张量证明 `codes.audio` 沿 dim0 拼满、`codes.ref` 只保留一份，以及错误策略 raise；真实波形键仍走 `CONCAT_LAST`。^[PR #7608]

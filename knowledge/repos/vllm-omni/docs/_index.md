@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 文档"
 created: 2026-07-10
-updated: 2026-09-15
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, docs]
 sources: ["PR #5715", "PR #6029", "PR #6858", .claude/skills/readme.md, README.md, docs/configuration/README.md, docs/contributing/README.md, docs/getting_started/installation/README.md, docs/getting_started/installation/gpu/cuda.inc.md, docs/getting_started/installation/npu/npu.inc.md]
@@ -38,3 +38,5 @@ sources: ["PR #5715", "PR #6029", "PR #6858", .claude/skills/readme.md, README.m
   commit tag，文档称只保留 newest 14。各 tag/image 的 live availability 仍须发布时核验。^[PR #6858]
 - README 将 full-duplex realtime serving 标为 experimental；公开说明、验收和支持承诺
   不能把它写成 stable feature。
+
+- [rules](rules.md) 新增核对：DOCS-1a。

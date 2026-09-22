@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 负责人"
 created: 2026-08-11
-updated: 2026-09-02
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, models]
 sources: [.github/CODEOWNERS, docs/community/governance.md, docs/design/module/, "PR #5958"]
@@ -31,3 +31,5 @@ sources: [.github/CODEOWNERS, docs/community/governance.md, docs/design/module/,
 | 确认 committer 身份与公开职责 | 上游 `docs/community/governance.md` | governance roster 是角色权威来源，不等同于每条 path 的 required reviewer |
 | 维护 module frontmatter → CODEOWNERS 投影 | [ownership projection rules](rules.md) | edit-first source map、additive overlay、last-match 与双向 parity |
 | 关键模型与 Owner 清单 | [model_owner](model_owner.md) | 模型 → 负责人对照表 |
+
+- [module_owner](module_owner.md)：维护者分工与发布政策。

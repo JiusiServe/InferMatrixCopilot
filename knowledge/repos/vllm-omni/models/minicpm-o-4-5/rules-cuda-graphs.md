@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5 Code2Wav CUDA graph 规则"
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: [vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, "PR #5869", "PR #6082", "PR #6587"]
+sources: [vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, "PR #5869", "PR #6082", "PR #6587", "PR #7416"]
 confidence: high
 ---
 
@@ -26,3 +26,11 @@ confidence: high
 - 强制：warmup 或 capture 发生异常时，在该 wrapper 的剩余生命周期内保持禁用并退休其自有 generation；不能在可能脏的 capture stream/allocator 状态继续捕获。无法由 key 重建的 dtype 仅标记该 shape eager，不得禁用其他可捕获 shape；capture admission 不得依赖 device free-memory。维护固定字段的 calls/hits/captures/flushes/eager 累计 telemetry。
 - 禁止：捕获整个 `_estimator_step` 或手写替代 graph target；使用无界 shape cache、逐图 eviction、跨 owner 的 process-wide cleanup，或在 nested capture 中重放；捕获失败后伪装成功；把 CFM graph 的配置、性能或 parity 结论外推到 HiFT、encoder、TRT 或其他模型。
 - 验收：CUDA 测试覆盖 uncached/cached shape 的 graph/eager 数值 parity、`None` cache parity、lazy capture、整代 flush 后 HiFT replay parity、capture/warmup failure 后不再 capture、unsupported dtype shape-local eager 与 `max_graphs <= 0` eager；CPU/mock 覆盖 active capture/non-CUDA、free-memory 非 gating、telemetry 和 inert non-CUDA memory reporting，并确认 deploy 配置值实际到达 estimator。^[PR #6082] ^[PR #6587]
+
+## MCPMO-1k — CFM graph 的变长 chunk 必须先对齐帧桶，padding 不得进入 cache
+
+- 触发：修改 MiniCPM-o 4.5 Code2Wav 的 CFM decode chunk、`cfm_graph_bucket_frames`、reference-audio 长度，或 attention/CNN cache 边界。
+- 强制：捕获前把 mel 帧 pad 到 `bucket_frames` 的倍数，输出再裁回有效帧，使 chunk 长度落在同一 grid。每份开启 CFM graph 的 shipping profile 必须显式写 `cfm_graph_bucket_frames`（当前 16），不能靠代码默认。`bucket_frames <= 1`、graphs 已禁用、ragged valid-lengths，或 pad 会越过 decoder noise capacity 时不 pad。
+- 强制：padded 列必须被真实 `attn_mask` 排除；零 key 仍会计入 softmax 分母。成为下一 chunk 的 key 或左上下文之前，清零 attention cache 的 padded 列，以及各 block CNN cache 中来自 padding 的尾部。speaker 向量会铺满每一帧，清零必须作用在 clone 上。conditioning pad 复制最后一帧有效值。reference audio 先转 mono、抗混叠重采样到 24 kHz，再按 `ref_audio_max_seconds`（默认 6s）截断或补零，使各请求共享一个 L0；默认 prompt 走同一路径，`soundfile` 的 `(samples, channels)` 先转置。
+- 禁止：让首尾 chunk 或 `plan_token2wav_encode_slices` 的任意长度各自成为 graph key；只清零 `x`/`mu`/`cond` 而留下非零 speaker 列；把桶化 parity 外推到 HiFT、TRT 或其他模型。
+- 验收：覆盖 pad/trim、noise overflow 不 pad、attn_mask 与 cache 清零、reference 归一化后的单一 L0，以及四份 CFM-graph profile 都带上 `cfm_graph_bucket_frames`。^[PR #7416]

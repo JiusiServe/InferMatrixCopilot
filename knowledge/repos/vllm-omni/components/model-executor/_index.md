@@ -1,7 +1,7 @@
 ---
 title: "Model Executor"
 created: 2026-07-10
-updated: 2026-09-06
+updated: 2026-09-22
 type: index
 tags: [vllm-omni, components, model-executor]
 sources: []
@@ -39,7 +39,7 @@ sources: []
 | runtime info、跨 stage payload、batch 与 request RNG 合同 | [跨 stage bridge 与 batch 合同](rules-bridge-batch.md) |
 | loader 的 dtype/config 获取、fused shard 与多模块 checkpoint 载入 | [loader 合同](rules-loader-contract.md) |
 | shared image example envelope 与 model_extras 参数声明 | [image task envelope 合同](rules-image-task-envelope.md) |
-| Omni 输出类型与字段/复制合同 | [输出类型合同](rules-output-contract.md) |
+| Omni 输出类型与字段/复制合同 | [输出类型合同](rules-output-contract.md)   新增核对：EXEC-7c、EXEC-7d。 |
 | 采样循环不变量、热路径缓存、AR 音频侧路、preprocess phase/one-token prefill | [运行时热路径合同](rules-runtime-hot-paths.md) |
 
-| NPU runner、ROCm 分页注意力、NPU 模型补丁 | [平台后端合同](rules-platform-backends.md) |
+| NPU runner、ROCm 分页注意力、NPU 模型补丁 | [平台后端合同](rules-platform-backends.md)   新增核对：EXEC-10f、EXEC-10f2。 |

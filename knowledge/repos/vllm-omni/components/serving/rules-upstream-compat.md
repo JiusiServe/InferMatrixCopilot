@@ -1,10 +1,10 @@
 ---
 title: "Serving upstream 兼容规则"
 created: 2026-09-02
-updated: 2026-09-05
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #5976", "PR #5957", vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, tests/config/test_endpoint_policy.py, "PR #5036", "PR #6642", "PR #6773", "PR #6707", vllm_omni/config/endpoint_policy.py]
+sources: ["PR #5976", "PR #5957", vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, tests/config/test_endpoint_policy.py, "PR #5036", "PR #6642", "PR #6773", "PR #6707", vllm_omni/config/endpoint_policy.py, "PR #6051", "PR #7426", "PR #5647"]
 confidence: high
 ---
 
@@ -55,3 +55,40 @@ confidence: high
   `tests/config/test_endpoint_policy.py`；API-server 路径仍仅为其 `ImportError` fallback 的静态合同。
   PR 描述报告该 suite `4 passed`，批准 review 的边界是 static review、merge tree 与 CI，且明确未执行
   untrusted fork code；因此不能扩展为完整 vLLM 版本兼容或端到端声明。^[PR #6707, merged 2026-09-02]
+
+## SERV-7f — OpenPI `nd` 标记必须同时接受 vLLM-native 与 msgpack-numpy 的 `kind`
+
+- 触发：修改 `entrypoints/openpi/connection.py` 的 `_decode_vllm_numpy_marker` / `_unpack_numpy`，或 OpenPI/DreamZero 观测 payload 解码。
+- 强制：`kind` 仍为区分 array marker 与普通 mapping 的必填字段。plain ndarray 的 `kind` 接受 `""`（msgpack-numpy 包）或 dtype kind 字符（vLLM-native）；二者任一匹配即通过。`kind == "V"`（structured）必须在调用 `np.dtype(type)` 之前拒绝，因该方言的 `type` 是 descriptor list。outbound 仍发 openpi-client 标记。
+- 禁止：要求 `kind == dtype.kind` 而拒绝空 kind；对 structured marker 让 `np.dtype` 抛出不透明 `TypeError`；把 msgpack-numpy **标量**（可省略 `kind`）误当成必须解码的 ndarray marker。
+- 验收：分别覆盖 vLLM-native `kind`、手写 `kind=b""`、真实 `msgpack_numpy.packb` 观测 round-trip、structured `kind=V` 拒绝，以及无 `kind` 的用户 dict 原样保留。^[PR #6051]
+
+## SERV-7e — realtime/video-stream 音频事件必须使用 `response.output_audio.*`
+
+- 触发：修改 realtime WebSocket、video stream serving、示例客户端或协议文档中的音频 delta/done 事件名。
+- 强制：服务端发出的增量与终态音频事件类型必须是 `response.output_audio.delta` / `response.output_audio.done`（及配套 transcript 命名），与已迁移的 OpenAI realtime 合同一致；示例与测试断言同一集合。
+- 禁止：在任一生产发送路径残留 legacy `response.audio.delta` / `response.audio.done`；只改文档/示例而漏改 `realtime_connection` 或 `serving_video_stream`/`video_stream_base`。
+- 验收：duplex/realtime/video-stream 测试收集到的音频事件类型集合等于 `response.output_audio.*`，且不接受仅 legacy 名作为成功合同。^[PR #7426]
+
+## SERV-7g — 公开 serve 入口退役必须在所有 producer 上 fail closed
+
+- 触发：删除或改名 serve CLI option、wrapper/chart key 或公开配置文件入口。
+- 强制：parser、headless builder、脚本、chart、测试和公开 serving 文档在同一批迁移到
+  canonical replacement；已删除的外部 key 必须显式拒绝并给出迁移目标。当前 serve
+  部署 YAML 的唯一公开 flag 是 `--deploy-config`。
+- 禁止：删除是有意 breaking change 时又加静默 alias/fallback；wrapper 接受但忽略旧值；
+  留下仍会发出旧 flag 的可运行命令。
+- 验收：replacement 可解析且到达最终 consumer，旧 option parser 失败；standard/headless
+  发出同一 canonical 值，wrapper/chart 同时有正向与旧 key 拒绝测试，公开 serve 调用扫描
+  不再命中退役 flag。 ^[PR #5647]
+
+## SERV-7h — 兼容性按 ingress 分类，不能按同名 symbol 推断
+
+- 触发：公开 CLI 已移除，但 Python/direct API、offline example 或 resolver 仍保留同名字段。
+- 强制：分别列出 public CLI、wrapper/chart、offline example、Python/direct 和内部 resolver；
+  public 行为由 Serving owner 决定，仍保留的 loader/schema 语义交给
+  [Configuration rules](../configuration/rules.md) 并记录明确 follow-up 边界。
+- 禁止：因为仓库仍出现 `stage_configs_path` 就恢复公开 serve flag；也不能因为 public parser
+  已删除就宣称所有内部兼容路径已移除。
+- 验收：公开 rejection 与 canonical forwarding 测试通过；每个暂留内部/direct 路径有独立
+  compatibility test，直到后续迁移显式删除。 ^[PR #5647]
