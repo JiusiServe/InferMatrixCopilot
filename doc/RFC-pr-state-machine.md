@@ -360,33 +360,40 @@ recovery, orphan adoption after a crash). Nothing new is invented for writes.
    malformed answers and incomplete coverage cannot resolve it. The request
    and result shapes are defined in [the SDK contract below](#sdk-boundary).
 
-   An author can dispute a finding with a 👎 reaction on its bot comment
-   or a reply in its thread. A dispute removes that finding from the ready
-   gate without proving it fixed. Disputed findings stay in the ledger and
-   are counted on the ready page so the maintainer sees the disagreement.
-   Review evidence and dispute state are stored separately; withdrawing a
-   dispute restores blocking status unless a valid explicit fix remains.
+   An author can dispute a finding with a 👎 reaction on the bot's inline
+   review comment. When GitHub cannot place a blocker/major finding inline,
+   the bot provides one marker-deduplicated PR issue comment for that finding;
+   the author's 👎 there has the same meaning. A reply can clarify the
+   finding, but an ordinary reply is not unambiguous evidence of disagreement
+   and does not by itself clear the gate. A dispute removes that finding from
+   the ready gate without proving it fixed. Disputed findings stay in the
+   ledger and are counted on the ready page so the maintainer sees the
+   disagreement. Review evidence and dispute state are stored separately;
+   withdrawing a dispute restores blocking status unless a valid explicit
+   fix remains.
 
    **Disputes are an evidence source with their own deadline, not a
-   by-product of the next review.** Thread replies arrive through the
-   repo-wide comment feed the reconciler already reads every cycle.
-   Reactions have no feed, so every PR with ≥ 1 **unresolved** blocker/major
-   — open *or disputed*; only `fixed` ends a finding's life — carries a
+   by-product of the next review.** Reactions have no feed, so every PR
+   with ≥ 1 **unresolved** blocker/major — open *or disputed*; only `fixed`
+   ends a finding's life — carries a
    `DISPUTE_SCAN_INTERVAL` deadline (default 15 min), folded into the row's
    `next_deadline_at`. On that deadline the reconciler reads the reactions
-   on each unresolved finding's stored `comment_id` from the findings
-   ledger, whatever head that comment was posted on (a carried finding
-   keeps the comment id of its first publication until the re-review
-   posts a new one), one request per comment, counted against
-   `PR_STATE_REQUEST_BUDGET`; the existing daily feedback scan is too slow
-   for this and is left as is. Either source updates `open_findings` /
+   on each unresolved finding's stored `comment_id` and `comment_kind`
+   from the findings ledger, whatever head that comment was posted on (a
+   carried finding keeps its original reaction target unless a re-review
+   places a newer inline comment). A missing inline ID is recovered only
+   when review head, anchor and finding identity match; otherwise a bounded
+   issue-comment lookup precedes the fallback POST, and an incomplete lookup
+   cannot cause a duplicate. These requests count against the separate
+   `DISPUTE_SCAN_REQUEST_BUDGET`; the existing daily feedback scan is too slow
+   for this and is left as is. Reaction evidence updates `open_findings` /
    `disputed_findings` on the `pr_state` row locally, with no model call, so
    the projection can move to `ready_for_maintainer` in the same cycle once
    nothing blocking remains. Because disputed findings stay in the scan set,
    a 👎 removed later re-opens the finding on the next scan and the PR
    leaves ready — the page already sent is not retracted, and a later return
-   to ready advances `ready_entry_seq` and pages again. Reactions and
-   replies from anyone other than the PR author are ignored for this
+   to ready advances `ready_entry_seq` and pages again. Reactions from
+   anyone other than the PR author are ignored for this
    purpose.
 
 The quality-readiness verdict (`ready` / `concerns` / `needs_rework`) is
@@ -689,7 +696,7 @@ blocked, timed out, rerouted all land in a column).
 | --- | --- |
 | projection, reconciler, sweep, clocks, our labels, notices, dashboard | `omni-reviewbot` |
 | review verdict, published `findings`, explicit `finding_rechecks`, quality verdict and head binding | this repo, via the SDK (`build_review_result`, `build_quality_result`) |
-| `open_findings` / `disputed_findings` counts | the bot, because they combine SDK per-finding results with reaction and reply data only the bot reads |
+| `open_findings` / `disputed_findings` counts | the bot, because they combine SDK per-finding results with author-reaction data only the bot reads |
 
 ### SDK boundary
 
@@ -993,6 +1000,12 @@ cooldown; production deployment and feature activation remain pending.
   finding's original comment from an older head is found after a push
   because the scan follows the stored comment
   id.
+- A body-only blocker has a separate, author-reactable PR comment. A lost
+  inline-ID read recovers only the same finding on the same reviewed head;
+  a different finding at the same anchor cannot clear this blocker. A lost
+  fallback POST response is adopted without duplicate delivery, and an
+  incomplete marker search never posts again. Ordinary replies do not
+  silently count as disputes.
 - Contract tests in this repo: Direct and Strict carry typed finding IDs
   and source heads; rechecks carry the current head, an explicit outcome
   and evidence. Cover complete `fixed`, `still_affected`, `unverified`,
