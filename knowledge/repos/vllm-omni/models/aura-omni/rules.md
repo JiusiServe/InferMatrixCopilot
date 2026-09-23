@@ -44,7 +44,7 @@ AURA-1e 因 Omni 尚未接线 Native 同名旋钮，单独视为 medium 证据�
 | Stage1 投影不消费 TTS | AURA-1b | `duplex/plugin.py::{project_intermediate_output,decide_output}` |
 | 投影后仍 stash Stage1 metrics | AURA-1c | `engine/duplex/session/runner.py::{on_stage_output,_stash_stage_metrics}`；`tests/engine/duplex/test_session_runner.py::test_projected_stage1_metrics_reach_the_spoken_audio_event` |
 | barge-in fence／draining abort | AURA-1d | `runner.py` barge-in／`older_abort_ids`；`duplex/capabilities.py` |
-| 入史三 case／裁剪 default／断线清 store | AURA-1e | `duplex/history.py::{begin_user_turn,commit_turn,prune,render_prefix,drop_session_history}`；`tests/.../test_aura_omni_duplex_history.py` |
+| 入史三 case／裁剪 default／断线清 store | AURA-1e | `duplex/history.py::{begin_user_turn,commit_turn,prune,render_prefix}`；`duplex/history.py::drop_session_history`；`tests/.../test_aura_omni_duplex_history.py` |
 | silent stop id 家族 | AURA-1f | `duplex/plugin.py::AURA_SILENT_TOKEN_ID` |
 | history 单一写入者 | AURA-1g | `plugin.py::commit_model_context`；`aura_omni.py::asr2aura`（只 `begin_user_turn`） |
 | `prompt_mm` pad 与 video 对齐 | AURA-1h | `aura_omni.py::asr2aura`／`_aura_prompt`；`history.py::render_prefix`／`retained_videos` |
