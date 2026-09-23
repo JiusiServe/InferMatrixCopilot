@@ -1146,7 +1146,8 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
     tools = build_rebase_tools(
         defs, paths, _build_backends(ctx, manifest, repo_root, target))
     prompt = build_debug_prompt(module or slug, traceback_text,
-                                data.debug_prompt_template, slug)
+                                data.debug_prompt_template_live
+                                or data.debug_prompt_template, slug)
     agent_log = ctx.run_dir / "agents" / f"debug-{slug}.log"
     agent_log.parent.mkdir(parents=True, exist_ok=True)
     ctx.trace.record("debug_attempt", slug=slug, module=module,

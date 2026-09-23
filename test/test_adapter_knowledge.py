@@ -82,22 +82,35 @@ def test_debug_prompt_matches_parent_golden():
     assert ours == (GOLDENS / "debug_prompt.txt").read_text()
 
 
+def test_live_debug_prompt_carries_rebase_attribution(prompt_data):
+    live = build_debug_prompt(
+        "worker_runner", "TypeError: RopeState",
+        prompt_data.debug_prompt_template_live, "tests/worker_v2/test_state.py")
+    assert "TypeError: RopeState" in live
+    assert "failure signature" in live
+    assert "main's last build predates a" in live
+    assert "adjacent constructor, override, result-field" in live
+
+
 def test_templates_are_parent_verbatim():
-    """Every shipped template byte-equals the parent's (they are DATA; any
-    edit belongs upstream of a fresh copy + golden refresh, not here)."""
+    """Parity templates match the parent; live additions are bounded."""
     parent = Path("/data/zhoutaichang/copilot/vllm-omni-rebase-agent/agent/templates")
     if not parent.is_dir():
         pytest.skip("parent checkout not present on this machine")
     for tmpl in sorted((REBASE_DATA / "templates").iterdir()):
         if ".live." in tmpl.name:
-            # the ONE recorded exception: the live variant differs from its
-            # parity sibling only in the wrapper-name prose (pinned below)
+            # Live guidance is intentionally outside the parent-parity pin.
             continue
         assert tmpl.read_bytes() == (parent / tmpl.name).read_bytes(), tmpl.name
     live = (REBASE_DATA / "templates" / "module_rebase.live.prompt.tmpl")
     parity = (REBASE_DATA / "templates" / "module_rebase.prompt.tmpl")
+    live_text = live.read_text()
+    start = live_text.index("## Release transition and adjacent API checks")
+    end = live_text.index("**Engine / unpack:**", start)
+    assert "real upstream constructor" in live_text[start:end]
+    without_live_guidance = live_text[:start] + live_text[end:]
     diff = [(a, b) for a, b in zip(parity.read_text().splitlines(),
-                                   live.read_text().splitlines()) if a != b]
+                                   without_live_guidance.splitlines()) if a != b]
     assert len(diff) == 2
     assert all("imx-omni-pytest" in b and "run_module_pytest" in a
                for a, b in diff)
@@ -385,6 +398,7 @@ def test_module_rebase_partial_e2e(tmp_path, prompt_data):
     debug_req = retry_client.requests[2]["messages"][0]["content"]
     assert debug_req.startswith("## Debug: fix failing test for module")
     assert "half done, ran out of road" in debug_req
+    assert "failure signature" in debug_req
     # the debug turn ADVERTISED the gated tools (gate persisted as passed)
     assert "edit_file" in [x["name"] for x in retry_client.requests[2]["tools"]]
 
