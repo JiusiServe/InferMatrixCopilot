@@ -43,7 +43,7 @@ reviewer 陷阱。
 - **`async_chunk` 分叉**：`deploy/aura_omni.yaml` 默认 **`false`**（非 duplex）。
   Realtime duplex 用 `examples/online_serving/aura_omni/aura_omni_duplex_smoke.yaml`
   （或等价）且必须 **`true`**，否则 Stage2→3 codec 交不出去。详情跟
-  [Q3TTS-3a](../qwen3-tts/rules.md#q3tts-3a--async-connector-只在首块传-prefix后续只传-delta)，
+  [Q3TTS-3a](../qwen3-tts/rules.md)，
   不要在本页重写 codec。
 - **Talker stop `2150`** 仍属 TTS 家族（duplex smoke Stage2 `stop_token_ids`）；
   改 stop／humming 边界先查 [qwen3-tts rules](../qwen3-tts/rules.md)。

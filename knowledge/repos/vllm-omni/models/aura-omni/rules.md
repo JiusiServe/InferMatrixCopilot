@@ -31,7 +31,7 @@ confidence: high
 
 只有 `AURA-<数字字母>` 是可审计规则 ID。共享 duplex serving 见
 [Serving session lifecycle](../../components/serving/rules-session-lifecycle.md)；
-Stage2–3 async codec／decoder 合同见 [Qwen3-TTS Q3TTS-3a…](../qwen3-tts/rules.md#q3tts-3a--async-connector-只在首块传-prefix后续只传-delta)，
+Stage2–3 async codec／decoder 合同见 [Qwen3-TTS Q3TTS-3a…](../qwen3-tts/rules.md)，
 **本页不重写 codec**。
 
 AURA-1e 因 Omni 尚未接线 Native 同名旋钮，单独视为 medium 证据强度。
@@ -58,8 +58,8 @@ AURA-1e 因 Omni 尚未接线 Native 同名旋钮，单独视为 medium 证据�
   Realtime duplex 入口 `/v1/realtime?duplex=1` + `AuraDuplexPlugin`。
 - 强制：`deploy/aura_omni.yaml` 默认 **`async_chunk: false`**。Duplex 必须用
   `aura_omni_duplex_smoke.yaml`（或等价）且 **`async_chunk: true`**。Stage2→3
-  async delta／decoder 生命周期合同跟 [Q3TTS-3a](../qwen3-tts/rules.md#q3tts-3a--async-connector-只在首块传-prefix后续只传-delta)／
-  [Q3TTS-3b](../qwen3-tts/rules.md#q3tts-3b--decoder-state-必须以-scheduler-id-定位且在所有终止边界释放)，
+  async delta／decoder 生命周期合同跟 [Q3TTS-3a](../qwen3-tts/rules.md)／
+  [Q3TTS-3b](../qwen3-tts/rules.md)，
   本规则不另写 codec。
 - 注意：`AURA_OMNI_PIPELINE.model_arch="Qwen3ASRForConditionalGeneration"` **不在**
   Omni `_OMNI_MODELS`，依赖上游 vLLM 模型表合并；Stage1
