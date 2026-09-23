@@ -9,16 +9,19 @@ sources:
     "PR #7633",
     vllm_omni/model_executor/models/aura_omni/duplex/plugin.py,
     vllm_omni/model_executor/models/aura_omni/duplex/history.py,
+    vllm_omni/model_executor/models/aura_omni/duplex/data_plane.py,
     vllm_omni/model_executor/models/aura_omni/duplex/capabilities.py,
     vllm_omni/model_executor/models/aura_omni/pipeline.py,
     vllm_omni/model_executor/stage_input_processors/aura_omni.py,
     vllm_omni/engine/duplex/session/runner.py,
     vllm_omni/config/environment_variable_inventory.py,
     vllm_omni/deploy/aura_omni.yaml,
+    examples/online_serving/aura_omni/aura_omni_duplex_smoke.yaml,
     docs/user_guide/examples/online_serving/aura_omni.md,
     tests/engine/duplex/test_session_runner.py,
     tests/model_executor/stage_input_processors/test_aura_omni.py,
-    tests/model_executor/models/aura_omni/test_aura_omni_duplex_history.py,
+    tests/model_executor/stage_input_processors/test_aura_omni_duplex_history.py,
+    tests/model_executor/models/aura_omni/duplex/test_aura_plugin_contract.py,
     tests/config/test_environment_variables.py,
   ]
 confidence: high
@@ -26,126 +29,136 @@ confidence: high
 
 # Aura-Omni 规则
 
-只有 `AURA-<数字字母>` 是可审计规则 ID。共享 duplex serving 生命周期见
+只有 `AURA-<数字字母>` 是可审计规则 ID。共享 duplex serving 见
 [Serving session lifecycle](../../components/serving/rules-session-lifecycle.md)；
-Talker/Code2Wav 共享行为见 [Qwen3-TTS](../qwen3-tts/rules.md)。
+Stage2–3 async codec／decoder 合同见 [Qwen3-TTS Q3TTS-3a…](../qwen3-tts/rules.md#q3tts-3a--async-connector-只在首块传-prefix后续只传-delta)，
+**本页不重写 codec**。
+
+AURA-1e 因 Omni 尚未接线 Native 同名旋钮，单独视为 medium 证据强度。
 
 ## Direct 代码快速入口
 
-| PR / 审查信号 | 规则组 | 第一批源码 |
+| PR / 审查信号 | 规则 | 第一批源码 |
 |---|---|---|
-| `aura_omni` pipeline、四段 stage、deploy pin | AURA-1a | `config/pipeline_registry.py`；`model_executor/models/aura_omni/pipeline.py`；`deploy/aura_omni.yaml` |
-| duplex `/v1/realtime?duplex=1`、`AuraDuplexPlugin` | AURA-1b / 1c / 1d / 1e | `models/aura_omni/duplex/plugin.py` → `engine/duplex/session/runner.py` |
-| `<\|silent\|>` stop id、v1 vs v2 checkpoint | AURA-1f | `duplex/plugin.py::AURA_SILENT_TOKEN_ID`；streaming Omni 侧 silent env |
-| OmniInteract / Stage1 TTFT·TPOT 报表 | AURA-1c / 1g | `runner._stash_stage_metrics`；`test_projected_stage1_metrics_reach_the_spoken_audio_event` |
-| barge-in、draining Stage2/3、cancel fence | AURA-1d | `runner` barge-in / `older_abort_ids`；`capabilities` / concurrent turn |
-| `VLLM_AURA_SENTENCE_TTS*` | AURA-1h | `environment_variable_inventory.py`；`stage_input_processors/aura_omni.py` |
+| 四段拓扑、`async_chunk`、默认 vs duplex yaml | AURA-1a | `pipeline.py::AURA_OMNI_PIPELINE`；`deploy/aura_omni.yaml`；`examples/online_serving/aura_omni/aura_omni_duplex_smoke.yaml` |
+| Stage1 投影不消费 TTS | AURA-1b | `duplex/plugin.py::{project_intermediate_output,decide_output}` |
+| 投影后仍 stash Stage1 metrics | AURA-1c | `engine/duplex/session/runner.py::{on_stage_output,_stash_stage_metrics}`；`tests/engine/duplex/test_session_runner.py::test_projected_stage1_metrics_reach_the_spoken_audio_event` |
+| barge-in fence／draining abort | AURA-1d | `runner.py` barge-in／`older_abort_ids`；`duplex/capabilities.py` |
+| 入史三 case／裁剪 default／断线清 store | AURA-1e | `duplex/history.py::{begin_user_turn,commit_turn,prune,render_prefix,drop_session_history}`；`tests/.../test_aura_omni_duplex_history.py` |
+| silent stop id 家族 | AURA-1f | `duplex/plugin.py::AURA_SILENT_TOKEN_ID` |
+| history 单一写入者 | AURA-1g | `plugin.py::commit_model_context`；`aura_omni.py::asr2aura`（只 `begin_user_turn`） |
+| `prompt_mm` pad 与 video 对齐 | AURA-1h | `aura_omni.py::asr2aura`／`_aura_prompt`；`history.py::render_prefix`／`retained_videos` |
+| `VLLM_AURA_*` inventory | AURA-1i | `environment_variable_inventory.py`；`tests/config/test_environment_variables.py` |
 
 ## AURA-1a — 四段组合管线不得把 AURA 当成单 stage 模型
 
 - 触发：注册、部署或审查 `aura_omni` / AURA 语音助手入口。
-- 强制：正式拓扑是 Stage0 Qwen3-ASR → Stage1 AURA（Thinker）→ Stage2 Qwen3-TTS
-  Talker → Stage3 `Qwen3TTSCode2Wav`。家族自有桥是 `asr2aura` / `aura2tts`
-  （`stage_input_processors/aura_omni.py`）；Stage2→3 复用 qwen3_tts 的
-  `talker2code2wav_*`。Realtime full-duplex 入口是 `/v1/realtime?duplex=1`，由
-  `AuraDuplexPlugin` 承接，不是把 AURA 伪装成单模型 chat completion。
-- 禁止：按单 stage LLM 改 sampling / history；或把 MiniCPM native duplex adapter
-  合同直接套到 AURA。
-- 验收：deploy / registry 仍展开四段；duplex smoke 走 realtime path；qwen3_tts
-  Talker/Code2Wav 回归仍影响本家族尾段。^[PR #7633]
+- 强制：拓扑为 Stage0 Qwen3-ASR → Stage1 AURA Thinker → Stage2 Talker →
+  Stage3 Code2Wav。家族桥 `asr2aura`／`aura2tts`；尾段复用 qwen3_tts。
+  Realtime duplex 入口 `/v1/realtime?duplex=1` + `AuraDuplexPlugin`。
+- 强制：`deploy/aura_omni.yaml` 默认 **`async_chunk: false`**。Duplex 必须用
+  `aura_omni_duplex_smoke.yaml`（或等价）且 **`async_chunk: true`**。Stage2→3
+  async delta／decoder 生命周期合同跟 [Q3TTS-3a](../qwen3-tts/rules.md#q3tts-3a--async-connector-只在首块传-prefix后续只传-delta)／
+  [Q3TTS-3b](../qwen3-tts/rules.md#q3tts-3b--decoder-state-必须以-scheduler-id-定位且在所有终止边界释放)，
+  本规则不另写 codec。
+- 注意：`AURA_OMNI_PIPELINE.model_arch="Qwen3ASRForConditionalGeneration"` **不在**
+  Omni `_OMNI_MODELS`，依赖上游 vLLM 模型表合并；Stage1
+  `AuraQwen3VLForConditionalGeneration` 才在 Omni 表内（仍成立，非已过时）。
+- 禁止：单 stage 化 AURA；把 MiniCPM native duplex／Code2Wav window／
+  `generate_chunk=26` 合同抄进本页；自写一套 Stage2–3 codec 规则替代 Q3TTS。
+- 验收：in-tree — pipeline／deploy 展开四段；duplex smoke yaml 含
+  `async_chunk: true`。**未证明** — 本条不声称 AURA duplex 音质或 GPU E2E
+  已绿（MiniCPM duplex E2E 不证明 AURA）。^[PR #7633]
 
 ## AURA-1b — Stage1 中间投影不得消费 TTS 路径
 
-- 触发：修改 `AuraDuplexPlugin.project_intermediate_output`、`decide_output`、或
-  duplex runner 对 projected stage 输出的消费/截断。
-- 强制：AURA 对 **Stage1** 返回 `project_intermediate_output=True`，把 Thinker
-  文本投影到 WS，但 **不消费、不截短** 后续 Talker/Code2Wav。Silent 决策走
-  `decide_output`（含 stop id / `<|silent|>` 文本），listening 不得误开 spoken
-  audio turn。
-- 禁止：为了「省一次投影」把 Stage1 当 pass-through 吃掉；或因投影而 `consume`
-  掉本应进入 Stage2 的 token。
-- 验收：有文本 delta 的 spoken turn 仍产生 Stage2/3 音频；silent turn 不产生
-  错误 TTS。^[PR #7633]
+- 触发：修改 `project_intermediate_output`、`decide_output`、或 runner 对
+  projected stage 的消费／截断。
+- 强制：Stage1 `project_intermediate_output=True`：文本可投影到 WS，**不
+  consume、不截短** Stage2／3。Silent 走 `decide_output`。
+- 禁止：投影即 consume；listening 误开 spoken audio turn。
+- 验收：in-tree — `tests/model_executor/models/aura_omni/duplex/test_aura_plugin_contract.py`
+  （投影／silent 决策）。**未证明** — 实权重多轮音质。^[PR #7633]
 
 ## AURA-1c — 投影的 Stage1 仍必须 stash engine stage metrics
 
-- 触发：修改 `engine/duplex/session/runner.py` 的 `on_stage_output` /
-  `_stash_stage_metrics`，或任何把 Stage1 TTFT/TPOT 挂到 spoken 事件的报表路径。
-- 强制：当 `project and not consume`（AURA Stage1）时，runner 仍须
-  `_stash_stage_metrics`。否则 OmniInteract / duplex 报表会丢 Stage1
-  `vllm_ttft_ms` / `vllm_tpot_ms`，只剩 client 侧假 TTFT。
-- 禁止：只在纯 pass-through（`not project`）分支 stash；或把 Stage0 ASR 指标
-  标成 Stage1 Thinker。
-- 验收：`test_projected_stage1_metrics_reach_the_spoken_audio_event`；spoken
-  事件带 Stage1 engine metrics，且数值量级是 Thinker request 时钟而非
-  Stage0。^[PR #7633]
+- 触发：修改 `on_stage_output`／`_stash_stage_metrics`，或 Stage1 TTFT／TPOT
+  报表路径。
+- 强制：`project and not consume` 时仍 `_stash_stage_metrics`。
+- 禁止：只在纯 pass-through stash；把 Stage0 指标标成 Stage1。
+- 验收：in-tree —
+  `test_projected_stage1_metrics_reach_the_spoken_audio_event`。^[PR #7633]
 
 ## AURA-1d — barge-in 必须清理 cancel fence，并仍 abort 旧 draining TTS
 
-- 触发：修改 duplex barge-in、`cancel_fence`、`abort_ids`、或 AURA concurrent
-  turn（Stage1 结束后不立刻 abort 旧 Stage2/3）的资源释放。
-- 强制：barge-in 对 **当前 cancel fence** 必须走完整 cleanup（含
-  `abort=True` 弹出 orchestrator `request_states`），不能只 abort 不 cleanup。
-  Concurrent / draining 旧 Stage2/3 的 request id 仍须 abort；对资源释放使用
-  **旧 fence 的** `older_abort_ids`（不在本次 `cancelled_ids` 内的 abort 集合），
-  避免把新 turn 刚绑定的 id 一并 `release_resources`。
-- 禁止：为修 leak 而 `release_resources_for_request_ids(全部 abort_ids)`；或
-  去掉对 draining 旧请求的 abort（会复活「取消后旧 TTS 仍占用座位」）。
-- 验收：stale-epoch drop 与 forwarded stage barge-in 测试；有 draining TTS 时
-  barge-in 后旧请求离开 `request_states`，新 turn 不被误 release。^[PR #7633]
+- 触发：修改 AURA／共享 runner 上与 AURA concurrent turn 相关的 barge-in、
+  `cancel_fence`、`abort_ids`、资源释放。
+- 强制：当前 cancel fence 完整 cleanup（`abort=True` 弹 `request_states`）；
+  draining 旧 Stage2／3 仍 abort；资源释放只用 **`older_abort_ids`**（不在本次
+  `cancelled_ids` 内），避免误 release 新 turn。
+- 禁止：`release_resources_for_request_ids(全部 abort_ids)`；去掉 draining
+  abort；把本条写成 MiniCPM native duplex／共享 serving 的通用修法（共享
+  lifecycle 进 serving 组件页）。
+- 验收：in-tree — duplex session runner barge-in／stale-epoch 相关 CPU 测试。
+  **未证明** — 多模型 draining 交互若红 MiniCPM step，应开 serving 规则，不
+  扩写本 ID。^[PR #7633]
 
-## AURA-1e — SessionHistory 裁剪默认对齐 Native，旋钮不得另发明一套
+## AURA-1e — SessionHistory 入史三 case + Native 默认裁剪（medium）
 
-- 触发：修改 `aura_omni/duplex/history.py`、`commit_model_context`、vision-follow
-  / OmniInteract proactive（无声 + frames）入史，或暴露 history 长度旋钮。
-- 强制（不可改硬核）：两帧视觉合成一轮 video、单一 `<|video_pad|>`；**空 user
-  transcript + assistant `<|silent|>`** 成对丢弃。Silent vision-follow（空
-  transcript **但有 clip** + silent）**会入** history 并占 video 名额；无 clip、
-  无 user 字、又 silent 的整轮不入。
-- 强制（长度政策）：裁剪 **默认** 对齐 Native Gateway
-  （`MAX_VIDEO_ROUNDS` / `NUM_VIDEO_ROUNDS_TO_REMOVE` / `MAX_ROUNDS_CONVERSATIONS`，
-  Native 默认 45 / 30 / 999）。数字是 default，不是唯一合法值。Native 用同名
-  env 可调；Omni 当前把 default 写成 `SessionHistory` 常量／字段，**尚未**接线。
-  日后 AURA 补旋钮时必须 **镜像同名语义**（超过 `MAX_VIDEO_ROUNDS` 再剥最旧
-  `NUM_VIDEO_ROUNDS_TO_REMOVE` 条 video payload，文字留下），禁止另起一套阈值名
-  或「一次清光」语义。
-- 禁止：把每帧当独立 history 轮；把 45/30 写成不可配置合同；或把「连续 VF
-  silent」默认诊断成 abort/座位回归（先查 Stage1 决策偏压与入史名额）。
-- 验收：`test_aura_omni_duplex_history` 覆盖入史／silent pair／默认裁剪；若接线
-  env／config，断言默认仍等于 Native、改旋钮后阈值随之变。^[PR #7633]
+- 触发：修改 `history.py`、`commit_model_context`、vision-follow／proactive
+  入史，或暴露 history 长度旋钮。
+- 强制（commit 三 case，互斥）：
+  1. 空 transcript + **有 clip** + silent → **入账**，占 video 名额；
+  2. 空 transcript + **无 clip** + silent → **整轮不入**；
+  3. **prune 后**（video 已剥、user 仍空、assistant silent／空）→ 才 **成对删除**。
+     成对删除是 prune 后果，不是 commit「silent VF 不入史」。
+- 强制：两帧→一轮 video、单一 `<|video_pad|>`。
+- 强制：裁剪 **默认** 对齐 Native
+  `MAX_VIDEO_ROUNDS`／`NUM_VIDEO_ROUNDS_TO_REMOVE`／`MAX_ROUNDS_CONVERSATIONS`
+  （默认 45／30／999）。数字是 default。Omni 字段已有、**旋钮尚未接线**；日后
+  接线必须镜像同名语义。
+- 强制：断线／close 调用 `drop_session_history(session_id)` 清 `_STORE`。
+- 禁止：把「成对丢弃」写成 commit 硬核；把 45／30 写成不可配置合同；每帧独立
+  history 轮。
+- 验收：in-tree — `test_aura_omni_duplex_history.py`、plugin contract 的
+  history／`drop_session_history`。**未证明** — env／config 旋钮接线（尚未实现）。^[PR #7633]
 
 ## AURA-1f — `<|silent|>` stop id 必须与 checkpoint 家族一致
 
-- 触发：配置 AURA stop / silent token、迁移 AURA v1↔v2 checkpoint、或复用
-  duplex plugin 常量到另一套权重。
-- 强制：合并后的 duplex plugin 常量是 **v1** `AURA_SILENT_TOKEN_ID = 151669`
-  （与 `151645` 等 companion stop 一起配置时不得混用 v2 id）。**AURA_v2**
-  streaming Omni 路径使用另一套 id（公开约定：`248070` / `248046` 等），必须
-  跟 checkpoint / tokenizer 对齐，不能把 v1 duplex 常量抄到 v2 serve。
-- 禁止：silent id 配错导致 silent 无法 stop、pad 到 `max_tokens`（表现为每轮
-  异常长的「假思考」）。
-- 验收：对应权重下 silent turn 在 stop id 处结束；错配回归会拉长到 max_tokens。^[PR #7633]
+- 触发：配置 silent／stop token，或 v1↔v2 checkpoint 混用。
+- 强制：duplex plugin **v1** `AURA_SILENT_TOKEN_ID = 151669`（companion 如
+  `151645`）；AURA_v2 streaming 用另一套（公开约定 `248070`／`248046`），不得
+  把 v1 常量抄到 v2 serve。
+- 禁止：错 id → silent 不 stop → pad 到 `max_tokens`。
+- 验收：in-tree — plugin stop／silent 检测单测。**未证明** — 全权重矩阵。^[PR #7633]
 
-## AURA-1g — OmniInteract（及同类）streaming 精度 / latency 报表必须以完整 0001 session 暖机
+## AURA-1g — SessionHistory 单一写入者
 
-- 触发：跑 AURA duplex / Omni streaming 的 OmniInteract（或同构 annotation-inject）
-  精度、spoken ASR 对照、Stage1 TTFT/TPOT 中位数。
-- 强制：在**同一 server 进程、同一 attention backend**上，量测片之前先跑完视频
-  **`0001` 的完整 streaming session** 做 warmup；片单可含 `0001,...`，但报表 /
-  GT / median **必须排除 `0001`**。
-- 禁止：只用 HTTP `--num-warmups` 空转代替真实 `0001` session；或把 `0001`
-  计入与 Native 对齐的 spoken QA / ASR 统计（cold-start silent 长锁会造成假阴，
-  例如首条量测片丢 annotation wav）。
-- 验收：暖机后首条量测片的首 silent 量级回到短延迟；排除 `0001` 后 spoken 计数
-  与 Native 对照不再系统性少一轮。^[PR #7633]
+- 触发：修改 `commit_model_context`、`aura2tts`、`aura_tts_partial`、或任何
+  Stage1 history commit。
+- 强制：仅 `AuraDuplexPlugin.commit_model_context` → `commit_turn` 写 assistant。
+  `asr2aura` 只 `begin_user_turn`；`aura2tts`／sentence-TTS partial **禁止**再
+  commit（含已删的 `commit_duplex_stage1_history`）。
+- 禁止：`[user, assistant, assistant]`；partial 入史。
+- 验收：in-tree — history／plugin contract 角色交替。^[PR #7633]
 
-## AURA-1h — 新增 `VLLM_AURA_*` 模型内化 env 必须进入 inventory 与 snapshot 计数
+## AURA-1h — `prompt_mm` 的当前 user pad 数必须与当前 clip 对齐
 
-- 触发：引入或重命名 AURA 专用环境变量（例如 `VLLM_AURA_SENTENCE_TTS`、
-  `VLLM_AURA_SENTENCE_TTS_MIN_CHARS`）。
-- 强制：变量加入 `environment_variable_inventory` 的模型内化集合，并同步
-  `tests/config/test_environment_variables.py` 的分类计数；sentence TTS 经
-  plugin / `aura2tts` 路径喂 Talker，不得假设「只有 SHM Stage1→2」才会触发。
-- 禁止：只在代码读取 env、不登记 inventory（CI 会报未分类变量）。
-- 验收：inventory 测试与 env 快照计数绿；开关 sentence TTS 时 Stage2 仍收到句级
-  条件。^[PR #7633]
+- 触发：修改 `asr2aura` 的 `history_prefix`／`prompt_mm`／`multi_modal_data["video"]`，
+  或 `render_prefix` 的 pad 布局。
+- 强制：`history_prefix` 已为每个仍带像素的历史 clip 写一个 `<|video_pad|>`。
+  传给 `_aura_prompt` 的 `prompt_mm` 对**当前 user 串**只带当前 clip（有则
+  `[current]`，无则去掉 video）→ 当前串只再加 **一个** pad。引擎侧
+  `multi_modal_data["video"]` 可为 `retained + current`，但不得把全列表双计进
+  当前 user 字串 pad。
+- 禁止：`pad 个数 ≠ 当前应绑定 video 项` → 错位／crash。
+- 验收：in-tree — `test_aura_omni*`／duplex history 覆盖「有 prior 时当前串仍
+  单 pad」。^[PR #7633]
+
+## AURA-1i — 新增 `VLLM_AURA_*` 必须进入 inventory 与 snapshot 计数
+
+- 触发：引入或重命名 AURA 专用环境变量（如 `VLLM_AURA_SENTENCE_TTS*`）。
+- 强制：登记 `environment_variable_inventory` 模型内化集，并同步
+  `tests/config/test_environment_variables.py` 分类计数。
+- 禁止：只读 env 不登记。
+- 验收：in-tree — inventory／snapshot 计数测试绿。^[PR #7633]
