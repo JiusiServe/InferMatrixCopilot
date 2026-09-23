@@ -94,17 +94,25 @@ Talker/Code2Wav 共享行为见 [Qwen3-TTS](../qwen3-tts/rules.md)。
 - 验收：stale-epoch drop 与 forwarded stage barge-in 测试；有 draining TTS 时
   barge-in 后旧请求离开 `request_states`，新 turn 不被误 release。^[PR #7633]
 
-## AURA-1e — SessionHistory 必须 Native 风格裁剪，且 silent 空轮有明确入史条件
+## AURA-1e — SessionHistory 裁剪默认对齐 Native，旋钮不得另发明一套
 
 - 触发：修改 `aura_omni/duplex/history.py`、`commit_model_context`、vision-follow
-  / OmniInteract proactive（无声 + frames）入史。
-- 强制：两帧视觉合成一轮 video、单一 `<|video_pad|>`；video rounds 超过 45 时
-  剥离最旧 30；**空 user transcript + assistant `<|silent|>`** 成对丢弃。Silent
-  vision-follow（空 transcript **但有 clip** + silent）**会入** history 并占
-  video 名额；无 clip、无 user 字、又 silent 的整轮不入。
-- 禁止：把每帧当独立 history 轮；或把「连续 VF silent」默认诊断成 abort/座位
-  回归（先查 Stage1 决策偏压与入史名额）。
-- 验收：`test_aura_omni_duplex_history`；超 45 裁剪与 silent pair 丢弃覆盖。^[PR #7633]
+  / OmniInteract proactive（无声 + frames）入史，或暴露 history 长度旋钮。
+- 强制（不可改硬核）：两帧视觉合成一轮 video、单一 `<|video_pad|>`；**空 user
+  transcript + assistant `<|silent|>`** 成对丢弃。Silent vision-follow（空
+  transcript **但有 clip** + silent）**会入** history 并占 video 名额；无 clip、
+  无 user 字、又 silent 的整轮不入。
+- 强制（长度政策）：裁剪 **默认** 对齐 Native Gateway
+  （`MAX_VIDEO_ROUNDS` / `NUM_VIDEO_ROUNDS_TO_REMOVE` / `MAX_ROUNDS_CONVERSATIONS`，
+  Native 默认 45 / 30 / 999）。数字是 default，不是唯一合法值。Native 用同名
+  env 可调；Omni 当前把 default 写成 `SessionHistory` 常量／字段，**尚未**接线。
+  日后 AURA 补旋钮时必须 **镜像同名语义**（超过 `MAX_VIDEO_ROUNDS` 再剥最旧
+  `NUM_VIDEO_ROUNDS_TO_REMOVE` 条 video payload，文字留下），禁止另起一套阈值名
+  或「一次清光」语义。
+- 禁止：把每帧当独立 history 轮；把 45/30 写成不可配置合同；或把「连续 VF
+  silent」默认诊断成 abort/座位回归（先查 Stage1 决策偏压与入史名额）。
+- 验收：`test_aura_omni_duplex_history` 覆盖入史／silent pair／默认裁剪；若接线
+  env／config，断言默认仍等于 Native、改旋钮后阈值随之变。^[PR #7633]
 
 ## AURA-1f — `<|silent|>` stop id 必须与 checkpoint 家族一致
 
