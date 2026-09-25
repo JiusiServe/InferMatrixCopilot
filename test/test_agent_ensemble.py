@@ -1164,7 +1164,7 @@ def test_resolved_residual_becomes_a_comment(settings, trace, tmp_path):
     comment. Ground truth on merged/amended heads is ~70% "the fix landed —
     what does it still not cover?", and the passes produce exactly that
     reasoning; it was rendering into the unscored Validated block."""
-    from infermatrix_copilot.engine.steps.review.steps import (
+    from infermatrix_copilot.engine.steps.review.refinement import (
         _promote_resolved_residuals,
     )
     out = _promote_resolved_residuals(

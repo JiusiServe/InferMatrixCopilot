@@ -162,7 +162,7 @@ def test_promoted_residuals_are_deduped_against_each_other():
     PR-description-staleness comments, saturating the cap of 4."""
     import asyncio
     from types import SimpleNamespace
-    from infermatrix_copilot.engine.steps.review.steps import (
+    from infermatrix_copilot.engine.steps.review.refinement import (
         _promote_resolved_residuals)
     ctx = SimpleNamespace(trace=SimpleNamespace(record=lambda *a, **k: None))
     out = _promote_resolved_residuals(ctx, {"findings": list(_TRC),
