@@ -2,7 +2,7 @@
 
 <!-- verified-against: 2026-09-26 -->
 
-`LOC ~900（6 个文件） · step 库（评审） · refactor-status: ok`
+`patch gate + PR review + quality（8 个源文件） · step 库（评审） · refactor-status: ok`
 
 ## 职责
 条件式 patch 门 + PR 评审 agent step + 有界的 PR review-readiness 质量 step，
@@ -10,17 +10,21 @@
 Pre-push patch 门必须审查显式 base 到当前 HEAD 的已提交变更；空范围、脏的
 tracked checkout、不可解析的 ref 或超过 reviewer 容量的 diff 都阻塞推送。
 通过后记录批准的 base/head，后续推送必须验证当前 HEAD 仍匹配。
-它曾是一个 341 行的模块；现在是一个把评测调优过的 prompt 数据、handler、
-确定性 helper 三者分开的包。
+它曾是一个 341 行的模块；现在将提交范围的 mutation gate、只读 PR 评审
+agent、评测调优过的 prompt 数据和确定性 helper 分开。
 
 ## 包内布局（一个文件一个关注点）
-- `__init__.py` —— import `steps` 以触发 `@step` 注册副作用；再导出公开契约（见下）。无逻辑。
+- `__init__.py` —— import `patch_gate`、`quality` 和 `steps` 以触发各自的
+  `@step` 注册副作用；再导出公开契约（见下）。无逻辑。
 - `prompts.py` —— 由评测得出的 prompt 数据：`_REVIEW_SYSTEM`、`_REVIEW_LENSES`、
   `_REVIEW_MERGE`。约 120 行文本，**移出控制流之外**。
 - `utils.py` —— 确定性、无 LLM 的 helper：`_sweep_targets`、`_render_review_md`、
   `_SEVERITY_ORDER`。
-- `steps.py` —— 两个 `@step` handler：`review.patch_gate`（validation/read）、
-  `agent.review_diff`（agent/read）。
+- `patch_gate.py` —— `review.patch_gate`（validation/read）：捕获已提交的
+  base/head 范围、计算触发条件、审查精确 diff 并记录批准的 head；不依赖
+  PR review agent 的 prompt/render 控制流。
+- `steps.py` —— `agent.review_diff`（agent/read）及其评审覆盖、二轮检查、
+  评论核验控制流；不批准或推送 mutation。
 - `anchor.py` —— 基于代码片段的评论锚定（2026-08 新增）。
 - `repo_tools.py` —— 只读的变更考古工具组（2026-08 新增）。
 - `quality.py` —— `agent.assess_pr_quality`：一次 tool-less、只读模型调用，
