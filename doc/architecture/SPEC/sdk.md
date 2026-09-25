@@ -19,12 +19,15 @@
 - Direct：`DirectReviewRequest` → `DirectClient.plan()` → `DirectReviewPlan`；
   `read_document(document_id, offset, max_bytes)`；
   `DirectCompletionRequest` → `validate()` → `DirectCompletionDecision`。
-- Strict：`StrictRuntime(settings_overrides=...)`，以及
+- Strict：`StrictRuntime(config=StrictRuntimeConfig(...))`，以及
   `capabilities` / `readiness` / `reserve_review`（`start_review` 别名）/
-  `get_status` / `get_result` / `close`。
+  `get_status` / `get_result` / `close`。旧 `settings_overrides` 暂作兼容入口；
+  新配置显式绑定完整仓库名、checkout、允许根、backend 和可选 run root。
+  `StrictPollResult.review` 提供类型化结构结果，`payload` 保持旧 wire 兼容。
 - Quality：同一 `StrictRuntime` 接受 typed `QualityReviewRequest`，提供
   `quality_readiness` / `reserve_quality_review`（`start_quality_review` 别名）/
   `get_quality_result`；机械信号只是 bounded hints，结果固定绑定 expected head。
+  `QualityPollResult.review` 投影类型化质量结果；非法结构触发 `ResultDecodeError`。
 - Knowledge：宿主把不可信输入投影成 `KnowledgeEvidenceEvent` / `KnowledgeEvidenceBatch`，
   再依次调用 `KnowledgeCurator.build_prompt()`、自己的 model adapter、
   `validate_proposals()` 与 `apply()`。返回值为 typed
@@ -36,7 +39,8 @@
 
 - **公开 import 无副作用**：单纯 import `sdk.v1` 不加载 `config`、legacy
   `contract`、`direct_routing` 或任一 server；Direct provider 实现在调用
-  `plan`/`validate` 时才加载，Strict server 在构造 `StrictRuntime` 时才加载。
+  `plan`/`validate` 时才加载；构造 `StrictRuntime` 加载 headless RunService，
+  不加载 CLI 或 MCP transport。
 - **只跨 document ID，不跨 provider filesystem path**：知识入口、route、guide、
   map 与 fallback 均为相对 knowledge-root 的 ID；`read_document` 拒绝 absolute、
   traversal 与 bundle 外路径。Strict result 丢弃私有 `report_path`，保留 report

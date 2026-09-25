@@ -2,30 +2,139 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Self
 
 from .direct import get_capabilities
 from .models import (
     Capabilities,
     QualityPollResult,
+    QualityReviewResult,
     QualityReviewRequest,
     QualityRunHandle,
+    FindingRecheck,
+    InvalidRequestError,
+    ResultDecodeError,
     StrictPollResult,
+    StrictReviewResult,
     StrictReviewRequest,
     StrictRunHandle,
+    StrictRuntimeConfig,
 )
+
+
+def _object_rows(raw: Any, field: str) -> tuple[dict[str, Any], ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, list) or any(not isinstance(row, dict) for row in raw):
+        raise ResultDecodeError(f"{field} must be an array of objects")
+    return tuple(raw)
+
+
+def _diagnostics(raw: Any) -> dict[str, Any]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ResultDecodeError("diagnostics must be an object")
+    return raw
+
+
+def _review_result(raw: Any) -> StrictReviewResult | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ResultDecodeError("Strict result must be an object")
+    rechecks = []
+    for row in _object_rows(raw.get("finding_rechecks"), "finding_rechecks"):
+        outcome = row.get("outcome")
+        if not isinstance(outcome, str) or outcome not in {"fixed", "still_affected", "unverified"}:
+            raise ResultDecodeError("finding recheck outcome is invalid")
+        try:
+            rechecks.append(FindingRecheck(**row))
+        except (TypeError, ValueError) as exc:
+            raise ResultDecodeError(f"invalid finding recheck: {exc}") from exc
+    missing = raw.get("recheck_missing") or []
+    if not isinstance(missing, list) or any(not isinstance(item, str) for item in missing):
+        raise ResultDecodeError("recheck_missing must be an array of strings")
+    complete = raw.get("rechecks_complete", False)
+    if not isinstance(complete, bool):
+        raise ResultDecodeError("rechecks_complete must be a boolean")
+    return StrictReviewResult(
+        contract_version=str(raw.get("contract_version") or ""),
+        reviewed_head_sha=str(raw.get("reviewed_head_sha") or ""),
+        verdict=str(raw.get("verdict") or ""),
+        summary_markdown=str(raw.get("summary_markdown") or ""),
+        comments=_object_rows(raw.get("comments"), "comments"),
+        findings=_object_rows(raw.get("findings"), "findings"),
+        finding_rechecks=tuple(rechecks),
+        rechecks_complete=complete,
+        recheck_missing=tuple(missing),
+        stale=bool(raw.get("stale", False)),
+        diagnostics=_diagnostics(raw.get("diagnostics")),
+    )
+
+
+def _quality_result(raw: Any) -> QualityReviewResult | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ResultDecodeError("quality result must be an object")
+    return QualityReviewResult(
+        contract_version=str(raw.get("contract_version") or ""),
+        reviewed_head_sha=str(raw.get("reviewed_head_sha") or ""),
+        verdict=str(raw.get("verdict") or ""),
+        confidence=str(raw.get("confidence") or ""),
+        summary=str(raw.get("summary") or ""),
+        reasons=_object_rows(raw.get("reasons"), "reasons"),
+        stale=bool(raw.get("stale", False)),
+        diagnostics=_diagnostics(raw.get("diagnostics")),
+    )
 
 
 class StrictRuntime:
     """Own a durable local Strict runtime without exposing MCP internals."""
 
-    def __init__(self, *, settings_overrides: dict[str, Any] | None = None):
+    def __init__(
+        self, *, config: StrictRuntimeConfig | None = None,
+        settings_overrides: dict[str, Any] | None = None,
+    ):
         # Lazy imports keep Direct-only consumers independent of server startup
         # and make this module, not the consumer, the implementation boundary.
         from ...config import Settings
-        from ...mcp_server import CopilotMCP
+        from ...app.run_service import RunService
 
-        self._core = CopilotMCP(Settings(**(settings_overrides or {})))
+        if config is not None and settings_overrides is not None:
+            raise InvalidRequestError("choose config or legacy settings_overrides")
+        if config is not None:
+            checkout = Path(config.checkout_path).resolve()
+            root = Path(config.allowed_root).resolve()
+            if not checkout.is_relative_to(root):
+                raise InvalidRequestError("checkout is outside the allowed root")
+            alias = config.repository.alias
+            overrides: dict[str, Any] = {
+                "_env_file": None,
+                "repo_paths": {alias: str(checkout)},
+                "repo_full_names": {alias: config.repository.full_name},
+                "mcp_allowed_repo_roots": [str(root)],
+                "mcp_repo_allowlist": [alias],
+                "default_repo": alias,
+            }
+            if config.backend:
+                overrides["strict_backend"] = config.backend
+            if config.run_root:
+                overrides["run_root"] = config.run_root
+        else:
+            overrides = settings_overrides or {}
+        if overrides.get("_env_file", object()) is None:
+            # Settings also reads adapter variables through model_config; a
+            # constructor-only _env_file override does not cover that path.
+            class EmbeddedSettings(Settings):
+                model_config = {**Settings.model_config, "env_file": None}
+
+            settings = EmbeddedSettings(**overrides)
+        else:
+            settings = Settings(**overrides)
+        self._core = RunService(settings)
 
     def capabilities(self) -> Capabilities:
         raw = dict(self._core.capabilities())
@@ -103,6 +212,7 @@ class StrictRuntime:
             run_id=run_id,
             state=str(payload.get("state") or "unknown"),
             payload=payload,
+            review=_review_result(payload.get("result")),
         )
 
     def get_quality_result(self, run_id: str) -> QualityPollResult:
@@ -112,6 +222,7 @@ class StrictRuntime:
             run_id=run_id,
             state=str(payload.get("state") or "unknown"),
             payload=payload,
+            review=_quality_result(payload.get("result")),
         )
 
     def close(self) -> None:

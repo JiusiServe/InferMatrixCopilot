@@ -45,6 +45,10 @@ class KnowledgeCurationError(SDKError):
     code = "knowledge_curation_error"
 
 
+class ResultDecodeError(SDKError):
+    code = "result_decode_error"
+
+
 @dataclass(frozen=True)
 class RepositoryRef(_Serializable):
     alias: str
@@ -293,10 +297,43 @@ class StrictRunHandle(_Serializable):
 
 
 @dataclass(frozen=True)
+class StrictRuntimeConfig(_Serializable):
+    """Explicit repository and worker binding for an embedded Strict host."""
+
+    repository: RepositoryRef
+    checkout_path: str
+    allowed_root: str
+    backend: str = ""
+    run_root: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.repository.alias or self.repository.full_name.count("/") != 1:
+            raise InvalidRequestError("Strict runtime needs a repository alias and full name")
+        if not self.checkout_path or not self.allowed_root:
+            raise InvalidRequestError("Strict runtime needs a checkout and allowed root")
+
+
+@dataclass(frozen=True)
+class StrictReviewResult(_Serializable):
+    contract_version: str
+    reviewed_head_sha: str
+    verdict: str
+    summary_markdown: str
+    comments: tuple[dict[str, Any], ...]
+    findings: tuple[dict[str, Any], ...]
+    finding_rechecks: tuple[FindingRecheck, ...]
+    rechecks_complete: bool
+    recheck_missing: tuple[str, ...]
+    stale: bool
+    diagnostics: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class StrictPollResult(_Serializable):
     run_id: str
     state: str
     payload: dict[str, Any]
+    review: StrictReviewResult | None = None
 
     @property
     def terminal(self) -> bool:
@@ -320,10 +357,23 @@ class QualityRunHandle(_Serializable):
 
 
 @dataclass(frozen=True)
+class QualityReviewResult(_Serializable):
+    contract_version: str
+    reviewed_head_sha: str
+    verdict: str
+    confidence: str
+    summary: str
+    reasons: tuple[dict[str, Any], ...]
+    stale: bool
+    diagnostics: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class QualityPollResult(_Serializable):
     run_id: str
     state: str
     payload: dict[str, Any]
+    review: QualityReviewResult | None = None
 
     @property
     def terminal(self) -> bool:

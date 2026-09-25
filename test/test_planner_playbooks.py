@@ -141,7 +141,7 @@ def _gate(settings, verdict_kind, *, assume_yes, monkeypatch):
     resolution that requires review (adapted/generated plans and explicit
     --playbook overrides; exact reuse never reaches this gate)."""
     from infermatrix_copilot.cli import Copilot
-    from infermatrix_copilot.cli import copilot as copilot_mod
+    from infermatrix_copilot.app import core as copilot_mod
     from infermatrix_copilot.engine.planner import Resolution
     from infermatrix_copilot.review.reviewer import ReviewVerdict
     from infermatrix_copilot.task_spec import TaskSpec
@@ -194,7 +194,7 @@ def test_interactive_run_surfaces_and_defers_to_the_confirm(
 def _gate_and_confirm(settings, verdict_kind, *, assume_yes, monkeypatch,
                       answer="y"):
     from infermatrix_copilot.cli import Copilot
-    from infermatrix_copilot.cli import copilot as copilot_mod
+    from infermatrix_copilot.app import core as copilot_mod
     from infermatrix_copilot.engine.planner import Resolution
     from infermatrix_copilot.review.reviewer import ReviewVerdict
     from infermatrix_copilot.task_spec import TaskSpec
