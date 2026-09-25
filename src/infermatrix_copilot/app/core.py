@@ -556,7 +556,7 @@ class Copilot:
         freezing it at reservation is what stops two concurrent per-call repos
         from racing through shared settings, which is how the deleted
         `configure_strict_repo` worked."""
-        from ..mcp_policy import authorize_repo_path
+        from .request_policy import authorize_repo_path
 
         if spec.repo_path:
             spec = spec.model_copy(update={"repo_path": authorize_repo_path(
@@ -621,13 +621,13 @@ class Copilot:
         MCP policy on the persisted request (request.json is untrusted — a host
         could have rewritten it), plans, then executes, driving
         `run_status.json` planning -> running -> terminal. Returns the exit code."""
-        from ..mcp_policy import enforce_mcp_policy
+        from .request_policy import enforce_mcp_policy
 
         return self._execute_reserved(run_id, enforce_mcp_policy)
 
     def execute_strict_reserved(self, run_id: str) -> int:
         """Execute a reserved Strict review using the previous Eco workflow."""
-        from ..mcp_policy import enforce_strict_review_policy
+        from .request_policy import enforce_strict_review_policy
 
         return self._execute_reserved(run_id, enforce_strict_review_policy)
 
@@ -651,7 +651,7 @@ class Copilot:
     def _execute_reserved_locked(self, run_dir: Path, lock: RunLock,
                                  policy) -> int:
         """The body of `_execute_reserved`, run while holding the run lock."""
-        from ..mcp_policy import PolicyError
+        from .request_policy import PolicyError
 
         # The claim, not the lock, is what makes execution at-most-once.
         # `RunLock` excludes concurrent children; it says nothing about a second
