@@ -1,6 +1,6 @@
 # engine/executor.py —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-09-26 -->
 
 `LOC ~293 · 引擎底座（那个循环） · refactor-status: ok`
 
@@ -22,6 +22,8 @@ helper：`_eval_when`、`_merge`。
 - **B2**：resume 在跳过之前先恢复 `outputs.state_updates`；成功后
   `state.update(state_updates)` 并按 step id 索引输出。
 - `_merge` 把每个 foreach 条目的 `state_updates` **提升**到顶层（同键最后写者胜）。
+- `foreach` 中会写工作区、推送或写知识库的 step 顺序执行，共享 checkout 不并发修改；
+  只读 fan-out 仍可并发执行。
 - **B3**：`when:` 先读 TaskSpec 再读 state；**未知键 → 阻塞，绝不静默**。
 - **B1**：类型化路由；未处理的异常 → BLOCKED（**绝不吞掉**）。
 - 只对 RETRYABLE 重试，受 `max_step_retries` 限制。

@@ -1,6 +1,6 @@
 # engine/steps/pr/ —— 规范
 
-<!-- verified-against: 2026-09-22 -->
+<!-- verified-against: 2026-09-26 -->
 
 `LOC ~1390（6 个文件） · step 库（PR） · refactor-status: ok`
 
@@ -25,6 +25,14 @@
 `pr.harvest_debug_knowledge`（deterministic/knowledge）；
 `pr.rebase_onto_base`、`agent.debug_group`（agent/write_workspace）；
 `agent.verify_module`（validation/read）；`pr.post_review`（script/push）。
+
+`pr-debug` 的 report-only 路径不 checkout PR 分支。诊断组数受 playbook 参数和
+settings 安全上限共同约束；执行组共享 checkout 时必须顺序修改。`agent.debug_group`
+只有在观察到新 commit、干净的 tracked checkout、根因和验证证据时才算成功。
+`agent.verify_module` 的咨询结论是 `verified | problem | inconclusive`，未知文本
+不能标成已验证。`ci.push` 对 PR debug/rebase 还需同一 HEAD 的 patch-gate 批准。
+知识 intake 的 canonical 记录使用 schema v2、完整仓库名和稳定 event ID；缺少
+完整身份时保留 v1 兼容记录，由消费者显式解析别名。
 
 ## 公开契约（可从 `engine.steps.pr` import）
 `extract_signature`（由 `utils` 再导出；供测试使用）。
