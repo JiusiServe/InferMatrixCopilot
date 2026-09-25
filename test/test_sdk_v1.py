@@ -315,6 +315,61 @@ def test_strict_facade_preserves_idempotency_and_hides_private_paths():
     assert runtime.capabilities().distribution_version == "0.2.0"
 
 
+def test_strict_typed_result_and_decode_error():
+    from infermatrix_copilot.sdk.v1 import ResultDecodeError
+
+    runtime = object.__new__(StrictRuntime)
+    core = _FakeStrictCore()
+    runtime._core = core
+    result = runtime.get_result("run-20260829-010101-abcdef")
+    assert result.review.verdict == "APPROVE"
+    assert result.review.findings == ()
+
+    core.get_result = lambda *_args, **_kwargs: {"state": "done", "result": {"comments": "invalid"}}
+    with pytest.raises(ResultDecodeError, match="comments"):
+        runtime.get_result("run-20260829-010101-abcdef")
+
+
+def test_typed_strict_config_rejects_checkout_outside_root(tmp_path):
+    from infermatrix_copilot.sdk.v1 import StrictRuntimeConfig, InvalidRequestError
+
+    config = StrictRuntimeConfig(
+        repository=RepositoryRef("demo", "owner/demo"),
+        checkout_path=str(tmp_path.parent / "elsewhere"),
+        allowed_root=str(tmp_path),
+    )
+    with pytest.raises(InvalidRequestError, match="outside the allowed root"):
+        StrictRuntime(config=config)
+
+
+def test_headless_strict_runtime_does_not_import_cli_or_mcp():
+    script = """
+import os
+import sys
+import tempfile
+from pathlib import Path
+from infermatrix_copilot.sdk.v1 import RepositoryRef, StrictRuntime, StrictRuntimeConfig
+with tempfile.TemporaryDirectory() as root:
+    Path(root, '.env').write_text('STRICT_BACKEND=cursor\\n')
+    os.chdir(root)
+    config = StrictRuntimeConfig(
+        repository=RepositoryRef('demo', 'owner/demo'),
+        checkout_path=root, allowed_root=root,
+        backend='codex',
+        run_root=str(Path(root) / 'runs'),
+    )
+    with StrictRuntime(config=config) as runtime:
+        assert runtime.capabilities().sdk_api_version == '1.0.0'
+        assert runtime._core.settings.strict_backend == 'codex'
+        assert runtime._core.settings.model_config.get('env_file') is None
+        assert not {'infermatrix_copilot.mcp_server',
+                    'infermatrix_copilot.cli.copilot',
+                    'infermatrix_copilot.cli.entry'} & sys.modules.keys()
+"""
+    env = {**os.environ, "PYTHONPATH": str(Path(__file__).parents[1] / "src")}
+    subprocess.run([sys.executable, "-c", script], check=True, env=env)
+
+
 def test_quality_facade_is_typed_idempotent_and_head_bound():
     runtime = object.__new__(StrictRuntime)
     core = _FakeStrictCore()

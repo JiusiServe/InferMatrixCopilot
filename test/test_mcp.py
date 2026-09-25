@@ -557,6 +557,7 @@ def test_child_launch_never_opens_the_post_gate(
 
     core = _core(settings)
     core.settings.allow_post = allow_post
+    core.settings.strict_backend = "codex"
     run_id, _ = core.copilot.reserve_run(
         TaskSpec(kind="pr_review", repo="vllm-omni", pr=3),
         owner_server_id=core.server_id, owner_server_pid=core.pid)
@@ -579,6 +580,7 @@ def test_child_launch_never_opens_the_post_gate(
 
     assert captured["env"]["ALLOW_POST"] == "0"
     assert captured["env"]["ALLOW_PUSH"] == "0"
+    assert captured["env"]["STRICT_BACKEND"] == "codex"
     expected_arg = (
         "--execute-strict-reserved" if strict_compat else "--execute-reserved")
     assert expected_arg in captured["argv"]

@@ -22,12 +22,4 @@ def parse_task_params(kvs: list[str]) -> dict:
     return params
 
 
-def format_metrics_line(m: dict, run_dir: Path) -> str:
-    """One-line run-cost/quality summary from a collected metrics dict."""
-    cost, risk, catq = m["cost"], m["risk"], m["catq"]
-    catq_str = (f" CATQ={catq:.3f}" + ("*" if m["quality"]["partial"] else "")
-                if catq is not None else "")
-    partial = "+? (unpriced calls)" if cost.get("cost_partial") else ""
-    return (f"  metrics: usd≈{cost['usd']:.2f}{partial} {cost['minutes']:.1f}min "
-            f"S={risk['safety_multiplier']:.2f}{catq_str}"
-            f"  ({run_dir / 'metrics.json'})")
+from ..metrics import format_metrics_line
