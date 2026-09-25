@@ -292,7 +292,7 @@ def test_prompt_fences_untrusted_events_and_exposes_exact_schema(workspace):
 
 
 def test_diff_excerpt_is_fenced_and_bounded_per_event_and_per_batch(workspace):
-    from infermatrix_copilot.knowledge_service import curation as module
+    from infermatrix_copilot.knowledge_service import common as module
 
     curator = KnowledgeCurator(workspace, max_events=30)
     base = _batch().events[0]

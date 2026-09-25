@@ -2,7 +2,7 @@
 
 <!-- verified-against: 2026-09-26 -->
 
-`KnowledgeCurator` implements provider-owned catalog, bounded evidence prompt,
+`KnowledgeCurator` composes provider-owned catalog, bounded evidence prompt,
 proposal validation, append-only apply, fixed validator execution, and byte-exact
 rollback for an explicit work checkout. It imports only SDK contract models and
 standard-library services; it never imports a CLI/MCP transport, calls a model,
