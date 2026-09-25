@@ -2,7 +2,7 @@
 
 <!-- verified-against: 2026-09-26 -->
 
-`patch gate + PR review + quality（8 个源文件） · step 库（评审） · refactor-status: ok`
+`patch gate + PR review + quality（9 个源文件） · step 库（评审） · refactor-status: ok`
 
 ## 职责
 条件式 patch 门 + PR 评审 agent step + 有界的 PR review-readiness 质量 step，
@@ -11,7 +11,7 @@ Pre-push patch 门必须审查显式 base 到当前 HEAD 的已提交变更；�
 tracked checkout、不可解析的 ref 或超过 reviewer 容量的 diff 都阻塞推送。
 通过后记录批准的 base/head，后续推送必须验证当前 HEAD 仍匹配。
 它曾是一个 341 行的模块；现在将提交范围的 mutation gate、只读 PR 评审
-agent、评测调优过的 prompt 数据和确定性 helper 分开。
+agent、评审结果的有界精炼、评测调优过的 prompt 数据和确定性 helper 分开。
 
 ## 包内布局（一个文件一个关注点）
 - `__init__.py` —— import `patch_gate`、`quality` 和 `steps` 以触发各自的
@@ -23,8 +23,10 @@ agent、评测调优过的 prompt 数据和确定性 helper 分开。
 - `patch_gate.py` —— `review.patch_gate`（validation/read）：捕获已提交的
   base/head 范围、计算触发条件、审查精确 diff 并记录批准的 head；不依赖
   PR review agent 的 prompt/render 控制流。
-- `steps.py` —— `agent.review_diff`（agent/read）及其评审覆盖、二轮检查、
-  评论核验控制流；不批准或推送 mutation。
+- `steps.py` —— `agent.review_diff`（agent/read）：冻结 evidence pack、
+  选择评审深度、调用评审 passes 并组装最终结果；不批准或推送 mutation。
+- `refinement.py` —— 对 draft 结果进行覆盖补充、定向第二轮、逐评论核验；
+  接受 handler 提供的 frozen diff、工具和 trace，不注册 step 或发布评论。
 - `anchor.py` —— 基于代码片段的评论锚定（2026-08 新增）。
 - `repo_tools.py` —— 只读的变更考古工具组（2026-08 新增）。
 - `quality.py` —— `agent.assess_pr_quality`：一次 tool-less、只读模型调用，
