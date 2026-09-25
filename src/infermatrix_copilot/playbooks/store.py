@@ -63,6 +63,7 @@ def playbook_to_doc(pb: Playbook) -> dict:
     return {
         "name": pb.name, "version": pb.version, "status": pb.status,
         "task_kinds": pb.task_kinds, "repos": pb.repos, "params": pb.params,
+        **({"mode_aware": True} if pb.mode_aware else {}),
         **({"requires": pb.requires} if pb.requires else {}),
         "provenance": pb.provenance, "success": pb.success,
         "steps": [

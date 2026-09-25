@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-09-22 -->
+<!-- verified-against: 2026-09-26 -->
 
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
@@ -54,8 +54,9 @@
 - **Strict findings 绑定发布结果**：`get_result` 的 `findings` 对最终发布集合逐条返回
   `finding_id`、最终 `severity`、`anchor` 与 `head_sha`，保持顺序及重复 identity。
   identity 以文件路径与完整归一化文本生成，行号变动不改变 identity；它不与
-  `finding_dispositions` 按 anchor 拼接。当前没有 carried-finding recheck，缺失旧
-  finding 不代表已修复；不得承诺 `head_recheck` 或 `findings_missing_carried` 字段。
+  `finding_dispositions` 按 anchor 拼接。Direct 1.1 / Strict 1.3 对传入的
+  carried finding 返回独立、绑定当前 head 的显式 `finding_rechecks`；缺失或
+  `unverified` 的答案不代表已修复，详见下方 carried-finding recheck 契约。
 - **知识规则由 provider 唯一定义**：catalog 只暴露当前仓库 owner 与 general 的
   owner rule page document ID —— 每个 owner 的 `rules.md` 入口页及其
   `type: rule` 的 `rules-<topic>.md` 专题页（`catalog_entries()` 附每页

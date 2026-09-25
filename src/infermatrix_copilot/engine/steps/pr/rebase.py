@@ -64,6 +64,9 @@ async def _pr_checkout(ctx: StepContext) -> StepResult:
     rc, out = _git(repo, "checkout", "-B", local, "FETCH_HEAD")
     if rc != 0:
         return StepResult(False, FailureKind.BLOCKED, f"checkout failed: {out[:400]}")
+    rc, initial_head_sha = _git(repo, "rev-parse", "HEAD")
+    if rc != 0:
+        return StepResult(False, FailureKind.BLOCKED, f"cannot identify PR head: {initial_head_sha[:400]}")
 
     force = bool(ctx.params.get("force_push", False))
     policy = PushPolicy(
@@ -72,7 +75,8 @@ async def _pr_checkout(ctx: StepContext) -> StepResult:
     )
     ctx.state.update(
         pr_head_ref=head_ref, pr_head_remote=remote, pr_base_branch=base,
-        pr_local_branch=local, push_policy=policy,
+        pr_local_branch=local, pr_initial_head_sha=initial_head_sha,
+        push_policy=policy,
     )
     return StepResult(True, summary=f"checked out PR #{pr} ({remote}/{head_ref} -> {local})",
                       outputs={"local_branch": local, "base": base, "remote": remote,
@@ -81,6 +85,7 @@ async def _pr_checkout(ctx: StepContext) -> StepResult:
                                "state_updates": {
                                    "pr_head_ref": head_ref, "pr_head_remote": remote,
                                    "pr_base_branch": base, "pr_local_branch": local,
+                                   "pr_initial_head_sha": initial_head_sha,
                                    "push_policy": asdict(policy),
                                }})
 
@@ -247,6 +252,12 @@ async def _verify_module(ctx: StepContext) -> StepResult:
                          input_tokens=reply.usage.get("input_tokens", 0),
                          output_tokens=reply.usage.get("output_tokens", 0))
     text = reply.text.strip()
-    if text.upper().startswith("PROBLEM"):
-        return StepResult(False, FailureKind.REPLAN, f"{module}: {text[:400]}")
-    return StepResult(True, summary=f"{module}: verified")
+    if text.upper().startswith("PROBLEM:"):
+        return StepResult(False, FailureKind.REPLAN, f"{module}: {text[:400]}",
+                          outputs={"verification_status": "problem"})
+    if text.upper() == "OK" or text.upper().startswith("OK:"):
+        return StepResult(True, summary=f"{module}: verified",
+                          outputs={"verification_status": "verified"})
+    return StepResult(True, summary=f"{module}: advisory result inconclusive",
+                      outputs={"verification_status": "inconclusive",
+                               "advisory_reply": text[:400]})

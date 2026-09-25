@@ -46,6 +46,17 @@ async def _push(ctx: StepContext) -> StepResult:
     decision = guard_push(policy, list(protected))
     if not decision.allowed:
         return StepResult(False, FailureKind.FORBIDDEN, decision.reason)
+    if _task_spec(ctx).get("kind") in {"pr_debug", "pr_rebase"}:
+        from ....review.change_set import ChangeSet, ChangeSetError
+
+        approval = ctx.state.get("approved_change_set") or {}
+        try:
+            current = ChangeSet.capture(repo, str(approval.get("base_sha") or ""))
+        except ChangeSetError as exc:
+            return StepResult(False, FailureKind.FORBIDDEN, f"pre-push approval unavailable: {exc}")
+        if current.head_sha != approval.get("head_sha"):
+            return StepResult(False, FailureKind.FORBIDDEN,
+                              "PR head changed after patch review; review the new commit")
     if not ctx.settings.allow_push:
         return StepResult(True, summary=f"dry-run (ALLOW_PUSH=0): {' '.join(decision.command)}",
                           outputs={"dry_run": True, "command": list(decision.command)})
