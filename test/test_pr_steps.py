@@ -81,7 +81,7 @@ def test_checkout_report_only_disallows_push(registry, settings, trace, tmp_path
 def test_patch_gate_reviews_committed_range_and_push_binds_head(
     registry, settings, trace, tmp_path, git_repo, monkeypatch,
 ):
-    from infermatrix_copilot.engine.steps.review import steps as review_steps
+    from infermatrix_copilot.engine.steps.review import patch_gate
     from infermatrix_copilot.review.reviewer import ReviewVerdict
 
     base = _git(git_repo, "rev-parse", "HEAD")
@@ -92,7 +92,7 @@ def test_patch_gate_reviews_committed_range_and_push_binds_head(
     def approve(_llm, *, diff_text, **_kwargs):
         seen.append(diff_text)
         return ReviewVerdict("lgtm")
-    monkeypatch.setattr(review_steps, "run_patch_review", approve)
+    monkeypatch.setattr(patch_gate, "run_patch_review", approve)
     state = {
         "repo_path": str(git_repo), "task_spec": {"kind": "pr_debug"},
         "pr_initial_head_sha": base,
