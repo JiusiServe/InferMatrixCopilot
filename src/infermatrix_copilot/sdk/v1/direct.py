@@ -86,7 +86,7 @@ def get_capabilities(
     supports_file_locking: bool = True,
 ) -> Capabilities:
     """Return the SDK/distribution/resource handshake without starting a server."""
-    from .knowledge import _apply_supported
+    from ...knowledge_service.curation import _apply_supported
 
     knowledge = knowledge_root()
     adapters = adapters_root()

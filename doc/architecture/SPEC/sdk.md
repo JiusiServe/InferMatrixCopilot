@@ -84,10 +84,10 @@
   `flock` 串行化；等待后的 SHA 复核让第二个 stale writer 失败，不会覆盖首个结果。
 - **知识 orchestration 留在宿主**：SDK 不 clone、调用 model、管理 ledger、commit、
   push、开 PR 或 schedule。ReviewBot 必须向 `KnowledgeCurator` 传 dedicated work
-  checkout，并继续拥有重试、artifact 与 fork publication；SDK 也绝不写 packaged
+  checkout，并继续拥有重试、artifact 与本地补丁导出；SDK 也绝不写 packaged
   knowledge tree。
-- SDK、Direct、Quality API 版本常量为 `1.0.0`；Strict 为 `1.2.0`
-  （1.1 新增 `finding_dispositions`；1.2 新增 `findings`），Knowledge 为 `1.1.0`
+- SDK、Quality API 版本常量为 `1.0.0`；Direct 为 `1.1.0`，Strict 为 `1.3.0`
+  （1.1 新增 `finding_dispositions`；1.2 新增 `findings`；1.3 新增显式 recheck），Knowledge 为 `1.1.0`
   （1.1 向后兼容地新增 `catalog_entries()` / `KnowledgeCatalogEntry` 与容量预检），
   distribution 为 `0.2.0`；`Capabilities.knowledge_api_version` 与
   `supports_knowledge_curation` 组成 ReviewBot 的 paired-release 握手，避免只按
@@ -99,7 +99,8 @@
 
 `sdk.v1.models` 为纯 stdlib 模型；`direct` import-time 只依赖模型与资源解析，
 函数调用时才向下进入 `direct_routing`；`strict` 构造时才向下进入
-`Settings`/`CopilotMCP`。`knowledge` 只依赖 stdlib、公开模型和显式 work checkout，
+headless `app.RunService`。`sdk.v1.knowledge` 是兼容导出，实际实现位于
+`knowledge_service.curation`；后者只依赖 stdlib、公开模型和显式 work checkout，
 并以 subprocess 运行上述两个固定 validator。任何 server 都不得被 SDK package
 initializer 反向 import，provider domain 也不得反向依赖 ReviewBot。
 
