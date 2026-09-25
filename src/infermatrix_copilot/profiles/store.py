@@ -119,11 +119,24 @@ class ProfileStore:
                   actor: str = "agent") -> list[str]:
         """Apply typed ops; returns per-op rejection reasons ('' = applied).
         Malformed/forbidden ops are rejected individually, never raised."""
-        allowed = RUN_OPS if tier == "run" else CONSOLIDATE_OPS
+        allowed = {"run": RUN_OPS, "consolidate": CONSOLIDATE_OPS}.get(tier)
         results: list[str] = []
         applied: list[dict] = []
         for op in ops:
-            kind = str((op or {}).get("op", ""))
+            if allowed is None:
+                results.append(f"unknown profile tier '{tier}'")
+                continue
+            if not isinstance(op, dict):
+                results.append("profile operation must be an object")
+                continue
+            kind = str(op.get("op", ""))
+            evidence = op.get("evidence")
+            if evidence is not None and (
+                not isinstance(evidence, list)
+                or not all(isinstance(item, str) for item in evidence)
+            ):
+                results.append(f"op '{kind}' evidence must be a list of strings")
+                continue
             if kind not in allowed:
                 results.append(f"op '{kind}' not allowed in tier '{tier}'")
                 continue

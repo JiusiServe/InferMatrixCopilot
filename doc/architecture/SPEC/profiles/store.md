@@ -1,6 +1,6 @@
 # profiles/store.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-09-26 -->
 
 `LOC ~268 · profile（精选层） · refactor-status: ok`
 
@@ -16,6 +16,8 @@
 ## 不变量
 - op 是**唯一**的变更路径；畸形/被禁的 op **逐条**拒绝（绝不抛异常）；档位不对的 op
   被拒（**D4**）。
+- 未知 tier、非 object op、非 `list[str]` 的证据均只拒绝对应 op；同批后续合法 op
+  仍可应用。
 - `add_fact` 需要正文 + 证据；重复 id 视为一次**确认**（**D3**）。
 - `rewrite_fact` 绝不让某条 fact 变成无证据；**稳定**（≥3 次确认）的 fact 不得丢弃已
   引用的证据；被取代的正文进 `history`（**D3**）。

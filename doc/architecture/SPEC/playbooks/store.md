@@ -1,6 +1,6 @@
 # playbooks/store.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-09-26 -->
 
 `LOC ~166 · 规划（注册表） · refactor-status: ok`
 
@@ -21,6 +21,7 @@
   locked > active；高版本 > 低版本。
 - `validate` 拒绝引用了未注册 step 的 playbook（**加载即失败**）。
 - `save_candidate` 强制 `status=candidate`（**D1** —— 不允许自我晋升）。
+- `playbook_to_doc` 保留 `mode_aware`，candidate 的序列化/解析往返不能改变模式门。
 
 ## 边界 —— 不属于这里
 不执行、不含规划策略（那是 planner 的）、不含 step 逻辑。

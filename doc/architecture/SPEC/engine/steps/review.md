@@ -1,12 +1,15 @@
 # engine/steps/review/ —— 规范
 
-<!-- verified-against: 2026-09-22 -->
+<!-- verified-against: 2026-09-26 -->
 
 `LOC ~900（6 个文件） · step 库（评审） · refactor-status: ok`
 
 ## 职责
 条件式 patch 门 + PR 评审 agent step + 有界的 PR review-readiness 质量 step，
 以及它们仓库中立的 prompt 体系。
+Pre-push patch 门必须审查显式 base 到当前 HEAD 的已提交变更；空范围、脏的
+tracked checkout、不可解析的 ref 或超过 reviewer 容量的 diff 都阻塞推送。
+通过后记录批准的 base/head，后续推送必须验证当前 HEAD 仍匹配。
 它曾是一个 341 行的模块；现在是一个把评测调优过的 prompt 数据、handler、
 确定性 helper 三者分开的包。
 
