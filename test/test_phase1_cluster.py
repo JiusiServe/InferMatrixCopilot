@@ -816,10 +816,14 @@ def test_drift_guard_unimportable_checked_class_fails_guard(
         drift_guard, tmp_path, monkeypatch, capsys):
     """An unimportable constructor-checked class IS drift (upstream
     moved/renamed it) and must fail the guard — the silent SKIP is exactly
-    how the dead pooling entry went unnoticed in the parent. Offline (no
-    vllm installed) every constructor check import-fails, so main() must
-    return 1 with a MISMATCH per entry."""
+    how the dead pooling entry went unnoticed in the parent. Force the
+    import failure so this assertion also holds in an environment that has
+    vllm installed."""
     monkeypatch.chdir(tmp_path)   # no tests/ dir; nothing else to scan
+    def missing_class(module, name):
+        raise ImportError(f"{module}.{name} is unavailable")
+
+    monkeypatch.setattr(drift_guard, "import_class", missing_class)
     rc = drift_guard.main()
     out = capsys.readouterr().out
     assert rc == 1

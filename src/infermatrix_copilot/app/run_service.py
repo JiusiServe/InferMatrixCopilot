@@ -21,7 +21,7 @@ from .. import idempotency as idem
 from .. import run_status as rs
 from ..config import Settings
 from ..knowledge_docs import KnowledgeDocs, KnowledgeDocsError
-from ..mcp_policy import (
+from .request_policy import (
     PolicyError, authorize_repo_path, enforce_mcp_policy,
     enforce_quality_review_policy, enforce_strict_review_policy,
 )
