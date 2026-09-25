@@ -24,7 +24,7 @@ from infermatrix_copilot.sdk.v1 import (
     StrictReviewRequest,
     StrictRuntime,
 )
-from infermatrix_copilot.sdk.v1 import knowledge as knowledge_module
+from infermatrix_copilot.knowledge_service import curation as knowledge_module
 
 HEAD = "a" * 40
 
