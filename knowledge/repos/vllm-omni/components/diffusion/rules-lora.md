@@ -1,10 +1,10 @@
 ---
 title: "Diffusion LoRA 规则"
 created: 2026-09-02
-updated: 2026-09-22
+updated: 2026-09-26
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/lora/layers/base_linear.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/diffusion/lora/test_lora_manager.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/lora.py, "PR #6268", benchmarks/kernels/benchmark_diffusion_lora_expand.py, tests/diffusion/lora/test_base_linear.py, "PR #7195", "PR #7349", "PR #5907"]
+sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/lora/layers/base_linear.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/diffusion/lora/test_lora_manager.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/lora.py, "PR #6268", benchmarks/kernels/benchmark_diffusion_lora_expand.py, tests/diffusion/lora/test_base_linear.py, "PR #7195", "PR #7349", "PR #5907", "PR #8008"]
 confidence: high
 ---
 
@@ -158,3 +158,10 @@ confidence: high
 - 强制：manager 默认只扫描通用 diffusers 名 `transformer`、`transformer_2`、`unet`；模型专用属性（如 Bagel 的 `bagel`）必须由 pipeline 经 `_dit_modules` 或 `_lora_components` 声明。ModelOpt 默认只保留通用 attention 融合（`to_qkv`、`add_kv_proj`）；模型专用融合（如 Z-Image `w13`）必须写在模型 `packed_modules_mapping` 并由 adapter 合并。
 - 禁止：把 `dit`/`bagel`/`w13` 等模型私有名硬编码进共享默认；在未扫描真实 denoiser 时宣称 adapter 已生效（零层绑定、输出等同 base）。
 - 验收：Bagel/同类测试 pipeline 必须显式 `_lora_components` 才能发现层；Z-Image 映射在模型侧声明后仍可解析；去掉声明后不得靠框架默认偷跑。^[PR #5907]
+
+## DIFF-2ag4 — 任一未绑定 module 的 diffusion LoRA adapter 必须失败
+
+- 触发：修改 `DiffusionLoRAManager._bind_adapter_weights` / `_activate_adapter`、fused/packed `lora_b` 切分，或把部分命中当成成功激活。
+- 强制：激活前必须证明 adapter 提供的每个 logical module 都已绑定；`bound_lora_names` 为空、或 `loras` 中仍有未绑定名，一律 `ValueError`，消息含 adapter id、`bound=k/n`、unbound 名和 expected target modules。fused-QKV / packed `output_slices` 对不上 `lora_b` 维度时立即 raise，不得 warning 后 `reset_lora` 并继续。空 adapter（`bound=0/0`）同样失败。稀疏 packed 目标（只供 Q 或 Q/V）在**已提供模块全部绑定**时合法，未提供的 slice 保持 `None`。失败必须走既有 activation cleanup：reset wrapper、清 active/suspended 身份。
+- 禁止：只拒绝零绑定却放行部分绑定（例如 `attn.to_out` 命中而 `attn.to_out.0` 被忽略）；把 fused 布局失败写成可跳过 warning；在部分 bind 后仍标 adapter active。
+- 验收：CPU 覆盖 unmatched 名、empty adapter、fused shape mismatch，以及从 active/suspended 切失败后的 rollback 与旧 adapter 再激活；packed 路径覆盖 Q、Q/V、Q/K/V 三种 name form。^[PR #8008]
