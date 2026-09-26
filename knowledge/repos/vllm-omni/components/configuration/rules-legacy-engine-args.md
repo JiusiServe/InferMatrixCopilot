@@ -38,3 +38,17 @@ confidence: high
 - 强制：把字段同时加入 `_ModelEngineOverrides` 与 `OmniStageModelConfig`，类型跟随 vLLM `EngineArgs`，默认 `None`，使 `_project_omni_config_fields` 只投影用户显式值，并经 typed/legacy engine-args 到达各 stage。不得把这些 ModelConfig 输入塞进 `_NON_STAGE_ENGINE_CLI_FIELDS` 来绕过 ownership。
 - 禁止：仅因 legacy `build_stage_runtime_overrides` 仍能透传就让 structured ownership 拒绝文档命令；把尚未归属的非 ModelConfig 开关（如 `enable_lora`/`speculative_config`）一并放行。
 - 验收：对至少两个 pipeline key 参数化断言显式全局值进入每个 stage 的 `model_config`，并用 typed `build_engine_args_dict_from_omni_stage_config` 读回同一集合；字段集合 census 必须包含这些 owner。^[PR #7390]
+
+## VOMNI-CFG-1v — `from_cli_args` 依赖的 diffusion 并行字段必须声明在 OmniEngineArgs
+
+- 触发：新增或转发 `--text-encoder-tp-size` 等 library/`OmniEngineArgs.from_cli_args` 会过滤的 diffusion 并行字段，或修改 `from_cli_args` 的 dataclass field filter。
+- 强制：凡 library 调用方经 `from_cli_args` → stage kwargs → `DiffusionParallelConfig` / `create_default_diffusion` 消费的字段，必须在 `OmniEngineArgs` 上显式声明（如 `text_encoder_tp_size: int | None = None`），使 filter 保留 namespace 值。注册 pipeline 若经 `stage_cli_aliases` 改写语义，须在规则/测试中单独钉死，不能与 generic diffusion fallback 混为一谈。
+- 禁止：只在 argparse/serve 路径注册 flag 却不声明 dataclass 字段，导致值被静默丢弃并回退默认（如 TP=1）；为通过 filter 把字段错误挂到破坏 shared-fields 不变量的 `OrchestratorArgs`。
+- 验收：`from_cli_args(SimpleNamespace(...))` 读回字段；再经 default diffusion factory 断言 `parallel_config` 同值；既有 serve CLI 与 shared-fields 回归不得回退。^[PR #7652]
+
+## VOMNI-CFG-1w — 写入 model_config 的 CLI-only alias 必须移出 explicit_keys
+
+- 触发：serve CLI 把 `--no-guardrails` 等仅入口别名改写进 `model_config`，或修改 `OmniServeCommand.cmd` 对 `TrackingNamespace.explicit_keys` 的更新。
+- 强制：alias 消费后只保留 canonical `model_config`（如 `guardrails=False`）；从 `explicit_keys` 去掉 `no_guardrails` 这类 CLI-only 名，再交给 diffusion stage 的严格 ingress 校验。标准与 headless 路径同一清理。
+- 禁止：映射完成后仍把 alias 当 stage engine override 转发，触发 `Unknown diffusion config field(s)`；为通过校验而放宽 unknown-field 拒绝。
+- 验收：真实 parser + `normalize_and_validate_diffusion_engine_ingress_kwargs` 断言 `model_config.guardrails is False` 且 explicit kwargs 不含 alias。^[PR #7917]

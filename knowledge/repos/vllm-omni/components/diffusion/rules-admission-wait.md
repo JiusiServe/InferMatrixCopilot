@@ -1,7 +1,7 @@
 ---
 title: "Diffusion admission wait rules"
 created: 2026-08-10
-updated: 2026-08-10
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, components, diffusion, scheduler]
 sources: [docs/mkdocs/hooks/generate_argparse.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/sched/base_scheduler.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_rpc_routing.py, tests/diffusion/test_diffusion_scheduler.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5843"]
@@ -54,3 +54,10 @@ sources: [docs/mkdocs/hooks/generate_argparse.py, vllm_omni/diffusion/data.py, v
   extraction 必须为自定义 type 提供安全 stub。当前私有 `_AdmissionWaitDecision` 自身没有
   `__post_init__` invariant validation，安全性依赖 only-in-tree scheduler producer；若重新导出或
   开放 extension，须补 deadline/stability/max-batch 非法值测试。^[PR #5843]
+
+## DIFFADM-1d — diffusion `pause_generation(mode="keep")` 必须闸住调度并在 batch 边界 ACK
+
+- 触发：修改 `DiffusionEngine` 的 `pause_scheduler` / `resume_scheduler`、`_scheduling_paused`、admission wait 与 pause 交互，或 `AsyncOmni.pause_generation(mode="keep")` 对 diffusion stage 的路由。
+- 强制：仅 request-level execution 且 `mode="keep"`；submit 时关闭调度闸，打断进行中的 admission wait，在闸打开前不得 `schedule()` 新 batch。ACK 是下一 batch 边界的全 rank `synchronize_device`（multiproc 先排空 async D2H/SHM output）。暂停期间 abort 的终态仍须经 `pending_finished_request_ids()` 发出。`AsyncOmni` 只对有效 keep 发 pause，resume 先开调度再开 admission。单 replica 控制 RPC 失败必须作为该 replica 错误返回，不得打崩 orchestrator。
+- 禁止：只关 frontend admission 却继续调度已入队请求；在 `step_execution=True` 或 `mode=abort/wait` 上静默声称已支持；ACK 前把暂停当成已交付最后 batch 输出。
+- 验收：CPU 覆盖 gate/resume、pause 中断 wait、暂停期 abort 终态、RPC 错误隔离；E2E 覆盖 keep 后无新 batch 直至 resume。^[PR #7685]
