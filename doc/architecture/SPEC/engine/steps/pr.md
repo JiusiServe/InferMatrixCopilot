@@ -2,7 +2,7 @@
 
 <!-- verified-against: 2026-09-26 -->
 
-`LOC ~1390（6 个文件） · step 库（PR） · refactor-status: ok`
+`LOC ~1988（6 个文件） · step 库（PR） · refactor-status: ok`
 
 ## 职责
 受守卫的推送、只读的 PR 抓取/门禁、PR rebase、PR debug、受门禁的评审发布。
@@ -20,8 +20,9 @@
 - `utils.py` —— 纯函数 `extract_signature`（及其正则）。
 
 ## Steps（12 个）
-`ci.push`（script/push）；`pr.fetch_diff`、`pr.gate_check`、`pr.checkout_branch`、
+`ci.push`（script/push）；`pr.fetch_diff`、`pr.gate_check`、
 `pr.analyze_diff`、`pr.fetch_ci_failures`、`pr.group_failures`（deterministic/read）；
+`pr.checkout_branch`（deterministic/write_workspace）；
 `pr.harvest_debug_knowledge`（deterministic/knowledge）；
 `pr.rebase_onto_base`、`agent.debug_group`（agent/write_workspace）；
 `agent.verify_module`（validation/read）；`pr.post_review`（script/push）。
@@ -29,6 +30,9 @@
 `pr-debug` 的 report-only 路径不 checkout PR 分支。诊断组数受 playbook 参数和
 settings 安全上限共同约束；执行组共享 checkout 时必须顺序修改。`agent.debug_group`
 只有在观察到新 commit、干净的 tracked checkout、根因和验证证据时才算成功。
+`pr-rebase` 的 report-only 路径在按 run 分键的私有 detached worktree 内本地
+rebase，不修改配置 checkout 的分支或文件，不推送。该树是一次 run 的可变 scratch，
+不是 `pr.fetch_diff` 使用的、按 head 分键的不可变评审快照。
 `agent.verify_module` 的咨询结论是 `verified | problem | inconclusive`，未知文本
 不能标成已验证。`ci.push` 对 PR debug/rebase 还需同一 HEAD 的 patch-gate 批准。
 知识 intake 的 canonical 记录使用 schema v2、完整仓库名和稳定 event ID；缺少
@@ -64,7 +68,13 @@ settings 安全上限共同约束；执行组共享 checkout 时必须顺序修�
   `gh` 不可用时降级为 BLOCKED，**绝不崩溃**。
 - `pr.checkout_branch` 把推导出的 `PushPolicy` **序列化后发布**（**B2**）——
   在推送处 resume 时**绝不能**看到那个 deny-all 的默认值。
+- `pr.checkout_branch` 的 report-only 模式只在私有树里 checkout，并经
+  `state_updates` 发布私有 `repo_path` 和配置 checkout 路径；resume 时所有后续
+  rebase/analyze/verify step 核对私有树身份、仓库归属及 detached HEAD，树若已被 reaper 清理就
+  BLOCKED，绝不回退到配置 checkout。
 - `pr.rebase_onto_base`：由受治理 agent 解冲突，或 abort+升级（**工作区始终被还原**）。
+  判断 rebase 是否完成时通过 `git rev-parse --git-path` 定位每棵 worktree
+  自己的元数据；不能假设 `.git` 是目录。抓取 base 或生成 diff 失败时 BLOCKED。
 - `pr.fetch_ci_failures` 经 profile 选定的 CI provider 富化日志，否则记一条
   `capability_gap`（**E2**）；`pr.group_failures` 按**归一化后**的签名分组。
 - `pr.post_review` 是**双闸**的（**C5**）。
@@ -89,12 +99,14 @@ settings 安全上限共同约束；执行组共享 checkout 时必须顺序修�
 不含 agent 治理（那是 `agent_runtime`）。
 
 ## 依赖（允许）
-`scopes`、`push`、`ci/*`、`adapters/base`（analyze）、`engine/step`、`.._common`、
+`scopes`、`push`、`ci/*`、`adapters/base`（analyze）、`engine/step`、
+`engine/worktrees`、`.._common`、
 `..agent_runtime`。
 
 ## 测试
 `test_pr_steps.py`（含钉 ref run 域隔离、head 移动检测、stale expected_head
-BLOCK、worktree 分键/拒外来树）、`test_push_and_steps.py`、
+BLOCK、worktree 分键/拒外来树、report-only rebase 的隔离与失效树拦截）、
+`test_push_and_steps.py`、
 `test_knowledge_harvest.py`（harvest step + executor crash-then-resume）、
 `test_ci_and_repo_map.py`（注意：`test_ci_and_repo_map` monkeypatch 的是
 `pr.debug._gh`，即 `pr.fetch_ci_failures` 绑定 `gh` 的那个子模块）；

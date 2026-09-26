@@ -69,13 +69,130 @@ def test_checkout_sets_branch_and_push_policy(registry, settings, trace, tmp_pat
     assert policy.allowed and policy.branch == "feature" and policy.force_with_lease
 
 
-def test_checkout_report_only_disallows_push(registry, settings, trace, tmp_path, pr_repos):
+def test_checkout_report_only_disallows_push(registry, settings, trace, tmp_path,
+                                             pr_repos, monkeypatch):
+    from infermatrix_copilot.engine import worktrees
+    from infermatrix_copilot.engine.lifecycle import finalize
+
+    monkeypatch.setattr(worktrees, "worktree_root", lambda: tmp_path / "private")
     _, work = pr_repos
+    original_head = _git(work, "rev-parse", "HEAD")
     state = {"repo_path": str(work), "task_spec": {"pr": 7, "report_only": True},
              "pr_meta": {"headRefName": "feature", "remote": "origin"}}
     step = registry.get("pr.checkout_branch")
-    assert asyncio.run(step.handler(_ctx(settings, trace, tmp_path, state))).ok
+    result = asyncio.run(step.handler(_ctx(settings, trace, tmp_path, state)))
+    assert result.ok, result.summary
     assert state["push_policy"].allowed is False
+    private = Path(state["repo_path"])
+    assert private != work and private.is_dir()
+    assert _git(private, "rev-parse", "HEAD") == _git(work, "rev-parse", "origin/feature")
+    assert _git(work, "rev-parse", "HEAD") == original_head
+    assert _git(work, "branch", "--show-current") == "main"
+    assert _git(work, "status", "--porcelain") == ""
+    assert "pr-7-feature" not in _git(work, "branch", "--list")
+    assert result.outputs["state_updates"]["repo_path"] == str(private)
+    asyncio.run(finalize(tmp_path / "rundir", None))
+
+
+def test_report_only_rebase_stays_private_across_resume(
+    registry, settings, trace, tmp_path, pr_repos, monkeypatch,
+):
+    from infermatrix_copilot.engine import worktrees
+    from infermatrix_copilot.engine.lifecycle import finalize
+    from infermatrix_copilot.engine.steps.pr.rebase import _rebase_in_progress
+
+    monkeypatch.setattr(worktrees, "worktree_root", lambda: tmp_path / "private")
+    origin, work = pr_repos
+    (origin / "other.py").write_text("o = 1\n")
+    _git(origin, "add", ".")
+    _git(origin, "commit", "-q", "-m", "main moves on")
+    original_head = _git(work, "rev-parse", "HEAD")
+    state = {"repo_path": str(work), "task_spec": {"pr": 7, "report_only": True},
+             "pr_meta": {"headRefName": "feature", "remote": "origin"}}
+    checkout = asyncio.run(registry.get("pr.checkout_branch").handler(
+        _ctx(settings, trace, tmp_path, state)))
+    assert checkout.ok, checkout.summary
+    private = Path(state["repo_path"])
+    # A linked worktree has a .git file. Rebase state lives in its Git metadata.
+    marker = Path(_git(private, "rev-parse", "--git-path", "rebase-merge"))
+    if not marker.is_absolute():
+        marker = private / marker
+    marker.mkdir()
+    assert _rebase_in_progress(private)
+    marker.rmdir()
+    assert not _rebase_in_progress(private)
+    # Executor resume replays only JSON-simple state_updates, not the handler.
+    resumed = {"task_spec": state["task_spec"],
+               **checkout.outputs["state_updates"]}
+    for name in ("pr.rebase_onto_base", "pr.analyze_diff"):
+        result = asyncio.run(registry.get(name).handler(
+            _ctx(settings, trace, tmp_path, resumed)))
+        assert result.ok, f"{name}: {result.summary}"
+    assert (private / "other.py").exists() and (private / "feature.py").exists()
+    assert resumed["affected_modules"] == ["root"]
+    assert _git(private, "rev-parse", "HEAD") != checkout.outputs["state_updates"]["pr_initial_head_sha"]
+    assert _git(work, "rev-parse", "HEAD") == original_head
+    assert _git(work, "branch", "--show-current") == "main"
+    assert _git(work, "status", "--porcelain") == ""
+    assert not (work / "other.py").exists()
+    assert not resumed["push_policy"]["allowed"]
+
+    # A second run of the same PR gets a distinct mutable checkout.
+    second_root = tmp_path / "second"
+    second_state = {"repo_path": str(work), "task_spec": state["task_spec"],
+                    "pr_meta": state["pr_meta"]}
+    second = asyncio.run(registry.get("pr.checkout_branch").handler(
+        _ctx(settings, trace, second_root, second_state)))
+    assert second.ok and second_state["repo_path"] != str(private)
+    asyncio.run(finalize(tmp_path / "rundir", None))
+    asyncio.run(finalize(second_root / "rundir", None))
+
+
+def test_report_only_rebase_rejects_redirected_or_missing_private_tree(
+    registry, settings, trace, tmp_path, pr_repos, monkeypatch,
+):
+    from infermatrix_copilot.engine import worktrees
+    from infermatrix_copilot.engine.lifecycle import finalize
+
+    monkeypatch.setattr(worktrees, "worktree_root", lambda: tmp_path / "private")
+    _, work = pr_repos
+    original_head = _git(work, "rev-parse", "HEAD")
+    state = {"repo_path": str(work), "task_spec": {"pr": 7, "report_only": True},
+             "pr_meta": {"headRefName": "feature", "remote": "origin"}}
+    dest = worktrees.mutable_dest_for(work, 7, tmp_path / "rundir")
+    dest.parent.mkdir(parents=True)
+    dest.symlink_to(work, target_is_directory=True)
+    refused = asyncio.run(registry.get("pr.checkout_branch").handler(
+        _ctx(settings, trace, tmp_path, state)))
+    assert not refused.ok and "redirected" in refused.summary
+    assert _git(work, "rev-parse", "HEAD") == original_head
+    assert _git(work, "branch", "--show-current") == "main"
+    dest.unlink()
+
+    checkout = asyncio.run(registry.get("pr.checkout_branch").handler(
+        _ctx(settings, trace, tmp_path, state)))
+    assert checkout.ok, checkout.summary
+    resumed = {"task_spec": state["task_spec"],
+               **checkout.outputs["state_updates"]}
+    _git(dest, "checkout", "-q", "-b", "unexpected")
+    attached = asyncio.run(registry.get("pr.rebase_onto_base").handler(
+        _ctx(settings, trace, tmp_path, resumed)))
+    assert not attached.ok and "detached" in attached.summary
+    # A real retry starts after run teardown releases the prior shared hold.
+    asyncio.run(finalize(tmp_path / "rundir", None))
+    retry_state = {"repo_path": str(work), "task_spec": state["task_spec"],
+                   "pr_meta": state["pr_meta"]}
+    retry = asyncio.run(registry.get("pr.checkout_branch").handler(
+        _ctx(settings, trace, tmp_path, retry_state)))
+    assert not retry.ok and "detached" in retry.summary
+    assert _git(work, "branch", "--show-current") == "main"
+    _git(dest, "checkout", "-q", "--detach")
+    asyncio.run(finalize(tmp_path / "rundir", None))
+    _git(work, "worktree", "remove", "--force", str(dest))
+    missing = asyncio.run(registry.get("pr.rebase_onto_base").handler(
+        _ctx(settings, trace, tmp_path, resumed)))
+    assert not missing.ok and "missing" in missing.summary
+    assert _git(work, "rev-parse", "HEAD") == original_head
 
 
 def test_patch_gate_reviews_committed_range_and_push_binds_head(
@@ -179,8 +296,15 @@ def test_clean_rebase_and_analyze(registry, settings, trace, tmp_path, pr_repos)
     assert state["primary_files"] == ["*feature.py"]
 
 
+@pytest.mark.parametrize("report_only", [False, True])
 def test_conflict_without_llm_aborts_and_escalates(registry, settings, trace,
-                                                   tmp_path, pr_repos):
+                                                   tmp_path, pr_repos,
+                                                   report_only, monkeypatch):
+    from infermatrix_copilot.engine import worktrees
+    from infermatrix_copilot.engine.lifecycle import finalize
+    from infermatrix_copilot.engine.steps.pr.rebase import _rebase_in_progress
+
+    monkeypatch.setattr(worktrees, "worktree_root", lambda: tmp_path / "private")
     origin, work = pr_repos
     # conflicting change on main touching the same line as a new feature commit
     (origin / "core.py").write_text("x = 2\n")
@@ -192,7 +316,7 @@ def test_conflict_without_llm_aborts_and_escalates(registry, settings, trace,
     _git(origin, "commit", "-q", "-m", "feature edits core")
     _git(origin, "checkout", "-q", "main")
 
-    state = {"repo_path": str(work), "task_spec": {"pr": 7},
+    state = {"repo_path": str(work), "task_spec": {"pr": 7, "report_only": report_only},
              "pr_meta": {"headRefName": "feature", "remote": "origin"}}
     assert asyncio.run(registry.get("pr.checkout_branch").handler(
         _ctx(settings, trace, tmp_path, state))).ok
@@ -201,9 +325,16 @@ def test_conflict_without_llm_aborts_and_escalates(registry, settings, trace,
     assert not result.ok and result.failure is FailureKind.ESCALATE
     assert "core.py" in result.outputs["conflicts"]
     # rebase aborted -> workspace clean, no rebase in progress
-    assert _git(work, "status", "--porcelain") == ""
-    assert not (work / ".git" / "rebase-merge").exists()
+    checkout = Path(state["repo_path"])
+    assert _git(checkout, "status", "--porcelain") == ""
+    assert not _rebase_in_progress(checkout)
+    if report_only:
+        assert checkout != work
+        assert _git(work, "branch", "--show-current") == "main"
+        assert (work / "core.py").read_text() == "x = 1\n"
+        assert _git(work, "status", "--porcelain") == ""
     assert list(trace.events("rebase_conflict"))
+    asyncio.run(finalize(tmp_path / "rundir", None))
 
 
 def test_extract_signature_prefers_root_cause_over_symptom():
