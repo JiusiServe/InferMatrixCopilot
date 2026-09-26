@@ -16,8 +16,11 @@ blocks the run. Execution rechecks the context after planning and refuses a
 changed checkout or policy before starting the executor.
 
 `Copilot` keeps reservation and run-path methods as compatibility delegates
-to `app.reservation.RunReservation`. It owns workflow resolution and child
-execution; it does not own idempotency indexing or run ID validation.
+to `app.reservation.RunReservation`. It owns workflow resolution, confirmation,
+reserved-run claims, and terminal status writes. `app.workflow_execution`
+owns the executor lifecycle, locks, tracing, and terminal outcome; the old
+`Copilot._execute` path delegates and retains the last-run summary. The
+application does not own idempotency indexing or run ID validation.
 
 The pre-execution gate runs before a normal CLI run directory is created.
 The child rechecks the read-only policy and checkout binding. Existing
