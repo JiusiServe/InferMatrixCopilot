@@ -11,6 +11,7 @@ import sys
 import zipfile
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -98,6 +99,48 @@ def test_archived_pull_requires_exact_merged_identity():
     for stale in (replace(live, head_sha="e" * 40), replace(live, state="open")):
         with pytest.raises(ValueError):
             archive.historical_pull(stale, pr=4893, head="a" * 40, base="d" * 40)
+
+
+def test_shadow_candidate_includes_the_posted_inline_payload():
+    body = "## Omni ReviewBot review\n\nSummary\n\nSee inline comments below.\n"
+    comment = {
+        "path": "models/foo.py", "line": 42, "side": "RIGHT",
+        "body": "**[major] Missing guard**\n\nThis path can fail.",
+    }
+    rendered = archive.shadow_candidate(body, [comment])
+    assert "### Inline findings" in rendered
+    assert "models/foo.py:42 (RIGHT)" in rendered
+    assert comment["body"] in rendered
+    assert archive.shadow_candidate(body, []) == body
+    with pytest.raises(ValueError, match="contradicts"):
+        archive.shadow_candidate("No actionable findings.\n", [comment])
+
+
+def test_shadow_artifact_requires_publication_parity_and_evaluation_path(tmp_path):
+    state = tmp_path / "state"
+    artifacts = state / "artifacts"
+    artifacts.mkdir(parents=True)
+    artifact = artifacts / "pr-4810-head.md"
+    artifact.write_text("See inline comments below.\n")
+    comment = {
+        "path": "foo.py", "line": 7, "side": "RIGHT",
+        "body": "**[P2] Missing guard**\n\nReason",
+    }
+    outcome = SimpleNamespace(
+        status="shadow", metrics={"inline_placed": 1},
+        body="See inline comments below.\n", artifact_path=artifact,
+    )
+    with pytest.raises(RuntimeError, match="differs"):
+        archive.write_shadow_artifact(outcome, [], state)
+    assert artifact.read_text() == outcome.body
+    outcome.artifact_path = tmp_path / "outside.md"
+    outcome.artifact_path.write_text(outcome.body)
+    with pytest.raises(RuntimeError, match="escaped"):
+        archive.write_shadow_artifact(outcome, [comment], state)
+    assert outcome.artifact_path.read_text() == outcome.body
+    outcome.artifact_path = artifact
+    archive.write_shadow_artifact(outcome, [comment], state)
+    assert comment["body"] in artifact.read_text()
 
 
 def test_archived_runner_identity_and_command_are_explicit():
