@@ -81,6 +81,48 @@ def historical_pull(pull, *, pr: int, head: str, base: str):
     )
 
 
+def shadow_candidate(body: str, inline_comments: list[dict]) -> str:
+    """Include the inline payload that a COMMENT review would publish.
+
+    The normal review-body artifact intentionally omits placed findings. A
+    judge reading that artifact alone would score a review with inline
+    findings as though it made none.
+    """
+    if not inline_comments:
+        return body
+    if "No actionable findings." in body:
+        raise ValueError("review body contradicts its inline findings")
+    parts = [body.rstrip(), "", "### Inline findings", ""]
+    for comment in inline_comments:
+        parts.extend([
+            f"#### {comment['path']}:{comment['line']} ({comment['side']})",
+            "",
+            str(comment["body"]).strip(),
+            "",
+        ])
+    return "\n".join(parts).rstrip() + "\n"
+
+
+def write_shadow_artifact(outcome, inline_comments: list[dict] | None, state_dir: Path) -> None:
+    """Complete only this evaluation's shadow artifact with placed comments."""
+    if outcome.status != "shadow":
+        return
+    metrics = outcome.metrics or {}
+    if inline_comments is None or metrics.get("inline_placed") != len(inline_comments):
+        raise RuntimeError("shadow inline payload differs from publication metrics")
+    if "See inline comments below." in outcome.body and not inline_comments:
+        raise RuntimeError("review body references missing inline findings")
+    if outcome.artifact_path is None:
+        raise RuntimeError("shadow review has no artifact")
+    artifact = Path(outcome.artifact_path).resolve(strict=True)
+    if artifact.parent != (state_dir / "artifacts").resolve():
+        raise RuntimeError("shadow artifact escaped the evaluation state")
+    artifact.write_text(
+        shadow_candidate(artifact.read_text(encoding="utf-8"), inline_comments),
+        encoding="utf-8",
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pr", type=int, required=True)
@@ -103,6 +145,7 @@ def main() -> int:
     from omni_reviewbot.cli import build_runtime
     from omni_reviewbot.config import Settings
     from omni_reviewbot.models import ChangedFile
+    from omni_reviewbot import publication
 
     settings = Settings.from_env()
     if settings.post or settings.review_context_mode != "no_discussion":
@@ -138,9 +181,23 @@ def main() -> int:
 
     github.get_pull = get_pull
     github.list_files = list_files
-    outcome = runtime.pipeline.run(
-        pr_number=args.pr, expected_head=args.expected_head, post=False,
-    )
+    original_inline = publication.inline_review_comments
+    captured: list[dict] | None = None
+
+    def capture_inline(*call_args, **call_kwargs):
+        nonlocal captured
+        comments, indexes = original_inline(*call_args, **call_kwargs)
+        captured = list(comments)
+        return comments, indexes
+
+    publication.inline_review_comments = capture_inline
+    try:
+        outcome = runtime.pipeline.run(
+            pr_number=args.pr, expected_head=args.expected_head, post=False,
+        )
+    finally:
+        publication.inline_review_comments = original_inline
+    write_shadow_artifact(outcome, captured, settings.state_dir)
     print(outcome.body)
     print(f"status: {outcome.status}")
     metrics = outcome.metrics or {}

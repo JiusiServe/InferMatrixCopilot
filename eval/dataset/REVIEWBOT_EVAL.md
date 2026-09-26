@@ -117,7 +117,9 @@ interpreter or manifest and does not probe installed packages.
   `changed_files` == the frozen GT diff's file count.
 - Sanitized artifacts (markers stripped, neutral heading) must fit the
   judge's 24k cap — over-cap is a campaign failure, not a silent
-  truncation.
+  truncation. The archived adapter captures the actual inline comment payload
+  from the ReviewBot publisher and appends it to the evaluation artifact;
+  ReviewBot's ordinary review-body artifact omits placed inline findings.
 - Before reporting, `build_reviewbot_report.py --verify` audits exact
   denominators, pinned judge identity, and fresh candidate sha256s in
   every verdict (judge_val skips existing files, so its exit code is not
