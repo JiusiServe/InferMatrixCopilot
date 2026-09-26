@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from .. import run_status as rs
+from ..adapters.base import AdapterError
 from ..config import Settings, TierNotConfiguredError
 from ..engine.executor import Executor
 from ..engine.lifecycle import RunLock, RunLockHeld, run_guarded
@@ -34,6 +35,7 @@ from ..task_spec import TaskSpec
 from ..ui import style
 from ..metrics import format_metrics_line
 from .reservation import RunReservation
+from .repository_context import RepositoryContext, RepositoryContextResolver
 
 
 class GateOutcome(NamedTuple):
@@ -70,6 +72,7 @@ class Copilot:
         and is filled by the first execution."""
         self.settings = settings or Settings()
         self.reservations = RunReservation(self.settings)
+        self.repository_context = RepositoryContextResolver(self.settings)
         # provider-registry seam: a real llm.LLM under backend "api"
         # (byte-identical), a HarnessLLM adapter under a harness backend
         from ..providers import llm_for
@@ -89,41 +92,15 @@ class Copilot:
         capability set so the planner only reuses playbooks the target supports.
         Capabilities come from the repo's adapter (if any), plus `repo.path` when
         a path is resolvable even without a adapter (REPO_PATHS works adapter-less)."""
-        # Only genuine adapter ABSENCE takes the unknown-capabilities
-        # compatibility path — a malformed/unreadable KNOWN adapter must fail
-        # closed here, not fail open into capabilities=None and recall a
-        # playbook whose requirements were never established.
-        from ..adapters.base import AdapterError, AdapterNotFound, AdapterRegistry
-        adapter_name = spec.repo.replace("-", "_")
-        try:
-            adapter = AdapterRegistry(self.settings.adapters_dir).resolve(
-                name=adapter_name)
-        except AdapterNotFound:
-            # the registry resolves by DECLARED manifest name and skips
-            # manifest-less directories — so "not found" alone does not
-            # prove absence. Only a genuinely absent directory is the
-            # v1-compatible path; an existing directory that failed to
-            # load/resolve (deleted manifest, wrong name:) fails closed.
-            if (Path(self.settings.adapters_dir) / adapter_name).exists():
-                raise AdapterError(
-                    f"adapter directory {adapter_name!r} exists but did not "
-                    "load/resolve (missing manifest.yaml or mismatched "
-                    "name:) — refusing to plan with unknown capabilities")
-            adapter = None                # absence: v1-compatible
-        except FileNotFoundError:
-            adapter = None                # no adapters directory at all
-        if adapter is None:
-            # No adapter means capabilities are UNKNOWN, not zero — the
-            # store's requires-filter (now covering exact-repo playbooks too)
-            # skips on None, keeping adapter-less setups v1-compatible
-            # instead of silently dropping every playbook with a `requires:`.
-            if self._repo_path_for(spec):
-                return self.planner.resolve(spec, capabilities=None)
-            return self.planner.resolve(spec, capabilities=set())
-        capabilities = set(adapter.capabilities)
-        if self._repo_path_for(spec):  # REPO_PATHS works adapter-less
-            capabilities.add("repo.path")
-        return self.planner.resolve(spec, capabilities=capabilities)
+        return self._resolve_with_context(spec)[0]
+
+    def _resolve_with_context(
+        self, spec: TaskSpec,
+    ) -> tuple[Resolution, RepositoryContext]:
+        context = self.repository_context.for_spec(spec)
+        return self.planner.resolve(
+            spec, capabilities=context.capabilities,
+        ), context
 
     def _plan_review_gate(self, resolution: Resolution, spec: TaskSpec,
                           assume_yes: bool) -> bool:
@@ -162,8 +139,8 @@ class Copilot:
         `plan_only` prints the resolved plan and returns 0 without running;
         `assume_yes` skips the interactive confirm."""
         try:
-            resolution = self.resolve(spec)
-        except PlanningError as exc:
+            resolution, repo_context = self._resolve_with_context(spec)
+        except (PlanningError, AdapterError) as exc:
             print(style("✋ cannot plan: ", "red", "bold") + str(exc))
             return BLOCKED_EXIT
         # tier preflight (plan v2): backend availability is DEPLOYMENT state,
@@ -215,7 +192,8 @@ class Copilot:
             "invocation_id": os.environ.get("IMX_INVOCATION_ID", ""),
         }, indent=2))
         return self._execute(resolution.playbook, spec, run_dir,
-                             resolution_mode=resolution.mode, tier=resolution.tier)
+                             resolution_mode=resolution.mode, tier=resolution.tier,
+                             planned_context=repo_context)
 
     def run_playbook(self, name: str, *, params: dict | None = None,
                      report_only: bool = False, assume_yes: bool = False,
@@ -287,7 +265,8 @@ class Copilot:
 
     def _execute(self, playbook, spec: TaskSpec, run_dir: Path, *,
                  resolution_mode: str = "resume", tier: str = "?",
-                 resuming: bool = False, held_lock: RunLock | None = None) -> int:
+                 resuming: bool = False, held_lock: RunLock | None = None,
+                 planned_context: RepositoryContext | None = None) -> int:
         """Run a resolved `playbook` to completion in `run_dir`: init tracing +
         notifier, seed the shared state (repo path, push policy, protected
         branches / high-risk modules from the adapter when present), drive the
@@ -298,6 +277,16 @@ class Copilot:
         the code but owns the terminal `run_status.json` write."""
         self.last_run_dir = run_dir
         self.last_blocked_reason = ""
+        try:
+            repo_context = self.repository_context.for_spec(spec)
+        except AdapterError as exc:
+            self.last_blocked_reason = f"repository context invalid: {exc}"
+            print(style("✋ ", "red", "bold") + self.last_blocked_reason)
+            return BLOCKED_EXIT
+        if planned_context is not None and repo_context != planned_context:
+            self.last_blocked_reason = "repository context changed after planning"
+            print(style("✋ ", "red", "bold") + self.last_blocked_reason)
+            return BLOCKED_EXIT
         lock = held_lock
         if lock is None:
             try:
@@ -349,17 +338,13 @@ class Copilot:
                          playbook=playbook.name, tier=tier)
             state: dict = {
                 "task_spec": spec.model_dump(),
-                "repo_path": self._repo_path_for(spec),
+                "repo_path": repo_context.repo_path,
                 "push_policy": PushPolicy(),  # steps may replace with a derived policy
-                "protected_branches": self.settings.protected_branches,
+                "protected_branches": list(repo_context.protected_branches),
                 "resuming": resuming,
             }
-            adapter = self._adapter_for(spec.repo)
-            if adapter is not None:
-                # repo knowledge from the adapter, not core settings (v2 P0 fix #5)
-                state["protected_branches"] = adapter.protected_branches
-                if adapter.high_risk_modules:
-                    state["high_risk_modules"] = adapter.high_risk_modules
+            if repo_context.high_risk_modules:
+                state["high_risk_modules"] = list(repo_context.high_risk_modules)
             executor = Executor(self.registry, self.settings, run_dir=run_dir,
                                 trace=trace, llm=self.llm, notifier=notifier)
             # run_guarded finalizes inside the event loop: playbooks that
@@ -509,8 +494,8 @@ class Copilot:
             rs.mark(run_dir, rs.FAILED, note=f"policy/request rejected: {exc}")
             return 1
         try:
-            resolution = self.resolve(spec)
-        except PlanningError as exc:
+            resolution, repo_context = self._resolve_with_context(spec)
+        except (PlanningError, AdapterError) as exc:
             rs.mark(run_dir, rs.BLOCKED, note=f"cannot plan: {exc}")
             return BLOCKED_EXIT
         try:  # tier preflight is re-enforced in the MCP child (authoritative)
@@ -526,7 +511,7 @@ class Copilot:
         try:
             code = self._execute(resolution.playbook, spec, run_dir,
                                  resolution_mode=resolution.mode, tier=resolution.tier,
-                                 held_lock=lock)
+                                 held_lock=lock, planned_context=repo_context)
         except Exception as exc:  # a crash still leaves a terminal record
             rs.mark(run_dir, rs.FAILED, note=f"{type(exc).__name__}: {exc}")
             raise
@@ -540,14 +525,8 @@ class Copilot:
         return code
 
     def _adapter_for(self, repo: str):
-        """The repo's registered adapter, or None (never raises)."""
-        try:
-            from ..adapters.base import AdapterRegistry
-
-            return AdapterRegistry(self.settings.adapters_dir).resolve(
-                name=repo.replace("-", "_"))
-        except Exception:
-            return None
+        """Compatibility lookup; a broken known adapter remains an error."""
+        return self.repository_context.adapter_for(repo)
 
     def _repo_path_for(self, spec: TaskSpec) -> str:
         """The checkout THIS spec runs against: its frozen `repo_path` first,
@@ -560,7 +539,7 @@ class Copilot:
         resolve a playbook that requires it — while a perfectly valid checkout
         sat in the spec. With both configured and differing, planning would
         evaluate one checkout and execution would run against another."""
-        return spec.repo_path or self._resolve_repo_path(spec.repo)
+        return self.repository_context.repo_path_for(spec)
 
     def _resolve_repo_path(self, repo: str) -> str:
         """REPO_PATHS first; fall back to the repo's adapter manifest (adapter zero
@@ -568,13 +547,7 @@ class Copilot:
 
         Alias-only: callers that hold a TaskSpec want `_repo_path_for`, which
         honors a frozen per-run path."""
-        p = self.settings.repo_path(repo)
-        if p:
-            return str(p)
-        adapter = self._adapter_for(repo)
-        if adapter and adapter.repo_path:
-            return adapter.repo_path
-        return ""
+        return self.repository_context.ambient_repo_path(repo)
 
     # -- built-ins ---------------------------------------------------------------
     def status(self) -> str:
