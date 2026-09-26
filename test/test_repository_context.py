@@ -1,9 +1,13 @@
 from pathlib import Path
+from types import SimpleNamespace
+import subprocess
+import sys
 
 import pytest
 
 from infermatrix_copilot.app.core import Copilot
 from infermatrix_copilot.app.repository_context import RepositoryContextResolver
+from infermatrix_copilot.engine.lifecycle import RunLock
 from infermatrix_copilot.notify import BLOCKED_EXIT
 from infermatrix_copilot.task_spec import TaskSpec
 
@@ -94,3 +98,53 @@ def test_unresolved_adapter_path_does_not_claim_checkout_capability(
 
     assert context.repo_path == ""
     assert "repo.path" not in context.capabilities
+
+
+def test_workflow_execution_seeds_context_and_returns_blocked_reason(
+    settings, tmp_path, monkeypatch,
+):
+    _adapter(settings, tmp_path / "ambient", branches="[main, release]")
+    frozen = tmp_path / "frozen"
+    spec = TaskSpec(kind="repo_rebase", repo_path=str(frozen))
+    seen = {}
+
+    class FakeExecutor:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def run(self, playbook, state):
+            seen.update(state)
+            return SimpleNamespace(
+                status="blocked", blocked_reason="fixture stop", step_results={},
+            )
+
+    monkeypatch.setattr(
+        "infermatrix_copilot.app.workflow_execution.Executor", FakeExecutor,
+    )
+    copilot = Copilot(settings)
+    run_dir = tmp_path / "run-context"
+
+    code = copilot._execute(
+        SimpleNamespace(name="fixture", version=1), spec, run_dir,
+        planned_context=copilot.repository_context.for_spec(spec),
+    )
+
+    assert code == BLOCKED_EXIT
+    assert copilot.last_blocked_reason == "fixture stop"
+    assert seen["repo_path"] == str(frozen)
+    assert seen["protected_branches"] == ["main", "release"]
+    assert seen["high_risk_modules"] == ["scheduler"]
+    with RunLock(run_dir):
+        pass
+
+
+def test_workflow_execution_import_does_not_load_transports():
+    code = (
+        "import sys\n"
+        "import infermatrix_copilot.app.workflow_execution\n"
+        "assert not any(name.startswith(('infermatrix_copilot.cli', "
+        "'infermatrix_copilot.mcp', 'infermatrix_copilot.thin_mcp')) "
+        "for name in sys.modules)\n"
+    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
