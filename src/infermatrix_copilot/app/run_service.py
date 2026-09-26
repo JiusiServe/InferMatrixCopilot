@@ -27,6 +27,7 @@ from .request_policy import (
 )
 from ..task_spec import READ_ONLY_KINDS
 from .core import Copilot
+from .reservation import RunReservation
 
 
 class RunService:
@@ -35,10 +36,10 @@ class RunService:
     unit-testable without a live protocol connection."""
 
     def __init__(self, settings: Settings | None = None):
-        """Wire settings + a `Copilot` (for `reserve_run`/`execute_reserved` path
-        helpers), register this server's liveness token, reconcile any runs
-        orphaned by a previous server, and start the single worker thread."""
+        """Wire reservation and workflow services, register this server's
+        liveness token, reconcile orphaned runs, and start the worker."""
         self.settings = settings or Settings()
+        self.reservations = RunReservation(self.settings)
         self.copilot = Copilot(self.settings)
         self.run_root = Path(self.settings.run_root)
         self.run_root.mkdir(parents=True, exist_ok=True)
@@ -169,7 +170,7 @@ class RunService:
         and `issue_filter`, which carry no PR and no head, so any spec-derived
         key would collapse every issue task in a repo onto one entry."""
         spec = enforce_mcp_policy(spec_dict, allowed_repos=self.settings.mcp_allowed_repos, settings=self.settings)
-        run_id, created = self.copilot.reserve_run(
+        run_id, created = self.reservations.reserve(
             spec, owner_server_id=self.server_id, owner_server_pid=self.pid)
         if created:
             self._q.put((run_id, False))
@@ -194,7 +195,7 @@ class RunService:
         spec = enforce_strict_review_policy(
             spec_dict, allowed_repos=self.settings.mcp_allowed_repos,
             settings=self.settings)
-        run_id, created = self.copilot.reserve_run(
+        run_id, created = self.reservations.reserve(
             spec, owner_server_id=self.server_id, owner_server_pid=self.pid,
             idempotency_key=str(spec_dict.get("idempotency_key") or ""))
         if created:
@@ -211,7 +212,7 @@ class RunService:
         spec = enforce_quality_review_policy(
             spec_dict, allowed_repos=self.settings.mcp_allowed_repos,
             settings=self.settings)
-        run_id, created = self.copilot.reserve_run(
+        run_id, created = self.reservations.reserve(
             spec, owner_server_id=self.server_id, owner_server_pid=self.pid,
             idempotency_key=str(spec_dict.get("idempotency_key") or ""))
         if created:
@@ -295,7 +296,7 @@ class RunService:
     def get_status(self, run_id: str) -> dict:
         """Lazy-reconcile then return `run_status.json` + `progress.json` (when
         present — queued/planning runs have none)."""
-        run_dir = self.copilot._contained_run_dir(run_id)
+        run_dir = self.reservations.contained_run_dir(run_id)
         rs.reconcile_if_dead(run_dir, self.run_root)
         status = rs.read_status(run_dir) or {}
         progress = None
@@ -320,7 +321,7 @@ class RunService:
         # A well-formed id this server has never heard of is answered, not
         # raised, so a bot holding a stale id can tell "lost" from "still
         # running". A malformed or escaping id is still an error.
-        run_dir = self.copilot._contained_run_dir(run_id, must_exist=False)
+        run_dir = self.reservations.contained_run_dir(run_id, must_exist=False)
         if not run_dir.exists():
             return {"run_id": run_id, "state": "unknown", "note": "",
                     "report": None, "report_path": None, "next_offset": None,
@@ -350,7 +351,7 @@ class RunService:
 
     def get_quality_result(self, run_id: str) -> dict:
         """Poll one quality run, returning its dedicated typed contract."""
-        run_dir = self.copilot._contained_run_dir(run_id, must_exist=False)
+        run_dir = self.reservations.contained_run_dir(run_id, must_exist=False)
         if not run_dir.exists():
             return {
                 "run_id": run_id,

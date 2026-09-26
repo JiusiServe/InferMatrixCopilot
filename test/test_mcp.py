@@ -325,9 +325,14 @@ def test_strict_reservation_reports_idempotent_reuse_accurately(
     core = _core(settings)
     queued = []
     monkeypatch.setattr(core._q, "put", queued.append)
+
+    def wrong_reservation_boundary(*_args, **_kwargs):
+        raise AssertionError("RunService called the Copilot facade")
+
+    monkeypatch.setattr(core.copilot, "reserve_run", wrong_reservation_boundary)
     monkeypatch.setattr(
-        core.copilot,
-        "reserve_run",
+        core.reservations,
+        "reserve",
         lambda *_args, **_kwargs: ("run-20260829-010101-abcdef", False),
     )
 

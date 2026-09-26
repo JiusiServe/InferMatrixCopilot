@@ -8,6 +8,11 @@ serialized worker, isolated child launch, startup/orphan reconciliation,
 readiness, bounded status/result polling, and repository-scoped knowledge
 reads. Construction and polling require no CLI or MCP module import.
 
+Reservation and run ID containment go directly through `RunReservation`,
+not the workflow `Copilot` facade. `Copilot` remains for playbook readiness
+and workflow execution; it does not mediate the service's reserve or poll
+paths.
+
 Reservations return `(run_id, created)` and enqueue only newly created runs.
 The worker launches an isolated subprocess with posting and pushing disabled,
 then reconciles the persisted status. A run can survive host restart; closing
