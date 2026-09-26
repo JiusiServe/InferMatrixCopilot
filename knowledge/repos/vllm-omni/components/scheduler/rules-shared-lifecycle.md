@@ -4,7 +4,7 @@ created: 2026-09-22
 updated: 2026-09-26
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5461"]
+sources: ["PR #5461", "PR #7877"]
 ---
 
 # Scheduler shared lifecycle 规则

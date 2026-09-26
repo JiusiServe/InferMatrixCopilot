@@ -4,7 +4,7 @@ created: 2026-09-05
 updated: 2026-09-26
 type: rule
 tags: [vllm-omni, benchmark]
-sources: ["PR #7648", "PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py, "PR #7130", "PR #7259", "PR #7624", "PR #7504"]
+sources: ["PR #7648", "PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py, "PR #7130", "PR #7259", "PR #7624", "PR #7504", "PR #8107"]
 confidence: high
 ---
 

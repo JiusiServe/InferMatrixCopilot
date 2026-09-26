@@ -4,7 +4,7 @@ created: 2026-09-05
 updated: 2026-09-26
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #6553", docs/serving/speech_api.md, vllm_omni/entrypoints/openai/audio_utils_mixin.py, vllm_omni/entrypoints/openai/protocol/audio.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/tts_adapters/base.py, vllm_omni/entrypoints/openai/tts_adapters/qwen3_tts.py, tests/entrypoints/openai_api/test_audio_format.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/e2e/online_serving/test_qwen3_tts_customvoice_expansion.py, "PR #7499"]
+sources: ["PR #6553", docs/serving/speech_api.md, vllm_omni/entrypoints/openai/audio_utils_mixin.py, vllm_omni/entrypoints/openai/protocol/audio.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/tts_adapters/base.py, vllm_omni/entrypoints/openai/tts_adapters/qwen3_tts.py, tests/entrypoints/openai_api/test_audio_format.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/e2e/online_serving/test_qwen3_tts_customvoice_expansion.py, "PR #7499", "PR #6487"]
 confidence: high
 ---
 
