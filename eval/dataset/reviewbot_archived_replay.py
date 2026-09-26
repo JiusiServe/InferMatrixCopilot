@@ -81,6 +81,19 @@ def historical_pull(pull, *, pr: int, head: str, base: str):
     )
 
 
+def disable_live_ci(github) -> None:
+    """Historical CI was not frozen with the PR; never read today's checks.
+
+    Installed ReviewBot releases that support a CI snapshot then mark it
+    unavailable. Older paired wheels do not need these methods, so the same
+    replay adapter remains compatible with both release generations.
+    """
+    for method in (
+        "list_commit_statuses", "list_check_runs", "list_required_status_checks",
+    ):
+        setattr(github, method, None)
+
+
 def shadow_candidate(body: str, inline_comments: list[dict]) -> str:
     """Include the inline payload that a COMMENT review would publish.
 
@@ -181,6 +194,7 @@ def main() -> int:
 
     github.get_pull = get_pull
     github.list_files = list_files
+    disable_live_ci(github)
     original_inline = publication.inline_review_comments
     captured: list[dict] | None = None
 

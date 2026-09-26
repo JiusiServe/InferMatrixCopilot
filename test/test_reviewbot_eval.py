@@ -101,6 +101,26 @@ def test_archived_pull_requires_exact_merged_identity():
             archive.historical_pull(stale, pr=4893, head="a" * 40, base="d" * 40)
 
 
+def test_archived_replay_cannot_read_live_ci():
+    class Client:
+        def list_commit_statuses(self, *_args, **_kwargs):
+            raise AssertionError("live CI must not be read")
+
+        def list_check_runs(self, *_args, **_kwargs):
+            raise AssertionError("live CI must not be read")
+
+        def list_required_status_checks(self, *_args, **_kwargs):
+            raise AssertionError("live CI must not be read")
+
+    client = Client()
+    archive.disable_live_ci(client)
+
+    for method in (
+        "list_commit_statuses", "list_check_runs", "list_required_status_checks",
+    ):
+        assert getattr(client, method) is None
+
+
 def test_shadow_candidate_includes_the_posted_inline_payload():
     body = "## Omni ReviewBot review\n\nSummary\n\nSee inline comments below.\n"
     comment = {
