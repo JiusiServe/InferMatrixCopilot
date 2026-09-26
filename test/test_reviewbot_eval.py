@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import zipfile
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,7 @@ sys.path.insert(0, str(DATASET_DIR))
 
 report = importlib.import_module("build_reviewbot_report")
 arm = importlib.import_module("run_reviewbot_arm")
+archive = importlib.import_module("reviewbot_archived_replay")
 
 
 TRAIN_VAL_PRS = [4804, 4810, 4816, 4817, 4825, 4837, 4859, 4870, 4893,
@@ -48,6 +50,81 @@ def test_dataset_items_are_train_val_only_and_pinned():
         for k, v in json.loads(arm.EXPECTED_HEADS.read_text()).items()
     }
     assert all(n in expected for n in items)
+
+
+def test_archived_base_pins_cover_frozen_train_val_dataset():
+    bases = json.loads(arm.EXPECTED_BASES.read_text())
+    assert set(bases) == {str(n) for n in TRAIN_VAL_PRS}
+    assert all(arm._SHA.fullmatch(sha) for sha in bases.values())
+    for pr in TRAIN_VAL_PRS:
+        files = archive.frozen_files((arm.GT / f"pr{pr}.diff").read_text())
+        assert len(files) == arm.gt_changed_files(pr)
+        assert all(file["path"] and file["patch"] for file in files)
+
+
+def test_archived_file_projection_counts_only_hunk_lines():
+    diff = (
+        "diff --git a/a.py b/a.py\nindex 111..222 100644\n"
+        "--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n-old\n+new\n"
+        "diff --git a/b.py b/b.py\nnew file mode 100644\n"
+        "--- /dev/null\n+++ b/b.py\n@@ -0,0 +1 @@\n+value\n"
+    )
+    assert archive.frozen_files(diff) == [
+        {"path": "a.py", "status": "modified", "additions": 1,
+         "deletions": 1, "patch": "@@ -1 +1 @@\n-old\n+new\n"},
+        {"path": "b.py", "status": "added", "additions": 1,
+         "deletions": 0, "patch": "@@ -0,0 +1 @@\n+value\n"},
+    ]
+
+
+def test_archived_pull_requires_exact_merged_identity():
+    # dataclasses.replace is used by the adapter, as it is for the installed
+    # ReviewBot PullRequest. A local frozen dataclass tests this without wheels.
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class Pull:
+        number: int = 4893
+        head_sha: str = "a" * 40
+        base_sha: str = "b" * 40
+        state: str = "closed"
+        merged_at: str = "2026-09-01"
+        merge_commit_sha: str = "c" * 40
+
+    live = Pull()
+    replay = archive.historical_pull(live, pr=4893, head="a" * 40, base="d" * 40)
+    assert (replay.state, replay.base_sha, replay.merged_at) == ("open", "d" * 40, "")
+    assert live.state == "closed"
+    for stale in (replace(live, head_sha="e" * 40), replace(live, state="open")):
+        with pytest.raises(ValueError):
+            archive.historical_pull(stale, pr=4893, head="a" * 40, base="d" * 40)
+
+
+def test_archived_runner_identity_and_command_are_explicit():
+    release = {"paired": True}
+    config = arm.build_config(
+        {}, release, archived_bases_sha256="a" * 64,
+        archived_diffs_sha256="b" * 64,
+        archived_adapter_sha256="c" * 64,
+    )
+    assert config["archived_replay"] == {
+        "mode": "frozen_open_pr_v1", "bases_sha256": "sha256:" + "a" * 64,
+        "diffs_sha256": "sha256:" + "b" * 64,
+        "adapter_sha256": "sha256:" + "c" * 64,
+    }
+    assert "archived_replay" not in arm.build_config({}, release)
+    runner = arm.Runner.__new__(arm.Runner)
+    runner.archived_replay = True
+    runner.python = "/paired/.venv/bin/python"
+    runner.expected = {4893: "a" * 40}
+    runner.bases = {4893: "b" * 40}
+    command = runner._review_command(4893)
+    assert command[:2] == [runner.python, str(arm.ARCHIVED_REPLAY)]
+    assert command[-4:] == ["--base", "b" * 40, "--diff", str(arm.GT / "pr4893.diff")]
+    runner.archived_replay = False
+    assert runner._review_command(4893) == [
+        runner.python, "-m", "omni_reviewbot", "review", "--pr", "4893",
+    ]
 
 
 def test_dry_run_plans_without_touching_anything(tmp_path):
@@ -340,6 +417,29 @@ def test_monthly_behavior_modes_are_pinned(
         lambda manifest: manifest["config"].__setitem__(field, value),
     )
     with pytest.raises(report.CampaignError, match=message):
+        report.load_campaign("reviewbot_2026-09", 1, 2)
+
+
+def test_monthly_accepts_archived_replay_provenance_and_rejects_drift(campaign_root):
+    _write_campaign(campaign_root)
+
+    def add_replay(manifest):
+        manifest["config"]["archived_replay"] = {
+            "mode": "frozen_open_pr_v1",
+            "bases_sha256": "sha256:" + "a" * 64,
+            "diffs_sha256": "sha256:" + "b" * 64,
+            "adapter_sha256": "sha256:" + "c" * 64,
+        }
+
+    _mutate_campaign_manifest(campaign_root, add_replay)
+    _verdicts, _stems, config = report.load_campaign("reviewbot_2026-09", 1, 2)
+    assert config["archived_replay"]["mode"] == "frozen_open_pr_v1"
+
+    def corrupt(manifest):
+        manifest["config"]["archived_replay"]["bases_sha256"] = "bad"
+
+    _mutate_campaign_manifest(campaign_root, corrupt)
+    with pytest.raises(report.CampaignError, match="archived_replay.bases_sha256"):
         report.load_campaign("reviewbot_2026-09", 1, 2)
 
 

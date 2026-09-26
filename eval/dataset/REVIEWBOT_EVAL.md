@@ -36,6 +36,31 @@ ONLY_ITEMS=4893 GEN_REPLICATES=1 bash eval/dataset/run_reviewbot_monthly.sh smok
 A non-month tag writes `results/reviewbot/REVIEWBOT_smoke.md` and never
 touches the month-over-month `INDEX.md`.
 
+The 15 frozen train+val PRs are now merged. The monthly command explicitly
+uses `REVIEWBOT_EVAL_ARCHIVED_REPLAY=1`: an evaluation-only adapter presents
+their pinned historical open snapshot to the installed ReviewBot Direct
+pipeline. It requires `POST_MODE=shadow`, `REVIEW_CONTEXT_MODE=no_discussion`,
+and `post=False`, and rejects every non-GET GitHub request. ReviewBot's
+production rule remains open PRs only (drafts require an explicit request).
+For a future live open-PR dataset, invoke `run_reviewbot_arm.py` directly
+without the replay flag.
+
+`goal-eval/expected_pr_bases.json` pins each historical merge base alongside
+the existing head pins. The adapter reads the frozen `gt/pr<N>.diff` for file
+metadata; GitHub's current file list has drifted for PRs 4816, 4926, and
+4977. Before changing any pin, verify all 15 patches against a local
+vllm-omni Git checkout:
+
+```bash
+python3 eval/dataset/verify_reviewbot_archived_bases.py --repo /path/to/vllm-omni
+```
+
+The verifier ignores only Git's display-only object IDs and optional hunk
+function names. Each normalized historical `base..head` patch must exactly
+equal its frozen ground-truth diff. The base-pin file, selected frozen diffs,
+adapter SHA-256s, and replay mode are recorded in each arm manifest, so a
+resumed campaign cannot silently mix historical snapshots or adapter versions.
+
 `--dry-run` is deliberately planning-only: it does not require the release
 interpreter or manifest and does not probe installed packages.
 
@@ -80,8 +105,10 @@ interpreter or manifest and does not probe installed packages.
   match them exactly. This strict envelope applies only to
   `reviewbot_YYYY-MM`; non-month smoke tags retain legacy-manifest compatibility.
 - Child processes receive no `PYTHONPATH`, `PYTHONHOME`, provider source-path
-  override, or user site. The harness invokes only the selected installed
-  `python -m omni_reviewbot`; it never imports a sibling ReviewBot checkout.
+  override, or user site. The harness runs the selected installed ReviewBot
+  wheel through the evaluation-only archived adapter for these merged PRs;
+  direct live-PR runs use `python -m omni_reviewbot`. It never imports a
+  sibling ReviewBot checkout.
 - `POST_MODE=shadow` asserted from CLI output — nothing can reach GitHub.
 - `REVIEW_CONTEXT_MODE=no_discussion` asserted (`review_context:
   no_discussion (0 threads)`): on these PRs the historical review

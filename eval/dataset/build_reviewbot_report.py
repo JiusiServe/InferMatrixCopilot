@@ -71,6 +71,9 @@ _MANIFEST_FIELDS = {
     "started_at",
 }
 _CONFIG_FIELDS = {"release", "env", "review_context_mode", "post_mode"}
+_ARCHIVED_REPLAY_FIELDS = {
+    "mode", "bases_sha256", "diffs_sha256", "adapter_sha256",
+}
 _ENV_FIELDS = {
     "AGENT_PROVIDER",
     "REVIEW_MODEL",
@@ -195,8 +198,19 @@ def _monthly_provenance_problems(
     if not isinstance(config, dict):
         problems.append("config is not an object")
         return problems
-    if set(config) != _CONFIG_FIELDS:
+    if set(config) not in (_CONFIG_FIELDS, _CONFIG_FIELDS | {"archived_replay"}):
         problems.append("config fields do not match the runner config shape")
+    if "archived_replay" in config:
+        replay = config["archived_replay"]
+        if not isinstance(replay, dict) or set(replay) != _ARCHIVED_REPLAY_FIELDS:
+            problems.append("config.archived_replay fields do not match")
+        else:
+            if replay.get("mode") != "frozen_open_pr_v1":
+                problems.append("config.archived_replay.mode is invalid")
+            for name in ("bases_sha256", "diffs_sha256", "adapter_sha256"):
+                digest = replay.get(name)
+                if not isinstance(digest, str) or not SHA256_FINGERPRINT.fullmatch(digest):
+                    problems.append(f"config.archived_replay.{name} is invalid")
     if config.get("post_mode") != "shadow":
         problems.append("config.post_mode must be 'shadow'")
     if config.get("review_context_mode") != "no_discussion":
@@ -520,6 +534,14 @@ def render(tag, aggregate, item_rows, wins, gap_rows, config,
         "| dim | Δ | 95% CI | items +/− | n |",
         "|---|---|---|---|---|",
     ]
+    replay = config.get("archived_replay")
+    if replay:
+        lines[6:6] = [
+            (
+                "- Dataset: frozen merged-PR shadow replay, historical "
+                f"base pins `{replay['bases_sha256']}`"
+            ),
+        ]
     for dim in DIMS:
         a = aggregate[dim]
         lines.append(
