@@ -17,8 +17,6 @@ import uuid
 from pathlib import Path
 from typing import NamedTuple
 
-import yaml
-
 from .. import idempotency as idem
 from .. import run_status as rs
 from ..config import Settings, TierNotConfiguredError
@@ -31,6 +29,7 @@ from ..llm import LLM
 from ..notify import BLOCKED_EXIT, Notifier
 from ..playbooks.store import PlaybookStore, parse_playbook, playbook_to_doc
 from ..push import PushPolicy
+from ..review.plan_gate import _mode_review_context, review_plan_gate
 from ..review.reviewer import run_plan_review
 from ..run_trace import RunTrace
 from ..task_spec import TaskSpec
@@ -55,43 +54,6 @@ class GateOutcome(NamedTuple):
     def stop(cls, exit_code: int) -> "GateOutcome":
         """A gate halted the run — return this exit code."""
         return cls(proceed=False, exit_code=exit_code)
-
-
-def _mode_review_context(playbook, spec) -> str:
-    """Plan-review context for MODE-AWARE playbooks: the reviewer sees the
-    raw yaml's FULL step list, but the `when:` gates resolve against the
-    ALREADY-RESOLVED mode (`resolve_effective_mode` runs before the review
-    gate) — without this context a report-only plan looks like it runs its
-    write/push steps and gets spuriously blocked. The active-step set is
-    the same mechanical truth the executor computes, never prose."""
-    if not getattr(playbook, "mode_aware", False):
-        return ""
-    mode = str((getattr(spec, "params", None) or {})
-               .get("rebase_mode", "") or "")
-    if not mode:
-        return ""
-    from ..engine.executor import _eval_when
-    from ..rebase_engine.modes import mode_state_flags
-
-    flags = {"task_spec": {}, **mode_state_flags(mode)}
-    active = [s.get("id", s.get("step", "?"))
-              for s in playbook_to_doc(playbook).get("steps", [])
-              if "when" not in s or _eval_when(s["when"], flags)]
-    repo = str(getattr(spec, "repo", "") or "")
-    repo_line = (f"\nTarget repo (authoritative): {repo!r} — bound at "
-                 "runtime from the TaskSpec; the yaml `repos:` list is a "
-                 "planner RECALL FILTER where empty means repo-neutral, "
-                 "never untargeted." if repo else "")
-    return (f"\n\nResolved mode context (authoritative): "
-            f"rebase_mode={mode}. Under this mode the `when:` gates run "
-            f"ONLY these steps: {active}. Every other listed step is "
-            "statically gated OFF for this run — judge the plan for THIS "
-            "mode's step set."
-            + repo_line +
-            "\nWrite/push governance (authoritative): the mode's own "
-            "push/CI steps are governed at runtime by the push-gate "
-            "ruling, guard_push, and the ALLOW_PUSH env double-gate — "
-            "the task tier does not forbid steps this mode activates.")
 
 
 class Copilot:
@@ -165,42 +127,14 @@ class Copilot:
 
     def _plan_review_gate(self, resolution: Resolution, spec: TaskSpec,
                           assume_yes: bool) -> bool:
-        """Inline Plan-Review for adapted/generated plans. LLM verdict shown in
-        the session; block stops. A non-`lgtm` verdict is only ever *surfaced*
-        — the human `[y/N]` is what actually gates it — so when `--yes` removes
-        that human, the same verdict must stop the run instead
-        (`ReviewVerdict.passing`, SPEC C6: only `lgtm` passes)."""
-        if not resolution.requires_review:
-            return True
-        doc = yaml.safe_dump(playbook_to_doc(resolution.playbook), sort_keys=False)
-        task_text = spec.describe() + _mode_review_context(
-            resolution.playbook, spec)
-        verdict = run_plan_review(self.llm, playbook_doc=doc,
-                                  task=task_text,
-                                  model=self.settings.reviewer)
-        if verdict.verdict != "unavailable":
-            print(f"  plan review: {verdict.verdict}"
-                  + (f" — {verdict.critiques}" if verdict.critiques else ""))
-        if verdict.verdict == "block":
-            print("✋ plan blocked by reviewer.")
-            return False
-        if verdict.passing:
-            return True
-        # Everything below is non-passing: `revise`, or `unavailable`. Both used
-        # to return True on the strength of a confirmation that `--yes` had
-        # already deleted, so an unattended run executed an unvetted plan on an
-        # unread verdict. Measured on the release matrix: an unparseable review
-        # let three of four backends run a pr-rebase plan through to its push
-        # gate, while the one backend whose reviewer parsed cleanly BLOCKED the
-        # very same plan.
-        if assume_yes:
-            reason = ("no reviewer LLM" if verdict.verdict == "unavailable"
-                      else f"plan review returned {verdict.verdict}")
-            print(f"✋ {reason} and --yes leaves no human to gate it — blocked.")
-            return False
-        if verdict.verdict == "unavailable":
-            print("  ⚠ no reviewer LLM — your confirmation is the plan-review gate")
-        return True  # revise/unavailable, surfaced to the user before their confirm
+        """Apply the reviewer verdict policy before human confirmation."""
+        result = review_plan_gate(
+            resolution, spec, self.llm, self.settings.reviewer, assume_yes,
+            review_fn=run_plan_review,
+        )
+        for notice in result.notices:
+            print(notice)
+        return result.allowed
 
     def _gate_and_confirm(self, resolution: Resolution, spec: TaskSpec,
                           assume_yes: bool, *, prompt: str = "Proceed?",
