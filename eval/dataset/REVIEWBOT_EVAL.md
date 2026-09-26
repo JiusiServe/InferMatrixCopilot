@@ -42,6 +42,9 @@ their pinned historical open snapshot to the installed ReviewBot Direct
 pipeline. It requires `POST_MODE=shadow`, `REVIEW_CONTEXT_MODE=no_discussion`,
 and `post=False`, and rejects every non-GET GitHub request. ReviewBot's
 production rule remains open PRs only (drafts require an explicit request).
+The adapter disables live CI-status and branch-rule reads: those results were
+not frozen with the historical PRs, so newer ReviewBot releases receive
+`ci_evidence.read_status=unavailable` rather than today's post-merge checks.
 For a future live open-PR dataset, invoke `run_reviewbot_arm.py` directly
 without the replay flag.
 
