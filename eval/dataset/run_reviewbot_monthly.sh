@@ -9,6 +9,9 @@ TAG="reviewbot_${MONTH}"
 GEN="${GEN_REPLICATES:-3}"
 cd "$(dirname "$0")"
 PY=${PYTHON:-python3}
+# The frozen train+val dataset now consists of merged PRs. Replay their
+# pinned historical open snapshots in the evaluation-only shadow adapter.
+export REVIEWBOT_EVAL_ARCHIVED_REPLAY=1
 
 echo "=== preflight ==="
 command -v claude >/dev/null || {
