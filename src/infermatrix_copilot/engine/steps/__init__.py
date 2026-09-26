@@ -1,34 +1,32 @@
-"""Vetted step library, self-registering via the `@step` decorator.
+"""Vetted step library, assembled explicitly when a registry is requested.
 
-Importing this package imports every step module for its registration side
-effects (each `@step` / `register_step` records a `StepSpec`);
-`register_builtin_steps` flushes the collected specs into a `StepRegistry`.
-There is no central `add(StepSpec(...))` block to keep in sync — a step's name,
-metadata and handler live together at its definition (see doc/architecture/CODE_TOUR.md §5).
+Each module still keeps its step name, metadata and handler together with
+`@step` / `register_step`. Importing this package alone is inert; only
+`register_builtin_steps` loads the vetted modules and fills a `StepRegistry`.
+This keeps application and SDK imports from loading every workflow effect.
 """
 
 from __future__ import annotations
 
+from importlib import import_module
+
 from ..registry import StepRegistry
 from . import _common
 
-# side-effect imports: each module registers its steps into the collection.
-from . import (  # noqa: F401,E402
-    workspace,
-    review,
-    report,
-    pr,
-    issue,
-    profile,
-    rebase_v3,
-    rebase_knowledge,
+_BUILTIN_MODULES = (
+    "workspace", "review", "report", "pr", "issue", "profile",
+    "rebase_v3", "rebase_knowledge",
 )
 
 
 def register_builtin_steps(registry: StepRegistry) -> StepRegistry:
-    """Flush every step collected by import side effects into `registry` and
-    return it. Called once at startup, after this package's module imports have
-    populated the collection; the registry then holds the full vetted library."""
+    """Load the vetted modules and install their collected specs into `registry`.
+
+    Module imports are cached by Python, so repeated registry assembly uses
+    the same step definitions without a second registration side effect.
+    """
+    for name in _BUILTIN_MODULES:
+        import_module(f"{__name__}.{name}")
     for spec in _common.collected():
         registry.register(spec)
     return registry
