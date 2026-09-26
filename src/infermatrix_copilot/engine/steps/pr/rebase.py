@@ -13,6 +13,8 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
+from ... import worktrees
+from ...lifecycle import FileLockingUnavailable
 from ....push import PushPolicy
 from ....scopes import post_plan_scope
 from ...step import FailureKind, StepContext, StepResult
@@ -23,11 +25,67 @@ from .._common import repo_path as _repo_path
 from .._common import task_spec as _task_spec
 
 
-@step("pr.checkout_branch", "deterministic", "read",
+def _checked_rebase_repo(ctx: StepContext) -> Path | StepResult:
+    """Resolve the checkout used after checkout_branch, failing closed on resume.
+
+    A report-only checkpoint may outlive its disposable worktree. Never fall
+    back to the configured checkout or follow a substituted worktree path.
+    """
+    repo = _repo_path(ctx)
+    if repo is None or not repo.is_dir():
+        return StepResult(False, FailureKind.BLOCKED,
+                          "PR rebase checkout is missing; restart in a new run")
+    spec = _task_spec(ctx)
+    if spec.get("report_only"):
+        source = ctx.state.get("pr_rebase_source_repo")
+        try:
+            expected = worktrees.mutable_dest_for(Path(source), int(spec["pr"]),
+                                                  ctx.run_dir)
+        except (TypeError, ValueError, KeyError):
+            return StepResult(False, FailureKind.BLOCKED,
+                              "private PR rebase checkout identity is missing")
+        if repo.is_symlink() or repo != expected:
+            return StepResult(False, FailureKind.BLOCKED,
+                              "private PR rebase checkout identity changed")
+        if not worktrees.hold(repo, ctx.run_dir) or not repo.is_dir():
+            return StepResult(False, FailureKind.BLOCKED,
+                              "private PR rebase checkout is unavailable")
+        try:
+            owned, why = worktrees.owned_by_repository(Path(source), repo, _git)
+        except OSError:
+            owned, why = False, "worktree disappeared"
+        if not owned:
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"private PR rebase checkout is unavailable ({why})")
+        rc, _ = _git(repo, "symbolic-ref", "--quiet", "HEAD")
+        if rc != 1:
+            return StepResult(False, FailureKind.BLOCKED,
+                              "private PR rebase checkout is no longer detached")
+    return repo
+
+
+def _rebase_in_progress(repo: Path) -> bool:
+    """Use Git's per-worktree metadata path, which is not always a .git dir."""
+    for marker in ("rebase-merge", "rebase-apply"):
+        rc, location = _git(repo, "rev-parse", "--git-path", marker)
+        if rc != 0:
+            return True
+        path = Path(location)
+        if not path.is_absolute():
+            path = repo / path
+        if path.exists():
+            return True
+    return False
+
+
+@step("pr.checkout_branch", "deterministic", "write_workspace",
       "Checkout PR head (fork-aware); derive PushPolicy.")
 async def _pr_checkout(ctx: StepContext) -> StepResult:
-    """Fetch PR metadata, add the fork remote if needed, check out a local
-    pr-<N>-<head> branch, and derive the PushPolicy for later steps."""
+    """Fetch the PR head and derive PushPolicy for later steps.
+
+    Report-only work runs in a private detached worktree keyed to this run;
+    it may rebase there but cannot change the configured checkout or push.
+    """
     repo = _repo_path(ctx)
     spec = _task_spec(ctx)
     pr = spec.get("pr")
@@ -60,34 +118,73 @@ async def _pr_checkout(ctx: StepContext) -> StepResult:
     rc, out = _git(repo, "fetch", remote, head_ref)
     if rc != 0:
         return StepResult(False, FailureKind.BLOCKED, f"fetch {remote}/{head_ref} failed: {out[:400]}")
+    rc, fetched_head = _git(repo, "rev-parse", "FETCH_HEAD")
+    if rc != 0:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"cannot identify fetched PR head: {fetched_head[:400]}")
+
+    report_only = bool(spec.get("report_only", False))
     local = f"pr-{pr}-{head_ref}".replace("/", "-")
-    rc, out = _git(repo, "checkout", "-B", local, "FETCH_HEAD")
-    if rc != 0:
-        return StepResult(False, FailureKind.BLOCKED, f"checkout failed: {out[:400]}")
-    rc, initial_head_sha = _git(repo, "rev-parse", "HEAD")
-    if rc != 0:
-        return StepResult(False, FailureKind.BLOCKED, f"cannot identify PR head: {initial_head_sha[:400]}")
+    checkout = repo
+    if report_only:
+        checkout = worktrees.mutable_dest_for(repo, int(pr), ctx.run_dir)
+        try:
+            ok, detail = worktrees.materialize_mutable(
+                repo, fetched_head, checkout, _git)
+        except FileLockingUnavailable as exc:
+            return StepResult(False, FailureKind.BLOCKED, str(exc))
+        if not ok:
+            return StepResult(False, FailureKind.BLOCKED, detail)
+        if not worktrees.hold(checkout, ctx.run_dir):
+            return StepResult(False, FailureKind.BLOCKED,
+                              "could not hold private rebase worktree")
+        rc, _ = _git(checkout, "symbolic-ref", "--quiet", "HEAD")
+        if rc != 1:
+            return StepResult(False, FailureKind.BLOCKED,
+                              "private checkout is no longer detached")
+        # This step can be retried after a crash before its checkpoint. Its
+        # private tree is safe to reset; a completed step is replayed instead,
+        # preserving in-progress work for a later resume.
+        _git(checkout, "rebase", "--abort")
+        if _rebase_in_progress(checkout):
+            return StepResult(False, FailureKind.BLOCKED,
+                              "private checkout still has a rebase in progress")
+        for args in (("reset", "--hard", fetched_head), ("clean", "-fd")):
+            rc, out = _git(checkout, *args)
+            if rc != 0:
+                return StepResult(False, FailureKind.BLOCKED,
+                                  f"private checkout reset failed: {out[:400]}")
+        local = "(detached private worktree)"
+    else:
+        rc, out = _git(repo, "checkout", "-B", local, "FETCH_HEAD")
+        if rc != 0:
+            return StepResult(False, FailureKind.BLOCKED, f"checkout failed: {out[:400]}")
+
+    rc, initial_head_sha = _git(checkout, "rev-parse", "HEAD")
+    if rc != 0 or initial_head_sha != fetched_head:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"checkout head differs from fetched PR head: {initial_head_sha[:400]}")
 
     force = bool(ctx.params.get("force_push", False))
     policy = PushPolicy(
-        allowed=not spec.get("report_only", False),
+        allowed=not report_only,
         remote=remote, branch=head_ref, force_with_lease=force,
     )
-    ctx.state.update(
+    updates = dict(
         pr_head_ref=head_ref, pr_head_remote=remote, pr_base_branch=base,
         pr_local_branch=local, pr_initial_head_sha=initial_head_sha,
-        push_policy=policy,
+        push_policy=asdict(policy),
     )
+    if report_only:
+        updates["repo_path"] = str(checkout)
+        updates["pr_rebase_source_repo"] = str(repo)
+    ctx.state.update(updates)
+    ctx.state["push_policy"] = policy
     return StepResult(True, summary=f"checked out PR #{pr} ({remote}/{head_ref} -> {local})",
                       outputs={"local_branch": local, "base": base, "remote": remote,
                                # push_policy serialized JSON-simple; ci.push
                                # rehydrates dicts back into a PushPolicy
-                               "state_updates": {
-                                   "pr_head_ref": head_ref, "pr_head_remote": remote,
-                                   "pr_base_branch": base, "pr_local_branch": local,
-                                   "pr_initial_head_sha": initial_head_sha,
-                                   "push_policy": asdict(policy),
-                               }})
+                               "state_updates": updates})
 
 
 _CONFLICT_GUIDANCE = """You are resolving git rebase conflicts. Work only inside the repository.
@@ -115,13 +212,18 @@ async def _pr_rebase_onto_base(ctx: StepContext) -> StepResult:
     sides, `rebase --continue`); success requires no rebase left in progress. If
     the agent can't finish, or when there is no LLM, `rebase --abort` restores the
     workspace and the step returns ESCALATE with the conflict file list."""
-    repo = _repo_path(ctx)
+    repo = _checked_rebase_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
     base = ctx.state.get("pr_base_branch", "main")
     base_remote = ctx.params.get("base_remote", "origin")
     rc, out = _git(repo, "fetch", base_remote, base)
     if rc != 0:
         return StepResult(False, FailureKind.BLOCKED, f"fetch {base_remote}/{base} failed: {out[:400]}")
     rc, base_sha = _git(repo, "rev-parse", "FETCH_HEAD")
+    if rc != 0:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"cannot identify fetched base: {base_sha[:400]}")
     ctx.state["rebase_base_sha"] = base_sha
 
     rc, out = _git(repo, "rebase", "FETCH_HEAD")
@@ -150,8 +252,7 @@ async def _pr_rebase_onto_base(ctx: StepContext) -> StepResult:
             scope=post_plan_scope(repo),  # write the workspace; run_shell allowed
             max_iters=ctx.settings.max_agent_iters,
         )
-        in_progress = (Path(repo) / ".git" / "rebase-merge").exists() or \
-                      (Path(repo) / ".git" / "rebase-apply").exists()
+        in_progress = _rebase_in_progress(repo)
         if result.ok and not in_progress:
             outputs = {**result.outputs}
             outputs.setdefault("state_updates", {})["rebase_base_sha"] = base_sha
@@ -191,9 +292,14 @@ async def _pr_analyze_diff(ctx: StepContext) -> StepResult:
     Publishes to state (B2 `state_updates`): `affected_modules` / `touched_modules`
     (the module list) and `primary_files` (the changed paths, as `*`-globs for
     the diff-summary scope check)."""
-    repo = _repo_path(ctx)
+    repo = _checked_rebase_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
     base_sha = ctx.state.get("rebase_base_sha", "HEAD~1")
     rc, out = _git(repo, "diff", "--numstat", f"{base_sha}..HEAD")
+    if rc != 0:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"cannot analyze rebased diff: {out[:400]}")
     changed: list[str] = []
     for line in out.splitlines():
         parts = line.split("\t")
@@ -204,8 +310,11 @@ async def _pr_analyze_diff(ctx: StepContext) -> StepResult:
     adapter = None
     try:
         from ....adapters.base import AdapterRegistry
+        # The adapter is registered for the configured checkout; report-only
+        # steps run in a private path with the same repository content.
+        adapter_repo = ctx.state.get("pr_rebase_source_repo") or repo
         adapter = AdapterRegistry(ctx.settings.adapters_dir).resolve(
-            repo_path=str(repo)) if repo else None
+            repo_path=str(adapter_repo)) if adapter_repo else None
     except Exception:
         adapter = None
     modules: list[str] = []
@@ -230,6 +339,9 @@ async def _pr_analyze_diff(ctx: StepContext) -> StepResult:
 async def _verify_module(ctx: StepContext) -> StepResult:
     """Read-only per-module sanity check of the rebased diff. Advisory: the
     fail-closed gate is review.patch_gate before push."""
+    repo = _checked_rebase_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
     module = ctx.item or "all"
     if ctx.llm is None or not ctx.llm.available:
         return no_llm_gap(ctx, "agent.verify_module",
@@ -237,9 +349,11 @@ async def _verify_module(ctx: StepContext) -> StepResult:
                           "remains fail-closed",
                           summary=f"{module}: verification skipped (no LLM); patch "
                                   "gate before push remains fail-closed")
-    repo = _repo_path(ctx)
     base_sha = ctx.state.get("rebase_base_sha", "HEAD~1")
-    _, diff = _git(repo, "diff", f"{base_sha}..HEAD")
+    rc, diff = _git(repo, "diff", f"{base_sha}..HEAD")
+    if rc != 0:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"cannot verify rebased diff: {diff[:400]}")
     reply = ctx.llm.create(
         system=("You verify a rebased PR branch. Check the diff for rebase damage: "
                 "dropped hunks, duplicated code, mis-merged imports, references to "
