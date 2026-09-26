@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni Benchmark 规则"
 created: 2026-09-05
-updated: 2026-09-22
+updated: 2026-09-26
 type: rule
 tags: [vllm-omni, benchmark]
 sources: ["PR #7648", "PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py, "PR #7130", "PR #7259", "PR #7624", "PR #7504"]
@@ -86,3 +86,10 @@ confidence: high
 - 强制：媒体路径经 PyAV（`av`）打开/seek/decode/resample；结果不得依赖主机安装的 ffmpeg 版本。帧抽取语义对齐“首个 PTS ≥ 目标时刻”；非 WAV 音频经 `AudioResampler` 并在循环后 `resample(None)` flush 尾部样本。
 - 禁止：`subprocess` 调用 host `ffmpeg`/`ffprobe` 作为默认路径；把“本机 ffmpeg 能跑”当作可复现证据；在已知会挂起的旧 HEVC decoder 上无超时地阻塞 generate 阶段。
 - 验收：覆盖 duration/JPEG/PCM 合同与失败 raise；至少用曾触发 host ffmpeg 4.4.2 挂起的样本证明不再无限忙等。^[PR #7504]
+
+## BENCH-1h — Buildkite perf 步骤必须按 JSON schema 选择 runner
+
+- 触发：修改 `.buildkite/**` 里 `run_benchmark.py` / `run_diffusion_benchmark.py` 的 `--test-config-file`，或把 perf JSON 在 `dataset` 与 `dataset_name` schema 之间迁移。
+- 强制：`run_diffusion_benchmark.py` 只跑 `is_diffusion_perf_config` 为真的 case（`benchmark_params[].dataset`）；`run_benchmark.py` 只跑 omni-bench case（`dataset_name`）。schema 过滤看字段，不看 `mark`。迁移 JSON 后，所有引用该文件的 CUDA/NPU/AMD 步骤必须一起换 runner，并改用对应的 `BENCHMARK_DIR` 与 artifact glob。
+- 禁止：一边已迁 omni-bench、一边仍调 diffusion runner（会 skip 全部 case，pytest 0 selected / exit 5）；把某一平台的 runner 修复外推为其他 pipeline 已对齐。
+- 验收：扫描全部 `.buildkite` 调用，断言 runner 与 JSON schema 一致；HunyuanVideo-1.5 t2v 等已迁 JSON 不得再回到 `run_diffusion_benchmark.py`。^[PR #8107]

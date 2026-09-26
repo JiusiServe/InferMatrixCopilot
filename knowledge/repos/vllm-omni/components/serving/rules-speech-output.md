@@ -1,7 +1,7 @@
 ---
 title: "Speech 输出采样率规则"
 created: 2026-09-05
-updated: 2026-09-22
+updated: 2026-09-26
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["PR #6553", docs/serving/speech_api.md, vllm_omni/entrypoints/openai/audio_utils_mixin.py, vllm_omni/entrypoints/openai/protocol/audio.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/tts_adapters/base.py, vllm_omni/entrypoints/openai/tts_adapters/qwen3_tts.py, tests/entrypoints/openai_api/test_audio_format.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/e2e/online_serving/test_qwen3_tts_customvoice_expansion.py, "PR #7499"]
@@ -27,3 +27,10 @@ confidence: high
 - 强制：MOSS-TTS-Nano、Gepard 等 `async_chunk=false` 的稀疏音频模型由 adapter 在 `PreparedRequest.output_policy` 声明 `accumulate_nonstreaming`。serving 用 `request_id` 键存 policy，仅非流式路径在准备成功后写入，并在累积器 `pop` 消费；优先使用 FINAL_ONLY 已拼接波形，否则 `torch.cat` delta。streaming 永不读写该表。
 - 禁止：在 `serving_speech.py` 增加 Gepard/MOSS 等模型名分支；在可失败步骤前写入 policy 导致泄漏；让并发请求共享可变 policy 槽位。
 - 验收：adapter 设/不设 flag 的非流式拼接与 sentinel-only final；并发非流式隔离；streaming 路径无 policy 条目。^[PR #7499]
+
+## SERV-9d — speech 非合同异常必须映射为 HTTP 500 InternalServerError
+
+- 触发：修改 `OmniOpenAIServingSpeech.create_speech` 的通用异常处理、`create_error_response` 的默认 type/status，或 API server 把 `ErrorResponse` 转成 HTTP。
+- 强制：CUDA OOM、codec/`RuntimeError` 等非请求合同失败必须显式 `err_type="InternalServerError"` 与 `HTTPStatus.INTERNAL_SERVER_ERROR`。`ValueError` 及既有引擎合同错误保持 HTTP 400 / `BadRequestError`。API 包装层按 `ErrorInfo.code` / `type` 透传，不得把所有 `ErrorResponse` 压成 400。
+- 禁止：通用 `except` 省略 type/status，从而默认成 400；把 OOM 或内部 codec 失败写成客户端坏请求。
+- 验收：CPU mock 分别断言 OOM 与 unexpected `RuntimeError` 得到 500/`InternalServerError`，并参数化覆盖 API 包装对 400 与 500 的透传。^[PR #6487]

@@ -1,7 +1,7 @@
 ---
 title: "Diffusion output 与 multiprocess runtime 规则"
 created: 2026-09-02
-updated: 2026-09-22
+updated: 2026-09-26
 type: rule
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5550", "PR #5864", "PR #5885", "PR #5978", "PR #6750", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/io_support.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/output_formatter.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/stage_diffusion_proc.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_timeout.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/diffusion/test_stage_diffusion_proc.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222", "PR #6094", "PR #6255", "PR #6288", "PR #6308", "PR #6499", "PR #6749", "PR #6847", "PR #6953", vllm_omni/diffusion/data.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_utils.py, tests/diffusion/test_diffusion_output_formatter.py, tests/diffusion/test_diffusion_plugin_hooks.py, tests/entrypoints/openai_api/test_video_pipeline_capability.py, "PR #6294", "PR #6615", "PR #7126", "PR #7198"]
@@ -217,3 +217,10 @@ confidence: high
 - 强制：含多 modality 的同一事件先全部 `validate_payload`，再入队；任一路不支持或非法不得部分改队列。`received_at`/boundary 时钟经 rank 同步，使 USP/SP 分片共享同一到达时刻。`lazy_initialize_session=False` 的 handler（如 camera）必须在首个 denoise chunk 前 `maybe_prepare_initial_session`，即使尚无 client enqueue。chunk apply 区分 `num_media_frames` 与 `num_latent_frames`，需要者才 `peek_chunk_media`。
 - 禁止：先入队再校验导致半更新；把未注册 camera 当已可用；懒会话与必须预创建会话混用同一 skip 逻辑；用未同步的 per-rank `time.monotonic()` 驱动跨分片时间线。
 - 验收：复合 prompt+camera 原子成功/失败、未注册拒绝、非懒会话在 chunk0 前存在、介质计数字段传播。^[PR #7198]
+
+## DIFF-1ak — inline DiffusionWorker 在 init_device 之后失败必须先 shutdown 再抛出
+
+- 触发：修改 `DiffusionWorker.__init__` / `shutdown`、`WorkerWrapperBase` 自定义 pipeline 再初始化，或同一进程连续构造 sleep-enabled `uni`/`mp` worker。
+- 强制：`init_device()` 已占用 process-global distributed / CuMem 后，runner 解析、load、LoRA 或 wrapper 再初始化失败必须调用幂等 `shutdown()` 再重抛**原始**异常。`shutdown` 先断开 model/LoRA/profiler/sleep-buffer/request-state 引用，再停 offloader 与 KV-transfer，best-effort 清 connector、A2A workspace 与 distributed state，只释放本 worker `_owns_sleep_pool` 的池，并同步/回收后检查 allocator。cleanup 自己失败不得遮蔽原始 init 异常。
+- 禁止：构造失败后留下非空 model-parallel state，让下一实例撞 `model parallel state must be empty`；shutdown 后仍让 CuMem 跟踪的模型分配活着，让下一 sleep worker 撞 `Sleep mode can only be used for one instance per process`；依赖 wrapper 不可达来做确定性 teardown。
+- 验收：覆盖 init-after-`init_device` 失败、wrapper 再初始化失败、cleanup 异常不改写根因、shutdown 幂等与所有权；不得把单次 AMD custom-pipeline 变绿外推为所有平台已无 leftover mapping。^[PR #7986]

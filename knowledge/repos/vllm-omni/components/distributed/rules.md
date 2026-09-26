@@ -1,7 +1,7 @@
 ---
 title: "Distributed 传输规则"
 created: 2026-08-05
-updated: 2026-09-22
+updated: 2026-09-26
 type: rule
 tags: [vllm-omni, components, distributed]
 sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", "PR #6834", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626", "PR #6529", "PR #7136", "PR #6889", "PR #6093", "PR #7870", "PR #7166"]
@@ -170,3 +170,10 @@ confidence: high
 - 强制：存在 stage `kv_transfer_config` 时必须 `async_chunk=False`。原生路径由 scheduler 拥有 diffusion KV 页；connector 失败 fail-close diffusion engine 后再拆页。非 caching P/D 池释放时按递增 `block_id` 归还，便于相邻页合并；deferred free 存逆序以匹配 vLLM drain。原生 transfer 边界用已确认 computed tokens，排除 async output placeholders；需要时短暂改写 request status/token 计数并在 `finally` 恢复。
 - 禁止：`async_chunk=True` 搭配原生 KV transfer；把 eviction-priority free 顺序当成无缓存池的物理布局；用含 placeholder 的 token 计数作为 transfer 边界；connector 失败后仍继续拆页当成功。
 - 验收：配置拒绝 async_chunk+kv_transfer；物理序 free；confirmed-token transfer 边界；失败 fail-close。^[PR #7166]
+
+## DIST-1m — SHM producer 只能按 put 的精确 key 回收，并有界 reap 跨进程已消费段
+
+- 触发：修改 `SharedMemoryConnector` 的 `_pending_keys` / `cleanup` / `close` / `reap_consumed`，chunk adapter abort 后的 sender 清理，或 lock-file 与 `/dev/shm` 回收。
+- 强制：`cleanup` 只 unlink `put()` 当时登记的精确 key，不得按 request-id 做 `_` 前缀/后缀模糊匹配。receiver 读到 SHM 字节后即可标 consumed 并删 lock file，即使随后 deserialize 失败。producer 在 `put` 与空闲 save loop 上做有界 round-robin `reap_consumed`（丢弃对端已 unlink 的 key）。abort 后在 in-flight 排空再按 adapter 生成的精确 chunk key 入队清理；成功终态 payload 必须留给下游消费，且清理发生在 external-id 复用之前。receiver 用当前 registration identity 拒 stale work，不得堆积 cancellation tombstone。
+- 禁止：用 request-id 子串误删无关 SHM；把已跨进程消费的 key 永远留在 `_pending_keys`；deserialize 失败就留下 lock file；用 underscore-prefix 猜测所有权。
+- 验收：覆盖相似 request id、abort-during-put、external-id 复用、无效 payload 后 lock 消失、consumed-key 回收，以及取消后 `/dev/shm` 与 pending keys 归零。^[PR #8082]

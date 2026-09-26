@@ -1,7 +1,7 @@
 ---
 title: "Cosmos3 规则"
 created: 2026-07-20
-updated: 2026-09-22
+updated: 2026-09-26
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/diffusion/models/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107", "PR #5614", "PR #6325", "PR #6913", "PR #6920", "PR #7427"]
@@ -166,3 +166,10 @@ confidence: high
 - 强制：在加载 tokenizer/组件之前，若 distilled 且 `cfg_parallel_size > 1`，立即 `ValueError`，并指引 `--cfg-parallel-size 1` 与 `--ulysses-degree` 做多卡。distilled 路径强制 `guidance_scale=1.0`；调用方显式请求其他值时 `warning_once`，并说明 `negative_prompt` 不影响生成。
 - 禁止：静默忽略 CFGP 导致无收益的重复实例；先加载权重再报并行非法；把 distilled 的 guidance override 写成仍消费 negative branch。
 - 验收：参数化覆盖 distilled/non-distilled × `cfg_parallel_size`/`ulysses_degree`，断言 distilled+CFGP>1 在组件加载前失败；guidance resolver 覆盖显式非 1.0 的 warning 与强制 1.0。^[PR #7427]
+
+## COSMOS-7a — 共享 HF metadata 的 Cosmos3 拓扑只能经 deploy `pipeline:` 选择
+
+- 触发：注册 Cosmos3 pipeline、写 `cosmos3_*.yaml`，或让 `--deploy-config` 的 stage/`model_config` 进入 Cosmos3 T2I/video/policy 启动。
+- 强制：T2I、video 与 policy checkpoint 共享 `model_type=cosmos3_omni` 和同一 `model_index.json` `_class_name`。`OMNI_PIPELINES` 不得注册可被该 metadata 自动命中的 `cosmos3_omni`。policy 用 `cosmos3_policy`，omni overlay 用 `cosmos3_omni_deploy`，两者都不声明 `hf_architectures` / `diffusers_class_name`，只经 YAML `pipeline:` 选中。单 stage overlay 必须 `async_chunk: false`；`guardrails: false` 等 stage extras 只有选中该 key 后才会合并。无 `--deploy-config` 时 T2I/video 仍走 CLI 单 stage fallback；`--no-guardrails` 仍是 CLI-only 路径。
+- 禁止：为了让 `--deploy-config` 生效而把 `cosmos3_omni` 做成 auto-detect（会吞掉 policy/video）；静默丢弃 deploy YAML 却宣称 guardrails/stage extras 已生效。
+- 验收：断言 `cosmos3_omni` 不在 registry、opt-in key 无 auto-capture 字段；`cosmos3_omni.yaml` 经 `merge_pipeline_deploy` 得到 `guardrails is False` 与 `final_output_type="video"`。^[PR #7971]
