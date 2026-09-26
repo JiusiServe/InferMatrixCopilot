@@ -11,13 +11,11 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import re
 import time
 import uuid
 from pathlib import Path
 from typing import NamedTuple
 
-from .. import idempotency as idem
 from .. import run_status as rs
 from ..config import Settings, TierNotConfiguredError
 from ..engine.executor import Executor
@@ -35,6 +33,7 @@ from ..run_trace import RunTrace
 from ..task_spec import TaskSpec
 from ..ui import style
 from ..metrics import format_metrics_line
+from .reservation import RunReservation
 
 
 class GateOutcome(NamedTuple):
@@ -70,6 +69,7 @@ class Copilot:
         configured dir, and the planner over both. `last_run_dir` starts unset
         and is filled by the first execution."""
         self.settings = settings or Settings()
+        self.reservations = RunReservation(self.settings)
         # provider-registry seam: a real llm.LLM under backend "api"
         # (byte-identical), a HarnessLLM adapter under a harness backend
         from ..providers import llm_for
@@ -433,121 +433,23 @@ class Copilot:
         print("no resumable run found")
         return 1
 
-    # -- MCP surface (reserve + child execute) --------------------------------
-    # These support the start/poll MCP server (mcp_server.py). The CLI path
-    # (run_task/run_playbook) is deliberately untouched: it still gates BEFORE
-    # creating a run dir, so an aborted plan leaves no directory. Reservation
-    # (dir before plan) is an MCP-only shape whose blocked/failed outcome is a
-    # terminal poll record, not litter.
-    _RUN_ID_RE = re.compile(r"^run-\d{8}-\d{6}-[0-9a-f]{6}$")
-
+    # -- MCP child execution and compatibility reservation facade -----------
     @staticmethod
     def _new_run_id() -> str:
-        """A fresh unique run id (`run-<ts>-<uuid6>`; same format the CLI uses)."""
-        return f"run-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        return RunReservation.new_run_id()
 
     def _contained_run_dir(self, run_id: str, *, must_exist: bool = True) -> Path:
-        """Validate `run_id` and resolve it to a directory strictly contained
-        under `run_root` — rejecting path traversal from an untrusted MCP arg.
-        Raises ValueError on a bad pattern, an escape, or (unless
-        `must_exist=False`) a missing run.
-
-        `must_exist=False` is for the poll path, which must distinguish a
-        well-formed id whose run this server has never heard of — answered as
-        `state: unknown` so a client can tell "lost" from "still running" — from
-        a malformed or escaping id, which stays an error."""
-        if not self._RUN_ID_RE.match(run_id or ""):
-            raise ValueError(f"invalid run_id: {run_id!r}")
-        root = self.settings.run_root.resolve()
-        run_dir = (self.settings.run_root / run_id).resolve()
-        if run_dir.parent != root:
-            raise ValueError(f"run_id escapes run_root: {run_id!r}")
-        if must_exist and not run_dir.exists():
-            raise ValueError(f"no such run: {run_id!r}")
-        return run_dir
+        return self.reservations.contained_run_dir(run_id, must_exist=must_exist)
 
     def reserve_run(self, spec: TaskSpec, *, owner_server_id: str,
                     owner_server_pid: int,
                     idempotency_key: str = "") -> tuple[str, bool]:
-        """MCP-only: reserve a run and return `(run_id, created)` **without**
-        planning or executing (no LLM), so the tool call returns in ms and the
-        caller polls. Persists `request.json` (0600) + an initial `queued`
-        `run_status.json` stamped with the owning server; planning happens later
-        in the child.
-
-        `created` is what the caller enqueues on. Deduplicating the id alone
-        would not deduplicate execution — the start path would hand back an
-        existing id and still launch a second child for it.
-
-        With an `idempotency_key`, a retry that lost the original response gets
-        the same run — including a finished one, whose result it can then read
-        instead of re-reviewing the same commit. See `idempotency.py` for why a
-        spec hash alone cannot do this and why the scope is Strict-only.
-
-        A `repo_path` on the spec is authorized and canonicalized HERE, so the
-        persisted request names one immutable checkout for the life of the run.
-        The child re-authorizes it anyway — `request.json` is untrusted — but
-        freezing it at reservation is what stops two concurrent per-call repos
-        from racing through shared settings, which is how the deleted
-        `configure_strict_repo` worked."""
-        from .request_policy import authorize_repo_path
-
-        if spec.repo_path:
-            spec = spec.model_copy(update={"repo_path": authorize_repo_path(
-                spec.repo, spec.repo_path, self.settings)})
-        key = idem.validate_key(idempotency_key)
-        if not key:
-            return self._reserve_new(spec, owner_server_id, owner_server_pid), True
-        with idem.key_lock(self.settings.run_root, key):
-            return self._reserve_keyed(spec, key, owner_server_id,
-                                       owner_server_pid)
-
-    def _reserve_keyed(self, spec: TaskSpec, key: str, owner_server_id: str,
-                       owner_server_pid: int) -> tuple[str, bool]:
-        """Resolve or create the run for `key`. Caller holds the key lock."""
-        fingerprint = idem.spec_fingerprint(spec.model_dump())
-        entry = idem.read_entry(self.settings.run_root, key)
-        if entry:
-            run_dir = self.settings.run_root / str(entry.get("run_id") or "")
-            # The index is a cache; the persisted request is the authority. A
-            # key presented with a DIFFERENT spec is a caller error — serving
-            # the old run would quietly review the wrong thing under a name the
-            # caller believes means something else.
-            recorded = str(entry.get("spec_fingerprint") or "")
-            if run_dir.exists() and recorded and recorded != fingerprint:
-                raise idem.IdempotencyError(
-                    f"idempotency_key {key!r} was already used for a different "
-                    "request; use a new key for a new attempt")
-            if run_dir.exists() and idem.resolvable(run_dir):
-                return run_dir.name, False
-            if run_dir.exists() and idem.relaunchable(run_dir):
-                # Reserved but never launched — the owner died between
-                # publishing this entry and starting a child. Re-arm and report
-                # it as created so the caller enqueues it; the re-stamp is what
-                # stops a SECOND retry from enqueueing it again.
-                if rs.reclaim_queued(run_dir, owner_server_id=owner_server_id,
-                                     owner_server_pid=owner_server_pid):
-                    return run_dir.name, True
-                return run_dir.name, False
-        run_id = self._reserve_new(spec, owner_server_id, owner_server_pid)
-        idem.write_entry(self.settings.run_root, key, run_id, fingerprint)
-        return run_id, True
-
-    def _reserve_new(self, spec: TaskSpec, owner_server_id: str,
-                     owner_server_pid: int) -> str:
-        """Create the run directory, request and initial status."""
-        run_id = self._new_run_id()
-        run_dir = self.settings.run_root / run_id
-        run_dir.mkdir(parents=True, exist_ok=True)
-        req = run_dir / "request.json"
-        req.write_text(json.dumps(spec.model_dump(), indent=2), encoding="utf-8")
-        try:  # least-privilege perms; advisory only against same-user tampering
-            os.chmod(req, 0o600)
-        except OSError:
-            pass
-        rs.init_queued(run_dir, run_id=run_id, owner_server_id=owner_server_id,
-                       owner_server_pid=owner_server_pid)
-        return run_id
+        """Compatibility entry for callers that still hold a ``Copilot``."""
+        return self.reservations.reserve(
+            spec, owner_server_id=owner_server_id,
+            owner_server_pid=owner_server_pid,
+            idempotency_key=idempotency_key,
+        )
 
     def execute_reserved(self, run_id: str) -> int:
         """MCP-only child entry (subprocess, stdout -> console.log). Writes its

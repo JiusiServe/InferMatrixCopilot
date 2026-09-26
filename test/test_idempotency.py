@@ -12,6 +12,7 @@ import pytest
 
 from infermatrix_copilot import idempotency as idem
 from infermatrix_copilot import run_status as rs
+from infermatrix_copilot.app.reservation import RunReservation
 from infermatrix_copilot.cli.copilot import Copilot
 from infermatrix_copilot.task_spec import TaskSpec
 
@@ -61,6 +62,21 @@ def test_same_key_returns_the_same_run_and_creates_once(settings):
     second, created_second = _reserve(cop, _spec())
     assert first == second
     assert created_first is True and created_second is False
+
+
+def test_headless_reservation_and_copilot_facade_share_keyed_state(settings):
+    spec = _spec()
+    run_id, created = RunReservation(settings).reserve(
+        spec, owner_server_id="S1", owner_server_pid=1234,
+        idempotency_key=KEY,
+    )
+    again, reused = _reserve(Copilot(settings), spec)
+
+    assert created is True and reused is False and again == run_id
+    run_dir = Path(settings.run_root) / run_id
+    assert json.loads((run_dir / "request.json").read_text()) == spec.model_dump()
+    assert rs.read_status(run_dir)["state"] == rs.QUEUED
+    assert len(list(Path(settings.run_root).glob("run-*"))) == 1
 
 
 def test_same_key_still_dedupes_after_the_run_is_terminal(settings):

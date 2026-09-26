@@ -30,3 +30,22 @@ for name in ('workspace', 'review', 'report', 'pr', 'issue', 'profile',
         capture_output=True, text=True, timeout=30,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_run_reservation_import_does_not_load_orchestrator_or_transports():
+    source = Path(__file__).resolve().parents[1] / "src"
+    code = """
+import sys
+from infermatrix_copilot.app.reservation import RunReservation
+for name in ('infermatrix_copilot.app.core',
+             'infermatrix_copilot.app.run_service',
+             'infermatrix_copilot.cli.entry',
+             'infermatrix_copilot.mcp_server'):
+    assert name not in sys.modules, name
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        env={**os.environ, "PYTHONPATH": str(source)},
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
