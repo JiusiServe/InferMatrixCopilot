@@ -4,8 +4,9 @@ Two things live here so a step's definition can be self-contained:
 
 1. the `@step` / `register_step` **self-registration** surface — decorating a
    handler (or calling `register_step` for factory-built handlers) records a
-   `StepSpec` into the package-level collection; `steps.register_builtin_steps`
-   flushes that collection into a `StepRegistry`. There is no separate
+   `StepSpec` into the package-level collection when its module is loaded;
+   `steps.register_builtin_steps` loads the vetted modules and flushes that
+   collection into a `StepRegistry`. There is no separate
    `add(StepSpec(...))` block to keep in sync anymore.
 2. the cross-module helpers every step file shares (`gh`, `repo_path`, `git`,
    `task_spec`, `gh_read_tools`, `post_step`) — one home instead of a
