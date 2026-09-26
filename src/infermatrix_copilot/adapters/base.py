@@ -295,10 +295,17 @@ def load_adapter(adapter_dir: str | Path) -> RepoAdapter:
     manifest_path = root / "manifest.yaml"
     if not manifest_path.exists():
         raise AdapterError(f"no manifest.yaml in {root}")
-    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    try:
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise AdapterError(f"cannot load adapter manifest in {root}: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise AdapterError(f"adapter {root.name}: manifest must be a mapping")
     for section in REQUIRED_SECTIONS:
         if section not in manifest:
             raise AdapterError(f"adapter {root.name}: missing required section '{section}'")
+    if not isinstance(manifest["name"], str) or not isinstance(manifest["repo"], dict):
+        raise AdapterError(f"adapter {root.name}: name must be text and repo a mapping")
     return RepoAdapter(name=manifest["name"], root=root, manifest=manifest)
 
 

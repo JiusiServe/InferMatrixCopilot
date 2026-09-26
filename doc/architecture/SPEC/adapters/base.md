@@ -1,6 +1,6 @@
 # adapters/base.py —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-09-26 -->
 
 `LOC ~423 · 边缘（仓库知识） · refactor-status: ok`
 
@@ -28,6 +28,9 @@
   获胜且**绝不被修改**；仍未解析的变量 → 返回 ""（fail-closed，能力缺口路径）。
 - **未知 adapter 名抛 `AdapterNotFound`**（子类）；把"不存在"当兼容路径的调用方
   只能捕获这个子类 —— 已知 adapter 的畸形 manifest 必须仍是硬失败。
+- `load_adapter` 将 manifest 读取、编码与 YAML 解析错误归一为 `AdapterError`，
+  并要求 manifest 为映射、`name` 为文本、`repo` 为映射；调用方不能把这些错误
+  当作 adapter 缺失而忽略。
 - `capabilities` 由 manifest 推导（repo.path/language.*/ci.provider/upstream.*/
   modules）+ 显式的 `capabilities:` —— 与 playbook 的 `requires:` 匹配。
 - `high_risk_modules` = 标了 `risk: high` 的模块（喂给 patch-review，**A5**）。
@@ -52,5 +55,6 @@
 ## 重构备注
 两个关注点在这里共存得很干净：`RepoAdapter`（访问器）+ 注册表 + 引导。
 如果引导继续长大（更丰富的指纹），可考虑 `adapters/bootstrap.py`。
-**把 `capabilities` 推导保持为 planner 信任的唯一来源** —— 不要在 `cli.resolve` 里
-复制一份能力逻辑（它目前只为 REPO_PATHS **补上** repo.path，这是可以接受的）。
+**把 `capabilities` 推导保持为 planner 信任的唯一来源** ——
+`app.repository_context` 只为实际 checkout **补上** `repo.path`，
+并将同一 adapter policy 交给执行层。

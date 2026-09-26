@@ -8,6 +8,13 @@ executes or resumes a playbook, and reserves/executes durable runs. The CLI
 imports it through `cli.copilot` for
 compatibility; the application never imports CLI or MCP transports.
 
+Repository checkout, capabilities, and adapter policy come from
+`app.repository_context.RepositoryContextResolver`. Planning and execution
+use the same context contract. A missing adapter retains the legacy
+unknown-capabilities path when a checkout exists; a broken known adapter
+blocks the run. Execution rechecks the context after planning and refuses a
+changed checkout or policy before starting the executor.
+
 `Copilot` keeps reservation and run-path methods as compatibility delegates
 to `app.reservation.RunReservation`. It owns workflow resolution and child
 execution; it does not own idempotency indexing or run ID validation.
