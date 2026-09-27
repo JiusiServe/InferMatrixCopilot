@@ -1,10 +1,10 @@
 ---
 title: "Scheduler shared lifecycle 规则"
 created: 2026-09-22
-updated: 2026-09-22
+updated: 2026-09-26
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5461"]
+sources: ["PR #5461", "PR #7877"]
 ---
 
 # Scheduler shared lifecycle 规则
@@ -22,3 +22,10 @@ sources: ["PR #5461"]
 - 验收：同一组 contract 测试分别驱动 AR 与 generation 输入路径；断言 base dataclass 的
   每个字段均被转交、现有 Omni entry 保持 identity、失败 KV load 终止输出、finished ID/
   stats/events/cleanup 一致，并单独验证显式 abort policy。 ^[PR #5461]
+
+## SCHED-1c — 同 step 的 prefix-hit prefetch 必须在 publish 后按新 version 重规划
+
+- 触发：修改 `OmniTensorPrefixCache` 的 same-step hit prefetch、`_hit_prefetch` / `_prefetch_queue`，或 `allocate_slots` 后同一次 `schedule()` 内后到请求命中先到请求本步才写入的 block。
+- 强制：B 在 `new_step_starts` 规划的 hit 可能读到 ABSENT mm 行，或回收块上上一 tenant 的 COMMITTED 行。A 在本步 `save_outputs` / `_publish_saved_step` 登记 write 后，必须丢掉 `reserved_version` 已不再匹配的 prefetch future（旧 fetch 可跑完但须 unregister pending read），再让 `_prefetch_hit_spans` 对现已 `IN_TRANSIT` 的行重规划。COW 保住旧 tenant 时，该 hit 也不得继续用旧 future。
+- 禁止：只因 `_hit_prefetch` 已有 future 就跳过 re-plan；把提前读到的 pool 行当成 B 的 merged prefix。
+- 验收：覆盖 fresh/reused block 与 immediate/deferred mm；断言 B 物化的 prefix 等于本步 A 刚写入的 hidden/mm，而不是 prefetch 当时的旧/空行。^[PR #7877]
