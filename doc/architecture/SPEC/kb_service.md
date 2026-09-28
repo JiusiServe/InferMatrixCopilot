@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-29 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -135,3 +135,8 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 知识路径都在该 PR 的改动内且内容与 head 相同；夹带额外改动的合并同样被发现）。否则（admin bypass、直接推送、账本漏记）对其涉及的仓库暂停自动合并（改动在仓库范围之外 → 全局暂停）、
 出队其打开的知识 PR 并转人工；不在 `auto_merge` 的仓库只写 `unrecorded_merge` trace。首次运行只记录基线；晚于
 2 小时宽限期的提交留到下次，避免与调度器记录合并赛跑。暂停逻辑与熔断共用 `Scheduler._pause`。
+
+## 2026-09-29 暂停清单端点
+`holds_server`（`kb holds-server`）只以 `GET/HEAD /holds.json` 提供 `<state_dir>/public/holds.json`（`Cache-Control: no-store`），
+其余路径一律 404，不列目录、不跟随路径、不接受写入；清单尚不存在时返回 503（门禁视为不可达并失败关闭）。默认只绑定
+`127.0.0.1`，由 bot 主机的反向代理加 TLS 后对外，URL 写入 `.github/kb-gate/config.json` 的 `holds_url`。
