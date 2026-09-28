@@ -182,6 +182,12 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
 停用不足 1 小时的快照不删除——在切换前刚解析到它的预留会在此窗口内写下钉住记录（运行服务在其他进程中，无法共享
 激活锁，因此以宽限期协调）。测试通过自动 fixture 把 `KB_RUN_ROOTS` 指向空目录，从不读取真实运行目录。
 
+
+## 2026-09-29 激活前的格式检查
+`verify_snapshot` 在其他检查之前核对快照声明的知识格式：未声明或不在本 Copilot 支持的 `SUPPORTED_FORMATS` 中 →
+`ActivationError`，`active` 保持不变（先升级 Copilot 再激活新格式的知识）。快照随顶层 Markdown 一起携带
+`_format.yaml`。
+
 ## 2026-09-29 Copilot 运行经验（来源②）
 `collect_events` 在 `intake.copilot_runs` 开启时，除 `inbox/lessons/` 外还读取 `pr_debug` 的已验证修复记录（v1/v2，
 `engine/steps/pr/debug.py` 产出）：同机运行投放到 `KB_BUGFIX_DIR`（缺省 `<state_dir>/inbox/bugfix`，与运行侧
