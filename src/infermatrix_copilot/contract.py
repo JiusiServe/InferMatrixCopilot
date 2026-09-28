@@ -240,6 +240,12 @@ def build_review_result(run_dir: Path | str) -> dict[str, Any]:
         if events:
             diagnostics[name] = events
 
+    # which knowledge the run reviewed with (pinned at reservation)
+    pin = _read_json(run_dir / "knowledge.json")
+    if pin.get("snapshot"):
+        diagnostics["knowledge_snapshot"] = str(pin["snapshot"])
+        diagnostics["knowledge_tree_sha256"] = str(pin.get("tree_sha256") or "")
+
     metrics = _read_json(run_dir / "metrics.json")
     cost = metrics.get("cost") or {}
     if cost:

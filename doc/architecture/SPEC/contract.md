@@ -1,6 +1,6 @@
 # contract.py —— 规范
 
-<!-- verified-against: 2026-09-22 -->
+<!-- verified-against: 2026-09-28 -->
 
 `旧版跨仓库契约兼容层 · refactor-status: compatibility-shim`
 
@@ -86,3 +86,7 @@ revision、supported repositories，以及 `supports_expected_head`、
 ## 重构备注
 新模块（PR2 mixed-mode contract 拆分）。保持它薄：任何"顺手在这里实现"
 的诱惑都在重造 thin_mcp_server 的巨石。
+
+## 2026-09-28 知识快照
+`build_review_result` 从 `<run>/knowledge.json` 读取钉住的知识，在 `diagnostics` 中给出 `knowledge_snapshot`
+与 `knowledge_tree_sha256`，供宿主（RB）与 review 一起记录。

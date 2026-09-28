@@ -1,6 +1,6 @@
 # app/run_service.py —— 规范
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-09-28 -->
 
 `RunService` is the durable application boundary shared by the embedded
 Strict SDK and MCP transport. It owns policy-checked reserve/start, one
@@ -25,3 +25,17 @@ report pages remain available after terminal status.
 `mcp_server.CopilotMCP` remains a compatibility alias. The MCP server owns
 tool registration and protocol error projection, while the SDK owns typed
 request/result projection. Neither transport owns the run queue.
+
+## 2026-09-28 Knowledge snapshot pinning
+When `reserve_strict_review` / `reserve_quality_review` CREATE a reservation,
+they record the current `KnowledgeView` in `<run>/knowledge.json`: snapshot id,
+manifest tree hash, and resolved real paths (never the `active` symlink). An
+idempotent retry does not rewrite it. `_launch` sets the child's
+`KNOWLEDGE_DIR` and `KNOWLEDGE_ROOT` from that record, so a run that executes
+later (queued, or relaunched after a restart) still reviews with the knowledge
+active at reservation. If the pinned snapshot was pruned, the run is marked
+`failed`; it never silently switches knowledge. Without a snapshot root the
+run is pinned to this server's effective `knowledge_dir` (reported as `packaged`,
+or `unverified` for a custom directory), with `KNOWLEDGE_ROOT` removed from the
+child's environment. Runs reserved before pinning
+existed have no record and use the process default.

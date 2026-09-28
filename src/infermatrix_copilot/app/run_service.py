@@ -29,6 +29,18 @@ from ..task_spec import READ_ONLY_KINDS
 from .core import Copilot
 from .reservation import RunReservation
 
+KNOWLEDGE_PIN = "knowledge.json"
+
+
+def read_knowledge_pin(run_dir: str | Path) -> dict:
+    """The knowledge a reserved run was pinned to ({} for runs reserved
+    before pinning existed, which use the process default)."""
+    try:
+        data = json.loads((Path(run_dir) / KNOWLEDGE_PIN).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
 
 class RunService:
     """The server core: a serialized run queue over isolated subprocesses, plus
@@ -130,6 +142,21 @@ class RunService:
             self.settings.allowed_repo_roots)
         if self.settings.strict_backend:
             env["STRICT_BACKEND"] = self.settings.strict_backend
+        pin = read_knowledge_pin(run_dir)
+        if pin.get("knowledge_dir"):
+            # the snapshot pinned at reservation, even if another is active now;
+            # a snapshot pruned since then fails the run instead of silently
+            # reviewing with different knowledge
+            if not (Path(pin["knowledge_dir"]) / "AGENTS.md").is_file():
+                rs.mark(run_dir, rs.FAILED, note=(
+                    f"pinned knowledge snapshot {pin.get('snapshot')} is no longer available"))
+                self._reap()
+                return
+            env["KNOWLEDGE_DIR"] = pin["knowledge_dir"]
+            if pin.get("knowledge_root"):
+                env["KNOWLEDGE_ROOT"] = pin["knowledge_root"]
+            else:
+                env.pop("KNOWLEDGE_ROOT", None)  # the packaged tree, whatever is configured now
         popen_kwargs: dict[str, Any] = {}
         if os.name == "nt":
             # Codex/Claude launch the MCP server over stdio.  Without a new
@@ -198,7 +225,7 @@ class RunService:
         run_id, created = self.reservations.reserve(
             spec, owner_server_id=self.server_id, owner_server_pid=self.pid,
             idempotency_key=str(spec_dict.get("idempotency_key") or ""))
-        if created:
+        if created and self._pin_or_fail(run_id):
             self._q.put((run_id, True))
         return run_id, created
 
@@ -215,9 +242,62 @@ class RunService:
         run_id, created = self.reservations.reserve(
             spec, owner_server_id=self.server_id, owner_server_pid=self.pid,
             idempotency_key=str(spec_dict.get("idempotency_key") or ""))
-        if created:
+        if created and self._pin_or_fail(run_id):
             self._q.put((run_id, False))
         return run_id, created
+
+    # -- knowledge pinning ---------------------------------------------------------
+    def _pin_or_fail(self, run_id: str) -> bool:
+        """Pin, or make the reservation durably terminal: a reservation that
+        exists but is never enqueued would stay queued forever (retries see
+        created=False), so a pinning failure fails the run with its reason."""
+        try:
+            self._pin_knowledge(run_id)
+            return True
+        except Exception as exc:  # noqa: BLE001 - any failure must end the run visibly
+            rs.mark(self.run_root / run_id, rs.FAILED,
+                    note=f"could not pin the knowledge snapshot: {type(exc).__name__}: {exc}")
+            return False
+
+    def _pin_knowledge(self, run_id: str) -> dict:
+        """Record, at reservation, the knowledge this run must review with.
+
+        The knowledge service swaps the active snapshot at runtime; a Strict
+        run that starts later (queued, or re-launched after a restart) must
+        still read the snapshot that was active when it was reserved, and its
+        result must say which one that was. The resolved real paths are
+        recorded, never the ``active`` symlink."""
+        from ..knowledge_view import KnowledgeView
+
+        existing = read_knowledge_pin(self.run_root / run_id)
+        if existing:
+            # reclaiming an interrupted, never-started reservation also reports
+            # created=True: its reservation-time pin stands
+            return existing
+        view = KnowledgeView.current()
+        if view.snapshot == "packaged":
+            env_root = ""
+        elif view.verified:
+            env_root = str(view.root.parent)  # the snapshot dir (MANIFEST.json + knowledge/)
+        else:
+            env_root = str(view.root)
+        snapshot, knowledge_dir = view.public_snapshot, str(view.root)
+        if view.snapshot == "packaged":
+            # no snapshot root selected: the run reviews with this server's
+            # EFFECTIVE knowledge_dir (a deployment may configure its own), and
+            # KNOWLEDGE_ROOT is cleared at launch, so a relaunch under a newly
+            # configured root cannot review with a snapshot while reporting this
+            configured = Path(self.settings.knowledge_dir).resolve()
+            if configured != view.root.resolve():
+                snapshot = "unverified"
+            knowledge_dir = str(configured)
+        pin = {"snapshot": snapshot, "tree_sha256": view.tree_sha256,
+               "knowledge_dir": knowledge_dir, "knowledge_root": env_root}
+        path = self.run_root / run_id / KNOWLEDGE_PIN
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(pin, sort_keys=True), encoding="utf-8")
+        os.replace(tmp, path)
+        return pin
 
     def strict_readiness(self, repo: str, repo_path: str = "") -> list[str]:
         """Return actionable setup gaps before reserving a Strict run.
