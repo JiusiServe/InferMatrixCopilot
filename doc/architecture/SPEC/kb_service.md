@@ -187,3 +187,11 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
 `verify_snapshot` 在其他检查之前核对快照声明的知识格式：未声明或不在本 Copilot 支持的 `SUPPORTED_FORMATS` 中 →
 `ActivationError`，`active` 保持不变（先升级 Copilot 再激活新格式的知识）。快照随顶层 Markdown 一起携带
 `_format.yaml`。
+
+## 2026-09-29 Copilot 运行经验（来源②）
+`collect_events` 在 `intake.copilot_runs` 开启时，除 `inbox/lessons/` 外还读取 `pr_debug` 的已验证修复记录（v1/v2，
+`engine/steps/pr/debug.py` 产出）：同机运行投放到 `KB_BUGFIX_DIR`（缺省 `<state_dir>/inbox/bugfix`，与运行侧
+`KNOWLEDGE_INTAKE_DIR` 配为同一目录），异机运行发到邮箱 issue `KB_BUGFIX_MAILBOX`（`owner/repo#N`）。仓库按完整名
+（不区分大小写）或别名精确匹配；歧义身份改名 `.quarantined` 隔离、从不改写；属于其他仓库的投放文件留待其处理。
+邮箱是公开 issue，只接受 `KB_BUGFIX_AUTHORS` 列出的作者（未设置则不读邮箱），每个仓库各自维护评论游标。
+事件 ID 与记录的 `event_id` 一致，重复投递幂等。
