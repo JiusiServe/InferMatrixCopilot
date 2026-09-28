@@ -1,6 +1,6 @@
 # engine/steps/__init__.py —— 规范
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-09-28 -->
 
 `LOC ~34 · step 库聚合 · refactor-status: ok`
 
@@ -38,3 +38,6 @@ import `_common` 而不加载领域模块。调用 `register_builtin_steps` 时�
 ## 重构备注
 保留显式模块列表，避免自动发现把未经审核的 step 带入 registry；模块名拼错在
 组装时大声失败。`_BUILTIN_MODULES` + `_COLLECTED` 是内建 step 集合的来源。
+
+## 2026-09-28
+`_BUILTIN_MODULES` 增加 `knowledge`（知识服务步骤）。

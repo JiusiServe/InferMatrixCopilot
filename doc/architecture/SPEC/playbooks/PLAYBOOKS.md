@@ -1,6 +1,6 @@
 # playbooks/*.yaml —— 规范
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-09-28 -->
 
 `9 个文件 · 声明式编排数据 · refactor-status: ok`
 
@@ -51,3 +51,6 @@ success, steps[]`。
 它们是 reuse>adapt>generate 模型里的"配置"那一半 —— **保持声明式**。
 要顶住在 `when:`/`foreach` 之外加条件逻辑的冲动；更复杂的东西属于某个 step。
 **当第二个仓库接入时，它应该不需要任何新 playbook —— 那就是不变性测试。**
+
+## kb-intake（candidate）
+知识服务按仓库运行：`knowledge.collect_events` → `knowledge.intake` → `knowledge.publish`。candidate 状态，planner 不可见，由知识服务调度。

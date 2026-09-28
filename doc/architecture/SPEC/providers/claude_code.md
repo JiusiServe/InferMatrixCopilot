@@ -1,6 +1,6 @@
 # providers/claude_code.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-09-28 -->
 
 `LOC ~205 · harness transport（Claude 订阅） · refactor-status: ok`
 
@@ -40,3 +40,6 @@ stdlib + `.base` + `..agent_loop.AgentOutcome` + `..llm` 的类型。
 ## 重构备注
 三个 transport（`claude_code`、`codex`、`cursor`）形状相似，但**恰恰在治理不同的地方
 不同** —— 要顶住把它们合并成一个参数化类的冲动：**那些差异本身就是安全姿态**。
+
+## 2026-09-28
+`complete()` 接受并忽略 `effort`（与 base 契约一致）。

@@ -5,6 +5,8 @@
     kb pause  (--repo R | --all) --reason TEXT
     kb resume (--repo R | --all)
     kb control                        refresh the signed control record and hold list now
+    kb run --playbook kb-intake --repo R   run one knowledge playbook once
+    kb calibrate --repo R             run the judge over the repository's calibration set
 
 Pause/resume bump the repository's generation, so every outbox item issued
 before it is void; they then re-sign the control record and hold list at once.
@@ -90,6 +92,11 @@ def main(argv: list[str] | None = None) -> int:
         if name == "pause":
             cmd.add_argument("--reason", required=True)
     sub.add_parser("control")
+    run = sub.add_parser("run")
+    run.add_argument("--playbook", required=True)
+    run.add_argument("--repo", required=True)
+    calibrate = sub.add_parser("calibrate")
+    calibrate.add_argument("--repo", required=True)
     args = parser.parse_args(argv)
 
     if args.command == "keygen":
@@ -140,6 +147,36 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "control":
             _refresh(state_dir, ledger, registry)
             return 0
+        if args.command == "run":
+            from ..config import Settings
+            from .runner import run_playbook
+
+            outcome, run_dir = run_playbook(Settings(), args.playbook, args.repo, state_dir=state_dir)
+            print(f"{args.playbook} {args.repo}: {outcome.status} ({run_dir})")
+            return 0 if outcome.status == "done" else 1
+        if args.command == "calibrate":
+            from ..config import Settings
+            from .calibration import run_calibration
+            from .models import ModelGateway, roles_from_env
+
+            lifecycle = registry.get(args.repo)
+            if lifecycle is None or not lifecycle.calibration_set or lifecycle.adapter_dir is None:
+                print(f"{args.repo} has no calibration_set", file=sys.stderr)
+                return 2
+            _generator, judge = roles_from_env()
+            from .calibration import case_set_digest
+            from .runtime import record_calibration
+
+            case_dir = lifecycle.adapter_dir / lifecycle.calibration_set
+            report = run_calibration(case_dir, gateway=ModelGateway(Settings()), judge=judge)
+            # publication under auto_merge requires this record to match the
+            # current judge and case set exactly
+            record_calibration(ledger, args.repo, judge=judge.label(),
+                               case_set=case_set_digest(case_dir), passed=report.passed, at=time.time())
+            json.dump({"repo": args.repo, "judge": judge.label(), **report.to_dict()},
+                      sys.stdout, indent=2, ensure_ascii=False)
+            print()
+            return 0 if report.passed else 1
     finally:
         ledger.close()
     return 2

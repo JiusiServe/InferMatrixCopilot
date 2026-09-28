@@ -27,3 +27,17 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 
 ## 测试
 `test_kb_service_core.py`。
+
+## 2026-09-28 intake 与质量门
+- `models`：生成与评审模型按 (provider, model, effort) 钉死（默认 `claude-code:claude-opus-5-5`
+  与 `codex:gpt-6-sol:medium`，评审必须与生成不同家族）；不可用/超时/无法解析 → `ModelUnavailable`，
+  调用方保持排队，绝不降级；每次调用经 recorder 记录输入、输出、用量。
+- `sources`：知识仓库克隆的只读读取（`knowledge_files`、`external_texts`）、只读 GitHub 客户端
+  （合并 PR、PR 证据有界摘录、release/tag）、本机 Copilot 运行经验收件目录。
+- `intake`：每个事件由生成器起草类型化操作（只允许 add/edit_same_meaning/replace/retire），
+  `apply_operations` 必须接受，最多两轮带精确错误的修复；多事件合并为一个变更集。
+- `gate`：L1 → 逐块 L2（每类块只问适用维度）→ 按 owner 目录的一致性检查；
+  外部引用、protected、熔断（按仓库计算）、任何不确定 → human；L1 失败不调用模型。
+- `runtime`：collect → intake → gate → publish；shadow 只记录；变更集文件存 `changesets/<id>.json`。
+- `calibration`：按仓库的校准集评分（坏样例须全部拦下、好样例误拒 ≤ 20%）。
+- `runner`：经标准 executor 运行 `kb-*` playbook。CLI 新增 `kb run`、`kb calibrate`。

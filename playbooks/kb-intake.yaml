@@ -1,0 +1,22 @@
+# Knowledge service intake for ONE repository (params.repo). Candidate status:
+# invisible to the planner; the knowledge service's scheduler runs it. Drafting
+# uses the pinned generator, the gate the pinned judge (kb_service/models.py).
+# In shadow mode `publish` only records what it would have opened.
+name: kb-intake
+version: 1
+status: candidate
+provenance:
+  created_by: human
+  source: knowledge-base redesign (Copilot owns the knowledge base), v7
+task_kinds: [knowledge_maintenance]
+repos: []
+requires: []
+params:
+  repo: "knowledge repository name, e.g. the adapter's repos/<repo>"
+  max_events: "events drafted per run (default 10)"
+steps:
+  - {id: collect, step: knowledge.collect_events}
+  - {id: intake, step: knowledge.intake}
+  - {id: publish, step: knowledge.publish}
+success: new events recorded; at most one gated change set staged and either
+  handed to the publisher (auto_merge) or recorded (shadow); nothing pushed here

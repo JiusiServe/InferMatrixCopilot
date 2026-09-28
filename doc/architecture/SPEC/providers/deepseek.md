@@ -1,6 +1,6 @@
 # providers/deepseek.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-09-28 -->
 
 `LOC ~502 · harness transport（dsh，API-keyed） · refactor-status: oversized`
 
@@ -56,3 +56,6 @@ stdlib + `.base` + `.registry` + `..agent_loop` + `..llm` 的类型 + dsh SDK（
 约 502 行，是目前**最大**的 transport，因为它要自己生成 composition —— 而基于 CLI 的
 那几个是从厂商那里拿到的。如果继续增长，composition 构建部分（`_composition`、`_env`）
 是天然的拆分点。
+
+## 2026-09-28
+`complete()` 接受并忽略 `effort`（与 base 契约一致）。

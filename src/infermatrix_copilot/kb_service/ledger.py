@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -160,6 +161,48 @@ class Ledger:
             held["heartbeat"] = self._clock()
             cur.execute("UPDATE meta SET value=? WHERE key='lease'", (json.dumps(held),))
 
+    @contextmanager
+    def lease(self, *, ttl: float = 900.0, renew_every: float = 60.0) -> Iterator[str]:
+        """Hold the single-writer lease for a unit of work; raises LeaseError
+        when another live process holds it. A keeper thread (its own SQLite
+        connection) renews it while the work blocks on slow model calls; the
+        work's final writes must still go through ``fenced`` because a stalled
+        process can lose the lease anyway."""
+        owner = self.acquire_lease(ttl=ttl)
+        stop = threading.Event()
+
+        def keep() -> None:
+            keeper = Ledger(self.path, clock=self._clock)
+            try:
+                while not stop.wait(renew_every):
+                    try:
+                        keeper.heartbeat(owner)
+                    except LeaseError:
+                        return
+            finally:
+                keeper.close()
+
+        thread = threading.Thread(target=keep, name="kb-lease-keeper", daemon=True)
+        thread.start()
+        try:
+            yield owner
+        finally:
+            stop.set()
+            thread.join(timeout=5)
+            self.release_lease(owner)
+
+    @contextmanager
+    def fenced(self, owner: str) -> Iterator[sqlite3.Cursor]:
+        """A write transaction that commits only while ``owner`` still holds a
+        live lease: a worker that lost its lease (expiry, takeover) writes
+        nothing, so two workers can never both stage the same events."""
+        with self.tx() as cur:
+            row = cur.execute("SELECT value FROM meta WHERE key='lease'").fetchone()
+            held = json.loads(row["value"]) if row else None
+            if held is None or held["owner"] != owner or self._clock() - held["heartbeat"] >= held["ttl"]:
+                raise LeaseError("lease was lost; refusing to write")
+            yield cur
+
     def release_lease(self, owner: str) -> None:
         with self.tx() as cur:
             row = cur.execute("SELECT value FROM meta WHERE key='lease'").fetchone()
@@ -261,6 +304,44 @@ class Ledger:
             )
 
     # -- change sets, verdicts, queue ----------------------------------------
+
+    @staticmethod
+    def new_changeset_id(repo: str, kind: str) -> str:
+        return f"{repo}-{kind}-{uuid.uuid4().hex[:12]}"
+
+    def set_event_statuses(self, owner: str, updates: list[tuple[int, str, str]]) -> None:
+        """Fenced (event id, status, detail) transitions."""
+        now = self._clock()
+        with self.fenced(owner) as cur:
+            for event_id, status, detail in updates:
+                cur.execute("UPDATE events SET status=?, detail=?, updated_at=? WHERE id=?",
+                            (status, detail, now, event_id))
+
+    def stage_intake(self, owner: str, repo: str, changeset_id: str, *, detail: dict, status: str,
+                     verdicts: list[dict], human_reason: str, drafted_events: list[int]) -> str:
+        """Create a change set with its verdicts, human-queue entry and event
+        transitions in ONE fenced transaction."""
+        now = self._clock()
+        with self.fenced(owner) as cur:
+            generation = cur.execute("SELECT generation FROM repo_state WHERE repo=?", (repo,)).fetchone()
+            cur.execute(
+                "INSERT INTO changesets (id, repo, kind, status, generation, detail, created_at, updated_at) "
+                "VALUES (?, ?, 'intake', ?, ?, ?, ?, ?)",
+                (changeset_id, repo, status, int(generation["generation"]),
+                 json.dumps(detail, sort_keys=True), now, now))
+            for verdict in verdicts:
+                cur.execute(
+                    "INSERT INTO verdicts (repo, changeset_id, block_id, layer, verdict, model, model_version, "
+                    "detail, created_at) VALUES (?, ?, ?, ?, ?, ?, '', ?, ?)",
+                    (repo, changeset_id, verdict.get("block_id", ""), verdict["layer"], verdict["verdict"],
+                     verdict.get("model", ""), json.dumps(verdict.get("detail") or {}, sort_keys=True), now))
+            if human_reason:
+                cur.execute("INSERT INTO human_queue (repo, changeset_id, reason, created_at) VALUES (?, ?, ?, ?)",
+                            (repo, changeset_id, human_reason, now))
+            for event_id in drafted_events:
+                cur.execute("UPDATE events SET status='drafted', detail=?, updated_at=? WHERE id=? AND status='pending'",
+                            (changeset_id, now, event_id))
+        return changeset_id
 
     def create_changeset(self, repo: str, kind: str, *, detail: dict | None = None) -> str:
         changeset_id = f"{repo}-{kind}-{uuid.uuid4().hex[:12]}"

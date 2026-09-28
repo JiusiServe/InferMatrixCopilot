@@ -146,8 +146,12 @@ class HarnessTransport:
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
-                 role: str = ""):
-        """One-shot tool-less completion; returns a normalized `llm.Reply`."""
+                 role: str = "", effort: str = ""):
+        """One-shot tool-less completion; returns a normalized `llm.Reply`.
+
+        `effort` is a reasoning-effort pin (`low`/`medium`/`high`/`xhigh`) for
+        transports whose CLI takes one (codex); the others accept and ignore
+        it, because their model id already fixes the reasoning budget."""
         raise NotImplementedError
 
 
