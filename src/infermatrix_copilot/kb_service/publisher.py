@@ -48,7 +48,9 @@ GOVERNED_PATH = re.compile(r"knowledge/(?:repos/[A-Za-z0-9._-]+|general)/(?:[A-Z
 BRANCH = re.compile(r"kb/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+")
 HOLD_LABEL = "kb:hold"
 PUSHING = frozenset({"open_pr", "open_companion_pr"})
-RETRIED = frozenset({"pause", "close"})  # stops: retried until done, never acked as failed
+# retried until done, never acked as failed: stops (pause, close) and reports
+# (open_issue: a transient GitHub error must not lose a sweep report)
+RETRIED = frozenset({"pause", "close", "open_issue"})
 
 
 class PublishError(RuntimeError):
@@ -365,6 +367,24 @@ class Publisher:
         self.github.gh("api", "-X", "PUT", f"repos/{self.github.repository}/pulls/{item.body['pr']}/update-branch",
                        "-f", f"expected_head_sha={item.body['head_sha']}")
         return {"pr": int(item.body["pr"])}
+
+    def _do_open_issue(self, item: OutboxItem) -> dict:
+        """One issue per title (a sweep report): an existing one is reused."""
+        title = str(item.body["title"])
+        found = json.loads(self.github.gh("issue", "list", "--repo", self.github.repository, "--state", "all",
+                                          "--search", f'in:title "{title}"', "--json", "number,title"))
+        for issue in found:
+            if issue.get("title") == title:
+                return {"pr": int(issue["number"])}
+        args = ["issue", "create", "--repo", self.github.repository, "--title", title, "--body-file", "-"]
+        for label in item.body.get("labels") or []:
+            args += ["--label", str(label)]
+        out = self.github.gh(*args, input=str(item.body.get("body") or ""), ok_fail=True)
+        if not out.strip():  # a missing label must not lose the report
+            out = self.github.gh("issue", "create", "--repo", self.github.repository, "--title", title,
+                                 "--body-file", "-", input=str(item.body.get("body") or ""))
+        number = out.strip().rsplit("/", 1)[-1]
+        return {"pr": int(number) if number.isdigit() else None}
 
     def _do_close(self, item: OutboxItem) -> dict:
         number = str(item.body["pr"])

@@ -272,7 +272,7 @@ def _progress(rt, lifecycle, sweep: dict) -> dict:
     key = [sweep["tag"], sweep["from_sha"], sweep["to_sha"]]
     if not progress or progress.get("key") != key:
         progress = {"key": key, "done": [], "attempts": {}, "t1_done": False, "purge_done": False,
-                    "held": []}
+                    "held": [], "kept": [], "started_at": rt.clock()}
     return progress
 
 
@@ -281,9 +281,21 @@ def run_sweep(rt, lifecycle, owner: str, sweep: dict, upstream: UpstreamRepo,
     """Traced: every model call and decision of the sweep carries its release."""
     from ..trace_store import trace_context
 
+    # one identity per sweep instance, persisted before any work so every
+    # resumed attempt traces under it (a fallback sweep reuses the tag)
+    progress = _progress(rt, lifecycle, sweep)
+    if rt.ledger.get_cursor(lifecycle.repo, "sweep_progress") in (None, ""):
+        rt.ledger.set_cursor(lifecycle.repo, "sweep_progress", json.dumps(progress, sort_keys=True))
+    run_id = sweep_run_id(lifecycle.repo, sweep, progress)
     with trace_context(playbook="kb-sweep", repo=lifecycle.repo, release=str(sweep.get("tag") or ""),
-                       run_id=f"sweep-{lifecycle.repo}-{sweep.get('tag') or ''}"):
-        return _run_sweep(rt, lifecycle, owner, sweep, upstream, audit_hints)
+                       run_id=run_id):
+        report = _run_sweep(rt, lifecycle, owner, sweep, upstream, audit_hints)
+    report["run_id"] = run_id
+    return report
+
+
+def sweep_run_id(repo: str, sweep: dict, progress: dict) -> str:
+    return f"sweep-{repo}-{sweep.get('tag') or ''}-{int(float(progress.get('started_at') or 0))}"
 
 
 def draft_key_for_page(repo: str, sweep: dict, page: str) -> str:
@@ -348,6 +360,7 @@ def _run_sweep(rt, lifecycle, owner: str, sweep: dict, upstream: UpstreamRepo,
             continue
         if outcome is None:
             report["skipped_pages"].append(page)
+            progress.setdefault("kept", []).append(page)
             progress["done"].append(page)
             continue
         operations, result = outcome
@@ -382,7 +395,16 @@ def _run_sweep(rt, lifecycle, owner: str, sweep: dict, upstream: UpstreamRepo,
         report["changesets"] = list(progress.get("held", []))
     report["breaker"] = breaker
     report["complete"] = settled
+    # the whole sweep, across every resumed attempt (not just this call)
+    report["kept_pages"] = list(progress.get("kept", []))
+    report["failed_attempts"] = dict(progress.get("attempts", {}))
+    report["started_at"] = progress.get("started_at")
     if settled:
+        # the report is queued durably BEFORE the progress that produced it is
+        # cleared; the scheduler flushes it (and retries until it succeeds)
+        from .report import queue_report
+
+        queue_report(rt.ledger, lifecycle.repo, {**report, "run_id": sweep_run_id(lifecycle.repo, sweep, progress)})
         rt.ledger.set_cursor(lifecycle.repo, "release", sweep["tag"])
         rt.ledger.set_cursor(lifecycle.repo, "sweep_baseline", sweep["to_sha"])
         rt.ledger.set_cursor(lifecycle.repo, "last_sweep_at", str(rt.clock()))

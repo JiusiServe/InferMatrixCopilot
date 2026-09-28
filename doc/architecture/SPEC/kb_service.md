@@ -146,3 +146,9 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 为 draft 时才记为已确认（draft 不能在合并队列中，也不能再次入队）；否则重发 `pause`。请求 5 分钟后仍未回执或未确认 →
 转人工一次，附出队与 `gh pr ready <n> --undo` 命令。`kb status` 报告每个仓库 `pause_unconfirmed` 数量，熔断/回滚在其归零
 前不算完成；`kb resume` 清除这些记录。
+
+## 2026-09-29 巡检汇总 issue
+每次巡检完成（`complete`）后，`report.publish_summary` 把汇总（T1 发现、修复的索引、保留/失败的页面、变更集及其状态、
+各类操作数、待人工处理数、模型调用次数/token/耗时）写入 `<state_dir>/reports/sweep-<repo>-<tag>.md`；仅当仓库为
+`auto_merge` 且上游公开时，另通过新的 outbox 项 `open_issue`（7 天有效）在知识仓库发布一个 issue。发布器按标题复用已有
+issue（同一报告只开一个），标签不存在时不带标签重试，绝不丢报告。
