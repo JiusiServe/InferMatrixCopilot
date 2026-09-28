@@ -159,3 +159,11 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
 哈希）显式记录而非依赖时间戳：blob 不可变只归档一次，增长的记录文件再次归档，归档期间才落盘的 blob 进入下一个归档，并写 `.sha256` 清单（首行为包的哈希，其后每个成员一行；清单最后写入，
 标志归档完整）。发布器（GPU 盒，经已有的 SSH 通道）每轮拉取本地没有的归档，只有哈希校验通过才保存到
 `$KB_PUBLISHER_STATE/archive/`，否则记入 trace 并拒绝。恢复：按名称顺序解开到空目录后运行 `TraceStore.rebuild_index`。
+
+## 2026-09-29 配套 PR（外部引用）
+质量门唯一的问题是"知识目录外引用了本次退役/替换/删除的规则"时（非巡检暂存、非强制人工），`companion.stage_companion`
+自动起草配套变更：被替换规则的 ID 改为新 ID；引用已退役规则的列表项/表格行删除，其余提及去掉 ID；只改配套白名单
+（`skills/`、`plugins/`、`adapters/`、`doc/`、`playbooks/`）。配套 PR 经 `open_companion_pr` 以 draft 创建并打 `kb:companion`
+标签，进入人工队列；发布器拒绝在其上执行 `post_verdict`/`enqueue`（ready 与合并只能由人完成），且拒绝白名单外路径
+（`knowledge/`、`.github/`、`src/`、`tools/`）。知识变更集处于 `companion_pending`（规则保持 active）；配套 PR 合并后，调度器
+在当前 main 上重建它（外部引用已清零 → 正常过门与发布）；配套 PR 被关闭则知识变更转人工，且不计入熔断。

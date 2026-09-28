@@ -297,6 +297,12 @@ def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind:
                      "consistency": [{"owner_dir": c["owner_dir"], "verdict": c["verdict"]}
                                      for c in decision.consistency],
                      "l1_issues": [i.to_dict() for i in decision.l1.issues]})
+    from .companion import needs_companion, stage_companion
+
+    if needs_companion(decision) and not hold and not force_human and operations:
+        # the change is fine except for citations outside knowledge/: draft the
+        # companion PR that updates them; this change waits for it
+        stage_companion(rt, lifecycle, owner, changeset_id, operations, decision, external, base_sha)
     return changeset_id
 
 

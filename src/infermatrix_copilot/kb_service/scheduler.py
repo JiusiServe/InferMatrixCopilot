@@ -29,6 +29,7 @@ from .activate import ActivationError, activate, activation_lock
 from .archive import make_archive
 from .audit import audit_main
 from .report import flush_reports
+from .companion import publish_companion
 from .external import poll_external
 from .runtime import collect_events, publish, run_intake
 from .sweep import UpstreamRepo, detect_release, run_sweep
@@ -127,6 +128,9 @@ class Scheduler:
         for changeset in rt.ledger.changesets(lifecycle.repo, ("gated",)):
             status = publish(rt, lifecycle, changeset["id"])
             self._record(lifecycle.repo, "published", changeset=changeset["id"], status=status)
+        for changeset in rt.ledger.changesets(lifecycle.repo, ("companion_staged",)):
+            status = publish_companion(rt, lifecycle, changeset["id"])
+            self._record(lifecycle.repo, "published", changeset=changeset["id"], status=status)
         if self._due(f"intake:{lifecycle.repo}", self.intake_every):
             new = collect_events(rt, lifecycle)
             changeset_id = run_intake(rt, lifecycle)
@@ -150,7 +154,8 @@ class Scheduler:
         rt = self.rt
         # only the service's own PRs: an author closing their own PR is no overturn
         recent = [cs for cs in rt.ledger.changesets(lifecycle.repo, ("closed",))
-                  if cs["kind"] != "external" and rt.clock() - float(cs["updated_at"]) < OVERTURN_WINDOW]
+                  if cs["kind"] not in ("external", "companion")
+                  and rt.clock() - float(cs["updated_at"]) < OVERTURN_WINDOW]
         state = rt.ledger.repo_state(lifecycle.repo)
         if len(recent) >= OVERTURN_LIMIT and not state["paused"]:
             self._pause(lifecycle.repo, f"overturn breaker: {len(recent)} knowledge PRs closed unmerged within 24h")
