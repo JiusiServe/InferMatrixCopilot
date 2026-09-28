@@ -267,6 +267,22 @@ class GitHubReader:
             changed_files=tuple(paths), diff_excerpt="".join(excerpt),
         )
 
+    def issue_comments(self, full_name: str, number: int, *, after_id: int = 0, since: str = "",
+                       max_pages: int = 20) -> list[dict]:
+        """Comments on an issue with an id above ``after_id``, oldest first,
+        updated after ``since`` (just before the last seen one's creation) so a caller
+        that advances both past what it read is never stuck behind a window of
+        ``max_pages`` pages."""
+        out: list[dict] = []
+        params = {"since": since} if since else {}
+        for page in range(1, max_pages + 1):
+            batch = self.get(f"/repos/{full_name}/issues/{int(number)}/comments", **params,
+                             per_page=100, page=page) or []
+            out.extend(c for c in batch if int(c.get("id") or 0) > after_id)
+            if len(batch) < 100:
+                break
+        return sorted(out, key=lambda c: int(c.get("id") or 0))
+
     def latest_release(self, full_name: str) -> dict | None:
         releases = self.get(f"/repos/{full_name}/releases", per_page=5)
         for release in releases:
@@ -282,6 +298,90 @@ class GitHubReader:
 
 def _glob_to_regex(pattern: str) -> str:
     return "".join(".*" if ch == "*" else re.escape(ch) for ch in pattern)
+
+
+BUGFIX_MARKERS = ("<!-- infermatrix-copilot:bugfix-record:v2 -->",
+                  "<!-- infermatrix-copilot:bugfix-record:v1 -->")
+
+
+def bugfix_lesson(record) -> dict | None:
+    """A verified pr_debug fix record (drop file or mailbox comment, v1/v2) as a
+    lesson; None when malformed. ``repo_key`` is its repository identity."""
+    if not isinstance(record, dict):
+        return None
+    repo, run = str(record.get("repo") or ""), str(record.get("run_id") or "")
+    groups = record.get("groups")
+    if not repo or not run or not isinstance(groups, list) or not groups:
+        return None
+    lines = [str(record.get("title") or "Copilot debug run")]
+    for group in groups[:10]:
+        if not isinstance(group, dict) or not isinstance(group.get("files") or [], list):
+            return None
+        lines += [f"- failure: {str(group.get('signature', ''))[:300]}",
+                  f"  root cause: {str(group.get('root_cause', ''))[:2000]}",
+                  f"  fix: {str(group.get('fix_summary', ''))[:2000]}",
+                  f"  verified by: {str(group.get('verification', ''))[:1000]}",
+                  "  files: " + ", ".join(str(f)[:300] for f in (group.get("files") or [])[:20])]
+    event_id = str(record.get("event_id") or f"bugfix_run:{repo.casefold()}:{run}")[:200]
+    return {"repo_key": repo, "event_id": event_id, "run_ref": run,
+            "summary": "\n".join(lines)[:MAX_BODY_CHARS], "diff_excerpt": ""}
+
+
+def resolve_repository(key: str, registry) -> str | None:
+    """The one configured repository ``key`` names (full name, case-insensitive,
+    or exact alias); None when none does; "?" when it is ambiguous."""
+    matches = {name for name, lc in registry.items()
+               if (lc.full_name and lc.full_name.casefold() == key.casefold()) or name == key}
+    if len(matches) > 1:
+        return "?"
+    return next(iter(matches), None)
+
+
+def load_bugfix_drops(directory: str | Path, registry, repo: str) -> list[dict]:
+    """Fix records that runs on this host dropped for ``repo``. Records naming
+    another configured repository stay for its turn; an ambiguous identity is
+    quarantined (renamed ``.quarantined``), never rewritten."""
+    directory = Path(directory)
+    lessons = []
+    if not directory.is_dir():
+        return lessons
+    for path in sorted(directory.glob("*.json")):
+        try:
+            lesson = bugfix_lesson(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            continue
+        if lesson is None:
+            continue  # malformed: left for inspection
+        owner = resolve_repository(lesson["repo_key"], registry)
+        if owner == "?":
+            path.rename(path.with_suffix(".quarantined"))
+            continue
+        if owner == repo:
+            lessons.append({**lesson, "path": str(path)})
+    return lessons
+
+
+def mailbox_records(comments, authors: set[str]) -> list[tuple[int, dict]]:
+    """(comment id, record) of marked fix-record comments by allowed authors.
+    The mailbox is a public issue: anyone else's comment is ignored."""
+    out = []
+    for comment in comments:
+        login = str((comment.get("user") or {}).get("login") or "").lower()
+        body = str(comment.get("body") or "")
+        marker = next((m for m in BUGFIX_MARKERS if m in body), None)
+        if marker is None or login not in authors:
+            continue
+        rest = body.split(marker, 1)[1]
+        start = rest.find("```json")
+        if start < 0:
+            continue
+        rest = rest[start + len("```json"):].lstrip()
+        try:  # decode the object itself: a fence inside a string is not the end
+            record, _ = json.JSONDecoder().raw_decode(rest)
+            out.append((int(comment["id"]), record))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
 
 
 def load_lessons(inbox: str | Path, repo: str) -> list[dict]:

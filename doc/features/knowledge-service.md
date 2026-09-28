@@ -50,6 +50,9 @@ infermatrix-copilot kb calibrate --repo vllm-omni                  # 评审模�
 模型：`KB_GENERATOR`（默认 `claude-code:claude-opus-5-5`）、`KB_JUDGE`（默认
 `codex:gpt-6-sol:medium`）。每次模型调用写入 `$KB_STATE_DIR/traces/model_calls.jsonl`。
 
+运行经验（来源②）：`pr_debug` 的已验证修复记录经 `KB_BUGFIX_DIR`（同机，与运行侧 `KNOWLEDGE_INTAKE_DIR`
+配为同一目录）与 `KB_BUGFIX_MAILBOX`（异机，`owner/repo#N`，只接受 `KB_BUGFIX_AUTHORS` 列出的作者）进入 intake。
+
 ## 调度、合并、激活与巡检
 
 ```bash

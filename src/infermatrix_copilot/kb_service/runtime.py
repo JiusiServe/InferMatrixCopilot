@@ -22,7 +22,10 @@ from .gate import changes_between, run_gate
 from .intake import draft_changes, merge_drafts, operations_json
 from .ledger import Ledger
 from .models import ModelGateway, ModelRole, ModelUnavailable, roles_from_env
-from .sources import GitHubReader, KnowledgeRepo, SourceError, load_lessons
+from .sources import (
+    GitHubReader, KnowledgeRepo, SourceError, bugfix_lesson, load_bugfix_drops, load_lessons, mailbox_records,
+    resolve_repository,
+)
 
 DEFAULT_BACKFILL_DAYS = 1
 
@@ -150,12 +153,42 @@ def collect_events(rt: KbRuntime, lifecycle: RepoLifecycle) -> int:
                 new += 1
             rt.ledger.set_cursor(lifecycle.repo, "merged_since", f"{merged_at}|{number}")
     if lifecycle.intake.copilot_runs:
-        for lesson in load_lessons(rt.state_dir / "inbox", lifecycle.repo):
+        def record(lesson: dict) -> None:
+            nonlocal new
             evidence = {"source_reference": f"run {lesson['run_ref']}", "title": "Copilot run lesson",
                         "body": lesson["summary"], "changed_files": [], "diff_excerpt": lesson["diff_excerpt"]}
             if rt.ledger.record_event(lifecycle.repo, "copilot_run", lesson["event_id"], evidence) is not None:
                 new += 1
+
+        for lesson in load_lessons(rt.state_dir / "inbox", lifecycle.repo):
+            record(lesson)
             Path(lesson["path"]).rename(Path(lesson["path"]).with_suffix(".consumed"))
+        # verified pr_debug fixes: dropped by runs on this host ...
+        drops = os.environ.get("KB_BUGFIX_DIR") or str(rt.state_dir / "inbox" / "bugfix")
+        for lesson in load_bugfix_drops(drops, rt.registry, lifecycle.repo):
+            record(lesson)
+            Path(lesson["path"]).rename(Path(lesson["path"]).with_suffix(".consumed"))
+        # ... and posted to the mailbox issue by runs on other hosts
+        mailbox = os.environ.get("KB_BUGFIX_MAILBOX", "")
+        authors = {a.strip().lower() for a in os.environ.get("KB_BUGFIX_AUTHORS", "").split(",") if a.strip()}
+        if mailbox and authors:
+            full_name, _, number = mailbox.partition("#")
+            after = int(rt.ledger.get_cursor(lifecycle.repo, "bugfix_mailbox_after") or 0)
+            since = rt.ledger.get_cursor(lifecycle.repo, "bugfix_mailbox_since") or ""
+            comments = rt.github.issue_comments(full_name, int(number), after_id=after, since=since)
+            for _comment_id, raw in mailbox_records(comments, authors):
+                lesson = bugfix_lesson(raw)
+                if lesson is not None and resolve_repository(lesson["repo_key"], rt.registry) == lifecycle.repo:
+                    record(lesson)
+            if comments:
+                rt.ledger.set_cursor(lifecycle.repo, "bugfix_mailbox_after", str(int(comments[-1]["id"])))
+                if comments[-1].get("created_at"):
+                    # ``since`` is exclusive and second-grained: step back one
+                    # second so an unread comment sharing that second is read
+                    # again; the id cursor drops what was already seen
+                    last = dt.datetime.fromisoformat(str(comments[-1]["created_at"]).replace("Z", "+00:00"))
+                    rt.ledger.set_cursor(lifecycle.repo, "bugfix_mailbox_since",
+                                         (last - dt.timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ"))
     return new
 
 
