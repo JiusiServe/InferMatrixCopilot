@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 
 from . import merge
 from .activate import ActivationError, activate, activation_lock
+from .archive import make_archive
 from .audit import audit_main
 from .report import flush_reports
 from .external import poll_external
@@ -43,6 +44,7 @@ class Scheduler:
     intake_every: float = 900.0
     release_every: float = 3600.0
     audit_every: float = 24 * 3600.0
+    archive_every: float = 7 * 24 * 3600.0
     log: list[dict] = field(default_factory=list)
     _last: dict[str, float] = field(default_factory=dict)
 
@@ -77,6 +79,13 @@ class Scheduler:
                 self._repo_tick(lifecycle)
             except Exception as exc:  # isolate repositories from each other
                 self._record(lifecycle.repo, "error", error=repr(exc), trace=traceback.format_exc()[-2000:])
+        if self._due("archive", self.archive_every):
+            try:  # the weekly off-machine copy of the traces (pulled by the publisher)
+                archive = make_archive(rt)
+                if archive is not None:
+                    self._record("*", "archive", archive=archive.name)
+            except Exception as exc:
+                self._record("*", "error", error=repr(exc), trace=traceback.format_exc()[-2000:])
         if self._due("audit", self.audit_every):
             try:  # every knowledge change on main must have been recorded
                 for finding in audit_main(rt, self._pause):

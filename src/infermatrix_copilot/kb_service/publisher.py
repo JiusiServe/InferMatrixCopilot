@@ -44,6 +44,7 @@ from ..knowledge_service.signing import sign
 from .outbox import CONTROL_MAX_AGE, OutboxError, OutboxItem, check_item
 
 ITEM_ID = re.compile(r"[0-9]+-[0-9a-f]{12}")
+ARCHIVE_NAME = re.compile(r"traces-\d{6}-\d{8}-\d{6}\.tar\.gz")
 GOVERNED_PATH = re.compile(r"knowledge/(?:repos/[A-Za-z0-9._-]+|general)/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\.(?:md|yaml)")
 BRANCH = re.compile(r"kb/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+")
 HOLD_LABEL = "kb:hold"
@@ -63,6 +64,7 @@ class Transport(Protocol):
     def list_items(self) -> list[str]: ...
     def read(self, rel: str) -> bytes: ...
     def write_ack(self, item_id: str, data: bytes) -> None: ...
+    def list_archives(self) -> list[str]: ...
 
 
 @dataclass
@@ -78,6 +80,12 @@ class LocalTransport:
 
     def read(self, rel: str) -> bytes:
         return (self.root / rel).read_bytes()
+
+    def list_archives(self) -> list[str]:
+        folder = self.root / "archive"
+        return sorted(p.name for p in folder.glob("traces-*.tar.gz")
+                      if ARCHIVE_NAME.fullmatch(p.name) and (folder / f"{p.name}.sha256").exists()) \
+            if folder.is_dir() else []
 
     def write_ack(self, item_id: str, data: bytes) -> None:
         folder = self.root / "inbox" / "acks"
@@ -115,6 +123,11 @@ class SshTransport:
 
     def read(self, rel: str) -> bytes:
         return self._ssh(f"cat {shlex.quote(self.root + '/' + rel)}")
+
+    def list_archives(self) -> list[str]:
+        out = self._ssh(f"ls -1 {shlex.quote(self.root + '/archive')} 2>/dev/null || true").decode().split()
+        names = set(out)
+        return sorted(n for n in names if ARCHIVE_NAME.fullmatch(n) and f"{n}.sha256" in names)
 
     def write_ack(self, item_id: str, data: bytes) -> None:
         folder = shlex.quote(self.root + "/inbox/acks")
@@ -187,6 +200,39 @@ class Publisher:
             return False
 
     # one round -----------------------------------------------------------------
+    def sync_archives(self) -> dict:
+        """Pull every weekly trace archive not yet here, keeping only those whose
+        hash verifies (the GPU box is the off-machine copy)."""
+        from .archive import verify_archive
+
+        dest = self.state_dir / "archive"
+        counts = {"pulled": 0, "rejected": 0}
+        try:
+            names = self.transport.list_archives()
+        except (OutboxError, OSError) as exc:
+            self._trace(event="archive_unreachable", error=str(exc))
+            return counts
+        for name in names:
+            if (dest / f"{name}.sha256").exists():
+                continue
+            try:
+                data = self.transport.read(f"archive/{name}")
+                manifest = self.transport.read(f"archive/{name}.sha256").decode("utf-8", "replace")
+            except (OutboxError, OSError) as exc:
+                self._trace(event="archive_unreachable", archive=name, error=str(exc))
+                continue
+            if not verify_archive(data, manifest, name):
+                counts["rejected"] += 1
+                self._trace(event="archive_rejected", archive=name)
+                continue
+            dest.mkdir(parents=True, exist_ok=True)
+            (dest / f".{name}.tmp").write_bytes(data)
+            (dest / f".{name}.tmp").replace(dest / name)
+            (dest / f"{name}.sha256").write_text(manifest, encoding="utf-8")  # last: marks it complete
+            counts["pulled"] += 1
+            self._trace(event="archive_pulled", archive=name, bytes=len(data))
+        return counts
+
     def run_once(self) -> dict:
         summary = {"performed": 0, "failed": 0, "resent": 0, "undelivered": 0, "dry_run": 0, "skipped": 0}
         try:
@@ -444,5 +490,5 @@ class Publisher:
 
         stop = stop or threading.Event()
         while not stop.is_set():
-            self._trace(event="round", **self.run_once())
+            self._trace(event="round", **self.run_once(), **self.sync_archives())
             stop.wait(interval)

@@ -152,3 +152,10 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 各类操作数、待人工处理数、模型调用次数/token/耗时）写入 `<state_dir>/reports/sweep-<repo>-<tag>.md`；仅当仓库为
 `auto_merge` 且上游公开时，另通过新的 outbox 项 `open_issue`（7 天有效）在知识仓库发布一个 issue。发布器按标题复用已有
 issue（同一报告只开一个），标签不存在时不带标签重试，绝不丢报告。
+
+## 2026-09-29 留痕离机归档
+`archive.make_archive`（调度器每 7 天）把 `<state_dir>/traces` 中尚未归档的内容（不含可重建的 `index.db`）打包为
+`archive/traces-<序号>-<时间>.tar.gz`（序号在前且单调递增，名称顺序即恢复顺序，不受时钟回拨影响；从不复用或覆盖）。已归档内容以 `archive/archived.json`（路径 → 内容
+哈希）显式记录而非依赖时间戳：blob 不可变只归档一次，增长的记录文件再次归档，归档期间才落盘的 blob 进入下一个归档，并写 `.sha256` 清单（首行为包的哈希，其后每个成员一行；清单最后写入，
+标志归档完整）。发布器（GPU 盒，经已有的 SSH 通道）每轮拉取本地没有的归档，只有哈希校验通过才保存到
+`$KB_PUBLISHER_STATE/archive/`，否则记入 trace 并拒绝。恢复：按名称顺序解开到空目录后运行 `TraceStore.rebuild_index`。

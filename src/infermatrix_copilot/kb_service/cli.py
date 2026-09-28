@@ -300,7 +300,7 @@ def _publish(args) -> int:
         allow_push=os.environ.get("ALLOW_PUSH") == "1",
     )
     if args.once:
-        json.dump(publisher.run_once(), sys.stdout, sort_keys=True)
+        json.dump({**publisher.run_once(), **publisher.sync_archives()}, sys.stdout, sort_keys=True)
         print()
         return 0
     publisher.serve(interval=args.interval)
