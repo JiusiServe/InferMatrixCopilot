@@ -128,3 +128,8 @@ Direct 1.1 / Strict 1.3 accept typed `CarriedFinding` inputs (unique IDs, source
 ## 2026-09-28 trace/1 导出
 `sdk.v1` 导出 `TraceStore`、`TRACE_SCHEMA`、`trace_context`、`redact`（见 `trace_store.md`），RB 用同一 schema
 记录 review 的模型调用、判定与结果；导入它们不加载 `config`/`contract`/`mcp_server` 等私有模块。
+
+## 2026-09-28 计划携带知识快照
+`DirectReviewPlan` 新增 `knowledge_snapshot`（激活快照 ID、`packaged` 或 `unverified`，从不暴露开发树路径）
+与 `knowledge_tree_sha256`（已验证快照的清单树哈希，否则为空）。同一 `review_context_id` 下的文档读取都来自这份
+快照，RB 应随每次 review 记录这两个值。

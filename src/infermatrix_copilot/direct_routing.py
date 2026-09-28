@@ -687,7 +687,7 @@ def direct_review_plan(
             "if_missing": "partial_review",
         },
         "diagnostics": {
-            "knowledge_snapshot": view.snapshot,
+            "knowledge_snapshot": view.public_snapshot,
             "timing_ms": {
                 "routing": route_ms,
                 "execution_budget": budget_ms,
