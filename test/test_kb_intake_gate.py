@@ -64,7 +64,7 @@ class ScriptedGateway:
             try:
                 validate(data)
             except (KeyError, TypeError, ValueError) as exc:
-                raise ModelUnavailable(str(exc)) from exc
+                raise ModelUnavailable(f"{role.label()} reply failed its schema: {exc!r}") from exc
         return ModelReply(role, data, json.dumps(data), role.model, {}, 0.1)
 
 
@@ -229,7 +229,8 @@ def _runtime(tmp_path, gateway, *, mode="shadow", outbox=False):
     if outbox:
         from infermatrix_copilot.kb_service.outbox import Outbox
         from infermatrix_copilot.knowledge_service.signing import generate_private_key
-        box = Outbox(tmp_path / "state", generate_private_key(tmp_path / "k.pem"), ledger, clock=lambda: 1e9)
+        box = Outbox(tmp_path / "state", generate_private_key(tmp_path / "k.pem"), ledger,
+                     clock=lambda: 1_790_000_000.0)  # same clock as the runtime
     rt = KbRuntime(state_dir=tmp_path / "state", ledger=ledger, registry={"demo": lifecycle},
                    gateway=gateway, generator=GEN, judge=JUDGE,
                    knowledge=KnowledgeRepo(_knowledge_remote(tmp_path)), github=FakeGitHub(),

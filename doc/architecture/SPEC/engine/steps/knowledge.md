@@ -16,3 +16,6 @@ auto_merge 仓库写 outbox 的 `open_pr` 项，shadow 只记录）。逻辑全�
 
 ## 测试
 `test_kb_intake_gate.py`。
+
+## 2026-09-28 合并、巡检、激活步骤
+新增 `knowledge.advance_merges`、`knowledge.sweep`、`knowledge.activate`；`kb run` 路径自行持有租约，调度器路径复用其租约。

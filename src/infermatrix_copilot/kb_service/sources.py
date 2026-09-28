@@ -83,6 +83,13 @@ class KnowledgeRepo:
         files = self._texts(rev, ("knowledge/repos/", "knowledge/general/"), KNOWLEDGE_SUFFIXES)
         return {name.removeprefix("knowledge/"): text for name, text in files.items()}
 
+    def top_level_knowledge(self, rev: str) -> dict[str, str]:
+        """knowledge/*.md at the top of the tree (AGENTS.md, README.md, ...):
+        not governed by the gate, but served with every snapshot."""
+        files = self._texts(rev, ("knowledge/",), (".md",))
+        return {name.removeprefix("knowledge/"): text for name, text in files.items()
+                if "/" not in name.removeprefix("knowledge/")}
+
     def external_texts(self, rev: str) -> dict[str, str]:
         """Text files outside knowledge/ that may cite rule IDs (companion PRs)."""
         return self._texts(rev, EXTERNAL_REF_DIRS, (".md", ".yaml", ".yml", ".json", ".txt"))

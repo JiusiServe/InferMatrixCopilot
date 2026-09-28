@@ -1,0 +1,17 @@
+# Knowledge service merge flow for ONE repository: apply publisher acks, sign
+# verdicts for opened PRs, enqueue once the PR-stage kb-gate passes (one queued
+# knowledge PR per repository), record merges. Candidate: scheduler-driven.
+name: kb-merge
+version: 1
+status: candidate
+provenance:
+  created_by: human
+  source: knowledge-base redesign (Copilot owns the knowledge base), v7
+task_kinds: [knowledge_maintenance]
+repos: []
+requires: []
+params:
+  repo: "knowledge repository name"
+steps:
+  - {id: advance, step: knowledge.advance_merges}
+success: every in-flight knowledge PR advanced one state or routed to people

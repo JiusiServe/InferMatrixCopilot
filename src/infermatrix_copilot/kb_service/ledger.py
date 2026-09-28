@@ -22,7 +22,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+# version -> statements that upgrade from the previous version
+_MIGRATIONS = {
+    2: ("ALTER TABLE changesets ADD COLUMN pending_item TEXT NOT NULL DEFAULT ''",),
+}
 GLOBAL = "*"
 
 _SCHEMA = """
@@ -63,6 +67,7 @@ CREATE TABLE IF NOT EXISTS changesets (
     status TEXT NOT NULL DEFAULT 'open', generation INTEGER NOT NULL,
     branch TEXT NOT NULL DEFAULT '', pr_number INTEGER, head_sha TEXT NOT NULL DEFAULT '',
     merge_sha TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '{}',
+    pending_item TEXT NOT NULL DEFAULT '',
     created_at REAL NOT NULL, updated_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS activations (
@@ -113,8 +118,18 @@ class Ledger:
             row = cur.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
             if row is None:
                 cur.execute("INSERT INTO meta VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
-            elif int(row["value"]) != SCHEMA_VERSION:
-                raise RuntimeError(f"ledger schema {row['value']} != {SCHEMA_VERSION}")
+            else:
+                version = int(row["value"])
+                if version > SCHEMA_VERSION:
+                    raise RuntimeError(f"ledger schema {version} is newer than this code ({SCHEMA_VERSION})")
+                columns = {r["name"] for r in cur.execute("PRAGMA table_info(changesets)")}
+                for target in range(version + 1, SCHEMA_VERSION + 1):
+                    for statement in _MIGRATIONS[target]:
+                        # idempotent: a fresh CREATE already has the column
+                        if "ADD COLUMN pending_item" in statement and "pending_item" in columns:
+                            continue
+                        cur.execute(statement)
+                cur.execute("UPDATE meta SET value=? WHERE key='schema_version'", (str(SCHEMA_VERSION),))
         try:
             os.chmod(self.path, 0o600)
         except OSError:
@@ -318,16 +333,17 @@ class Ledger:
                             (status, detail, now, event_id))
 
     def stage_intake(self, owner: str, repo: str, changeset_id: str, *, detail: dict, status: str,
-                     verdicts: list[dict], human_reason: str, drafted_events: list[int]) -> str:
+                     verdicts: list[dict], human_reason: str, drafted_events: list[int],
+                     kind: str = "intake") -> str:
         """Create a change set with its verdicts, human-queue entry and event
-        transitions in ONE fenced transaction."""
+        transitions in ONE fenced transaction (any change-set kind)."""
         now = self._clock()
         with self.fenced(owner) as cur:
             generation = cur.execute("SELECT generation FROM repo_state WHERE repo=?", (repo,)).fetchone()
             cur.execute(
                 "INSERT INTO changesets (id, repo, kind, status, generation, detail, created_at, updated_at) "
-                "VALUES (?, ?, 'intake', ?, ?, ?, ?, ?)",
-                (changeset_id, repo, status, int(generation["generation"]),
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (changeset_id, repo, kind, status, int(generation["generation"]),
                  json.dumps(detail, sort_keys=True), now, now))
             for verdict in verdicts:
                 cur.execute(
@@ -356,12 +372,14 @@ class Ledger:
         return changeset_id
 
     def update_changeset(self, changeset_id: str, **fields: Any) -> None:
-        allowed = {"status", "branch", "pr_number", "head_sha", "merge_sha", "detail"}
+        allowed = {"status", "branch", "pr_number", "head_sha", "merge_sha", "detail", "pending_item"}
         unknown = set(fields) - allowed
         if unknown:
             raise ValueError(f"unknown changeset fields: {sorted(unknown)}")
         if "detail" in fields:
             fields["detail"] = json.dumps(fields["detail"], sort_keys=True)
+        if "pending_item" in fields:
+            fields["pending_item"] = json.dumps(fields["pending_item"], sort_keys=True) if fields["pending_item"] else ""
         assignments = ", ".join(f"{key}=?" for key in fields)
         with self.tx() as cur:
             cur.execute(
@@ -373,14 +391,14 @@ class Ledger:
         row = self._conn.execute("SELECT * FROM changesets WHERE id=?", (changeset_id,)).fetchone()
         if row is None:
             raise KeyError(changeset_id)
-        return {**dict(row), "detail": json.loads(row["detail"])}
+        return _changeset_row(row)
 
     def changesets(self, repo: str, statuses: tuple[str, ...]) -> list[dict[str, Any]]:
         marks = ",".join("?" for _ in statuses)
         rows = self._conn.execute(
             f"SELECT * FROM changesets WHERE repo=? AND status IN ({marks}) ORDER BY created_at",
             (repo, *statuses)).fetchall()
-        return [{**dict(r), "detail": json.loads(r["detail"])} for r in rows]
+        return [_changeset_row(r) for r in rows]
 
     def record_verdict(self, repo: str, *, layer: str, verdict: str, changeset_id: str | None = None,
                        block_id: str = "", model: str = "", model_version: str = "",
@@ -471,3 +489,11 @@ class Ledger:
     def outbox_items(self, repo: str, status: str = "written") -> list[dict[str, Any]]:
         return [dict(r) for r in self._conn.execute(
             "SELECT * FROM outbox WHERE repo=? AND status=? ORDER BY created_at", (repo, status))]
+
+
+def _changeset_row(row) -> dict[str, Any]:
+    data = dict(row)
+    data["detail"] = json.loads(row["detail"])
+    data["pending_item"] = json.loads(row["pending_item"]) if row["pending_item"] else None
+    return data
+

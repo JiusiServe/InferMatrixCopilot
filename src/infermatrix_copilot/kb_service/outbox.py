@@ -26,6 +26,7 @@ import hashlib
 import json
 import os
 import tempfile
+import threading
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -114,8 +115,7 @@ class Outbox:
         self._key = key
         self._ledger = ledger
         self._clock = clock
-        self._lock_depth = 0
-        self._lock_fd: int | None = None
+        self._local = threading.local()  # re-entrancy is per thread, never shared
 
     @contextmanager
     def publication_lock(self) -> Iterator[None]:
@@ -123,22 +123,25 @@ class Outbox:
         publication, and around state transitions that must be published
         atomically (pause/resume). Without it a refresh that read the state
         before a pause could overwrite the pause's newer control record."""
-        if self._lock_depth:
-            self._lock_depth += 1
+        depth = getattr(self._local, "depth", 0)
+        if depth:
+            self._local.depth = depth + 1
             try:
                 yield
             finally:
-                self._lock_depth -= 1
+                self._local.depth -= 1
             return
         self.root.mkdir(parents=True, exist_ok=True)
+        # a fresh descriptor per acquisition: flock excludes other descriptors
+        # (other threads and processes) and is released when this one closes
         fd = os.open(self.root / ".publish.lock", os.O_RDWR | os.O_CREAT, 0o600)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
-            self._lock_fd, self._lock_depth = fd, 1
+            self._local.depth = 1
             try:
                 yield
             finally:
-                self._lock_depth, self._lock_fd = 0, None
+                self._local.depth = 0
                 fcntl.flock(fd, fcntl.LOCK_UN)
         finally:
             os.close(fd)

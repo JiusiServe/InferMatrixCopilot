@@ -44,3 +44,6 @@ passing per-block judgements, the consistency judgement with the page hashes it
 saw, upstream fact attestations and the decision source (`auto` or
 `human-approved` with its reviews). `check_binding` rejects replay on another
 PR, head or window. Standard library only; vendored by kb-gate.
+
+## 2026-09-28 T1 索引修复
+L1 的索引检查允许为目录中已存在但未列入索引的页面补链接（巡检 T1 修复），新页面仍必须被链接。

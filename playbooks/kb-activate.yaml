@@ -1,0 +1,16 @@
+# Build, verify and atomically activate the knowledge snapshot of the knowledge
+# repository's main (what Direct/Strict reviews read). Candidate.
+name: kb-activate
+version: 1
+status: candidate
+provenance:
+  created_by: human
+  source: knowledge-base redesign (Copilot owns the knowledge base), v7
+task_kinds: [knowledge_maintenance]
+repos: []
+requires: []
+params:
+  repo: "any enabled knowledge repository (activation is tree-wide)"
+steps:
+  - {id: activate, step: knowledge.activate}
+success: state/kb/active points at a verified snapshot of main
