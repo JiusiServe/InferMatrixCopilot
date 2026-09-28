@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 
 from . import merge
 from .activate import ActivationError, activate, activation_lock
+from .audit import audit_main
 from .external import poll_external
 from .runtime import collect_events, publish, run_intake
 from .sweep import UpstreamRepo, detect_release, run_sweep
@@ -40,6 +41,7 @@ class Scheduler:
     tick_seconds: float = 60.0
     intake_every: float = 900.0
     release_every: float = 3600.0
+    audit_every: float = 24 * 3600.0
     log: list[dict] = field(default_factory=list)
     _last: dict[str, float] = field(default_factory=dict)
 
@@ -74,6 +76,12 @@ class Scheduler:
                 self._repo_tick(lifecycle)
             except Exception as exc:  # isolate repositories from each other
                 self._record(lifecycle.repo, "error", error=repr(exc), trace=traceback.format_exc()[-2000:])
+        if self._due("audit", self.audit_every):
+            try:  # every knowledge change on main must have been recorded
+                for finding in audit_main(rt, self._pause):
+                    self._record("*", "audit", finding=finding)
+            except Exception as exc:
+                self._record("*", "error", error=repr(exc), trace=traceback.format_exc()[-2000:])
         if self._due("external", self.intake_every) and not merge.is_paused(rt.ledger, "*"):
             try:  # knowledge PRs the service did not open (source 4, human approvals)
                 for event in poll_external(rt):
@@ -132,18 +140,25 @@ class Scheduler:
                   if cs["kind"] != "external" and rt.clock() - float(cs["updated_at"]) < OVERTURN_WINDOW]
         state = rt.ledger.repo_state(lifecycle.repo)
         if len(recent) >= OVERTURN_LIMIT and not state["paused"]:
-            reason = f"overturn breaker: {len(recent)} knowledge PRs closed unmerged within 24h"
-            # publish the pause in the same locked transition as the state change,
-            # so the publisher and the gate see it at once, then dequeue open PRs
-            if rt.outbox is not None:
-                rt.outbox.transition(
-                    lambda: rt.ledger.bump_generation(lifecycle.repo, pause=True, reason=reason),
-                    public_repos=self._public_repos())
-            else:
-                rt.ledger.bump_generation(lifecycle.repo, pause=True, reason=reason)
-            merge.pause_open_prs(rt.ledger, rt.outbox, lifecycle.repo, reason)
-            rt.ledger.enqueue_human(lifecycle.repo, reason)
-            self._record(lifecycle.repo, "paused", reason=reason)
+            self._pause(lifecycle.repo, f"overturn breaker: {len(recent)} knowledge PRs closed unmerged within 24h")
+
+    def _pause(self, repo: str, reason: str) -> None:
+        """Pause a repository ("*": all of them) and dequeue its open PRs."""
+        rt = self.rt
+        if rt.ledger.repo_state(repo)["paused"]:
+            rt.ledger.enqueue_human(repo if repo != "*" else next(iter(rt.registry)), reason)
+            return
+        # publish the pause in the same locked transition as the state change,
+        # so the publisher and the gate see it at once, then dequeue open PRs
+        if rt.outbox is not None:
+            rt.outbox.transition(lambda: rt.ledger.bump_generation(repo, pause=True, reason=reason),
+                                 public_repos=self._public_repos())
+        else:
+            rt.ledger.bump_generation(repo, pause=True, reason=reason)
+        for name in ([repo] if repo != "*" else [lc.repo for lc in rt.registry.values()]):
+            merge.pause_open_prs(rt.ledger, rt.outbox, name, reason)
+        rt.ledger.enqueue_human(repo if repo != "*" else next(iter(rt.registry)), reason)
+        self._record(repo, "paused", reason=reason)
 
     def serve(self, stop: threading.Event | None = None, *, once: bool = False) -> None:
         stop = stop or threading.Event()

@@ -107,6 +107,41 @@ class KnowledgeRepo:
             })
         return entries
 
+    def first_parent_commits(self, old: str, new: str) -> list[tuple[str, list[str], float, str]]:
+        """(sha, parents, commit time, message) on new's first-parent chain
+        after old, oldest first."""
+        out = self._git("log", "--first-parent", "--reverse", "-z", "--format=%H %P%n%ct%n%B",
+                        f"{old}..{new}").decode("utf-8", "replace")
+        commits = []
+        for record in out.split("\0"):
+            if not record.strip():
+                continue
+            head, _, rest = record.lstrip("\n").partition("\n")
+            stamp, _, message = rest.partition("\n")
+            shas = head.split()
+            commits.append((shas[0], shas[1:], float(stamp or 0), message))
+        return commits
+
+    def blob_ids(self, rev: str, paths: list[str]) -> dict[str, str]:
+        """path -> "<mode> <type> <blob id>" at ``rev`` ("" for an absent path):
+        the mode is part of the identity (an executable bit is a change)."""
+        if not paths:
+            return {}
+        out = self._git("ls-tree", "-z", "--full-tree", rev, "--", *paths).split(b"\0")
+        found = {}
+        for entry in out:
+            if entry:
+                meta, _, name = entry.partition(b"\t")
+                found[name.decode("utf-8", "replace")] = meta.decode()
+        return {path: found.get(path, "") for path in paths}
+
+    def changed_names(self, old: str, new: str) -> list[str]:
+        if not old:  # a root commit
+            out = self._git("ls-tree", "-r", "-z", "--name-only", new)
+        else:
+            out = self._git("diff", "--name-only", "-z", "--no-renames", old, new)
+        return [name.decode("utf-8", "replace") for name in out.split(b"\0") if name]
+
     def knowledge_files(self, rev: str) -> dict[str, str]:
         """Knowledge-relative path -> text for the governed tree at ``rev``."""
         files = self._texts(rev, ("knowledge/repos/", "knowledge/general/"), KNOWLEDGE_SUFFIXES)
