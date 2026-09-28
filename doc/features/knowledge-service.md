@@ -84,6 +84,13 @@ python tools/build_kb_gate_bundle.py --check  # CI 提醒（非阻塞）
 python tools/build_kb_gate_bundle.py --lock   # 从 PyPI 重新按哈希固定依赖
 ```
 
+暂停清单端点（bot 主机）：
+
+```bash
+infermatrix-copilot kb holds-server --port 8765   # 只提供 GET /holds.json，默认绑定 127.0.0.1
+# 反向代理加 TLS，例如 Caddy：  handle /kb/holds.json { rewrite * /holds.json; reverse_proxy 127.0.0.1:8765 }
+```
+
 切换前的负责人步骤：提交 `.github/kb-gate.pub`（`kb keygen` 的公钥）；在
 `.github/kb-gate/config.json` 填入暂停清单的公开 HTTPS 地址（`$KB_STATE_DIR/public/holds.json`）；
 在 `.github/CODEOWNERS` 中再加入至少一名知识维护者；仓库 admin 开启合并队列（merge commit）

@@ -10,6 +10,7 @@
     kb serve [--once]                 the scheduler (holds the single-writer lease)
     kb activate                       activate the knowledge snapshot of the repository's main now
     kb rollback --to SHA              point `active` back at an earlier snapshot
+    kb holds-server [--host H] [--port P]                           serve ONLY the signed hold list (read-only)
     kb traces [--kind K] [--changeset ID] [--rule ID] [--limit N]   query trace/1 records
     kb replay --record ID --model PROVIDER:MODEL[:EFFORT]           re-ask a recorded call
     kb export --out FILE [--role judge|generator]                   dataset (calibration-safe)
@@ -113,6 +114,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("activate")
     rollback = sub.add_parser("rollback")
     rollback.add_argument("--to", required=True)
+    holds = sub.add_parser("holds-server")
+    holds.add_argument("--host", default="127.0.0.1", help="bind address; put TLS in front of it")
+    holds.add_argument("--port", type=int, default=8765)
     traces = sub.add_parser("traces")
     traces.add_argument("--kind")
     traces.add_argument("--changeset")
@@ -144,6 +148,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "publish":
         return _publish(args)
+    if args.command == "holds-server":
+        from .holds_server import serve_holds
+
+        serve_holds(_state_dir(args.state_dir), host=args.host, port=args.port)
+        return 0
     if args.command in {"traces", "replay", "export"}:
         return _traces_command(args, _state_dir(args.state_dir))
 
