@@ -781,3 +781,41 @@ def test_pin_discovery_reads_each_run_status_once(tmp_path, monkeypatch):
     answers = iter([{"state": rs.INTERRUPTED, "child_pid": None}, {"state": rs.QUEUED}])
     monkeypatch.setattr(rs, "read_status", lambda _d: next(answers))   # a reclaim lands between reads
     assert pinned_snapshots([tmp_path / "runs"]) == {(tmp_path / "s").resolve()}
+
+
+def test_activation_refuses_a_knowledge_format_this_copilot_does_not_read(tmp_path):
+    import json
+
+    rt, lifecycle = _flow_runtime(tmp_path)
+    _add_agents(rt)
+    good = rt.knowledge.fetch()
+    snapshot = activate(rt, good)
+    assert json.loads((snapshot / "MANIFEST.json").read_text())["knowledge_format"] == 2
+    newer = _commit_change(rt, "_format.yaml", "format_version: 3\n")
+    with pytest.raises(ActivationError, match="knowledge format 3"):
+        activate(rt, newer)
+    origin = Path(rt.knowledge.path).parent / "origin"
+    (origin / "knowledge" / "_format.yaml").unlink()
+    _git(origin, "add", "-A")
+    _git(origin, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-q", "-m", "undeclared")
+    with pytest.raises(ActivationError, match="undeclared"):
+        activate(rt, rt.knowledge.fetch())
+    assert Path(active_link(rt.state_dir)).resolve().name == good     # still the good one
+
+
+def test_the_packaged_knowledge_declares_a_supported_format():
+    from infermatrix_copilot.knowledge_view import SUPPORTED_FORMATS, KnowledgeView, knowledge_format
+
+    assert knowledge_format(KnowledgeView.current().root) in SUPPORTED_FORMATS
+
+
+@pytest.mark.parametrize("declared", ["2.9", "'2'", "true", ".inf", "[2]", "{}"])
+def test_a_malformed_format_declaration_is_refused_not_coerced(tmp_path, declared):
+    rt, lifecycle = _flow_runtime(tmp_path)
+    _add_agents(rt)
+    good = rt.knowledge.fetch()
+    activate(rt, good)
+    bad = _commit_change(rt, "_format.yaml", f"format_version: {declared}\n")
+    with pytest.raises(ActivationError, match="undeclared"):
+        activate(rt, bad)
+    assert Path(active_link(rt.state_dir)).resolve().name == good

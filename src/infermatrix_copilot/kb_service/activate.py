@@ -98,6 +98,13 @@ def verify_snapshot(snapshot: Path) -> KnowledgeView:
             view.path(rel)
         except (KnowledgeViewError, FileNotFoundError, ValueError) as exc:
             raise ActivationError(f"snapshot content does not match its manifest: {exc}") from exc
+    from ..knowledge_view import SUPPORTED_FORMATS, knowledge_format
+
+    declared = knowledge_format(view.root)
+    if declared not in SUPPORTED_FORMATS:
+        raise ActivationError(
+            f"knowledge format {declared if declared is not None else '(undeclared)'} is not one this Copilot "
+            f"reads ({sorted(SUPPORTED_FORMATS)}); upgrade the Copilot before activating this knowledge")
     files = {p.relative_to(view.root).as_posix(): p.read_text(encoding="utf-8")
              for p in view.root.rglob("*") if p.is_file() and p.suffix in (".md", ".yaml")}
     issues = check_tree({k: v for k, v in files.items() if k.startswith(("repos/", "general/"))})

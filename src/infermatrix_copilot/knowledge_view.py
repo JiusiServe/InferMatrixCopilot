@@ -33,6 +33,25 @@ from .sdk._resources import knowledge_root
 KNOWLEDGE_ROOT_ENV = "KNOWLEDGE_ROOT"
 MANIFEST_NAME = "MANIFEST.json"
 MANIFEST_SCHEMA_VERSION = 1
+# The knowledge tree declares the format it is written in (rule lifecycle
+# footers, typed operations, _routes.yaml, _tombstones.yaml). A Copilot only
+# activates snapshots in a format it reads. The file sits at the top of
+# knowledge/, outside the auto-merge whitelist: changing it takes a person.
+FORMAT_FILE = "_format.yaml"
+SUPPORTED_FORMATS = frozenset({2})
+
+
+def knowledge_format(root: Path) -> int | None:
+    """The declared format of the knowledge tree at ``root`` (None: undeclared or unreadable)."""
+    import yaml
+
+    try:
+        data = yaml.safe_load((Path(root) / FORMAT_FILE).read_text(encoding="utf-8"))
+        value = data["format_version"]
+    except (OSError, TypeError, KeyError, yaml.YAMLError):
+        return None
+    # exactly an integer: 2.9, "2", true or .inf are malformed, never coerced
+    return value if type(value) is int else None
 
 
 class KnowledgeViewError(RuntimeError):
@@ -191,6 +210,7 @@ def build_manifest(root: Path, snapshot: str) -> dict:
     return {
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "snapshot": snapshot,
+        "knowledge_format": knowledge_format(root),
         "files": files,
         "tree_sha256": tree.hexdigest(),
     }
