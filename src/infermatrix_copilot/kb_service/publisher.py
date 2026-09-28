@@ -47,6 +47,12 @@ ITEM_ID = re.compile(r"[0-9]+-[0-9a-f]{12}")
 ARCHIVE_NAME = re.compile(r"traces-\d{6}-\d{8}-\d{6}\.tar\.gz")
 GOVERNED_PATH = re.compile(r"knowledge/(?:repos/[A-Za-z0-9._-]+|general)/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\.(?:md|yaml)")
 BRANCH = re.compile(r"kb/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+")
+# a companion may only touch these (never knowledge/, .github/, src/, tools/)
+COMPANION_PATH = re.compile(r"(?:skills|plugins|adapters|doc|playbooks)/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+")
+COMPANION_LABEL = "kb:companion"
+# companions are recognized by their branch too (kb/<repo>/<repo>-companion-<id>),
+# so a label that failed to apply cannot make one mergeable by automation
+COMPANION_BRANCH = re.compile(r"kb/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+-companion-[0-9a-f]+")
 HOLD_LABEL = "kb:hold"
 PUSHING = frozenset({"open_pr", "open_companion_pr"})
 # retried until done, never acked as failed: stops (pause, close) and reports
@@ -327,7 +333,8 @@ class Publisher:
             raise PublishError(f"PR #{item.body['pr']} head moved to {str(pr.get('headRefOid'))[:12]}")
         return pr
 
-    def _do_open_pr(self, item: OutboxItem, *, draft: bool = False) -> dict:
+    def _do_open_pr(self, item: OutboxItem, *, draft: bool = False, allowed: re.Pattern = GOVERNED_PATH,
+                    what: str = "governed knowledge pages") -> dict:
         body = item.body
         branch = str(body["branch"])
         if not BRANCH.fullmatch(branch):
@@ -335,8 +342,8 @@ class Publisher:
         files: dict[str, str] = dict(body.get("files") or {})
         deleted = [str(p) for p in body.get("deleted") or []]
         for path in [*files, *deleted]:
-            if not GOVERNED_PATH.fullmatch(path) or ".." in path.split("/"):
-                raise PublishError(f"refusing to write outside governed knowledge pages: {path}")
+            if not allowed.fullmatch(path) or ".." in path.split("/"):
+                raise PublishError(f"refusing to write outside {what}: {path}")
         commit = self._build_commit(str(body["base_sha"]), files, deleted, str(body["title"]),
                                     when=item.issued_at)
         existing = json.loads(self.github.gh("pr", "list", "--repo", self.github.repository, "--head", branch,
@@ -365,13 +372,24 @@ class Publisher:
         return {"pr": int(opened[0]["number"]), "head_sha": commit, "branch": branch}
 
     def _do_open_companion_pr(self, item: OutboxItem) -> dict:
-        return self._do_open_pr(item, draft=True)  # companions are always drafts for people
+        """Always a draft, labelled kb:companion, and only within the companion
+        whitelist: people review, ready and merge it; automation never does."""
+        result = self._do_open_pr(item, draft=True, allowed=COMPANION_PATH,
+                                  what="the companion whitelist (skills, plugins, adapters, doc, playbooks)")
+        self.github.gh("pr", "edit", str(result["pr"]), "--repo", self.github.repository,
+                       "--add-label", COMPANION_LABEL, ok_fail=True)
+        return result
+
+    def _refuse_companion(self, pr: dict) -> None:
+        labelled = COMPANION_LABEL in {str(label.get("name")) for label in pr.get("labels") or []}
+        if labelled or COMPANION_BRANCH.fullmatch(str(pr.get("headRefName") or "")):
+            raise PublishError("a companion PR is readied and merged only by people")
 
     def _do_post_verdict(self, item: OutboxItem) -> dict:
         """A verdict is only issued for an unpaused repository, under its current
         generation, so posting one also lifts an earlier pause's kb:hold label
         (first, so the precheck the comment triggers no longer sees it)."""
-        self._checked_head(item)
+        self._refuse_companion(self._checked_head(item))
         number = str(item.body["pr"])
         self.github.gh("pr", "edit", number, "--repo", self.github.repository, "--remove-label", HOLD_LABEL,
                        ok_fail=True)  # fails when the label is absent; what matters is checked next
@@ -383,6 +401,7 @@ class Publisher:
 
     def _do_enqueue(self, item: OutboxItem) -> dict:
         pr = self._checked_head(item)
+        self._refuse_companion(pr)
         number = str(item.body["pr"])
         if pr.get("isDraft"):  # a resumed PR was turned into a draft by its pause
             self.github.gh("pr", "ready", number, "--repo", self.github.repository)

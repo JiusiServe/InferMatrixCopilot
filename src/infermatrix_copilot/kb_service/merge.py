@@ -53,6 +53,7 @@ def knowledge_repository() -> str:
 # the transition each outbox item kind drives: (state before, state after)
 TRANSITIONS = {
     "open_pr": ("pr_requested", "pr_open"),
+    "open_companion_pr": ("pr_requested", "companion_open"),
     "post_verdict": ("pr_open", "verdict_posted"),
     "enqueue": ("verdict_posted", "queued"),
 }
@@ -135,7 +136,7 @@ def apply_acks(rt, acks: list[dict]) -> None:
                                     changeset_id)
             continue
         fields = {"status": after, "pending_item": None}
-        if kind == "open_pr":
+        if kind in ("open_pr", "open_companion_pr"):
             fields.update(pr_number=int(ack["pr"]), head_sha=str(ack["head_sha"]),
                           branch=str(ack.get("branch", "")))
         elif kind == "enqueue":
@@ -305,10 +306,12 @@ def rebuild(rt, lifecycle, changeset: dict, why: str) -> str | None:
         # the rebuild itself did not pass the gate: nothing replaces the PR
         to_people(f"rebuild {new_id} on current main did not pass the gate ({staged['status']})")
         return None
-    rt.ledger.update_changeset(changeset["id"], status="superseding",
+    no_pr = changeset.get("pr_number") is None
+    rt.ledger.update_changeset(changeset["id"], status="superseded" if no_pr else "superseding",
                                detail={**detail, "rebuilt_as": new_id, "superseded_because": why})
     _outcome(rt, changeset, "superseded", reason=why, replaced_by=new_id)
-    _request_close(rt, lifecycle.repo, rt.ledger.changeset(changeset["id"]))
+    if not no_pr:
+        _request_close(rt, lifecycle.repo, rt.ledger.changeset(changeset["id"]))
     publish(rt, lifecycle, new_id)
     return new_id
 
@@ -332,7 +335,8 @@ def advance(rt, lifecycle) -> list[str]:
     queued = rt.ledger.changesets(lifecycle.repo, ("queued",)) + [
         cs for cs in rt.ledger.changesets(lifecycle.repo, ("verdict_posted",))
         if _enqueue_outstanding(rt, cs) or cs["detail"].get("withdrawn")]
-    for changeset in rt.ledger.changesets(lifecycle.repo, (*IN_FLIGHT, "superseding", "paused")):
+    for changeset in rt.ledger.changesets(lifecycle.repo, (*IN_FLIGHT, "superseding", "paused",
+                                                           "companion_open")):
         number = changeset["pr_number"]
         if number is None:
             continue
@@ -343,6 +347,42 @@ def advance(rt, lifecycle) -> list[str]:
             if changeset["status"] == "paused" or paused:
                 _pause_unconfirmed(rt, lifecycle.repo, changeset, events)
             events.append(f"observe_failed {changeset['id']}")
+            continue
+        if changeset["status"] == "companion_open":
+            # people review and merge companions; the service only follows them
+            waiting = [cs for cs in rt.ledger.changesets(lifecycle.repo, ("companion_pending",))
+                       if cs["detail"].get("companion") == changeset["id"]]
+            target = changeset["detail"].get("for_changeset")
+            if target and not waiting:
+                # the companion names its change; a crash between staging the
+                # companion and linking the change leaves it "human" and unlinked
+                parent = rt.ledger.changeset(target)
+                if parent["status"] in ("companion_pending", "human") and not parent["detail"].get("rebuilt_as"):
+                    waiting = [parent]
+            if pr.get("merged"):
+                if waiting and (paused or not getattr(rt, "lease_owner", None)):
+                    continue  # rebuild only unpaused and under the scheduler's lease: next pass
+                events.append(f"companion_merged {changeset['id']}")
+                retry = False
+                for knowledge in waiting:
+                    try:
+                        new_id = rebuild(rt, lifecycle, knowledge, "its companion PR merged")
+                    except Exception as exc:  # noqa: BLE001 - e.g. main not fetchable: next pass
+                        retry = True
+                        events.append(f"rebuild_retry {knowledge['id']}: {exc}")
+                        continue
+                    events.append(f"rebuilt {knowledge['id']} as {new_id}" if new_id
+                                  else f"rebuild_failed {knowledge['id']}")
+                if not retry:  # only once every waiting change was handled
+                    rt.ledger.update_changeset(changeset["id"], status="merged",
+                                               merge_sha=str(pr.get("merge_commit_sha") or ""))
+            elif pr.get("state") == "closed":
+                rt.ledger.update_changeset(changeset["id"], status="closed")
+                for knowledge in waiting:
+                    rt.ledger.update_changeset(knowledge["id"], status="human")
+                    rt.ledger.enqueue_human(lifecycle.repo, f"companion PR #{number} was closed unmerged",
+                                            knowledge["id"])
+                events.append(f"companion_closed {changeset['id']}")
             continue
         if changeset["status"] == "superseding":
             # the replaced PR stays tracked until GitHub shows it closed; the
