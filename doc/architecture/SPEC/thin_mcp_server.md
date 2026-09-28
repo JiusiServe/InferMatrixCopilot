@@ -1,6 +1,6 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-08-31 -->
+<!-- verified-against: 2026-09-28 -->
 
 `LOC ~490 · 默认 MCP：Direct 门面 + Strict 入口 · refactor-status: ok`
 
@@ -82,3 +82,6 @@ stdlib + `mcp` extra + `.direct_routing`（下划线别名 re-import）+
 迁到 `direct_routing`，避免 MCP 和 Python SDK 各拼一份协议。
 拆分保住了"server 不跑模型"—— 它仍是 Direct 模式的产品承诺；
 后续增长优先落到 `direct_routing`/adapter 数据面，不回到这里。
+
+## 2026-09-28 知识视图
+知识根改为每次调用经 `KnowledgeView.current()` 解析；`_KNOWLEDGE` 仅为惰性别名。

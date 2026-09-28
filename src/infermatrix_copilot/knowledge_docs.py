@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 
 class KnowledgeDocsError(ValueError):
@@ -25,7 +26,17 @@ class KnowledgeHit:
 class KnowledgeDocs:
     """Read/search only the shared general slice and one repo-specific slice."""
 
-    def __init__(self, root: str | Path, repo_subdir: str | None = None):
+    def __init__(
+        self,
+        root: str | Path,
+        repo_subdir: str | None = None,
+        *,
+        verify: Callable[[str], Path] | None = None,
+    ):
+        # `verify(rel)` is called before every file is read; an activated
+        # knowledge snapshot passes `KnowledgeView.path`, which raises when a
+        # file is missing from, or differs from, the snapshot manifest.
+        self._verify = verify
         self.root = Path(root).resolve()
         if not self.root.is_dir():
             raise KnowledgeDocsError(f"knowledge root does not exist: {self.root}")
@@ -69,7 +80,12 @@ class KnowledgeDocs:
             raise KnowledgeDocsError("path is not a regular file")
         if target.suffix.casefold() != ".md":
             raise KnowledgeDocsError("only Markdown documents are readable")
+        self._checked(target)
         return target
+
+    def _checked(self, target: Path) -> None:
+        if self._verify is not None:
+            self._verify(target.relative_to(self.root).as_posix())
 
     def read(self, path: str, *, offset: int = 0, limit: int = 24_000) -> dict:
         if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
@@ -103,6 +119,7 @@ class KnowledgeDocs:
                 if target in seen_files or not self._in_scope(target) or not target.is_file():
                     continue
                 seen_files.add(target)
+                self._checked(target)
                 rel = target.relative_to(self.root).as_posix()
                 for lineno, line in enumerate(
                         target.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
