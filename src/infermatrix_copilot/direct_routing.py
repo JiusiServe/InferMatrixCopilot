@@ -484,7 +484,10 @@ def _direct_knowledge_routes(
     models = routes_table["models"]
     if intent and models is not None:
         model_root = view.root / models["dir"]
-        for model_dir in sorted(model_root.iterdir(), key=lambda path: -len(path.name)):
+        # longest name first; ties by name. Length alone left equal-length
+        # models in filesystem order, so two machines routed the same PR
+        # differently once the three-route cap cut between them.
+        for model_dir in sorted(model_root.iterdir(), key=lambda path: (-len(path.name), path.name)):
             rules = model_dir / models["page"]
             if not rules.is_file():
                 continue
