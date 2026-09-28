@@ -207,6 +207,10 @@ def test_sdk_completion_pins_the_plan_snapshot(tmp_path, monkeypatch):
         changed_paths=(ChangedPath(path="vllm_omni/core/sched/a.py"),),
     ))
     assert plan.diagnostics["knowledge_snapshot"] == "e" * 40
+    assert plan.knowledge_snapshot == "e" * 40
+    manifest = json.loads((old / "MANIFEST.json").read_text())
+    assert plan.knowledge_tree_sha256 == manifest["tree_sha256"]
+    assert plan.to_dict()["knowledge_snapshot"] == "e" * 40
 
     tmp_link = tmp_path / "active.tmp"
     tmp_link.symlink_to(new)
@@ -218,6 +222,21 @@ def test_sdk_completion_pins_the_plan_snapshot(tmp_path, monkeypatch):
         existing_feedback_status="not_applicable",
     ))
     assert "provider resources changed after the review context was issued" not in decision.missing
+
+
+def test_plans_from_a_development_tree_never_expose_its_path(tmp_path, monkeypatch):
+    from infermatrix_copilot.sdk.v1 import ChangedPath, DirectClient, DirectReviewRequest, RepositoryRef
+
+    root = _copy_tree(tmp_path)
+    monkeypatch.setenv(KNOWLEDGE_ROOT_ENV, str(root))
+    _load_view.cache_clear()
+    plan = DirectClient().plan(DirectReviewRequest(
+        review_id="r3", repository=RepositoryRef(alias="vllm-omni"), pr_number=3,
+        expected_head_sha="3" * 40, title="scheduler fix", body="",
+        changed_paths=(ChangedPath(path="vllm_omni/core/sched/a.py"),),
+    ))
+    assert plan.knowledge_snapshot == "unverified" and plan.knowledge_tree_sha256 == ""
+    assert str(tmp_path) not in json.dumps(plan.to_dict())
 
 
 def test_sdk_document_reads_follow_the_plan_snapshot(tmp_path, monkeypatch):

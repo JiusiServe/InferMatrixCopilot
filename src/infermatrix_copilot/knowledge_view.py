@@ -62,6 +62,22 @@ class KnowledgeView:
     def verified(self) -> bool:
         return self.files is not None
 
+    @property
+    def public_snapshot(self) -> str:
+        """The snapshot id safe to record anywhere: the activated snapshot's id,
+        ``packaged``, or ``unverified`` (a development tree's path is never exposed)."""
+        return "unverified" if self.snapshot.startswith("unverified:") else self.snapshot
+
+    @property
+    def tree_sha256(self) -> str:
+        """The manifest tree hash of a verified snapshot ("" otherwise)."""
+        if self.files is None:
+            return ""
+        tree = hashlib.sha256()
+        for rel in sorted(self.files):
+            tree.update(f"{rel}\0{self.files[rel]}\n".encode("utf-8"))
+        return tree.hexdigest()
+
     def relative(self, path: str | Path) -> str:
         """Return the knowledge-relative id of an absolute path inside this view."""
         try:

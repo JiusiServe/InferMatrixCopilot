@@ -31,3 +31,7 @@ stdlib + `.sdk._resources`。叶子模块。
 
 ## 测试
 `test_knowledge_view_routing.py`。
+
+## 2026-09-28 可记录的快照标识
+`public_snapshot`：激活快照 ID、`packaged` 或 `unverified`（开发树的绝对路径不外泄）；`tree_sha256`：已验证快照
+按清单重算的树哈希。`direct_routing` 的 `diagnostics.knowledge_snapshot` 与 SDK 计划都使用它们。

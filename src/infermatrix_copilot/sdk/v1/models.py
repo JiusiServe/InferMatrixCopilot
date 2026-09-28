@@ -250,6 +250,10 @@ class DirectReviewPlan(_Serializable):
     completion_gate: dict[str, Any]
     diagnostics: dict[str, Any] = field(default_factory=dict)
     carried_findings: tuple[CarriedFinding, ...] = ()
+    # which knowledge this plan (and every document read under its
+    # review_context_id) was served from: record it with the review
+    knowledge_snapshot: str = ""
+    knowledge_tree_sha256: str = ""
 
 FeedbackStatus = Literal[
     "checked", "disabled", "unavailable", "not_applicable"

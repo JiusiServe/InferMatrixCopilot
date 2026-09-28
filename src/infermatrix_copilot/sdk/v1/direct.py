@@ -378,6 +378,8 @@ class DirectClient:
             completion_gate=completion_gate,
             diagnostics=dict(raw.get("diagnostics") or {}),
             carried_findings=request.carried_findings,
+            knowledge_snapshot=view.public_snapshot,
+            knowledge_tree_sha256=view.tree_sha256,
         )
         self._remember_context(review_context_id, expected_head, carried, view)
         return plan
