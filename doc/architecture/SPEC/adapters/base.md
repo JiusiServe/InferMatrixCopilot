@@ -1,6 +1,6 @@
 # adapters/base.py —— 规范
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-09-28 -->
 
 `LOC ~423 · 边缘（仓库知识） · refactor-status: ok`
 
@@ -58,3 +58,6 @@
 **把 `capabilities` 推导保持为 planner 信任的唯一来源** ——
 `app.repository_context` 只为实际 checkout **补上** `repo.path`，
 并将同一 adapter policy 交给执行层。
+
+## 2026-09-28 退役规则不再提供
+`render_briefing_docs` 经 `visible_text` 去掉退役规则。

@@ -177,6 +177,17 @@ class DirectClient:
             raise DocumentNotFoundError(f"unknown document_id: {document_id!r}")
         return view.path(value)
 
+    @staticmethod
+    def _served_bytes(path: Path) -> bytes:
+        """Document bytes as served: retired rules are withheld (their text
+        stays on disk for one release cycle but is no longer knowledge)."""
+        from ...knowledge_service.lifecycle import visible_text
+
+        data = path.read_bytes()
+        if path.suffix != ".md" or b"kb:rule" not in data:
+            return data
+        return visible_text(data.decode("utf-8")).encode("utf-8")
+
     def _document_id(self, path_value: str | Path, view=None) -> str:
         view = view if view is not None else self._view()
         path = Path(path_value).expanduser().resolve()
@@ -190,7 +201,7 @@ class DirectClient:
     def _document_ref(self, path_value: str | Path, view=None) -> DocumentRef:
         view = view if view is not None else self._view()
         document_id = self._document_id(path_value, view)
-        data = self._document_path(document_id, view).read_bytes()
+        data = self._served_bytes(self._document_path(document_id, view))
         excerpt_data = data[:_EXCERPT_BYTES]
         return DocumentRef(
             document_id=document_id,
@@ -228,7 +239,7 @@ class DirectClient:
                     "review_context_id was not issued by this DirectClient"
                 )
             view = issued.knowledge_view
-        data = self._document_path(document_id, view).read_bytes()
+        data = self._served_bytes(self._document_path(document_id, view))
         page = data[offset:offset + max_bytes]
         next_offset = offset + len(page) if offset + len(page) < len(data) else None
         return DocumentPage(

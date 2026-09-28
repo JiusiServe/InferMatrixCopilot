@@ -1,6 +1,6 @@
 # knowledge_service/ — provider curation components
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-09-28 -->
 
 The provider owns knowledge curation beneath the public SDK v1 facade.
 `KnowledgeCurator` composes four domain components over one explicit work
@@ -17,3 +17,11 @@ local commits and proposal export. The public `sdk.v1.knowledge` module only
 re-exports the curator and validator error. Existing proposal IDs, errors,
 wire projections, validator order and rollback behavior are compatibility
 contracts across the move.
+
+Knowledge Ops API 2.0 sits beside the v1 curator and does not change it:
+`lifecycle` parses rule pages (byte-exact) and their `kb:rule` footers,
+`ops.apply_operations` applies typed add / edit_same_meaning / replace / retire
+/ purge changes with their mechanical consequences, and `l1` is the
+deterministic half of the quality gate (`check_tree`, `check_changeset`). The
+three modules need only the standard library and PyYAML and import nothing else
+from the package, so the kb-gate verifier bundle can vendor them.

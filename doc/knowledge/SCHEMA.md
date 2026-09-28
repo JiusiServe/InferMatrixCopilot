@@ -64,6 +64,33 @@ contradictions: [相对路径]         # 可选：与本页冲突的页面
 先把仍然有效的独有结论合入最近 owner 的幸存页面，再删除被取代或重复页面并修复
 入链。Git 历史负责追溯旧版本；`knowledge/` 内不再维护 `_archive/` 副本。
 
+## 规则生命周期尾注
+
+规则段（`## <ID> — <标题>`）可以以一行机器可读尾注结束，渲染时不可见：
+
+```
+<!-- kb:rule status=retired since=v0.30.0 retired_at=v0.31.0 reason=upstream-removed evidence="PR #8201" -->
+<!-- kb:rule status=active since=v0.31.0 supersedes=BENCH-1b -->
+```
+
+- 没有尾注 = `status=active`（兼容全部既有规则）。
+- `status=retired` 必须带 `retired_at`、`reason`（`upstream-removed` / `superseded` /
+  `incorrect` / `duplicate`）与 `evidence`；`superseded` 还必须带 `superseded_by`，且
+  后继规则带对应的 `supersedes`。
+- 退役规则的正文在磁盘上保留一个发版周期供复核与撤销，但**立即停止对外提供**：
+  Direct 文档读取、`doc_read`/`doc_search`、briefing 都会去掉它。
+- `protected=true` 的规则只能经人工路径修改、退役或删除。
+- 物理删除（purge）只针对已退役满一个发版周期的规则；被删除的 ID 记入同仓库的
+  `_tombstones.yaml`，永不复用。
+- 尾注、`updated:`、`sources:`（只追加）、新页面的 `_index.md` 行与 tombstones 由知识服务
+  按 Knowledge Ops API 2.0 写入，并由 L1 门禁重算核对；手工改动也必须符合同一规则。
+
+## Direct 路由表
+
+每个仓库的 Direct owner 路由在 `repos/<repo>/_routes.yaml`（`schema_version: 1`，
+`owners[{owner, path, signals, scope_prefixes}]`，可选 `models{dir, page}`）。路由引用的页面
+必须存在；新增仓库只需提供它和 adapter，不改代码。
+
 ## 校验
 
 ```bash

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from .knowledge_service.lifecycle import visible_text
+
 
 class KnowledgeDocsError(ValueError):
     """A refused or invalid knowledge-base operation."""
@@ -94,7 +96,7 @@ class KnowledgeDocs:
             raise KnowledgeDocsError("limit must be a positive integer")
         limit = min(limit, 65_536)
         target = self._resolve_doc(path)
-        data = target.read_text(encoding="utf-8", errors="replace")
+        data = visible_text(target.read_text(encoding="utf-8", errors="replace"))
         end = offset + limit
         return {
             "path": target.relative_to(self.root).as_posix(),
@@ -121,8 +123,8 @@ class KnowledgeDocs:
                 seen_files.add(target)
                 self._checked(target)
                 rel = target.relative_to(self.root).as_posix()
-                for lineno, line in enumerate(
-                        target.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+                served = visible_text(target.read_text(encoding="utf-8", errors="replace"))
+                for lineno, line in enumerate(served.splitlines(), 1):
                     line_folded = line.casefold()
                     exact = folded in line_folded
                     term_match = bool(terms) and all(t in line_folded for t in terms)
