@@ -33,3 +33,6 @@
 
 ## 2026-09-28 快照校验
 可选 `verify(rel)` 回调在 `read`/`search` 读取每个文件前调用；MCP 传入 `KnowledgeView.path`，快照中缺失或被改动的文件使读取/搜索 fail-closed。
+
+## 2026-09-28 退役规则不再提供
+`read`/`search` 经 `visible_text` 去掉退役规则后再返回。

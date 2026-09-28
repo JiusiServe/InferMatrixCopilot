@@ -16,6 +16,8 @@ from pathlib import Path
 
 import yaml
 
+from ..knowledge_service.lifecycle import visible_text
+
 HIGH_RISK_SECTIONS = ("push", "repo", "upstream", "rebase")
 
 
@@ -87,7 +89,7 @@ def render_briefing_docs(root: Path | str, docs: list[str], *, header: str = "",
             if warnings is not None:
                 warnings.append(f"briefing document missing or not Markdown: {rel}")
             continue
-        text = p.read_text(encoding="utf-8", errors="replace")
+        text = visible_text(p.read_text(encoding="utf-8", errors="replace"))
         parts.append(_without_frontmatter(text).strip())
     if not parts:
         return ""
