@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 
 from . import merge
 from .activate import ActivationError, activate, activation_lock
+from .external import poll_external
 from .runtime import collect_events, publish, run_intake
 from .sweep import UpstreamRepo, detect_release, run_sweep
 
@@ -73,6 +74,12 @@ class Scheduler:
                 self._repo_tick(lifecycle)
             except Exception as exc:  # isolate repositories from each other
                 self._record(lifecycle.repo, "error", error=repr(exc), trace=traceback.format_exc()[-2000:])
+        if self._due("external", self.intake_every) and not merge.is_paused(rt.ledger, "*"):
+            try:  # knowledge PRs the service did not open (source 4, human approvals)
+                for event in poll_external(rt):
+                    self._record("*", "external", detail=event)
+            except Exception as exc:
+                self._record("*", "error", error=repr(exc), trace=traceback.format_exc()[-2000:])
         try:
             sha = rt.knowledge.fetch()
             with activation_lock(rt.state_dir):  # the pin cannot change under this decision
@@ -120,8 +127,9 @@ class Scheduler:
 
     def _overturn_breaker(self, lifecycle) -> None:
         rt = self.rt
+        # only the service's own PRs: an author closing their own PR is no overturn
         recent = [cs for cs in rt.ledger.changesets(lifecycle.repo, ("closed",))
-                  if rt.clock() - float(cs["updated_at"]) < OVERTURN_WINDOW]
+                  if cs["kind"] != "external" and rt.clock() - float(cs["updated_at"]) < OVERTURN_WINDOW]
         state = rt.ledger.repo_state(lifecycle.repo)
         if len(recent) >= OVERTURN_LIMIT and not state["paused"]:
             reason = f"overturn breaker: {len(recent)} knowledge PRs closed unmerged within 24h"

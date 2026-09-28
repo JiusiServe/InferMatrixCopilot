@@ -108,3 +108,22 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   中断后再次执行会找到它而不会重复暂存）。只有重建**通过**质量门才取代旧 PR：旧变更集进入 `superseding`，`close` 项
   过期即重发，直到观测到 PR 已关闭才记为 `superseded`（不计入被人工推翻的熔断）；重建未通过、操作无法再应用或没有
   可重放的操作 → `rebuild_failed` 并转人工，旧 PR 保持打开。其他失败（变更本身有问题）→ `gate_failed` 并转人工一次。
+
+## 2026-09-28 外部知识 PR（来源④）与 human-approved 判定
+`external.poll_external`（调度器按 intake 间隔、全局未暂停时调用，需持有租约）处理知识仓库中**非服务创建**、非 draft、
+触碰 `knowledge/` 的打开 PR，每个 head 在每条路径（auto / human）上只评一次（auto 路径转人工的 head 在维护者审批后
+无需新推送即可按 human 路径重新评判）：
+- `kb:human-approved` 且知识维护者（main 上 `.github/kb-gate/` 的 CODEOWNERS）对**当前 head** 的审批仍有效（同一人的
+  后续审阅覆盖之前的）→ 只在受治理页面上跑 L1（审批替代白名单与 L2，不替代其余 L1）→ 签发 `human-approved` 判定，
+  绑定这些审阅。
+- 否则全部路径须为受治理页面 → 以**当前 main 加上 PR 改动**完整过质量门（L1、L2、一致性）→ 通过则签发 `auto` 判定。
+  PR 的前像必须等于 main（否则队列落地的改动与签名不同），不等则请作者 rebase。
+  与服务自己的 PR 一样，`auto` 判定要求当前通过的评审校准；否则记为 `calibration_required`，校准恢复后才重新评判
+  （期间不重复调用付费评审）。维护者审批读取全部分页的审阅，后续页上的撤回同样生效。
+- 其余情况（跨多个仓库、白名单外路径未经审批、L1 失败、质量门未通过）转人工，每个 head 一次。
+- 判定清单直接取自 git（`merge-base..head` 的完整原始 diff），覆盖白名单外路径；`context_base_sha` 为评判时的 main。
+- 暂存为 `external` 变更集后走普通合并流程。作者推送新 head → `head_changed`（不转人工）；上下文失效 → `stale_context`；
+  两者都在下次轮询时重新评判。签发后维护者撤回审批（最新审阅不再批准该 head）→ 转人工并下发 `pause`（出队 + draft）；
+  在 pause 回执成功前保持原状态（继续占用队列名额），回执后才记为 `approval_withdrawn`，剩余审批不会让同一 head 重新暂存。外部 PR 没有操作列表，L1 发现的退役/删除规则写入 `retirements`/`purges`，合并后同样进入
+  退役账本（之后的发版巡检据此 purge）。作者关闭自己的 PR 不计入熔断。只触碰非受治理知识路径的 PR 归入 `general`（若其接收
+  人工 PR），否则归入第一个接收人工 PR 的仓库。

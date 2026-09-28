@@ -169,6 +169,8 @@ class World:
         parts = path.strip("/").split("/")
         if parts[-2:] == ["comments"] or parts[-1] == "comments":
             return self.comments.get(int(parts[-2]), [])
+        if len(parts) == 6 and parts[5] == "reviews":
+            return [r for (n, _id), r in sorted(self.reviews.items()) if n == int(parts[4])]
         if len(parts) == 7 and parts[5] == "reviews":
             return self.reviews[(int(parts[4]), int(parts[6]))]
         if parts[-1] == "pulls":
