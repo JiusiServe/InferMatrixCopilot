@@ -104,29 +104,46 @@ class ModelGateway:
                   validate: Callable[[dict], None] | None = None) -> ModelReply:
         transport = self._transport(role.provider)
         started = time.time()
+        identity = {"role": role.name, "requested": role.label(), "provider": role.provider,
+                    "model": role.model, "effort": role.effort}
         try:
             reply = transport.complete(
                 system=system, messages=[{"role": "user", "content": prompt}],
                 model=role.model, effort=role.effort, role=role.name)
         except Exception as exc:  # the transport's own failure modes
+            if self._recorder is not None:
+                self._recorder({**identity, "served_model": "", "stop_reason": "", "usage": {},
+                                "seconds": round(time.time() - started, 3), "system": system,
+                                "prompt": prompt, "reply": "", "error": str(exc)[:2000]})
             raise ModelUnavailable(f"{role.label()} failed: {exc}") from exc
         seconds = time.time() - started
         text = "".join(getattr(block, "text", "") or "" for block in getattr(reply, "blocks", []))
         record = {
-            "role": role.name, "requested": role.label(),
+            **identity,
             "served_model": getattr(reply, "model", "") or "",
             "stop_reason": getattr(reply, "stop_reason", ""),
             "usage": dict(getattr(reply, "usage", {}) or {}),
             "seconds": round(seconds, 3), "system": system, "prompt": prompt, "reply": text,
         }
-        if self._recorder is not None:
-            self._recorder(record)
+        # the record carries the call's FINAL verdict: a truncated, empty,
+        # unparseable or schema-failing reply is recorded as a failure, so it
+        # never becomes a training example
+        failure: ModelUnavailable | None = None
+        data: dict = {}
         if getattr(reply, "stop_reason", "") == "max_tokens" or not text.strip():
-            raise ModelUnavailable(f"{role.label()} timed out or returned nothing")
-        data = parse_json_object(text)
-        if validate is not None:
+            failure = ModelUnavailable(f"{role.label()} timed out or returned nothing")
+        else:
             try:
-                validate(data)
-            except Exception as exc:  # any malformed shape is a controlled refusal
-                raise ModelUnavailable(f"{role.label()} reply failed its schema: {exc!r}") from exc
+                data = parse_json_object(text)
+                if validate is not None:
+                    try:
+                        validate(data)
+                    except Exception as exc:  # any malformed shape is a controlled refusal
+                        raise ModelUnavailable(f"{role.label()} reply failed its schema: {exc!r}") from exc
+            except ModelUnavailable as exc:
+                failure = exc
+        if self._recorder is not None:
+            self._recorder({**record, "error": str(failure) if failure else ""})
+        if failure is not None:
+            raise failure
         return ModelReply(role, data, text, record["served_model"], record["usage"], seconds)
