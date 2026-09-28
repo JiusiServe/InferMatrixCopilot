@@ -35,3 +35,12 @@ reported as reconciliation.
 the canonical JSON payload, so a signature made for one purpose (gate verdict,
 outbox item, control record, hold list, publisher ack) never verifies for
 another. It needs only `cryptography` and is vendored by the kb-gate verifier.
+
+## 2026-09-28 verdict
+`verdict` defines the signed kb-gate verdict (`kb-gate-verdict/1`): identity
+(repository, PR, exact head, nonce, 72-hour issue window), the complete patch
+manifest compared by pre/post git blob IDs independent of any base SHA, the
+passing per-block judgements, the consistency judgement with the page hashes it
+saw, upstream fact attestations and the decision source (`auto` or
+`human-approved` with its reviews). `check_binding` rejects replay on another
+PR, head or window. Standard library only; vendored by kb-gate.

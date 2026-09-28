@@ -15,7 +15,7 @@ from . import _common
 
 _BUILTIN_MODULES = (
     "workspace", "review", "report", "pr", "issue", "profile",
-    "rebase_v3", "rebase_knowledge",
+    "rebase_v3", "rebase_knowledge", "knowledge",
 )
 
 

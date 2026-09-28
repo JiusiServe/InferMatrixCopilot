@@ -1,6 +1,6 @@
 # providers/cursor.py —— 规范
 
-<!-- verified-against: 2026-09-19 -->
+<!-- verified-against: 2026-09-28 -->
 
 `LOC ~207 · harness transport（Cursor 订阅） · refactor-status: ok`
 
@@ -45,3 +45,6 @@ stdlib + `.base` + `.registry` + `..agent_loop.AgentOutcome` + `..llm` 的类型
 registry 给 cursor 的能力是 `{mcp_tools, usage_reporting}`——**没有**
 `builtin_tools_off`，所以 cursor 自带工具会绕过 bridge：bridged 调用受
 scope 约束，native 调用只被**记录**。
+
+## 2026-09-28
+`complete()` 接受并忽略 `effort`（与 base 契约一致）。

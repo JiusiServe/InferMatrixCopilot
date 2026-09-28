@@ -421,4 +421,5 @@ knowledge_lifecycle:
     retire_ratio: 0.10
     max_files: 50
   protected_rules: []
+  calibration_set: kb-calibration   # adapters/vllm_omni/kb-calibration/cases/*.json
   model_dir: repos/vllm-omni/models

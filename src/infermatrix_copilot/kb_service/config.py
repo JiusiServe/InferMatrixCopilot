@@ -60,7 +60,7 @@ class RepoLifecycle:
     retire_ratio: float = 0.10
     max_files: int = 50
     protected_rules: tuple[str, ...] = ()
-    calibration_set: str = ""
+    calibration_set: str = ""      # directory relative to the adapter (ships in the wheel)
     model_dir: str = ""
     adapter_dir: Path | None = None
 

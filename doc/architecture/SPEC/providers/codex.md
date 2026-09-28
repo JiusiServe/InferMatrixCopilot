@@ -1,6 +1,6 @@
 # providers/codex.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-09-28 -->
 
 `LOC ~197 · harness transport（ChatGPT 订阅） · refactor-status: ok`
 
@@ -39,3 +39,6 @@ stdlib + `.base` + `..agent_loop.AgentOutcome` + `..llm` 的类型。
 **不要**把 `_tool_activity` "改进"成审计：`providers/audit.py` 的存在正是为了那些没有
 OS 级控制可用的后端；把两者混同，会模糊掉"当前实际生效的是哪一类控制"——
 而这正是 RUN_REPORT 要披露的事实。
+
+## 2026-09-28
+`complete()` 接受 `effort`（推理强度）：codex 以 `-c model_reasoning_effort="<effort>"` 生效并校验取值；其他 transport 接受并忽略（模型 id 已决定推理预算）。
