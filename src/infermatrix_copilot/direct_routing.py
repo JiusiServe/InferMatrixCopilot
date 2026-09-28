@@ -1,13 +1,14 @@
-"""Direct-mode knowledge routing: the tables and the routing mechanism.
+"""Direct-mode knowledge routing: the repo-neutral routing mechanism.
 
 Its four entry points — `direct_knowledge_routes`, `direct_execution_budget`,
 `direct_completion_result`, `direct_mandatory_review_guides` — are re-exported by
-`contract.py`, which is the surface consumers import. They live here rather than
-there because the routing tables below are repo-specific knowledge, and the
-public contract module must stay repo-neutral (invariant 6). This module carries
-that debt, inherited verbatim from `thin_mcp_server.py` where it used to sit;
-extracting the tables into `adapters/<repo>/` is the pending cleanup, unchanged
-by this move.
+`contract.py`, which is the surface consumers import.
+
+Nothing here names a served repository. Each repository's owner table lives in
+its own knowledge slice, `knowledge/repos/<repo>/_routes.yaml`; repository
+aliases come from `adapters/<repo>/manifest.yaml`. Every request resolves one
+`KnowledgeView` up front and all reads inside it use that view, so an activated
+knowledge snapshot takes effect on the next request without a restart.
 
 They were moved out of `thin_mcp_server.py` because a downstream consumer
 imported the four `_direct_*` privates from it through `importlib` — a coupling
@@ -19,149 +20,113 @@ from __future__ import annotations
 
 import re
 import time
+from functools import lru_cache
 from pathlib import Path
 
+import yaml
+
 from .adapters import AdapterError, AdapterRegistry, RepoAdapter
-from .sdk._resources import adapters_root, knowledge_root
+from .knowledge_view import KnowledgeView
+from .sdk._resources import adapters_root
 
 _ROOT = Path(__file__).resolve().parents[2]
-
-
-def _knowledge_root() -> Path:
-    return knowledge_root()
-
-
-_KNOWLEDGE = _knowledge_root()
-
-
 _ADAPTERS = adapters_root()
-_REPO_ALIASES = {
-    "vllm-project/vllm-omni": "vllm-omni",
-    "vllm-project/afd-plugin": "afd-plugin",
-}
-_DIRECT_OWNER_ROUTES = (
-    {
-        "owner": "configuration",
-        "path": "repos/vllm-omni/components/configuration/rules.md",
-        "signals": (
-            "config",
-            "configuration",
-            "yaml",
-            "registry",
-            "deploy",
-            "pipeline",
-            "override",
-            "default",
-            "cli flag",
-            "topology",
-        ),
-        "scope_prefixes": (
-            "vllm_omni/config/",
-            "vllm_omni/deploy/",
-        ),
-    },
-    {
-        "owner": "serving",
-        "path": "repos/vllm-omni/components/serving/rules.md",
-        "signals": (
-            "serving",
-            "server",
-            "endpoint",
-            "openai",
-            "request",
-            "response",
-            "http",
-            "chat completion",
-            "completion endpoint",
-            "speech api",
-            "sse",
-            "websocket",
-            "sleep",
-            "wake",
-            "partial wake",
-            "engine lifecycle",
-            "idempotency",
-            "ack",
-        ),
-        "scope_prefixes": (
-            "vllm_omni/entrypoints/openai/",
-            "vllm_omni/entrypoints/api_server.py",
-            "vllm_omni/entrypoints/async_omni.py",
-        ),
-    },
-    {
-        "owner": "model-executor",
-        "path": "repos/vllm-omni/components/model-executor/rules.md",
-        "signals": (
-            "model executor",
-            "loader",
-            "checkpoint",
-            "tokenizer",
-            "processor",
-            "stage input",
-            "stage handoff",
-            "runtime info",
-            "runtime_info",
-            "batch",
-            "sampling",
-        ),
-        "scope_prefixes": (
-            "vllm_omni/model_executor/",
-            "vllm_omni/inputs/",
-        ),
-    },
-    {
-        "owner": "diffusion",
-        "path": "repos/vllm-omni/components/diffusion/rules.md",
-        "signals": (
-            "diffusion",
-            "image generation",
-            "text to image",
-            "image to image",
-            "lora",
-            "vae",
-            "dit",
-            "ulysses",
-            "cache dit",
-        ),
-        "scope_prefixes": (
-            "vllm_omni/diffusion/",
-            "vllm_omni/model_executor/models/diffusers/",
-        ),
-    },
-    {
-        "owner": "distributed",
-        "path": "repos/vllm-omni/components/distributed/_index.md",
-        "signals": (
-            "distributed",
-            "tensor parallel",
-            "data parallel",
-            "replica",
-            "collective",
-            "rpc",
-        ),
-        "scope_prefixes": (
-            "vllm_omni/distributed/",
-            "vllm_omni/worker/",
-            "vllm_omni/entrypoints/async_omni.py",
-        ),
-    },
-    {
-        "owner": "scheduler",
-        "path": "repos/vllm-omni/components/scheduler/rules.md",
-        "signals": (
-            "scheduler",
-            "scheduling",
-            "prefix cache",
-            "token budget",
-            "queue",
-            "side stream",
-        ),
-        "scope_prefixes": (
-            "vllm_omni/core/sched/",
-        ),
-    },
-)
+ROUTES_FILE = "_routes.yaml"
+_ROUTES_SCHEMA_VERSION = 1
+
+
+def _view(view: KnowledgeView | None = None) -> KnowledgeView:
+    return view if view is not None else KnowledgeView.current()
+
+
+def __getattr__(name: str):
+    # `_KNOWLEDGE` used to be an import-time constant. Kept as a lazy alias for
+    # existing importers; it now reflects the CURRENT view on every access.
+    if name == "_KNOWLEDGE":
+        return KnowledgeView.current().root
+    raise AttributeError(name)
+
+
+@lru_cache(maxsize=1)
+def _repo_aliases() -> dict[str, str]:
+    """casefolded full name / alias / adapter name -> knowledge repo name."""
+    aliases: dict[str, str] = {}
+    try:
+        adapters = AdapterRegistry(_ADAPTERS).all()
+    except AdapterError:
+        return aliases
+    for adapter in adapters:
+        name = _adapter_repo_name(adapter)
+        repo = adapter.manifest.get("repo") or {}
+        for value in (adapter.name, repo.get("full_name"), *(repo.get("aliases") or ())):
+            if value:
+                aliases[str(value).strip().casefold()] = name
+    return aliases
+
+
+def _adapter_repo_name(adapter: RepoAdapter) -> str:
+    repo_subdir = str(
+        (adapter.manifest.get("knowledge") or {}).get("repo_subdir") or "")
+    if repo_subdir.startswith("repos/"):
+        return repo_subdir.removeprefix("repos/").strip("/")
+    return adapter.name.replace("_", "-")
+
+
+def load_routes(repo: str, view: KnowledgeView | None = None) -> dict | None:
+    """Return a repository's validated `_routes.yaml`, or None when it has none."""
+    view = _view(view)
+    return _load_routes(view, _normalize_repo(repo))
+
+
+_REPO_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
+@lru_cache(maxsize=64)
+def _load_routes(view: KnowledgeView, repo: str) -> dict | None:
+    if not _REPO_NAME.fullmatch(repo):
+        return None
+    relative = f"repos/{repo}/{ROUTES_FILE}"
+    try:
+        text = view.read_text(relative)
+    except FileNotFoundError:
+        return None
+    data = yaml.safe_load(text)
+    return _validate_routes(data, relative, view)
+
+
+def _validate_routes(data: object, relative: str, view: KnowledgeView) -> dict:
+    if not isinstance(data, dict) or data.get("schema_version") != _ROUTES_SCHEMA_VERSION:
+        raise ValueError(f"{relative}: schema_version must be {_ROUTES_SCHEMA_VERSION}")
+    owners = data.get("owners") or []
+    if not isinstance(owners, list):
+        raise ValueError(f"{relative}: owners must be a list")
+    seen: set[str] = set()
+    normalized = []
+    for index, item in enumerate(owners):
+        if not isinstance(item, dict):
+            raise ValueError(f"{relative}: owners[{index}] must be a mapping")
+        owner = str(item.get("owner") or "").strip()
+        path = str(item.get("path") or "").strip()
+        signals = item.get("signals") or []
+        prefixes = item.get("scope_prefixes") or []
+        if not owner or owner in seen:
+            raise ValueError(f"{relative}: owners[{index}] needs a unique owner")
+        if not isinstance(signals, list) or not isinstance(prefixes, list):
+            raise ValueError(f"{relative}: owners[{index}] signals/scope_prefixes must be lists")
+        view.path(path)  # fail closed on a route to a missing page
+        seen.add(owner)
+        normalized.append({
+            "owner": owner,
+            "path": path,
+            "signals": tuple(str(value) for value in signals),
+            "scope_prefixes": tuple(str(value) for value in prefixes),
+        })
+    models = data.get("models") or None
+    if models is not None:
+        if not isinstance(models, dict) or not models.get("dir") or not models.get("page"):
+            raise ValueError(f"{relative}: models needs dir and page")
+        models = {"dir": str(models["dir"]).strip("/"), "page": str(models["page"])}
+    return {"owners": tuple(normalized), "models": models}
 
 
 _DIRECT_MANDATORY_REVIEW_GUIDES = (
@@ -229,17 +194,12 @@ _EVIDENCE_HEAD_SHA = re.compile(r"[0-9a-f]{7,40}")
 
 
 def _normalize_repo(repo: str) -> str:
-    selected = str(repo or "vllm-omni").strip()
-    alias = _REPO_ALIASES.get(selected.casefold())
+    selected = str(repo or "").strip()
+    if not selected:
+        raise ValueError("repo is required")
+    alias = _repo_aliases().get(selected.casefold())
     if alias:
         return alias
-    adapter = _adapter_for_repo(selected)
-    if adapter is not None:
-        repo_subdir = str(
-            (adapter.manifest.get("knowledge") or {}).get("repo_subdir") or "")
-        if repo_subdir.startswith("repos/"):
-            return repo_subdir.removeprefix("repos/").strip("/")
-        return adapter.name.replace("_", "-")
     return selected.replace("_", "-")
 
 
@@ -253,7 +213,9 @@ def _adapter_for_repo(repo: str) -> RepoAdapter | None:
 def _adapter_changed_file_routes(
     repo: str,
     changed_files: list[str],
+    view: KnowledgeView | None = None,
 ) -> tuple[list[dict[str, object]], list[str]]:
+    view = _view(view)
     selected_repo = _normalize_repo(repo)
     adapter = _adapter_for_repo(selected_repo)
     if adapter is None:
@@ -277,7 +239,7 @@ def _adapter_changed_file_routes(
             continue
         for hit in hits:
             doc = str(hit["doc"])
-            doc_path = _knowledge_path(doc)
+            doc_path = _knowledge_path(doc, view)
             quick_map, quick_map_status = _direct_quick_map(doc_path)
             routed.append({
                 "owner": str(hit["owner"]),
@@ -293,23 +255,15 @@ def _adapter_changed_file_routes(
     return routed, unmatched
 
 
-def _knowledge_path(relative_path: str) -> str:
-    path = (_KNOWLEDGE / relative_path).resolve()
-    try:
-        path.relative_to(_KNOWLEDGE.resolve())
-    except ValueError as exc:
-        raise ValueError(
-            f"knowledge route escapes the knowledge root: {relative_path}"
-        ) from exc
-    if not path.is_file():
-        raise FileNotFoundError(f"knowledge route is missing: {path}")
-    return str(path)
+def _knowledge_path(relative_path: str, view: KnowledgeView | None = None) -> str:
+    return str(_view(view).path(relative_path))
 
 
-def _direct_mandatory_review_guides() -> list[str]:
+def _direct_mandatory_review_guides(view: KnowledgeView | None = None) -> list[str]:
     """Return required cross-owner review procedures, failing closed if absent."""
+    view = _view(view)
     return [
-        _knowledge_path(relative_path)
+        _knowledge_path(relative_path, view)
         for relative_path in _DIRECT_MANDATORY_REVIEW_GUIDES
     ]
 
@@ -440,6 +394,7 @@ def _direct_knowledge_routes(
     title: str = "",
     body: str = "",
     changed_files: list[str] | None = None,
+    view: KnowledgeView | None = None,
 ) -> dict:
     """Select bounded Direct knowledge routes from PR intent.
 
@@ -456,6 +411,7 @@ def _direct_knowledge_routes(
     its reason. Handing the host nothing while holding the answer was the worse
     option: the owners were already computed and then discarded.
     """
+    view = _view(view)
     selected_repo = _normalize_repo(repo)
     changed_files = changed_files or []
     if not isinstance(changed_files, list) or any(
@@ -467,7 +423,8 @@ def _direct_knowledge_routes(
     # description-less PR on an unsupported repo fell through to the generic path —
     # and once that path started deriving routes from changed files, it would have
     # served this repo's owner knowledge for a repo we do not serve.
-    if selected_repo != "vllm-omni":
+    routes_table = _load_routes(view, selected_repo)
+    if routes_table is None or not routes_table["owners"]:
         # Adapter presence decides which non-default-repo case this is. Without the
         # gate, a repo we do not serve at all fell into the adapter path, whose
         # helper returns every changed file as "unmatched" when there is no
@@ -483,7 +440,7 @@ def _direct_knowledge_routes(
                 "scope_validation": [],
             }
         routes, unmatched = _adapter_changed_file_routes(
-            selected_repo, changed_files)
+            selected_repo, changed_files, view)
         if routes or unmatched:
             return {
                 "status": "ready" if routes else "description_unrouted",
@@ -508,25 +465,27 @@ def _direct_knowledge_routes(
             "scope_validation": [],
         }
 
+    owner_table = routes_table["owners"]
     intent = _route_text(f"{title}\n{body}")
 
     owner_routes: list[dict[str, object]] = []
     if intent:
-        for route in _DIRECT_OWNER_ROUTES:
+        for route in owner_table:
             matched = [
                 signal for signal in route["signals"]
                 if _signal_matches(intent, signal)
             ]
             if matched:
                 owner_routes.append(_direct_route(
-                    str(route["owner"]), _knowledge_path(str(route["path"])),
+                    str(route["owner"]), _knowledge_path(str(route["path"]), view),
                     f"title/body: {', '.join(matched[:3])}"))
 
     model_routes: list[dict[str, object]] = []
-    model_root = _KNOWLEDGE / "repos" / "vllm-omni" / "models"
-    if intent:
+    models = routes_table["models"]
+    if intent and models is not None:
+        model_root = view.root / models["dir"]
         for model_dir in sorted(model_root.iterdir(), key=lambda path: -len(path.name)):
-            rules = model_dir / "rules.md"
+            rules = model_dir / models["page"]
             if not rules.is_file():
                 continue
             model_name = _route_text(model_dir.name)
@@ -536,14 +495,15 @@ def _direct_knowledge_routes(
             compact_match = len(compact_name) >= 8 and compact_name in compact_intent
             if exact_match or compact_match:
                 model_routes.append(_direct_route(
-                    f"model:{model_dir.name}", str(rules.resolve()),
+                    f"model:{model_dir.name}",
+                    _knowledge_path(view.relative(rules), view),
                     f"title/body model: {model_dir.name}"))
 
     routes = (model_routes + owner_routes)[:3]
 
     scope_hits: dict[str, list[str]] = {}
     scope_validation = []
-    for route in _DIRECT_OWNER_ROUTES:
+    for route in owner_table:
         hits = sorted({
             path for path in changed_files
             if any(
@@ -578,9 +538,9 @@ def _direct_knowledge_routes(
     surviving = {str(item["owner"]) for item in routes}
     fallback_used = False
     if scope_hits and not (surviving & set(scope_hits)):
-        by_owner = {str(r["owner"]): r for r in _DIRECT_OWNER_ROUTES}
+        by_owner = {str(r["owner"]): r for r in owner_table}
         # most changed files first, then owner name — the choice reflects evidence
-        # rather than the declaration order of _DIRECT_OWNER_ROUTES
+        # rather than the declaration order of the owner table
         candidates = sorted(scope_hits, key=lambda o: (-len(scope_hits[o]), o))
         for owner in candidates:
             if len(routes) >= 3:
@@ -589,7 +549,7 @@ def _direct_knowledge_routes(
                 routes.pop()  # displace the weakest description route, cap stays 3
             spec = by_owner[owner]
             routes.append(_direct_route(
-                owner, _knowledge_path(str(spec["path"])),
+                owner, _knowledge_path(str(spec["path"]), view),
                 f"changed files: {', '.join(scope_hits[owner][:3])}"))
             fallback_used = True
 
@@ -622,6 +582,7 @@ def direct_review_plan(
     title: str = "",
     body: str = "",
     changed_files: list[str] | None = None,
+    view: KnowledgeView | None = None,
 ) -> dict:
     """Return the complete Direct policy bundle for one frozen review.
 
@@ -630,6 +591,7 @@ def direct_review_plan(
     from reconstructing a smaller, divergent protocol out of routing helpers.
     """
     started = time.perf_counter()
+    view = _view(view)
     changed_files = list(changed_files or [])
     route_started = time.perf_counter()
     routing = _direct_knowledge_routes(
@@ -637,6 +599,7 @@ def direct_review_plan(
         title=title,
         body=body,
         changed_files=changed_files,
+        view=view,
     )
     route_ms = int((time.perf_counter() - route_started) * 1000)
     knowledge_routes = list(routing.get("routes") or [])
@@ -645,7 +608,7 @@ def direct_review_plan(
         for route in knowledge_routes
         if route.get("quick_map_status") != "ok"
     ]
-    mandatory_review_guides = _direct_mandatory_review_guides()
+    mandatory_review_guides = _direct_mandatory_review_guides(view)
     budget_started = time.perf_counter()
     execution_budget = _direct_execution_budget(
         changed_files,
@@ -659,7 +622,7 @@ def direct_review_plan(
         "knowledge_entry": (
             knowledge_routes[0]["path"]
             if knowledge_routes
-            else _knowledge_path("AGENTS.md")
+            else _knowledge_path("AGENTS.md", view)
         ),
         "knowledge_routes": knowledge_routes,
         "mandatory_review_guides": mandatory_review_guides,
@@ -679,7 +642,7 @@ def direct_review_plan(
             ),
             "max_routes": 3,
             "stop_after_routes": True,
-            "fallback_entry": _knowledge_path("AGENTS.md"),
+            "fallback_entry": _knowledge_path("AGENTS.md", view),
         },
         "execution_budget": execution_budget,
         "first_review_checklist": list(DIRECT_REVIEW_CHECKLIST),
@@ -721,6 +684,7 @@ def direct_review_plan(
             "if_missing": "partial_review",
         },
         "diagnostics": {
+            "knowledge_snapshot": view.snapshot,
             "timing_ms": {
                 "routing": route_ms,
                 "execution_budget": budget_ms,

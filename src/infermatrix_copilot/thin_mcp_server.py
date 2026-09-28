@@ -14,9 +14,6 @@ from .config import Settings
 # module's own call sites unchanged and delegate DOWN — nothing imports back up
 # into a server module.
 from .direct_routing import (  # noqa: F401 — aliases kept for existing importers
-    _DIRECT_OWNER_ROUTES,
-    _KNOWLEDGE,
-    _REPO_ALIASES,
     _ROOT,
     _adapter_changed_file_routes,
     _adapter_for_repo,
@@ -30,6 +27,7 @@ from .direct_routing import (  # noqa: F401 — aliases kept for existing import
     _normalize_repo,
     direct_review_plan,
 )
+from .knowledge_view import KnowledgeView
 from .intent import resolve_repo_alias
 from .knowledge_docs import KnowledgeDocs, KnowledgeDocsError
 from .mcp_policy import PolicyError
@@ -40,21 +38,30 @@ _PR_URL = re.compile(
     re.IGNORECASE,
 )
 _PR_NUMBER = re.compile(r"^(?:pr\s*#?\s*)?(\d+)$", re.IGNORECASE)
+def __getattr__(name: str):
+    # formerly an import-time constant; now the knowledge root of the current view
+    if name == "_KNOWLEDGE":
+        return KnowledgeView.current().root
+    raise AttributeError(name)
+
+
 def _supported_repos() -> list[str]:
-    if not (_KNOWLEDGE / "repos").is_dir():
+    knowledge = KnowledgeView.current().root
+    if not (knowledge / "repos").is_dir():
         return []
     return sorted(
-        path.name for path in (_KNOWLEDGE / "repos").iterdir()
+        path.name for path in (knowledge / "repos").iterdir()
         if path.is_dir() and (path / "_index.md").is_file()
     )
 
 
 def _docs(repo: str) -> KnowledgeDocs:
     repo = _normalize_repo(repo)
-    repo_dir = _KNOWLEDGE / "repos" / repo
+    view = KnowledgeView.current()
+    repo_dir = view.root / "repos" / repo
     if not repo_dir.is_dir():
         raise KnowledgeDocsError(f"unsupported knowledge repo: {repo}")
-    return KnowledgeDocs(_KNOWLEDGE, f"repos/{repo}")
+    return KnowledgeDocs(view.root, f"repos/{repo}", verify=view.path)
 
 
 def _guard(fn):
@@ -66,7 +73,7 @@ def _guard(fn):
 
 
 def _knowledge_entry(name: str) -> str:
-    path = (_KNOWLEDGE / name).resolve()
+    path = (KnowledgeView.current().root / name).resolve()
     if not path.is_file():
         raise FileNotFoundError(f"knowledge entry is missing: {path}")
     return str(path)
@@ -84,7 +91,7 @@ def _contributing_entry() -> str:
     tree, so an installed wheel still answers the tool.
     """
     for candidate in (_ROOT / "doc" / "knowledge" / "CONTRIBUTING.md",
-                      _KNOWLEDGE.parent / "doc" / "knowledge" / "CONTRIBUTING.md"):
+                      KnowledgeView.current().root.parent / "doc" / "knowledge" / "CONTRIBUTING.md"):
         if candidate.is_file():
             return str(candidate.resolve())
     raise FileNotFoundError(

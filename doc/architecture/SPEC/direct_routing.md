@@ -1,15 +1,14 @@
 # direct_routing.py —— 规范
 
-<!-- verified-against: 2026-09-10 -->
+<!-- verified-against: 2026-09-28 -->
 
-`LOC ~917 · Direct 模式完整策略包与知识路由 · refactor-status: known-debt`
+`LOC ~880 · Direct 模式完整策略包与仓库中立的知识路由 · refactor-status: stable`
 
 ## 职责
-Direct 模式的知识路由：owner/model 路由表和选路机制。从
-`thin_mcp_server.py` **逐字迁出**（下游曾经 `importlib` 拿它的私有名），
-公开面由 `contract.py` 再导出。它显式携带仓库专属知识 —— 这正是
-`contract.py` 必须保持中立而这里不必的原因；把表外置到
-`adapters/<repo>/` 是**未被这次搬迁改变的既有欠账**。
+Direct 模式的知识路由**机制**。模块中不出现任何被服务仓库的名字：每个仓库的
+owner/model 路由表是知识数据 `knowledge/repos/<repo>/_routes.yaml`，仓库别名
+来自 `adapters/<repo>/manifest.yaml` 的 `repo.full_name`/`repo.aliases`。
+公开面由 `contract.py` 再导出。
 
 ## 公开契约
 经 `contract.py` 再导出的五个名字：`direct_review_plan`（完整、一次性的
@@ -29,9 +28,15 @@ Direct policy bundle）、`direct_knowledge_routes`、
   又不许看"不是）。
 - adapter-backed changed-file 路由同样拆开 `(quick_map, status)`，绝不把 tuple
   当成文本跨边界，也绝不把 unavailable 误报成无需读取。
-- knowledge/adapters 根由 `sdk._resources` 的 `importlib.resources` 解析，editable
-  source 与安装 wheel 走同一标记校验；仓库路径只留在本模块内部的旧版 dict，
-  `sdk.v1.DirectClient` 对外转换为 document ID。
+- **每请求一个 `KnowledgeView`**：入口函数在开始时解析一次视图（未设置
+  `KNOWLEDGE_ROOT` 时为打包知识；设置时为激活快照的真实目录并按清单校验），
+  本请求内所有读取经同一视图。模块不再在导入期缓存知识根；`_KNOWLEDGE` 只保留
+  为模块级 `__getattr__` 惰性别名。
+- **路由选择按数据而非仓库名**：仓库有非空 `_routes.yaml` → title/body owner
+  路由 + 模型路由 + scope fallback；否则有 adapter → changed-file 路由；否则
+  `unsupported_exact_router`。`_routes.yaml` 引用的页面不存在时 fail-closed。
+- `repo` 必填：空值抛 `ValueError`，不再默认某个仓库；形似路径的仓库名直接
+  视为不支持。
 - **changed files 校验选择、绝不静默替换选择**：title/body 选 owner，
   diff 只报告支持或矛盾；scope-fallback 是最后手段且永远显式
   （`status="scope_fallback"`）。
@@ -46,23 +51,26 @@ Direct policy bundle）、`direct_knowledge_routes`、
   （`test_contract.py::test_direct_routing_does_not_import_a_server_module`）。
 
 ## 边界 —— 不属于这里
-不执行、不调模型；只有路由表 + 机制。多 adapter 桥接经
+不执行、不调模型；只有机制，路由表在知识数据里。多 adapter 桥接经
 `_normalize_repo`/`_adapter_for_repo` 走 `adapters/`。
 
 ## 依赖（允许）
-stdlib + `.adapters`（AdapterError / AdapterRegistry / RepoAdapter）+
-`.sdk._resources`。
+stdlib + PyYAML + `.adapters`（AdapterError / AdapterRegistry / RepoAdapter）+
+`.knowledge_view` + `.sdk._resources`。
 位于 `contract.py` 和 `thin_mcp_server.py` 之下。
 
 ## 扩展点
-新 owner 路由/模型规则 → 表数据；跨仓库通用化 → 外置进
-`adapters/<repo>/routing`（既有欠账的正解，不是在这里再长表）。
+新 owner 路由/模型规则 → 改对应仓库的 `_routes.yaml`（schema_version 1：
+`owners[{owner, path, signals, scope_prefixes}]`、可选 `models{dir, page}`）；
+新仓库 → 提供 adapter 与 `_routes.yaml`，不改 `src/`。
 
 ## 测试
-`test_contract.py`（公开家、import 方向、中立性豁免）；
+`test_knowledge_view_routing.py`（150 个真实 vllm-omni PR 的黄金路由输出、
+第二仓库经自身 `_routes.yaml` 路由、快照切换下一请求生效、快照篡改 fail-closed、
+SDK 完成校验钉住计划时快照、模块源码不含仓库名）；`test_contract.py`（公开家、import 方向、中立性豁免）；
 `test_thin_mcp_server.py` / `test_thin_mcp.py`（经新家继续锻炼全部
 下划线函数：路由、预算、完成门）。
 
 ## 重构备注
-768 行里约 500 行是表数据。`known-debt` 指的就是表：机制是稳定的，
-表的归宿在 adapter 数据面（见结构重组计划 Stage 8 的 routing.yaml 方案）。
+原 `_DIRECT_OWNER_ROUTES`/`_REPO_ALIASES` 已外置（`known-debt` 清零），
+`test_v2_p0.py` 与 `test_repo_vocabulary.py` 中本模块的泄漏上限随之移除。

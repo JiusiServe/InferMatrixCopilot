@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-09-28 -->
 
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
@@ -118,3 +118,6 @@ knowledge checkout，不改仓库真实 `knowledge/`。
 ## Carried finding rechecks
 
 Direct 1.1 / Strict 1.3 accept typed `CarriedFinding` inputs (unique IDs, source head, severity, location, title and evidence). Direct binds the carried set into its issued context and validates `FindingRecheck` answers. Strict passes the set through the policy allowlist, performs a read-only recheck against the frozen PR head, and persists answers for the public structured result. Every carried ID needs an explicit outcome: `fixed`, `still_affected`, or `unverified`. Missing evidence is never a fix.
+
+## 2026-09-28 知识视图
+`DirectClient` 每次 `plan` 解析一个 `KnowledgeView`，文档引用与 `resource_revision` 均取自该视图；`validate` 按计划时钉住的知识根校验资源未变，激活新快照不会使进行中的 review 失效；`diagnostics.knowledge_snapshot` 报告所用快照。`read_document(..., review_context_id=...)` 从该 review 计划时钉住的知识树读取（含分页），未签发的 context id 被拒绝；不带 context id 时读当前激活树。

@@ -788,13 +788,20 @@ def test_every_routed_page_yields_a_quick_map():
     server the way a second copy of the heading regex would."""
     from pathlib import Path
 
-    from infermatrix_copilot.thin_mcp_server import (
-        _DIRECT_OWNER_ROUTES, _KNOWLEDGE, _direct_quick_map, _knowledge_path,
-    )
+    from infermatrix_copilot.direct_routing import load_routes
+    from infermatrix_copilot.knowledge_view import KnowledgeView
+    from infermatrix_copilot.thin_mcp_server import _direct_quick_map, _knowledge_path
 
-    pages = [_knowledge_path(str(r["path"])) for r in _DIRECT_OWNER_ROUTES]
-    pages += [str(p) for p in
-              sorted((_KNOWLEDGE / "repos" / "vllm-omni" / "models").glob("*/rules.md"))]
+    root = KnowledgeView.current().root
+    pages = []
+    for repo_dir in sorted((root / "repos").iterdir()):
+        table = load_routes(repo_dir.name) if repo_dir.is_dir() else None
+        if not table:
+            continue
+        pages += [_knowledge_path(str(r["path"])) for r in table["owners"]]
+        if table["models"]:
+            pages += [str(p) for p in sorted(
+                (root / table["models"]["dir"]).glob(f"*/{table['models']['page']}"))]
     assert pages, "no routed pages found — the enumeration itself is broken"
 
     # Pages whose Direct section exceeds the 3500-char cap. They still behave
