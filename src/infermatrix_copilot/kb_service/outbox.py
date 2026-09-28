@@ -37,13 +37,14 @@ from ..knowledge_service.signing import canonical_json, sign, verify
 
 ITEM_KINDS = (
     "open_pr", "open_companion_pr", "post_verdict", "enqueue",
-    "update_branch", "pause", "close",
+    "update_branch", "pause", "close", "open_issue",
 )
 ALWAYS_EXECUTABLE = frozenset({"pause", "close"})
 ITEM_TTL = {
     "open_pr": 24 * 3600, "open_companion_pr": 24 * 3600,
     "post_verdict": 30 * 60, "enqueue": 30 * 60,
     "update_branch": 24 * 3600, "pause": 24 * 3600, "close": 24 * 3600,
+    "open_issue": 7 * 24 * 3600,
 }
 CONTROL_MAX_AGE = 10 * 60
 HOLDS_MAX_AGE = 10 * 60

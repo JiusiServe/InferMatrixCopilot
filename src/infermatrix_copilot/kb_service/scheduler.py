@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from . import merge
 from .activate import ActivationError, activate, activation_lock
 from .audit import audit_main
+from .report import flush_reports
 from .external import poll_external
 from .runtime import collect_events, publish, run_intake
 from .sweep import UpstreamRepo, detect_release, run_sweep
@@ -130,8 +131,11 @@ class Scheduler:
                 report = run_sweep(rt, lifecycle, rt.lease_owner, sweep, upstream)
                 for changeset_id in report["changesets"]:
                     publish(rt, lifecycle, changeset_id)
+
                 self._record(lifecycle.repo, "sweep", tag=sweep["tag"], reason=sweep["reason"],
                              changesets=report["changesets"], breaker=report["breaker"])
+        for run_id in flush_reports(rt, lifecycle):  # queued by settled sweeps; retried until done
+            self._record(lifecycle.repo, "sweep_report", run_id=run_id)
 
     def _overturn_breaker(self, lifecycle) -> None:
         rt = self.rt
