@@ -92,6 +92,17 @@ class KnowledgeRepo:
         except SourceError:
             return None
 
+    def export(self, rev: str, dest: str | Path) -> Path:
+        """Materialize the tree at ``rev`` under ``dest`` (no checkout involved)."""
+        import io
+        import tarfile
+
+        dest = Path(dest)
+        dest.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(fileobj=io.BytesIO(self._git("archive", "--format=tar", rev))) as tar:
+            tar.extractall(dest, filter="data")
+        return dest
+
     def raw_manifest(self, old: str, new: str) -> list[dict]:
         """Every changed path as a kb-gate manifest entry (renames are D + A),
         the exact form the verifier recomputes."""

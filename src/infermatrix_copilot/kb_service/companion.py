@@ -87,10 +87,16 @@ def publish_companion(rt, lifecycle, companion_id: str) -> str:
     issue_once(rt, lifecycle.repo, changeset, "open_companion_pr", {
         "changeset_id": companion_id, "base_sha": data["base_sha"],
         "branch": f"kb/{lifecycle.repo}/{companion_id}", "files": data["files"], "deleted": [],
-        "title": f"knowledge({lifecycle.repo}): update references for {changeset['detail']['for_changeset']}",
-        "body": ("Companion to a knowledge change that retires or replaces rules cited here "
-                 f"(`{changeset['detail']['for_changeset']}`). Drafted by the Copilot knowledge service; "
-                 "review, mark ready and merge it by hand. The knowledge change is rebuilt once this merges."),
+        "title": (f"knowledge({lifecycle.repo}): update references for {changeset['detail']['for_changeset']}"
+                  if changeset["detail"].get("for_changeset")
+                  else f"adapter({lifecycle.repo}): update the release baseline "
+                       f"({changeset['detail'].get('baseline_for', '')})"),
+        "body": (("Companion to a knowledge change that retires or replaces rules cited here "
+                  f"(`{changeset['detail']['for_changeset']}`). The knowledge change is rebuilt once this merges.")
+                 if changeset["detail"].get("for_changeset")
+                 else "The committed adapter baseline lags the audited upstream release (reconciliation "
+                      "findings of the release audit); this updates its upstream pin and inventories.")
+                + " Drafted by the Copilot knowledge service; review, mark ready and merge it by hand.",
     })
     rt.ledger.update_changeset(companion_id, status="pr_requested")
     return "pr_requested"

@@ -745,7 +745,7 @@ def audit_for_knowledge(
 ) -> dict[str, Any]:
     """Knowledge-service plugin entry (repo-neutral ``ReleaseAuditor`` contract):
     generated-baseline audit using this adapter's baseline and manifest."""
-    return audit_release(
+    data = audit_release(
         upstream_repo=upstream_repo,
         from_ref=from_ref,
         to_ref=to_ref,
@@ -755,6 +755,8 @@ def audit_for_knowledge(
         project_root=project_root,
         baseline_source="generated",
     ).data
+    # which adapter file the baseline companion PR updates (relative to this adapter)
+    return {**data, "baseline_file": "release_baseline.yaml"}
 
 
 def render_summary(report: ReleaseAuditReport) -> str:
