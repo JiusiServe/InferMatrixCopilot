@@ -38,6 +38,20 @@ python tools/audit_vllm_omni_release.py `
   --json-output $env:TEMP\vllm-omni-release-audit.json
 ```
 
+实现位于 adapter 插件 `adapters/vllm_omni/release_audit.py`（随 wheel 打包，知识服务经
+`knowledge_service.release_audit` 加载），`tools/vllm_omni_release_audit.py` 只是转发入口。
+
+两种基线来源：
+
+- `--baseline-source committed`（默认）：对照已提交的 `release_baseline.yaml`，全部问题
+  均强制（下文的发版流程用这一种）。
+- `--baseline-source generated`：为 `--from/--to` 这对 SHA 在内存中生成基线，只强制
+  **知识文档本身**的问题（`stale_knowledge_source`、`knowledge_metadata_error`、
+  `owner_document_missing`）；基线 pin/inventory、未路由路径、过期 source map 与文档 pin
+  等 adapter 维护项放入 `reconciliation` 报告，不阻塞。知识服务的巡检与知识 PR 的门禁使用
+  这一种，因此知识变更不必等待 adapter 基线 PR 合并；`reconciliation` 就是该基线 PR 要
+  修的清单。
+
 审计覆盖：
 
 - AR、Diffusion 和 pipeline registry；

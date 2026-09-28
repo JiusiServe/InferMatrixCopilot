@@ -11,6 +11,7 @@ on:
       - knowledge/repos/vllm-omni/**
       - tools/audit_vllm_omni_release.py
       - tools/vllm_omni_release_audit.py
+      - adapters/vllm_omni/release_audit.py
   schedule:
     - cron: "23 3 * * 1"
   workflow_dispatch:
