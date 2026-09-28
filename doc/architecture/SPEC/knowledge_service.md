@@ -25,3 +25,8 @@ Knowledge Ops API 2.0 sits beside the v1 curator and does not change it:
 deterministic half of the quality gate (`check_tree`, `check_changeset`). The
 three modules need only the standard library and PyYAML and import nothing else
 from the package, so the kb-gate verifier bundle can vendor them.
+
+`release_audit` loads a repository's release-audit plugin from its adapter
+directory and runs it with a baseline generated for the audited SHA pair:
+knowledge-document issues are enforced, adapter-baseline maintenance is
+reported as reconciliation.
