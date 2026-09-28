@@ -7,6 +7,9 @@
     kb control                        refresh the signed control record and hold list now
     kb run --playbook kb-intake --repo R   run one knowledge playbook once
     kb calibrate --repo R             run the judge over the repository's calibration set
+    kb serve [--once]                 the scheduler (holds the single-writer lease)
+    kb activate                       activate the knowledge snapshot of the repository's main now
+    kb rollback --to SHA              point `active` back at an earlier snapshot
 
 Pause/resume bump the repository's generation, so every outbox item issued
 before it is void; they then re-sign the control record and hold list at once.
@@ -97,6 +100,11 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--repo", required=True)
     calibrate = sub.add_parser("calibrate")
     calibrate.add_argument("--repo", required=True)
+    serve = sub.add_parser("serve")
+    serve.add_argument("--once", action="store_true")
+    sub.add_parser("activate")
+    rollback = sub.add_parser("rollback")
+    rollback.add_argument("--to", required=True)
     args = parser.parse_args(argv)
 
     if args.command == "keygen":
@@ -139,9 +147,24 @@ def main(argv: list[str] | None = None) -> int:
                 generation = _outbox(state_dir, ledger).transition(
                     lambda: ledger.bump_generation(repo, pause=True, reason=args.reason),
                     public_repos=_public(registry))
+                # the pause itself: dequeue + draft every open knowledge PR
+                from . import merge
+
+                outbox = _outbox(state_dir, ledger)
+                paused_repos = list(registry) if repo == "*" else [repo]
+                issued = sum(merge.pause_open_prs(ledger, outbox, r, args.reason) for r in paused_repos)
+                print(f"pause items issued for {issued} open knowledge PR(s)")
             else:
-                generation = _outbox(state_dir, ledger).transition(
-                    lambda: ledger.resume(repo), public_repos=_public(registry))
+                from . import merge
+
+                def _resume():
+                    generation = ledger.resume(repo)
+                    for name in (list(registry) if repo == "*" else [repo]):
+                        merge.resume_paused_prs(ledger, name)
+                    return generation
+
+                # paused PRs leave the hold list in the same published transition
+                generation = _outbox(state_dir, ledger).transition(_resume, public_repos=_public(registry))
             print(f"{args.command}d {repo}: generation {generation}")
             return 0
         if args.command == "control":
@@ -154,6 +177,23 @@ def main(argv: list[str] | None = None) -> int:
             outcome, run_dir = run_playbook(Settings(), args.playbook, args.repo, state_dir=state_dir)
             print(f"{args.playbook} {args.repo}: {outcome.status} ({run_dir})")
             return 0 if outcome.status == "done" else 1
+        if args.command in {"serve", "activate", "rollback"}:
+            from ..config import Settings
+            from .runtime import KbRuntime
+
+            rt = KbRuntime.from_env(Settings(), state_dir=state_dir)
+            if args.command == "serve":
+                from .scheduler import Scheduler
+
+                Scheduler(rt).serve(once=args.once)
+                return 0
+            from .activate import activate, rollback
+
+            if args.command == "activate":
+                print(activate(rt, rt.knowledge.fetch()))
+            else:
+                print(rollback(rt, args.to))
+            return 0
         if args.command == "calibrate":
             from ..config import Settings
             from .calibration import run_calibration

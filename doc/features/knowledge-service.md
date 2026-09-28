@@ -3,7 +3,7 @@
 > **一览**
 > | | |
 > |---|---|
-> | **状态** | 🚧 分阶段落地。已合并：Direct 路由多仓库化与按请求知识视图（#203）、Knowledge Ops API 2.0 与 L1（#204）、generated-baseline 发版审计（#205）、服务核心（#206）；本 PR 加入 intake、质量门与校准；本页随后续 PR 更新 |
+> | **状态** | 🚧 分阶段落地。已合并：Direct 路由多仓库化与按请求知识视图（#203）、Knowledge Ops API 2.0 与 L1（#204）、generated-baseline 发版审计（#205）、服务核心（#206）、intake 与质量门（#207）；本 PR 加入合并流程、快照激活、发版巡检与调度器；本页随后续 PR 更新 |
 > | **做什么** | 知识的创建、维护、退役、删除与发版巡检全部在 Copilot；每次变更经质量门，通过即经合并队列自动合并；ReviewBot 只读消费 |
 > | **怎么开关** | 每个仓库在 `adapters/<repo>/manifest.yaml` 的 `knowledge_lifecycle`（人工审阅的高风险段）中设置 `enabled` 与 `mode: shadow\|auto_merge` |
 > | **设计** | 经 GPT-6 sol 评审批准的设计文档（知识库管理重构设计，多仓库，v7） |
@@ -49,4 +49,18 @@ infermatrix-copilot kb calibrate --repo vllm-omni                  # 评审模�
 
 模型：`KB_GENERATOR`（默认 `claude-code:claude-opus-5-5`）、`KB_JUDGE`（默认
 `codex:gpt-6-sol:medium`）。每次模型调用写入 `$KB_STATE_DIR/traces/model_calls.jsonl`。
+
+## 调度、合并、激活与巡检
+
+```bash
+infermatrix-copilot kb serve                 # 常驻调度器（systemd），持有单写入租约
+infermatrix-copilot kb activate              # 立即激活知识仓库 main 的快照
+infermatrix-copilot kb rollback --to <sha>   # 回指到较早的快照（下一请求生效）
+```
+
+合并流程：`open_pr` 回执 → 为该 PR 的精确 head 签发判定并发布评论 → PR 阶段 `kb-gate`
+通过后入合并队列（每仓库至多 1 个）→ 合并后激活新快照。发版巡检在上游新 release 后运行
+T1/T2/T3 与 purge，每个规则页一个变更集，全部经过质量门。
+
+评审服务读取知识：将 `KNOWLEDGE_ROOT` 指向 `$KB_STATE_DIR/active`。
 

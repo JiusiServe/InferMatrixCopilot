@@ -337,7 +337,8 @@ def _classify_page(path: str, base_text: str | None, head_text: str | None,
 
 
 def _index_mechanical(path: str, base_text: str | None, head_text: str | None,
-                      new_pages: set[str], issues: list[Issue], blocks: list[Block]) -> None:
+                      new_pages: set[str], issues: list[Issue], blocks: list[Block],
+                      head: Mapping[str, str] | None = None) -> None:
     if base_text is None or head_text is None:
         issues.append(Issue("index_added_or_deleted", path, "index files are never created or deleted by a change set"))
         return
@@ -345,6 +346,13 @@ def _index_mechanical(path: str, base_text: str | None, head_text: str | None,
     expected_new = sorted(PurePosixPath(p).name for p in new_pages
                           if str(PurePosixPath(p).parent) == directory
                           and p.endswith(".md") and PurePosixPath(p).name != INDEX_NAME)
+    # pages already in the directory but missing from the old index may be
+    # linked too (the release sweep's T1 repair); new pages MUST be
+    allowed = set(expected_new) | {
+        PurePosixPath(p).name for p in (head or {})
+        if str(PurePosixPath(p).parent) == directory and p.endswith(".md")
+        and PurePosixPath(p).name != INDEX_NAME and f"]({PurePosixPath(p).name})" not in base_text
+    }
     for name in expected_new:  # required whatever else the index change does
         if f"]({name})" not in head_text:
             issues.append(Issue("index_missing", path, f"new page {name} is not linked"))
@@ -359,8 +367,9 @@ def _index_mechanical(path: str, base_text: str | None, head_text: str | None,
             blocks.append(Block("prose", path, "", "prose", _sha(head_text)))
             return
         files.append(match.group("file"))
-    if sorted(files) != expected_new:
-        issues.append(Issue("index_mismatch", path, f"expected index lines for {expected_new}, got {files}"))
+    if not set(expected_new) <= set(files) or not set(files) <= allowed or len(files) != len(set(files)):
+        issues.append(Issue("index_mismatch", path,
+                            f"index lines must cover new pages {expected_new} and only link unlisted pages; got {files}"))
 
 
 def check_changeset(
@@ -402,7 +411,7 @@ def check_changeset(
     for path in sorted(knowledge_paths):
         name = PurePosixPath(path).name
         if name == INDEX_NAME:
-            _index_mechanical(path, base.get(path), head.get(path), new_pages, issues, blocks)
+            _index_mechanical(path, base.get(path), head.get(path), new_pages, issues, blocks, head)
         elif name == TOMBSTONES_NAME:
             tombstone_paths.append(path)
         elif name == ROUTES_NAME:

@@ -54,3 +54,6 @@ success, steps[]`。
 
 ## kb-intake（candidate）
 知识服务按仓库运行：`knowledge.collect_events` → `knowledge.intake` → `knowledge.publish`。candidate 状态，planner 不可见，由知识服务调度。
+
+## kb-merge / kb-sweep / kb-activate（candidate）
+知识服务的合并推进、发版巡检与快照激活；candidate 状态，由 `kb serve` 调度或 `kb run` 手动运行。

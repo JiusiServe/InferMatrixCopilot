@@ -41,3 +41,23 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 - `runtime`：collect → intake → gate → publish；shadow 只记录；变更集文件存 `changesets/<id>.json`。
 - `calibration`：按仓库的校准集评分（坏样例须全部拦下、好样例误拒 ≤ 20%）。
 - `runner`：经标准 executor 运行 `kb-*` playbook。CLI 新增 `kb run`、`kb calibrate`。
+
+## 2026-09-28 合并流程、激活、巡检与调度
+- `merge`：publisher 回执推进状态（pr_requested → pr_open → verdict_posted → queued → merged）；
+  对 PR 的精确 head 签发 kb-gate 判定（清单、逐块、一致性）并经 outbox `post_verdict` 发布；
+  PR 阶段 `kb-gate` 成功后才发 `enqueue`，每仓库同时至多 1 个排队；head 变化 → human；
+  关闭未合并 → closed；合并后记录退役以便下个发版 purge。`pause_open_prs` 发出出队 + 转 draft 项。
+- `activate`：每个 main SHA 生成不可变快照（`snapshots/<sha>/knowledge` + MANIFEST），
+  加载校验、树级检查、各仓库 `_routes.yaml` 可加载后原子切换 `active`；支持回滚；保留最近 10 个及当前激活。
+- `sweep`：发版触发（首次只记录基线）/ 兜底周期；T1 结构报告（唯一自动修复是补索引链接）；
+  T2/T3 按规则页让生成器对照发版 diff 逐条给出 keep/edit/replace/retire；purge；全局熔断强制 human。
+- `scheduler`（`kb serve`）：终身持有租约；每 tick 重签控制记录与暂停清单、处理回执、按仓库
+  advance/intake/sweep（仓库间隔离）、main 变化即激活；24 小时内 2 个知识 PR 被人关闭 → 暂停该仓库并出队。
+- CLI：`kb serve [--once]`、`kb activate`、`kb rollback --to SHA`；`kb pause` 同时为已开 PR 发暂停项。
+- 每个变更集记录其待回执的 outbox 项（`pending_item`）：未过期时不重复签发；回执只作用于与之匹配的项和
+  对应的前置状态，迟到的重复项回执不改变状态。
+- 回滚后写入 `rollback_pin`：调度器不会重新激活被回滚的那个 main，只有更新的 main 才会激活。
+- 巡检按页记录进度（`sweep_progress`）：页面评估失败与“保持”区分，失败页在下次重试，3 次后交给人；
+  所有页面落定后基线才推进；兜底巡检只做 T1 与 purge。
+- 熔断暂停与状态变化在同一加锁事务中发布控制记录与暂停清单。
+

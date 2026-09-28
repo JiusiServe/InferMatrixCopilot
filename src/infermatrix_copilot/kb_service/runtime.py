@@ -38,6 +38,8 @@ class KbRuntime:
     github: GitHubReader
     outbox: object | None = None
     clock: Callable[[], float] = time.time
+    lease_owner: str | None = None  # set by `kb serve`, which holds the lease for its lifetime
+    publisher_public_key: object | None = None
     release_label: Callable[[str], str] = field(default=lambda repo: "")
 
     @classmethod
@@ -59,7 +61,13 @@ class KbRuntime:
             from .outbox import Outbox
 
             outbox = Outbox(state_dir, load_private_key(os.environ["KB_SIGNING_KEY"]), ledger, clock=time.time)
+        publisher_key = None
+        if os.environ.get("KB_PUBLISHER_PUBKEY"):
+            from ..knowledge_service.signing import load_public_key
+
+            publisher_key = load_public_key(Path(os.environ["KB_PUBLISHER_PUBKEY"]).read_text(encoding="utf-8"))
         return cls(
+            publisher_public_key=publisher_key,
             state_dir=state_dir, ledger=ledger, registry=registry,
             gateway=ModelGateway(settings, recorder=_trace_recorder(state_dir)),
             generator=generator, judge=judge,
@@ -138,6 +146,8 @@ def run_intake(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: int = 10)
     from .ledger import LeaseError
 
     try:
+        if rt.lease_owner:
+            return _run_intake_locked(rt, lifecycle, max_events=max_events, owner=rt.lease_owner)
         with rt.ledger.lease() as owner:
             return _run_intake_locked(rt, lifecycle, max_events=max_events, owner=owner)
     except LeaseError:
@@ -188,30 +198,46 @@ def _run_intake_locked(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: i
             (event_id, "rejected", f"writes outside {lifecycle.knowledge_dir}: {outside}")
             for event_id in kept_ids])
         return None
-    head = {**base, **result.files}
     evidence = [e["payload"] for e in events if e["id"] in kept_ids]
+    return gate_and_stage(rt, lifecycle, owner, kind="intake", base=base, base_sha=base_sha,
+                          external=external, operations=operations, result=result,
+                          evidence=evidence, event_ids=sorted(kept_ids), release=release)
+
+
+def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind: str, base: dict,
+                   base_sha: str, external: dict, operations, result, evidence: list[dict],
+                   event_ids: list[int], release: str, force_human: str = "",
+                   hold: bool = False) -> str:
+    """Run the quality gate on one change set and stage it (files first, then
+    every ledger write in one transaction fenced on the lease). Used by intake,
+    sweep and purge. ``force_human`` routes a passing change set to people
+    (e.g. a sweep-wide circuit breaker)."""
+    head = {**base, **result.files}
     rt.ledger.heartbeat(owner)
     decision = run_gate(
         base=base, head=head, changes=changes_between(base, head), external_texts=external,
         evidence=evidence, gateway=rt.gateway, judge=rt.judge, release=release,
         repo_dir=lifecycle.knowledge_dir, protected_rules=lifecycle.protected_rules,
         retire_ratio=lifecycle.retire_ratio, max_files=lifecycle.max_files)
-    status = {"pass": "gated", "fail": "failed", "human": "human"}[decision.status]
+    if force_human and decision.status == "pass":
+        decision.status = "human"
+        decision.reasons.append(force_human)
+    # a held change set (release sweep) is released only once the whole sweep
+    # is settled and its aggregate circuit breaker has been evaluated
+    status = {"pass": "sweep_held" if hold else "gated", "fail": "failed", "human": "human"}[decision.status]
     verdicts = [{"layer": "L2", "verdict": b.verdict, "block_id": b.block.block_id,
                  "model": b.model, "detail": b.to_dict()} for b in decision.blocks]
     verdicts.append({"layer": "gate", "verdict": decision.status, "detail": {"reasons": decision.reasons}})
-    # files first (a crash leaves an orphan file, never a change set without
-    # files), then every ledger write in one transaction fenced on the lease
-    changeset_id = rt.ledger.new_changeset_id(lifecycle.repo, "intake")
+    changeset_id = rt.ledger.new_changeset_id(lifecycle.repo, kind)
     rt.save_changeset_files(changeset_id, {"base_sha": base_sha, "files": result.files,
                                            "deleted": [], "evidence": evidence})
     try:
         rt.ledger.stage_intake(
-            owner, lifecycle.repo, changeset_id, status=status, verdicts=verdicts,
+            owner, lifecycle.repo, changeset_id, kind=kind, status=status, verdicts=verdicts,
             human_reason="; ".join(decision.reasons) if decision.status == "human" else "",
-            drafted_events=sorted(kept_ids),
+            drafted_events=event_ids,
             detail={
-                "operations": operations_json(operations), "event_ids": sorted(kept_ids),
+                "operations": operations_json(operations), "event_ids": event_ids,
                 "base_sha": base_sha, "release": release, "decision": decision.to_dict(),
                 "generator": rt.generator.label(), "judge": rt.judge.label(),
             })
@@ -232,7 +258,9 @@ def publish(rt: KbRuntime, lifecycle: RepoLifecycle, changeset_id: str) -> str:
     if changeset["status"] != "gated":
         return changeset["status"]
     state = rt.ledger.repo_state(lifecycle.repo)
-    if not lifecycle.auto_merge or not lifecycle.publishes or state["paused"] or rt.outbox is None:
+    globally_paused = rt.ledger.repo_state("*")["paused"]
+    if not lifecycle.auto_merge or not lifecycle.publishes or state["paused"] or globally_paused \
+            or rt.outbox is None:
         rt.ledger.update_changeset(changeset_id, status="shadow_recorded")
         return "shadow_recorded"
     if not calibration_current(rt, lifecycle):
@@ -243,7 +271,9 @@ def publish(rt: KbRuntime, lifecycle: RepoLifecycle, changeset_id: str) -> str:
         return "calibration_required"
     data = rt.load_changeset_files(changeset_id)
     detail = changeset["detail"]
-    rt.outbox.issue(lifecycle.repo, "open_pr", {
+    from .merge import issue_once
+
+    issue_once(rt, lifecycle.repo, changeset, "open_pr", {
         "changeset_id": changeset_id,
         "base_sha": data["base_sha"],
         "branch": f"kb/{lifecycle.repo}/{changeset_id}",

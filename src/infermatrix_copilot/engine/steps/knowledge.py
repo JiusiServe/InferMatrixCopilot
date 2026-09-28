@@ -83,3 +83,69 @@ async def publish(ctx: StepContext) -> StepResult:
     status = publish_changeset(rt, lifecycle, changeset_id)
     return StepResult(True, summary=f"change set {changeset_id}: {status}",
                       outputs={"state_updates": {"kb_changeset_status": status}})
+
+
+def _with_lease(rt, work):
+    """Run ``work(owner)`` under the single-writer lease (``kb run`` path); the
+    scheduler already holds it and passes its own owner."""
+    if rt.lease_owner:
+        return work(rt.lease_owner)
+    with rt.ledger.lease() as owner:
+        return work(owner)
+
+
+@step("knowledge.advance_merges", kind="deterministic", risk="knowledge",
+      description="Advance in-flight knowledge PRs: sign verdicts, enqueue, record merges")
+async def advance_merges(ctx: StepContext) -> StepResult:
+    rt, lifecycle = _lifecycle(ctx)
+    if lifecycle is None:
+        return StepResult(False, FailureKind.BLOCKED, "repository is unknown or disabled")
+    from ...kb_service import merge
+
+    if rt.outbox is not None and rt.publisher_public_key is not None:
+        merge.apply_acks(rt, rt.outbox.collect_acks(rt.publisher_public_key))
+    events = _with_lease(rt, lambda owner: merge.advance(rt, lifecycle))
+    return StepResult(True, summary="; ".join(events) or "nothing to advance",
+                      outputs={"state_updates": {"kb_merge_events": events}})
+
+
+@step("knowledge.sweep", kind="agent", risk="knowledge",
+      description="Release sweep: T1 structure, T2/T3 rule re-checks, purge; each page through the gate")
+async def sweep(ctx: StepContext) -> StepResult:
+    rt, lifecycle = _lifecycle(ctx)
+    if lifecycle is None or not lifecycle.full_name:
+        return StepResult(False, FailureKind.BLOCKED, "repository is unknown, disabled or has no upstream")
+    from ...kb_service.runtime import publish as publish_changeset
+    from ...kb_service.sweep import UpstreamRepo, detect_release, run_sweep
+
+    upstream = UpstreamRepo(rt.state_dir / "upstream" / f"{lifecycle.repo}.git", lifecycle.full_name)
+
+    def work(owner):
+        found = detect_release(rt, lifecycle, upstream)
+        if found is None:
+            return None
+        report = run_sweep(rt, lifecycle, owner, found, upstream)
+        for changeset_id in report["changesets"]:
+            publish_changeset(rt, lifecycle, changeset_id)
+        return report
+
+    report = _with_lease(rt, work)
+    if report is None:
+        return StepResult(True, summary="no release to sweep")
+    return StepResult(True, summary=f"sweep {report['sweep']['tag']}: {len(report['changesets'])} change set(s)",
+                      outputs={"state_updates": {"kb_sweep_changesets": report["changesets"]}})
+
+
+@step("knowledge.activate", kind="deterministic", risk="knowledge",
+      description="Build, verify and activate the knowledge snapshot of the knowledge repository's main")
+async def activate_snapshot(ctx: StepContext) -> StepResult:
+    rt = _runtime(ctx)
+    from ...kb_service.activate import ActivationError, activate
+
+    try:
+        sha = rt.knowledge.fetch()
+        snapshot = activate(rt, sha)
+    except ActivationError as exc:
+        return StepResult(False, FailureKind.ESCALATE, f"activation refused: {exc}")
+    return StepResult(True, summary=f"active snapshot {sha}",
+                      outputs={"state_updates": {"kb_active_snapshot": sha, "kb_snapshot_path": str(snapshot)}})
