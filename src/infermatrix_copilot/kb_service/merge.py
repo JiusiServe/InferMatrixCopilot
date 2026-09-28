@@ -25,6 +25,19 @@ from ..knowledge_service.verdict import build_verdict, manifest_from_files
 
 VERDICT_MARKER = "<!-- kb-gate:verdict:v1 -->"
 IN_FLIGHT = ("pr_requested", "pr_open", "verdict_posted", "queued")
+# a verdict must first verify within 72 hours: re-sign well before that
+RESIGN_AFTER = 48 * 3600
+# a queued PR that neither merged nor left the queue by then was dropped by a
+# failing merge group (GitHub does not tell us): re-sign and re-enqueue
+QUEUE_STALL = 2 * 3600
+# kb-gate failures, by what the service can do about them (matched against the
+# status description, which is the verifier's first problem)
+TRANSIENT_GATE = ("hold list", "paused by the knowledge service", "global pause", "unreachable",
+                  "verifier error", "fetched head does not match",
+                  "carries kb:hold")  # left by our own pause until the re-signed verdict lifts it
+RESIGN_GATE = ("outside its issue window", "no valid signed verdict")
+REBUILD_GATE = ("context changed since the verdict", "pages changed since the consistency judgement",
+                "does not merge cleanly", "signed patch manifest does not match")
 KNOWLEDGE_REPO_ENV = "KB_KNOWLEDGE_REPOSITORY"
 DEFAULT_KNOWLEDGE_REPOSITORY = "JiusiServe/InferMatrixCopilot"
 
@@ -102,6 +115,8 @@ def apply_acks(rt, acks: list[dict]) -> None:
         if kind == "open_pr":
             fields.update(pr_number=int(ack["pr"]), head_sha=str(ack["head_sha"]),
                           branch=str(ack.get("branch", "")))
+        elif kind == "enqueue":
+            fields["detail"] = {**changeset["detail"], "queued_at": rt.clock()}
         rt.ledger.update_changeset(changeset_id, **fields)
 
 
@@ -136,11 +151,123 @@ def _pr_state(rt, number: int) -> dict:
 
 
 def _gate_status(rt, sha: str) -> str:
+    return _gate(rt, sha)[0]
+
+
+def _gate(rt, sha: str, *, since: float = 0.0) -> tuple[str, str]:
+    """(state, description) of the latest kb-gate status on ``sha``; a status
+    posted before ``since`` (the current verdict) is not about it: ("", "")."""
     combined = rt.github.get(f"/repos/{knowledge_repository()}/commits/{sha}/status")
     for status in combined.get("statuses", []):
         if status.get("context") == "kb-gate":
-            return str(status.get("state") or "")
-    return ""
+            posted = _epoch(status.get("updated_at") or status.get("created_at"))
+            if since and posted and posted < since:
+                return "", ""
+            return str(status.get("state") or ""), str(status.get("description") or "")
+    return "", ""
+
+
+def _epoch(value) -> float:
+    if not value:
+        return 0.0
+    import datetime as dt
+
+    try:
+        return dt.datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+
+def _enqueue_outstanding(rt, changeset: dict) -> bool:
+    """A signed enqueue that the publisher may still execute (unexpired)."""
+    pending = changeset.get("pending_item") or {}
+    return pending.get("kind") == "enqueue" and float(pending.get("expires_at", 0)) > rt.clock()
+
+
+def _resign(rt, changeset: dict, why: str) -> None:
+    """Back to pr_open: the next pass signs a fresh verdict for the same head."""
+    rt.ledger.update_changeset(changeset["id"], status="pr_open", pending_item=None)
+    _outcome(rt, changeset, "resigned", reason=why)
+
+
+REBUILD_MARK = "rebuild of "
+
+
+def _rebuild_of(rt, repo: str, old_id: str) -> str | None:
+    """A change set already staged as the rebuild of ``old_id`` (its evidence
+    carries the mark, written atomically with the staging), so an interrupted
+    rebuild is resumed instead of staged twice."""
+    for candidate in rt.ledger.changesets(repo, ("gated", "failed", "human", *IN_FLIGHT)):
+        if candidate["kind"] != "rebuild":
+            continue
+        try:
+            evidence = rt.load_changeset_files(candidate["id"]).get("evidence") or []
+        except (OSError, ValueError):
+            continue
+        if any(str(item.get("source_reference") or "") == REBUILD_MARK + old_id for item in evidence):
+            return candidate["id"]
+    return None
+
+
+def rebuild(rt, lifecycle, changeset: dict, why: str) -> str | None:
+    """Rebuild a change set whose verdict can no longer verify on the current
+    base (context pages moved, or the PR no longer applies): re-apply its
+    operations to current main and gate them again. Only a rebuild that passes
+    the gate replaces the PR; the old one then waits in ``superseding`` until
+    its close is observed. Anything else goes to people with the old PR left
+    open. Needs the scheduler's lease; returns the new change set id or None."""
+    from ..knowledge_service.lifecycle import LifecycleError
+    from ..knowledge_service.ops import KnowledgeOperation, apply_operations
+    from .runtime import gate_and_stage, publish
+
+    owner = getattr(rt, "lease_owner", None)
+    if not owner:
+        return None
+
+    def to_people(reason: str) -> None:
+        rt.ledger.update_changeset(changeset["id"], status="rebuild_failed")
+        rt.ledger.enqueue_human(lifecycle.repo, reason, changeset["id"])
+
+    detail = changeset["detail"]
+    raw = detail.get("operations") or []
+    if not raw:  # a mechanical change set (index fixes): nothing to re-apply
+        to_people(f"kb-gate failed ({why}); no operations to rebuild")
+        return None
+    new_id = _rebuild_of(rt, lifecycle.repo, changeset["id"])
+    if new_id is None:
+        base_sha = rt.knowledge.fetch()
+        base = rt.knowledge.knowledge_files(base_sha)
+        external = rt.knowledge.external_texts(base_sha)
+        operations = [KnowledgeOperation.from_dict(item) for item in raw]
+        try:
+            result = apply_operations(base, operations, release=detail["release"], today=rt.today())
+        except LifecycleError as exc:
+            to_people(f"cannot rebuild on current main: {exc}")
+            return None
+        evidence = [*(rt.load_changeset_files(changeset["id"]).get("evidence") or []),
+                    {"source_reference": REBUILD_MARK + changeset["id"], "title": why}]
+        new_id = gate_and_stage(rt, lifecycle, owner, kind="rebuild", base=base, base_sha=base_sha,
+                                external=external, operations=operations, result=result,
+                                evidence=evidence, event_ids=[], release=detail["release"],
+                                draft_keys=[])
+    staged = rt.ledger.changeset(new_id)
+    if staged["status"] not in ("gated", *IN_FLIGHT):
+        # the rebuild itself did not pass the gate: nothing replaces the PR
+        to_people(f"rebuild {new_id} on current main did not pass the gate ({staged['status']})")
+        return None
+    rt.ledger.update_changeset(changeset["id"], status="superseding",
+                               detail={**detail, "rebuilt_as": new_id, "superseded_because": why})
+    _outcome(rt, changeset, "superseded", reason=why, replaced_by=new_id)
+    _request_close(rt, lifecycle.repo, rt.ledger.changeset(changeset["id"]))
+    publish(rt, lifecycle, new_id)
+    return new_id
+
+
+def _request_close(rt, repo: str, changeset: dict) -> None:
+    issue_once(rt, repo, changeset, "close", {
+        "changeset_id": changeset["id"], "pr": int(changeset["pr_number"]),
+        "reason": (f"Superseded by change set {changeset['detail'].get('rebuilt_as')}, rebuilt on "
+                   f"current main ({changeset['detail'].get('superseded_because', '')}).")})
 
 
 def advance(rt, lifecycle) -> list[str]:
@@ -149,12 +276,24 @@ def advance(rt, lifecycle) -> list[str]:
     if rt.outbox is None:
         return events
     paused = is_paused(rt.ledger, lifecycle.repo)
-    queued = rt.ledger.changesets(lifecycle.repo, ("queued",))
-    for changeset in rt.ledger.changesets(lifecycle.repo, IN_FLIGHT):
+    # the one queue slot per repository is taken by a queued PR AND by any PR
+    # whose signed enqueue is still executable (not yet acked)
+    queued = rt.ledger.changesets(lifecycle.repo, ("queued",)) + [
+        cs for cs in rt.ledger.changesets(lifecycle.repo, ("verdict_posted",)) if _enqueue_outstanding(rt, cs)]
+    for changeset in rt.ledger.changesets(lifecycle.repo, (*IN_FLIGHT, "superseding")):
         number = changeset["pr_number"]
         if number is None:
             continue
         pr: dict[str, Any] = _pr_state(rt, int(number))
+        if changeset["status"] == "superseding":
+            # the replaced PR stays tracked until GitHub shows it closed; the
+            # close item is re-issued whenever the previous one expired
+            if pr.get("state") == "closed" or pr.get("merged"):
+                rt.ledger.update_changeset(changeset["id"], status="superseded", pending_item=None)
+                events.append(f"superseded {changeset['id']}")
+            else:
+                _request_close(rt, lifecycle.repo, changeset)
+            continue
         if pr.get("merged"):
             rt.ledger.update_changeset(changeset["id"], status="merged",
                                        merge_sha=str(pr.get("merge_commit_sha") or ""))
@@ -176,6 +315,41 @@ def advance(rt, lifecycle) -> list[str]:
             continue
         if paused:
             continue  # the pause itself is issued by `kb pause` / breakers
+        signed_at = float(changeset["detail"].get("verdict_issued_at") or 0)
+        stale_verdict = bool(signed_at) and rt.clock() - signed_at > RESIGN_AFTER
+        queued_at = float(changeset["detail"].get("queued_at") or 0)
+        if changeset["status"] == "queued" and (
+                stale_verdict or (queued_at and rt.clock() - queued_at > QUEUE_STALL)):
+            # never free the queue slot on a timer: dequeue (+ draft) first; the
+            # pause ack returns it to pr_open, then it is re-signed and re-queued
+            if issue_once(rt, lifecycle.repo, changeset, "pause", {
+                    "changeset_id": changeset["id"], "pr": int(number),
+                    "reason": "re-signing: the verdict is ageing or the PR stalled in the merge queue"}):
+                events.append(f"requeue {changeset['id']}")
+            continue
+        if changeset["status"] == "verdict_posted" and _enqueue_outstanding(rt, changeset):
+            continue  # its ack decides: queued (then the queued path applies) or refused
+        if changeset["status"] == "verdict_posted" and stale_verdict:
+            _resign(rt, changeset, "verdict close to its issue window")
+            events.append(f"resign {changeset['id']}")
+            continue
+        if changeset["status"] == "verdict_posted":
+            state, description = _gate(rt, changeset["head_sha"], since=signed_at)
+            if state == "failure" and not any(m in description for m in TRANSIENT_GATE):
+                if any(m in description for m in RESIGN_GATE):
+                    _resign(rt, changeset, description)
+                    events.append(f"resign {changeset['id']}")
+                elif any(m in description for m in REBUILD_GATE):
+                    if not getattr(rt, "lease_owner", None):
+                        continue  # only the scheduler (holding the lease) rebuilds
+                    new_id = rebuild(rt, lifecycle, changeset, description)
+                    events.append(f"rebuilt {changeset['id']} as {new_id}" if new_id
+                                  else f"rebuild_failed {changeset['id']}")
+                else:  # a real problem with the change itself: people decide
+                    rt.ledger.update_changeset(changeset["id"], status="gate_failed")
+                    rt.ledger.enqueue_human(lifecycle.repo, f"kb-gate failed: {description}", changeset["id"])
+                    events.append(f"gate_failed {changeset['id']}")
+                continue
         if changeset["status"] == "pr_open":
             pending = changeset.get("pending_item")
             if pending and pending.get("kind") == "post_verdict" and float(pending["expires_at"]) > rt.clock():
@@ -185,6 +359,9 @@ def advance(rt, lifecycle) -> list[str]:
                 "changeset_id": changeset["id"], "pr": int(number), "head_sha": changeset["head_sha"],
                 "comment": f"{VERDICT_MARKER}\n```json\n{json.dumps(envelope, ensure_ascii=False)}\n```\n",
             }):
+                current = rt.ledger.changeset(changeset["id"])
+                rt.ledger.update_changeset(changeset["id"], detail={
+                    **current["detail"], "verdict_issued_at": envelope["payload"]["issued_at"]})
                 events.append(f"verdict issued {changeset['id']}")
         elif changeset["status"] == "verdict_posted" and not queued:
             if _gate_status(rt, changeset["head_sha"]) == "success":
