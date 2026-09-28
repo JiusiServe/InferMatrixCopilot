@@ -17,6 +17,8 @@ dev = ["pytest>=8.0"]
 # MCP server (Claude Code / Codex integration) — kept optional so a standalone
 # CLI install stays dependency-free.
 mcp = ["mcp>=1.8,<2"]
+# Knowledge service (signing, verdict envelopes); the kb-gate verifier pins it by hash.
+kb = ["cryptography>=42"]
 
 [project.scripts]
 infermatrix-copilot = "infermatrix_copilot.cli:main"

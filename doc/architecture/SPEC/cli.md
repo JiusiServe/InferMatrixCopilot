@@ -1,6 +1,6 @@
 # cli/ —— 规范
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-09-28 -->
 
 `LOC ~1420（6 个文件） · 接口 + 编排门面 · refactor-status: ok`
 
@@ -90,3 +90,6 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
 拆分**已完成**（它曾是内聚拆分候选）。`Copilot` 类完整留在 `copilot.py`，
 好让 resolve→execute 的流程能在一个文件里读完；只有 argparse/REPL 前端（`entry.py`）
 和两个纯格式化器（`utils.py`）搬了出去。K6（`_gate_and_confirm`）已完成，挂在类上。
+
+## 2026-09-28 kb 子命令
+`infermatrix-copilot kb …` 在 argparse 之前分派到 `kb_service.cli.main`（知识服务运维命令），不启动 Copilot/LLM。

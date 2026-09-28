@@ -36,9 +36,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      # pytest lives in the `dev` extra; `mcp` is needed for the MCP server tests.
+      # pytest lives in the `dev` extra; `mcp` is needed for the MCP server tests;
+      # `kb` (cryptography) for the knowledge service's signing.
       - name: Install
-        run: pip install -e ".[dev,mcp]"
+        run: pip install -e ".[dev,mcp,kb]"
 
       - name: Unit tests
         run: python -m pytest -q

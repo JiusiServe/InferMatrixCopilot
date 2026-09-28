@@ -30,3 +30,8 @@ from the package, so the kb-gate verifier bundle can vendor them.
 directory and runs it with a baseline generated for the audited SHA pair:
 knowledge-document issues are enforced, adapter-baseline maintenance is
 reported as reconciliation.
+
+`signing` provides Ed25519 envelopes whose signature covers a purpose tag plus
+the canonical JSON payload, so a signature made for one purpose (gate verdict,
+outbox item, control record, hold list, publisher ack) never verifies for
+another. It needs only `cryptography` and is vendored by the kb-gate verifier.
