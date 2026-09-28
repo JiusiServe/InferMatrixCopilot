@@ -610,3 +610,163 @@ def test_subprocess_tamper_defense(settings):
     assert st["owner_server_id"] == core.server_id
     assert (rd / "console.log").exists()
     core.close()
+
+
+# -- Strict runs pin the knowledge snapshot at reservation ---------------------------
+
+def _reserve_created(core, monkeypatch, run_id="run-20260928-120000-aaaaaa"):
+    (core.run_root / run_id).mkdir(parents=True, exist_ok=True)
+    rs.init_queued(core.run_root / run_id, run_id=run_id, owner_server_id=core.server_id,
+                   owner_server_pid=core.pid)
+    monkeypatch.setattr(core._q, "put", lambda item: None)
+    monkeypatch.setattr(core.reservations, "reserve", lambda *_a, **_k: (run_id, True))
+    return core.reserve_strict_review({
+        "kind": "pr_review", "repo": "vllm-omni", "pr": 7, "post": False,
+        "params": {"review_depth": "standard"}, "expected_head_sha": "a" * 40,
+        "idempotency_key": "attempt-pin"})[0]
+
+
+def _fake_launch(core, monkeypatch, run_id):
+    from infermatrix_copilot import mcp_server
+
+    captured = {}
+
+    class FakeProcess:
+        pid = 424243
+        returncode = 0
+
+        def wait(self):
+            return 0
+
+    def fake_popen(argv, **kwargs):
+        captured["env"] = kwargs["env"]
+        return FakeProcess()
+
+    monkeypatch.setattr(mcp_server.subprocess, "Popen", fake_popen)
+    core._launch(run_id)
+    return captured
+
+
+def test_a_strict_run_reviews_with_the_snapshot_active_when_it_was_reserved(settings, monkeypatch, tmp_path):
+    from infermatrix_copilot.contract import build_review_result
+    from infermatrix_copilot.knowledge_view import KNOWLEDGE_ROOT_ENV, _load_view
+    from test_knowledge_view_routing import _snapshot
+
+    old = _snapshot(tmp_path, "c" * 40, retire=False)
+    new = _snapshot(tmp_path, "d" * 40, retire=True)
+    active = tmp_path / "active"
+    active.symlink_to(old)
+    monkeypatch.setenv(KNOWLEDGE_ROOT_ENV, str(active))
+    _load_view.cache_clear()
+    core = _core(settings)
+    run_id = _reserve_created(core, monkeypatch)
+    swap = tmp_path / "active.tmp"
+    swap.symlink_to(new)
+    swap.replace(active)                       # a newer snapshot is activated meanwhile
+
+    env = _fake_launch(core, monkeypatch, run_id)["env"]
+    assert env["KNOWLEDGE_DIR"] == str((old / "knowledge").resolve())
+    assert env["KNOWLEDGE_ROOT"] == str(old.resolve())
+    diagnostics = build_review_result(core.run_root / run_id)["diagnostics"]
+    manifest = json.loads((old / "MANIFEST.json").read_text())
+    assert diagnostics["knowledge_snapshot"] == "c" * 40
+    assert diagnostics["knowledge_tree_sha256"] == manifest["tree_sha256"]
+    core.close()
+
+
+def test_a_pruned_pinned_snapshot_fails_the_run_instead_of_switching_knowledge(settings, monkeypatch, tmp_path):
+    import shutil
+
+    from infermatrix_copilot.knowledge_view import KNOWLEDGE_ROOT_ENV, _load_view
+    from test_knowledge_view_routing import _snapshot
+
+    old = _snapshot(tmp_path, "e" * 40, retire=False)
+    monkeypatch.setenv(KNOWLEDGE_ROOT_ENV, str(old))
+    _load_view.cache_clear()
+    core = _core(settings)
+    run_id = _reserve_created(core, monkeypatch)
+    shutil.rmtree(old)
+    assert _fake_launch(core, monkeypatch, run_id) == {}          # never launched
+    status = rs.read_status(core.run_root / run_id)
+    assert status["state"] == rs.FAILED and "e" * 40 in status["note"]
+    core.close()
+
+
+def test_packaged_knowledge_is_pinned_even_if_a_root_is_configured_later(settings, monkeypatch, tmp_path):
+    from infermatrix_copilot.contract import build_review_result
+    from infermatrix_copilot.knowledge_view import KNOWLEDGE_ROOT_ENV, KnowledgeView, _load_view
+
+    monkeypatch.delenv(KNOWLEDGE_ROOT_ENV, raising=False)
+    monkeypatch.delenv("KNOWLEDGE_DIR", raising=False)
+    _load_view.cache_clear()
+    core = _core(settings)
+    run_id = _reserve_created(core, monkeypatch)
+    packaged = str(KnowledgeView.current().root)
+    monkeypatch.setenv(KNOWLEDGE_ROOT_ENV, str(tmp_path / "later-activated"))   # config changes before launch
+    env = _fake_launch(core, monkeypatch, run_id)["env"]
+    assert env["KNOWLEDGE_DIR"] == packaged and KNOWLEDGE_ROOT_ENV not in env
+    assert build_review_result(core.run_root / run_id)["diagnostics"]["knowledge_snapshot"] == "packaged"
+    core.close()
+
+
+def test_a_reclaimed_reservation_keeps_its_original_pin(settings, monkeypatch, tmp_path):
+    from infermatrix_copilot.knowledge_view import KNOWLEDGE_ROOT_ENV, _load_view
+    from test_knowledge_view_routing import _snapshot
+
+    old = _snapshot(tmp_path, "7" * 40, retire=False)
+    new = _snapshot(tmp_path, "8" * 40, retire=True)
+    active = tmp_path / "active"
+    active.symlink_to(old)
+    monkeypatch.setenv(KNOWLEDGE_ROOT_ENV, str(active))
+    _load_view.cache_clear()
+    core = _core(settings)
+    run_id = _reserve_created(core, monkeypatch)
+    swap = tmp_path / "active.tmp"
+    swap.symlink_to(new)
+    swap.replace(active)
+    assert _reserve_created(core, monkeypatch, run_id) == run_id     # reclaimed: created=True again
+    pin = json.loads((core.run_root / run_id / "knowledge.json").read_text())
+    assert pin["snapshot"] == "7" * 40
+    core.close()
+
+
+def test_a_pinning_failure_fails_the_run_instead_of_stranding_it(settings, monkeypatch):
+    from infermatrix_copilot.knowledge_view import KnowledgeView, KnowledgeViewError
+
+    def broken():
+        raise KnowledgeViewError("KNOWLEDGE_ROOT does not resolve")
+
+    monkeypatch.setattr(KnowledgeView, "current", classmethod(lambda cls: broken()))
+    core = _core(settings)
+    queued = []
+    run_id = "run-20260928-120000-bbbbbb"
+    (core.run_root / run_id).mkdir(parents=True)
+    rs.init_queued(core.run_root / run_id, run_id=run_id, owner_server_id=core.server_id,
+                   owner_server_pid=core.pid)
+    monkeypatch.setattr(core._q, "put", queued.append)
+    monkeypatch.setattr(core.reservations, "reserve", lambda *_a, **_k: (run_id, True))
+    core.reserve_strict_review({
+        "kind": "pr_review", "repo": "vllm-omni", "pr": 7, "post": False,
+        "params": {"review_depth": "standard"}, "expected_head_sha": "a" * 40,
+        "idempotency_key": "attempt-broken"})
+    status = rs.read_status(core.run_root / run_id)
+    assert queued == [] and status["state"] == rs.FAILED
+    assert "could not pin the knowledge snapshot" in status["note"]
+    core.close()
+
+
+def test_a_configured_knowledge_dir_is_pinned_not_replaced_by_the_packaged_tree(settings, monkeypatch, tmp_path):
+    from infermatrix_copilot.contract import build_review_result
+    from infermatrix_copilot.knowledge_view import KNOWLEDGE_ROOT_ENV, KnowledgeView, _load_view
+
+    monkeypatch.delenv(KNOWLEDGE_ROOT_ENV, raising=False)
+    _load_view.cache_clear()
+    custom = tmp_path / "custom-knowledge"
+    shutil.copytree(KnowledgeView.current().root, custom, ignore=shutil.ignore_patterns("__pycache__"))
+    settings.knowledge_dir = custom
+    core = _core(settings)
+    run_id = _reserve_created(core, monkeypatch)
+    env = _fake_launch(core, monkeypatch, run_id)["env"]
+    assert env["KNOWLEDGE_DIR"] == str(custom.resolve()) and KNOWLEDGE_ROOT_ENV not in env
+    assert build_review_result(core.run_root / run_id)["diagnostics"]["knowledge_snapshot"] == "unverified"
+    core.close()
