@@ -195,6 +195,7 @@ def _knowledge_remote(tmp_path: Path) -> Path:
         target = origin / "knowledge" / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(text, encoding="utf-8")
+    (origin / "knowledge" / "_format.yaml").write_text("format_version: 2\n", encoding="utf-8")
     (origin / "skills").mkdir()
     (origin / "skills" / "x.md").write_text("see DEMO-1a\n", encoding="utf-8")
     subprocess.run(["git", "init", "-q", "-b", "main", str(origin)], check=True)

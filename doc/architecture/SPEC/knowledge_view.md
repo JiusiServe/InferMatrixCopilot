@@ -1,6 +1,6 @@
 # knowledge_view.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-29 -->
 
 `LOC ~170 · 每请求的知识树视图（打包知识或激活快照） · refactor-status: stable`
 
@@ -35,3 +35,8 @@ stdlib + `.sdk._resources`。叶子模块。
 ## 2026-09-28 可记录的快照标识
 `public_snapshot`：激活快照 ID、`packaged` 或 `unverified`（开发树的绝对路径不外泄）；`tree_sha256`：已验证快照
 按清单重算的树哈希。`direct_routing` 的 `diagnostics.knowledge_snapshot` 与 SDK 计划都使用它们。
+
+## 2026-09-29 知识格式版本
+知识树在顶层 `knowledge/_format.yaml` 声明其格式（`format_version`；当前为 2：规则生命周期尾注、类型化操作、
+`_routes.yaml`、`_tombstones.yaml`）。`knowledge_format(root)` 读取它，`build_manifest` 把它记入 `MANIFEST.json` 的
+`knowledge_format`。该文件位于自动合并白名单之外，改动它需要人工。

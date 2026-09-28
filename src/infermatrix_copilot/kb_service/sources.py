@@ -159,9 +159,10 @@ class KnowledgeRepo:
         return {name.removeprefix("knowledge/"): text for name, text in files.items()}
 
     def top_level_knowledge(self, rev: str) -> dict[str, str]:
-        """knowledge/*.md at the top of the tree (AGENTS.md, README.md, ...):
-        not governed by the gate, but served with every snapshot."""
-        files = self._texts(rev, ("knowledge/",), (".md",))
+        """knowledge/*.md at the top of the tree (AGENTS.md, README.md, ...) and
+        the format declaration: not governed by the gate, but served with every
+        snapshot."""
+        files = self._texts(rev, ("knowledge/",), (".md", "_format.yaml"))
         return {name.removeprefix("knowledge/"): text for name, text in files.items()
                 if "/" not in name.removeprefix("knowledge/")}
 
