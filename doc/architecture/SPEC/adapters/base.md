@@ -61,3 +61,6 @@
 
 ## 2026-09-28 退役规则不再提供
 `render_briefing_docs` 经 `visible_text` 去掉退役规则。
+
+## 2026-09-28 knowledge_lifecycle
+`knowledge_lifecycle` 加入 `HIGH_RISK_SECTIONS`：知识服务的开关与 `auto_merge` 切换只能经人工审阅修改。

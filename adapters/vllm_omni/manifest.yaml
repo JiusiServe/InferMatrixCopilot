@@ -399,3 +399,26 @@ push:
   rebase_branch: dev/vllm-align
   # rebase-commit author identity (parent config SIGNOFF_NAME/EMAIL)
   signoff: {name: tzhouam, email: tzhouam@connect.ust.hk}
+
+# Knowledge service (doc/features/knowledge-service.md). Human-only section:
+# switching `mode` to auto_merge is a reviewed code change, never an agent write.
+knowledge_lifecycle:
+  enabled: true
+  mode: shadow                     # shadow | auto_merge
+  knowledge_dir: repos/vllm-omni
+  intake:
+    merged_prs: true
+    copilot_runs: true
+    human_prs: true
+    daily_model_budget_usd: 50
+  release:
+    trigger: github_release
+    auditor: release_audit.py      # adapters/vllm_omni/release_audit.py
+  sweep:
+    fallback_interval_days: 30
+  upstream_visibility: public
+  circuit_breaker:
+    retire_ratio: 0.10
+    max_files: 50
+  protected_rules: []
+  model_dir: repos/vllm-omni/models

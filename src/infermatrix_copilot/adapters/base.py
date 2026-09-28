@@ -18,7 +18,7 @@ import yaml
 
 from ..knowledge_service.lifecycle import visible_text
 
-HIGH_RISK_SECTIONS = ("push", "repo", "upstream", "rebase")
+HIGH_RISK_SECTIONS = ("push", "repo", "upstream", "rebase", "knowledge_lifecycle")
 
 
 def expand_path(value: str, extra: dict | None = None) -> str:
