@@ -29,6 +29,8 @@ IN_FLIGHT = ("pr_requested", "pr_open", "verdict_posted", "queued")
 RESIGN_AFTER = 48 * 3600
 # margin for the publisher's clock when deciding an item has certainly expired
 CLOCK_SKEW = 5 * 60
+# a pause not confirmed on GitHub by then goes to people (procedure P, step 4)
+PAUSE_CONFIRM = 5 * 60
 # a queued PR that neither merged nor left the queue by then was dropped by a
 # failing merge group (GitHub does not tell us): re-sign and re-enqueue
 QUEUE_STALL = 2 * 3600
@@ -93,6 +95,11 @@ def apply_acks(rt, acks: list[dict]) -> None:
             # cannot slip between reading the pause state and recording the ack
             with rt.outbox.publication_lock():
                 current = rt.ledger.changeset(changeset_id)
+                if ack.get("ok") and current["status"] == "paused":
+                    # a re-pause retry completed: nothing is pending any more
+                    if (current.get("pending_item") or {}).get("id") == ack.get("item_id"):
+                        rt.ledger.update_changeset(changeset_id, pending_item=None)
+                    continue
                 if not ack.get("ok") or current["status"] not in ("pr_open", "verdict_posted", "queued"):
                     continue
                 if current["detail"].get("withdrawn"):
@@ -325,11 +332,18 @@ def advance(rt, lifecycle) -> list[str]:
     queued = rt.ledger.changesets(lifecycle.repo, ("queued",)) + [
         cs for cs in rt.ledger.changesets(lifecycle.repo, ("verdict_posted",))
         if _enqueue_outstanding(rt, cs) or cs["detail"].get("withdrawn")]
-    for changeset in rt.ledger.changesets(lifecycle.repo, (*IN_FLIGHT, "superseding")):
+    for changeset in rt.ledger.changesets(lifecycle.repo, (*IN_FLIGHT, "superseding", "paused")):
         number = changeset["pr_number"]
         if number is None:
             continue
-        pr: dict[str, Any] = _pr_state(rt, int(number))
+        try:
+            pr: dict[str, Any] = _pr_state(rt, int(number))
+        except Exception:  # noqa: BLE001 - GitHub down or rate-limited
+            # the overdue-pause escalation must not depend on GitHub answering
+            if changeset["status"] == "paused" or paused:
+                _pause_unconfirmed(rt, lifecycle.repo, changeset, events)
+            events.append(f"observe_failed {changeset['id']}")
+            continue
         if changeset["status"] == "superseding":
             # the replaced PR stays tracked until GitHub shows it closed; the
             # close item is re-issued whenever the previous one expired
@@ -351,6 +365,32 @@ def advance(rt, lifecycle) -> list[str]:
             _outcome(rt, changeset, "closed_unmerged")  # overturned by people: a negative label
             events.append(f"closed {changeset['id']}")
             continue
+        # pause tracking comes before head checks: a paused PR stays watched
+        if changeset["status"] == "paused":
+            # an ack is the publisher's word; the pause counts once GitHub shows
+            # the PR as a draft (a draft cannot be in, or re-enter, the queue)
+            if pr.get("draft"):
+                if not changeset["detail"].get("pause_confirmed"):
+                    # a pending retry is done with: a later undo gets a fresh pause
+                    rt.ledger.update_changeset(changeset["id"], pending_item=None, detail={
+                        **changeset["detail"], "pause_confirmed": True})
+                    events.append(f"pause_confirmed {changeset['id']}")
+            else:
+                if changeset["detail"].get("pause_confirmed"):  # un-drafted since: not paused any more
+                    rt.ledger.update_changeset(changeset["id"], pending_item=None, detail={
+                        **changeset["detail"], "pause_confirmed": False, "pause_alerted": False,
+                        "pause_requested_at": rt.clock()})
+                    changeset = rt.ledger.changeset(changeset["id"])
+                issue_once(rt, lifecycle.repo, changeset, "pause", {
+                    "changeset_id": changeset["id"], "pr": int(number),
+                    "reason": "re-pausing: GitHub does not show the PR as a draft"})
+                _pause_unconfirmed(rt, lifecycle.repo, changeset, events)
+            continue
+        if paused:
+            # the pause itself is issued by `kb pause` / breakers; one that has
+            # not even been acked in time goes to people
+            _pause_unconfirmed(rt, lifecycle.repo, changeset, events)
+            continue
         head = str((pr.get("head") or {}).get("sha") or "")
         if head != changeset["head_sha"] and changeset["kind"] == "external":
             # authors push: the new head is simply judged again at the next poll
@@ -363,8 +403,6 @@ def advance(rt, lifecycle) -> list[str]:
             rt.ledger.enqueue_human(lifecycle.repo, f"PR #{number} head changed after signing", changeset["id"])
             events.append(f"head_changed {changeset['id']}")
             continue
-        if paused:
-            continue  # the pause itself is issued by `kb pause` / breakers
         if changeset["kind"] == "external" and changeset["detail"].get("source") == "human-approved" \
                 and changeset["status"] in ("verdict_posted", "queued"):
             from .external import approval_stands
@@ -488,17 +526,44 @@ def record_retirements(rt, changeset: dict) -> None:
 
 def pause_open_prs(ledger, outbox, repo: str, reason: str) -> int:
     """Issue always-executable pause items (dequeue + draft) for every open
-    knowledge PR of ``repo``; they are marked paused once the publisher acks."""
+    knowledge PR of ``repo``; they are marked paused once the publisher acks,
+    and confirmed once GitHub shows them as drafts."""
     count = 0
     if outbox is None:
         return count
     for changeset in ledger.changesets(repo, ("pr_open", "verdict_posted", "queued")):
         if changeset["pr_number"] is None:
             continue
-        outbox.issue(repo, "pause", {"changeset_id": changeset["id"], "pr": int(changeset["pr_number"]),
-                                     "reason": reason})
+        item = outbox.issue(repo, "pause", {"changeset_id": changeset["id"], "pr": int(changeset["pr_number"]),
+                                            "reason": reason})
+        ledger.update_changeset(changeset["id"], detail={
+            **changeset["detail"], "pause_requested_at": item.issued_at, "pause_reason": reason})
         count += 1
     return count
+
+
+def _pause_unconfirmed(rt, repo: str, changeset: dict, events: list[str]) -> None:
+    """Alert people once when a requested pause is not confirmed in time."""
+    detail = changeset["detail"]
+    requested = float(detail.get("pause_requested_at") or 0)
+    if not requested or detail.get("pause_alerted") or detail.get("pause_confirmed") \
+            or rt.clock() - requested < PAUSE_CONFIRM:
+        return
+    number = changeset["pr_number"]
+    rt.ledger.update_changeset(changeset["id"], detail={**detail, "pause_alerted": True})
+    rt.ledger.enqueue_human(repo, (
+        f"pause of PR #{number} not confirmed after {PAUSE_CONFIRM // 60} minutes "
+        f"({detail.get('pause_reason', '')}): remove it from the merge queue and run "
+        f"`gh pr ready {number} --undo -R {knowledge_repository()}`"), changeset["id"])
+    events.append(f"pause_unconfirmed {changeset['id']}")
+
+
+def pause_unconfirmed(ledger, repo: str) -> int:
+    """How many of ``repo``'s PRs are paused on paper but not yet on GitHub."""
+    pending = [cs for cs in ledger.changesets(repo, ("pr_open", "verdict_posted", "queued"))
+               if cs["detail"].get("pause_requested_at")]
+    acked = [cs for cs in ledger.changesets(repo, ("paused",)) if not cs["detail"].get("pause_confirmed")]
+    return len(pending) + len(acked)
 
 
 def resume_paused_prs(ledger, repo: str) -> int:
@@ -507,10 +572,16 @@ def resume_paused_prs(ledger, repo: str) -> int:
     verdict for the PR's current head and re-enqueues (the publisher's enqueue
     marks the draft PR ready first); a head that moved goes to people."""
     count = 0
+    tracking = ("pause_requested_at", "pause_reason", "pause_alerted", "pause_confirmed")
+    for changeset in ledger.changesets(repo, ("pr_open", "verdict_posted", "queued")):
+        if any(key in changeset["detail"] for key in tracking):  # requested but never acked
+            ledger.update_changeset(changeset["id"], detail={
+                k: v for k, v in changeset["detail"].items() if k not in tracking})
     for changeset in ledger.changesets(repo, ("paused",)):
         if changeset["pr_number"] is None:
             continue
-        ledger.update_changeset(changeset["id"], status="pr_open", pending_item=None)
+        detail = {k: v for k, v in changeset["detail"].items() if k not in tracking}
+        ledger.update_changeset(changeset["id"], status="pr_open", pending_item=None, detail=detail)
         count += 1
     return count
 

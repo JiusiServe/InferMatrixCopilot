@@ -85,6 +85,12 @@ def _public(registry) -> set[str]:
     return {name for name, lifecycle in registry.items() if lifecycle.publishes}
 
 
+def _unconfirmed(ledger, repo: str) -> int:
+    from .merge import pause_unconfirmed
+
+    return pause_unconfirmed(ledger, repo)
+
+
 def _refresh(state_dir: Path, ledger, registry) -> None:
     _outbox(state_dir, ledger).transition(lambda: None, public_repos=_public(registry))
 
@@ -170,7 +176,9 @@ def main(argv: list[str] | None = None) -> int:
                     {**row, "configured": row["repo"] in registry or row["repo"] == "*",
                      "open_changesets": len(ledger.changesets(row["repo"], ("open", "pr_open", "signed", "queued")))
                      if row["repo"] != "*" else None,
-                     "human_queue": len(ledger.human_queue(row["repo"])) if row["repo"] != "*" else None}
+                     "human_queue": len(ledger.human_queue(row["repo"])) if row["repo"] != "*" else None,
+                     # a breaker/rollback is not done while any of these remain
+                     "pause_unconfirmed": _unconfirmed(ledger, row["repo"]) if row["repo"] != "*" else None}
                     for row in ledger.all_repo_states()
                 ],
             }

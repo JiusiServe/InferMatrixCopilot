@@ -140,3 +140,9 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 `holds_server`（`kb holds-server`）只以 `GET/HEAD /holds.json` 提供 `<state_dir>/public/holds.json`（`Cache-Control: no-store`），
 其余路径一律 404，不列目录、不跟随路径、不接受写入；清单尚不存在时返回 503（门禁视为不可达并失败关闭）。默认只绑定
 `127.0.0.1`，由 bot 主机的反向代理加 TLS 后对外，URL 写入 `.github/kb-gate/config.json` 的 `holds_url`。
+
+## 2026-09-29 暂停以观测确认
+`pause_open_prs` 记录每个暂停请求的时间与原因。回执只代表发布器的说法：状态 `paused` 的变更集只有在 GitHub 显示该 PR
+为 draft 时才记为已确认（draft 不能在合并队列中，也不能再次入队）；否则重发 `pause`。请求 5 分钟后仍未回执或未确认 →
+转人工一次，附出队与 `gh pr ready <n> --undo` 命令。`kb status` 报告每个仓库 `pause_unconfirmed` 数量，熔断/回滚在其归零
+前不算完成；`kb resume` 清除这些记录。
