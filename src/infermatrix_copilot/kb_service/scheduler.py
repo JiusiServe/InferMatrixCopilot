@@ -31,6 +31,7 @@ from .audit import audit_main
 from .report import flush_reports
 from .companion import publish_companion
 from .external import poll_external
+from .sweep_audit import audit_sweep, stage_baseline_companion
 from .runtime import collect_events, publish, run_intake
 from .sweep import UpstreamRepo, detect_release, run_sweep
 
@@ -129,7 +130,11 @@ class Scheduler:
             status = publish(rt, lifecycle, changeset["id"])
             self._record(lifecycle.repo, "published", changeset=changeset["id"], status=status)
         for changeset in rt.ledger.changesets(lifecycle.repo, ("companion_staged",)):
-            status = publish_companion(rt, lifecycle, changeset["id"])
+            try:  # a companion that cannot be published yet never blocks the rest of the tick
+                status = publish_companion(rt, lifecycle, changeset["id"])
+            except Exception as exc:
+                self._record(lifecycle.repo, "error", error=f"companion {changeset['id']}: {exc!r}")
+                continue
             self._record(lifecycle.repo, "published", changeset=changeset["id"], status=status)
         if self._due(f"intake:{lifecycle.repo}", self.intake_every):
             new = collect_events(rt, lifecycle)
@@ -141,7 +146,23 @@ class Scheduler:
             upstream = UpstreamRepo(rt.state_dir / "upstream" / f"{lifecycle.repo}.git", lifecycle.full_name)
             sweep = detect_release(rt, lifecycle, upstream)
             if sweep is not None:
-                report = run_sweep(rt, lifecycle, rt.lease_owner, sweep, upstream)
+                # the release audit feeds the sweep hints; baseline drift becomes a
+                # companion PR that runs in parallel and never blocks the sweep
+                base_sha = rt.knowledge.fetch()  # one revision for the audit and the sweep
+                hints, audit = audit_sweep(rt, lifecycle, sweep, upstream, base_sha)
+                try:  # the baseline companion never blocks the sweep
+                    stage_baseline_companion(rt, lifecycle, rt.lease_owner, sweep, audit, base_sha)
+                except Exception as exc:
+                    self._record(lifecycle.repo, "error", error=f"baseline companion: {exc!r}",
+                                 trace=traceback.format_exc()[-2000:])
+                    key = f"baseline_companion_failed:{sweep.get('tag')}:{sweep.get('to_sha')}"
+                    if not rt.ledger.get_cursor(lifecycle.repo, key):
+                        rt.ledger.set_cursor(lifecycle.repo, key, "1")
+                        rt.ledger.enqueue_human(lifecycle.repo,
+                                                f"could not draft the adapter baseline update: {exc}")
+                report = run_sweep(rt, lifecycle, rt.lease_owner, sweep, upstream, audit_hints=hints,
+                                   reconciliation=len(audit.reconciliation) if audit is not None else None,
+                                   base_sha=base_sha)
                 for changeset_id in report["changesets"]:
                     publish(rt, lifecycle, changeset_id)
 

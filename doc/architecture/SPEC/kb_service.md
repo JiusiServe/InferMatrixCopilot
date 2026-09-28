@@ -167,3 +167,10 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
 标签，进入人工队列；发布器拒绝在其上执行 `post_verdict`/`enqueue`（ready 与合并只能由人完成），且拒绝白名单外路径
 （`knowledge/`、`.github/`、`src/`、`tools/`）。知识变更集处于 `companion_pending`（规则保持 active）；配套 PR 合并后，调度器
 在当前 main 上重建它（外部引用已清零 → 正常过门与发布）；配套 PR 被关闭则知识变更转人工，且不计入熔断。
+
+## 2026-09-29 巡检中的发版审计与基线配套 PR
+配置了 `release.auditor` 的仓库，调度器在每次巡检前以 generated-baseline 模式运行审计插件（上游 SHA 对未变的回退巡检
+跳过）：知识文档问题按页面转为巡检生成器的提示；审计失败每次巡检只转人工一次，巡检照常进行（无提示）。reconciliation
+（提交的适配器基线落后于审计的上游）不阻塞巡检，而是起草一个配套 PR：插件以 `baseline_file`（相对适配器目录）指明基线
+文件，只替换其中的 `upstream:` 与 `inventories:` 块（其余内容与注释保留），经 `open_companion_pr` 以 draft 发布并转人工；
+每次巡检最多一个。巡检汇总列出 reconciliation 数量。

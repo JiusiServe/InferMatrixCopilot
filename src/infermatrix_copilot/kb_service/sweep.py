@@ -277,7 +277,8 @@ def _progress(rt, lifecycle, sweep: dict) -> dict:
 
 
 def run_sweep(rt, lifecycle, owner: str, sweep: dict, upstream: UpstreamRepo,
-              audit_hints: dict[str, list[dict]] | None = None) -> dict:
+              audit_hints: dict[str, list[dict]] | None = None, reconciliation: int | None = None,
+              base_sha: str | None = None) -> dict:
     """Traced: every model call and decision of the sweep carries its release."""
     from ..trace_store import trace_context
 
@@ -289,7 +290,7 @@ def run_sweep(rt, lifecycle, owner: str, sweep: dict, upstream: UpstreamRepo,
     run_id = sweep_run_id(lifecycle.repo, sweep, progress)
     with trace_context(playbook="kb-sweep", repo=lifecycle.repo, release=str(sweep.get("tag") or ""),
                        run_id=run_id):
-        report = _run_sweep(rt, lifecycle, owner, sweep, upstream, audit_hints)
+        report = _run_sweep(rt, lifecycle, owner, sweep, upstream, audit_hints, reconciliation, base_sha)
     report["run_id"] = run_id
     return report
 
@@ -304,7 +305,8 @@ def draft_key_for_page(repo: str, sweep: dict, page: str) -> str:
 
 
 def _run_sweep(rt, lifecycle, owner: str, sweep: dict, upstream: UpstreamRepo,
-               audit_hints: dict[str, list[dict]] | None = None) -> dict:
+               audit_hints: dict[str, list[dict]] | None = None, reconciliation: int | None = None,
+               base_sha: str | None = None) -> dict:
     from ..trace_store import accepted_key, trace_context
 
     accepted: dict[str, str] = {}  # page -> the accepted generator call's key
@@ -317,13 +319,13 @@ def _run_sweep(rt, lifecycle, owner: str, sweep: dict, upstream: UpstreamRepo,
     to re-check rules against."""
     from .runtime import gate_and_stage
 
-    base_sha = rt.knowledge.fetch()
+    base_sha = base_sha or rt.knowledge.fetch()  # the revision the audit read, when there was one
     base = rt.knowledge.knowledge_files(base_sha)
     external = rt.knowledge.external_texts(base_sha)
     release, today = sweep["tag"] or rt.release_for(lifecycle.repo), rt.today()
     progress = _progress(rt, lifecycle, sweep)
     report = {"sweep": sweep, "t1": structural_report(base, lifecycle.knowledge_dir),
-              "changesets": [], "skipped_pages": [], "failed_pages": []}
+              "changesets": [], "skipped_pages": [], "failed_pages": [], "reconciliation": reconciliation}
     staged: list[tuple[list, object, list, str]] = []  # (ops, result, evidence, page key)
     t1 = report["t1"]
     if not progress["t1_done"]:

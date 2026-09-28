@@ -90,6 +90,8 @@ def summary(rt, lifecycle, report: dict) -> tuple[str, str]:
         f"({', '.join(f'{k}: {v}' for k, v in sorted(statuses.items())) or 'none'}) |",
         f"| operations | {', '.join(f'{k}: {v}' for k, v in sorted(ops.items())) or 'none'} |",
         f"| waiting for people | {len(rt.ledger.human_queue(lifecycle.repo))} |",
+        f"| release audit reconciliation findings | "
+        f"{'not run' if report.get('reconciliation') is None else report['reconciliation']} |",
         f"| model calls | {calls} ({tokens['input']} in / {tokens['output']} out tokens, {seconds:.0f}s) |",
     ]
     if report.get("breaker"):

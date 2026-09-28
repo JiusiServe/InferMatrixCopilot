@@ -451,6 +451,8 @@ def test_repo_neutral_plugin_loader(tmp_path):
         project_root=fixture["project"],
     )
     assert result.to_sha == fixture["new"]
+    assert result.data["baseline_file"] == "release_baseline.yaml"      # the baseline companion's target
+    assert (adapter / result.data["baseline_file"]).is_file()
     kinds = {i["kind"] for i in result.issues}
     # the real adapter baseline is used, so its owner documents are absent
     # from this fixture project; only knowledge-document kinds are enforced
