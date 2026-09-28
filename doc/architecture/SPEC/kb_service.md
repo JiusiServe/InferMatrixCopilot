@@ -61,3 +61,23 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   所有页面落定后基线才推进；兜底巡检只做 T1 与 purge。
 - 熔断暂停与状态变化在同一加锁事务中发布控制记录与暂停清单。
 
+
+## 2026-09-28 发布器
+`publisher` 在 GPU 盒上以仓库负责人的 gh 登录运行（`kb publish`），是知识 PR 唯一的 GitHub 写入方。
+- 每轮：经 SSH（或本地目录）读取签名控制记录，过期即整轮不动；对每个 outbox 项执行 `check_item`（签名、
+  过期、代际、暂停、控制记录与**发布器自己的适配器配置**同时为 `auto_merge`），执行后先在本地记录结果，
+  再写回发布器密钥签名的 `kb-ack`（字段：item_id、kind、changeset_id、ok、pr、head_sha、branch、error）。
+- 幂等：已执行的项只重发 ack（服务收取 ack 后删除该项）；完成记录原子写入，损坏的记录移到 `.corrupt` 并等人处理，
+  绝不猜测是否已执行；`open_pr` 只复用 head 恰为重建提交的已打开 PR（companion 还须是 draft）；
+  提交由签名内容在 `base_sha` 上用临时索引重建，日期取自该项，重试得到同一 SHA；分支已存在且内容不同则拒绝，
+  绝不覆盖。路径必须是受治理的知识页面（`knowledge/{repos/<r>,general}/**.md|yaml`，无 `..`）。
+- 恢复：`post_verdict` 只在未暂停、当前代际下签发，发布它时先移除 `kb:hold` 标签并确认已移除，再发布评论，使评论触发的预检不再因暂停标签失败。
+  失败的 `pause`/`close` 不回执，留在 outbox 中每轮重试直到成功；格式错误的控制记录或项目记入 trace 并跳过。
+  SSH 读取或回执失败只记入 trace，不终止进程；完成记录保留，下一轮重发回执而不重复动作。
+- 动作：`open_pr`/`open_companion_pr`（始终 draft）、`post_verdict` 与 `enqueue`/`update_branch`（先核对 PR
+  仍打开且 head 未变；`enqueue` 先把 draft 转为 ready，再 `gh pr merge --auto --match-head-commit`）、
+  `pause`（程序 P：出队 → 关闭自动合并 → 转 draft，确认已是 draft，再加 `kb:hold`）、`close`。
+- 双重门控：无 `ALLOW_POST=1` 只记录将要执行的动作；推送分支还需 `ALLOW_PUSH=1`。无法验证或不可执行的项
+  既不执行也不回执。每轮与每个决定都写入 `traces/publisher.jsonl`。
+- 测试：`test_kb_publisher.py`（端到端 open_pr → ack → pr_open、dry-run、崩溃后不重复执行、伪造/未配置/过期、
+  越界路径、verdict/入队/暂停/关闭、暂停期间仍执行暂停、SSH 引号与回执、ack 字段）。

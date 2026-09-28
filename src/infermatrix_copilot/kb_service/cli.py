@@ -10,6 +10,10 @@
     kb serve [--once]                 the scheduler (holds the single-writer lease)
     kb activate                       activate the knowledge snapshot of the repository's main now
     kb rollback --to SHA              point `active` back at an earlier snapshot
+    kb publish (--remote HOST:/STATE_DIR | --local DIR) [--once]
+                                      the publisher (GPU box, owner's gh login): perform
+                                      the signed outbox items; writes need ALLOW_POST=1
+                                      (and ALLOW_PUSH=1 to push branches)
 
 Pause/resume bump the repository's generation, so every outbox item issued
 before it is void; they then re-sign the control record and hold list at once.
@@ -20,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -105,6 +110,14 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("activate")
     rollback = sub.add_parser("rollback")
     rollback.add_argument("--to", required=True)
+    publish = sub.add_parser("publish")
+    where = publish.add_mutually_exclusive_group(required=True)
+    where.add_argument("--remote", help="host:/absolute/path of the service state directory (over ssh)")
+    where.add_argument("--local", help="the service state directory on this machine")
+    publish.add_argument("--once", action="store_true")
+    publish.add_argument("--interval", type=float, default=60.0)
+    publish.add_argument("--publisher-state",
+                         help="default: $KB_PUBLISHER_STATE or ~/.infermatrix-copilot/kb-publisher")
     args = parser.parse_args(argv)
 
     if args.command == "keygen":
@@ -113,6 +126,9 @@ def main(argv: list[str] | None = None) -> int:
         key = generate_private_key(args.out)
         print(public_key_text(key.public_key()))
         return 0
+
+    if args.command == "publish":
+        return _publish(args)
 
     state_dir = _state_dir(args.state_dir)
     ledger = _ledger(state_dir)
@@ -220,3 +236,38 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         ledger.close()
     return 2
+
+
+def _publish(args) -> int:
+    """The publisher never opens the service ledger: it only sees the outbox."""
+    from ..knowledge_service.signing import load_private_key, load_public_key
+    from .merge import knowledge_repository
+    from .publisher import Gh, LocalTransport, Publisher, SshTransport
+
+    for name in ("KB_SERVICE_PUBKEY", "KB_PUBLISHER_KEY", "KB_PUBLISHER_GIT_AUTHOR"):
+        if not os.environ.get(name):
+            raise SystemExit(f"{name} is not set")
+    author = re.fullmatch(r"\s*(.+?)\s*<([^<>\s]+@[^<>\s]+)>\s*", os.environ["KB_PUBLISHER_GIT_AUTHOR"])
+    if not author:
+        raise SystemExit("KB_PUBLISHER_GIT_AUTHOR must look like 'Name <email>'")
+    state = Path(args.publisher_state or os.environ.get("KB_PUBLISHER_STATE")
+                 or Path.home() / ".infermatrix-copilot" / "kb-publisher").expanduser()
+    state.mkdir(parents=True, exist_ok=True)
+    registry = _registry()
+    publisher = Publisher(
+        transport=SshTransport.parse(args.remote) if args.remote else LocalTransport(Path(args.local)),
+        service_public_key=load_public_key(Path(os.environ["KB_SERVICE_PUBKEY"]).read_text(encoding="utf-8")),
+        publisher_key=load_private_key(os.environ["KB_PUBLISHER_KEY"]),
+        github=Gh(knowledge_repository(), cwd=state),
+        state_dir=state,
+        author=(author.group(1), author.group(2)),
+        repo_flags={name: (lc.publishes, lc.auto_merge) for name, lc in registry.items() if lc.enabled},
+        allow_post=os.environ.get("ALLOW_POST") == "1",
+        allow_push=os.environ.get("ALLOW_PUSH") == "1",
+    )
+    if args.once:
+        json.dump(publisher.run_once(), sys.stdout, sort_keys=True)
+        print()
+        return 0
+    publisher.serve(interval=args.interval)
+    return 0

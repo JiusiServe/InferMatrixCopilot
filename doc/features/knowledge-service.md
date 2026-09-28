@@ -89,3 +89,20 @@ python tools/build_kb_gate_bundle.py --lock   # 从 PyPI 重新按哈希固定�
 在 `.github/CODEOWNERS` 中再加入至少一名知识维护者；仓库 admin 开启合并队列（merge commit）
 与 ruleset（必需检查 `kb-gate` 限定 GitHub Actions 来源、Code Owner 审阅、新推送需重新批准）。
 在此之前，所有触碰 `knowledge/` 的 PR 都会被 `kb-gate` 拒绝（失败即关闭），代码 PR 不受影响。
+
+## 发布器（GPU 盒）
+
+发布器以仓库负责人现有的 `gh` 登录执行服务签名的 outbox 项，写回签名回执。凭据不离开 GPU 盒。
+
+```bash
+infermatrix-copilot kb keygen --out ~/.infermatrix-copilot/kb-publisher.pem   # 发布器密钥；公钥给服务的 KB_PUBLISHER_PUBKEY
+export KB_SERVICE_PUBKEY=/path/to/service.pub          # 服务公钥（kb keygen 输出的一行）
+export KB_PUBLISHER_KEY=~/.infermatrix-copilot/kb-publisher.pem
+export KB_PUBLISHER_GIT_AUTHOR='Name <email>'         # 知识 PR 提交的作者
+export KB_PUBLISHER_STATE=/data/<owner>/kb-publisher  # 必须在负责人目录下（gh 包装器按目录选择登录）
+infermatrix-copilot kb publish --remote bot-host:/path/to/kb-state --once   # 只记录（dry-run）
+ALLOW_POST=1 ALLOW_PUSH=1 infermatrix-copilot kb publish --remote bot-host:/path/to/kb-state   # 常驻
+```
+
+没有 `ALLOW_POST=1` 时只把将要执行的动作写入 `$KB_PUBLISHER_STATE/traces/publisher.jsonl`；推送分支还需要
+`ALLOW_PUSH=1`。控制记录超过 10 分钟未更新（服务可能宕机）时整轮不执行任何动作。
