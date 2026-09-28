@@ -64,3 +64,28 @@ T1/T2/T3 与 purge，每个规则页一个变更集，全部经过质量门。
 
 评审服务读取知识：将 `KNOWLEDGE_ROOT` 指向 `$KB_STATE_DIR/active`。
 
+
+## 仓库端门禁 `kb-gate`
+
+必需检查 `kb-gate`（`.github/workflows/kb-gate.yml`）只从受 CODEOWNERS 保护的验证包
+`.github/kb-gate/` 运行，从不导入 `src/`、`tools/`、`knowledge/tools/`。
+
+- **PR 预检**：`pull_request_target`、带判定标记的评论或手动触发；在当前 `main` 上验证后，
+  把 `kb-gate` 状态发布到 PR head。只决定能否入队。
+- **merge group**：名为 `kb-gate` 的作业逐段验证将要落地的提交；失败则 PR 被移出队列。
+- 未触碰 `knowledge/` 的 PR 总是通过；知识 PR 需要有效签名判定、清单一致、L1 通过、
+  暂停清单新鲜且未命中（见 SPEC `knowledge_service.md` 的 kb-gate 验证器一节）。
+
+修改验证逻辑后重新生成验证包（属于 `.github/**` 改动，需要知识维护者审批）：
+
+```bash
+python tools/build_kb_gate_bundle.py          # 重新生成
+python tools/build_kb_gate_bundle.py --check  # CI 提醒（非阻塞）
+python tools/build_kb_gate_bundle.py --lock   # 从 PyPI 重新按哈希固定依赖
+```
+
+切换前的负责人步骤：提交 `.github/kb-gate.pub`（`kb keygen` 的公钥）；在
+`.github/kb-gate/config.json` 填入暂停清单的公开 HTTPS 地址（`$KB_STATE_DIR/public/holds.json`）；
+在 `.github/CODEOWNERS` 中再加入至少一名知识维护者；仓库 admin 开启合并队列（merge commit）
+与 ruleset（必需检查 `kb-gate` 限定 GitHub Actions 来源、Code Owner 审阅、新推送需重新批准）。
+在此之前，所有触碰 `knowledge/` 的 PR 都会被 `kb-gate` 拒绝（失败即关闭），代码 PR 不受影响。
