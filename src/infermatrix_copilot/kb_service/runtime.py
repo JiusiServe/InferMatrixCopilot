@@ -12,6 +12,7 @@ import datetime as dt
 import json
 import os
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -40,6 +41,7 @@ class KbRuntime:
     clock: Callable[[], float] = time.time
     lease_owner: str | None = None  # set by `kb serve`, which holds the lease for its lifetime
     publisher_public_key: object | None = None
+    traces: object | None = None  # trace_store.TraceStore: decisions and outcomes (model calls via the gateway)
     release_label: Callable[[str], str] = field(default=lambda repo: "")
 
     @classmethod
@@ -66,16 +68,28 @@ class KbRuntime:
             from ..knowledge_service.signing import load_public_key
 
             publisher_key = load_public_key(Path(os.environ["KB_PUBLISHER_PUBKEY"]).read_text(encoding="utf-8"))
+        from ..trace_store import TraceStore
+
+        traces = TraceStore(state_dir / "traces")
         return cls(
-            publisher_public_key=publisher_key,
+            publisher_public_key=publisher_key, traces=traces,
             state_dir=state_dir, ledger=ledger, registry=registry,
-            gateway=ModelGateway(settings, recorder=_trace_recorder(state_dir)),
+            gateway=ModelGateway(settings, recorder=trace_recorder(traces)),
             generator=generator, judge=judge,
             knowledge=KnowledgeRepo(Path(os.environ.get("KB_KNOWLEDGE_CLONE") or state_dir / "knowledge-repo")),
             github=GitHubReader(), outbox=outbox,
         )
 
     # -- helpers -------------------------------------------------------------
+
+    def trace(self, kind: str, **fields) -> None:
+        """Append a trace/1 record; never lets tracing break the service."""
+        if self.traces is None:
+            return
+        try:
+            self.traces.append(kind, **fields)
+        except Exception:  # noqa: BLE001 - a full disk must not stop the gate
+            pass
 
     def today(self) -> str:
         return dt.datetime.fromtimestamp(self.clock(), dt.timezone.utc).date().isoformat()
@@ -95,14 +109,21 @@ class KbRuntime:
         return json.loads(self.changeset_path(changeset_id).read_text(encoding="utf-8"))
 
 
-def _trace_recorder(state_dir: Path):
-    """Append every model call (inputs, outputs, usage) to the service trace."""
-    path = state_dir / "traces" / "model_calls.jsonl"
+def trace_recorder(traces):
+    """Every model call (inputs, outputs, usage, failure) as a trace/1
+    ``model_call`` record, under the caller's bound trace context."""
 
     def record(entry: dict) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps({"at": time.time(), **entry}, ensure_ascii=False) + "\n")
+        try:
+            traces.append(
+                "model_call",
+                inputs={"system": entry["system"], "prompt": entry["prompt"]},
+                outputs={"reply": entry["reply"]},
+                model={k: entry.get(k, "") for k in ("role", "provider", "model", "effort", "served_model")},
+                usage=entry.get("usage") or {}, seconds=entry.get("seconds"),
+                result={"stop_reason": entry.get("stop_reason", "")}, error=entry.get("error", ""))
+        except Exception:  # noqa: BLE001 - tracing never breaks a model call
+            pass
 
     return record
 
@@ -145,11 +166,14 @@ def run_intake(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: int = 10)
     request duplicate PRs)."""
     from .ledger import LeaseError
 
+    from ..trace_store import trace_context
+
     try:
-        if rt.lease_owner:
-            return _run_intake_locked(rt, lifecycle, max_events=max_events, owner=rt.lease_owner)
-        with rt.ledger.lease() as owner:
-            return _run_intake_locked(rt, lifecycle, max_events=max_events, owner=owner)
+        with trace_context(playbook="kb-intake", repo=lifecycle.repo, run_id=f"intake-{uuid.uuid4().hex[:12]}"):
+            if rt.lease_owner:
+                return _run_intake_locked(rt, lifecycle, max_events=max_events, owner=rt.lease_owner)
+            with rt.ledger.lease() as owner:
+                return _run_intake_locked(rt, lifecycle, max_events=max_events, owner=owner)
     except LeaseError:
         return None
 
@@ -166,13 +190,23 @@ def _run_intake_locked(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: i
         return None  # retried next tick; events stay pending
     release, today = rt.release_for(lifecycle.repo), rt.today()
     drafts = []
+    from ..trace_store import accepted_key, trace_context
+
+    accepted: dict[int, str] = {}  # event -> the accepted generator call's key
     for event in events:
         rt.ledger.heartbeat(owner)  # model calls are slow; keep the lease live
         try:
-            drafts.append(draft_changes(
-                repo=lifecycle.repo, repo_dir=lifecycle.knowledge_dir, event_id=event["id"],
-                evidence=event["payload"], files=base, gateway=rt.gateway,
-                generator=rt.generator, release=release, today=today))
+            # the change set does not exist yet: the draft key and the accepted
+            # attempt link exactly the call whose reply became the change to
+            # the decision that later stages it
+            key, holder = draft_key_for_event(lifecycle.repo, event["id"]), {}
+            with trace_context(draft_key=key, _accepted=holder, step="draft"):
+                drafts.append(draft_changes(
+                    repo=lifecycle.repo, repo_dir=lifecycle.knowledge_dir, event_id=event["id"],
+                    evidence=event["payload"], files=base, gateway=rt.gateway,
+                    generator=rt.generator, release=release, today=today))
+            if accepted_key(key, holder):
+                accepted[event["id"]] = accepted_key(key, holder)
         except ModelUnavailable as exc:
             # fenced: if this worker lost its lease meanwhile, the new holder may
             # already have staged the event; an unfenced reset would undo that
@@ -201,24 +235,35 @@ def _run_intake_locked(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: i
     evidence = [e["payload"] for e in events if e["id"] in kept_ids]
     return gate_and_stage(rt, lifecycle, owner, kind="intake", base=base, base_sha=base_sha,
                           external=external, operations=operations, result=result,
-                          evidence=evidence, event_ids=sorted(kept_ids), release=release)
+                          evidence=evidence, event_ids=sorted(kept_ids), release=release,
+                          draft_keys=[accepted[i] for i in sorted(kept_ids) if i in accepted])
+
+
+def draft_key_for_event(repo: str, event_id) -> str:
+    """Unique per drafting: a redrafted event never shares a key with an earlier try."""
+    return f"event:{repo}:{event_id}:{uuid.uuid4().hex[:8]}"
 
 
 def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind: str, base: dict,
                    base_sha: str, external: dict, operations, result, evidence: list[dict],
                    event_ids: list[int], release: str, force_human: str = "",
-                   hold: bool = False) -> str:
+                   hold: bool = False, draft_keys: list[str] = ()) -> str:
     """Run the quality gate on one change set and stage it (files first, then
     every ledger write in one transaction fenced on the lease). Used by intake,
     sweep and purge. ``force_human`` routes a passing change set to people
     (e.g. a sweep-wide circuit breaker)."""
+    from ..trace_store import trace_context
+
     head = {**base, **result.files}
     rt.ledger.heartbeat(owner)
-    decision = run_gate(
-        base=base, head=head, changes=changes_between(base, head), external_texts=external,
-        evidence=evidence, gateway=rt.gateway, judge=rt.judge, release=release,
-        repo_dir=lifecycle.knowledge_dir, protected_rules=lifecycle.protected_rules,
-        retire_ratio=lifecycle.retire_ratio, max_files=lifecycle.max_files)
+    changeset_id = rt.ledger.new_changeset_id(lifecycle.repo, kind)
+    rule_ids = sorted({op.new_rule_id or op.rule_id for op in operations if (op.new_rule_id or op.rule_id)})
+    with trace_context(changeset_id=changeset_id, rule_ids=rule_ids, step="gate"):
+        decision = run_gate(
+            base=base, head=head, changes=changes_between(base, head), external_texts=external,
+            evidence=evidence, gateway=rt.gateway, judge=rt.judge, release=release,
+            repo_dir=lifecycle.knowledge_dir, protected_rules=lifecycle.protected_rules,
+            retire_ratio=lifecycle.retire_ratio, max_files=lifecycle.max_files)
     if force_human and decision.status == "pass":
         decision.status = "human"
         decision.reasons.append(force_human)
@@ -228,7 +273,6 @@ def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind:
     verdicts = [{"layer": "L2", "verdict": b.verdict, "block_id": b.block.block_id,
                  "model": b.model, "detail": b.to_dict()} for b in decision.blocks]
     verdicts.append({"layer": "gate", "verdict": decision.status, "detail": {"reasons": decision.reasons}})
-    changeset_id = rt.ledger.new_changeset_id(lifecycle.repo, kind)
     rt.save_changeset_files(changeset_id, {"base_sha": base_sha, "files": result.files,
                                            "deleted": [], "evidence": evidence})
     try:
@@ -244,6 +288,15 @@ def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind:
     except Exception:
         rt.changeset_path(changeset_id).unlink(missing_ok=True)
         raise
+    rt.trace("decision", context={"changeset_id": changeset_id, "rule_ids": rule_ids, "step": "gate",
+                                  "draft_keys": list(draft_keys)},
+             model={"role": "judge", "model": rt.judge.label()},
+             result={"status": decision.status, "staged_as": status, "reasons": decision.reasons,
+                     "blocks": [{"block_id": b.block.block_id, "rule_id": b.block.rule_id, "op": b.block.op,
+                                 "verdict": b.verdict, "dimensions": b.dimensions} for b in decision.blocks],
+                     "consistency": [{"owner_dir": c["owner_dir"], "verdict": c["verdict"]}
+                                     for c in decision.consistency],
+                     "l1_issues": [i.to_dict() for i in decision.l1.issues]})
     return changeset_id
 
 

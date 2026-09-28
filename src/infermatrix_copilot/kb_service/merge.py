@@ -159,14 +159,17 @@ def advance(rt, lifecycle) -> list[str]:
             rt.ledger.update_changeset(changeset["id"], status="merged",
                                        merge_sha=str(pr.get("merge_commit_sha") or ""))
             record_retirements(rt, changeset)
+            _outcome(rt, changeset, "merged", merge_sha=str(pr.get("merge_commit_sha") or ""))
             events.append(f"merged {changeset['id']}")
             continue
         if pr.get("state") == "closed":
             rt.ledger.update_changeset(changeset["id"], status="closed")
+            _outcome(rt, changeset, "closed_unmerged")  # overturned by people: a negative label
             events.append(f"closed {changeset['id']}")
             continue
         head = str((pr.get("head") or {}).get("sha") or "")
         if head != changeset["head_sha"]:
+            _outcome(rt, changeset, "head_changed", head_sha=head)
             rt.ledger.update_changeset(changeset["id"], status="head_changed")
             rt.ledger.enqueue_human(lifecycle.repo, f"PR #{number} head changed after signing", changeset["id"])
             events.append(f"head_changed {changeset['id']}")
@@ -192,11 +195,31 @@ def advance(rt, lifecycle) -> list[str]:
     return events
 
 
+def _rule_ids(changeset: dict) -> list[str]:
+    return sorted({op.get("new_rule_id") or op["rule_id"] for op in changeset["detail"].get("operations", [])
+                   if op.get("new_rule_id") or op.get("rule_id")})
+
+
+def _outcome(rt, changeset: dict, outcome: str, **result) -> None:
+    """What finally happened to a change set: the gold label its decision is scored against."""
+    trace = getattr(rt, "trace", None)
+    if trace is not None:
+        trace("outcome", context={"repo": changeset["repo"], "changeset_id": changeset["id"],
+                                  "pr": changeset.get("pr_number"), "rule_ids": _rule_ids(changeset)},
+              result={"outcome": outcome, **result})
+
+
 def record_retirements(rt, changeset: dict) -> None:
     release = changeset["detail"].get("release", "")
     for op in changeset["detail"].get("operations", []):
         if op["kind"] in ("retire", "replace"):
             rt.ledger.record_retirement(changeset["repo"], op["rule_id"], op["page"], release)
+            trace = getattr(rt, "trace", None)
+            if trace is not None:  # the rule's earlier admission now has a later-retired label
+                trace("outcome", context={"repo": changeset["repo"], "changeset_id": changeset["id"],
+                                          "rule_ids": [op["rule_id"]]},
+                      result={"outcome": "rule_retired", "rule_id": op["rule_id"], "release": release,
+                              "reason": op.get("reason", "")})
         elif op["kind"] == "purge":
             rt.ledger.mark_purged(changeset["repo"], op["rule_id"])
 

@@ -67,6 +67,14 @@ def load_cases(directory: str | Path) -> list[dict]:
 
 
 def run_calibration(directory: str | Path, *, gateway, judge) -> CalibrationReport:
+    """Traced as playbook ``kb-calibrate``: dataset export never uses these calls."""
+    from ..trace_store import trace_context
+
+    with trace_context(playbook="kb-calibrate", run_id=f"calibrate-{Path(directory).name}"):
+        return _run_calibration(directory, gateway=gateway, judge=judge)
+
+
+def _run_calibration(directory: str | Path, *, gateway, judge) -> CalibrationReport:
     details = []
     bad_total = bad_caught = good_total = good_rejected = 0
     for case in load_cases(directory):

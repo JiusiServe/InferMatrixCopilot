@@ -46,6 +46,7 @@ from .models import (
     UnsupportedRepositoryError,
 )
 from .strict import StrictRuntime
+from ...trace_store import SCHEMA as TRACE_SCHEMA, TraceStore, redact, trace_context
 
 __all__ = [
     "DIRECT_API_VERSION",
@@ -53,6 +54,7 @@ __all__ = [
     "QUALITY_API_VERSION",
     "SDK_API_VERSION",
     "STRICT_API_VERSION",
+    "TRACE_SCHEMA",
     "Capabilities",
     "ChangedPath",
     "CarriedFinding",
@@ -92,6 +94,9 @@ __all__ = [
     "StrictRunHandle",
     "StrictRuntimeConfig",
     "StrictRuntime",
+    "TraceStore",
     "UnsupportedRepositoryError",
     "get_capabilities",
+    "redact",
+    "trace_context",
 ]

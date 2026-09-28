@@ -261,7 +261,7 @@ def test_intake_end_to_end_shadow_records_and_publishes_nothing(tmp_path):
     assert "DEMO-2a" in files[PAGE]
     assert publish(rt, lifecycle, changeset_id) == "shadow_recorded"
     assert not (tmp_path / "state" / "outbox").exists()
-    calls = (tmp_path / "state" / "traces" / "model_calls.jsonl")
+    calls = (tmp_path / "state" / "traces" / "records")
     assert not calls.exists()  # scripted gateway bypasses the recorder; real one records
 
 

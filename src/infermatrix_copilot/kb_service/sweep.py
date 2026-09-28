@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import uuid
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 
@@ -198,10 +199,13 @@ def sweep_page(rt, lifecycle, *, page: str, files: dict[str, str], diff: str, hi
         "<", "\\u003c") + "\n</untrusted_data>\n"
     feedback = ""
     last_error = ""
-    for _attempt in range(MAX_REPAIRS + 1):
+    from ..trace_store import accept_attempt, trace_context
+
+    for attempt in range(MAX_REPAIRS + 1):
         try:
-            reply = rt.gateway.call_json(rt.generator, system=SWEEP_SYSTEM, prompt=prompt + feedback,
-                                         validate=_validate_sweep)
+            with trace_context(attempt=attempt):
+                reply = rt.gateway.call_json(rt.generator, system=SWEEP_SYSTEM, prompt=prompt + feedback,
+                                             validate=_validate_sweep)
         except ModelUnavailable as exc:
             if "failed its schema" not in str(exc):
                 raise
@@ -217,7 +221,9 @@ def sweep_page(rt, lifecycle, *, page: str, files: dict[str, str], diff: str, hi
             last_error = feedback.strip()
             continue
         try:
-            return operations, apply_operations(files, operations, release=release, today=today)
+            result = apply_operations(files, operations, release=release, today=today)
+            accept_attempt(attempt)
+            return operations, result
         except LifecycleError as exc:
             feedback = f"\n\nYour previous answer was rejected by the knowledge base: {exc}. Fix exactly that."
             last_error = str(exc)
@@ -272,6 +278,25 @@ def _progress(rt, lifecycle, sweep: dict) -> dict:
 
 def run_sweep(rt, lifecycle, owner: str, sweep: dict, upstream: UpstreamRepo,
               audit_hints: dict[str, list[dict]] | None = None) -> dict:
+    """Traced: every model call and decision of the sweep carries its release."""
+    from ..trace_store import trace_context
+
+    with trace_context(playbook="kb-sweep", repo=lifecycle.repo, release=str(sweep.get("tag") or ""),
+                       run_id=f"sweep-{lifecycle.repo}-{sweep.get('tag') or ''}"):
+        return _run_sweep(rt, lifecycle, owner, sweep, upstream, audit_hints)
+
+
+def draft_key_for_page(repo: str, sweep: dict, page: str) -> str:
+    """Unique per evaluation: a retried page never shares a key with a failed try."""
+    return f"sweep:{repo}:{sweep.get('tag') or ''}:{page}:{uuid.uuid4().hex[:8]}"
+
+
+def _run_sweep(rt, lifecycle, owner: str, sweep: dict, upstream: UpstreamRepo,
+               audit_hints: dict[str, list[dict]] | None = None) -> dict:
+    from ..trace_store import accepted_key, trace_context
+
+    accepted: dict[str, str] = {}  # page -> the accepted generator call's key
+
     """Run (or resume) one sweep. Progress is per page: a page is done once its
     answer is staged or it is kept; a page whose evaluation failed is retried on
     the next due run and handed to people after MAX_PAGE_ATTEMPTS. The baseline
@@ -306,9 +331,13 @@ def run_sweep(rt, lifecycle, owner: str, sweep: dict, upstream: UpstreamRepo,
             diff_cache[prefixes] = upstream.diff(sweep["from_sha"], sweep["to_sha"], list(prefixes))
         rt.ledger.heartbeat(owner)
         try:
-            outcome = sweep_page(rt, lifecycle, page=page, files=base, diff=diff_cache[prefixes],
-                                 hints=(audit_hints or {}).get(page, []), sweep=sweep,
-                                 release=release, today=today)
+            key, holder = draft_key_for_page(lifecycle.repo, sweep, page), {}
+            with trace_context(draft_key=key, _accepted=holder, step="draft"):
+                outcome = sweep_page(rt, lifecycle, page=page, files=base, diff=diff_cache[prefixes],
+                                     hints=(audit_hints or {}).get(page, []), sweep=sweep,
+                                     release=release, today=today)
+            if accepted_key(key, holder):
+                accepted[page] = accepted_key(key, holder)
         except SweepPageFailed as exc:
             attempts = progress["attempts"].get(page, 0) + 1
             progress["attempts"][page] = attempts
@@ -335,7 +364,8 @@ def run_sweep(rt, lifecycle, owner: str, sweep: dict, upstream: UpstreamRepo,
         kind = "purge" if operations and all(op.kind == "purge" for op in operations) else "sweep"
         changeset_id = gate_and_stage(rt, lifecycle, owner, kind=kind, base=base, base_sha=base_sha,
                                       external=external, operations=operations, result=result,
-                                      evidence=evidence, event_ids=[], release=release, hold=True)
+                                      evidence=evidence, event_ids=[], release=release, hold=True,
+                                      draft_keys=[accepted[key]] if key in accepted else [])
         progress.setdefault("held", []).append(changeset_id)
         if key == "#t1":
             progress["t1_done"] = True

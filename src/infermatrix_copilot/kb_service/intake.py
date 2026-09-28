@@ -166,10 +166,13 @@ def draft_changes(*, repo: str, repo_dir: str, event_id: int, evidence: dict,
     prompt = draft_prompt(repo, evidence, files, repo_dir)
     attempts: list[dict] = []
     feedback = ""
+    from ..trace_store import accept_attempt, trace_context
+
     for attempt in range(MAX_REPAIRS + 1):
         try:
-            reply = gateway.call_json(generator, system=SYSTEM, prompt=prompt + feedback,
-                                      validate=_validate_reply)
+            with trace_context(attempt=attempt):
+                reply = gateway.call_json(generator, system=SYSTEM, prompt=prompt + feedback,
+                                          validate=_validate_reply)
         except ModelUnavailable as exc:
             if "failed its schema" not in str(exc):
                 raise  # the model itself is unavailable: the event waits
@@ -194,6 +197,7 @@ def draft_changes(*, repo: str, repo_dir: str, event_id: int, evidence: dict,
                             "Fix exactly that and answer again with the full JSON object.")
                 attempts.append({"attempt": attempt, "error": str(exc)})
                 continue
+            accept_attempt(attempt)  # only this call's reply became the change
             return Draft([event_id], operations, result, str(reply.data.get("rationale") or ""), attempts)
         attempts.append({"attempt": attempt, "error": feedback.strip()})
     return Draft([event_id], [], None, "rejected after repairs", attempts, rejected=True)

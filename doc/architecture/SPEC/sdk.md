@@ -124,3 +124,7 @@ Direct 1.1 / Strict 1.3 accept typed `CarriedFinding` inputs (unique IDs, source
 
 ## 2026-09-28 退役规则不再提供
 `DirectClient` 返回的文档内容与 `sha256` 均基于去掉退役规则后的服务文本（无退役规则时与磁盘字节一致）。
+
+## 2026-09-28 trace/1 导出
+`sdk.v1` 导出 `TraceStore`、`TRACE_SCHEMA`、`trace_context`、`redact`（见 `trace_store.md`），RB 用同一 schema
+记录 review 的模型调用、判定与结果；导入它们不加载 `config`/`contract`/`mcp_server` 等私有模块。

@@ -10,6 +10,9 @@
     kb serve [--once]                 the scheduler (holds the single-writer lease)
     kb activate                       activate the knowledge snapshot of the repository's main now
     kb rollback --to SHA              point `active` back at an earlier snapshot
+    kb traces [--kind K] [--changeset ID] [--rule ID] [--limit N]   query trace/1 records
+    kb replay --record ID --model PROVIDER:MODEL[:EFFORT]           re-ask a recorded call
+    kb export --out FILE [--role judge|generator]                   dataset (calibration-safe)
     kb publish (--remote HOST:/STATE_DIR | --local DIR) [--once]
                                       the publisher (GPU box, owner's gh login): perform
                                       the signed outbox items; writes need ALLOW_POST=1
@@ -110,6 +113,18 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("activate")
     rollback = sub.add_parser("rollback")
     rollback.add_argument("--to", required=True)
+    traces = sub.add_parser("traces")
+    traces.add_argument("--kind")
+    traces.add_argument("--changeset")
+    traces.add_argument("--rule")
+    traces.add_argument("--run")
+    traces.add_argument("--limit", type=int, default=50)
+    replay = sub.add_parser("replay")
+    replay.add_argument("--record", required=True)
+    replay.add_argument("--model", required=True, help="provider:model[:effort], e.g. codex:gpt-6-mini:low")
+    export = sub.add_parser("export")
+    export.add_argument("--out", required=True)
+    export.add_argument("--role", default="judge", choices=("judge", "generator"))
     publish = sub.add_parser("publish")
     where = publish.add_mutually_exclusive_group(required=True)
     where.add_argument("--remote", help="host:/absolute/path of the service state directory (over ssh)")
@@ -129,6 +144,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "publish":
         return _publish(args)
+    if args.command in {"traces", "replay", "export"}:
+        return _traces_command(args, _state_dir(args.state_dir))
 
     state_dir = _state_dir(args.state_dir)
     ledger = _ledger(state_dir)
@@ -270,4 +287,38 @@ def _publish(args) -> int:
         print()
         return 0
     publisher.serve(interval=args.interval)
+    return 0
+
+
+def _traces_command(args, state_dir: Path) -> int:
+    """Read-only over the trace store (replay also calls the substitute model)."""
+    from ..trace_store import TraceStore
+
+    store = TraceStore(state_dir / "traces")
+    if args.command == "traces":
+        records = store.query(kind=args.kind, changeset_id=args.changeset, rule_id=args.rule,
+                              run_id=args.run, limit=args.limit)
+        for record in records:
+            print(json.dumps({k: record[k] for k in ("id", "kind", "at", "context", "model", "result", "error")},
+                             ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.command == "replay":
+        from ..config import Settings
+        from .models import ModelGateway, ModelRole
+        from .replay import replay
+        from .runtime import trace_recorder
+
+        role_name = (store.get(args.record).get("model") or {}).get("role") or "judge"
+        gateway = ModelGateway(Settings(), recorder=trace_recorder(store))  # the replay call is traced too
+        result = replay(store, args.record, gateway, ModelRole.parse(role_name, args.model))
+        json.dump(result, sys.stdout, ensure_ascii=False, indent=2, sort_keys=True)
+        print()
+        return 0
+    from ..sdk._resources import adapters_root
+    from .replay import export_dataset
+
+    adapters = Path(os.environ.get("ADAPTERS_DIR") or adapters_root())
+    calibration = [p for p in sorted(adapters.glob("*/kb-calibration")) if p.is_dir()]
+    json.dump(export_dataset(store, args.out, role=args.role, calibration_dirs=calibration), sys.stdout)
+    print()
     return 0

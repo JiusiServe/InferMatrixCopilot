@@ -81,3 +81,17 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   既不执行也不回执。每轮与每个决定都写入 `traces/publisher.jsonl`。
 - 测试：`test_kb_publisher.py`（端到端 open_pr → ack → pr_open、dry-run、崩溃后不重复执行、伪造/未配置/过期、
   越界路径、verdict/入队/暂停/关闭、暂停期间仍执行暂停、SSH 引号与回执、ack 字段）。
+
+## 2026-09-28 留痕、回放与数据集
+- 运行时持有 `TraceStore(state_dir/traces)`：`ModelGateway` 的每次调用（含失败）写为 `model_call`；
+  `gate_and_stage` 先分配变更集 ID，判定期间绑定 `changeset_id`/`rule_ids`，暂存后写 `decision`；
+  `merge.advance` 写 `outcome`（merged / closed_unmerged / head_changed），退役写 `rule_retired`。
+  intake、sweep、calibration 分别绑定 playbook `kb-intake`/`kb-sweep`/`kb-calibrate`。留痕失败从不中断服务。
+- `replay`：用记录中的原始 system/prompt 询问替代模型，比较决定性字段（`dimensions` 或 `verdict`），写
+  `replay` 记录；替代模型的调用本身也记为 playbook `kb-replay`。只调用模型，不触及 GitHub、outbox 或账本。
+- `export_dataset`：按角色导出（输入、高成本模型输出、变更集判定、事后结果、规则后续结果）；丢弃校准与回放
+  调用、失败调用（截断、空、无法解析或不符 schema 的回复都记为失败），以及 prompt 中任意位置出现校准用例证据
+  引用（如 `PR #8107`，按边界匹配）或标题的调用。生成器调用发生在变更集之前：每次起草有唯一 `draft_key`（intake 为事件、
+  巡检为发版 + 页面，均带随机后缀），只有被采纳的那次尝试（`draft_key#attempt`）列入之后 `decision` 记录的
+  `draft_keys`，被拒绝的尝试与失败的重试不继承判定。记录的每个字符串（含键、model、usage）都经过脱敏。
+- CLI：`kb traces`、`kb replay --record ID --model P:M[:E]`、`kb export --out FILE`。
