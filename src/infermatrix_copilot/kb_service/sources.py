@@ -78,6 +78,35 @@ class KnowledgeRepo:
                 continue
         return texts
 
+    def fetch_pull(self, number: int) -> str:
+        """Fetch a pull request's head as data (never checked out); its SHA."""
+        self._git("fetch", "--quiet", self.remote, f"+refs/pull/{int(number)}/head:refs/kb/pull/{int(number)}")
+        return self._git("rev-parse", f"refs/kb/pull/{int(number)}").decode().strip()
+
+    def merge_base(self, a: str, b: str) -> str:
+        return self._git("merge-base", a, b).decode().strip()
+
+    def show(self, rev: str, path: str) -> str | None:
+        try:
+            return self._git("show", f"{rev}:{path}").decode("utf-8", "replace")
+        except SourceError:
+            return None
+
+    def raw_manifest(self, old: str, new: str) -> list[dict]:
+        """Every changed path as a kb-gate manifest entry (renames are D + A),
+        the exact form the verifier recomputes."""
+        out = self._git("diff", "--raw", "-z", "--no-renames", "--no-abbrev", old, new).split(b"\0")
+        entries, zero = [], "0" * 40
+        for index in range(0, len(out) - 1, 2):
+            old_mode, new_mode, old_blob, new_blob, status = out[index].decode()[1:].split()
+            entries.append({
+                "path": out[index + 1].decode("utf-8", "replace"), "status": status[0],
+                "old_blob": "" if old_blob == zero else old_blob, "new_blob": "" if new_blob == zero else new_blob,
+                "old_mode": "" if old_mode == "000000" else old_mode,
+                "new_mode": "" if new_mode == "000000" else new_mode,
+            })
+        return entries
+
     def knowledge_files(self, rev: str) -> dict[str, str]:
         """Knowledge-relative path -> text for the governed tree at ``rev``."""
         files = self._texts(rev, ("knowledge/repos/", "knowledge/general/"), KNOWLEDGE_SUFFIXES)

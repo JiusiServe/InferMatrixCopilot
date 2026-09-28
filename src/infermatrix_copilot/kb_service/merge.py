@@ -27,6 +27,8 @@ VERDICT_MARKER = "<!-- kb-gate:verdict:v1 -->"
 IN_FLIGHT = ("pr_requested", "pr_open", "verdict_posted", "queued")
 # a verdict must first verify within 72 hours: re-sign well before that
 RESIGN_AFTER = 48 * 3600
+# margin for the publisher's clock when deciding an item has certainly expired
+CLOCK_SKEW = 5 * 60
 # a queued PR that neither merged nor left the queue by then was dropped by a
 # failing merge group (GitHub does not tell us): re-sign and re-enqueue
 QUEUE_STALL = 2 * 3600
@@ -68,7 +70,7 @@ def issue_once(rt, repo: str, changeset: dict, kind: str, body: dict) -> bool:
         return False
     item = rt.outbox.issue(repo, kind, body)
     rt.ledger.update_changeset(changeset["id"], pending_item={
-        "id": item.id, "kind": kind, "expires_at": item.expires_at})
+        "id": item.id, "kind": kind, "expires_at": item.expires_at, "issued_at": item.issued_at})
     return True
 
 
@@ -93,7 +95,21 @@ def apply_acks(rt, acks: list[dict]) -> None:
                 current = rt.ledger.changeset(changeset_id)
                 if not ack.get("ok") or current["status"] not in ("pr_open", "verdict_posted", "queued"):
                     continue
-                if is_paused(rt.ledger, current["repo"]):
+                if current["detail"].get("withdrawn"):
+                    live_until = float(current["detail"].get("enqueue_expires_at") or 0) + CLOCK_SKEW
+                    # decided by when the ACKED pause was issued, never by when its
+                    # ack arrived: only a pause issued after every enqueue died is final
+                    pending = current.get("pending_item") or {}
+                    acked_issued = float(pending.get("issued_at") or 0) \
+                        if pending.get("kind") == "pause" and pending.get("id") == ack.get("item_id") else 0.0
+                    if acked_issued < live_until:
+                        # an enqueue signed earlier could still run after this
+                        # pause: pause again once it has certainly expired
+                        rt.ledger.update_changeset(changeset_id, pending_item=None, detail={
+                            **current["detail"], "pause_again_after": live_until})
+                    else:
+                        rt.ledger.update_changeset(changeset_id, status="approval_withdrawn", pending_item=None)
+                elif is_paused(rt.ledger, current["repo"]):
                     rt.ledger.update_changeset(changeset_id, status="paused", pending_item=None)
                 else:
                     # resumed before this (late) pause landed: the PR is now
@@ -131,16 +147,22 @@ def sign_verdict(rt, changeset: dict) -> dict:
     touched = set(data["files"]) | set(data.get("deleted", []))
     manifest = manifest_from_files({k: v for k, v in base.items() if k in touched},
                                    {k: v for k, v in head.items() if k in touched})
+    # an external PR's manifest comes from git and covers every changed path
+    manifest = detail.get("manifest") or manifest
     decision = detail["decision"]
     blocks = [{k: b[k] for k in ("block_id", "kind", "path", "rule_id", "op", "sha256", "verdict", "model")}
               for b in decision["blocks"]]
     consistency = [{"owner_dir": c["owner_dir"], "verdict": c["verdict"], "pages": c["pages"]}
                    for c in decision["consistency"]]
+    human = detail.get("source") == "human-approved"
     verdict = build_verdict(
         repository=knowledge_repository(), pr=int(changeset["pr_number"]), head_sha=changeset["head_sha"],
-        context_base_sha=detail["base_sha"], manifest=manifest, blocks=blocks, consistency=consistency,
+        context_base_sha=detail["base_sha"], manifest=manifest, blocks=[] if human else blocks,
+        consistency=[] if human else consistency,
         release=detail["release"], upstream={}, facts=[],
         models={"generator": detail["generator"], "judge": detail["judge"]},
+        source="human-approved" if human else "auto",
+        review_ids=tuple(detail.get("review_ids") or ()), reviewers=tuple(detail.get("reviewers") or ()),
         issued_at=rt.clock(),
     )
     return sign("kb-gate-verdict", verdict, rt.outbox._key)
@@ -176,6 +198,27 @@ def _epoch(value) -> float:
         return dt.datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
     except ValueError:
         return 0.0
+
+
+def _live_enqueue_until(rt, changeset: dict) -> float:
+    """The latest expiry of any enqueue signed for this change set that the
+    publisher could still execute, from every durable record: the recorded
+    value, the pending item, and unacknowledged signed items still in the
+    outbox (an item leaves the outbox only once its ack is collected)."""
+    latest = float(changeset["detail"].get("enqueue_expires_at") or 0)
+    pending = changeset.get("pending_item") or {}
+    if pending.get("kind") == "enqueue":
+        latest = max(latest, float(pending.get("expires_at") or 0))
+    for path in sorted(rt.outbox.outbox_dir.glob("*.json")):
+        if path.name == "control.json":
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))["payload"]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        if payload.get("kind") == "enqueue" and (payload.get("body") or {}).get("changeset_id") == changeset["id"]:
+            latest = max(latest, float(payload.get("expires_at") or 0))
+    return latest
 
 
 def _enqueue_outstanding(rt, changeset: dict) -> bool:
@@ -276,10 +319,12 @@ def advance(rt, lifecycle) -> list[str]:
     if rt.outbox is None:
         return events
     paused = is_paused(rt.ledger, lifecycle.repo)
-    # the one queue slot per repository is taken by a queued PR AND by any PR
-    # whose signed enqueue is still executable (not yet acked)
+    # the one queue slot per repository is taken by a queued PR, by any PR whose
+    # signed enqueue is still executable (not yet acked), and by a withdrawn PR
+    # until its pause (dequeue) is acked: it may have been queued meanwhile
     queued = rt.ledger.changesets(lifecycle.repo, ("queued",)) + [
-        cs for cs in rt.ledger.changesets(lifecycle.repo, ("verdict_posted",)) if _enqueue_outstanding(rt, cs)]
+        cs for cs in rt.ledger.changesets(lifecycle.repo, ("verdict_posted",))
+        if _enqueue_outstanding(rt, cs) or cs["detail"].get("withdrawn")]
     for changeset in rt.ledger.changesets(lifecycle.repo, (*IN_FLIGHT, "superseding")):
         number = changeset["pr_number"]
         if number is None:
@@ -307,6 +352,11 @@ def advance(rt, lifecycle) -> list[str]:
             events.append(f"closed {changeset['id']}")
             continue
         head = str((pr.get("head") or {}).get("sha") or "")
+        if head != changeset["head_sha"] and changeset["kind"] == "external":
+            # authors push: the new head is simply judged again at the next poll
+            rt.ledger.update_changeset(changeset["id"], status="head_changed", pending_item=None)
+            events.append(f"head_changed {changeset['id']}")
+            continue
         if head != changeset["head_sha"]:
             _outcome(rt, changeset, "head_changed", head_sha=head)
             rt.ledger.update_changeset(changeset["id"], status="head_changed")
@@ -315,6 +365,27 @@ def advance(rt, lifecycle) -> list[str]:
             continue
         if paused:
             continue  # the pause itself is issued by `kb pause` / breakers
+        if changeset["kind"] == "external" and changeset["detail"].get("source") == "human-approved" \
+                and changeset["status"] in ("verdict_posted", "queued"):
+            from .external import approval_stands
+
+            withdrawn = bool(changeset["detail"].get("withdrawn"))
+            if withdrawn or not approval_stands(rt, changeset):
+                # a withdrawn approval must stop the PR: dequeue + draft. The
+                # change set keeps its status (and its queue slot) until the
+                # pause is acked; only then is it approval_withdrawn
+                if not withdrawn:
+                    rt.ledger.update_changeset(changeset["id"], detail={
+                        **changeset["detail"], "withdrawn": True,
+                        "enqueue_expires_at": _live_enqueue_until(rt, changeset)})
+                    rt.ledger.enqueue_human(lifecycle.repo, f"PR #{number}: approval withdrawn", changeset["id"])
+                    changeset = rt.ledger.changeset(changeset["id"])
+                    events.append(f"approval_withdrawn {changeset['id']}")
+                if rt.clock() >= float(changeset["detail"].get("pause_again_after") or 0):
+                    issue_once(rt, lifecycle.repo, changeset, "pause", {
+                        "changeset_id": changeset["id"], "pr": int(number),
+                        "reason": "a knowledge maintainer withdrew the approval"})
+                continue
         signed_at = float(changeset["detail"].get("verdict_issued_at") or 0)
         stale_verdict = bool(signed_at) and rt.clock() - signed_at > RESIGN_AFTER
         queued_at = float(changeset["detail"].get("queued_at") or 0)
@@ -339,6 +410,10 @@ def advance(rt, lifecycle) -> list[str]:
                 if any(m in description for m in RESIGN_GATE):
                     _resign(rt, changeset, description)
                     events.append(f"resign {changeset['id']}")
+                elif any(m in description for m in REBUILD_GATE) and changeset["kind"] == "external":
+                    # nothing of ours to rebuild: judge the PR again on current main
+                    rt.ledger.update_changeset(changeset["id"], status="stale_context", pending_item=None)
+                    events.append(f"stale_context {changeset['id']}")
                 elif any(m in description for m in REBUILD_GATE):
                     if not getattr(rt, "lease_owner", None):
                         continue  # only the scheduler (holding the lease) rebuilds
@@ -367,6 +442,11 @@ def advance(rt, lifecycle) -> list[str]:
             if _gate_status(rt, changeset["head_sha"]) == "success":
                 if issue_once(rt, lifecycle.repo, changeset, "enqueue", {
                         "changeset_id": changeset["id"], "pr": int(number), "head_sha": changeset["head_sha"]}):
+                    current = rt.ledger.changeset(changeset["id"])
+                    # remembered past any later pending item: a withdrawal must
+                    # outlast every enqueue that could still execute
+                    rt.ledger.update_changeset(changeset["id"], detail={
+                        **current["detail"], "enqueue_expires_at": current["pending_item"]["expires_at"]})
                     events.append(f"enqueue issued {changeset['id']}")
                 queued = [changeset]  # at most one queued knowledge PR per repository
     return events
@@ -399,6 +479,11 @@ def record_retirements(rt, changeset: dict) -> None:
                               "reason": op.get("reason", "")})
         elif op["kind"] == "purge":
             rt.ledger.mark_purged(changeset["repo"], op["rule_id"])
+    # external PRs carry no operations: what L1 found them retiring/purging
+    for item in changeset["detail"].get("retirements", []):
+        rt.ledger.record_retirement(changeset["repo"], item["rule_id"], item["page"], release)
+    for rule_id in changeset["detail"].get("purges", []):
+        rt.ledger.mark_purged(changeset["repo"], rule_id)
 
 
 def pause_open_prs(ledger, outbox, repo: str, reason: str) -> int:

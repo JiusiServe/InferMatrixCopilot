@@ -543,6 +543,19 @@ def _human_approval_problems(ctx: Context, pr: dict, verdict: dict, head_sha: st
             problems.append(f"review {review_id} is by someone the verdict does not name")
         else:
             approvers.add(login)
+    if approvers:
+        # a later review by the same person (changes requested, dismissal)
+        # withdraws the approval even though the bound review still reads APPROVED
+        latest: dict[str, dict] = {}
+        for review in ctx.github.get_all(f"/repos/{ctx.repository}/pulls/{number}/reviews"):
+            login = str((review.get("user") or {}).get("login") or "").lower()
+            if login and review.get("state") in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED"):
+                latest[login] = review
+        for login in sorted(approvers):
+            review = latest.get(login) or {}
+            if review.get("state") != "APPROVED" or review.get("commit_id") != head_sha:
+                problems.append(f"{login}'s latest review no longer approves this head")
+                approvers.discard(login)
     # knowledge maintainers = the CODEOWNERS of the gate itself. Governed pages
     # deliberately have no code owners (that would force a review on every auto
     # PR); paths outside the whitelist get GitHub's native code-owner review.
