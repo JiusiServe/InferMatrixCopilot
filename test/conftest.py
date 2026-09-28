@@ -89,3 +89,10 @@ def git_repo(tmp_path: Path) -> Path:
     git("add", ".")
     git("commit", "-q", "-m", "init")
     return repo
+
+
+@pytest.fixture(autouse=True)
+def _no_real_run_roots(tmp_path, monkeypatch):
+    """Snapshot pruning looks for runs that pin a snapshot; tests never read
+    the real ~/.infermatrix-copilot/runs."""
+    monkeypatch.setenv("KB_RUN_ROOTS", str(tmp_path / "no-runs"))

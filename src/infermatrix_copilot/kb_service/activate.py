@@ -16,6 +16,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
@@ -25,6 +26,10 @@ from ..knowledge_view import KnowledgeView, _load_view, build_manifest
 from .outbox import atomic_write_json
 
 KEEP = 10
+# a snapshot switched away from less than this ago is never pruned: a run that
+# resolved it just before the switch publishes its pin within this window
+PIN_GRACE = 3600
+DEACTIVATED = ".deactivated-{name}"
 
 
 class ActivationError(RuntimeError):
@@ -111,6 +116,11 @@ def verify_snapshot(snapshot: Path) -> KnowledgeView:
 
 def switch_active(state_dir: Path, snapshot: Path) -> None:
     link = active_link(state_dir)
+    if link.is_symlink():
+        previous = link.resolve()
+        if previous != snapshot.resolve() and previous.parent == snapshots_dir(state_dir).resolve():
+            # when it stopped being active: pruning honours a grace period after this
+            (snapshots_dir(state_dir) / DEACTIVATED.format(name=previous.name)).write_text("", encoding="utf-8")
     tmp = link.with_name(f".active.{os.getpid()}")
     if tmp.is_symlink() or tmp.exists():
         tmp.unlink()
@@ -149,13 +159,63 @@ def rollback(rt, sha: str) -> Path:
         return snapshot
 
 
-def prune(state_dir: Path, keep: int = KEEP) -> None:
+def run_roots() -> list[Path]:
+    """Where the review runs that may pin a snapshot keep their run
+    directories: ``KB_RUN_ROOTS`` (os.pathsep-separated), else the runs'
+    ``RUN_ROOT``, else its default."""
+    raw = os.environ.get("KB_RUN_ROOTS")
+    if raw:
+        return [Path(part).expanduser() for part in raw.split(os.pathsep) if part]
+    try:  # the runs' EFFECTIVE run_root (environment or the supported .env files)
+        from ..config import Settings
+
+        return [Path(Settings().run_root).expanduser()]
+    except Exception:  # noqa: BLE001 - unreadable config: the documented default
+        return [Path(os.environ.get("RUN_ROOT") or Path.home() / ".infermatrix-copilot" / "runs").expanduser()]
+
+
+def pinned_snapshots(roots: list[Path]) -> set[Path]:
+    """Snapshot directories pinned (``<run>/knowledge.json``) by runs that have
+    not finished: a queued or running Strict review must keep its knowledge."""
+    from .. import run_status as rs
+
+    pinned: set[Path] = set()
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for run_dir in root.iterdir():
+            try:
+                pin = json.loads((run_dir / "knowledge.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            target = pin.get("knowledge_root") if isinstance(pin, dict) else None
+            if not target:
+                continue
+            status = rs.read_status(run_dir) or {}  # ONE read: a reclaim may change it meanwhile
+            state = status.get("state")
+            # an interrupted reservation that never launched (no child pid) can
+            # be reclaimed and will run with its original pin
+            if state not in rs.TERMINAL or (state == rs.INTERRUPTED and status.get("child_pid") is None):
+                pinned.add(Path(target).resolve())
+    return pinned
+
+
+def prune(state_dir: Path, keep: int = KEEP, *, roots: list[Path] | None = None) -> None:
+    """Keep the newest ``keep`` snapshots, the active one, and every snapshot an
+    unfinished run pinned; remove the rest."""
     root = snapshots_dir(state_dir)
     link = active_link(state_dir)
     active = link.resolve() if link.is_symlink() else None
+    pinned = pinned_snapshots(run_roots() if roots is None else roots)
     snapshots = sorted((p for p in root.iterdir() if p.is_dir() and not p.name.startswith(".")),
                        key=lambda p: p.stat().st_mtime, reverse=True)
+    now = time.time()
     for old in snapshots[keep:]:
-        if active is not None and old.resolve() == active:
+        resolved = old.resolve()
+        if (active is not None and resolved == active) or resolved in pinned:
             continue
+        marker = root / DEACTIVATED.format(name=old.name)
+        if marker.exists() and now - marker.stat().st_mtime < PIN_GRACE:
+            continue  # deactivated too recently: a reservation may be pinning it right now
         shutil.rmtree(old, ignore_errors=True)
+        marker.unlink(missing_ok=True)

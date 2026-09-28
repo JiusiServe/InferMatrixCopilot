@@ -686,3 +686,98 @@ def test_pause_ack_waits_for_a_resume_holding_the_publication_lock(tmp_path):
     acker.join(5)
     assert not errors, errors
     assert rt.ledger.changeset(changeset_id)["status"] == "pr_open"  # never stranded as paused
+
+
+def test_prune_keeps_snapshots_pinned_by_unfinished_runs(tmp_path):
+    import json
+    import os
+
+    from infermatrix_copilot import run_status as rs
+
+    state = tmp_path / "state"
+    for n in range(4):
+        path = snapshots_dir(state) / f"s{n}"
+        path.mkdir(parents=True)
+        os.utime(path, (1000 + n, 1000 + n))
+    active_link(state).symlink_to((snapshots_dir(state) / "s3").resolve())
+    runs = tmp_path / "runs"
+    for n in range(4, 6):
+        path = snapshots_dir(state) / f"s{n}"
+        path.mkdir(parents=True)
+        os.utime(path, (900 + n, 900 + n))
+    for name, snapshot, status in (("running", "s1", {"state": rs.RUNNING}), ("queued", "s0", {"state": rs.QUEUED}),
+                                   ("done", "s2", {"state": rs.DONE}),
+                                   ("never-launched", "s4", {"state": rs.INTERRUPTED, "child_pid": None}),
+                                   ("partly-ran", "s5", {"state": rs.INTERRUPTED, "child_pid": 4242})):
+        run_dir = runs / name
+        run_dir.mkdir(parents=True)
+        (run_dir / "knowledge.json").write_text(json.dumps(
+            {"snapshot": snapshot, "knowledge_root": str(snapshots_dir(state) / snapshot)}))
+        (run_dir / rs.STATUS_NAME).write_text(json.dumps(status))
+    prune(state, keep=1, roots=[runs])
+    remaining = sorted(p.name for p in snapshots_dir(state).iterdir())
+    # live runs and a reclaimable (never-launched) reservation keep their pins;
+    # a finished run's, or one that ran and was interrupted, does not
+    assert remaining == ["s0", "s1", "s3", "s4"]
+
+
+def test_run_roots_come_from_the_environment(monkeypatch, tmp_path):
+    import os
+
+    from infermatrix_copilot.kb_service.activate import run_roots
+
+    monkeypatch.setenv("KB_RUN_ROOTS", os.pathsep.join([str(tmp_path / "a"), str(tmp_path / "b")]))
+    assert run_roots() == [tmp_path / "a", tmp_path / "b"]
+    monkeypatch.delenv("KB_RUN_ROOTS")
+    monkeypatch.setenv("RUN_ROOT", str(tmp_path / "c"))
+    assert run_roots() == [tmp_path / "c"]                  # Settings reads RUN_ROOT too
+
+
+def test_a_snapshot_switched_away_from_is_kept_through_the_pin_grace_period(tmp_path):
+    import os
+    import time
+
+    from infermatrix_copilot.kb_service.activate import DEACTIVATED, PIN_GRACE, switch_active
+
+    state = tmp_path / "state"
+    for n in range(3):
+        path = snapshots_dir(state) / f"s{n}"
+        path.mkdir(parents=True)
+        os.utime(path, (1000 + n, 1000 + n))
+    switch_active(state, snapshots_dir(state) / "s0")
+    switch_active(state, snapshots_dir(state) / "s2")     # s0 just stopped being active
+    prune(state, keep=1, roots=[])
+    assert sorted(p.name for p in snapshots_dir(state).iterdir() if not p.name.startswith(".")) == ["s0", "s2"]
+    marker = snapshots_dir(state) / DEACTIVATED.format(name="s0")
+    old = time.time() - PIN_GRACE - 1
+    os.utime(marker, (old, old))                          # the grace period has passed
+    prune(state, keep=1, roots=[])
+    assert sorted(p.name for p in snapshots_dir(state).iterdir() if not p.name.startswith(".")) == ["s2"]
+    assert not marker.exists()
+
+
+def test_run_roots_fall_back_to_the_effective_settings(monkeypatch, tmp_path):
+    from infermatrix_copilot import config
+    from infermatrix_copilot.kb_service.activate import run_roots
+
+    monkeypatch.delenv("KB_RUN_ROOTS")
+
+    class FakeSettings:
+        run_root = tmp_path / "from-dotenv"
+
+    monkeypatch.setattr(config, "Settings", FakeSettings)
+    assert run_roots() == [tmp_path / "from-dotenv"]
+
+
+def test_pin_discovery_reads_each_run_status_once(tmp_path, monkeypatch):
+    import json
+
+    from infermatrix_copilot import run_status as rs
+    from infermatrix_copilot.kb_service.activate import pinned_snapshots
+
+    run_dir = tmp_path / "runs" / "r"
+    run_dir.mkdir(parents=True)
+    (run_dir / "knowledge.json").write_text(json.dumps({"snapshot": "s", "knowledge_root": str(tmp_path / "s")}))
+    answers = iter([{"state": rs.INTERRUPTED, "child_pid": None}, {"state": rs.QUEUED}])
+    monkeypatch.setattr(rs, "read_status", lambda _d: next(answers))   # a reclaim lands between reads
+    assert pinned_snapshots([tmp_path / "runs"]) == {(tmp_path / "s").resolve()}
