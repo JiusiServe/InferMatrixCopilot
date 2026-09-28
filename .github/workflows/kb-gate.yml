@@ -1,0 +1,99 @@
+name: kb-gate
+
+# The required check for knowledge pull requests (doc/features/knowledge-service.md).
+#
+# Two stages, one check name:
+#   * precheck (pull_request_target / issue_comment / workflow_dispatch): verifies
+#     the PR against current main and posts the `kb-gate` commit STATUS on the PR
+#     head. It only decides whether the PR may enter the merge queue.
+#   * merge group (merge_group): the job named `kb-gate` verifies every segment of
+#     the group on the exact commit that would land. This decides what lands.
+#
+# Security: the precheck runs with the BASE branch's workflow and bundle
+# (pull_request_target), reads the PR only as git objects, never checks it out,
+# never installs or executes anything from it, and holds no secret (the repository
+# is public, so PR refs are fetched anonymously; the token only reads the API and
+# posts the status). Both jobs
+# run the verifier ONLY from .github/kb-gate/ (pinned, hash-locked deps).
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited, ready_for_review, converted_to_draft]
+  issue_comment:
+    types: [created, edited]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to (re)check
+        required: true
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  precheck:
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+       contains(github.event.comment.body, '<!-- kb-gate:verdict:v1 -->'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    concurrency:
+      group: kb-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the pinned verifier
+        run: |
+          cd .github/kb-gate && sha256sum --check --strict MANIFEST.sha256
+          python -m venv "$RUNNER_TEMP/kb-gate"
+          "$RUNNER_TEMP/kb-gate/bin/pip" install --quiet --require-hashes --no-deps -r requirements.lock
+      - name: Verify and post the kb-gate status
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          "$RUNNER_TEMP/kb-gate/bin/python" -E -s .github/kb-gate/kb_gate.py pr \
+            --repository "$GITHUB_REPOSITORY" --pr "$PR" --post-status --target-url "$RUN_URL"
+
+  kb-gate:
+    if: github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the pinned verifier
+        run: |
+          cd .github/kb-gate && sha256sum --check --strict MANIFEST.sha256
+          python -m venv "$RUNNER_TEMP/kb-gate"
+          "$RUNNER_TEMP/kb-gate/bin/pip" install --quiet --require-hashes --no-deps -r requirements.lock
+      - name: Verify every segment of the merge group
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          BASE_REF: ${{ github.event.merge_group.base_ref }}
+        run: |
+          "$RUNNER_TEMP/kb-gate/bin/python" -E -s .github/kb-gate/kb_gate.py merge-group \
+            --repository "$GITHUB_REPOSITORY" --head-sha "$HEAD_SHA" --base-ref "${BASE_REF#refs/heads/}"

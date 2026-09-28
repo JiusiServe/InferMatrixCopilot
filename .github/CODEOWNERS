@@ -1,0 +1,18 @@
+# Knowledge maintainers own the knowledge gate: its verifier bundle, workflows,
+# signing key and this file, plus the knowledge tooling and the non-governed
+# knowledge paths. With the ruleset's "require review from Code Owners" and
+# "dismiss stale approvals", a change here cannot land without a maintainer
+# approving its current head (doc/features/knowledge-service.md).
+#
+# Governed knowledge pages (knowledge/repos/**, knowledge/general/**) have NO
+# code owner on purpose: they merge through the kb-gate signed verdict. A
+# human-approved verdict must be approved by an owner of /.github/kb-gate/.
+#
+# GitHub does not let an author approve their own PR, and knowledge PRs are
+# opened as @tzhouam, so at least one more maintainer must be listed below
+# before the human-approved path can be used (owner setup step).
+
+/.github/                 @tzhouam
+/knowledge/tools/         @tzhouam
+/knowledge/skills/        @tzhouam
+/knowledge/.claude/       @tzhouam
