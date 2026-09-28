@@ -95,3 +95,16 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   巡检为发版 + 页面，均带随机后缀），只有被采纳的那次尝试（`draft_key#attempt`）列入之后 `decision` 记录的
   `draft_keys`，被拒绝的尝试与失败的重试不继承判定。记录的每个字符串（含键、model、usage）都经过脱敏。
 - CLI：`kb traces`、`kb replay --record ID --model P:M[:E]`、`kb export --out FILE`。
+
+## 2026-09-28 过期判定：重签、重建或转人工
+`merge.advance` 记录每次签发判定的时间（`verdict_issued_at`）与入队时间（`queued_at`），并处理不再能通过门禁的判定：
+- 判定签发超过 48 小时（有效期 72 小时）：`verdict_posted` 直接回到 `pr_open` 重签；`queued` 以及入队 2 小时仍未合并的
+  PR **不按计时释放队列名额**，而是先下发 `pause`（出队 + 转 draft），其回执把它送回 `pr_open`，再重签并重新入队。
+- 尚未过期的 `enqueue` 项未回执时不重签（其回执决定：进入 `queued` 后走上面的出队路径）。
+- PR 阶段 `kb-gate` 失败（只看签发当前判定之后发布的状态），按描述（验证器的第一个问题）分类：暂停清单/不可达/
+  验证器错误、我们自己暂停留下的 `kb:hold` 等瞬时问题 → 等待；判定过期或
+  缺失 → 重签；上下文改变、一致性页面变化、无法干净合并、清单不符 → **重建**：只有持有租约的调度器执行，在当前 main
+  上重新应用同样的操作并重新过质量门，暂存为 `rebuild` 变更集（证据带 `rebuild of <旧 id>` 标记，与暂存原子写入，
+  中断后再次执行会找到它而不会重复暂存）。只有重建**通过**质量门才取代旧 PR：旧变更集进入 `superseding`，`close` 项
+  过期即重发，直到观测到 PR 已关闭才记为 `superseded`（不计入被人工推翻的熔断）；重建未通过、操作无法再应用或没有
+  可重放的操作 → `rebuild_failed` 并转人工，旧 PR 保持打开。其他失败（变更本身有问题）→ `gate_failed` 并转人工一次。
