@@ -61,8 +61,9 @@ infermatrix-copilot kb activate              # 立即激活知识仓库 main 的
 infermatrix-copilot kb rollback --to <sha>   # 回指到较早的快照（下一请求生效）
 ```
 
-合并流程：`open_pr` 回执 → 为该 PR 的精确 head 签发判定并发布评论 → PR 阶段 `kb-gate`
-通过后入合并队列（每仓库至多 1 个）→ 合并后激活新快照。发版巡检在上游新 release 后运行
+合并流程（v8）：`open_pr` 回执 → 为该 PR 的精确 head 签发判定，随 `merge` 项交给 GPU 盒发布器 → 发布器在
+`main` 与 PR head 的合并树上运行本地门禁，通过才 `gh pr merge`（每仓库同时至多 1 个）→ 合并后激活新快照。
+本地门禁拒绝的变更从不合并：上下文变化则在当前 main 上重建，变更本身的问题转人工。发版巡检在上游新 release 后运行
 T1/T2/T3 与 purge，每个规则页一个变更集，全部经过质量门。
 
 评审服务读取知识：将 `KNOWLEDGE_ROOT` 指向 `$KB_STATE_DIR/active`。

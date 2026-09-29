@@ -195,3 +195,26 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
 （不区分大小写）或别名精确匹配；歧义身份改名 `.quarantined` 隔离、从不改写；属于其他仓库的投放文件留待其处理。
 邮箱是公开 issue，只接受 `KB_BUGFIX_AUTHORS` 列出的作者（未设置则不读邮箱），每个仓库各自维护评论游标。
 事件 ID 与记录的 `event_id` 一致，重复投递幂等。
+
+## 2026-09-29 v8：发布器本地门禁与合并
+- 服务不再发布判定评论、不再等待 GitHub `kb-gate` 状态、不再入合并队列：`pr_open` 时签发绑定 PR/head 的判定，随
+  `merge` 项交给发布器（每仓库同时至多一个 `merge_requested`）。回执：成功 → `merged`（合并 SHA、落地后复核结果）；
+  落地后复核失败 → 暂停该仓库并转人工；拒绝 → 按理由分为重建（上下文/页面哈希变化、无法干净合并、清单不符 →
+  `rebuild_needed`，由持有租约的调度器在当前 main 上重建）、瞬时（main 持续变化、控制记录变化、git/gh 问题 → 回到
+  `pr_open` 重签）、变更本身的问题（→ `gate_failed`，转人工，从不按原样重试）。未回执的 `merge` 过期后回到 `pr_open`。
+  v7 的 `verdict_posted`/`queued` 记录按 `pr_open` 重签。
+- 落地后复核：回执中的 `passed`/`failed` 为终态（`failed` 暂停该仓库并转人工），即使 GitHub 先显示已合并、回执后到也照常处理；
+  `unknown`（发布器无法运行，或崩溃后恢复的合并）由服务 `verify_merged` 在自己的克隆上重跑，无法运行则下一轮重试。
+- `local_gate`：发布器在自己安装的 Copilot 版本上，对 `main` tip 与 PR head 的合并树运行 `gate_verifier.verify_change`
+  （直接传入已验签的判定、不读暂停清单），另要求每个路径都在该项所属仓库的知识目录内、判定来源为 `auto`，并检查合并树
+  无新增树级问题；`post_merge_problems` 在 GitHub 实际生成的合并提交上重跑。
+- 发布器 `merge`：整轮持有跨进程 `flock`（第二个实例直接退出）；验签与绑定 → PR 打开且目标为 `main`、head 一致 →
+  取 main 与 PR head 跑本地门禁 → main 变化则重来（至多 3 次）→ 重读控制记录（暂停/代际变化即放弃）→ 写合并意图 →
+  `gh pr merge --merge --match-head-commit` → 读取合并提交并做落地后复核。合并之后的任何异常都不会变成失败回执；
+  每轮开始先恢复有意图无完成记录的项（已合并则补发回执，未合并则丢弃意图、下一轮重试）。
+  `gh pr merge` 报错时无法确定是否已合并：保留意图、不写记录也不回执，由下一轮恢复向 GitHub 确认。遗留的 `kb:hold`
+  标签（v7 暂停留下）在合并前移除并确认。
+  只有 GitHub 显示 `MERGED` 才算合并：若 `main` 要求合并队列或开启了自动合并，`gh pr merge` 只会入队——此时关闭自动合并并
+  拒绝（转人工，要求 `main` 允许发布器直接合并）；只有经 GraphQL 确认既不在合并队列中（必要时 `dequeuePullRequest`）也没有自动合并，才记为拒绝，否则保留意图，由恢复流程继续取消或接收
+  后来发生的合并。存在未结的合并意图时该项跳过，直到恢复流程从 GitHub 得到结果。
+- external 的状态集合由 `merge.IN_FLIGHT` 派生，合并中的外部 PR 不会被重复评审。

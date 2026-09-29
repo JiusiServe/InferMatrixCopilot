@@ -1,6 +1,6 @@
 # knowledge_service/ — provider curation components
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-29 -->
 
 The provider owns knowledge curation beneath the public SDK v1 facade.
 `KnowledgeCurator` composes four domain components over one explicit work
@@ -74,3 +74,7 @@ L1 的索引检查允许为目录中已存在但未列入索引的页面补链�
 ## 2026-09-28 human-approved：最新审阅
 验证器除核对签名绑定的审阅仍为 APPROVED 外，还读取该 PR 的全部审阅：每位被引用审阅者的**最新**审阅必须仍批准当前 head；
 之后的 changes requested 或 dismiss 使该审批失效（即使被绑定的那条审阅仍显示 APPROVED）。
+
+## 2026-09-29 verify_change 供本地门禁调用
+`verify_change` 新增 `verdict=`（调用方已验签与绑定的判定，跳过从 PR 评论查找）与 `check_holds=`（本地门禁不读暂停清单，
+暂停由签名控制记录表达）。其余检查不变。

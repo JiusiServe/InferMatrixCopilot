@@ -30,7 +30,7 @@ from ..knowledge_service.gate_verifier import MAINTAINER_PATH, WHITELIST_CODES, 
 from ..knowledge_service.l1 import Change, check_changeset
 from ..knowledge_service.ops import repo_scope
 from .gate import run_gate
-from .merge import knowledge_repository
+from .merge import IN_FLIGHT, knowledge_repository
 from .runtime import calibration_current
 
 KIND = "external"
@@ -148,9 +148,12 @@ def _ours(rt, number: int) -> bool:
     return False
 
 
-_ALL = ("gated", "pr_requested", "pr_open", "verdict_posted", "queued", "merged", "closed", "failed", "human",
-        "head_changed", "stale_context", "superseded", "superseding", "gate_failed", "rebuild_failed",
-        "paused", "shadow_recorded", "calibration_required", "approval_withdrawn")
+# every status an external change set can have; the in-flight ones come from
+# the merge flow itself, so a new merge state can never be judged twice
+_ALL = tuple(dict.fromkeys((
+    *IN_FLIGHT, "gated", "merged", "closed", "failed", "human",
+    "head_changed", "stale_context", "superseded", "superseding", "gate_failed", "rebuild_failed",
+    "paused", "shadow_recorded", "calibration_required", "approval_withdrawn")))
 
 
 def poll_external(rt) -> list[str]:

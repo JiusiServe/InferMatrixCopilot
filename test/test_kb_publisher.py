@@ -21,6 +21,10 @@ def _git(path: Path, *args: str) -> str:
     return _git_raw(path, *args).strip()
 
 
+class Crash(BaseException):
+    """The publisher process dies (not an error it handles)."""
+
+
 class FakeGh:
     """Just enough of `gh` for the publisher; PR heads come from the git remote."""
 
@@ -30,6 +34,13 @@ class FakeGh:
         self.calls: list[list[str]] = []
         self.comments: list[tuple[int, str]] = []
         self.fail: set[str] = set()     # "remove-label" / "undo": that call fails
+        self.crash_after_merge = False  # the publisher dies right after GitHub merged
+        self.merge_error_after_merging = False  # GitHub merged, but the CLI reports an error
+        self.queue_instead_of_merging = False   # main requires a merge queue: gh only enqueues
+        self.fail_views = 0                      # the next N `pr view` calls fail
+        self.fail_disable_auto = 0               # the next N `--disable-auto` calls fail
+        self.fail_dequeue = 0                    # the next N dequeue mutations fail
+        self.raise_on_query = 0                  # the next N GraphQL queries crash the command (OSError)
 
     def _by_branch(self, branch: str) -> list[dict]:
         return [pr for pr in self.prs.values() if pr["headRefName"] == branch and pr["state"] == "OPEN"]
@@ -49,10 +60,17 @@ class FakeGh:
             number = 42 + len(self.prs)
             self.prs[number] = {"number": number, "state": "OPEN", "isDraft": "--draft" in args,
                                 "headRefOid": head, "headRefName": branch, "id": f"PR_{number}",
-                                "labels": [], "queued": False, "body": (input or b"").decode()}
+                                "labels": [], "queued": False, "body": (input or b"").decode(),
+                                "baseRefName": "main", "mergeCommit": None}
+            _git(self.origin, "update-ref", f"refs/pull/{number}/head", head)
         elif args[:2] == ["pr", "view"]:
+            if self.fail_views:
+                self.fail_views -= 1
+                return subprocess.CompletedProcess(argv, 1, b"", b"HTTP 502")
             pr = self.prs[int(args[2])]
             out = json.dumps({**{k: pr[k] for k in ("number", "state", "isDraft", "headRefOid", "headRefName", "id")},
+                              "baseRefName": pr.get("baseRefName", "main"), "mergeCommit": pr.get("mergeCommit"),
+                              "autoMergeRequest": {"mergeMethod": "MERGE"} if pr.get("auto") else None,
                               "labels": [{"name": name} for name in pr["labels"]]})
         elif args[:2] == ["pr", "comment"]:
             self.comments.append((int(args[2]), input.decode()))
@@ -64,10 +82,25 @@ class FakeGh:
         elif args[:2] == ["pr", "merge"]:
             pr = self.prs[int(args[2])]
             if "--disable-auto" in args:
-                pr["queued"] = False
-            else:
+                if self.fail_disable_auto:
+                    self.fail_disable_auto -= 1
+                    return subprocess.CompletedProcess(argv, 1, b"", b"HTTP 502")
+                pr["queued"] = pr["auto"] = False
+            elif "--auto" in args:
                 assert args[args.index("--match-head-commit") + 1] == pr["headRefOid"]
                 pr["queued"] = True
+            elif self.queue_instead_of_merging:
+                pr["in_queue"] = True      # a merge queue entry; auto-merge stays off
+            else:  # a direct merge (design v8): a real merge commit on origin's main
+                assert args[args.index("--match-head-commit") + 1] == pr["headRefOid"]
+                assert not pr["isDraft"]
+                _git(self.origin, "-c", "user.name=gh", "-c", "user.email=gh@e", "merge", "-q", "--no-ff",
+                     "-m", f"Merge pull request #{pr['number']}", pr["headRefOid"])
+                pr["state"], pr["mergeCommit"] = "MERGED", {"oid": _git(self.origin, "rev-parse", "HEAD")}
+                if self.crash_after_merge:
+                    raise Crash()
+                if self.merge_error_after_merging:
+                    return subprocess.CompletedProcess(argv, 1, b"", b"HTTP 502 (but it merged)")
         elif args[:2] == ["pr", "edit"]:
             labels = self.prs[int(args[2])]["labels"]
             if "--remove-label" in args and "remove-label" in self.fail:
@@ -78,10 +111,22 @@ class FakeGh:
                 labels.remove(args[args.index("--remove-label") + 1])
         elif args[:2] == ["pr", "close"]:
             self.prs[int(args[2])]["state"] = "CLOSED"
+        elif args[:2] == ["api", "graphql"] and args[3].startswith("query=query("):
+            if self.raise_on_query:
+                self.raise_on_query -= 1
+                raise OSError("gh could not be started")
+            pr = self.prs[int([a for a in args if a.startswith("number=")][0].split("=", 1)[1])]
+            out = json.dumps({"data": {"repository": {"pullRequest": {
+                "id": pr["id"], "state": pr["state"],
+                "mergeQueueEntry": {"id": "Q"} if pr.get("in_queue") else None,
+                "autoMergeRequest": {"enabledAt": "t"} if pr.get("auto") else None}}}})
         elif args[:2] == ["api", "graphql"]:
+            if "dequeuePullRequest" in args[3] and self.fail_dequeue:
+                self.fail_dequeue -= 1
+                return subprocess.CompletedProcess(argv, 1, b"", b"HTTP 502")
             for pr in self.prs.values():
                 if f"id={pr['id']}" in args:
-                    pr["queued"] = False
+                    pr["queued"] = pr["in_queue"] = False
         elif args[:3] == ["api", "-X", "PUT"]:
             pass
         else:
@@ -228,9 +273,141 @@ def test_pause_is_performed_even_while_the_repository_is_paused(tmp_path):
     assert rt.ledger.changeset(changeset_id)["status"] == "paused"
 
 
-def test_pause_resume_regate_and_enqueue_round_trip(tmp_path):
-    """pause (draft + kb:hold) -> kb resume -> fresh verdict lifts the label ->
-    the gate can pass -> enqueue readies the draft and queues it."""
+def _merge_ready(tmp_path):
+    """The service's PR is open and its merge item (with a signed verdict) is issued."""
+    rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
+    pub.run_once()
+    _collect(rt)
+    head = gh.prs[42]["headRefOid"]
+    rt.github.prs[42] = {"number": 42, "state": "open", "merged": False, "head": {"sha": head}}
+    assert merge.advance(rt, lifecycle) == [f"merge issued {changeset_id}"]
+    rt.outbox.refresh_control()
+    return rt, lifecycle, changeset_id, pub, gh, head
+
+
+def test_the_publisher_merges_only_after_its_local_gate_passes(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    assert pub.run_once()["performed"] == 1
+    origin = tmp_path / "origin"
+    merge_sha = _git(origin, "rev-parse", "main")
+    assert _git(origin, "rev-parse", "main^2") == head          # a merge of exactly the verified head
+    _collect(rt)
+    changeset = rt.ledger.changeset(changeset_id)
+    assert changeset["status"] == "merged" and changeset["merge_sha"] == merge_sha
+    assert changeset["detail"]["post_check"] == "passed"
+    assert not list((tmp_path / "publisher" / "intents").glob("*.json"))
+
+
+def test_a_change_the_local_gate_refuses_is_never_merged(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    origin = tmp_path / "origin"
+    before = _git(origin, "rev-parse", "main")
+    index = origin / "knowledge" / "repos" / "demo" / "core" / "_index.md"   # main moves in the same owner dir
+    index.write_text(index.read_text() + "\nmain moved here\n")
+    _git(origin, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-qam", "main moves")
+    moved = _git(origin, "rev-parse", "main")
+    summary = pub.run_once()
+    assert summary["failed"] == 1 and gh.prs[42]["state"] == "OPEN"
+    assert _git(origin, "rev-parse", "main") == moved != before
+    _collect(rt)
+    changeset = rt.ledger.changeset(changeset_id)
+    assert changeset["status"] == "rebuild_needed"
+    assert "context changed" in changeset["detail"]["rebuild_because"]
+
+
+def test_a_merge_whose_receipt_was_lost_is_recovered_not_repeated(tmp_path):
+    from test_kb_publisher import Crash
+
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    gh.crash_after_merge = True
+    with pytest.raises(Crash):
+        pub.run_once()                                    # merged on GitHub, then the process died
+    assert list((tmp_path / "publisher" / "intents").glob("*.json"))
+    gh.crash_after_merge = False
+    merges = sum(1 for call in gh.calls if call[:2] == ["pr", "merge"])
+    pub.run_once()
+    assert sum(1 for call in gh.calls if call[:2] == ["pr", "merge"]) == merges   # not merged twice
+    _collect(rt)
+    changeset = rt.ledger.changeset(changeset_id)
+    assert changeset["status"] == "merged"
+    assert changeset["merge_sha"] == _git(tmp_path / "origin", "rev-parse", "main")
+    # a recovered receipt carries no post-merge check: the service runs it itself
+    assert changeset["detail"]["post_check"] == "unknown"
+    assert f"post_check passed {changeset_id}" in merge.advance(rt, lifecycle)
+    assert rt.ledger.changeset(changeset_id)["detail"]["post_check"] == "passed"
+
+
+def test_a_merge_reported_as_failed_that_did_merge_is_settled_from_github(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    gh.merge_error_after_merging = True
+    pub.run_once()
+    assert list((tmp_path / "publisher" / "intents").glob("*.json"))      # kept: the outcome is unknown
+    assert not list((tmp_path / "state" / "inbox" / "acks").glob("*.json"))  # and nothing was answered
+    gh.merge_error_after_merging = False
+    merges = sum(1 for call in gh.calls if call[:2] == ["pr", "merge"])
+    pub.run_once()
+    assert sum(1 for call in gh.calls if call[:2] == ["pr", "merge"]) == merges
+    _collect(rt)
+    assert rt.ledger.changeset(changeset_id)["status"] == "merged"
+
+
+def test_a_merge_that_only_queued_is_not_reported_as_merged(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    gh.queue_instead_of_merging = True
+    assert pub.run_once()["failed"] == 1
+    assert gh.prs[42]["state"] == "OPEN" and not gh.prs[42].get("in_queue")   # dequeued
+    assert any("dequeuePullRequest" in " ".join(call) for call in gh.calls)
+    _collect(rt)
+    changeset = rt.ledger.changeset(changeset_id)
+    assert changeset["status"] == "gate_failed"
+    assert "merge queue" in changeset["detail"]["gate_problems"][0]
+
+
+def test_a_queued_merge_whose_cancellation_fails_stays_unresolved(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    gh.queue_instead_of_merging = True
+    gh.fail_dequeue = 2                         # this round, and the next recovery attempt
+    pub.run_once()
+    assert gh.prs[42]["in_queue"] is True
+    assert list((tmp_path / "publisher" / "intents").glob("*.json"))      # kept: GitHub may still merge it
+    assert not list((tmp_path / "state" / "inbox" / "acks").glob("*.json"))
+    pub.run_once()                                                         # recovery: cancelling fails again
+    assert list((tmp_path / "publisher" / "intents").glob("*.json"))
+    pub.run_once()        # recovery dequeues it, the item is tried again and refused (main queues)
+    assert not gh.prs[42]["in_queue"]
+    _collect(rt)
+    assert rt.ledger.changeset(changeset_id)["status"] == "gate_failed"
+
+
+def test_an_error_while_cancelling_leaves_the_merge_unresolved(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    gh.queue_instead_of_merging = True
+    gh.raise_on_query = 1                       # the confirmation query cannot even run
+    pub.run_once()
+    assert list((tmp_path / "publisher" / "intents").glob("*.json"))
+    assert not list((tmp_path / "state" / "inbox" / "acks").glob("*.json"))
+    assert rt.ledger.changeset(changeset_id)["status"] == "merge_requested"
+
+
+def test_an_unsettled_recovery_blocks_the_item_until_github_answers(tmp_path):
+    from test_kb_publisher import Crash
+
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    gh.crash_after_merge = True
+    with pytest.raises(Crash):
+        pub.run_once()
+    gh.crash_after_merge = False
+    gh.fail_views = 1                           # recovery cannot ask GitHub this round
+    summary = pub.run_once()
+    assert summary["skipped"] == 1 and summary["failed"] == 0
+    assert list((tmp_path / "publisher" / "intents").glob("*.json"))
+    assert not list((tmp_path / "state" / "inbox" / "acks").glob("*.json"))
+    pub.run_once()                               # now it can: the merge is settled from GitHub
+    _collect(rt)
+    assert rt.ledger.changeset(changeset_id)["status"] == "merged"
+
+
+def test_a_paused_then_resumed_pr_merges(tmp_path):
     rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
     pub.run_once()
     _collect(rt)
@@ -242,22 +419,53 @@ def test_pause_resume_regate_and_enqueue_round_trip(tmp_path):
     pub.run_once()
     _collect(rt)
     assert gh.prs[42]["isDraft"] and "kb:hold" in gh.prs[42]["labels"]
-    assert rt.ledger.changeset(changeset_id)["status"] == "paused"
 
     def _resume():
         rt.ledger.resume(lifecycle.repo)
         merge.resume_paused_prs(rt.ledger, lifecycle.repo)
     rt.outbox.transition(_resume, public_repos={lifecycle.repo})
-    assert merge.advance(rt, lifecycle) == [f"verdict issued {changeset_id}"]
-    pub.run_once()
+    rt.github.prs[42]["draft"] = True
+    assert merge.advance(rt, lifecycle) == [f"merge issued {changeset_id}"]
+    assert pub.run_once()["performed"] == 1
+    assert gh.prs[42]["state"] == "MERGED" and "kb:hold" not in gh.prs[42]["labels"]
     _collect(rt)
-    assert "kb:hold" not in gh.prs[42]["labels"] and gh.comments[-1][0] == 42
-    rt.github.statuses[head] = "success"             # the precheck the comment triggered
-    assert merge.advance(rt, lifecycle) == [f"enqueue issued {changeset_id}"]
-    pub.run_once()
-    _collect(rt)
-    assert gh.prs[42]["isDraft"] is False and gh.prs[42]["queued"] is True
-    assert rt.ledger.changeset(changeset_id)["status"] == "queued"
+    assert rt.ledger.changeset(changeset_id)["status"] == "merged"
+
+
+def test_a_second_publisher_does_nothing_while_one_runs(tmp_path):
+    import fcntl
+    import os
+
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    fd = os.open(tmp_path / "publisher" / "publisher.lock", os.O_RDWR | os.O_CREAT, 0o600)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    try:
+        calls = len(gh.calls)
+        assert pub.run_once().get("locked") == 1
+        assert len(gh.calls) == calls and gh.prs[42]["state"] == "OPEN"
+    finally:
+        os.close(fd)
+    assert pub.run_once()["performed"] == 1
+
+
+def test_a_pause_issued_while_the_gate_ran_stops_the_merge(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    from infermatrix_copilot.kb_service import local_gate
+
+    real = local_gate.gate
+
+    def gate_then_pause(*args, **kwargs):
+        problems = real(*args, **kwargs)
+        rt.outbox.transition(lambda: rt.ledger.bump_generation(lifecycle.repo, pause=True, reason="drill"),
+                             public_repos={lifecycle.repo})
+        return problems
+    local_gate.gate = gate_then_pause
+    try:
+        assert pub.run_once()["failed"] == 1
+    finally:
+        local_gate.gate = real
+    assert gh.prs[42]["state"] == "OPEN"
+    assert not any(call[:2] == ["pr", "merge"] for call in gh.calls)
 
 
 def test_a_failed_pause_is_retried_not_acknowledged(tmp_path):

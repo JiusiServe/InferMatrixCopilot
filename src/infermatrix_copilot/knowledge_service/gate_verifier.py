@@ -407,13 +407,16 @@ def context_paths(touched: set[str], owner_dirs: set[str], post: Mapping[str, st
 
 
 def verify_change(ctx: Context, *, pr: dict, head_sha: str, pre: str, post: str, final: str,
-                  effective_base: str, stage: str) -> list[str]:
+                  effective_base: str, stage: str, verdict: dict | None = None,
+                  check_holds: bool = True) -> list[str]:
     """Problems with one PR's knowledge change (empty when it passes).
 
     ``pre``/``post`` are the commits (or trees) around this PR's change as it
     is applied; ``final`` is the tree that would land; ``effective_base`` is
     the state the change is applied on (current main, or the first parent of
-    the merge-group segment)."""
+    the merge-group segment). The publisher's local gate passes the verdict it
+    was handed (its signature and binding already checked) and no hold list:
+    a pause there is the signed control record."""
     number = int(pr["number"])
     entries = ctx.git.raw_diff(pre, post)
     if not touches_knowledge(entries):
@@ -441,7 +444,7 @@ def verify_change(ctx: Context, *, pr: dict, head_sha: str, pre: str, post: str,
     touched = {e["path"][len(KNOWLEDGE_PREFIX):] for e in entries if e["path"].startswith(KNOWLEDGE_PREFIX)}
 
     try:
-        holds = ctx.holds()
+        holds = ctx.holds() if check_holds else {}
         if holds.get("global"):
             problems.append("the knowledge service holds every repository (global pause)")
         if number in {int(p) for p in holds.get("prs") or []}:
@@ -454,7 +457,9 @@ def verify_change(ctx: Context, *, pr: dict, head_sha: str, pre: str, post: str,
     except (GateError, SignatureError, LifecycleError, KeyError, TypeError, ValueError) as exc:
         problems.append(f"hold list: {exc}")
 
-    verdict, rejected = find_verdict(ctx, number, head_sha)
+    rejected: list[str] = []
+    if verdict is None:
+        verdict, rejected = find_verdict(ctx, number, head_sha)
     if verdict is None:
         detail = f" (rejected: {'; '.join(rejected[:3])})" if rejected else ""
         problems.append(f"no valid signed verdict for PR #{number} at {head_sha[:12]}{detail}")

@@ -29,6 +29,7 @@ item's branch and opens the PR.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
@@ -58,6 +59,22 @@ PUSHING = frozenset({"open_pr", "open_companion_pr"})
 # retried until done, never acked as failed: stops (pause, close) and reports
 # (open_issue: a transient GitHub error must not lose a sweep report)
 RETRIED = frozenset({"pause", "close", "open_issue"})
+
+
+class MergeUncertain(RuntimeError):
+    """`gh pr merge` failed in a way that does not say whether GitHub merged:
+    the intent stays and the next round's recovery asks GitHub (no receipt now)."""
+
+
+class GateRefused(RuntimeError):
+    """The local gate found problems: the PR is not merged (the service refines)."""
+
+    def __init__(self, problems: list[str]):
+        super().__init__("local gate: " + "; ".join(problems))
+        self.problems = problems
+
+
+MAIN_RETRIES = 3  # main moved between the check and the merge: check again at most this often
 
 
 class PublishError(RuntimeError):
@@ -162,7 +179,8 @@ class Gh:
 
     def pr(self, number: int) -> dict:
         return json.loads(self.gh("pr", "view", str(number), "--repo", self.repository,
-                                  "--json", "number,state,isDraft,headRefOid,headRefName,id,labels"))
+                                  "--json", "number,state,isDraft,headRefOid,headRefName,baseRefName,id,"
+                                  "labels,mergeCommit,autoMergeRequest"))
 
 
 # -- the publisher -------------------------------------------------------------------
@@ -240,7 +258,26 @@ class Publisher:
         return counts
 
     def run_once(self) -> dict:
+        """One round under a cross-process lock: a second publisher (a timer
+        firing while a manual run is going) does nothing at all."""
         summary = {"performed": 0, "failed": 0, "resent": 0, "undelivered": 0, "dry_run": 0, "skipped": 0}
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        fd = os.open(self.state_dir / "publisher.lock", os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                self._trace(event="locked", detail="another publisher is running")
+                return {**summary, "locked": 1}
+            try:
+                self._recover_merges()
+                return self._round(summary)
+            finally:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+    def _round(self, summary: dict) -> dict:
         try:
             control = json.loads(self.transport.read("outbox/control.json"))
             # a quick look before verifying (check_item verifies it for real)
@@ -272,6 +309,12 @@ class Publisher:
             if done.with_suffix(".corrupt").exists():
                 summary["skipped"] += 1  # waits for a person to decide (see the trace)
                 continue
+            if self._intent_path(item_id).is_file():
+                # a merge whose outcome recovery could not settle yet: never
+                # perform it again until GitHub has said what happened
+                self._trace(event="awaiting_recovery", item=item_id)
+                summary["skipped"] += 1
+                continue
             summary[self._handle(item_id, control)] += 1
         return summary
 
@@ -290,6 +333,48 @@ class Publisher:
             Path(tmp).unlink(missing_ok=True)
             raise
 
+    def _intent_path(self, item_id: str) -> Path:
+        return self.state_dir / "intents" / f"{item_id}.json"
+
+    def _recover_merges(self) -> None:
+        """A merge intent without a completion record: the publisher stopped
+        between asking GitHub to merge and recording it. Ask GitHub what
+        happened and finish the record, so the service gets its receipt."""
+        folder = self.state_dir / "intents"
+        if not folder.is_dir():
+            return
+        for path in sorted(folder.glob("*.json")):
+            item_id = path.stem
+            if self._done_path(item_id).is_file():
+                path.unlink(missing_ok=True)
+                continue
+            try:
+                intent = json.loads(path.read_text(encoding="utf-8"))
+                pr = self.github.pr(int(intent["pr"]))
+            except (PublishError, OSError, ValueError, KeyError, TypeError) as exc:
+                self._trace(event="recovery_pending", item=item_id, error=str(exc))
+                continue
+            merged = str((pr.get("mergeCommit") or {}).get("oid") or "")
+            ack = {"item_id": item_id, "kind": "merge", "changeset_id": intent["changeset_id"],
+                   "pr": int(intent["pr"]), "head_sha": intent["head_sha"], "branch": "", "error": "",
+                   "merge_sha": "", "problems": [], "ok": True, "recovered": True,
+                   "post_check": "unknown"}
+            if pr.get("state") == "MERGED" and merged and pr.get("headRefOid") == intent["head_sha"]:
+                ack["merge_sha"] = merged
+            elif pr.get("state") == "OPEN":
+                if not self._cancel_pending_merge(int(intent["pr"])):
+                    self._trace(event="recovery_pending", item=item_id, error="still queued or auto-merging")
+                    continue  # GitHub may still merge it: keep the intent
+                path.unlink()  # the merge did not happen: the item is simply tried again
+                self._trace(event="intent_dropped", item=item_id)
+                continue
+            else:
+                ack.update(ok=False, error=f"PR #{intent['pr']} is {pr.get('state')} (not merged by us)")
+            self._record_done(item_id, ack)
+            path.unlink(missing_ok=True)
+            self._trace(event="merge_recovered", item=item_id, ack=ack)
+            self._send_ack(ack)
+
     def _handle(self, item_id: str, control: Any) -> str:
         try:
             envelope = json.loads(self.transport.read(f"outbox/{item_id}.json"))
@@ -298,6 +383,7 @@ class Publisher:
             publishes, auto_merge = self.repo_flags.get(claimed, (False, False))
             item = check_item(envelope, control, self.service_public_key, now=self.clock(),
                               repo_publishes=publishes, repo_auto_merge=auto_merge)
+            self._envelope, self._flags = envelope, (publishes, auto_merge)
         except (OutboxError, OSError, ValueError, KeyError, TypeError) as exc:
             # not performed and not acked: an unverifiable item is never
             # answered, and a stale one is superseded by the service itself
@@ -311,6 +397,11 @@ class Publisher:
                "ok": True, "pr": None, "head_sha": "", "branch": "", "error": ""}
         try:
             ack.update(getattr(self, f"_do_{item.kind}")(item))
+        except MergeUncertain as exc:
+            self._trace(event="merge_uncertain", item=item.id, repo=item.repo, error=str(exc))
+            return "failed"  # no record, no ack: recovery settles it from GitHub
+        except GateRefused as exc:
+            ack.update(ok=False, error=str(exc)[:500], problems=exc.problems[:50])
         except (PublishError, OSError, ValueError, KeyError, TypeError) as exc:
             ack.update(ok=False, error=str(exc)[:500])
         if not ack["ok"] and item.kind in RETRIED:
@@ -319,6 +410,7 @@ class Publisher:
             self._trace(event="retry", item=item.id, kind=item.kind, repo=item.repo, error=ack["error"])
             return "failed"
         self._record_done(item.id, ack)
+        self._intent_path(item.id).unlink(missing_ok=True)  # the completion record supersedes it
         self._trace(event="performed" if ack["ok"] else "failed", item=item.id, kind=item.kind,
                     repo=item.repo, ack=ack)
         self._send_ack(ack)
@@ -451,6 +543,134 @@ class Publisher:
         number = out.strip().rsplit("/", 1)[-1]
         return {"pr": int(number) if number.isdigit() else None}
 
+    def _recheck_control(self) -> None:
+        """Right before merging: a pause, rollback or mode change issued while
+        the gate ran voids the item (the control record is re-read)."""
+        try:
+            control = json.loads(self.transport.read("outbox/control.json"))
+            publishes, auto_merge = self._flags
+            check_item(self._envelope, control, self.service_public_key, now=self.clock(),
+                       repo_publishes=publishes, repo_auto_merge=auto_merge)
+        except (OutboxError, OSError, ValueError, KeyError, TypeError) as exc:
+            raise PublishError(f"not merging: {exc}") from exc
+
+    def _do_merge(self, item: OutboxItem) -> dict:
+        """The local gate on the exact merged tree, then the merge (design v8 §8.2)."""
+        from . import local_gate
+
+        body = item.body
+        number, head = int(body["pr"]), str(body["head_sha"])
+        verdict = local_gate.check_verdict(body["verdict"], self.service_public_key,
+                                           repository=self.github.repository, pr=number, head_sha=head,
+                                           now=self.clock())
+        pr = self.github.pr(number)
+        if pr.get("state") != "OPEN":
+            raise PublishError(f"PR #{number} is {pr.get('state')}")
+        if pr.get("baseRefName") != "main":
+            raise GateRefused([f"PR #{number} targets {pr.get('baseRefName')}, not main"])
+        if pr.get("headRefOid") != head:
+            raise PublishError(f"PR #{number} head moved to {str(pr.get('headRefOid'))[:12]}")
+        self._refuse_companion(pr)
+        labels = {str(label.get("name")) for label in pr.get("labels") or []}
+        if HOLD_LABEL in labels:
+            # a v7 pause left it: a merge item exists only for an unpaused
+            # repository under its current generation, so the hold is over
+            self.github.gh("pr", "edit", str(number), "--repo", self.github.repository,
+                           "--remove-label", HOLD_LABEL, ok_fail=True)
+            pr = self.github.pr(number)
+            if HOLD_LABEL in {str(label.get("name")) for label in pr.get("labels") or []}:
+                raise PublishError(f"PR #{number} still carries {HOLD_LABEL}; retried next round")
+        remote = self._ensure_clone()
+        rest = {"number": number, "state": "open", "head": {"sha": head}, "draft": bool(pr.get("isDraft")),
+                "labels": pr.get("labels") or []}
+        for _attempt in range(MAIN_RETRIES):
+            self._git("fetch", "--quiet", remote, "+refs/heads/main:refs/remotes/origin/main",
+                      f"+refs/pull/{number}/head:refs/kb/pr-{number}", auth=True)
+            if self._git("rev-parse", f"refs/kb/pr-{number}") != head:
+                raise PublishError(f"fetched head of PR #{number} is not {head[:12]}")
+            main_sha = self._git("rev-parse", "refs/remotes/origin/main")
+            problems = local_gate.gate(self.clone, repository=self.github.repository, repo=item.repo, pr=rest,
+                                       head_sha=head, main_sha=main_sha, verdict=verdict,
+                                       public_key=self.service_public_key, now=self.clock())
+            if problems:
+                raise GateRefused(problems)
+            self._git("fetch", "--quiet", remote, "+refs/heads/main:refs/remotes/origin/main", auth=True)
+            if self._git("rev-parse", "refs/remotes/origin/main") == main_sha:
+                break
+        else:
+            raise PublishError(f"main kept moving while PR #{number} was checked; retried next round")
+        self._recheck_control()
+        if pr.get("isDraft"):  # a v7 pause left it a draft; GitHub will not merge a draft
+            self.github.gh("pr", "ready", str(number), "--repo", self.github.repository)
+        intent = self._intent_path(item.id)
+        intent.parent.mkdir(parents=True, exist_ok=True)
+        intent.write_text(json.dumps({"pr": number, "head_sha": head, "changeset_id": body["changeset_id"],
+                                      "main_sha": main_sha, "at": self.clock()}), encoding="utf-8")
+        try:
+            self.github.gh("pr", "merge", str(number), "--repo", self.github.repository, "--merge",
+                           "--match-head-commit", head)
+        except PublishError as exc:
+            raise MergeUncertain(f"gh pr merge #{number}: {exc}") from exc
+        # only a PR GitHub shows as MERGED is a merge: with a merge queue or
+        # auto-merge on main, `gh pr merge` succeeds by queueing instead
+        try:
+            merged = self.github.pr(number)
+        except (PublishError, OSError, ValueError, KeyError, TypeError) as exc:
+            raise MergeUncertain(f"PR #{number} state after merging: {exc}") from exc
+        if merged.get("state") == "OPEN":
+            if not self._cancel_pending_merge(number):
+                # GitHub could still merge it later: keep the intent, so recovery
+                # keeps trying to cancel, or picks up the merge if it happens
+                raise MergeUncertain(f"PR #{number} was queued for auto-merge and could not be cancelled yet")
+            raise GateRefused([f"PR #{number} was queued or set to auto-merge, not merged: main must allow "
+                               "a direct merge by the publisher (no merge queue); auto-merge was disabled"])
+        if merged.get("state") != "MERGED":
+            raise PublishError(f"PR #{number} is {merged.get('state')} after merging")
+        # merged from here on: nothing below may turn this into a failure ack
+        try:
+            merge_sha = str((merged.get("mergeCommit") or {}).get("oid") or "")
+            if not merge_sha:
+                return {"pr": number, "head_sha": head, "merge_sha": "", "post_check": "unknown",
+                        "problems": ["merged, but GitHub has not reported the merge commit yet"]}
+            self._git("fetch", "--quiet", remote, "+refs/heads/main:refs/remotes/origin/main", auth=True)
+            post = local_gate.post_merge_problems(self.clone, repository=self.github.repository, pr=rest,
+                                                  head_sha=head, merge_sha=merge_sha, verdict=verdict,
+                                                  public_key=self.service_public_key, now=self.clock())
+        except (PublishError, local_gate.LocalGateError, OSError, ValueError, KeyError, TypeError) as exc:
+            return {"pr": number, "head_sha": head, "merge_sha": "", "post_check": "unknown",
+                    "problems": [f"merged, but the post-merge check could not run: {exc}"]}
+        return {"pr": number, "head_sha": head, "merge_sha": merge_sha,
+                "post_check": "failed" if post else "passed", "problems": post[:50]}
+
+    _PENDING_QUERY = ("query=query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name)"
+                      "{pullRequest(number:$number){id state mergeQueueEntry{id} autoMergeRequest{enabledAt}}}}")
+
+    def _pending_merge(self, number: int) -> dict:
+        owner, name = self.github.repository.split("/", 1)
+        data = json.loads(self.github.gh("api", "graphql", "-f", self._PENDING_QUERY, "-F", f"owner={owner}",
+                                         "-F", f"name={name}", "-F", f"number={number}"))
+        return data["data"]["repository"]["pullRequest"]
+
+    def _cancel_pending_merge(self, number: int) -> bool:
+        """Take the PR out of the merge queue AND turn auto-merge off, then
+        confirm both on GitHub. True only when GitHub shows the PR open with
+        neither: any failure (a command, the network, a malformed answer)
+        leaves the merge unresolved."""
+        try:
+            pr = self._pending_merge(number)
+            if pr.get("mergeQueueEntry"):
+                self.github.gh("api", "graphql", "-f", "query=mutation($id:ID!){dequeuePullRequest("
+                               "input:{id:$id}){clientMutationId}}", "-f", f"id={pr['id']}", ok_fail=True)
+            if pr.get("autoMergeRequest"):
+                self.github.gh("pr", "merge", str(number), "--repo", self.github.repository, "--disable-auto",
+                               ok_fail=True)
+            after = self._pending_merge(number)
+        except (PublishError, OSError, ValueError, KeyError, TypeError) as exc:
+            self._trace(event="cancel_unconfirmed", pr=number, error=str(exc))
+            return False
+        return after.get("state") == "OPEN" and not after.get("mergeQueueEntry") \
+            and not after.get("autoMergeRequest")
+
     def _do_close(self, item: OutboxItem) -> dict:
         number = str(item.body["pr"])
         if self.github.pr(int(number)).get("state") == "OPEN":
@@ -473,10 +693,8 @@ class Publisher:
             raise PublishError(f"git {args[0]} failed: {proc.stderr.decode(errors='replace')[:300]}")
         return proc.stdout.decode().strip()
 
-    def _build_commit(self, base_sha: str, files: Mapping[str, str], deleted: list[str], title: str,
-                      *, when: float) -> str:
-        """The change as ONE commit on ``base_sha``, built in a scratch index.
-        Deterministic (dates from the item), so a retry rebuilds the same SHA."""
+    def _ensure_clone(self) -> str:
+        """The publisher's own bare clone (never a working tree); returns the remote."""
         remote = self.git_remote or f"https://github.com/{self.github.repository}.git"
         if not (self.clone / ".git").exists() and not (self.clone / "HEAD").exists():
             self.clone.parent.mkdir(parents=True, exist_ok=True)
@@ -484,6 +702,13 @@ class Publisher:
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, cwd=self.github.cwd)
             if proc.returncode != 0:
                 raise PublishError(f"git clone failed: {proc.stderr.decode(errors='replace')[:300]}")
+        return remote
+
+    def _build_commit(self, base_sha: str, files: Mapping[str, str], deleted: list[str], title: str,
+                      *, when: float) -> str:
+        """The change as ONE commit on ``base_sha``, built in a scratch index.
+        Deterministic (dates from the item), so a retry rebuilds the same SHA."""
+        remote = self._ensure_clone()
         self._git("fetch", "--quiet", remote, "+refs/heads/main:refs/remotes/origin/main")
         if self._git("cat-file", "-t", base_sha) != "commit":
             raise PublishError(f"base {base_sha[:12]} is not a commit")
