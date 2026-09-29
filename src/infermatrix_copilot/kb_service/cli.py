@@ -259,6 +259,8 @@ def _publish(args) -> int:
         state_dir=state,
         author=(author.group(1), author.group(2)),
         repo_flags={name: (lc.publishes, lc.auto_merge) for name, lc in registry.items() if lc.enabled},
+        upstreams={name: lc.full_name for name, lc in registry.items()
+                   if lc.enabled and lc.publishes and lc.full_name},
         allow_post=os.environ.get("ALLOW_POST") == "1",
         allow_push=os.environ.get("ALLOW_PUSH") == "1",
     )

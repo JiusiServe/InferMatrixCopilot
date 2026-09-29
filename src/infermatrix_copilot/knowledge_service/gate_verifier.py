@@ -266,8 +266,6 @@ def verify_change(ctx: Context, *, pr: dict, head_sha: str, pre: str, post: str,
         problems.append("only auto verdicts merge (there is no human-approved path)")
     if not manifests_equal(verdict.get("manifest") or [], entries):
         problems.append("the signed patch manifest does not match the change as applied")
-    if verdict.get("facts"):
-        problems.append("the verdict carries upstream fact attestations this verifier cannot re-check")
 
     result = check_changeset(pre_files, post_files, changes,
                              external_texts=ctx.git.external_texts(final),

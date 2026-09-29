@@ -199,6 +199,8 @@ class Publisher:
     git_remote: str = ""                         # default https://github.com/<repository>.git
     clock: Callable[[], float] = time.time
     log: list[dict] = field(default_factory=list)
+    upstreams: Mapping[str, str] = field(default_factory=dict)  # repo -> public upstream, from OUR config
+    observer: Callable[[str, str], Any] | None = None           # (repo, upstream) -> facts observer
 
     # local records -------------------------------------------------------------
     def _done_path(self, item_id: str) -> Path:
@@ -524,6 +526,32 @@ class Publisher:
         except (OutboxError, OSError, ValueError, KeyError, TypeError) as exc:
             raise PublishError(f"not merging: {exc}") from exc
 
+    def _recheck_facts(self, repo: str, verdict: dict) -> None:
+        """Observe every signed upstream fact again from the upstream itself (our
+        own mirror and ``gh api``, never the service's). Any difference, or an
+        upstream we cannot read, means no merge this round (design v8 §8.2)."""
+        from ..knowledge_service.facts import FactsError, recheck
+
+        facts = verdict.get("facts") or []
+        if not facts:
+            return
+        upstream = self.upstreams.get(repo, "")
+        if not upstream:
+            raise PublishError(f"not merging: upstream facts: {repo} has no public upstream in our configuration")
+        observer = (self.observer or self._mirror_observer)(repo, upstream)
+        try:
+            problems = recheck(verdict.get("upstream") or {}, facts, observer)
+        except FactsError as exc:
+            raise PublishError(f"not merging: upstream facts: {exc}") from exc
+        if problems:
+            raise PublishError("not merging: upstream facts: " + "; ".join(problems[:5]))
+
+    def _mirror_observer(self, repo: str, upstream: str):
+        from .upstream_facts import MirrorObserver
+
+        return MirrorObserver(self.state_dir / "upstream" / f"{repo}.git", upstream,
+                              lambda number: json.loads(self.github.gh("api", f"repos/{upstream}/pulls/{number}")))
+
     def _do_merge(self, item: OutboxItem) -> dict:
         """The local gate on the exact merged tree, then the merge (design v8 §8.2)."""
         from . import local_gate
@@ -566,6 +594,7 @@ class Publisher:
                 break
         else:
             raise PublishError(f"main kept moving while PR #{number} was checked; retried next round")
+        self._recheck_facts(item.repo, verdict)
         self._recheck_control()
         intent = self._intent_path(item.id)
         intent.parent.mkdir(parents=True, exist_ok=True)

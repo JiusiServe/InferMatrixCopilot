@@ -46,6 +46,8 @@ class KbRuntime:
     publisher_public_key: object | None = None
     traces: object | None = None  # trace_store.TraceStore: decisions and outcomes (model calls via the gateway)
     release_label: Callable[[str], str] = field(default=lambda repo: "")
+    # the repository's upstream as the gate observes it (None: no facts attested)
+    upstream_facts: Callable[[RepoLifecycle], object | None] = field(default=lambda lifecycle: None)
 
     @classmethod
     def from_env(cls, settings, *, state_dir: Path | None = None) -> "KbRuntime":
@@ -74,13 +76,15 @@ class KbRuntime:
         from ..trace_store import TraceStore
 
         traces = TraceStore(state_dir / "traces")
+        github = GitHubReader()
         return cls(
+            upstream_facts=lambda lifecycle: service_observer(state_dir, lifecycle, github),
             publisher_public_key=publisher_key, traces=traces,
             state_dir=state_dir, ledger=ledger, registry=registry,
             gateway=ModelGateway(settings, recorder=trace_recorder(traces)),
             generator=generator, judge=judge,
             knowledge=KnowledgeRepo(Path(os.environ.get("KB_KNOWLEDGE_CLONE") or state_dir / "knowledge-repo")),
-            github=GitHubReader(), outbox=outbox,
+            github=github, outbox=outbox,
         )
 
     # -- helpers -------------------------------------------------------------
@@ -296,7 +300,8 @@ def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind:
             base=base, head=head, changes=changes_between(base, head), external_texts=external,
             evidence=evidence, gateway=rt.gateway, judge=rt.judge, release=release,
             repo_dir=lifecycle.knowledge_dir, protected_rules=lifecycle.protected_rules,
-            retire_ratio=lifecycle.retire_ratio, max_files=lifecycle.max_files)
+            retire_ratio=lifecycle.retire_ratio, max_files=lifecycle.max_files,
+            facts=rt.upstream_facts(lifecycle))
     if force_human and decision.status == "pass":
         decision.status = "human"
         decision.reasons.append(force_human)
@@ -390,6 +395,19 @@ def _pr_body(changeset_id: str, detail: dict) -> str:
     lines += ["", f"Generator: `{detail['generator']}` · judge: `{detail['judge']}`.",
               "The publisher merges it only if its local gate passes on the exact merge result."]
     return "\n".join(lines)
+
+
+def service_observer(state_dir: Path, lifecycle: RepoLifecycle, github: GitHubReader):
+    """The service's view of a public upstream: its own mirror (shared with the
+    release sweep) and the read-only GitHub reader. A repository without an
+    upstream, or one that publishes nothing, attests no facts."""
+    if not lifecycle.full_name or not lifecycle.publishes:
+        return None
+    from .upstream_facts import MirrorObserver
+
+    full_name = lifecycle.full_name
+    return MirrorObserver(state_dir / "upstream" / f"{lifecycle.repo}.git", full_name,
+                          lambda number: github.get(f"/repos/{full_name}/pulls/{number}"))
 
 
 def calibration_record(rt: KbRuntime, lifecycle: RepoLifecycle) -> dict | None:

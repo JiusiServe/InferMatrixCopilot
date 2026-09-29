@@ -63,3 +63,12 @@ merge group 逐段验证、暂停清单与 `human-approved` 审批核对已于 2
 ## 2026-09-29 verify_change 供本地门禁调用
 `verify_change` 只接受调用方已验签与绑定的判定（`verdict=`），不再从 PR 评论查找判定，也不读暂停清单；
 暂停由签名控制记录表达。
+
+## 2026-09-29 上游事实（facts）
+`facts` 从变更涉及的规则中抽取可解析的上游声明：`^[PR #N]` 引用（PR 已合并）、反引号中首段为上游仓库顶层条目的路径
+（文件或目录存在）与 `path::Symbol`（文件中以 def/class/赋值定义了每个点分量）；首段不是顶层条目的片段路径、`..` 与
+`...` 段不算声明。`active` 规则的声明必须成立；退役规则的声明只按观测记录，但退役证据中的 PR 必须已合并。
+`attest(claims, observer)` 在上游当前 head 上观测，返回 `upstream={repository, sha}`、事实列表与问题；超过 200 条声明拒绝。
+`recheck(upstream, facts, observer)` 由发布器调用：仓库一致、SHA 为 40 位、每条事实重新观测后逐字段相等，
+签名了不成立的必需事实或格式错误均为问题；上游不可读（未知 SHA、网络、API 错误）抛 `FactsError`，由调用方重试。
+仅标准库。`gate_verifier.verify_change` 不再拒绝带事实的判定（由发布器的 `recheck` 复核）。

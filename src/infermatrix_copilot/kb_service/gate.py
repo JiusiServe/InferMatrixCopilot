@@ -78,6 +78,8 @@ class GateDecision:
     l1: ChangesetResult
     blocks: list[BlockVerdict] = field(default_factory=list)
     consistency: list[dict] = field(default_factory=list)
+    upstream: dict = field(default_factory=dict)   # {repository, sha} the facts were observed on
+    facts: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -86,6 +88,7 @@ class GateDecision:
             "external_refs": [list(ref) for ref in self.l1.external_refs],
             "blocks": [b.to_dict() for b in self.blocks],
             "consistency": self.consistency,
+            "upstream": self.upstream, "facts": self.facts,
         }
 
 
@@ -210,11 +213,26 @@ def run_gate(*, base: dict[str, str], head: dict[str, str], changes: list[Change
              external_texts: dict[str, str], evidence: list[dict], gateway: ModelGateway,
              judge: ModelRole, release: str, repo_dir: str,
              protected_rules: tuple[str, ...] = (),
-             retire_ratio: float = 0.10, max_files: int = 50) -> GateDecision:
+             retire_ratio: float = 0.10, max_files: int = 50, facts=None) -> GateDecision:
+    """``facts`` observes the repository's public upstream (None: the
+    repository has no upstream to attest, or it publishes nothing)."""
     l1 = check_changeset(base, head, changes, external_texts=external_texts, release=release)
     reasons: list[str] = []
     if not l1.ok:
         return GateDecision("fail", [f"L1: {i.code} {i.path} {i.detail}" for i in l1.issues], l1)
+    upstream, signed_facts = {}, []
+    if facts is not None:
+        from ..knowledge_service.facts import FactsError, attest
+        from .upstream_facts import change_claims
+
+        try:
+            claims = change_claims(head, l1.blocks, facts.top_level(facts.head()))
+            upstream, signed_facts, problems = attest(claims, facts) if claims else ({}, [], [])
+        except FactsError as exc:
+            return GateDecision("human", [f"upstream facts could not be checked: {exc}"], l1)
+        if problems:
+            return GateDecision("fail", [f"upstream fact: {p}" for p in problems], l1,
+                                upstream=upstream, facts=signed_facts)
     if l1.external_refs:
         reasons.append("references outside knowledge/ need a companion PR: "
                        + ", ".join(f"{rid}@{path}" for rid, path in l1.external_refs))
@@ -234,17 +252,20 @@ def run_gate(*, base: dict[str, str], head: dict[str, str], changes: list[Change
               for b in l1.blocks]
     if any(b.verdict == "fail" for b in blocks):
         return GateDecision("fail", reasons + [f"L2 rejected {b.block.rule_id or b.block.path}"
-                                               for b in blocks if b.verdict == "fail"], l1, blocks)
+                                               for b in blocks if b.verdict == "fail"], l1, blocks,
+                            upstream=upstream, facts=signed_facts)
     owner_dirs = sorted({_owner_dir(b.path) for b in l1.blocks})
     consistency = check_consistency(head, owner_dirs, gateway=gateway, judge=judge)
     if any(item["verdict"] == "conflict" for item in consistency):
-        return GateDecision("fail", reasons + ["change set is inconsistent"], l1, blocks, consistency)
+        return GateDecision("fail", reasons + ["change set is inconsistent"], l1, blocks, consistency,
+                            upstream, signed_facts)
     if any(b.verdict == "human" for b in blocks):
         reasons.append("L2 was not sure about " + ", ".join(
             b.block.rule_id or b.block.path for b in blocks if b.verdict == "human"))
     if any(item["verdict"] == "unsure" for item in consistency):
         reasons.append("consistency check was not sure")
-    return GateDecision("human" if reasons else "pass", reasons, l1, blocks, consistency)
+    return GateDecision("human" if reasons else "pass", reasons, l1, blocks, consistency,
+                        upstream, signed_facts)
 
 
 def _is_active(section) -> bool:

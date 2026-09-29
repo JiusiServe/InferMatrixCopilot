@@ -244,3 +244,17 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
 - 测试：`test_kb_local_gate_verifier.py`（取代 `test_kb_gate_verifier.py`；本地门禁上的重放/过期/伪造/非 auto 来源、清单与块表、
   混合路径与可执行位、跨仓库、上下文失效、落地树中的悬空引用）；`test_kb_publisher.py`（暂停不触碰 PR、恢复后重签合并、
   draft 不合并、`close` 重试）；`test_kb_external.py`（受治理页面以外的路径从不合并）。
+
+## 2026-09-29 v8：上游事实证明与发布器复核
+- 服务：`run_gate(facts=observer)` 在 L1 之后、L2 之前对变更涉及的规则调用 `facts.attest`（观测者为
+  `upstream_facts.MirrorObserver`：服务自己的上游裸镜像 `<state_dir>/upstream/<repo>.git`（与发版巡检共用）+ 只读
+  GitHub reader）。必需声明不成立 → `fail`（理由 `upstream fact: …`，不调用付费评审，进入精炼）；上游不可读 → `human`。
+  事实与钉住的 `upstream` 写入 `decision`，`sign_verdict` 签入判定。没有上游（`general`）或不发布的仓库不做证明。
+  `KbRuntime.upstream_facts(lifecycle)` 提供观测者（`from_env` 装配；测试默认不证明）。
+- 发布器：`merge` 在本地门禁通过后、最后一次读控制记录前调用 `facts.recheck`，数据来源独立：发布器自己的镜像
+  `<publisher_state>/upstream/<repo>.git` 与 `gh api repos/<upstream>/pulls/<n>`；上游来自**发布器自己的**适配器配置
+  （`upstreams`，只含启用且发布的仓库）。任何不一致、未配置公开上游或上游不可读 → 本轮不合并（`not merging: upstream facts: …`）。
+- 服务收到这类拒绝：回到 `pr_open` 下一轮重签，记录 `facts_failing_since`；连续 24 小时仍失败 → `gate_failed` 并转人工。
+  其他任何回执结束这段连续失败。
+- 测试：`test_kb_upstream_facts.py`（声明抽取、符号定义、证明与复核的一致/不一致/不可达/伪造、真实 git 镜像、
+  门禁在 L2 前失败、发布器一致时合并、不一致或不可达时不合并并在 24 小时后转人工、未配置上游不合并）。
