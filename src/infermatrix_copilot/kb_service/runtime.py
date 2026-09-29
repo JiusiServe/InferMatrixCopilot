@@ -345,7 +345,7 @@ def publish(rt: KbRuntime, lifecycle: RepoLifecycle, changeset_id: str) -> str:
 
     Shadow (and any repository that does not publish) records what WOULD be
     opened and writes nothing to the outbox. The rest of the merge flow
-    (verdict signing, enqueue, activation) is driven by the scheduler once the
+    (verdict signing, the merge item, activation) is driven by the scheduler once the
     publisher reports the PR."""
     changeset = rt.ledger.changeset(changeset_id)
     if changeset["status"] != "gated":
@@ -388,7 +388,7 @@ def _pr_body(changeset_id: str, detail: dict) -> str:
     for op in detail["operations"]:
         lines.append(f"| {op['kind']} | `{op['page']}` | {op.get('new_rule_id') or op['rule_id']} |")
     lines += ["", f"Generator: `{detail['generator']}` · judge: `{detail['judge']}`.",
-              "Merge eligibility is decided by the kb-gate check in the merge queue."]
+              "The publisher merges it only if its local gate passes on the exact merge result."]
     return "\n".join(lines)
 
 

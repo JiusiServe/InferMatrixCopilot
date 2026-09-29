@@ -1,7 +1,7 @@
 """L1: the deterministic half of the knowledge quality gate.
 
 Two entry points, both pure functions over ``{knowledge-relative path: text}``
-mappings so the service, the gate and the vendored verifier agree exactly:
+mappings so the service's gate and the publisher's local gate agree exactly:
 
 * ``check_tree(files)`` — structural issues in one tree (footers, supersede
   links, tombstones, ``_routes.yaml``).
@@ -18,7 +18,7 @@ mappings so the service, the gate and the vendored verifier agree exactly:
                   pages, tombstones. Recomputed here; a mismatch is an issue,
                   never a block a verdict could cover.
 
-Standard library + PyYAML + ``lifecycle``/``ops`` only (vendored by kb-gate).
+Standard library + PyYAML + ``lifecycle``/``ops`` only.
 """
 
 from __future__ import annotations
@@ -32,22 +32,11 @@ from typing import Iterable, Mapping
 
 import yaml
 
-try:
-    from .lifecycle import (
-        FRONTMATTER, LifecycleError, Page, Section, expected_sources,
-    )
-    from .ops import (
-        INDEX_NAME, TOMBSTONES_NAME, all_rule_ids, all_tombstoned_ids,
-        load_tombstones, page_over_capacity, render_tombstones,
-    )
-except ImportError:  # pragma: no cover - vendored verifier bundle
-    from lifecycle import (  # type: ignore[no-redef]
-        FRONTMATTER, LifecycleError, Page, Section, expected_sources,
-    )
-    from ops import (  # type: ignore[no-redef]
-        INDEX_NAME, TOMBSTONES_NAME, all_rule_ids, all_tombstoned_ids,
-        load_tombstones, page_over_capacity, render_tombstones,
-    )
+from .lifecycle import LifecycleError, Page, Section, expected_sources
+from .ops import (
+    INDEX_NAME, TOMBSTONES_NAME, all_rule_ids, all_tombstoned_ids,
+    load_tombstones, page_over_capacity, render_tombstones,
+)
 
 ROUTES_NAME = "_routes.yaml"
 KNOWLEDGE_PREFIX = "knowledge/"

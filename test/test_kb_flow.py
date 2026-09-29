@@ -215,7 +215,7 @@ def test_a_receipt_arriving_after_github_showed_the_merge_still_counts(tmp_path)
 def test_merged_retirements_become_purge_candidates_next_release(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     cs = rt.ledger.new_changeset_id("demo", "sweep")
-    rt.ledger.stage_intake(rt.ledger.acquire_lease("t"), "demo", cs, kind="sweep", status="queued",
+    rt.ledger.stage_intake(rt.ledger.acquire_lease("t"), "demo", cs, kind="sweep", status="merge_requested",
                            verdicts=[], human_reason="", drafted_events=[],
                            detail={"release": "v1", "operations": [
                                {"kind": "retire", "page": PAGE, "rule_id": "DEMO-1a"}]})
@@ -388,7 +388,7 @@ def test_scheduler_tick_runs_intake_and_signs_control(tmp_path):
     assert any(e["event"] == "intake" for e in scheduler.log)
 
 
-def test_overturn_breaker_pauses_and_dequeues(tmp_path):
+def test_overturn_breaker_pauses_and_signs_nothing_more(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     owner = rt.ledger.acquire_lease("t")
     for n in (1, 2):
@@ -396,15 +396,14 @@ def test_overturn_breaker_pauses_and_dequeues(tmp_path):
         rt.ledger.stage_intake(owner, "demo", cs, detail={}, status="closed", verdicts=[],
                                human_reason="", drafted_events=[])
     open_cs = rt.ledger.new_changeset_id("demo", "intake")
-    rt.ledger.stage_intake(owner, "demo", open_cs, detail={}, status="queued", verdicts=[],
+    rt.ledger.stage_intake(owner, "demo", open_cs, detail={}, status="pr_open", verdicts=[],
                            human_reason="", drafted_events=[])
     rt.ledger.update_changeset(open_cs, pr_number=77, head_sha="a" * 40)
     rt.ledger.release_lease(owner)
     Scheduler(rt)._overturn_breaker(lifecycle)
     assert rt.ledger.repo_state("demo")["paused"] == 1
-    assert _items(tmp_path, "pause")[0]["body"]["pr"] == 77
-
-
+    rt.github.prs[77] = {"state": "open", "merged": False, "head": {"sha": "a" * 40}}
+    assert merge.advance(rt, lifecycle) == [] and not _items(tmp_path, "merge")
 def test_scheduler_isolates_a_failing_repository(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     broken = replace(lifecycle, repo="broken", full_name="org/broken", knowledge_dir="repos/broken")
@@ -476,8 +475,7 @@ def test_overturn_breaker_publishes_the_pause_at_once(tmp_path):
     Scheduler(rt)._overturn_breaker(lifecycle)
     public = load_public_key(public_key_text(rt.outbox._key.public_key()))
     control = verify("kb-control", json.loads((tmp_path / "state" / "outbox" / "control.json").read_text()), public)
-    holds = verify("kb-holds", json.loads((tmp_path / "state" / "public" / "holds.json").read_text()), public)
-    assert control["repos"]["demo"]["paused"] is True and holds["repos"] == ["demo"]
+    assert control["repos"]["demo"]["paused"] is True
 
 
 def test_scheduler_does_not_undo_a_rollback_until_main_moves(tmp_path):
@@ -647,20 +645,15 @@ def test_rollback_and_a_concurrent_tick_are_serialised(tmp_path, monkeypatch):
 
 
 
-def test_resume_returns_paused_prs_to_re_signing(tmp_path):
+def test_resume_signs_a_fresh_verdict(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     changeset_id, publisher = _open_pr(tmp_path, rt, lifecycle)
     _ack(tmp_path, rt, publisher, kind="open_pr", changeset_id=changeset_id, ok=True, pr=42, head_sha="d" * 40)
     rt.ledger.bump_generation("demo", pause=True, reason="drill")
-    _ack(tmp_path, rt, publisher, kind="pause", changeset_id=changeset_id, ok=True, item_id="p1")
-    assert rt.ledger.changeset(changeset_id)["status"] == "paused"
-    rt.ledger.resume("demo")
-    merge.resume_paused_prs(rt.ledger, "demo")
-    assert rt.ledger.changeset(changeset_id)["status"] == "pr_open"
     rt.github.prs[42] = {"state": "open", "merged": False, "head": {"sha": "d" * 40}}
+    assert merge.advance(rt, lifecycle) == []                             # no verdict while paused
+    rt.ledger.resume("demo")
     assert merge.advance(rt, lifecycle) == [f"merge issued {changeset_id}"]  # fresh verdict
-
-
 def test_gated_change_sets_are_published_after_an_interruption(tmp_path):
     def answer(role, prompt):
         if role.name == "generator":
@@ -684,77 +677,14 @@ def test_gated_change_sets_are_published_after_an_interruption(tmp_path):
 
 
 
-def test_a_pause_ack_after_resume_sends_the_pr_back_to_re_signing(tmp_path):
-    rt, lifecycle = _flow_runtime(tmp_path)
-    changeset_id, publisher = _open_pr(tmp_path, rt, lifecycle)
-    _ack(tmp_path, rt, publisher, kind="open_pr", changeset_id=changeset_id, ok=True, pr=42, head_sha="d" * 40)
-    rt.ledger.bump_generation("demo", pause=True, reason="drill")
-    merge.pause_open_prs(rt.ledger, rt.outbox, "demo", "drill")
-    rt.ledger.resume("demo")
-    merge.resume_paused_prs(rt.ledger, "demo")            # nothing paused yet: the ack is late
-    assert rt.ledger.changeset(changeset_id)["status"] == "pr_open"
-    _ack(tmp_path, rt, publisher, kind="pause", changeset_id=changeset_id, ok=True, item_id="late")
-    assert rt.ledger.changeset(changeset_id)["status"] == "pr_open"   # not stranded as paused
-    rt.github.prs[42] = {"state": "open", "merged": False, "head": {"sha": "d" * 40}}
-    assert merge.advance(rt, lifecycle) == [f"merge issued {changeset_id}"]
-
-
-def test_global_pause_is_respected_by_acks_advance_and_publish(tmp_path):
+def test_global_pause_is_respected_by_advance(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     changeset_id, publisher = _open_pr(tmp_path, rt, lifecycle)
     _ack(tmp_path, rt, publisher, kind="open_pr", changeset_id=changeset_id, ok=True, pr=42, head_sha="d" * 40)
     rt.ledger.bump_generation("*", pause=True, reason="all stop")
-    _ack(tmp_path, rt, publisher, kind="pause", changeset_id=changeset_id, ok=True, item_id="g")
-    assert rt.ledger.changeset(changeset_id)["status"] == "paused"       # not sent back to re-signing
-    rt.ledger.update_changeset(changeset_id, status="pr_open")
     rt.github.prs[42] = {"state": "open", "merged": False, "head": {"sha": "d" * 40}}
     assert merge.advance(rt, lifecycle) == []                             # no verdict while paused
-
-
-def test_pause_ack_waits_for_a_resume_holding_the_publication_lock(tmp_path):
-    import threading
-
-    rt, lifecycle = _flow_runtime(tmp_path)
-    changeset_id, publisher = _open_pr(tmp_path, rt, lifecycle)
-    _ack(tmp_path, rt, publisher, kind="open_pr", changeset_id=changeset_id, ok=True, pr=42, head_sha="d" * 40)
-    rt.ledger.bump_generation("demo", pause=True, reason="drill")
-    ack = {"item_id": "p", "kind": "pause", "changeset_id": changeset_id, "ok": True}
-    holding, release, errors = threading.Event(), threading.Event(), []
-
-    def resume_holding_lock():  # what `kb resume` does, in another "process"
-        from infermatrix_copilot.kb_service.ledger import Ledger
-        try:
-            other = Ledger(rt.ledger.path)
-            with rt.outbox.publication_lock():
-                holding.set()
-                release.wait(5)
-                other.resume("demo")
-                merge.resume_paused_prs(other, "demo")
-        except BaseException as exc:  # pragma: no cover
-            errors.append(exc)
-
-    def apply_ack():
-        from dataclasses import replace as dc_replace
-        from infermatrix_copilot.kb_service.ledger import Ledger
-        try:
-            merge.apply_acks(dc_replace(rt, ledger=Ledger(rt.ledger.path)), [ack])
-        except BaseException as exc:  # pragma: no cover
-            errors.append(exc)
-
-    resumer = threading.Thread(target=resume_holding_lock)
-    resumer.start()
-    assert holding.wait(5)
-    acker = threading.Thread(target=apply_ack)
-    acker.start()
-    acker.join(0.5)
-    assert acker.is_alive()          # the ack waits for the resume's lock
-    release.set()
-    resumer.join(5)
-    acker.join(5)
-    assert not errors, errors
-    assert rt.ledger.changeset(changeset_id)["status"] == "pr_open"  # never stranded as paused
-
-
+    assert rt.ledger.changeset(changeset_id)["status"] == "pr_open"
 def test_prune_keeps_snapshots_pinned_by_unfinished_runs(tmp_path):
     import json
     import os

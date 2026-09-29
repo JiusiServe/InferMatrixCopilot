@@ -229,7 +229,7 @@ class Ledger:
     def ensure_repo(self, repo: str, mode: str) -> bool:
         """Register ``repo`` or record its configured mode. A CHANGE of mode
         bumps the generation in the same transaction, so nothing issued under
-        the previous mode (e.g. an enqueue before a switch to shadow) survives
+        the previous mode (e.g. a merge item before a switch to shadow) survives
         a round trip back. Returns whether the generation changed."""
         now = self._clock()
         with self.tx() as cur:

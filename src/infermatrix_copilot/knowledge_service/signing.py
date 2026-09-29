@@ -5,8 +5,7 @@ The signature covers the canonical JSON of the payload (sorted keys, compact
 separators, UTF-8) prefixed with a purpose tag, so a verdict signature can never
 be replayed as an outbox item or a control record and vice versa.
 
-Only ``cryptography`` beyond the standard library: the kb-gate verifier bundle
-vendors this module and pins that dependency by hash.
+Only ``cryptography`` beyond the standard library.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey, Ed25519PublicKey,
 )
 
-PURPOSES = ("kb-gate-verdict", "kb-outbox-item", "kb-control", "kb-holds", "kb-ack")
+PURPOSES = ("kb-gate-verdict", "kb-outbox-item", "kb-control", "kb-ack")
 
 
 class SignatureError(ValueError):
@@ -47,7 +46,7 @@ def public_key_id(public: Ed25519PublicKey) -> str:
 
 
 def public_key_text(public: Ed25519PublicKey) -> str:
-    """The one-line form committed as ``.github/kb-gate.pub``."""
+    """The one-line form handed to the publisher (the file ``KB_SERVICE_PUBKEY`` names)."""
     raw = public.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     return "ed25519 " + base64.b64encode(raw).decode("ascii")
 

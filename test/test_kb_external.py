@@ -1,8 +1,7 @@
-"""Knowledge PRs the service did not open: auto gate, human approval, people."""
+"""Knowledge PRs the service did not open: the auto gate, findings, people."""
 
 from __future__ import annotations
 
-import json
 import subprocess
 import uuid
 
@@ -24,17 +23,11 @@ class PullsGitHub(KnowledgeGitHub):
     def __init__(self):
         super().__init__()
         self.open: dict[int, dict] = {}
-        self.reviews: dict[int, list[dict]] = {}
 
     def _answer(self, url):
         path = url.split("?", 1)[0]
         if path.endswith(f"/repos/{REPO}/pulls"):
             return list(self.open.values()) if "page=1" in url else []
-        if "/reviews" in path:
-            reviews = self.reviews.get(int(path.split("/pulls/")[1].split("/")[0]), [])
-            from urllib.parse import parse_qs, urlsplit
-            page = int(parse_qs(urlsplit(url).query).get("page", ["1"])[0])
-            return reviews[(page - 1) * 100: page * 100]
         return super()._answer(url)
 
 
@@ -44,12 +37,7 @@ def _setup(tmp_path):
     github.prs = rt.github.prs
     rt.github = github
     rt.lease_owner = rt.ledger.acquire_lease("scheduler")
-    origin = tmp_path / "origin"
-    (origin / ".github").mkdir(exist_ok=True)
-    (origin / ".github" / "CODEOWNERS").write_text("/.github/ @alice\n")
-    _git(origin, "add", "-A")
-    _git(origin, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-q", "-m", "owners")
-    return rt, lifecycle, origin
+    return rt, lifecycle, tmp_path / "origin"
 
 
 def _open_human_pr(rt, origin, number, files: dict[str, str | None], *, labels=(), draft=False):
@@ -110,41 +98,20 @@ def test_a_human_knowledge_pr_passes_the_auto_gate_and_gets_a_verdict(tmp_path):
     assert verdict["blocks"] and all(b["verdict"] == "pass" for b in verdict["blocks"])
 
 
-def test_paths_outside_the_governed_pages_need_a_maintainer(tmp_path):
+def test_paths_outside_the_governed_pages_are_never_merged(tmp_path):
     rt, lifecycle, origin = _setup(tmp_path)
-    head = _open_human_pr(rt, origin, 8, {"knowledge/tools/check.md": "tool notes\n"})
+    _open_human_pr(rt, origin, 8, {"knowledge/tools/check.md": "tool notes\n"})
     (event,) = _daily(rt)
     assert event.endswith("to people")
     assert rt.ledger.human_queue("demo") == []            # the author is told, not people's queue
-    assert "kb:human-approved" in _findings(tmp_path, 8)[-1] and "not passed" in _findings(tmp_path, 8)[-1]
-    assert len(_daily(rt)) == 1                           # not passed: checked again the next day
-    # a maintainer approves the CURRENT head and labels it: a human-approved verdict
-    rt.github.open[8]["labels"] = [{"name": "kb:human-approved"}]
-    rt.github.reviews[8] = [{"id": 99, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
-    head2 = _open_human_pr(rt, origin, 8, {"knowledge/tools/check.md": "tool notes v2\n"},
-                           labels=("kb:human-approved",))
-    rt.github.reviews[8] = [{"id": 99, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
-    assert _daily(rt) == []                       # approval is for the old head: wait
-    rt.github.reviews[8].append({"id": 100, "state": "APPROVED", "commit_id": head2, "user": {"login": "alice"}})
-    (event,) = _daily(rt)
-    assert "human-approved pr_open" in event
-    (changeset,) = [cs for cs in rt.ledger.changesets("demo", ("pr_open",)) if cs["kind"] == "external"]
+    findings = _findings(tmp_path, 8)[-1]
+    assert "not passed" in findings and "knowledge/tools/check.md" in findings and "split" in findings
+    assert "human-approved" not in findings
+    rt.github.open[8]["labels"] = [{"name": "kb:human-approved"}]  # a label changes nothing any more
+    (event,) = _daily(rt)                                 # not passed: checked again the next day
+    assert event.endswith("to people")
     merge.advance(rt, lifecycle)
-    verdict = _verdict(tmp_path, rt)
-    assert verdict["source"] == "human-approved" and verdict["review_ids"] == [100]
-    assert verdict["reviewers"] == ["alice"] and verdict["blocks"] == []
-    assert changeset["head_sha"] == head2
-
-
-def test_approvals_by_non_maintainers_or_later_retracted_do_not_count(tmp_path):
-    rt, lifecycle, origin = _setup(tmp_path)
-    head = _open_human_pr(rt, origin, 9, {"knowledge/tools/x.md": "x\n"}, labels=("kb:human-approved",))
-    rt.github.reviews[9] = [{"id": 1, "state": "APPROVED", "commit_id": head, "user": {"login": "mallory"}},
-                            {"id": 2, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}},
-                            {"id": 3, "state": "DISMISSED", "commit_id": head, "user": {"login": "alice"}}]
-    assert _daily(rt) == []
-
-
+    assert not _items(tmp_path, "merge")
 def test_a_pr_branched_before_main_changed_the_same_page_must_be_rebased(tmp_path):
     rt, lifecycle, origin = _setup(tmp_path)
     _open_human_pr(rt, origin, 10, _add_rule_files())
@@ -199,35 +166,13 @@ def _local_gate(tmp_path, rt, number):
 
 
 def test_verdicts_for_external_prs_pass_the_publishers_local_gate(tmp_path):
-    import pytest
-
-    from infermatrix_copilot.knowledge_service.verdict import VerdictError
-
     rt, lifecycle, origin = _setup(tmp_path)
     rt.clock = __import__("time").time          # verdict windows are checked against the real clock
     _open_human_pr(rt, origin, 7, _add_rule_files())
     _daily(rt)
     merge.advance(rt, lifecycle)
     assert _local_gate(tmp_path, rt, 7) == []
-
-    head = _open_human_pr(rt, origin, 8, {"knowledge/tools/check.md": "tool notes\n"}, labels=("kb:human-approved",))
-    rt.github.reviews[8] = [{"id": 100, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
     assert [e for e in _daily(rt) if "PR #7" in e and "findings" not in e] == []   # not judged again
-    rt.ledger.update_changeset(rt.ledger.changesets("demo", ("merge_requested",))[0]["id"], status="merged")
-    merge.advance(rt, lifecycle)
-    with pytest.raises(VerdictError, match="only auto verdicts merge"):
-        _local_gate(tmp_path, rt, 8)            # v8: a human-approved verdict never merges
-
-
-def test_a_retraction_on_a_later_page_of_reviews_is_seen(tmp_path):
-    rt, lifecycle, origin = _setup(tmp_path)
-    head = _open_human_pr(rt, origin, 20, {"knowledge/tools/x.md": "x\n"}, labels=("kb:human-approved",))
-    noise = [{"id": 1000 + i, "state": "COMMENTED", "commit_id": head, "user": {"login": f"u{i}"}}
-             for i in range(120)]
-    rt.github.reviews[20] = [{"id": 1, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}},
-                             *noise,
-                             {"id": 2, "state": "CHANGES_REQUESTED", "commit_id": head, "user": {"login": "alice"}}]
-    assert _daily(rt) == []
 
 
 def test_an_auto_verdict_needs_a_current_judge_calibration(tmp_path):
@@ -246,19 +191,6 @@ def test_an_auto_verdict_needs_a_current_judge_calibration(tmp_path):
     assert event.endswith("auto pr_open")
 
 
-def test_a_head_sent_to_people_can_be_approved_without_a_new_push(tmp_path):
-    rt, lifecycle, origin = _setup(tmp_path)
-    head = _open_human_pr(rt, origin, 30, {"knowledge/tools/y.md": "y\n"})
-    (event,) = _daily(rt)
-    assert event.endswith("to people")
-    assert len(_daily(rt)) == 1                           # still not passing: checked again the next day
-    rt.github.open[30]["labels"] = [{"name": "kb:human-approved"}]
-    rt.github.reviews[30] = [{"id": 7, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
-    (event,) = _daily(rt)
-    assert "human-approved pr_open" in event
-    assert _daily(rt) == []
-
-
 def test_rules_an_external_pr_retires_enter_the_retirement_ledger(tmp_path):
     rt, lifecycle, origin = _setup(tmp_path)
     (origin / "skills" / "x.md").write_text("no citations here\n")   # else it needs a companion PR
@@ -272,7 +204,7 @@ def test_rules_an_external_pr_retires_enter_the_retirement_ledger(tmp_path):
     assert "auto pr_open" in events[0], (events, rt.ledger.human_queue("demo"))
     (changeset,) = [cs for cs in rt.ledger.changesets("demo", ("pr_open",)) if cs["kind"] == "external"]
     assert changeset["detail"]["retirements"] == [{"rule_id": "DEMO-1a", "page": PAGE}]
-    rt.ledger.update_changeset(changeset["id"], status="verdict_posted")
+    rt.ledger.update_changeset(changeset["id"], status="merge_requested")
     rt.github.prs[41] = {"state": "closed", "merged": True, "merge_commit_sha": "f" * 40,
                          "head": {"sha": changeset["head_sha"]}}
     merge.advance(rt, lifecycle)

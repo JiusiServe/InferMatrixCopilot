@@ -1,74 +1,38 @@
-"""kb-gate: the repository-side verifier for knowledge pull requests.
+"""The knowledge verifier: the checks the publisher's local gate runs (design v8).
 
-It is the required check ``kb-gate`` and runs in two places under one name:
-
-* PR stage (``pull_request_target`` / ``issue_comment`` / dispatch): verifies
-  the PR against the current base and posts a ``kb-gate`` commit status on the
-  PR head. It only decides whether a PR may ENTER the merge queue.
-* merge group stage (``merge_group``): verifies every segment of the group on
-  the exact commit that would land and exits non-zero on any failure. This is
-  what decides whether anything lands.
-
-A change that does not touch ``knowledge/`` passes. A knowledge change passes
-only when all of these hold for it:
+The publisher is the only thing that merges knowledge PRs; right before each
+merge it runs ``verify_change`` on the exact tree that would land (see
+``kb_service.local_gate``). A change passes only when all of these hold:
 
 1. L1: whitelisted paths only, regular files only, no new tree issues, on the
-   PR's own change AND on the tree that would land;
-2. a valid Ed25519-signed verdict comment for this repository, PR and exact
-   head SHA, inside its issue window (the comment's author is irrelevant);
-3. the signed patch manifest equals the change as applied (base independent);
-4. ``auto``: the signed block table equals the blocks L1 derives, every block
-   passed, the consistency judgements cover the same owner directories and
-   their page hashes match the tree that would land; no page in the context
-   set changed between the judged base and the effective base;
-   ``human-approved``: every bound review is still APPROVED on this head, one
-   is by a knowledge maintainer (a CODEOWNERS owner of ``.github/kb-gate/``),
-   and ``kb:human-approved`` is set;
-5. no ``kb:hold`` label and not held by the service's signed hold list (a
-   missing, forged or stale hold list fails closed).
+   PR's own change AND on the tree that would land (including references to
+   rules the change retires or purges);
+2. the signed patch manifest equals the change as applied (base independent);
+3. the signed block table equals the blocks L1 derives, every block passed,
+   the consistency judgements cover the same owner directories and their page
+   hashes match the tree that would land;
+4. no page in the context set changed between the judged base and the
+   effective base.
 
-PR content is only ever READ through git objects; nothing from the PR is
-executed or installed. This module is vendored into ``.github/kb-gate/`` by
-``tools/build_kb_gate_bundle.py`` and runs from there, so it imports nothing
-outside the standard library and its vendored siblings.
+The verdict's signature and binding (repository, PR, head, issue window) are
+checked by the caller. PR content is only ever READ through git objects;
+nothing from the PR is executed or installed.
 """
 
 from __future__ import annotations
 
-import argparse
-import fnmatch
 import hashlib
-import json
 import os
 import subprocess
-import sys
-import time
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable, Iterable, Mapping
+from typing import Callable, Iterable, Mapping
 
-try:
-    from .l1 import Change, _dangling_refs as dangling_refs, check_changeset, check_tree
-    from .lifecycle import LifecycleError, Page
-    from .ops import all_rule_ids, repo_scope
-    from .signing import SignatureError, load_public_key, verify
-    from .verdict import VerdictError, check_binding, manifests_equal
-except ImportError:  # pragma: no cover - vendored verifier bundle
-    from l1 import Change, _dangling_refs as dangling_refs, check_changeset, check_tree  # type: ignore[no-redef]
-    from lifecycle import LifecycleError, Page  # type: ignore[no-redef]
-    from ops import all_rule_ids, repo_scope  # type: ignore[no-redef]
-    from signing import SignatureError, load_public_key, verify  # type: ignore[no-redef]
-    from verdict import VerdictError, check_binding, manifests_equal  # type: ignore[no-redef]
+from .l1 import Change, _dangling_refs as dangling_refs, check_changeset, check_tree
+from .lifecycle import LifecycleError, Page
+from .ops import all_rule_ids
+from .verdict import manifests_equal
 
-STATUS_CONTEXT = "kb-gate"
-VERDICT_MARKER = "<!-- kb-gate:verdict:v1 -->"
-HOLD_LABEL = "kb:hold"
-HUMAN_LABEL = "kb:human-approved"
-HOLDS_MAX_AGE = 10 * 60
-MAINTAINER_PATH = ".github/kb-gate/kb_gate.py"
-WHITELIST_CODES = ("path_not_whitelisted", "mode_not_regular")
 KNOWLEDGE_PREFIX = "knowledge/"
 GOVERNED_PREFIXES = ("knowledge/repos/", "knowledge/general/")
 GOVERNED_SUFFIXES = (".md", ".yaml")
@@ -206,113 +170,13 @@ class Git:
         return proc.stdout.decode("utf-8", "replace") if proc.returncode == 0 else None
 
 
-# -- GitHub REST (read, plus the PR-stage status) --------------------------------
-
-class GitHub:
-    def __init__(self, repository: str, token: str, api: str = "https://api.github.com"):
-        self.repository, self._token, self._api = repository, token, api.rstrip("/")
-
-    def _request(self, method: str, path: str, body: dict | None = None) -> Any:
-        data = None if body is None else json.dumps(body).encode()
-        request = urllib.request.Request(self._api + path, data=data, method=method, headers={
-            "Accept": "application/vnd.github+json", "Authorization": f"Bearer {self._token}",
-            "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "kb-gate"})
-        try:
-            with urllib.request.urlopen(request, timeout=30) as response:
-                return json.loads(response.read() or b"null")
-        except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-            raise GateError(f"GitHub {method} {path} failed: {exc}") from exc
-
-    def get(self, path: str) -> Any:
-        return self._request("GET", path)
-
-    def get_all(self, path: str, *, pages: int = 10) -> list:
-        out: list = []
-        sep = "&" if "?" in path else "?"
-        for page in range(1, pages + 1):
-            batch = self.get(f"{path}{sep}per_page=100&page={page}")
-            out.extend(batch)
-            if len(batch) < 100:
-                break
-        return out
-
-    def post(self, path: str, body: dict) -> Any:
-        return self._request("POST", path, body)
-
-
-# -- inputs from the protected checkout -------------------------------------------
-
-def fetch_holds(url: str) -> Any:
-    if not url:
-        raise GateError("no hold-list URL is configured (.github/kb-gate/config.json)")
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "kb-gate"}),
-                                    timeout=20) as response:
-            return json.loads(response.read())
-    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-        raise GateError(f"hold list unreachable: {exc}") from exc
-
-
-def verify_holds(envelope: Any, public_key, *, now: float) -> dict:
-    holds = verify("kb-holds", envelope, public_key)
-    if not 0 <= now - float(holds["issued_at"]) <= HOLDS_MAX_AGE:
-        raise GateError("hold list is stale (the knowledge service may be down)")
-    return holds
-
-
-def parse_codeowners(text: str | None) -> list[tuple[str, tuple[str, ...]]]:
-    rules = []
-    for line in (text or "").splitlines():
-        line = line.split("#", 1)[0].strip()
-        if not line:
-            continue
-        pattern, *owners = line.split()
-        rules.append((pattern, tuple(owner.lstrip("@").lower() for owner in owners)))
-    return rules
-
-
-def _codeowner_match(pattern: str, path: str) -> bool:
-    anchored = pattern.startswith("/")
-    pattern = pattern.lstrip("/")
-    if pattern.endswith("/"):
-        pattern += "**"
-    candidates = [path] if anchored or "/" in pattern.rstrip("*") else \
-        [path] + [path.split("/", i)[-1] for i in range(1, path.count("/") + 1)]
-    for candidate in candidates:
-        if fnmatch.fnmatchcase(candidate, pattern) or fnmatch.fnmatchcase(candidate, pattern + "/**") \
-                or (pattern.endswith("/**") and candidate.startswith(pattern[:-2])):
-            return True
-    return False
-
-
-def code_owners(rules: list[tuple[str, tuple[str, ...]]], path: str) -> tuple[str, ...]:
-    """Owners of ``path``: the LAST matching line wins. Team entries never
-    match a person here (their membership is not readable with the job token),
-    so a team-only path cannot be human-approved through this verifier."""
-    owners: tuple[str, ...] = ()
-    for pattern, names in rules:
-        if _codeowner_match(pattern, path):
-            owners = names
-    return tuple(name for name in owners if "/" not in name)
-
-
 # -- the verification of one change ------------------------------------------------
 
 @dataclass
 class Context:
     git: Git
-    github: Any
     repository: str
-    public_key: Any                 # None when .github/kb-gate.pub is missing
-    holds_loader: Callable[[], Any]
-    codeowners: list[tuple[str, tuple[str, ...]]]
     now: float
-    _holds: dict | None = None
-
-    def holds(self) -> dict:
-        if self._holds is None:
-            self._holds = verify_holds(self.holds_loader(), self.public_key, now=self.now)
-        return self._holds
 
 
 def governed(path: str) -> bool:
@@ -326,41 +190,6 @@ def touches_knowledge(entries: Iterable[Mapping[str, str]]) -> bool:
 
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def verdict_envelopes(comments: Iterable[Mapping[str, Any]]) -> list[Any]:
-    out = []
-    for comment in comments:
-        body = str(comment.get("body") or "")
-        if VERDICT_MARKER not in body:
-            continue
-        rest = body.split(VERDICT_MARKER, 1)[1]
-        start = rest.find("```json")
-        if start < 0:
-            continue
-        rest = rest[start + len("```json"):]
-        end = rest.find("```")
-        try:
-            out.append(json.loads(rest[:end] if end >= 0 else rest))
-        except ValueError:
-            continue
-    return out
-
-
-def find_verdict(ctx: Context, pr: int, head_sha: str) -> tuple[dict | None, list[str]]:
-    """The newest valid verdict for exactly this PR head, and why others failed."""
-    comments = ctx.github.get_all(f"/repos/{ctx.repository}/issues/{pr}/comments")
-    valid, rejected = [], []
-    for envelope in verdict_envelopes(comments):
-        try:
-            verdict = verify("kb-gate-verdict", envelope, ctx.public_key)
-            check_binding(verdict, repository=ctx.repository, pr=pr, head_sha=head_sha, now=ctx.now)
-            valid.append(verdict)
-        except (SignatureError, VerdictError, KeyError, TypeError, ValueError) as exc:
-            rejected.append(str(exc))
-    if not valid:
-        return None, rejected
-    return max(valid, key=lambda v: float(v["issued_at"])), rejected
 
 
 def _owner_dir(path: str) -> str:
@@ -407,32 +236,22 @@ def context_paths(touched: set[str], owner_dirs: set[str], post: Mapping[str, st
 
 
 def verify_change(ctx: Context, *, pr: dict, head_sha: str, pre: str, post: str, final: str,
-                  effective_base: str, stage: str, verdict: dict | None = None,
-                  check_holds: bool = True) -> list[str]:
+                  effective_base: str, verdict: dict) -> list[str]:
     """Problems with one PR's knowledge change (empty when it passes).
 
     ``pre``/``post`` are the commits (or trees) around this PR's change as it
     is applied; ``final`` is the tree that would land; ``effective_base`` is
-    the state the change is applied on (current main, or the first parent of
-    the merge-group segment). The publisher's local gate passes the verdict it
-    was handed (its signature and binding already checked) and no hold list:
-    a pause there is the signed control record."""
+    the state the change is applied on (current main, or the merge commit's
+    first parent). ``verdict`` is the signed verdict the caller verified."""
     number = int(pr["number"])
     entries = ctx.git.raw_diff(pre, post)
     if not touches_knowledge(entries):
         return []
-    if ctx.public_key is None:
-        return [".github/kb-gate.pub is not committed: knowledge changes cannot be verified"]
     problems: list[str] = []
-    labels = {str(label.get("name")) for label in pr.get("labels") or []}
     if pr.get("state") != "open":
         problems.append(f"PR #{number} is not open")
     if str((pr.get("head") or {}).get("sha")) != head_sha:
         problems.append(f"PR #{number} head moved from {head_sha[:12]}")
-    if stage == "merge_group" and pr.get("draft"):
-        problems.append(f"PR #{number} is a draft (paused)")
-    if HOLD_LABEL in labels:
-        problems.append(f"PR #{number} carries {HOLD_LABEL}")
 
     pre_files, post_files = ctx.git.knowledge_files(pre), ctx.git.knowledge_files(post)
     final_files = ctx.git.knowledge_files(final)
@@ -443,47 +262,19 @@ def verify_change(ctx: Context, *, pr: dict, head_sha: str, pre: str, post: str,
             problems.append(f"{e['path']}: change type {e['status']} is not allowed")
     touched = {e["path"][len(KNOWLEDGE_PREFIX):] for e in entries if e["path"].startswith(KNOWLEDGE_PREFIX)}
 
-    try:
-        holds = ctx.holds() if check_holds else {}
-        if holds.get("global"):
-            problems.append("the knowledge service holds every repository (global pause)")
-        if number in {int(p) for p in holds.get("prs") or []}:
-            problems.append(f"PR #{number} is on the service's hold list")
-        held = set(holds.get("repos") or [])
-        # a scope is its repository name, or "general" for knowledge/general/
-        scopes = {repo_scope(p).split("/")[-1] for p in touched if p.startswith(("repos/", "general/"))}
-        for scope in sorted(scopes & held):
-            problems.append(f"repository {scope} is paused by the knowledge service")
-    except (GateError, SignatureError, LifecycleError, KeyError, TypeError, ValueError) as exc:
-        problems.append(f"hold list: {exc}")
-
-    rejected: list[str] = []
-    if verdict is None:
-        verdict, rejected = find_verdict(ctx, number, head_sha)
-    if verdict is None:
-        detail = f" (rejected: {'; '.join(rejected[:3])})" if rejected else ""
-        problems.append(f"no valid signed verdict for PR #{number} at {head_sha[:12]}{detail}")
-        # still report L1, so the author sees every structural problem at once
-        result = check_changeset(pre_files, post_files, changes, external_texts={})
-        return problems + [f"L1 {i.code} {i.path} {i.detail}".rstrip() for i in result.issues]
-
+    if verdict.get("source") != "auto":
+        problems.append("only auto verdicts merge (there is no human-approved path)")
     if not manifests_equal(verdict.get("manifest") or [], entries):
         problems.append("the signed patch manifest does not match the change as applied")
     if verdict.get("facts"):
         problems.append("the verdict carries upstream fact attestations this verifier cannot re-check")
 
-    human = verdict["source"] == "human-approved"
-    # a maintainer's approval replaces the auto-merge whitelist (knowledge/tools,
-    # skills, scripts, mixed PRs) and L2, never the rest of L1: non-governed
-    # paths are not pages, so the page lifecycle checks run on governed ones only
-    l1_changes = [c for c in changes if governed(c.path)] if human else changes
-    result = check_changeset(pre_files, post_files, l1_changes,
+    result = check_changeset(pre_files, post_files, changes,
                              external_texts=ctx.git.external_texts(final),
                              release=str(verdict.get("release") or ""))
-    waived = WHITELIST_CODES if human else ()
-    problems.extend(f"L1 {i.code} {i.path} {i.detail}".rstrip() for i in result.issues if i.code not in waived)
+    problems.extend(f"L1 {i.code} {i.path} {i.detail}".rstrip() for i in result.issues)
     # what this change retires or purges must not be cited anywhere in the tree
-    # that would land (a PR queued behind it, or main, may have added a citation)
+    # that would land (main may have added a citation meanwhile)
     gone = set(result.retired) | set(result.purged)
     if gone:
         try:
@@ -492,81 +283,37 @@ def verify_change(ctx: Context, *, pr: dict, head_sha: str, pre: str, post: str,
         except (LifecycleError, ValueError) as exc:
             problems.append(f"L1 the tree that would land does not parse: {exc}")
 
-    if verdict["source"] == "auto":
-        if result.external_refs:
-            problems.append("retired rules are still cited outside knowledge/ (needs a companion PR)")
-        signed_blocks = verdict.get("blocks") or []
-        if {b.block_id for b in result.blocks} != {b.get("block_id") for b in signed_blocks}:
-            problems.append("the signed block table does not cover exactly the changed blocks")
-        if any(b.get("verdict") != "pass" for b in signed_blocks):
-            problems.append("a signed block did not pass")
-        owner_dirs = {_owner_dir(b.path) for b in result.blocks}
-        consistency = verdict.get("consistency") or []
-        if {c.get("owner_dir") for c in consistency} != owner_dirs:
-            problems.append("the consistency judgement does not cover exactly the changed owner directories")
-        for item in consistency:
-            directory = item.get("owner_dir")
-            actual = {p: _sha256(t) for p, t in final_files.items()
-                      if _owner_dir(p) == directory and p.endswith(".md")}
-            if item.get("verdict") != "consistent":
-                problems.append(f"{directory}: consistency was not judged consistent")
-            if item.get("pages") != actual:
-                problems.append(f"{directory}: pages changed since the consistency judgement")
-        base_sha = str(verdict["context_base_sha"])
-        try:
-            if not ctx.git.is_ancestor(base_sha, effective_base):
-                problems.append("the judged context base is not an ancestor of the effective base")
-            else:
-                relevant = context_paths(touched, owner_dirs, post_files, pre_files)
-                moved = [n[len(KNOWLEDGE_PREFIX):] for n in ctx.git.changed_names(base_sha, effective_base)]
-                stale = sorted(p for p in moved if relevant(p))
-                if stale:
-                    problems.append("context changed since the verdict was judged: " + ", ".join(stale[:5]))
-        except GateError as exc:
-            problems.append(f"context base: {exc}")
-    else:
-        problems.extend(_human_approval_problems(ctx, pr, verdict, head_sha, labels))
-    return problems
-
-
-def _human_approval_problems(ctx: Context, pr: dict, verdict: dict, head_sha: str,
-                             labels: set[str]) -> list[str]:
-    problems = []
-    if HUMAN_LABEL not in labels:
-        problems.append(f"{HUMAN_LABEL} was removed")
-    number = int(pr["number"])
-    reviewers = {str(r).lower() for r in verdict.get("reviewers") or []}
-    approvers = set()
-    for review_id in verdict.get("review_ids") or []:
-        review = ctx.github.get(f"/repos/{ctx.repository}/pulls/{number}/reviews/{int(review_id)}")
-        login = str((review.get("user") or {}).get("login") or "").lower()
-        if review.get("state") != "APPROVED":
-            problems.append(f"review {review_id} is no longer APPROVED")
-        elif review.get("commit_id") != head_sha:
-            problems.append(f"review {review_id} approved another head")
-        elif login not in reviewers:
-            problems.append(f"review {review_id} is by someone the verdict does not name")
+    if result.external_refs:
+        problems.append("retired rules are still cited outside knowledge/ (needs a companion PR)")
+    signed_blocks = verdict.get("blocks") or []
+    if {b.block_id for b in result.blocks} != {b.get("block_id") for b in signed_blocks}:
+        problems.append("the signed block table does not cover exactly the changed blocks")
+    if any(b.get("verdict") != "pass" for b in signed_blocks):
+        problems.append("a signed block did not pass")
+    owner_dirs = {_owner_dir(b.path) for b in result.blocks}
+    consistency = verdict.get("consistency") or []
+    if {c.get("owner_dir") for c in consistency} != owner_dirs:
+        problems.append("the consistency judgement does not cover exactly the changed owner directories")
+    for item in consistency:
+        directory = item.get("owner_dir")
+        actual = {p: _sha256(t) for p, t in final_files.items()
+                  if _owner_dir(p) == directory and p.endswith(".md")}
+        if item.get("verdict") != "consistent":
+            problems.append(f"{directory}: consistency was not judged consistent")
+        if item.get("pages") != actual:
+            problems.append(f"{directory}: pages changed since the consistency judgement")
+    base_sha = str(verdict["context_base_sha"])
+    try:
+        if not ctx.git.is_ancestor(base_sha, effective_base):
+            problems.append("the judged context base is not an ancestor of the effective base")
         else:
-            approvers.add(login)
-    if approvers:
-        # a later review by the same person (changes requested, dismissal)
-        # withdraws the approval even though the bound review still reads APPROVED
-        latest: dict[str, dict] = {}
-        for review in ctx.github.get_all(f"/repos/{ctx.repository}/pulls/{number}/reviews"):
-            login = str((review.get("user") or {}).get("login") or "").lower()
-            if login and review.get("state") in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED"):
-                latest[login] = review
-        for login in sorted(approvers):
-            review = latest.get(login) or {}
-            if review.get("state") != "APPROVED" or review.get("commit_id") != head_sha:
-                problems.append(f"{login}'s latest review no longer approves this head")
-                approvers.discard(login)
-    # knowledge maintainers = the CODEOWNERS of the gate itself. Governed pages
-    # deliberately have no code owners (that would force a review on every auto
-    # PR); paths outside the whitelist get GitHub's native code-owner review.
-    maintainers = set(code_owners(ctx.codeowners, MAINTAINER_PATH))
-    if not approvers & maintainers:
-        problems.append("no valid approving review by a knowledge maintainer (CODEOWNERS of .github/kb-gate/)")
+            relevant = context_paths(touched, owner_dirs, post_files, pre_files)
+            moved = [n[len(KNOWLEDGE_PREFIX):] for n in ctx.git.changed_names(base_sha, effective_base)]
+            stale = sorted(p for p in moved if relevant(p))
+            if stale:
+                problems.append("context changed since the verdict was judged: " + ", ".join(stale[:5]))
+    except GateError as exc:
+        problems.append(f"context base: {exc}")
     return problems
 
 
@@ -575,135 +322,3 @@ def tree_problems(git: Git, base: str, final: str) -> list[str]:
     before = {(i.code, i.detail) for i in check_tree(git.knowledge_files(base))}
     return [f"L1 {i.code} {i.path} {i.detail}".rstrip()
             for i in check_tree(git.knowledge_files(final)) if (i.code, i.detail) not in before]
-
-
-# -- the two stages -----------------------------------------------------------------
-
-def verify_pr(ctx: Context, number: int, *, base_ref: str = "main",
-              remote: str = "origin") -> tuple[str, list[str]]:
-    """(the head SHA verified, its problems). The status goes on THAT head, so
-    a push during verification can only leave the new head without a status."""
-    pr = ctx.github.get(f"/repos/{ctx.repository}/pulls/{number}")
-    head = str(pr["head"]["sha"])
-    return head, _verify_pr_head(ctx, pr, head, base_ref=base_ref, remote=remote)
-
-
-def _verify_pr_head(ctx: Context, pr: dict, head: str, *, base_ref: str, remote: str) -> list[str]:
-    number = int(pr["number"])
-    ctx.git.run("fetch", "--quiet", "--no-tags", remote,
-                f"+refs/pull/{number}/head:refs/kb-gate/pr-{number}", f"+refs/heads/{base_ref}:refs/kb-gate/base")
-    if ctx.git.rev(f"refs/kb-gate/pr-{number}") != head:
-        return [f"fetched head does not match PR #{number}'s head {head[:12]} (retry)"]
-    base_tip = ctx.git.rev("refs/kb-gate/base")
-    merge_base = ctx.git.merge_base(base_tip, head)
-    if not touches_knowledge(ctx.git.raw_diff(merge_base, head)):
-        return []
-    try:
-        final = ctx.git.merge_tree(base_tip, head)
-    except GateError as exc:
-        return [str(exc)]
-    problems = verify_change(ctx, pr=pr, head_sha=head, pre=merge_base, post=head, final=final,
-                             effective_base=base_tip, stage="pull_request")
-    return problems + tree_problems(ctx.git, base_tip, final)
-
-
-def _pr_for_head(ctx: Context, sha: str) -> dict:
-    matches = [pr for pr in ctx.github.get_all(f"/repos/{ctx.repository}/pulls?state=open")
-               if str((pr.get("head") or {}).get("sha")) == sha]
-    if len(matches) != 1:
-        raise GateError(f"{len(matches)} open PRs have head {sha[:12]}; the group cannot be attributed")
-    return ctx.github.get(f"/repos/{ctx.repository}/pulls/{int(matches[0]['number'])}")
-
-
-def verify_merge_group(ctx: Context, head_sha: str, *, base_ref: str = "main",
-                       remote: str = "origin") -> list[str]:
-    """Every segment of the group, each against its own first parent."""
-    ctx.git.run("fetch", "--quiet", "--no-tags", remote, f"+refs/heads/{base_ref}:refs/kb-gate/base")
-    main_tip = ctx.git.rev("refs/kb-gate/base")
-    if not ctx.git.is_ancestor(main_tip, head_sha):
-        return [f"the merge group {head_sha[:12]} is not built on the current {base_ref}"]
-    chain = ctx.git.first_parent_chain(main_tip, head_sha)
-    if not chain or chain[-1] != head_sha:
-        return ["the merge group has no segments"]
-    problems: list[str] = []
-    any_knowledge = False
-    for commit in chain:
-        parents = ctx.git.parents(commit)
-        if len(parents) != 2:
-            return [f"segment {commit[:12]} is not a two-parent merge commit; the group cannot be attributed"]
-        first, second = parents
-        if not touches_knowledge(ctx.git.raw_diff(first, commit)):
-            continue
-        any_knowledge = True
-        if ctx.public_key is None:
-            return [".github/kb-gate.pub is not committed: knowledge changes cannot be verified"]
-        try:
-            pr = _pr_for_head(ctx, second)
-        except GateError as exc:
-            return [str(exc)]
-        found = verify_change(ctx, pr=pr, head_sha=second, pre=first, post=commit, final=head_sha,
-                              effective_base=first, stage="merge_group")
-        problems.extend(f"PR #{pr['number']}: {p}" for p in found)
-    if any_knowledge:
-        problems.extend(tree_problems(ctx.git, main_tip, head_sha))
-    return problems
-
-
-# -- entry point ----------------------------------------------------------------------
-
-def _load_context(args, github) -> Context:
-    root = Path(args.root)
-    config_path = Path(__file__).resolve().parent / "config.json"
-    config = json.loads(config_path.read_text()) if config_path.is_file() else {}
-    pub = root / ".github" / "kb-gate.pub"
-    public_key = load_public_key(pub.read_text()) if pub.is_file() else None
-    codeowners_path = root / ".github" / "CODEOWNERS"
-    holds_url = str(config.get("holds_url") or "")
-    return Context(
-        git=Git(root), github=github, repository=args.repository, public_key=public_key,
-        holds_loader=lambda: fetch_holds(holds_url),
-        codeowners=parse_codeowners(codeowners_path.read_text() if codeowners_path.is_file() else ""),
-        now=time.time(),
-    )
-
-
-def main(argv: list[str] | None = None, *, github=None) -> int:
-    parser = argparse.ArgumentParser(prog="kb-gate")
-    sub = parser.add_subparsers(dest="stage", required=True)
-    pr_stage = sub.add_parser("pr")
-    pr_stage.add_argument("--pr", type=int, required=True)
-    pr_stage.add_argument("--post-status", action="store_true")
-    pr_stage.add_argument("--target-url", default="")
-    group = sub.add_parser("merge-group")
-    group.add_argument("--head-sha", required=True)
-    for stage in (pr_stage, group):
-        stage.add_argument("--repository", required=True)
-        stage.add_argument("--root", default=".")
-        stage.add_argument("--base-ref", default="main")
-    args = parser.parse_args(argv)
-    github = github or GitHub(args.repository, os.environ.get("GITHUB_TOKEN", ""),
-                              os.environ.get("GITHUB_API_URL", "https://api.github.com"))
-    ctx = _load_context(args, github)
-    head = ""
-    try:
-        if args.stage == "pr":
-            head = str(github.get(f"/repos/{args.repository}/pulls/{args.pr}")["head"]["sha"])
-            head, problems = verify_pr(ctx, args.pr, base_ref=args.base_ref)
-        else:
-            problems = verify_merge_group(ctx, args.head_sha, base_ref=args.base_ref)
-    except (GateError, SignatureError, VerdictError, LifecycleError, KeyError, TypeError, ValueError) as exc:
-        problems = [f"verifier error: {exc}"]
-    for problem in problems:
-        print(f"kb-gate: {problem}")
-    print("kb-gate: " + ("FAIL" if problems else "PASS"))
-    if args.stage == "pr" and args.post_status and head:
-        description = (problems[0] if problems else "knowledge verdict verified")[:139]
-        github.post(f"/repos/{args.repository}/statuses/{head}", {
-            "state": "failure" if problems else "success", "context": STATUS_CONTEXT,
-            "description": description, **({"target_url": args.target_url} if args.target_url else {})})
-        return 0
-    return 1 if problems else 0
-
-
-if __name__ == "__main__":  # pragma: no cover
-    sys.exit(main())

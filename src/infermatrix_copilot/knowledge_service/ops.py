@@ -21,7 +21,7 @@ the same result. After the operations it writes the MECHANICAL consequences the
 verifier later recomputes: ``updated:``, ``sources:`` (append-only), an index
 line for every new page, and tombstones for purged IDs.
 
-Standard library + PyYAML + ``lifecycle`` only: vendored by the verifier bundle.
+Standard library + PyYAML + ``lifecycle`` only.
 """
 
 from __future__ import annotations
@@ -33,16 +33,9 @@ from typing import Iterable, Mapping
 
 import yaml
 
-try:  # package import; the verifier bundle vendors both modules side by side
-    from .lifecycle import (
-        ANY_RULE_HEADING, RETIRE_REASONS, RULE_HEADING, Footer, LifecycleError,
-        Page, Section, expected_sources,
-    )
-except ImportError:  # pragma: no cover - exercised by the vendored bundle
-    from lifecycle import (  # type: ignore[no-redef]
-        ANY_RULE_HEADING, RETIRE_REASONS, RULE_HEADING, Footer, LifecycleError,
-        Page, Section, expected_sources,
-    )
+from .lifecycle import (
+    ANY_RULE_HEADING, RETIRE_REASONS, Footer, LifecycleError, Page, Section, expected_sources,
+)
 
 KNOWLEDGE_OPS_API_VERSION = "2.0.0"
 OP_KINDS = ("add", "edit_same_meaning", "replace", "retire", "purge")
@@ -127,7 +120,7 @@ def load_tombstones(text: str | None) -> list[dict]:
 def render_tombstones(items: list[dict]) -> str:
     lines = [
         "# IDs of purged knowledge rules. An ID listed here is never reused.",
-        "# Written by the knowledge service; recomputed by the kb-gate verifier.",
+        "# Written by the knowledge service; recomputed by the publisher's local gate.",
         "schema_version: 1",
         "ids:",
     ]
