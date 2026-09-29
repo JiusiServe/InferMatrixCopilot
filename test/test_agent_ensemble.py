@@ -1159,28 +1159,44 @@ def test_outcome_blocked_distinguishes_dead_seat_from_quiet_seat():
                                     "_tools_used": ["grep"]})
 
 
-def test_resolved_residual_becomes_a_comment(settings, trace, tmp_path):
-    """A `[resolved]` line that states a RESIDUAL is promoted into a scored
-    comment. Ground truth on merged/amended heads is ~70% "the fix landed —
-    what does it still not cover?", and the passes produce exactly that
-    reasoning; it was rendering into the unscored Validated block."""
-    from infermatrix_copilot.engine.steps.review.refinement import (
-        _promote_resolved_residuals,
-    )
-    out = _promote_resolved_residuals(
-        _ctx(settings, trace, tmp_path),
-        {"review_comments": [],
-         "findings": [
-             "[resolved] prior concern 'guard runs after the collective': "
-             "fixed at pipe.py:120 `validate(x)`. Residual: the batch path "
-             "at pipe.py:340 still calls it inside the rank-0 branch.",
-             "[resolved] prior concern 'missing pin': fixed at req.txt:3.",
-             "[sweep] read 40 files, nothing else of note"]})
-    kept = out["review_comments"]
-    assert len(kept) == 1, "only the residual-bearing line promotes"
-    assert kept[0]["file"] == "pipe.py" and kept[0]["line"] == 120
-    assert "Residual" in kept[0]["comment"]
-    assert next(trace.events("review_resolved_promoted"))["added"] == 1
+# vllm-project/vllm-omni#6968, verbatim: the `[resolved]` line that the old
+# prose promotion published as a P2 even though it says it is not re-raised.
+_DECLINED_RESOLVED = (
+    "[resolved] TI2I silent guidance-mode flip on co-batch: request-unique key "
+    "(`_boogu_batch_compatibility_key` → (\"boogu_image\", \"ti2i\", request_id)) "
+    "+ RuntimeError fail-closed at pipeline_boogu_image.py:667; residual: TI2I "
+    "stays batch=1 until RequestBatchSamplingParamsKey adds "
+    "`guidance_scale_2_provided` (author follow-up) — not re-raised.")
+
+
+def test_resolved_line_is_never_mined_into_a_comment(settings, trace, tmp_path):
+    """#155: a `[resolved]` findings line is the review's record, not an ask.
+    The prose promotion that turned residual-sounding lines into comments is
+    gone, and the coverage editor no longer receives `[resolved]` lines as raw
+    material, so the #6968 line cannot become a published finding."""
+    from types import SimpleNamespace
+
+    from infermatrix_copilot.engine.steps.review import refinement
+
+    assert not hasattr(refinement, "_promote_resolved_residuals")
+    seen: list[str] = []
+
+    class _LLM:
+        available = True
+
+        def create(self, *, messages, **_kw):
+            seen.append(messages[0]["content"])
+            return SimpleNamespace(text='{"additions": []}')
+
+    ctx = _ctx(settings, trace, tmp_path, llm=_LLM())
+    out = asyncio.run(refinement._promote_uncovered(
+        ctx, {"review_comments": [],
+              "findings": [_DECLINED_RESOLVED,
+                           "[validated] pipeline_boogu_image.py:690 image_gs "
+                           "forced to 1.0 without a reference"]}, {}))
+    assert out["review_comments"] == []
+    assert seen and "TI2I silent guidance-mode flip" not in seen[0]
+    assert "image_gs forced to 1.0" in seen[0]
 
 
 def test_empty_final_lens_is_retried_not_discarded(settings, trace, tmp_path):

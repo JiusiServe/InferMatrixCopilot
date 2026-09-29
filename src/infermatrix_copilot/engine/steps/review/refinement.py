@@ -13,69 +13,7 @@ import re
 
 from ....llm import parse_json_reply
 from ...step import StepContext
-from .utils import _SEVERITY_ORDER, _same_finding
-
-
-_RESIDUAL_MARKERS = ("residual", "not covered", "does not cover", "still ",
-                     "remains ", "left unfixed", "but ")
-
-
-def _promote_resolved_residuals(ctx: StepContext, output: dict) -> dict:
-    """Turn every `[resolved]` findings line that states a RESIDUAL into a
-    review comment.
-
-    Measured across two holdouts: the ground truth on merged/amended heads is
-    ~70% "a reviewer raised X, the fix landed — what does it still not
-    cover?", and the passes DO produce that reasoning (the `[resolved]`
-    contract in prompts.py asks for exactly it). But `[resolved]` is a
-    FINDINGS line, and findings render into the unscored 'Validated' block —
-    so the arm's best answers to the dominant question class were routed away
-    from the only channel a reader (or judge) scores. This promotion is
-    grounded by construction: it re-files a line the run already wrote and
-    verified, so it cannot invent a claim, and it sits outside the
-    coverage-promotion cap because it is not a discretionary addition."""
-    findings = [str(f) for f in (output.get("findings") or [])]
-    comments = list(output.get("review_comments") or [])
-    covered = {(str(c.get("file") or ""), str(c.get("comment") or "")[:60])
-               for c in comments}
-    added: list[dict] = []
-    for line in findings:
-        low = line.lstrip().lower()
-        if not low.startswith("[resolved]"):
-            continue
-        body = line.split("]", 1)[-1].strip()
-        if not any(m in body.lower() for m in _RESIDUAL_MARKERS):
-            continue          # a bare confirmation is not a finding
-        m = re.search(r"([\w./\-]+\.\w+):(\d+)", body)
-        file_, line_no = (m.group(1), int(m.group(2))) if m else ("", None)
-        if (file_, body[:60]) in covered:
-            continue
-        # ...and against EACH OTHER. `covered` only holds the pre-existing
-        # comments, so N resolved lines about one residual promoted N times:
-        # pr4977 shipped four near-identical "the PR description still claims
-        # trust_remote_code" comments (the cap of 4, saturated) out of five
-        # `[resolved]` lines stating that one residual, and the judge docked
-        # it for "4 nearly-identical inline comments restating the same
-        # PR-description staleness point, hurting signal density". Promotion
-        # is where that duplication is cheapest to stop — before these
-        # compete for the comment budget against distinct findings.
-        if any(_same_finding(body, prev["comment"]) for prev in added):
-            continue
-        added.append({"file": file_, "line": line_no, "severity": "minor",
-                      "comment": body,
-                      "evidence": line.strip(),
-                      "corroborated_by": ["resolved-residual"]})
-    if not added:
-        ctx.trace.record("review_resolved_promoted", step="agent.review_diff",
-                         added=0, resolved_lines=sum(
-                             1 for f in findings
-                             if f.lstrip().lower().startswith("[resolved]")))
-        return output
-    out = dict(output)
-    out["review_comments"] = comments + added[:4]
-    ctx.trace.record("review_resolved_promoted", step="agent.review_diff",
-                     added=len(added[:4]))
-    return out
+from .utils import _SEVERITY_ORDER
 
 
 async def _promote_uncovered(ctx: StepContext, output: dict,
@@ -91,7 +29,12 @@ async def _promote_uncovered(ctx: StepContext, output: dict,
     comment. Promotion is grounded by construction — the call may only cite
     material from the lines it is shown, never new claims — so it raises
     recall without the speculation cost of widening the lens budget."""
-    findings = [str(x) for x in (output.get("findings") or [])][:60]
+    # `[resolved]` lines are the review's record of a concern it closed, not
+    # raw material: a residual that needs action is filed by the reviewer as
+    # its own `publish` comment (prompts.py), and mining the record here
+    # re-published lines that explicitly decline their point (#155).
+    findings = [str(x) for x in (output.get("findings") or [])
+                if not str(x).lstrip().lower().startswith("[resolved]")][:60]
     blockers = [str(x) for x in (output.get("blockers") or [])][:10]
     assumptions = [str(x) for x in (output.get("assumptions") or [])][:10]
     comments = output.get("review_comments") or []
@@ -516,7 +459,6 @@ async def refine_review(
     disposition and comment budget.
     """
     if depth != "light":
-        output = _promote_resolved_residuals(ctx, output)
         output = await _promote_uncovered(ctx, output, spec)
         output = await _second_round(ctx, output, common, diff)
     return await _verify_comments(ctx, output, common)

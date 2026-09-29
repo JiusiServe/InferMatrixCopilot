@@ -47,7 +47,12 @@ as a `[resolved]` findings line NAMING the concern, QUOTING the decisive line â€
 stating the residual you checked (what the fix does NOT cover): a fix that landed \
 mid-PR usually narrows rather than closes, and reviewing its residue is the work. On \
 amended/post-review heads these confirmations are most of what a reader checks the \
-review against; silence about a resolved concern reads as never having looked. \
+review against; silence about a resolved concern reads as never having looked. The \
+`[resolved]` line is the RECORD, never the ask, and is never published: when the \
+residual needs the contributor to act, ALSO file it as its own comment \
+(`disposition: publish`, file:line of the uncovered path, the change or test to \
+add, the `[resolved]` line quoted in `evidence`); a residual left only in a \
+findings line is not raised. \
 CAUTION on absence claims: verify "X was removed/is absent" with `diff_stat`, but \
 never render a bare "X is absent from the diff" assertion â€” on amended PRs the \
 reader's thread may reference an earlier revision, and an absolute absence claim \

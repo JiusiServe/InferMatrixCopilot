@@ -156,19 +156,25 @@ def test_findings_with_no_file_do_not_invent_a_broken_reference():
     assert "`PR description`" in md and "`general`" in md
 
 
-def test_promoted_residuals_are_deduped_against_each_other():
-    """`covered` only held the pre-existing comments, so N resolved lines
-    about one residual promoted N times - pr4977 shipped four near-identical
-    PR-description-staleness comments, saturating the cap of 4."""
-    import asyncio
-    from types import SimpleNamespace
-    from infermatrix_copilot.engine.steps.review.refinement import (
-        _promote_resolved_residuals)
-    ctx = SimpleNamespace(trace=SimpleNamespace(record=lambda *a, **k: None))
-    out = _promote_resolved_residuals(ctx, {"findings": list(_TRC),
-                                            "review_comments": []})
-    assert len(out["review_comments"]) == 1
-    assert asyncio is not None  # keep the import honest for the linter
+def test_residual_filed_as_a_publish_comment_is_published():
+    """#155: a genuine residual still ships, as the reviewer's own comment.
+    The pr4977 residual (`_TRC`: the PR description still advertises the
+    dropped trust_remote_code kwarg) arrives as ONE `publish` comment quoting
+    its `[resolved]` line; the `[resolved]` lines themselves stay records."""
+    from infermatrix_copilot.engine.steps.review.utils import (
+        finalize_review_dispositions)
+    residual = {"file": "PR description", "line": None, "severity": "minor",
+                "disposition": "publish",
+                "comment": "The PR description still advertises the "
+                           "trust_remote_code kwarg that 9947f414 dropped for "
+                           "kernels 0.13.x compat; update it.",
+                "evidence": _TRC[3]}
+    record = {"file": "flash_attn_hub.py", "line": 34, "severity": "minor",
+              "disposition": "resolved", "comment": _TRC[1], "evidence": _TRC[1]}
+    published, withheld = finalize_review_dispositions(
+        {"review_comments": [residual, record], "findings": list(_TRC)})
+    assert [c["comment"] for c in published] == [residual["comment"]]
+    assert [c["comment"] for c in withheld] == [_TRC[1]]
 
 
 def test_skill_curation_queue_stays_out_of_the_deliverable():
