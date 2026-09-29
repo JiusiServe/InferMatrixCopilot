@@ -55,7 +55,7 @@ COMPANION_LABEL = "kb:companion"
 # so a label that failed to apply cannot make one mergeable by automation
 COMPANION_BRANCH = re.compile(r"kb/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+-companion-[0-9a-f]+")
 HOLD_LABEL = "kb:hold"
-PUSHING = frozenset({"open_pr", "open_companion_pr"})
+PUSHING = frozenset({"open_pr", "open_companion_pr", "open_revert_pr"})
 # retried until done, never acked as failed: stops (pause, close) and reports
 # (open_issue, post_findings: a transient GitHub error must not lose a sweep
 # report or an author's findings)
@@ -384,7 +384,7 @@ class Publisher:
             publishes, auto_merge = self.repo_flags.get(claimed, (False, False))
             item = check_item(envelope, control, self.service_public_key, now=self.clock(),
                               repo_publishes=publishes, repo_auto_merge=auto_merge)
-            self._envelope, self._flags = envelope, (publishes, auto_merge)
+            self._envelope, self._flags, self._control = envelope, (publishes, auto_merge), control
         except (OutboxError, OSError, ValueError, KeyError, TypeError) as exc:
             # not performed and not acked: an unverifiable item is never
             # answered, and a stale one is superseded by the service itself
@@ -463,6 +463,32 @@ class Publisher:
         if len(opened) != 1 or opened[0]["headRefOid"] != commit:
             raise PublishError(f"the PR for {branch} could not be confirmed after creation")
         return {"pr": int(opened[0]["number"]), "head_sha": commit, "branch": branch}
+
+    def _do_open_revert_pr(self, item: OutboxItem) -> dict:
+        """A revert of an unknown change: governed pages only, never merged by us."""
+        return self._do_open_pr(item)
+
+    def _provenance_problems(self, main_sha: str) -> list[str]:
+        """Every governed knowledge commit on main since the active snapshot
+        must be trusted: listed in the signed control record, or a merge this
+        publisher made itself (its receipt may not have reached the service)."""
+        payload = (getattr(self, "_control", None) or {}).get("payload") or {}
+        provenance = payload.get("provenance") or {}
+        active = str(provenance.get("active") or "")
+        if not active:
+            return []  # nothing activated yet: no trusted baseline to compare with
+        trusted = set(provenance.get("trusted") or [])
+        done = self.state_dir / "done"
+        for path in (done.glob("*.json") if done.is_dir() else []):
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if record.get("kind") == "merge" and record.get("merge_sha"):
+                trusted.add(record["merge_sha"])
+        commits = self._git("rev-list", "--first-parent", f"{active}..{main_sha}", "--",
+                            "knowledge/repos", "knowledge/general").split()
+        return [sha for sha in commits if sha not in trusted]
 
     def _do_open_companion_pr(self, item: OutboxItem) -> dict:
         """Always a draft, labelled kb:companion, and only within the companion
@@ -590,6 +616,10 @@ class Publisher:
             if self._git("rev-parse", f"refs/kb/pr-{number}") != head:
                 raise PublishError(f"fetched head of PR #{number} is not {head[:12]}")
             main_sha = self._git("rev-parse", "refs/remotes/origin/main")
+            unknown = self._provenance_problems(main_sha)
+            if unknown:
+                raise PublishError(f"not merging: knowledge changes on main that passed no gate "
+                                   f"({', '.join(s[:12] for s in unknown[:3])}); the service pauses and reverts them")
             problems = local_gate.gate(self.clone, repository=self.github.repository, repo=item.repo, pr=rest,
                                        head_sha=head, main_sha=main_sha, verdict=verdict,
                                        public_key=self.service_public_key, now=self.clock())

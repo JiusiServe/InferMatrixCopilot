@@ -37,12 +37,15 @@ from ..knowledge_service.signing import canonical_json, sign, verify
 
 ITEM_KINDS = (
     "open_pr", "open_companion_pr", "post_verdict", "enqueue",
-    "update_branch", "pause", "close", "open_issue", "merge", "post_findings",
+    "update_branch", "pause", "close", "open_issue", "merge", "post_findings", "open_revert_pr",
 )
-ALWAYS_EXECUTABLE = frozenset({"pause", "close"})
+# they only ever stop or undo: executable while a repository is paused (a
+# revert is issued BECAUSE the repository was paused for an unknown change)
+ALWAYS_EXECUTABLE = frozenset({"pause", "close", "open_revert_pr"})
 ITEM_TTL = {
     "open_pr": 24 * 3600, "open_companion_pr": 24 * 3600,
     "post_verdict": 30 * 60, "enqueue": 30 * 60, "merge": 30 * 60, "post_findings": 24 * 3600,
+    "open_revert_pr": 24 * 3600,
     "update_branch": 24 * 3600, "pause": 24 * 3600, "close": 24 * 3600,
     "open_issue": 7 * 24 * 3600,
 }
@@ -182,7 +185,11 @@ class Outbox:
                           "paused": bool(row["paused"])}
             for row in self._ledger.all_repo_states()
         }
-        return {"issued_at": self._clock(), "repos": repos}
+        # what the publisher checks main against before every merge: every
+        # governed knowledge commit since the active snapshot must be trusted
+        trusted = json.loads(self._ledger.get_cursor("*", "trusted_merges") or "[]")
+        return {"issued_at": self._clock(), "repos": repos,
+                "provenance": {"active": self._ledger.active_snapshot() or "", "trusted": trusted}}
 
     def refresh_control(self) -> dict:
         with self.publication_lock():

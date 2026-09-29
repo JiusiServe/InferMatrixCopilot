@@ -86,6 +86,24 @@ class KnowledgeRepo:
     def merge_base(self, a: str, b: str) -> str:
         return self._git("merge-base", a, b).decode().strip()
 
+    def is_ancestor(self, older: str, newer: str) -> bool:
+        proc = subprocess.run(["git", "-C", str(self.path), "merge-base", "--is-ancestor", older, newer],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        return proc.returncode == 0
+
+    def diff_text(self, old: str, new: str, paths: list[str]) -> str:
+        """The textual diff of ``paths`` (evidence for a candidate)."""
+        if not paths:
+            return ""
+        args = ["diff", old, new, "--", *paths] if old else ["show", "--format=", new, "--", *paths]
+        try:
+            return self._git(*args).decode("utf-8", "replace")
+        except SourceError:
+            return ""
+
+    def parents(self, sha: str) -> list[str]:
+        return self._git("rev-list", "--parents", "-n", "1", sha).decode().split()[1:]
+
     def show(self, rev: str, path: str) -> str | None:
         try:
             return self._git("show", f"{rev}:{path}").decode("utf-8", "replace")

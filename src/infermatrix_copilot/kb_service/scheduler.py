@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from . import merge
 from .activate import ActivationError, activate, activation_lock
 from .archive import make_archive
-from .audit import audit_main
+from .audit import audit_main, open_unknown, provenance_problems
 from .report import flush_reports
 from .companion import publish_companion
 from .external import poll_external
@@ -45,7 +45,7 @@ class Scheduler:
     tick_seconds: float = 60.0
     intake_every: float = 900.0
     release_every: float = 3600.0
-    audit_every: float = 24 * 3600.0
+    audit_every: float = 0.0  # v8: provenance is checked every tick
     archive_every: float = 7 * 24 * 3600.0
     log: list[dict] = field(default_factory=list)
     _last: dict[str, float] = field(default_factory=dict)
@@ -108,8 +108,14 @@ class Scheduler:
                 if pinned_main == sha:
                     pass  # rolled back away from this main: stay there until main moves on
                 elif sha != rt.ledger.active_snapshot():
-                    activate(rt, sha, locked=True)
-                    self._record("*", "activated", snapshot=sha)
+                    blocked = open_unknown(rt) or provenance_problems(rt, sha)
+                    if blocked:
+                        # a knowledge change that passed no gate is on main: nothing
+                        # new is served until it is reverted (design v8, G5 exception)
+                        self._record("*", "activation_blocked", unknown=[s[:12] for s in blocked])
+                    else:
+                        activate(rt, sha, locked=True)
+                        self._record("*", "activated", snapshot=sha)
         except ActivationError as exc:
             rt.ledger.enqueue_human("*", f"snapshot activation refused: {exc}")
             self._record("*", "activation_refused", error=str(exc))

@@ -135,11 +135,20 @@ def switch_active(state_dir: Path, snapshot: Path) -> None:
     os.replace(tmp, link)
 
 
-def activate(rt, sha: str, *, locked: bool = False) -> Path:
-    """Build, verify and switch to the snapshot of knowledge at ``sha``."""
+def activate(rt, sha: str, *, locked: bool = False, verify_provenance: bool = True) -> Path:
+    """Build, verify and switch to the snapshot of knowledge at ``sha``. Every
+    knowledge commit from the active snapshot up to ``sha`` must have passed
+    the gate (design v8): nothing that bypassed it is ever served, whoever
+    asks (the scheduler, or `kb activate`)."""
     if not locked:
         with activation_lock(rt.state_dir):
-            return activate(rt, sha, locked=True)
+            return activate(rt, sha, locked=True, verify_provenance=verify_provenance)
+    if verify_provenance:
+        from .audit import provenance_problems
+
+        problems = provenance_problems(rt, sha)
+        if problems:
+            raise ActivationError("provenance: " + "; ".join(problems[:5]))
     files = rt.knowledge.knowledge_files(sha)
     extra = rt.knowledge.top_level_knowledge(sha)
     snapshot = build_snapshot(rt.state_dir, sha, files, extra=extra)
