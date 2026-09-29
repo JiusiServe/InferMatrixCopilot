@@ -126,12 +126,14 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "routing",
         "navigation_policy",
         "execution_budget",
+        "untested_public_api",
         "first_review_checklist",
         "progress_update",
         "completion_gate",
         "diagnostics",
     }
     assert review["mode"] == "direct"
+    assert review["untested_public_api"] == {"status": "no_diff"}
     assert core.requests == []
     assert Path(review["knowledge_entry"]).parts[-2:] == ("knowledge", "AGENTS.md")
     assert review["knowledge_routes"] == []

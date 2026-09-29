@@ -423,3 +423,11 @@ knowledge_lifecycle:
   protected_rules: []
   calibration_set: kb-calibration   # adapters/vllm_omni/kb-calibration/cases/*.json
   model_dir: repos/vllm-omni/models
+
+# Unit-test coverage candidates for new public functions (#164). Sources are
+# the package; tests live under tests/. Entry points and generated/registry
+# files are skipped: their coverage is end-to-end by design.
+ut_coverage:
+  source_roots: [vllm_omni/]
+  test_globs: ["tests/*", "*/test_*.py", "*/conftest.py"]
+  exclude: ["*/__init__.py", "vllm_omni/entrypoints/cli/*", "vllm_omni/version.py"]

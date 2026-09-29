@@ -28,6 +28,8 @@ import yaml
 from .adapters import AdapterError, AdapterRegistry, RepoAdapter
 from .knowledge_view import KnowledgeView
 from .sdk._resources import adapters_root
+from .ut_coverage import UTCoverageRules, analyze as _ut_analyze
+from .ut_coverage import REVIEWER_INSTRUCTIONS as _UT_INSTRUCTIONS
 
 _ROOT = Path(__file__).resolve().parents[2]
 _ADAPTERS = adapters_root()
@@ -158,6 +160,7 @@ DIRECT_REVIEW_CHECKLIST = (
     "Classify every candidate finding as new, duplicate, extends_existing, or resolved_or_outdated. Suppress duplicates; for extensions, point to the existing thread instead of opening a parallel inline comment. Reverify resolved/outdated concerns at the pinned head and suppress them only when fixed. Use disabled only for PR_CONTEXT_MODE=no_discussion evaluation, record unavailable feedback as a validation gap, and use not_applicable only for local/worktree reviews.",
     "Run subtraction only when the diff adds or expands a helper, class, fallback, compatibility branch, or public behavior; otherwise mark no subtraction signal.",
     "When subtraction is triggered, read the mandatory simplification guide and prove consumers, trust boundaries, and lifecycle ownership before calling code dead or over-defensive.",
+    "When the plan's untested_public_api lists candidates, judge each new public function as indirectly covered, trivial, or a real unit-test gap after reading it and searching the head's tests; when the host passed no diff, list the diff's new public functions and search the tests yourself. File at most three real gaps as minor findings on the def's file:line and name any further ones in one line.",
     "Report the non-test added-line count the host supplies rather than counting the diff yourself; above the stated budget, ask for a split plan or a concrete exemption on the largest contributing file, and record the reason instead when the PR body already gives one. Size is never a correctness finding and never raises another finding's severity.",
     "Plan exactly one consolidated final review comment.",
 )
@@ -586,8 +589,13 @@ def direct_review_plan(
     body: str = "",
     changed_files: list[str] | None = None,
     view: KnowledgeView | None = None,
+    diff: str = "",
 ) -> dict:
     """Return the complete Direct policy bundle for one frozen review.
+
+    ``diff`` is optional: with it, the bundle carries the new public
+    functions no test in the diff names (#164) for the agent to judge; without
+    it, the checklist asks the agent to find them itself.
 
     This is the canonical provider operation used by both the Python SDK and
     the MCP adapter.  Keeping the full bundle here prevents downstream hosts
@@ -620,6 +628,7 @@ def direct_review_plan(
         ),
     )
     budget_ms = int((time.perf_counter() - budget_started) * 1000)
+    untested = _direct_untested_public_api(repo, diff)
     return {
         "mode": "direct",
         "knowledge_entry": (
@@ -648,6 +657,7 @@ def direct_review_plan(
             "fallback_entry": _knowledge_path("AGENTS.md", view),
         },
         "execution_budget": execution_budget,
+        "untested_public_api": untested,
         "first_review_checklist": list(DIRECT_REVIEW_CHECKLIST),
         "progress_update": {
             **DIRECT_PROGRESS_UPDATE,
@@ -695,6 +705,21 @@ def direct_review_plan(
             }
         },
     }
+
+
+def _direct_untested_public_api(repo: str, diff: str) -> dict:
+    """Candidates from the diff alone: the provider holds no checkout of the
+    PR head, so the head-tree test search is the agent's (see checklist)."""
+    if not diff:
+        return {"status": "no_diff"}
+    adapter = _adapter_for_repo(repo)
+    rules = UTCoverageRules.from_manifest(
+        adapter.manifest if adapter is not None else None)
+    if rules is None:
+        return {"status": "disabled"}
+    report = _ut_analyze(diff, rules)
+    return {"status": "ok", **report.to_dict(),
+            "instructions": _UT_INSTRUCTIONS if report.candidates else ""}
 
 
 def _direct_completion_result(

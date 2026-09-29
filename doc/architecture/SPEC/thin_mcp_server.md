@@ -1,6 +1,6 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-29 -->
 
 `LOC ~490 · 默认 MCP：Direct 门面 + Strict 入口 · refactor-status: ok`
 
@@ -26,6 +26,8 @@
   委托 —— 没有任何东西从那两个模块向上 import 回 server。下面关于
   quick-map fail-closed、路由不静默替换、仓库守卫先跑的不变量**仍然为真**，
   但其实现体在 `direct_routing.py`（规范见其页）。
+- `review` 的可选 `diff` 只对 Direct 生效：原样交给 `direct_review_plan`，
+  由其生成 `untested_public_api` 候选（#164）；仍然零模型。
 - **Strict 分支透传快照绑定**：`_strict_review_request` 把
   `expected_head_sha`、`repo_path`、`idempotency_key` 一并送进内部请求；
   `review()` 的 Strict 路径按 `strict_readiness(repo, repo_path)`（两参，

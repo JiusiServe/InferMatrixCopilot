@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-29 -->
 
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
@@ -133,3 +133,7 @@ Direct 1.1 / Strict 1.3 accept typed `CarriedFinding` inputs (unique IDs, source
 `DirectReviewPlan` 新增 `knowledge_snapshot`（激活快照 ID、`packaged` 或 `unverified`，从不暴露开发树路径）
 与 `knowledge_tree_sha256`（已验证快照的清单树哈希，否则为空）。同一 `review_context_id` 下的文档读取都来自这份
 快照，RB 应随每次 review 记录这两个值。
+
+## 2026-09-29 未测公开函数候选
+`DirectReviewRequest` 新增可选 `diff`（冻结 head 的 unified diff），`DirectReviewPlan` 新增
+`untested_public_api`（`direct_routing` 的同名块，默认空字典）。两者都是可选增量字段，旧调用方不受影响（#164）。

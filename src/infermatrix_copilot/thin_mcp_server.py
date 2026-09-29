@@ -273,6 +273,7 @@ def build_mcp(
         repo_path: str = "",
         expected_head_sha: str = "",
         idempotency_key: str = "",
+        diff: str = "",
     ) -> dict:
         """Begin a Direct or Strict review.
 
@@ -289,6 +290,9 @@ def build_mcp(
         ``expected_head_sha`` (Strict only) pins the review to one snapshot: pass
         the full 40-hex head you observed, and the run stops as stale rather than
         reviewing a different commit if the PR moved in between.
+        ``diff`` (Direct only, optional) is the frozen unified diff; with it the
+        plan lists the new public functions no test in the diff names
+        (``untested_public_api``) for you to judge.
         ``idempotency_key`` (Strict only) makes a retry safe: pass a stable id for
         the attempt and a repeated call returns the SAME run — including a
         finished one, whose result you can read — instead of starting a second
@@ -311,6 +315,7 @@ def build_mcp(
                     title=title,
                     body=body,
                     changed_files=changed_files,
+                    diff=diff,
                 )
 
             if post:
