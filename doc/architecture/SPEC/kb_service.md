@@ -275,3 +275,10 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
   （幂等 upsert）记入退役账本，下个发版的巡检据此 purge。
 - `kb status` 新增 `unknown_commits`：未处置的未知提交及其接受请求的状态。
 - 测试：`test_kb_accept_unknown.py`。
+
+## 2026-09-29 一致性冲突只算本次改动的
+一致性评审看整个 owner 目录，但只有**涉及本次改动的规则**（新增、编辑、退役、被替代的规则 ID）的冲突才使变更失败；
+两条都未被改动的规则之间的冲突已经在 main 上，记入该目录的 `preexisting`，不计入变更（精炼也无法修复它，否则该目录
+的任何变更都会被永久挡住并白白消耗精炼轮次）。没有写出规则 ID 的冲突仍算本次改动的（失败即关闭）。评审提示中带
+`changed_rule_ids`。校准不传 `changed`，保持整目录严格判定。首个线上运行即遇到此情况：configuration 目录中 CONF-1a..4a 在
+两页重复、DIFF-2s/2t、SERV-4o/4r5 在 main 上已冲突，导致两批 intake 全部 `refine_exhausted`。
