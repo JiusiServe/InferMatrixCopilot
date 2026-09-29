@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from . import merge
 from .activate import ActivationError, activate, activation_lock
 from .archive import make_archive
+from .accept import accept_pending
 from .audit import audit_main, open_unknown, provenance_problems
 from .report import flush_reports
 from .companion import publish_companion
@@ -91,8 +92,13 @@ class Scheduler:
                     self._record("*", "audit", finding=finding)
             except Exception as exc:
                 self._record("*", "error", error=repr(exc), trace=traceback.format_exc()[-2000:])
+        try:  # `kb accept-unknown` requests: an unknown commit judged through the gate
+            for event in accept_pending(rt):
+                self._record("*", "accept", detail=event)
+        except Exception as exc:
+            self._record("*", "error", error=repr(exc), trace=traceback.format_exc()[-2000:])
         if self._due("external", self.intake_every) and not merge.is_paused(rt.ledger, "*"):
-            try:  # knowledge PRs the service did not open (source 4, human approvals)
+            try:  # knowledge PRs the service did not open (source 4)
                 for event in poll_external(rt):
                     self._record("*", "external", detail=event)
             except Exception as exc:
