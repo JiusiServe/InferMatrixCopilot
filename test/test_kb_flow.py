@@ -247,10 +247,10 @@ def test_activation_switches_atomically_and_rolls_back(tmp_path, monkeypatch):
     rt, lifecycle = _flow_runtime(tmp_path)
     _add_agents(rt)
     first = rt.knowledge.fetch()
-    activate(rt, first)
+    activate(rt, first, verify_provenance=False)
     assert Path(active_link(rt.state_dir)).resolve().name == first
     second = _commit_change(rt, "repos/demo/guide.md", "# guide\n")
-    activate(rt, second)
+    activate(rt, second, verify_provenance=False)
     monkeypatch.setenv("KNOWLEDGE_ROOT", str(active_link(rt.state_dir)))
     from infermatrix_copilot.knowledge_view import _load_view
     _load_view.cache_clear()
@@ -265,11 +265,11 @@ def test_activation_refuses_a_broken_tree(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     _add_agents(rt)
     good = rt.knowledge.fetch()
-    activate(rt, good)
+    activate(rt, good, verify_provenance=False)
     bad = _commit_change(rt, "repos/demo/_routes.yaml",
                          "schema_version: 1\nowners:\n  - owner: core\n    path: repos/demo/missing.md\n")
     with pytest.raises(ActivationError):
-        activate(rt, bad)
+        activate(rt, bad, verify_provenance=False)
     assert Path(active_link(rt.state_dir)).resolve().name == good  # unchanged
 
 
@@ -484,9 +484,9 @@ def test_scheduler_does_not_undo_a_rollback_until_main_moves(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     _add_agents(rt)
     first = rt.knowledge.fetch()
-    activate(rt, first)
+    activate(rt, first, verify_provenance=False)
     second = _commit_change(rt, "repos/demo/guide.md", "# guide\n")
-    activate(rt, second)
+    activate(rt, second, verify_provenance=False)
     rollback(rt, first)
     scheduler = Scheduler(rt)
     scheduler.intake_every = scheduler.release_every = 10 ** 9
@@ -494,6 +494,12 @@ def test_scheduler_does_not_undo_a_rollback_until_main_moves(tmp_path):
     scheduler.tick()
     assert Path(active_link(rt.state_dir)).resolve().name == first      # rollback respected
     third = _commit_change(rt, "repos/demo/guide.md", "# guide v3\n")
+    owner = rt.ledger.acquire_lease("t")
+    for sha in (second, third):                                         # both passed the gate
+        merged = rt.ledger.new_changeset_id("demo", "intake")
+        rt.ledger.stage_intake(owner, "demo", merged, detail={}, status="merged",
+                               verdicts=[], human_reason="", drafted_events=[])
+        rt.ledger.update_changeset(merged, merge_sha=sha)
     scheduler.tick()
     assert Path(active_link(rt.state_dir)).resolve().name == third      # a newer main activates
 
@@ -502,7 +508,7 @@ def test_activation_rejects_a_snapshot_whose_content_was_altered(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     _add_agents(rt)
     sha = rt.knowledge.fetch()
-    snapshot = activate(rt, sha)
+    snapshot = activate(rt, sha, verify_provenance=False)
     (snapshot / "knowledge" / "AGENTS.md").write_text("# tampered\n", encoding="utf-8")
     with pytest.raises(ActivationError, match="does not match its manifest"):
         verify_snapshot(snapshot)
@@ -610,9 +616,9 @@ def test_rollback_and_a_concurrent_tick_are_serialised(tmp_path, monkeypatch):
     rt, lifecycle = _flow_runtime(tmp_path)
     _add_agents(rt)
     first = rt.knowledge.fetch()
-    activate(rt, first)
+    activate(rt, first, verify_provenance=False)
     second = _commit_change(rt, "repos/demo/guide.md", "# guide\n")
-    activate(rt, second)
+    activate(rt, second, verify_provenance=False)
     original = activate_module.verify_snapshot
     entered = threading.Event()
 
@@ -850,17 +856,17 @@ def test_activation_refuses_a_knowledge_format_this_copilot_does_not_read(tmp_pa
     rt, lifecycle = _flow_runtime(tmp_path)
     _add_agents(rt)
     good = rt.knowledge.fetch()
-    snapshot = activate(rt, good)
+    snapshot = activate(rt, good, verify_provenance=False)
     assert json.loads((snapshot / "MANIFEST.json").read_text())["knowledge_format"] == 2
     newer = _commit_change(rt, "_format.yaml", "format_version: 3\n")
     with pytest.raises(ActivationError, match="knowledge format 3"):
-        activate(rt, newer)
+        activate(rt, newer, verify_provenance=False)
     origin = Path(rt.knowledge.path).parent / "origin"
     (origin / "knowledge" / "_format.yaml").unlink()
     _git(origin, "add", "-A")
     _git(origin, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-q", "-m", "undeclared")
     with pytest.raises(ActivationError, match="undeclared"):
-        activate(rt, rt.knowledge.fetch())
+        activate(rt, rt.knowledge.fetch(), verify_provenance=False)
     assert Path(active_link(rt.state_dir)).resolve().name == good     # still the good one
 
 
@@ -875,8 +881,8 @@ def test_a_malformed_format_declaration_is_refused_not_coerced(tmp_path, declare
     rt, lifecycle = _flow_runtime(tmp_path)
     _add_agents(rt)
     good = rt.knowledge.fetch()
-    activate(rt, good)
+    activate(rt, good, verify_provenance=False)
     bad = _commit_change(rt, "_format.yaml", f"format_version: {declared}\n")
     with pytest.raises(ActivationError, match="undeclared"):
-        activate(rt, bad)
+        activate(rt, bad, verify_provenance=False)
     assert Path(active_link(rt.state_dir)).resolve().name == good

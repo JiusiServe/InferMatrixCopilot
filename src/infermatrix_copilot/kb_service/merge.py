@@ -69,6 +69,7 @@ TRANSITIONS = {
     "post_verdict": ("pr_open", "verdict_posted"),
     "enqueue": ("verdict_posted", "queued"),
     "merge": ("merge_requested", "merged"),
+    "open_revert_pr": ("pr_requested", "revert_open"),
 }
 
 
@@ -164,7 +165,7 @@ def apply_acks(rt, acks: list[dict]) -> None:
                                     changeset_id)
             continue
         fields = {"status": after, "pending_item": None}
-        if kind in ("open_pr", "open_companion_pr"):
+        if kind in ("open_pr", "open_companion_pr", "open_revert_pr"):
             fields.update(pr_number=int(ack["pr"]), head_sha=str(ack["head_sha"]),
                           branch=str(ack.get("branch", "")))
         elif kind == "enqueue":
@@ -463,7 +464,7 @@ def advance(rt, lifecycle) -> list[str]:
     paused = is_paused(rt.ledger, lifecycle.repo)
     merging = rt.ledger.changesets(lifecycle.repo, ("merge_requested",))
     for changeset in rt.ledger.changesets(lifecycle.repo, (*IN_FLIGHT, "superseding", "paused",
-                                                           "companion_open")):
+                                                           "companion_open", "revert_open")):
         number = changeset["pr_number"]
         if number is None:
             continue
@@ -510,6 +511,24 @@ def advance(rt, lifecycle) -> list[str]:
                     rt.ledger.enqueue_human(lifecycle.repo, f"companion PR #{number} was closed unmerged",
                                             knowledge["id"])
                 events.append(f"companion_closed {changeset['id']}")
+            continue
+        if changeset["status"] == "revert_open":
+            # people merge reverts; an exact one disposes of the unknown change
+            from .audit import settle_revert
+
+            if pr.get("merged"):
+                try:
+                    exact = settle_revert(rt, changeset, pr)
+                except Exception as exc:  # noqa: BLE001 - e.g. the clone cannot fetch yet: next pass
+                    events.append(f"revert_settle_retry {changeset['id']}: {exc}")
+                    continue
+                events.append(f"revert_merged {changeset['id']} exact={exact}")
+            elif pr.get("state") == "closed":
+                rt.ledger.update_changeset(changeset["id"], status="closed")
+                rt.ledger.enqueue_human(lifecycle.repo, (
+                    f"revert PR #{number} was closed: {changeset['detail'].get('reverts', '')[:12]} stays "
+                    "undisposed and activation stays blocked until it is reverted"), changeset["id"])
+                events.append(f"revert_closed {changeset['id']}")
             continue
         if changeset["status"] == "superseding":
             # the replaced PR stays tracked until GitHub shows it closed; the
