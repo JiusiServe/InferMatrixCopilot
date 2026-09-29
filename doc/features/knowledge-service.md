@@ -96,8 +96,11 @@ infermatrix-copilot kb holds-server --port 8765   # 只提供 GET /holds.json，
 
 切换前的负责人步骤：提交 `.github/kb-gate.pub`（`kb keygen` 的公钥）；在
 `.github/kb-gate/config.json` 填入暂停清单的公开 HTTPS 地址（`$KB_STATE_DIR/public/holds.json`）；
-在 `.github/CODEOWNERS` 中再加入至少一名知识维护者；仓库 admin 开启合并队列（merge commit）
-与 ruleset（必需检查 `kb-gate` 限定 GitHub Actions 来源、Code Owner 审阅、新推送需重新批准）。
+仓库 admin 开启合并队列（merge commit）并配置两个 ruleset：
+- `main-gate`（无 bypass）：必须经合并队列合并，必需检查 `kb-gate` 限定 GitHub Actions 来源，禁止删除与强推；
+- `main-code-owners`：要求 PR、Code Owner 审阅、新推送后需重新批准；bypass 仅 @tzhouam（唯一维护者，
+  GitHub 不允许作者批准自己的 PR，其本人对 `.github/**` 等路径的修改经此 bypass 合并，但仍受 `main-gate` 约束）。
+唯一维护者意味着 `human-approved` 路径只适用于他人开的 PR；服务自己开的 PR 若转人工，由负责人关闭或修改后重新过门。
 在此之前，所有触碰 `knowledge/` 的 PR 都会被 `kb-gate` 拒绝（失败即关闭），代码 PR 不受影响。
 
 ## 发布器（GPU 盒）
