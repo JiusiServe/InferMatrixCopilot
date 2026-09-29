@@ -258,3 +258,20 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
   其他任何回执结束这段连续失败。
 - 测试：`test_kb_upstream_facts.py`（声明抽取、符号定义、证明与复核的一致/不一致/不可达/伪造、真实 git 镜像、
   门禁在 L2 前失败、发布器一致时合并、不一致或不可达时不合并并在 24 小时后转人工、未配置上游不合并）。
+
+## 2026-09-29 v8：`kb accept-unknown`
+第二种处置未知提交的方式（与精确 revert 并列，design §8.3）：
+- `kb accept-unknown SHA`（至少 7 位、唯一前缀）只校验并记录请求（`accept_request:<sha>`，已处置或不是未知提交 → 退出码 2）；
+  `kb serve` 持有租约，在下一个 tick 由 `accept.accept_pending` 判定。
+- 判定：该提交自身的改动（第一父 → 提交）作为 `accept` 变更集走**完整**门禁（L1、L2、一致性、上游事实），要求当前通过的
+  评审校准；只能是单个启用且公开的仓库范围、全部为受治理页面、非根提交。服务的 revert PR 仍在创建中（`pr_requested`）
+  时等到下一 tick。
+- 只有 `pass` 才处置：`disposed:<sha> = <sha>`（提交在历史中即被信任）、记录 `state=accepted`、丢弃该提交的 `unrecorded`
+  intake 候选、已打开的 revert PR 转 `superseding` 并下发 `close`。暂停不自动解除：由人 `kb resume`。
+  其余结果（门禁未过、无校准、范围或路径不合格）不处置，转人工并写入请求记录。
+- 可恢复：通过后先把记录写为 `accepting`，清理（按 `ledger.event_by_external_id` 直接定位候选事件、revert 转 `superseding`）
+  完成后才写 `disposed:` 与 `accepted`；中途崩溃由下一 tick 完成清理且不再次调用评审。
+- 与外部 PR 一样，L1 发现该提交退役/删除的规则写入 `accept` 变更集的 `retirements`/`purges`，清理时经 `record_retirements`
+  （幂等 upsert）记入退役账本，下个发版的巡检据此 purge。
+- `kb status` 新增 `unknown_commits`：未处置的未知提交及其接受请求的状态。
+- 测试：`test_kb_accept_unknown.py`。

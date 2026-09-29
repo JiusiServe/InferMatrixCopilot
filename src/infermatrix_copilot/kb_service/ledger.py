@@ -311,6 +311,11 @@ class Ledger:
                 return None
             return int(cur.lastrowid)
 
+    def event_by_external_id(self, repo: str, source: str, external_id: str) -> dict[str, Any] | None:
+        row = self._conn.execute("SELECT * FROM events WHERE repo=? AND source=? AND external_id=?",
+                                 (repo, source, external_id)).fetchone()
+        return {**dict(row), "payload": json.loads(row["payload"])} if row else None
+
     def events(self, repo: str, status: str, *, limit: int = 100) -> list[dict[str, Any]]:
         rows = self._conn.execute(
             "SELECT * FROM events WHERE repo=? AND status=? ORDER BY id LIMIT ?",

@@ -4,7 +4,8 @@
     kb status                         repositories, modes, generations, queues
     kb pause  (--repo R | --all) --reason TEXT
     kb resume (--repo R | --all)
-    kb control                        refresh the signed control record and hold list now
+    kb control                        refresh the signed control record now
+    kb accept-unknown SHA             judge an unknown knowledge commit through the gate instead of reverting it
     kb run --playbook kb-intake --repo R   run one knowledge playbook once
     kb calibrate --repo R             run the judge over the repository's calibration set
     kb serve [--once]                 the scheduler (holds the single-writer lease)
@@ -80,6 +81,24 @@ def _outbox(state_dir: Path, ledger):
     return Outbox(state_dir, _signing_key(), ledger, clock=time.time)
 
 
+def _unknown_status(ledger) -> dict:
+    """Unknown knowledge commits not disposed of, with any accept request."""
+    from .accept import ACCEPT
+    from .audit import DISPOSED, UNKNOWN
+
+    disposed = {n[len(DISPOSED):] for n in ledger.cursors_with_prefix("*", DISPOSED)}
+    out = {}
+    for name, raw in ledger.cursors_with_prefix("*", UNKNOWN).items():
+        sha = name[len(UNKNOWN):]
+        if sha in disposed:
+            continue
+        record = json.loads(raw)
+        request = ledger.get_cursor("*", ACCEPT + sha)
+        out[sha] = {"state": record.get("state"), "reason": record.get("reason"),
+                    "accept": json.loads(request) if request else None}
+    return out
+
+
 def _refresh(state_dir: Path, ledger, registry) -> None:
     _outbox(state_dir, ledger).transition(lambda: None)
 
@@ -99,6 +118,8 @@ def main(argv: list[str] | None = None) -> int:
         if name == "pause":
             cmd.add_argument("--reason", required=True)
     sub.add_parser("control")
+    accept = sub.add_parser("accept-unknown")
+    accept.add_argument("sha")
     run = sub.add_parser("run")
     run.add_argument("--playbook", required=True)
     run.add_argument("--repo", required=True)
@@ -160,6 +181,7 @@ def main(argv: list[str] | None = None) -> int:
                      "human_queue": len(ledger.human_queue(row["repo"])) if row["repo"] != "*" else None}
                     for row in ledger.all_repo_states()
                 ],
+                "unknown_commits": _unknown_status(ledger),
             }
             json.dump(report, sys.stdout, indent=2, sort_keys=True)
             print()
@@ -182,6 +204,17 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "control":
             _refresh(state_dir, ledger, registry)
+            return 0
+        if args.command == "accept-unknown":
+            from .accept import AcceptError, request_accept
+
+            try:
+                sha = request_accept(ledger, args.sha, at=time.time())
+            except AcceptError as exc:
+                print(str(exc), file=sys.stderr)
+                return 2
+            print(f"accept requested for {sha}: `kb serve` judges it through the gate on its next tick "
+                  "(`kb status` and the human queue show the outcome)")
             return 0
         if args.command == "run":
             from ..config import Settings
