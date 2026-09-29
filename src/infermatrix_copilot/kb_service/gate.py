@@ -129,10 +129,14 @@ def _neighbours(files: dict[str, str], path: str, rule_id: str, limit: int = 30)
 
 
 def judge_block(block: Block, *, base: dict[str, str], head: dict[str, str], evidence: list[dict],
-                gateway: ModelGateway, judge: ModelRole) -> BlockVerdict:
+                gateway: ModelGateway, judge: ModelRole, evidence_for=None) -> BlockVerdict:
+    """``evidence_for(rule_text, evidence)`` narrows and expands the evidence for
+    this one block (None: the change set's evidence as recorded)."""
     dimensions = DIMENSIONS[block.op]
     before = _section_text(base, block.path, block.rule_id) if block.op != "add" else ""
     after = _section_text(head, block.path, block.rule_id) if block.op != "purge" else ""
+    if evidence_for is not None and block.kind == "rule":
+        evidence = evidence_for(after or before, evidence)
     payload = {
         "change": {"op": block.op, "page": block.path, "rule_id": block.rule_id,
                    "before": before, "after": after},
@@ -253,7 +257,8 @@ def run_gate(*, base: dict[str, str], head: dict[str, str], changes: list[Change
              external_texts: dict[str, str], evidence: list[dict], gateway: ModelGateway,
              judge: ModelRole, release: str, repo_dir: str,
              protected_rules: tuple[str, ...] = (),
-             retire_ratio: float = 0.10, max_files: int = 50, facts=None) -> GateDecision:
+             retire_ratio: float = 0.10, max_files: int = 50, facts=None,
+             evidence_for=None) -> GateDecision:
     """``facts`` observes the repository's public upstream (None: the
     repository has no upstream to attest, or it publishes nothing)."""
     l1 = check_changeset(base, head, changes, external_texts=external_texts, release=release)
@@ -288,8 +293,8 @@ def run_gate(*, base: dict[str, str], head: dict[str, str], changes: list[Change
         reasons.append(f"circuit breaker: {removed} of {active_before} rules retired/purged")
     if len(changes) > max_files:
         reasons.append(f"circuit breaker: {len(changes)} files changed (limit {max_files})")
-    blocks = [judge_block(b, base=base, head=head, evidence=evidence, gateway=gateway, judge=judge)
-              for b in l1.blocks]
+    blocks = [judge_block(b, base=base, head=head, evidence=evidence, gateway=gateway, judge=judge,
+                          evidence_for=evidence_for) for b in l1.blocks]
     if any(b.verdict == "fail" for b in blocks):
         return GateDecision("fail", reasons + [f"L2 rejected {b.block.rule_id or b.block.path}"
                                                for b in blocks if b.verdict == "fail"], l1, blocks,

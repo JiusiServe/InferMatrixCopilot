@@ -282,3 +282,12 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
 的任何变更都会被永久挡住并白白消耗精炼轮次）。没有写出规则 ID 的冲突仍算本次改动的（失败即关闭）。评审提示中带
 `changed_rule_ids`。校准不传 `changed`，保持整目录严格判定。首个线上运行即遇到此情况：configuration 目录中 CONF-1a..4a 在
 两页重复、DIFF-2s/2t、SERV-4o/4r5 在 main 上已冲突，导致两批 intake 全部 `refine_exhausted`。
+
+## 2026-09-29 L2 按规则取证据
+`evidence.for_rule(rule_text, evidence, observer)`：L2 评审每条规则时只给它引用的 PR（`^[PR #N]`；一个都不在批次里则
+全部给），并把这些上游合并 PR 的 8 KB 摘录换成合并提交的完整逐文件 diff（服务自己的上游镜像，`MirrorObserver.file_diff`）：
+规则提到的文件在前，每文件 24 KB、每条规则 48 KB，截断处注明；超出预算的文件列在 `diffs_omitted`。镜像读不到或没有
+diff 时保留原摘录（证据不会因此变得更"好过"）。只扩展带 `merged_at` 的上游 PR 证据；Copilot 运行经验与外部 PR 证据不变。
+`merged_pr` 事件的证据新增 `merge_commit_sha`（旧事件经 `pull()` 查询）。`run_gate(evidence_for=...)` 由 `gate_and_stage`
+与事实证明共用同一个观测者（一次镜像同步）。首个线上运行中"所给 diff 在…之前截断"是 L2 判 unsure/fail 的主要原因，
+而整批 10 个 PR 的证据（约 105 KB）对每条规则都重复发送；按规则取证据后约 11 KB + 所引 PR 的完整 diff。

@@ -73,6 +73,25 @@ class MirrorObserver:
         proc = self._git("cat-file", "blob", f"{sha}:{path}", ok=(0, 1, 128))
         return proc.stdout if proc.returncode == 0 else None
 
+    def pr_diff(self, number: int, merge_sha: str, path: str) -> str:
+        """What PR ``number`` changed in ``path``, as GitHub shows it: from the
+        merge base of its head with main before it landed (``merge_sha^1``) to
+        its head. Right for squash, merge-commit and rebase merges alike (for a
+        rebase merge ``merge_sha`` is only the LAST rebased commit)."""
+        base, head = self._pr_range(number, merge_sha)
+        return self._git("diff", "--no-color", "-U3", base, head, "--", path).stdout
+
+    def _pr_range(self, number: int, merge_sha: str) -> tuple[str, str]:
+        cache = self.__dict__.setdefault("_ranges", {})
+        if number not in cache:
+            self._commit(merge_sha)
+            ref = f"refs/kb-pr/{number}"
+            self._git("fetch", "--quiet", "origin", f"+refs/pull/{number}/head:{ref}")
+            head = self._git("rev-parse", f"{ref}^{{commit}}").stdout.strip()
+            base = self._git("merge-base", f"{merge_sha}^1", head).stdout.strip()
+            cache[number] = (base, head)
+        return cache[number]
+
     def pull(self, number: int) -> dict:
         try:
             data = self._pull(number)
