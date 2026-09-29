@@ -1,6 +1,6 @@
 # engine/steps/review/ —— 规范
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-09-29 -->
 
 `patch gate + PR review + quality（9 个源文件） · step 库（评审） · refactor-status: ok`
 
@@ -49,6 +49,11 @@ agent、评审结果的有界精炼、评测调优过的 prompt 数据和确定�
   「Checked, no defect found」注记：保留证据，去掉诉求，不带优先级。
   在此之前取舍只活在模型的 `summary` 散文里，而发布读的是列表，于是
   summary 说要丢弃的请求照样行内发出（#141）。
+- **`[resolved]` 是记录，不是诉求**：findings 里的 `[resolved]` 行从不变成评论。
+  残留问题若需要贡献者处理，由评审者自己另发一条 `publish` 评论（file:line、
+  要做的改动、`evidence` 引用该 `[resolved]` 行）；覆盖补充（coverage editor）
+  的输入也剔除 `[resolved]` 行。此前按关键词从散文里“提拔”残留，会把明确
+  写着不再追究的行发成 P2（#155）。
 - **`review_verdict` 是发布的 state 字段，不是散文**：由
   `_review_verdict(review_comments, pr_state)` 计算（**与渲染器同一个
   helper，绝不第二份校准规则**），随 `review_text`/`review_summary`/
