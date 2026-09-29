@@ -559,3 +559,42 @@ def test_late_generator_failure_cannot_reset_an_event_staged_by_the_new_holder(t
     assert run_intake(rt, lifecycle) is None
     drafted = rt.ledger.events("demo", "drafted")
     assert len(drafted) == 1 and drafted[0]["detail"] == "demo-intake-usurped"
+
+
+def _conflicting(pairs, seen=None):
+    def answer(role, prompt):
+        if '"directory"' in prompt:
+            if seen is not None:
+                seen.append(prompt)
+            return {"verdict": "conflict", "conflicts": [[a, b, "they disagree"] for a, b in pairs]}
+        return _judge_all("yes")(role, prompt)
+    return answer
+
+
+ADD = [Op("add", PAGE, "DEMO-2a", _rule("DEMO-2a", "PR #11"))]
+
+
+def test_a_conflict_already_on_main_does_not_fail_the_change():
+    decision = _gate(ADD, _conflicting([("DEMO-1a", "OLD-9z")]))        # neither rule is the change's
+    assert decision.status == "pass", decision.reasons
+    (item,) = decision.consistency
+    assert item["verdict"] == "consistent" and item["conflicts"] == []
+    assert item["preexisting"] == [["DEMO-1a", "OLD-9z", "they disagree"]]
+    decision = _gate(ADD, _conflicting([("DEMO-1a", "OLD-9z"), ("DEMO-2a", "DEMO-1a")]))
+    assert decision.status == "fail"                                    # the new rule is in it: ours
+    assert decision.consistency[0]["conflicts"] == [["DEMO-2a", "DEMO-1a", "they disagree"]]
+    assert _gate(ADD, _conflicting([("", "")])).status == "fail"        # names no rule: counted against it
+    assert _gate(ADD, _conflicting([(None, None)])).status == "fail"    # null IDs: likewise
+
+
+def test_a_rule_nested_in_a_changed_rule_is_part_of_the_change():
+    text = _rule("DEMO-2a", "PR #11") + "\n### DEMO-2a1 — a nested case\n\n- 强制：嵌套规则。 ^[PR #11]\n"
+    nested = [Op("add", PAGE, "DEMO-2a", text)]
+    assert _gate(nested, _conflicting([("DEMO-2a1", "DEMO-1a")])).status == "fail"
+
+
+def test_the_consistency_judge_is_told_which_rules_changed():
+    seen: list[str] = []
+    _gate(ADD, _conflicting([], seen))
+    data = json.loads(seen[0].split("<untrusted_data>\n", 1)[1].rsplit("\n</untrusted_data>", 1)[0])
+    assert data["changed_rule_ids"] == ["DEMO-2a"]

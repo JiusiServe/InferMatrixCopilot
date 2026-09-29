@@ -169,7 +169,12 @@ def judge_block(block: Block, *, base: dict[str, str], head: dict[str, str], evi
 
 
 def check_consistency(head: dict[str, str], owner_dirs: list[str], *, gateway: ModelGateway,
-                      judge: ModelRole) -> list[dict]:
+                      judge: ModelRole, changed: set[str] | None = None) -> list[dict]:
+    """``changed``: the rule IDs the change adds, edits, retires or supersedes.
+    Only a conflict naming one of them is the change's; a conflict between
+    rules it does not touch was already on main, is kept as ``preexisting``,
+    and never fails the change (refining could not fix it). A conflict that
+    names no rule counts against the change. None: every conflict counts."""
     from ..knowledge_service.l1 import _sha as sha256_text
 
     results = []
@@ -187,7 +192,8 @@ def check_consistency(head: dict[str, str], owner_dirs: list[str], *, gateway: M
                     rules.append({"page": path, "rule_id": section.rule_id,
                                   "supersedes": footer.supersedes,
                                   "text": section.body_without_footer})
-        prompt = "<untrusted_data>\n" + json.dumps({"directory": directory, "rules": rules},
+        prompt = "<untrusted_data>\n" + json.dumps({"directory": directory, "rules": rules,
+                                                   **({"changed_rule_ids": sorted(changed)} if changed is not None else {})},
                                                    ensure_ascii=False, indent=1).replace("<", "\\u003c") \
             + "\n</untrusted_data>\n"
 
@@ -202,11 +208,45 @@ def check_consistency(head: dict[str, str], owner_dirs: list[str], *, gateway: M
             verdict, conflicts = reply.data["verdict"], reply.data.get("conflicts") or []
         except ModelUnavailable as exc:
             verdict, conflicts = "unsure", [["", "", str(exc)]]
+        preexisting: list = []
+        if verdict == "conflict" and changed is not None and conflicts:
+            ours = [c for c in conflicts if _names_changed(c, changed)]
+            preexisting = [c for c in conflicts if not _names_changed(c, changed)]
+            conflicts = ours
+            if not ours:
+                verdict = "consistent"
         results.append({
-            "owner_dir": directory, "verdict": verdict, "conflicts": conflicts,
+            "owner_dir": directory, "verdict": verdict, "conflicts": conflicts, "preexisting": preexisting,
             "pages": {p: sha256_text(t) for p, t in pages.items()},
         })
     return results
+
+
+def _names_changed(conflict, changed: set[str]) -> bool:
+    """Whether a reported conflict involves a changed rule. Anything malformed,
+    or naming no rule (empty, null, not a string), counts as the change's."""
+    if not isinstance(conflict, (list, tuple)) or len(conflict) < 2:
+        return True
+    ids = conflict[:2]
+    if not all(isinstance(i, str) and i.strip() for i in ids):
+        return True
+    return any(i.strip() in changed for i in ids)
+
+
+def _changed_rule_ids(blocks, base: dict[str, str], head: dict[str, str]) -> set[str]:
+    """The rule IDs of every changed rule block, with the ``###`` rules nested
+    inside them (on either side of the change)."""
+    out: set[str] = set()
+    for block in blocks:
+        if block.kind != "rule":
+            continue
+        out.add(block.rule_id)
+        for files in (base, head):
+            try:
+                out.update(Page.parse(files[block.path]).rule(block.rule_id).nested_rule_ids)
+            except (KeyError, LifecycleError):
+                continue
+    return out
 
 
 def run_gate(*, base: dict[str, str], head: dict[str, str], changes: list[Change],
@@ -255,7 +295,8 @@ def run_gate(*, base: dict[str, str], head: dict[str, str], changes: list[Change
                                                for b in blocks if b.verdict == "fail"], l1, blocks,
                             upstream=upstream, facts=signed_facts)
     owner_dirs = sorted({_owner_dir(b.path) for b in l1.blocks})
-    consistency = check_consistency(head, owner_dirs, gateway=gateway, judge=judge)
+    consistency = check_consistency(head, owner_dirs, gateway=gateway, judge=judge,
+                                    changed=_changed_rule_ids(l1.blocks, base, head))
     if any(item["verdict"] == "conflict" for item in consistency):
         return GateDecision("fail", reasons + ["change set is inconsistent"], l1, blocks, consistency,
                             upstream, signed_facts)
