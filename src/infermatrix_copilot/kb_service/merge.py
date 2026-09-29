@@ -48,6 +48,9 @@ TRANSIENT_GATE = ("hold list", "paused by the knowledge service", "global pause"
 RESIGN_GATE = ("outside its issue window", "no valid signed verdict")
 REBUILD_GATE = ("context changed since the verdict", "pages changed since the consistency judgement",
                 "does not merge cleanly", "signed patch manifest does not match")
+# a refused merge caused by how the repository is set up, not by the change:
+# refining cannot fix it, people must (it would only loop)
+CONFIG_MERGE = ("must allow a direct merge",)
 # a refused local-gate merge that is about the moment, not the change: sign again
 TRANSIENT_MERGE = ("main kept moving", "not merging:", "head of PR", "head moved", "git ", "gh ",
                    "did not merge", "is not open", "verdict: ")
@@ -242,11 +245,19 @@ def _apply_merge_ack(rt, changeset: dict, ack: dict) -> None:
     elif any(m in text for m in TRANSIENT_MERGE) and not ack.get("problems"):
         rt.ledger.update_changeset(changeset_id, status="pr_open", pending_item=None)
     else:  # the local gate refused the change itself: it is not merged
-        rt.ledger.update_changeset(changeset_id, status="gate_failed", pending_item=None,
-                                   detail={**changeset["detail"], "gate_problems": (ack.get("problems") or [])[:50]})
-        rt.ledger.enqueue_human(repo, f"local gate refused PR #{changeset['pr_number']}: {text[:400]}",
-                                changeset_id)
-        _outcome(rt, changeset, "gate_failed", problems=(ack.get("problems") or [])[:20])
+        from .refine import REFINABLE
+
+        problems = (ack.get("problems") or [])[:50]
+        if changeset["kind"] in REFINABLE and not any(m in text for m in CONFIG_MERGE):
+            # our own change: refined with these reasons and checked again
+            rt.ledger.update_changeset(changeset_id, status="refine_needed", pending_item=None,
+                                       detail={**changeset["detail"], "gate_problems": problems})
+        else:
+            rt.ledger.update_changeset(changeset_id, status="gate_failed", pending_item=None,
+                                       detail={**changeset["detail"], "gate_problems": problems})
+            rt.ledger.enqueue_human(repo, f"local gate refused PR #{changeset['pr_number']}: {text[:400]}",
+                                    changeset_id)
+        _outcome(rt, changeset, "gate_failed", problems=problems[:20])
 
 
 def sign_verdict(rt, changeset: dict) -> dict:
@@ -405,7 +416,11 @@ def rebuild(rt, lifecycle, changeset: dict, why: str) -> str | None:
         new_id = gate_and_stage(rt, lifecycle, owner, kind="rebuild", base=base, base_sha=base_sha,
                                 external=external, operations=operations, result=result,
                                 evidence=evidence, event_ids=[], release=detail["release"],
-                                draft_keys=[])
+                                draft_keys=[],
+                                # a rebuild continues the change's refine lineage: the
+                                # limit never resets because context moved meanwhile
+                                extra_detail={k: detail[k] for k in ("refine_round", "refine_history")
+                                              if k in detail})
     staged = rt.ledger.changeset(new_id)
     if staged["status"] not in ("gated", *IN_FLIGHT):
         # the rebuild itself did not pass the gate: nothing replaces the PR
@@ -594,6 +609,10 @@ def advance(rt, lifecycle) -> list[str]:
                     **current["detail"], "verdict_issued_at": envelope["payload"]["issued_at"]})
                 merging = [changeset]
                 events.append(f"merge issued {changeset['id']}")
+    from .refine import refine_pending
+
+    if not paused:
+        events += refine_pending(rt, lifecycle)
     return events + verify_merged(rt, lifecycle)
 
 

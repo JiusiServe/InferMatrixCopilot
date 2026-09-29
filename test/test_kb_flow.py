@@ -169,10 +169,15 @@ def test_a_refused_merge_goes_by_what_the_local_gate_said(tmp_path):
     assert refused(error="local gate: context changed since the verdict was judged: x",
                    problems=["context changed since the verdict was judged: x"])["status"] == "rebuild_needed"
     rt.ledger.update_changeset(changeset_id, status="pr_open")
-    # the change itself: never merged, people decide
+    # the change itself: never merged; our own change is refined (test_kb_refine)
     changeset = refused(error="local gate: L1 dangling_reference", problems=["L1 dangling_reference a b"])
-    assert changeset["status"] == "gate_failed"
+    assert changeset["status"] == "refine_needed"
     assert changeset["detail"]["gate_problems"] == ["L1 dangling_reference a b"]
+    rt.ledger.update_changeset(changeset_id, status="pr_open")
+    # how the repository is set up: refining cannot help, people decide
+    changeset = refused(error="local gate: queued", problems=["PR #42 was queued ...: main must allow a direct "
+                                                              "merge by the publisher"])
+    assert changeset["status"] == "gate_failed"
     assert any("local gate refused" in row["reason"] for row in rt.ledger.human_queue("demo"))
 
 

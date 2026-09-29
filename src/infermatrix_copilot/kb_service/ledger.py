@@ -400,6 +400,18 @@ class Ledger:
             (repo, *statuses)).fetchall()
         return [_changeset_row(r) for r in rows]
 
+    def changesets_for_pr(self, repo: str, number: int) -> list[dict[str, Any]]:
+        """Every change set of ``repo`` that has PR ``number``, whatever its status."""
+        rows = self._conn.execute(
+            "SELECT * FROM changesets WHERE repo=? AND pr_number=? ORDER BY created_at", (repo, number)).fetchall()
+        return [_changeset_row(r) for r in rows]
+
+    def changesets_of_kind(self, repo: str, kind: str) -> list[dict[str, Any]]:
+        """Every change set of ``kind`` in ``repo``, whatever its status."""
+        rows = self._conn.execute(
+            "SELECT * FROM changesets WHERE repo=? AND kind=? ORDER BY created_at", (repo, kind)).fetchall()
+        return [_changeset_row(r) for r in rows]
+
     def record_verdict(self, repo: str, *, layer: str, verdict: str, changeset_id: str | None = None,
                        block_id: str = "", model: str = "", model_version: str = "",
                        detail: dict | None = None) -> None:

@@ -268,3 +268,15 @@ def test_rules_an_external_pr_retires_enter_the_retirement_ledger(tmp_path):
     merge.advance(rt, lifecycle)
     row = rt.ledger._conn.execute("SELECT rule_id, page FROM retirements WHERE repo='demo'").fetchall()
     assert [tuple(r) for r in row] == [("DEMO-1a", PAGE)]
+
+
+def test_our_own_prs_are_never_judged_as_external_in_any_status(tmp_path):
+    rt, lifecycle, origin = _setup(tmp_path)
+    for number, status in ((31, "refine_needed"), (32, "refine_exhausted"), (33, "superseding")):
+        ours = rt.ledger.new_changeset_id("demo", "intake")
+        rt.ledger.stage_intake(rt.lease_owner, "demo", ours, detail={}, status=status, verdicts=[],
+                               human_reason="", drafted_events=[])
+        rt.ledger.update_changeset(ours, pr_number=number)
+        _open_human_pr(rt, origin, number, _add_rule_files())
+    assert poll_external(rt) == []
+    assert not _items(tmp_path, "merge")

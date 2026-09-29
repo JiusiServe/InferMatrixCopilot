@@ -43,13 +43,15 @@ def test_transient_refusals_are_signed_again(tmp_path):
     assert len(_items(tmp_path, "merge")) == 1   # the answered item left the outbox; this is the new one
 
 
-def test_a_real_problem_goes_to_people_once(tmp_path):
+def test_a_real_problem_is_refined_never_retried_as_is(tmp_path):
     rt, lifecycle, changeset_id, _ = _posted(tmp_path)
     _fail(rt, "L1 duplicate_rule_id  DEMO-2a")
-    assert rt.ledger.changeset(changeset_id)["status"] == "gate_failed"
-    assert len(rt.ledger.human_queue("demo")) == 1
-    assert merge.advance(rt, lifecycle) == []
-    assert _items(tmp_path, "merge") == []       # never retried as is
+    changeset = rt.ledger.changeset(changeset_id)
+    assert changeset["status"] == "refine_needed"          # refined next pass (test_kb_refine)
+    assert changeset["detail"]["gate_problems"] == ["L1 duplicate_rule_id  DEMO-2a"]
+    assert rt.ledger.human_queue("demo") == []
+    assert merge.advance(rt, lifecycle) == []              # no lease: nothing refined, nothing retried
+    assert _items(tmp_path, "merge") == []
 
 
 def test_a_context_change_rebuilds_on_current_main_and_replaces_the_pr(tmp_path):
@@ -111,7 +113,10 @@ def test_a_rebuild_that_fails_its_own_gate_leaves_the_pr_to_people(tmp_path):
     rt.gateway = ScriptedGateway(_generator_then_judge("no"))
     _fail(rt, "context changed since the verdict was judged: repos/demo/core/_index.md")
     rt.lease_owner = rt.ledger.acquire_lease("scheduler")
-    assert merge.advance(rt, lifecycle) == [f"rebuild_failed {changeset_id}"]
+    events = merge.advance(rt, lifecycle)
+    assert events[0] == f"rebuild_failed {changeset_id}"
+    # the rebuild the gate rejected is a change of our own: it is refined next
+    assert any(e.startswith("refined demo-rebuild-") for e in events[1:])
     assert rt.ledger.changeset(changeset_id)["status"] == "rebuild_failed"
     assert _items(tmp_path, "close") == [] and rt.ledger.human_queue("demo")
 
