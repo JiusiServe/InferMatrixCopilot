@@ -143,10 +143,10 @@ _STRING_FIELDS = ("page", "rule_id", "section_markdown", "new_rule_id", "new_pag
                   "reason", "evidence", "page_title")
 
 
-def _validate_reply(data: dict) -> None:
+def _validate_reply(data: dict, max_operations: int = MAX_OPS_PER_EVENT) -> None:
     operations = data.get("operations")
-    if not isinstance(operations, list) or len(operations) > MAX_OPS_PER_EVENT:
-        raise ValueError(f"operations must be a list of at most {MAX_OPS_PER_EVENT}")
+    if not isinstance(operations, list) or len(operations) > max_operations:
+        raise ValueError(f"operations must be a list of at most {max_operations}")
     for item in operations:
         if not isinstance(item, dict) or item.get("kind") not in INTAKE_KINDS:
             raise ValueError(f"operation kind must be one of {INTAKE_KINDS}")
@@ -162,7 +162,7 @@ def _validate_reply(data: dict) -> None:
 
 def draft_changes(*, repo: str, repo_dir: str, event_id: int, evidence: dict,
                   files: dict[str, str], gateway: ModelGateway, generator: ModelRole,
-                  release: str, today: str) -> Draft:
+                  release: str, today: str, max_operations: int = MAX_OPS_PER_EVENT) -> Draft:
     prompt = draft_prompt(repo, evidence, files, repo_dir)
     attempts: list[dict] = []
     feedback = ""
@@ -172,7 +172,7 @@ def draft_changes(*, repo: str, repo_dir: str, event_id: int, evidence: dict,
         try:
             with trace_context(attempt=attempt):
                 reply = gateway.call_json(generator, system=SYSTEM, prompt=prompt + feedback,
-                                          validate=_validate_reply)
+                                          validate=lambda data: _validate_reply(data, max_operations))
         except ModelUnavailable as exc:
             if "failed its schema" not in str(exc):
                 raise  # the model itself is unavailable: the event waits

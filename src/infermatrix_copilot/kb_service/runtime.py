@@ -280,7 +280,7 @@ def draft_key_for_event(repo: str, event_id) -> str:
 def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind: str, base: dict,
                    base_sha: str, external: dict, operations, result, evidence: list[dict],
                    event_ids: list[int], release: str, force_human: str = "",
-                   hold: bool = False, draft_keys: list[str] = ()) -> str:
+                   hold: bool = False, draft_keys: list[str] = (), extra_detail: dict | None = None) -> str:
     """Run the quality gate on one change set and stage it (files first, then
     every ledger write in one transaction fenced on the lease). Used by intake,
     sweep and purge. ``force_human`` routes a passing change set to people
@@ -315,6 +315,7 @@ def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind:
             drafted_events=event_ids,
             detail={
                 "operations": operations_json(operations), "event_ids": event_ids,
+                **(extra_detail or {}),
                 "base_sha": base_sha, "release": release, "decision": decision.to_dict(),
                 "generator": rt.generator.label(), "judge": rt.judge.label(),
             })

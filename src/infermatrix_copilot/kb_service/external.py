@@ -141,10 +141,11 @@ def _judged(rt, number: int, head: str, path: str) -> bool:
 
 
 def _ours(rt, number: int) -> bool:
+    """A PR the service opened, in ANY status (refine_needed, refine_exhausted,
+    superseding...): it is never judged again as someone else's PR."""
     for lifecycle in rt.registry.values():
-        for changeset in rt.ledger.changesets(lifecycle.repo, _ALL):
-            if changeset["pr_number"] == number and changeset["kind"] != KIND:
-                return True
+        if any(cs["kind"] != KIND for cs in rt.ledger.changesets_for_pr(lifecycle.repo, number)):
+            return True
     return False
 
 
