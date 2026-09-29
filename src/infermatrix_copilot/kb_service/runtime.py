@@ -295,13 +295,14 @@ def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind:
     rt.ledger.heartbeat(owner)
     changeset_id = rt.ledger.new_changeset_id(lifecycle.repo, kind)
     rule_ids = sorted({op.new_rule_id or op.rule_id for op in operations if (op.new_rule_id or op.rule_id)})
+    observer = rt.upstream_facts(lifecycle)  # one mirror sync for facts and evidence
     with trace_context(changeset_id=changeset_id, rule_ids=rule_ids, step="gate"):
         decision = run_gate(
             base=base, head=head, changes=changes_between(base, head), external_texts=external,
             evidence=evidence, gateway=rt.gateway, judge=rt.judge, release=release,
             repo_dir=lifecycle.knowledge_dir, protected_rules=lifecycle.protected_rules,
             retire_ratio=lifecycle.retire_ratio, max_files=lifecycle.max_files,
-            facts=rt.upstream_facts(lifecycle))
+            facts=observer, evidence_for=_evidence_for(observer))
     if force_human and decision.status == "pass":
         decision.status = "human"
         decision.reasons.append(force_human)
@@ -395,6 +396,15 @@ def _pr_body(changeset_id: str, detail: dict) -> str:
     lines += ["", f"Generator: `{detail['generator']}` · judge: `{detail['judge']}`.",
               "The publisher merges it only if its local gate passes on the exact merge result."]
     return "\n".join(lines)
+
+
+def _evidence_for(observer):
+    """Per-rule evidence with full upstream diffs (the judge's view; see kb_service.evidence)."""
+    if observer is None:
+        return None
+    from .evidence import for_rule
+
+    return lambda text, evidence: for_rule(text, evidence, observer)
 
 
 def service_observer(state_dir: Path, lifecycle: RepoLifecycle, github: GitHubReader):

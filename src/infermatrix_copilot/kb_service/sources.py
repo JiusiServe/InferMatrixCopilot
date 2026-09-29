@@ -206,6 +206,7 @@ class PullRequest:
             "title": self.title,
             "body": self.body[:MAX_BODY_CHARS],
             "merged_at": self.merged_at,
+            "merge_commit_sha": self.merge_commit_sha,
             "changed_files": list(self.changed_files[:MAX_CHANGED_PATHS]),
             "diff_excerpt": self.diff_excerpt,
         }
