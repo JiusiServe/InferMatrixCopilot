@@ -1,15 +1,20 @@
-"""The merge flow after a change set is handed to the publisher.
+"""The merge flow after a change set is handed to the publisher (design v8).
 
-    gated ─publish→ pr_requested ─ack(pr, head)→ pr_open ─sign→ verdict_posted
-      ─PR-stage kb-gate success→ queued ─merged→ merged ─activation→ activated
+    gated ─publish→ pr_requested ─ack(pr, head)→ pr_open ─sign→ merge_requested
+      ─ack(merged, merge sha)→ merged ─activation→ activated
 
-Anything off the happy path goes to people or stops: a rejected publisher
-action (``failed``), a head that no longer matches what was signed
-(``head_changed`` → human), a PR closed unmerged (``closed``), a paused
-repository (``paused``; the pause itself is performed by the publisher through
-an always-executable ``pause`` item). At most one knowledge PR per repository
-is in the merge queue at a time, which bounds what can land while the
-publisher is unavailable.
+The service signs a verdict for the PR's exact head and hands it to the
+publisher in a ``merge`` item; the publisher, the only thing that merges
+knowledge PRs, runs the gate locally on the exact tree that would land and
+merges only if it passes. A refused merge is never retried as is: context that
+moved or a PR that no longer applies is rebuilt on current main, a real
+problem with the change goes to people, and a transient failure (main moving,
+GitHub or git trouble) is signed again next pass. At most one merge per
+repository is in flight.
+
+Anything else off the happy path goes to people or stops: a head that no
+longer matches what was signed (``head_changed`` → human), a PR closed
+unmerged (``closed``), a paused repository (no ``merge`` is issued).
 
 The service only READS GitHub; every write is an outbox item.
 """
@@ -24,7 +29,8 @@ from ..knowledge_service.signing import sign
 from ..knowledge_service.verdict import build_verdict, manifest_from_files
 
 VERDICT_MARKER = "<!-- kb-gate:verdict:v1 -->"
-IN_FLIGHT = ("pr_requested", "pr_open", "verdict_posted", "queued")
+# verdict_posted/queued: v7 records (merge queue), signed again as pr_open
+IN_FLIGHT = ("pr_requested", "pr_open", "verdict_posted", "queued", "merge_requested", "rebuild_needed")
 # a verdict must first verify within 72 hours: re-sign well before that
 RESIGN_AFTER = 48 * 3600
 # margin for the publisher's clock when deciding an item has certainly expired
@@ -42,6 +48,9 @@ TRANSIENT_GATE = ("hold list", "paused by the knowledge service", "global pause"
 RESIGN_GATE = ("outside its issue window", "no valid signed verdict")
 REBUILD_GATE = ("context changed since the verdict", "pages changed since the consistency judgement",
                 "does not merge cleanly", "signed patch manifest does not match")
+# a refused local-gate merge that is about the moment, not the change: sign again
+TRANSIENT_MERGE = ("main kept moving", "not merging:", "head of PR", "head moved", "git ", "gh ",
+                   "did not merge", "is not open", "verdict: ")
 KNOWLEDGE_REPO_ENV = "KB_KNOWLEDGE_REPOSITORY"
 DEFAULT_KNOWLEDGE_REPOSITORY = "JiusiServe/InferMatrixCopilot"
 
@@ -56,6 +65,7 @@ TRANSITIONS = {
     "open_companion_pr": ("pr_requested", "companion_open"),
     "post_verdict": ("pr_open", "verdict_posted"),
     "enqueue": ("verdict_posted", "queued"),
+    "merge": ("merge_requested", "merged"),
 }
 
 
@@ -125,10 +135,20 @@ def apply_acks(rt, acks: list[dict]) -> None:
                     rt.ledger.update_changeset(changeset_id, status="pr_open", pending_item=None)
             continue
         pending = changeset.get("pending_item") or {}
+        if kind == "merge" and ack.get("ok") and changeset["status"] == "merged" \
+                and ack.get("merge_sha") and ack.get("merge_sha") == changeset.get("merge_sha"):
+            # GitHub showed the merge before its receipt arrived: the receipt's
+            # post-merge check still counts
+            _record_post_check(rt, rt.ledger.changeset(changeset_id), ack.get("post_check", ""),
+                               ack.get("problems") or [])
+            continue
         if kind not in TRANSITIONS or pending.get("id") != ack.get("item_id"):
             continue
         before, after = TRANSITIONS[kind]
         if changeset["status"] != before:
+            continue
+        if kind == "merge":
+            _apply_merge_ack(rt, changeset, ack)
             continue
         if not ack.get("ok"):
             rt.ledger.update_changeset(changeset_id, status="failed", pending_item=None)
@@ -142,6 +162,91 @@ def apply_acks(rt, acks: list[dict]) -> None:
         elif kind == "enqueue":
             fields["detail"] = {**changeset["detail"], "queued_at": rt.clock()}
         rt.ledger.update_changeset(changeset_id, **fields)
+
+
+def _pause_repo(rt, repo: str, reason: str) -> None:
+    """Stop automatic merging for ``repo`` (a new generation voids every item)."""
+    public = {name for name, lc in rt.registry.items() if lc.publishes}
+    rt.outbox.transition(lambda: rt.ledger.bump_generation(repo, pause=True, reason=reason), public_repos=public)
+
+
+def _record_post_check(rt, changeset: dict, result: str, problems: list) -> None:
+    """``passed`` / ``failed`` are final; anything else (``unknown``: the
+    publisher could not run it, or recovered the merge after a crash) is run
+    by the service itself on the next pass (``verify_merged``)."""
+    if changeset["detail"].get("post_check") in ("passed", "failed"):
+        return
+    rt.ledger.update_changeset(changeset["id"], detail={**changeset["detail"], "post_check": result or "unknown"})
+    if result == "failed":
+        # main moved in the seconds before the merge and what landed does not
+        # pass: stop merging this repository; people decide on a revert
+        reason = (f"post-merge check failed on {str(changeset.get('merge_sha') or '')[:12]} "
+                  f"(PR #{changeset['pr_number']}): " + "; ".join(map(str, problems))[:400])
+        _pause_repo(rt, changeset["repo"], reason)
+        rt.ledger.enqueue_human(changeset["repo"], reason, changeset["id"])
+
+
+def verify_merged(rt, lifecycle) -> list[str]:
+    """Run the post-merge check for merges whose result is not known yet, on
+    the service's own clone. A check that cannot run is simply retried."""
+    from pathlib import Path
+
+    from . import local_gate
+
+    events = []
+    for changeset in rt.ledger.changesets(lifecycle.repo, ("merged",)):
+        detail = changeset["detail"]
+        if not detail.get("verdict_issued_at") or detail.get("post_check") in ("passed", "failed"):
+            continue  # not a v8 merge, or already settled
+        merge_sha = str(changeset.get("merge_sha") or "")
+        if not merge_sha:
+            try:
+                merge_sha = str(_pr_state(rt, int(changeset["pr_number"])).get("merge_commit_sha") or "")
+            except Exception:  # noqa: BLE001 - GitHub trouble: next pass
+                continue
+            if not merge_sha:
+                continue
+            rt.ledger.update_changeset(changeset["id"], merge_sha=merge_sha)
+            changeset = rt.ledger.changeset(changeset["id"])
+        try:
+            rt.knowledge.fetch()
+            verdict = sign_verdict(rt, changeset)["payload"]
+            problems = local_gate.post_merge_problems(
+                Path(rt.knowledge.path), repository=knowledge_repository(),
+                pr={"number": int(changeset["pr_number"]), "state": "open",
+                    "head": {"sha": changeset["head_sha"]}, "labels": []},
+                head_sha=changeset["head_sha"], merge_sha=merge_sha, verdict=verdict,
+                public_key=rt.outbox._key.public_key(), now=rt.clock())
+        except Exception as exc:  # noqa: BLE001 - e.g. the clone cannot fetch: next pass
+            events.append(f"post_check_retry {changeset['id']}: {exc}")
+            continue
+        _record_post_check(rt, changeset, "failed" if problems else "passed", problems)
+        events.append(f"post_check {'failed' if problems else 'passed'} {changeset['id']}")
+    return events
+
+
+def _apply_merge_ack(rt, changeset: dict, ack: dict) -> None:
+    changeset_id, repo = changeset["id"], changeset["repo"]
+    if ack.get("ok"):
+        merge_sha = str(ack.get("merge_sha") or "")
+        rt.ledger.update_changeset(changeset_id, status="merged", merge_sha=merge_sha or None, pending_item=None)
+        record_retirements(rt, changeset)
+        _outcome(rt, changeset, "merged", merge_sha=merge_sha)
+        _record_post_check(rt, rt.ledger.changeset(changeset_id), ack.get("post_check", ""),
+                           ack.get("problems") or [])
+        return
+    text = " ".join([str(ack.get("error") or ""), *map(str, ack.get("problems") or [])])
+    if any(m in text for m in REBUILD_GATE):
+        rt.ledger.update_changeset(changeset_id, status="rebuild_needed", pending_item=None,
+                                   detail={**changeset["detail"], "rebuild_because": text[:500]})
+    elif any(m in text for m in TRANSIENT_MERGE) and not ack.get("problems"):
+        rt.ledger.update_changeset(changeset_id, status="pr_open", pending_item=None)
+    else:  # the local gate refused the change itself: it is not merged
+        rt.ledger.update_changeset(changeset_id, status="gate_failed", pending_item=None,
+                                   detail={**changeset["detail"], "gate_problems": (ack.get("problems") or [])[:50]})
+        rt.ledger.enqueue_human(repo, f"local gate refused PR #{changeset['pr_number']}: {text[:400]}",
+                                changeset_id)
+        _outcome(rt, changeset, "gate_failed", problems=(ack.get("problems") or [])[:20])
 
 
 def sign_verdict(rt, changeset: dict) -> dict:
@@ -329,12 +434,7 @@ def advance(rt, lifecycle) -> list[str]:
     if rt.outbox is None:
         return events
     paused = is_paused(rt.ledger, lifecycle.repo)
-    # the one queue slot per repository is taken by a queued PR, by any PR whose
-    # signed enqueue is still executable (not yet acked), and by a withdrawn PR
-    # until its pause (dequeue) is acked: it may have been queued meanwhile
-    queued = rt.ledger.changesets(lifecycle.repo, ("queued",)) + [
-        cs for cs in rt.ledger.changesets(lifecycle.repo, ("verdict_posted",))
-        if _enqueue_outstanding(rt, cs) or cs["detail"].get("withdrawn")]
+    merging = rt.ledger.changesets(lifecycle.repo, ("merge_requested",))
     for changeset in rt.ledger.changesets(lifecycle.repo, (*IN_FLIGHT, "superseding", "paused",
                                                            "companion_open")):
         number = changeset["pr_number"]
@@ -399,7 +499,7 @@ def advance(rt, lifecycle) -> list[str]:
             record_retirements(rt, changeset)
             _outcome(rt, changeset, "merged", merge_sha=str(pr.get("merge_commit_sha") or ""))
             events.append(f"merged {changeset['id']}")
-            continue
+            continue  # its post-merge check: the receipt, or verify_merged
         if pr.get("state") == "closed":
             rt.ledger.update_changeset(changeset["id"], status="closed")
             _outcome(rt, changeset, "closed_unmerged")  # overturned by people: a negative label
@@ -464,70 +564,37 @@ def advance(rt, lifecycle) -> list[str]:
                         "changeset_id": changeset["id"], "pr": int(number),
                         "reason": "a knowledge maintainer withdrew the approval"})
                 continue
-        signed_at = float(changeset["detail"].get("verdict_issued_at") or 0)
-        stale_verdict = bool(signed_at) and rt.clock() - signed_at > RESIGN_AFTER
-        queued_at = float(changeset["detail"].get("queued_at") or 0)
-        if changeset["status"] == "queued" and (
-                stale_verdict or (queued_at and rt.clock() - queued_at > QUEUE_STALL)):
-            # never free the queue slot on a timer: dequeue (+ draft) first; the
-            # pause ack returns it to pr_open, then it is re-signed and re-queued
-            if issue_once(rt, lifecycle.repo, changeset, "pause", {
-                    "changeset_id": changeset["id"], "pr": int(number),
-                    "reason": "re-signing: the verdict is ageing or the PR stalled in the merge queue"}):
-                events.append(f"requeue {changeset['id']}")
+        if changeset["status"] == "merge_requested":
+            pending = changeset.get("pending_item") or {}
+            if pending.get("kind") == "merge" and float(pending.get("expires_at") or 0) + CLOCK_SKEW < rt.clock():
+                # expired unanswered: the publisher never ran it (or its record
+                # is lost); sign again. A merge it did run still shows as merged.
+                rt.ledger.update_changeset(changeset["id"], status="pr_open", pending_item=None)
+                events.append(f"merge_expired {changeset['id']}")
             continue
-        if changeset["status"] == "verdict_posted" and _enqueue_outstanding(rt, changeset):
-            continue  # its ack decides: queued (then the queued path applies) or refused
-        if changeset["status"] == "verdict_posted" and stale_verdict:
-            _resign(rt, changeset, "verdict close to its issue window")
-            events.append(f"resign {changeset['id']}")
+        if changeset["status"] == "rebuild_needed":
+            if changeset["kind"] == "external":
+                # nothing of ours to rebuild: judge the PR again on current main
+                rt.ledger.update_changeset(changeset["id"], status="stale_context", pending_item=None)
+                events.append(f"stale_context {changeset['id']}")
+            elif getattr(rt, "lease_owner", None):  # only the scheduler (holding the lease) rebuilds
+                new_id = rebuild(rt, lifecycle, changeset, changeset["detail"].get("rebuild_because", ""))
+                events.append(f"rebuilt {changeset['id']} as {new_id}" if new_id
+                              else f"rebuild_failed {changeset['id']}")
             continue
-        if changeset["status"] == "verdict_posted":
-            state, description = _gate(rt, changeset["head_sha"], since=signed_at)
-            if state == "failure" and not any(m in description for m in TRANSIENT_GATE):
-                if any(m in description for m in RESIGN_GATE):
-                    _resign(rt, changeset, description)
-                    events.append(f"resign {changeset['id']}")
-                elif any(m in description for m in REBUILD_GATE) and changeset["kind"] == "external":
-                    # nothing of ours to rebuild: judge the PR again on current main
-                    rt.ledger.update_changeset(changeset["id"], status="stale_context", pending_item=None)
-                    events.append(f"stale_context {changeset['id']}")
-                elif any(m in description for m in REBUILD_GATE):
-                    if not getattr(rt, "lease_owner", None):
-                        continue  # only the scheduler (holding the lease) rebuilds
-                    new_id = rebuild(rt, lifecycle, changeset, description)
-                    events.append(f"rebuilt {changeset['id']} as {new_id}" if new_id
-                                  else f"rebuild_failed {changeset['id']}")
-                else:  # a real problem with the change itself: people decide
-                    rt.ledger.update_changeset(changeset["id"], status="gate_failed")
-                    rt.ledger.enqueue_human(lifecycle.repo, f"kb-gate failed: {description}", changeset["id"])
-                    events.append(f"gate_failed {changeset['id']}")
-                continue
-        if changeset["status"] == "pr_open":
-            pending = changeset.get("pending_item")
-            if pending and pending.get("kind") == "post_verdict" and float(pending["expires_at"]) > rt.clock():
-                continue
+        if changeset["status"] in ("pr_open", "verdict_posted", "queued"):
+            if merging:
+                continue  # one merge in flight per repository
             envelope = sign_verdict(rt, changeset)
-            if issue_once(rt, lifecycle.repo, changeset, "post_verdict", {
-                "changeset_id": changeset["id"], "pr": int(number), "head_sha": changeset["head_sha"],
-                "comment": f"{VERDICT_MARKER}\n```json\n{json.dumps(envelope, ensure_ascii=False)}\n```\n",
-            }):
+            if issue_once(rt, lifecycle.repo, changeset, "merge", {
+                    "changeset_id": changeset["id"], "pr": int(number), "head_sha": changeset["head_sha"],
+                    "verdict": envelope}):
                 current = rt.ledger.changeset(changeset["id"])
-                rt.ledger.update_changeset(changeset["id"], detail={
+                rt.ledger.update_changeset(changeset["id"], status="merge_requested", detail={
                     **current["detail"], "verdict_issued_at": envelope["payload"]["issued_at"]})
-                events.append(f"verdict issued {changeset['id']}")
-        elif changeset["status"] == "verdict_posted" and not queued:
-            if _gate_status(rt, changeset["head_sha"]) == "success":
-                if issue_once(rt, lifecycle.repo, changeset, "enqueue", {
-                        "changeset_id": changeset["id"], "pr": int(number), "head_sha": changeset["head_sha"]}):
-                    current = rt.ledger.changeset(changeset["id"])
-                    # remembered past any later pending item: a withdrawal must
-                    # outlast every enqueue that could still execute
-                    rt.ledger.update_changeset(changeset["id"], detail={
-                        **current["detail"], "enqueue_expires_at": current["pending_item"]["expires_at"]})
-                    events.append(f"enqueue issued {changeset['id']}")
-                queued = [changeset]  # at most one queued knowledge PR per repository
-    return events
+                merging = [changeset]
+                events.append(f"merge issued {changeset['id']}")
+    return events + verify_merged(rt, lifecycle)
 
 
 def _rule_ids(changeset: dict) -> list[str]:

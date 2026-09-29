@@ -89,7 +89,8 @@ def _items(tmp_path, kind):
 
 # -- merge flow -------------------------------------------------------------------------
 
-def test_happy_path_signs_a_verdict_bound_to_the_pr_and_enqueues_once(tmp_path):
+
+def test_happy_path_signs_a_verdict_bound_to_the_pr_and_hands_it_to_the_publisher(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     changeset_id, publisher = _open_pr(tmp_path, rt, lifecycle)
     head = "d" * 40
@@ -97,11 +98,11 @@ def test_happy_path_signs_a_verdict_bound_to_the_pr_and_enqueues_once(tmp_path):
     assert rt.ledger.changeset(changeset_id)["status"] == "pr_open"
     rt.github.prs[42] = {"state": "open", "merged": False, "head": {"sha": head}}
 
-    assert merge.advance(rt, lifecycle) == [f"verdict issued {changeset_id}"]
-    comment = _items(tmp_path, "post_verdict")[0]["body"]["comment"]
-    assert comment.startswith(merge.VERDICT_MARKER)
-    envelope = json.loads(comment.split("```json\n", 1)[1].rsplit("\n```", 1)[0])
-    verdict = verify("kb-gate-verdict", envelope, load_public_key(public_key_text(rt.outbox._key.public_key())))
+    assert merge.advance(rt, lifecycle) == [f"merge issued {changeset_id}"]
+    assert rt.ledger.changeset(changeset_id)["status"] == "merge_requested"
+    body = _items(tmp_path, "merge")[0]["body"]
+    assert (body["changeset_id"], body["pr"], body["head_sha"]) == (changeset_id, 42, head)
+    verdict = verify("kb-gate-verdict", body["verdict"], load_public_key(public_key_text(rt.outbox._key.public_key())))
     check_binding(verdict, repository="JiusiServe/InferMatrixCopilot", pr=42, head_sha=head, now=rt.clock())
     base = rt.knowledge.knowledge_files(rt.ledger.changeset(changeset_id)["detail"]["base_sha"])
     head_files = {**base, **rt.load_changeset_files(changeset_id)["files"]}
@@ -110,16 +111,12 @@ def test_happy_path_signs_a_verdict_bound_to_the_pr_and_enqueues_once(tmp_path):
     assert manifests_equal(verdict["manifest"], manifest_from_files(
         {k: v for k, v in base.items() if k in touched}, {k: v for k, v in head_files.items() if k in touched}))
     assert all(b["verdict"] == "pass" for b in verdict["blocks"])
+    assert not _items(tmp_path, "post_verdict") and not _items(tmp_path, "enqueue")
 
-    _ack(tmp_path, rt, publisher, kind="post_verdict", changeset_id=changeset_id, ok=True)
-    assert merge.advance(rt, lifecycle) == []           # PR-stage kb-gate not green yet
-    rt.github.statuses[head] = "success"
-    assert merge.advance(rt, lifecycle) == [f"enqueue issued {changeset_id}"]
-    assert _items(tmp_path, "enqueue")[0]["body"] == {"changeset_id": changeset_id, "pr": 42, "head_sha": head}
-    _ack(tmp_path, rt, publisher, kind="enqueue", changeset_id=changeset_id, ok=True)
-    rt.github.prs[42] = {"state": "closed", "merged": True, "merge_commit_sha": "e" * 40, "head": {"sha": head}}
-    assert merge.advance(rt, lifecycle) == [f"merged {changeset_id}"]
-    assert rt.ledger.changeset(changeset_id)["merge_sha"] == "e" * 40
+    _ack(tmp_path, rt, publisher, kind="merge", changeset_id=changeset_id, ok=True, pr=42, head_sha=head,
+         merge_sha="e" * 40, post_check="passed", problems=[])
+    changeset = rt.ledger.changeset(changeset_id)
+    assert changeset["status"] == "merged" and changeset["merge_sha"] == "e" * 40
 
 
 def test_head_change_after_signing_goes_to_people(tmp_path):
@@ -131,19 +128,19 @@ def test_head_change_after_signing_goes_to_people(tmp_path):
     assert rt.ledger.human_queue("demo")
 
 
-def test_one_queued_knowledge_pr_per_repository(tmp_path):
+
+def test_one_merge_in_flight_per_repository(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     first, publisher = _open_pr(tmp_path, rt, lifecycle)
-    rt.ledger.update_changeset(first, status="queued", pr_number=1, head_sha="a" * 40)
+    rt.ledger.update_changeset(first, status="merge_requested", pr_number=1, head_sha="a" * 40)
     rt.github.prs[1] = {"state": "open", "merged": False, "head": {"sha": "a" * 40}}
     second = rt.ledger.new_changeset_id("demo", "intake")
-    rt.ledger.stage_intake(rt.ledger.acquire_lease("t"), "demo", second, detail={}, status="verdict_posted",
+    rt.ledger.stage_intake(rt.ledger.acquire_lease("t"), "demo", second, detail={}, status="pr_open",
                            verdicts=[], human_reason="", drafted_events=[])
     rt.ledger.update_changeset(second, pr_number=2, head_sha="b" * 40)
     rt.github.prs[2] = {"state": "open", "merged": False, "head": {"sha": "b" * 40}}
-    rt.github.statuses["b" * 40] = "success"
-    assert merge.advance(rt, lifecycle) == []          # waits for the queued one to land
-    assert not _items(tmp_path, "enqueue")
+    assert merge.advance(rt, lifecycle) == []          # waits for the first merge to be answered
+    assert not _items(tmp_path, "merge")
 
 
 def test_refused_publisher_action_fails_and_is_queued_for_people(tmp_path):
@@ -152,6 +149,62 @@ def test_refused_publisher_action_fails_and_is_queued_for_people(tmp_path):
     _ack(tmp_path, rt, publisher, kind="open_pr", changeset_id=changeset_id, ok=False, error="patch mismatch")
     assert rt.ledger.changeset(changeset_id)["status"] == "failed"
     assert any("patch mismatch" in row["reason"] for row in rt.ledger.human_queue("demo"))
+
+
+def test_a_refused_merge_goes_by_what_the_local_gate_said(tmp_path):
+    rt, lifecycle = _flow_runtime(tmp_path)
+    changeset_id, publisher = _open_pr(tmp_path, rt, lifecycle)
+    head = "d" * 40
+    _ack(tmp_path, rt, publisher, kind="open_pr", changeset_id=changeset_id, ok=True, pr=42, head_sha=head)
+    rt.github.prs[42] = {"state": "open", "merged": False, "head": {"sha": head}}
+
+    def refused(**ack):
+        merge.advance(rt, lifecycle)
+        _ack(tmp_path, rt, publisher, kind="merge", changeset_id=changeset_id, ok=False, **ack)
+        return rt.ledger.changeset(changeset_id)
+
+    # the moment, not the change: signed again next pass
+    assert refused(error="main kept moving while PR #42 was checked")["status"] == "pr_open"
+    # context moved: rebuilt on current main
+    assert refused(error="local gate: context changed since the verdict was judged: x",
+                   problems=["context changed since the verdict was judged: x"])["status"] == "rebuild_needed"
+    rt.ledger.update_changeset(changeset_id, status="pr_open")
+    # the change itself: never merged, people decide
+    changeset = refused(error="local gate: L1 dangling_reference", problems=["L1 dangling_reference a b"])
+    assert changeset["status"] == "gate_failed"
+    assert changeset["detail"]["gate_problems"] == ["L1 dangling_reference a b"]
+    assert any("local gate refused" in row["reason"] for row in rt.ledger.human_queue("demo"))
+
+
+def test_a_failed_post_merge_check_pauses_the_repository(tmp_path):
+    rt, lifecycle = _flow_runtime(tmp_path)
+    changeset_id, publisher = _open_pr(tmp_path, rt, lifecycle)
+    head = "d" * 40
+    _ack(tmp_path, rt, publisher, kind="open_pr", changeset_id=changeset_id, ok=True, pr=42, head_sha=head)
+    rt.github.prs[42] = {"state": "open", "merged": False, "head": {"sha": head}}
+    merge.advance(rt, lifecycle)
+    _ack(tmp_path, rt, publisher, kind="merge", changeset_id=changeset_id, ok=True, pr=42, head_sha=head,
+         merge_sha="e" * 40, post_check="failed", problems=["L1 dangling_reference x y"])
+    assert rt.ledger.changeset(changeset_id)["status"] == "merged"
+    assert rt.ledger.repo_state("demo")["paused"] == 1
+    assert any("post-merge check failed" in row["reason"] for row in rt.ledger.human_queue("demo"))
+
+
+def test_a_receipt_arriving_after_github_showed_the_merge_still_counts(tmp_path):
+    rt, lifecycle = _flow_runtime(tmp_path)
+    changeset_id, publisher = _open_pr(tmp_path, rt, lifecycle)
+    head = "d" * 40
+    _ack(tmp_path, rt, publisher, kind="open_pr", changeset_id=changeset_id, ok=True, pr=42, head_sha=head)
+    rt.github.prs[42] = {"state": "open", "merged": False, "head": {"sha": head}}
+    merge.advance(rt, lifecycle)
+    item = rt.ledger.changeset(changeset_id)["pending_item"]["id"]
+    rt.github.prs[42] = {"state": "closed", "merged": True, "merge_commit_sha": "e" * 40, "head": {"sha": head}}
+    assert f"merged {changeset_id}" in merge.advance(rt, lifecycle)   # seen on GitHub first
+    assert rt.ledger.repo_state("demo")["paused"] == 0
+    _ack(tmp_path, rt, publisher, kind="merge", changeset_id=changeset_id, ok=True, pr=42, head_sha=head,
+         merge_sha="e" * 40, post_check="failed", problems=["L1 dangling_reference x y"], item_id=item)
+    assert rt.ledger.repo_state("demo")["paused"] == 1
+    assert rt.ledger.changeset(changeset_id)["detail"]["post_check"] == "failed"
 
 
 def test_merged_retirements_become_purge_candidates_next_release(tmp_path):
@@ -372,25 +425,25 @@ def test_scheduler_isolates_a_failing_repository(tmp_path):
 
 # -- review regressions ---------------------------------------------------------------------
 
+
 def test_pending_actions_are_not_reissued_and_stale_acks_change_nothing(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     changeset_id, publisher = _open_pr(tmp_path, rt, lifecycle)
     head = "d" * 40
     _ack(tmp_path, rt, publisher, kind="open_pr", changeset_id=changeset_id, ok=True, pr=42, head_sha=head)
     rt.github.prs[42] = {"state": "open", "merged": False, "head": {"sha": head}}
-    assert merge.advance(rt, lifecycle) == [f"verdict issued {changeset_id}"]
-    assert merge.advance(rt, lifecycle) == []      # still pending: no duplicate verdict item
-    assert len(_items(tmp_path, "post_verdict")) == 1
+    assert merge.advance(rt, lifecycle) == [f"merge issued {changeset_id}"]
+    assert merge.advance(rt, lifecycle) == []      # still pending: no duplicate merge item
+    assert len(_items(tmp_path, "merge")) == 1
     first = rt.ledger.changeset(changeset_id)["pending_item"]["id"]
-    _ack(tmp_path, rt, publisher, kind="post_verdict", changeset_id=changeset_id, ok=True)
-    rt.github.statuses[head] = "success"
-    merge.advance(rt, lifecycle)
-    _ack(tmp_path, rt, publisher, kind="enqueue", changeset_id=changeset_id, ok=True)
-    assert rt.ledger.changeset(changeset_id)["status"] == "queued"
-    # a late REJECTION of the earlier verdict item must not demote the queued change set
-    _ack(tmp_path, rt, publisher, kind="post_verdict", changeset_id=changeset_id, ok=False,
+    _ack(tmp_path, rt, publisher, kind="merge", changeset_id=changeset_id, ok=True, pr=42, head_sha=head,
+         merge_sha="e" * 40, post_check="passed", problems=[])
+    assert rt.ledger.changeset(changeset_id)["status"] == "merged"
+    # a late REJECTION of the same item must not undo the merge
+    _ack(tmp_path, rt, publisher, kind="merge", changeset_id=changeset_id, ok=False,
          error="late duplicate", item_id=first)
-    assert rt.ledger.changeset(changeset_id)["status"] == "queued"
+    assert rt.ledger.changeset(changeset_id)["status"] == "merged"
+
 
 
 def test_expired_pending_action_may_be_reissued(tmp_path):
@@ -401,8 +454,10 @@ def test_expired_pending_action_may_be_reissued(tmp_path):
     rt.github.prs[42] = {"state": "open", "merged": False, "head": {"sha": head}}
     merge.advance(rt, lifecycle)
     now = rt.clock()
-    rt.clock = lambda: now + 31 * 60
-    assert merge.advance(rt, lifecycle) == [f"verdict issued {changeset_id}"]
+    rt.clock = lambda: now + 36 * 60             # 30 min expiry + clock-skew margin
+    assert merge.advance(rt, lifecycle) == [f"merge_expired {changeset_id}"]
+    assert merge.advance(rt, lifecycle) == [f"merge issued {changeset_id}"]
+    assert len(_items(tmp_path, "merge")) == 2
 
 
 def test_overturn_breaker_publishes_the_pause_at_once(tmp_path):
@@ -580,6 +635,7 @@ def test_rollback_and_a_concurrent_tick_are_serialised(tmp_path, monkeypatch):
     assert json.loads(rt.ledger.get_cursor("*", "rollback_pin"))["main"] == second
 
 
+
 def test_resume_returns_paused_prs_to_re_signing(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     changeset_id, publisher = _open_pr(tmp_path, rt, lifecycle)
@@ -591,7 +647,7 @@ def test_resume_returns_paused_prs_to_re_signing(tmp_path):
     merge.resume_paused_prs(rt.ledger, "demo")
     assert rt.ledger.changeset(changeset_id)["status"] == "pr_open"
     rt.github.prs[42] = {"state": "open", "merged": False, "head": {"sha": "d" * 40}}
-    assert merge.advance(rt, lifecycle) == [f"verdict issued {changeset_id}"]  # fresh verdict
+    assert merge.advance(rt, lifecycle) == [f"merge issued {changeset_id}"]  # fresh verdict
 
 
 def test_gated_change_sets_are_published_after_an_interruption(tmp_path):
@@ -616,20 +672,20 @@ def test_gated_change_sets_are_published_after_an_interruption(tmp_path):
     assert rt.ledger.changeset(changeset_id)["status"] == "pr_requested"
 
 
+
 def test_a_pause_ack_after_resume_sends_the_pr_back_to_re_signing(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     changeset_id, publisher = _open_pr(tmp_path, rt, lifecycle)
     _ack(tmp_path, rt, publisher, kind="open_pr", changeset_id=changeset_id, ok=True, pr=42, head_sha="d" * 40)
-    rt.ledger.update_changeset(changeset_id, status="queued")
     rt.ledger.bump_generation("demo", pause=True, reason="drill")
     merge.pause_open_prs(rt.ledger, rt.outbox, "demo", "drill")
     rt.ledger.resume("demo")
     merge.resume_paused_prs(rt.ledger, "demo")            # nothing paused yet: the ack is late
-    assert rt.ledger.changeset(changeset_id)["status"] == "queued"
+    assert rt.ledger.changeset(changeset_id)["status"] == "pr_open"
     _ack(tmp_path, rt, publisher, kind="pause", changeset_id=changeset_id, ok=True, item_id="late")
     assert rt.ledger.changeset(changeset_id)["status"] == "pr_open"   # not stranded as paused
     rt.github.prs[42] = {"state": "open", "merged": False, "head": {"sha": "d" * 40}}
-    assert merge.advance(rt, lifecycle) == [f"verdict issued {changeset_id}"]
+    assert merge.advance(rt, lifecycle) == [f"merge issued {changeset_id}"]
 
 
 def test_global_pause_is_respected_by_acks_advance_and_publish(tmp_path):

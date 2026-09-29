@@ -81,8 +81,7 @@ def _add_rule_files():
 
 
 def _verdict(tmp_path, rt):
-    comment = _items(tmp_path, "post_verdict")[-1]["body"]["comment"]
-    envelope = json.loads(comment.split("```json\n", 1)[1].rsplit("\n```", 1)[0])
+    envelope = _items(tmp_path, "merge")[-1]["body"]["verdict"]
     return verify("kb-gate-verdict", envelope, load_public_key(public_key_text(rt.outbox._key.public_key())))
 
 
@@ -94,7 +93,7 @@ def test_a_human_knowledge_pr_passes_the_auto_gate_and_gets_a_verdict(tmp_path):
     (changeset,) = [cs for cs in rt.ledger.changesets("demo", ("pr_open",)) if cs["kind"] == "external"]
     assert changeset["pr_number"] == 7 and changeset["head_sha"] == head
     assert poll_external(rt) == []                       # judged once per head
-    assert merge.advance(rt, lifecycle) == [f"verdict issued {changeset['id']}"]
+    assert merge.advance(rt, lifecycle) == [f"merge issued {changeset['id']}"]
     verdict = _verdict(tmp_path, rt)
     merge_base = _git(origin, "merge-base", "main", head)
     assert verdict["source"] == "auto" and verdict["pr"] == 7 and verdict["head_sha"] == head
@@ -170,49 +169,44 @@ def test_a_new_head_is_judged_again_and_drafts_and_our_own_prs_are_skipped(tmp_p
     assert all("PR #12" not in event for event in poll_external(rt))
 
 
-def _verifier_passes(tmp_path, rt, origin, number, labels=(), reviews=()):
-    """Run the real kb-gate PR-stage verifier on the verdict this service posted."""
+def _local_gate(tmp_path, rt, number):
+    """Run the publisher's local gate on the verdict this service handed over."""
     import time
 
-    from infermatrix_copilot.knowledge_service import gate_verifier as gv
-    from infermatrix_copilot.knowledge_service.signing import sign
+    from infermatrix_copilot.kb_service import local_gate
 
-    (comment,) = [item["body"]["comment"] for item in _items(tmp_path, "post_verdict")
-                  if item["body"]["pr"] == number]
-    head = rt.github.open[number]["head"]["sha"]
-
-    class VerifierGitHub:
-        def get(self, path):
-            if path.endswith(f"/pulls/{number}"):
-                return {"number": number, "state": "open", "draft": False, "head": {"sha": head},
-                        "labels": [{"name": name} for name in labels]}
-            return {r["id"]: r for r in reviews}[int(path.rsplit("/", 1)[1])]
-
-        def get_all(self, path):
-            return list(reviews) if path.endswith("/reviews") else [{"body": comment}]
-
-    holds = {"issued_at": time.time(), "sequence": 1, "global": False, "repos": [], "prs": []}
-    ctx = gv.Context(git=gv.Git(rt.knowledge.path), github=VerifierGitHub(), repository=REPO,
-                     public_key=rt.outbox._key.public_key(), holds_loader=lambda: sign("kb-holds", holds, rt.outbox._key),
-                     codeowners=gv.parse_codeowners((origin / ".github" / "CODEOWNERS").read_text()), now=time.time())
-    _head, problems = gv.verify_pr(ctx, number)
-    return problems
+    (body,) = [item["body"] for item in _items(tmp_path, "merge") if item["body"]["pr"] == number]
+    key = rt.outbox._key.public_key()
+    verdict = local_gate.check_verdict(body["verdict"], key, repository=REPO, pr=number,
+                                       head_sha=body["head_sha"], now=time.time())
+    clone = rt.knowledge.path
+    _git(clone, "fetch", "-q", "origin", "+refs/heads/main:refs/remotes/origin/main",
+         f"+refs/pull/{number}/head:refs/kb/pr-{number}")
+    pr = {"number": number, "state": "open", "head": {"sha": body["head_sha"]}, "labels": []}
+    return local_gate.gate(clone, repository=REPO, repo="demo", pr=pr, head_sha=body["head_sha"],
+                           main_sha=_git(clone, "rev-parse", "refs/remotes/origin/main"), verdict=verdict,
+                           public_key=key, now=time.time())
 
 
-def test_verdicts_for_external_prs_pass_the_real_kb_gate_verifier(tmp_path):
+def test_verdicts_for_external_prs_pass_the_publishers_local_gate(tmp_path):
+    import pytest
+
+    from infermatrix_copilot.knowledge_service.verdict import VerdictError
+
     rt, lifecycle, origin = _setup(tmp_path)
     rt.clock = __import__("time").time          # verdict windows are checked against the real clock
     _open_human_pr(rt, origin, 7, _add_rule_files())
     poll_external(rt)
     merge.advance(rt, lifecycle)
-    assert _verifier_passes(tmp_path, rt, origin, 7) == []
+    assert _local_gate(tmp_path, rt, 7) == []
 
     head = _open_human_pr(rt, origin, 8, {"knowledge/tools/check.md": "tool notes\n"}, labels=("kb:human-approved",))
-    review = {"id": 100, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}
-    rt.github.reviews[8] = [review]
-    poll_external(rt)
+    rt.github.reviews[8] = [{"id": 100, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
+    assert [e for e in poll_external(rt) if "PR #7" in e] == []   # a merge in flight is not judged again
+    rt.ledger.update_changeset(rt.ledger.changesets("demo", ("merge_requested",))[0]["id"], status="merged")
     merge.advance(rt, lifecycle)
-    assert _verifier_passes(tmp_path, rt, origin, 8, labels=("kb:human-approved",), reviews=(review,)) == []
+    with pytest.raises(VerdictError, match="only auto verdicts merge"):
+        _local_gate(tmp_path, rt, 8)            # v8: a human-approved verdict never merges
 
 
 def test_a_retraction_on_a_later_page_of_reviews_is_seen(tmp_path):
@@ -255,30 +249,6 @@ def test_a_head_sent_to_people_can_be_approved_without_a_new_push(tmp_path):
     assert poll_external(rt) == []
 
 
-def test_a_withdrawn_approval_after_signing_stops_the_pr(tmp_path):
-    rt, lifecycle, origin = _setup(tmp_path)
-    rt.clock = __import__("time").time          # the verifier checks the verdict window in real time
-    head = _open_human_pr(rt, origin, 40, {"knowledge/tools/z.md": "z\n"}, labels=("kb:human-approved",))
-    rt.github.reviews[40] = [{"id": 5, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
-    poll_external(rt)
-    (changeset,) = [cs for cs in rt.ledger.changesets("demo", ("pr_open",)) if cs["kind"] == "external"]
-    merge.advance(rt, lifecycle)
-    rt.ledger.update_changeset(changeset["id"], status="verdict_posted", pending_item=None)
-    rt.github.reviews[40].append({"id": 6, "state": "CHANGES_REQUESTED", "commit_id": head,
-                                  "user": {"login": "alice"}})
-    assert merge.advance(rt, lifecycle) == [f"approval_withdrawn {changeset['id']}"]
-    assert any(item["body"]["pr"] == 40 for item in _items(tmp_path, "pause"))
-    assert rt.ledger.human_queue("demo")
-    # until the pause is acked it keeps its state (and so its queue slot)
-    assert rt.ledger.changeset(changeset["id"])["status"] == "verdict_posted"
-    assert merge.advance(rt, lifecycle) == []
-    assert poll_external(rt) == []                      # never re-staged on the remaining approvals
-    # the verifier sees it too, even though review 5 still reads APPROVED
-    problems = _verifier_passes(tmp_path, rt, origin, 40, labels=("kb:human-approved",),
-                                reviews=tuple(rt.github.reviews[40]))
-    assert any("latest review no longer approves" in p for p in problems), problems
-
-
 def test_rules_an_external_pr_retires_enter_the_retirement_ledger(tmp_path):
     rt, lifecycle, origin = _setup(tmp_path)
     (origin / "skills" / "x.md").write_text("no citations here\n")   # else it needs a companion PR
@@ -298,139 +268,3 @@ def test_rules_an_external_pr_retires_enter_the_retirement_ledger(tmp_path):
     merge.advance(rt, lifecycle)
     row = rt.ledger._conn.execute("SELECT rule_id, page FROM retirements WHERE repo='demo'").fetchall()
     assert [tuple(r) for r in row] == [("DEMO-1a", PAGE)]
-
-
-def test_a_withdrawn_queued_pr_holds_the_slot_until_its_pause_is_acked(tmp_path):
-    from test_kb_flow import _ack
-    from infermatrix_copilot.knowledge_service.signing import generate_private_key, load_public_key, public_key_text
-
-    rt, lifecycle, origin = _setup(tmp_path)
-    publisher = generate_private_key(tmp_path / "pub.pem")
-    rt.publisher_public_key = load_public_key(public_key_text(publisher.public_key()))
-    head = _open_human_pr(rt, origin, 50, {"knowledge/tools/q.md": "q\n"}, labels=("kb:human-approved",))
-    rt.github.reviews[50] = [{"id": 1, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}},
-                             {"id": 2, "state": "APPROVED", "commit_id": head, "user": {"login": "bob"}}]
-    (origin / ".github" / "CODEOWNERS").write_text("/.github/ @alice @bob\n")
-    _git(origin, "add", "-A")
-    _git(origin, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-q", "-m", "two maintainers")
-    rt.github.open[50]["head"]["sha"] = head
-    poll_external(rt)
-    (changeset,) = [cs for cs in rt.ledger.changesets("demo", ("pr_open",)) if cs["kind"] == "external"]
-    rt.ledger.update_changeset(changeset["id"], status="queued", pending_item=None)
-    rt.github.reviews[50].append({"id": 3, "state": "CHANGES_REQUESTED", "commit_id": head,
-                                  "user": {"login": "alice"}})
-    assert merge.advance(rt, lifecycle) == [f"approval_withdrawn {changeset['id']}"]
-    assert rt.ledger.changeset(changeset["id"])["status"] == "queued"       # slot still held
-    _ack(tmp_path, rt, publisher, kind="pause", changeset_id=changeset["id"], ok=False)   # dequeue failed
-    assert rt.ledger.changeset(changeset["id"])["status"] == "queued"
-    _ack(tmp_path, rt, publisher, kind="pause", changeset_id=changeset["id"], ok=True)
-    assert rt.ledger.changeset(changeset["id"])["status"] == "approval_withdrawn"
-    assert poll_external(rt) == []                      # bob's approval alone does not re-stage it
-
-
-def test_a_withdrawal_during_an_outstanding_enqueue_keeps_the_queue_slot(tmp_path):
-    rt, lifecycle, origin = _setup(tmp_path)
-    head = _open_human_pr(rt, origin, 60, {"knowledge/tools/w.md": "w\n"}, labels=("kb:human-approved",))
-    rt.github.reviews[60] = [{"id": 1, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
-    poll_external(rt)
-    (first,) = [cs for cs in rt.ledger.changesets("demo", ("pr_open",)) if cs["kind"] == "external"]
-    merge.advance(rt, lifecycle)
-    rt.ledger.update_changeset(first["id"], status="verdict_posted", pending_item=None)
-    rt.github.statuses[head] = "success"
-    assert merge.advance(rt, lifecycle) == [f"enqueue issued {first['id']}"]
-    rt.github.reviews[60].append({"id": 2, "state": "DISMISSED", "commit_id": head, "user": {"login": "alice"}})
-    assert merge.advance(rt, lifecycle) == [f"approval_withdrawn {first['id']}"]
-    # a second, fully eligible PR must not be enqueued while the first may be queued
-    second = rt.ledger.new_changeset_id("demo", "intake")
-    rt.ledger.stage_intake(rt.lease_owner, "demo", second, detail={}, status="verdict_posted", verdicts=[],
-                           human_reason="", drafted_events=[])
-    rt.ledger.update_changeset(second, pr_number=61, head_sha="6" * 40)
-    rt.github.prs[61] = {"state": "open", "merged": False, "head": {"sha": "6" * 40}}
-    rt.github.statuses["6" * 40] = "success"
-    assert merge.advance(rt, lifecycle) == []
-    assert [i["body"]["pr"] for i in _items(tmp_path, "enqueue")] == [60]
-
-
-
-def test_a_withdrawal_completes_only_after_every_enqueue_could_have_run(tmp_path):
-    """The publisher may run the pause before a still-valid enqueue: the pause
-    is repeated once that enqueue has certainly expired."""
-    from test_kb_flow import _ack
-    from infermatrix_copilot.knowledge_service.signing import generate_private_key, load_public_key, public_key_text
-
-    rt, lifecycle, origin = _setup(tmp_path)
-    publisher = generate_private_key(tmp_path / "pub.pem")
-    rt.publisher_public_key = load_public_key(public_key_text(publisher.public_key()))
-    head = _open_human_pr(rt, origin, 70, {"knowledge/tools/v.md": "v\n"}, labels=("kb:human-approved",))
-    rt.github.reviews[70] = [{"id": 1, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
-    poll_external(rt)
-    (cs,) = [c for c in rt.ledger.changesets("demo", ("pr_open",)) if c["kind"] == "external"]
-    merge.advance(rt, lifecycle)
-    rt.ledger.update_changeset(cs["id"], status="verdict_posted", pending_item=None)
-    rt.github.statuses[head] = "success"
-    assert merge.advance(rt, lifecycle) == [f"enqueue issued {cs['id']}"]
-    rt.github.reviews[70].append({"id": 2, "state": "DISMISSED", "commit_id": head, "user": {"login": "alice"}})
-    merge.advance(rt, lifecycle)
-    _ack(tmp_path, rt, publisher, kind="pause", changeset_id=cs["id"], ok=True)   # ran before the enqueue
-    assert rt.ledger.changeset(cs["id"])["status"] == "verdict_posted"           # not complete yet
-    pauses = len(_items(tmp_path, "pause"))
-    assert merge.advance(rt, lifecycle) == [] and len(_items(tmp_path, "pause")) == pauses
-    start = rt.clock()
-    rt.clock = lambda: start + 30 * 60 + merge.CLOCK_SKEW + 1
-    rt.outbox._clock = rt.clock                                   # items are stamped by the outbox clock                     # the enqueue is dead now
-    merge.advance(rt, lifecycle)
-    assert len(_items(tmp_path, "pause")) == pauses + 1
-    _ack(tmp_path, rt, publisher, kind="pause", changeset_id=cs["id"], ok=True)
-    assert rt.ledger.changeset(cs["id"])["status"] == "approval_withdrawn"
-
-
-def test_a_late_ack_of_an_early_pause_does_not_complete_the_withdrawal(tmp_path):
-    from test_kb_flow import _ack
-    from infermatrix_copilot.knowledge_service.signing import generate_private_key, load_public_key, public_key_text
-
-    rt, lifecycle, origin = _setup(tmp_path)
-    publisher = generate_private_key(tmp_path / "pub.pem")
-    rt.publisher_public_key = load_public_key(public_key_text(publisher.public_key()))
-    head = _open_human_pr(rt, origin, 80, {"knowledge/tools/u.md": "u\n"}, labels=("kb:human-approved",))
-    rt.github.reviews[80] = [{"id": 1, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
-    poll_external(rt)
-    (cs,) = [c for c in rt.ledger.changesets("demo", ("pr_open",)) if c["kind"] == "external"]
-    merge.advance(rt, lifecycle)
-    rt.ledger.update_changeset(cs["id"], status="verdict_posted", pending_item=None)
-    rt.github.statuses[head] = "success"
-    merge.advance(rt, lifecycle)                                  # enqueue issued
-    rt.github.reviews[80].append({"id": 2, "state": "DISMISSED", "commit_id": head, "user": {"login": "alice"}})
-    merge.advance(rt, lifecycle)                                  # the first pause, issued now
-    start = rt.clock()
-    rt.clock = lambda: start + 30 * 60 + merge.CLOCK_SKEW + 1
-    rt.outbox._clock = rt.clock                                   # items are stamped by the outbox clock
-    _ack(tmp_path, rt, publisher, kind="pause", changeset_id=cs["id"], ok=True)   # its ack arrives late
-    assert rt.ledger.changeset(cs["id"])["status"] == "verdict_posted"
-    merge.advance(rt, lifecycle)                                  # a pause issued after the boundary
-    _ack(tmp_path, rt, publisher, kind="pause", changeset_id=cs["id"], ok=True)
-    assert rt.ledger.changeset(cs["id"])["status"] == "approval_withdrawn"
-
-
-def test_a_missing_enqueue_expiry_is_recovered_from_the_outbox(tmp_path):
-    from test_kb_flow import _ack
-    from infermatrix_copilot.knowledge_service.signing import generate_private_key, load_public_key, public_key_text
-
-    rt, lifecycle, origin = _setup(tmp_path)
-    publisher = generate_private_key(tmp_path / "pub.pem")
-    rt.publisher_public_key = load_public_key(public_key_text(publisher.public_key()))
-    head = _open_human_pr(rt, origin, 90, {"knowledge/tools/t.md": "t\n"}, labels=("kb:human-approved",))
-    rt.github.reviews[90] = [{"id": 1, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
-    poll_external(rt)
-    (cs,) = [c for c in rt.ledger.changesets("demo", ("pr_open",)) if c["kind"] == "external"]
-    merge.advance(rt, lifecycle)
-    rt.ledger.update_changeset(cs["id"], status="verdict_posted", pending_item=None)
-    rt.github.statuses[head] = "success"
-    merge.advance(rt, lifecycle)                                  # enqueue issued
-    detail = rt.ledger.changeset(cs["id"])["detail"]
-    detail.pop("enqueue_expires_at")                              # a restart lost the recorded expiry
-    rt.ledger.update_changeset(cs["id"], detail=detail, pending_item=None)
-    rt.github.reviews[90].append({"id": 2, "state": "DISMISSED", "commit_id": head, "user": {"login": "alice"}})
-    merge.advance(rt, lifecycle)
-    assert rt.ledger.changeset(cs["id"])["detail"]["enqueue_expires_at"] > 0   # from the signed outbox item
-    _ack(tmp_path, rt, publisher, kind="pause", changeset_id=cs["id"], ok=True)
-    assert rt.ledger.changeset(cs["id"])["status"] == "verdict_posted"         # not final yet
