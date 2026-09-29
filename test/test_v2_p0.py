@@ -317,16 +317,6 @@ _KNOWN_LEAKS = {
     "intent.py": 2,              # parse_* default_repo parameter defaults
     "rebase/monitor.py": 1,      # locked-pipeline delegation (by design)
     "task_spec.py": 1,           # TaskSpec.repo default
-    # KNOWN DEBT, not a design allowance: _DIRECT_OWNER_ROUTES/_REPO_ALIASES embed the
-    # served repo's owner table inline. Recorded at today's exact count so it can only
-    # shrink; the fix is externalizing them to adapters/<repo>/routing.yaml.
-    # This was invisible until config.py dropped to its ceiling — the assertion below
-    # stops at the first offending file, so one leak masks every later one.
-    # The tables moved to direct_routing.py when Direct got a public home in
-    # contract.py; the debt moved with them (29 -> 24 + 4) rather than growing,
-    # and putting them in contract.py — the module consumers import — was
-    # exactly what this ratchet exists to prevent.
-    "direct_routing.py": 24,
     "thin_mcp_server.py": 4,
 }
 _LEAK = re.compile(r"vllm[_\- ]?omni|/rebase/", re.IGNORECASE)

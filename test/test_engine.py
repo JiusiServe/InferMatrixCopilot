@@ -42,6 +42,30 @@ def test_sequential_execution_and_outputs(env):
     assert outcome.step_results["b"].summary == "got 1"
 
 
+def test_mutating_foreach_owns_shared_checkout_one_item_at_a_time(env):
+    registry, executor, _ = env
+    active = 0
+    peak = 0
+    seen = []
+
+    async def edit(ctx):
+        nonlocal active, peak
+        active += 1
+        peak = max(peak, active)
+        await asyncio.sleep(0)
+        seen.append(ctx.item)
+        active -= 1
+        return StepResult(True, summary="edited")
+
+    registry.register(StepSpec("s.edit", "agent", "write_workspace", edit))
+    result = asyncio.run(executor.run(
+        playbook([PlaybookStep("edit", "s.edit", foreach="groups")]),
+        {"groups": ["first", "second"]},
+    ))
+    assert result.status == "done"
+    assert seen == ["first", "second"] and peak == 1
+
+
 def test_task_params_reach_steps(env):
     """`--task-param K=V` lands on the TaskSpec; it must also reach a step's
     `ctx.params`, which previously only ever saw the playbook's step params."""

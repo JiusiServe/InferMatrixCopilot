@@ -80,6 +80,9 @@ def test_landed_fix_writes_one_record(registry, settings, trace, tmp_path):
     record = json.loads(path.read_text(encoding="utf-8"))
     assert record["run_id"] == "run-x"
     assert record["repo"] == "owner/demo"  # full identity, not the alias
+    assert record["schema_version"] == 2
+    assert record["event_id"] == "bugfix_run:owner/demo:run-x"
+    assert record["repository"] == {"full_name": "owner/demo", "alias": "demo"}
     assert record["pr"] == 42
     assert record["kind"] == "bugfix_run"
     assert record["groups"][0]["signature"] == "ImportError: cycle"
@@ -120,7 +123,7 @@ def test_landed_fix_is_posted_to_the_mailbox_issue(
     body = (tmp_path / "run-x" / "knowledge-intake-comment.md").read_text(
         encoding="utf-8"
     )
-    assert body.startswith("<!-- infermatrix-copilot:bugfix-record:v1 -->\n```json\n")
+    assert body.startswith("<!-- infermatrix-copilot:bugfix-record:v2 -->\n```json\n")
     posted = json.loads(body.split("```json\n", 1)[1].rsplit("```", 1)[0])
     # The comment carries exactly the record the drop file carries.
     dropped = json.loads((tmp_path / "intake" / "run-x.json").read_text(encoding="utf-8"))

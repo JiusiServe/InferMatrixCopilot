@@ -162,3 +162,24 @@ def test_malformed_ops_rejected_individually(tmp_path, bad):
     results = store.apply_ops([_fact_op(), bad], tier="consolidate")
     assert results[0] == "" and results[1] != ""
     assert "fmt" in store.facts  # the good op still applied
+
+
+def test_non_object_and_malformed_evidence_do_not_abort_later_operations(tmp_path):
+    store = ProfileStore(tmp_path / "profile")
+    results = store.apply_ops(["bad", _fact_op(evidence=42), _fact_op()])
+    assert "must be an object" in results[0]
+    assert "list of strings" in results[1]
+    assert results[2] == ""
+    assert list(store.facts) == ["fmt"]
+
+
+def test_unknown_tier_cannot_rewrite_profile(tmp_path):
+    store = ProfileStore(tmp_path / "profile")
+    assert store.apply_ops([_fact_op()]) == [""]
+    before = store.facts["fmt"].text
+    result = store.apply_ops(
+        [{"op": "rewrite_fact", "id": "fmt", "text": "replacement"}],
+        tier="typo",
+    )
+    assert "unknown profile tier" in result[0]
+    assert store.facts["fmt"].text == before

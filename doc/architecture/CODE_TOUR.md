@@ -124,8 +124,8 @@ TaskSpec 遇上仓库能力,解析成一条可执行流水线。
   (name/kind/risk/handler)、`StepResult`(ok + 类型化 `FailureKind`,失败是
   **值**不是异常)、`StepContext`(handler 能触碰的一切:settings/state/
   params/run_dir/trace/llm)。六种失败类型走不同路由。`engine/registry.py`
-  (39)是"名字→handler"的唯一解析点;`engine/steps/__init__.py`(34)导入
-  即触发 `@step` 自注册、`register_builtin_steps` 刷进 registry;
+  (39)是"名字→handler"的唯一解析点;`engine/steps/__init__.py` 延迟加载
+  内建模块，`register_builtin_steps` 触发 `@step` 自注册并填充 registry;
   `engine/__init__.py`(8)导出。
 - **`config.py`**(418)——`Settings`(pydantic,从 `.env`/环境,永不提交),
   被塞进每个 `StepContext`:LLM 端点、仓库路径、引擎预算

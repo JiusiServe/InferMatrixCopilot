@@ -407,3 +407,33 @@ def test_a_budget_cut_is_not_recorded_as_a_review_decision(
     assert recorded.count("publish") == 8
     assert recorded.count("over_budget") == 1
     assert "excluded" not in recorded
+
+
+def test_carried_findings_are_rechecked_on_frozen_head_and_persisted(settings, trace, tmp_path, git_repo):
+    from infermatrix_copilot.contract import build_review_result
+    head = "a" * 40
+    carried = [{"finding_id": "old-7", "source_head_sha": "b" * 40,
+                "severity": "blocker", "path": "mod_a.py", "title": "Old defect"}]
+    reply = _contract_reply([])
+    payload = json.loads(reply.blocks[0].text)
+    payload["finding_rechecks"] = [{"finding_id": "old-7", "head_sha": head,
+        "outcome": "fixed", "evidence": "mod_a.py now guards the None input"}]
+    llm = ScriptedLLM([_contract_reply([]), Reply(blocks=[Block(type="text", text=json.dumps(payload))])])
+    state = {"diff_text": "diff --git a/mod_a.py b/mod_a.py\n+A = 1",
+             "pr_head_sha": head, "repo_path": str(git_repo),
+             "task_spec": {"kind": "pr_review", "pr": 9, "params": {"carried_findings": carried}}}
+    result = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    prompt = llm.calls[-1]["messages"][0]["content"]
+    assert "old-7" in prompt and head in prompt and "untrusted_data" in prompt
+    assert "write_file" not in {tool["name"] for tool in llm.calls[-1]["tools"]}
+    updates = result.outputs["state_updates"]
+    updates["pr_head_sha"] = head
+    run_dir = tmp_path / "assembled"
+    run_dir.mkdir()
+    (run_dir / "progress.json").write_text(json.dumps({"completed": {
+        "review": {"outputs": {"state_updates": updates}}}}))
+    structured = build_review_result(run_dir)
+    assert structured["rechecks_complete"]
+    assert structured["finding_rechecks"] == payload["finding_rechecks"]

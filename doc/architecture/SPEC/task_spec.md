@@ -23,6 +23,9 @@ expected_head_sha?, repo_path?)`；property `tier`、`read_only`、
 - **C1**：**不存在可设置的 tier 字段**；`tier = KIND_TIER[kind]` —— 文本无法把它扩大。
 - 只读 kind 的 `read_only` = `not post`，其余为 `report_only`；
   `confirm_required = not read_only`。
+- 这里的 `read_only` 是**任务权限/对外发布**的推导，不表示执行期间零文件写入：
+  `pr_rebase` 的 report-only 模式允许在按 run 隔离的 disposable worktree
+  本地 rebase，但不能修改配置 checkout 的分支/文件或推送 PR head。
 - **快照绑定字段只收窄，绝不扩权**（C1 完整无损）：`expected_head_sha`
   （field_validator 强制 `FULL_SHA_RE`；设置后 run 只准评审这个 head，
   否则以 stale 停下）与 `repo_path`（预约时冻结、由

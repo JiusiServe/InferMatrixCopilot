@@ -1,0 +1,37 @@
+# Direct-mode owner routing for vllm-omni. Read by the repo-neutral router in
+# src/infermatrix_copilot/direct_routing.py; nothing in src/ names this repo.
+#
+# owners: the PR's title/body is matched against `signals` (word-bounded, case-
+#   and separator-insensitive) to pick owner pages; `scope_prefixes` report which
+#   owners the changed files touch, and select them only as a last resort.
+# models: every <dir>/<page> under `dir` is a model route matched by name.
+# Order of `owners` is the tie-break order and must stay stable.
+schema_version: 1
+owners:
+  - owner: configuration
+    path: repos/vllm-omni/components/configuration/rules.md
+    signals: [config, configuration, yaml, registry, deploy, pipeline, override, default, cli flag, topology]
+    scope_prefixes: [vllm_omni/config/, vllm_omni/deploy/]
+  - owner: serving
+    path: repos/vllm-omni/components/serving/rules.md
+    signals: [serving, server, endpoint, openai, request, response, http, chat completion, completion endpoint, speech api, sse, websocket, sleep, wake, partial wake, engine lifecycle, idempotency, ack]
+    scope_prefixes: [vllm_omni/entrypoints/openai/, vllm_omni/entrypoints/api_server.py, vllm_omni/entrypoints/async_omni.py]
+  - owner: model-executor
+    path: repos/vllm-omni/components/model-executor/rules.md
+    signals: [model executor, loader, checkpoint, tokenizer, processor, stage input, stage handoff, runtime info, runtime_info, batch, sampling]
+    scope_prefixes: [vllm_omni/model_executor/, vllm_omni/inputs/]
+  - owner: diffusion
+    path: repos/vllm-omni/components/diffusion/rules.md
+    signals: [diffusion, image generation, text to image, image to image, lora, vae, dit, ulysses, cache dit]
+    scope_prefixes: [vllm_omni/diffusion/, vllm_omni/model_executor/models/diffusers/]
+  - owner: distributed
+    path: repos/vllm-omni/components/distributed/_index.md
+    signals: [distributed, tensor parallel, data parallel, replica, collective, rpc]
+    scope_prefixes: [vllm_omni/distributed/, vllm_omni/worker/, vllm_omni/entrypoints/async_omni.py]
+  - owner: scheduler
+    path: repos/vllm-omni/components/scheduler/rules.md
+    signals: [scheduler, scheduling, prefix cache, token budget, queue, side stream]
+    scope_prefixes: [vllm_omni/core/sched/]
+models:
+  dir: repos/vllm-omni/models
+  page: rules.md

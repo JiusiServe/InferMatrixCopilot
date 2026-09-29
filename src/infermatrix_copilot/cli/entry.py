@@ -6,6 +6,7 @@ the wiring that turns argv/stdin into calls on it.
 from __future__ import annotations
 
 import argparse
+import sys
 
 from ..intent import parse_intents
 from .copilot import Copilot
@@ -136,6 +137,11 @@ def main(argv: list[str] | None = None) -> int:
                         help=argparse.SUPPRESS)
     parser.add_argument("--execute-strict-reserved", metavar="RUN_ID",
                         help=argparse.SUPPRESS)
+    raw = list(sys.argv[1:] if argv is None else argv)
+    if raw and raw[0] == "kb":  # the knowledge service has its own subcommands
+        from ..kb_service.cli import main as kb_main
+
+        return kb_main(raw[1:])
     args = parser.parse_args(argv)
 
     if args.command == "doctor":  # diagnostics only — no Copilot/LLM spin-up

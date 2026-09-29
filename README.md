@@ -254,9 +254,10 @@ python knowledge/tools/check_wiki_lint.py
 
 自动知识回流也遵循同一条边界：本仓库发布的
 `infermatrix_copilot.sdk.v1.KnowledgeCurator` 是 catalog、受信 prompt、proposal
-shape/ID/page/source 校验、append-only apply 与两道 validator rollback 的唯一实现；
-ReviewBot 只把 evidence 和 model JSON 接到该 API，并继续拥有 dedicated clone、
-ledger/retry、Git commit、fork push、PR 与 schedule。SDK 不 clone、不调 model、
+shape/ID/page/source 校验、append-only apply 与两道 validator rollback 的公共入口；
+实现位于 `infermatrix_copilot.knowledge_service.curation`，SDK v1 只保留兼容导出。
+ReviewBot 把 evidence 和 model JSON 接到该 API，并继续拥有 dedicated clone、
+ledger/retry、Git commit、本地补丁导出与 schedule。SDK 不 clone、不调 model、
 不发布，也不会写 wheel 内的 knowledge 副本。
 
 ## 快速上手 4 · CI 修复（imcifix）

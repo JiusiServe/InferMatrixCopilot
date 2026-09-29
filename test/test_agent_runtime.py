@@ -198,11 +198,26 @@ def test_every_agent_step_goes_through_the_runtime(settings, trace, tmp_path,
     llm = ScriptedLLM([contract(review_comments=[], answer_draft="a",
                                 triage_table=[], root_cause="r",
                                 fix_summary="f", verification="v")])
+    if step_name == "agent.debug_group":
+        import subprocess
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        for args in (("init", "-q"), ("config", "user.email", "t@e.c"),
+                     ("config", "user.name", "t")):
+            subprocess.run(["git", *args], cwd=repo, check=True)
+        (repo / "source.py").write_text("value = 1\n")
+        subprocess.run(["git", "add", "source.py"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo, check=True)
+        state = {**state, "repo_path": str(repo)}
     ctx = StepContext(settings=settings, state=state, params={},
                       run_dir=tmp_path / "run", trace=trace, llm=llm)
     ctx.item = {"signature": "sig", "jobs": []}  # for debug_group
     result = asyncio.run(registry.get(step_name).handler(ctx))
-    assert result.ok, f"{step_name}: {result.summary}"
+    if step_name == "agent.debug_group":
+        assert not result.ok and "observed commit" in result.summary
+    else:
+        assert result.ok, f"{step_name}: {result.summary}"
     ev = next(trace.events("agent_dispatch"))
     assert ev["permissions"]["tools"], step_name
 

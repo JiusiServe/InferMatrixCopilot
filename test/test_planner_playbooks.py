@@ -3,7 +3,7 @@ import pytest
 from infermatrix_copilot.engine.steps import register_builtin_steps
 from infermatrix_copilot.engine.planner import Planner, PlanningError
 from infermatrix_copilot.engine.registry import StepRegistry
-from infermatrix_copilot.playbooks.store import PlaybookStore
+from infermatrix_copilot.playbooks.store import PlaybookStore, parse_playbook, playbook_to_doc
 from infermatrix_copilot.task_spec import TaskSpec
 
 LOCKED_PB = """\
@@ -104,6 +104,15 @@ def test_candidate_save_roundtrip(stack, settings):
     assert store.find("pr_review") is None
 
 
+def test_mode_aware_survives_playbook_serialization():
+    original = parse_playbook({
+        "name": "mode-aware", "status": "candidate", "version": 1,
+        "task_kinds": ["repo_rebase"], "mode_aware": True,
+        "steps": [{"id": "report", "step": "report.final_summary"}],
+    })
+    assert parse_playbook(playbook_to_doc(original)).mode_aware is True
+
+
 def test_real_pr_review_playbook_reuses_with_review_depth():
     """The shipped pr-review.yaml declares review_depth, so a spec carrying it
     resolves as reuse (L0) — an undeclared param would demote to adapt (L1,
@@ -132,7 +141,7 @@ def _gate(settings, verdict_kind, *, assume_yes, monkeypatch):
     resolution that requires review (adapted/generated plans and explicit
     --playbook overrides; exact reuse never reaches this gate)."""
     from infermatrix_copilot.cli import Copilot
-    from infermatrix_copilot.cli import copilot as copilot_mod
+    from infermatrix_copilot.app import core as copilot_mod
     from infermatrix_copilot.engine.planner import Resolution
     from infermatrix_copilot.review.reviewer import ReviewVerdict
     from infermatrix_copilot.task_spec import TaskSpec
@@ -185,7 +194,7 @@ def test_interactive_run_surfaces_and_defers_to_the_confirm(
 def _gate_and_confirm(settings, verdict_kind, *, assume_yes, monkeypatch,
                       answer="y"):
     from infermatrix_copilot.cli import Copilot
-    from infermatrix_copilot.cli import copilot as copilot_mod
+    from infermatrix_copilot.app import core as copilot_mod
     from infermatrix_copilot.engine.planner import Resolution
     from infermatrix_copilot.review.reviewer import ReviewVerdict
     from infermatrix_copilot.task_spec import TaskSpec

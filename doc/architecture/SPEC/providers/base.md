@@ -1,6 +1,6 @@
 # providers/base.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-09-28 -->
 
 `LOC ~161 · provider 层契约 + 子进程环境白名单 · refactor-status: ok`
 
@@ -50,3 +50,6 @@ stdlib + `..scopes.ToolScope`。它是一个叶子契约模块。
 ## 重构备注
 `sanitized_env()` 和 `push.guard_push`、`scopes` 一样是安全原语 —— 保持它纯粹、无依赖。
 **放宽 `_ENV_KEEP` 是一个安全决策，不是便利性决策。**
+
+## 2026-09-28
+`complete()` 接受 `effort`（推理强度）：codex 以 `-c model_reasoning_effort="<effort>"` 生效并校验取值；其他 transport 接受并忽略（模型 id 已决定推理预算）。

@@ -6,8 +6,8 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 SDK_API_VERSION = "1.0.0"
-DIRECT_API_VERSION = "1.0.0"
-STRICT_API_VERSION = "1.2.0"   # + findings / findings_missing_carried (#174)
+DIRECT_API_VERSION = "1.1.0"
+STRICT_API_VERSION = "1.3.0"  # explicit carried-finding rechecks
 QUALITY_API_VERSION = "1.0.0"
 KNOWLEDGE_API_VERSION = "1.1.0"
 
@@ -43,6 +43,10 @@ class DocumentNotFoundError(SDKError):
 
 class KnowledgeCurationError(SDKError):
     code = "knowledge_curation_error"
+
+
+class ResultDecodeError(SDKError):
+    code = "result_decode_error"
 
 
 @dataclass(frozen=True)
@@ -196,6 +200,26 @@ class Capabilities(_Serializable):
 
 
 @dataclass(frozen=True)
+class CarriedFinding(_Serializable):
+    finding_id: str
+    source_head_sha: str
+    severity: str
+    path: str
+    title: str
+    body: str = ""
+    line: int | None = None
+    disputed: bool = False
+
+
+@dataclass(frozen=True)
+class FindingRecheck(_Serializable):
+    finding_id: str
+    head_sha: str
+    outcome: Literal["fixed", "still_affected", "unverified"]
+    evidence: str
+
+
+@dataclass(frozen=True)
 class DirectReviewRequest(_Serializable):
     review_id: str
     repository: RepositoryRef
@@ -204,6 +228,7 @@ class DirectReviewRequest(_Serializable):
     title: str
     body: str
     changed_paths: tuple[ChangedPath, ...]
+    carried_findings: tuple[CarriedFinding, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -224,6 +249,11 @@ class DirectReviewPlan(_Serializable):
     progress_update: dict[str, Any]
     completion_gate: dict[str, Any]
     diagnostics: dict[str, Any] = field(default_factory=dict)
+    carried_findings: tuple[CarriedFinding, ...] = ()
+    # which knowledge this plan (and every document read under its
+    # review_context_id) was served from: record it with the review
+    knowledge_snapshot: str = ""
+    knowledge_tree_sha256: str = ""
 
 FeedbackStatus = Literal[
     "checked", "disabled", "unavailable", "not_applicable"
@@ -241,6 +271,7 @@ class DirectCompletionRequest(_Serializable):
     final_comment_count: int = 1
     existing_feedback_status: FeedbackStatus = "not_applicable"
     finding_dispositions: tuple[dict[str, str], ...] = ()
+    finding_rechecks: tuple[FindingRecheck, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -260,6 +291,7 @@ class StrictReviewRequest(_Serializable):
     repo_path: str
     idempotency_key: str
     review_depth: str = "standard"
+    carried_findings: tuple[CarriedFinding, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -269,10 +301,43 @@ class StrictRunHandle(_Serializable):
 
 
 @dataclass(frozen=True)
+class StrictRuntimeConfig(_Serializable):
+    """Explicit repository and worker binding for an embedded Strict host."""
+
+    repository: RepositoryRef
+    checkout_path: str
+    allowed_root: str
+    backend: str = ""
+    run_root: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.repository.alias or self.repository.full_name.count("/") != 1:
+            raise InvalidRequestError("Strict runtime needs a repository alias and full name")
+        if not self.checkout_path or not self.allowed_root:
+            raise InvalidRequestError("Strict runtime needs a checkout and allowed root")
+
+
+@dataclass(frozen=True)
+class StrictReviewResult(_Serializable):
+    contract_version: str
+    reviewed_head_sha: str
+    verdict: str
+    summary_markdown: str
+    comments: tuple[dict[str, Any], ...]
+    findings: tuple[dict[str, Any], ...]
+    finding_rechecks: tuple[FindingRecheck, ...]
+    rechecks_complete: bool
+    recheck_missing: tuple[str, ...]
+    stale: bool
+    diagnostics: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class StrictPollResult(_Serializable):
     run_id: str
     state: str
     payload: dict[str, Any]
+    review: StrictReviewResult | None = None
 
     @property
     def terminal(self) -> bool:
@@ -296,10 +361,23 @@ class QualityRunHandle(_Serializable):
 
 
 @dataclass(frozen=True)
+class QualityReviewResult(_Serializable):
+    contract_version: str
+    reviewed_head_sha: str
+    verdict: str
+    confidence: str
+    summary: str
+    reasons: tuple[dict[str, Any], ...]
+    stale: bool
+    diagnostics: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class QualityPollResult(_Serializable):
     run_id: str
     state: str
     payload: dict[str, Any]
+    review: QualityReviewResult | None = None
 
     @property
     def terminal(self) -> bool:

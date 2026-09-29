@@ -17,6 +17,7 @@ from ....scopes import post_plan_scope
 from ...step import FailureKind, StepContext, StepResult
 from .._common import from_state, published, record_debug_memory, require_repo, step
 from .._common import gh as _gh
+from .._common import git as _git
 from .._common import repo_path as _repo_path
 from .._common import task_spec as _task_spec
 from .utils import extract_signature
@@ -117,7 +118,17 @@ async def _pr_group_failures(ctx: StepContext) -> StepResult:
         if f.get("log") and not g["log_excerpt"]:
             g["log_excerpt"] = f["log"][-4_000:]
     group_list = list(groups.values())
-    max_groups = ctx.settings.pr_debug_max_groups
+    requested = ctx.params.get("max_groups")
+    try:
+        max_groups = (ctx.settings.pr_debug_max_groups if requested is None
+                      else int(requested))
+    except (TypeError, ValueError):
+        return StepResult(False, FailureKind.BLOCKED,
+                          "max_groups must be a positive integer")
+    if max_groups < 1:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "max_groups must be a positive integer")
+    max_groups = min(max_groups, ctx.settings.pr_debug_max_groups)
     if len(group_list) > max_groups:
         return StepResult(False, FailureKind.ESCALATE,
                           f"{len(group_list)} distinct failure groups exceeds the "
@@ -154,6 +165,10 @@ async def _pr_debug_group(ctx: StepContext) -> StepResult:
     repo = require_repo(ctx, must_exist=False)
     if isinstance(repo, StepResult):
         return repo
+    before_rc, before_head = _git(repo, "rev-parse", "HEAD")
+    if before_rc != 0:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"cannot identify checkout head before debug: {before_head[:300]}")
     from ...agent_runtime import run_agent_step
 
     result, output = await run_agent_step(
@@ -172,6 +187,14 @@ async def _pr_debug_group(ctx: StepContext) -> StepResult:
         max_iters=ctx.settings.max_agent_iters,
     )
     if result.ok:
+        after_rc, after_head = _git(repo, "rev-parse", "HEAD")
+        dirty_rc, dirty = _git(repo, "status", "--porcelain", "--untracked-files=no")
+        if (after_rc != 0 or dirty_rc != 0 or before_head == after_head
+                or dirty.strip() or not str(output.get("root_cause") or "").strip()
+                or not str(output.get("verification") or "").strip()):
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"'{sig}': fix needs an observed commit, clean tracked "
+                              "checkout, root cause and verification")
         result.summary = (f"'{sig}': {output.get('fix_summary', '')[:150]} "
                           f"(verified: {output.get('verification', '?')[:80]})")
         if output.get("root_cause") and output.get("verification"):
@@ -234,17 +257,25 @@ async def _pr_harvest_debug_knowledge(ctx: StepContext) -> StepResult:
         return StepResult(True, summary="no verified fixes to harvest")
     spec = ctx.state.get("task_spec") or {}
     alias = str(spec.get("repo", ""))
+    full_name = ctx.settings.repo_full_names.get(alias, alias)
+    # Older installations may only know a local alias. Keep their v1 record
+    # readable, but never claim a canonical identity that was not configured.
+    canonical = isinstance(full_name, str) and full_name.count("/") == 1
     record = {
+        "schema_version": 2 if canonical else 1,
         "run_id": ctx.run_dir.name,
         # Full GitHub identity when configured, so the consumer keys the
         # event correctly; the local alias otherwise.
-        "repo": ctx.settings.repo_full_names.get(alias, alias),
+        "repo": full_name,
         "pr": spec.get("pr"),
         "kind": "bugfix_run",
         "title": f"pr_debug fixes for PR #{spec.get('pr')}",
         "groups": fixes,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if canonical:
+        record["event_id"] = f"bugfix_run:{full_name.casefold()}:{ctx.run_dir.name}"
+        record["repository"] = {"full_name": full_name, "alias": alias}
     # Two independent sinks: the local drop (same-host consumer) and the
     # mailbox issue (cross-host consumer). Each is attempted when
     # configured, and neither one's failure suppresses the other.
@@ -285,7 +316,7 @@ async def _pr_harvest_debug_knowledge(ctx: StepContext) -> StepResult:
                       outputs=outputs)
 
 
-BUGFIX_RECORD_MARKER = "<!-- infermatrix-copilot:bugfix-record:v1 -->"
+BUGFIX_RECORD_MARKER = "<!-- infermatrix-copilot:bugfix-record:v2 -->"
 _INTAKE_ISSUE = re.compile(r"^(?P<slug>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(?P<number>[1-9][0-9]*)$")
 
 

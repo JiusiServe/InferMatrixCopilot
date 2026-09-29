@@ -14,7 +14,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from ... import __version__
-from .._resources import adapters_root, knowledge_root
+from .._resources import adapters_root
 from .models import (
     DIRECT_API_VERSION,
     KNOWLEDGE_API_VERSION,
@@ -86,9 +86,11 @@ def get_capabilities(
     supports_file_locking: bool = True,
 ) -> Capabilities:
     """Return the SDK/distribution/resource handshake without starting a server."""
-    from .knowledge import _apply_supported
+    from ...knowledge_service.curation import _apply_supported
 
-    knowledge = knowledge_root()
+    from ...knowledge_view import KnowledgeView
+
+    knowledge = KnowledgeView.current().root
     adapters = adapters_root()
     repositories = tuple(sorted(
         path.name
@@ -120,6 +122,8 @@ def get_capabilities(
 class _IssuedContext:
     expected_head_sha: str
     resource_revision: str
+    carried_findings: tuple[dict, ...] = ()
+    knowledge_view: Any = None
 
 
 class DirectClient:
@@ -133,47 +137,71 @@ class DirectClient:
     def __init__(self, *, max_issued_contexts: int = _DEFAULT_CONTEXT_LIMIT) -> None:
         if max_issued_contexts < 1:
             raise InvalidRequestError("max_issued_contexts must be >= 1")
-        self._knowledge = knowledge_root()
         self._adapters = adapters_root()
         self._max_issued_contexts = int(max_issued_contexts)
         self._issued_contexts: OrderedDict[str, _IssuedContext] = OrderedDict()
         self._context_lock = threading.Lock()
 
+    @staticmethod
+    def _view():
+        # Resolved per request: an activated knowledge snapshot takes effect on
+        # the next request, and one request never mixes two trees.
+        from ...knowledge_view import KnowledgeView
+
+        return KnowledgeView.current()
+
     @property
     def resource_revision(self) -> str:
-        return _resource_revision(str(self._knowledge), str(self._adapters))
+        return self._revision(self._view().root)
+
+    def _revision(self, knowledge: Path) -> str:
+        return _resource_revision(str(knowledge), str(self._adapters))
 
     def capabilities(self) -> Capabilities:
         return get_capabilities()
 
-    def _document_path(self, document_id: str) -> Path:
+    def _document_path(self, document_id: str, view=None) -> Path:
+        view = view if view is not None else self._view()
         value = str(document_id).strip().replace("\\", "/")
         pure = PurePosixPath(value)
         if not value or pure.is_absolute() or ".." in pure.parts:
             raise DocumentNotFoundError(f"invalid document_id: {document_id!r}")
-        path = (self._knowledge / pure).resolve()
+        path = (view.root / pure).resolve()
         try:
-            path.relative_to(self._knowledge)
+            path.relative_to(view.root)
         except ValueError as exc:
             raise DocumentNotFoundError(
                 f"document_id escapes the knowledge bundle: {document_id!r}"
             ) from exc
         if not path.is_file():
             raise DocumentNotFoundError(f"unknown document_id: {document_id!r}")
-        return path
+        return view.path(value)
 
-    def _document_id(self, path_value: str | Path) -> str:
+    @staticmethod
+    def _served_bytes(path: Path) -> bytes:
+        """Document bytes as served: retired rules are withheld (their text
+        stays on disk for one release cycle but is no longer knowledge)."""
+        from ...knowledge_service.lifecycle import visible_text
+
+        data = path.read_bytes()
+        if path.suffix != ".md" or b"kb:rule" not in data:
+            return data
+        return visible_text(data.decode("utf-8")).encode("utf-8")
+
+    def _document_id(self, path_value: str | Path, view=None) -> str:
+        view = view if view is not None else self._view()
         path = Path(path_value).expanduser().resolve()
         try:
-            return path.relative_to(self._knowledge).as_posix()
+            return path.relative_to(view.root).as_posix()
         except ValueError as exc:
             raise DocumentNotFoundError(
                 "provider returned a document outside the packaged knowledge bundle"
             ) from exc
 
-    def _document_ref(self, path_value: str | Path) -> DocumentRef:
-        document_id = self._document_id(path_value)
-        data = self._document_path(document_id).read_bytes()
+    def _document_ref(self, path_value: str | Path, view=None) -> DocumentRef:
+        view = view if view is not None else self._view()
+        document_id = self._document_id(path_value, view)
+        data = self._served_bytes(self._document_path(document_id, view))
         excerpt_data = data[:_EXCERPT_BYTES]
         return DocumentRef(
             document_id=document_id,
@@ -188,12 +216,30 @@ class DirectClient:
         *,
         offset: int = 0,
         max_bytes: int = _EXCERPT_BYTES,
+        review_context_id: str = "",
     ) -> DocumentPage:
+        """Read one knowledge document page.
+
+        With ``review_context_id`` the read (and every later page of it) comes
+        from the knowledge tree that review's plan was issued from, so a snapshot
+        activated mid-review cannot change what the reviewer reads. Without it,
+        the currently active tree is used.
+        """
         if offset < 0 or max_bytes < 1 or max_bytes > _EXCERPT_BYTES:
             raise InvalidRequestError(
                 "offset must be >= 0 and max_bytes must be within 1..65536"
             )
-        data = self._document_path(document_id).read_bytes()
+        view = None
+        context_id = str(review_context_id).strip().casefold()
+        if context_id:
+            with self._context_lock:
+                issued = self._issued_contexts.get(context_id)
+            if issued is None:
+                raise InvalidRequestError(
+                    "review_context_id was not issued by this DirectClient"
+                )
+            view = issued.knowledge_view
+        data = self._served_bytes(self._document_path(document_id, view))
         page = data[offset:offset + max_bytes]
         next_offset = offset + len(page) if offset + len(page) < len(data) else None
         return DocumentPage(
@@ -232,11 +278,16 @@ class DirectClient:
             changed_files.append(path.as_posix())
         return alias, changed_files
 
-    def _remember_context(self, context_id: str, expected_head_sha: str) -> None:
+    def _remember_context(
+        self, context_id: str, expected_head_sha: str, carried=(), view=None,
+    ) -> None:
+        view = view if view is not None else self._view()
         with self._context_lock:
             self._issued_contexts[context_id] = _IssuedContext(
                 expected_head_sha=expected_head_sha,
-                resource_revision=self.resource_revision,
+                resource_revision=self._revision(view.root),
+                carried_findings=tuple(carried),
+                knowledge_view=view,
             )
             self._issued_contexts.move_to_end(context_id)
             while len(self._issued_contexts) > self._max_issued_contexts:
@@ -247,18 +298,25 @@ class DirectClient:
         # must not import server/config modules or initialize provider runtime.
         from ...direct_routing import direct_review_plan
 
+        from .rechecks import validate_carried
+
+        carried = tuple(item.to_dict() for item in request.carried_findings)
+        validate_carried(carried)
         alias, changed_files = self._request_values(request)
         expected_head = request.expected_head_sha.strip().casefold()
+        view = self._view()
+        revision = self._revision(view.root)
         raw = direct_review_plan(
             alias,
             title=request.title,
             body=request.body,
             changed_files=changed_files,
+            view=view,
         )
         routes = tuple(
             KnowledgeRoute(
                 owner=str(item.get("owner") or "unknown"),
-                document=self._document_ref(str(item["path"])),
+                document=self._document_ref(str(item["path"]), view),
                 reason=str(item.get("reason") or ""),
                 quick_map=str(item.get("quick_map") or ""),
                 quick_map_status=str(item.get("quick_map_status") or "unavailable"),
@@ -268,10 +326,10 @@ class DirectClient:
         )
         repo_name = alias.replace("_", "-")
         map_candidates = (
-            self._knowledge / "README.md",
-            self._knowledge / "general" / "_index.md",
-            self._knowledge / "repos" / "_index.md",
-            self._knowledge / "repos" / repo_name / "_index.md",
+            view.root / "README.md",
+            view.root / "general" / "_index.md",
+            view.root / "repos" / "_index.md",
+            view.root / "repos" / repo_name / "_index.md",
         )
         context_payload = {
             "review_id": request.review_id,
@@ -281,7 +339,8 @@ class DirectClient:
             "title": request.title,
             "body": request.body,
             "changed_paths": [item.to_dict() for item in request.changed_paths],
-            "resource_revision": self.resource_revision,
+            "carried_findings": carried,
+            "resource_revision": revision,
         }
         review_context_id = _sha256(json.dumps(
             context_payload, sort_keys=True, separators=(",", ":"),
@@ -290,7 +349,7 @@ class DirectClient:
         navigation_policy = dict(raw.get("navigation_policy") or {})
         fallback = navigation_policy.pop("fallback_entry", "")
         if fallback:
-            navigation_policy["fallback_document_id"] = self._document_id(fallback)
+            navigation_policy["fallback_document_id"] = self._document_id(fallback, view)
         completion_gate = dict(raw.get("completion_gate") or {})
         completion_gate["operation"] = str(
             completion_gate.pop("tool", "") or "validate_direct_review"
@@ -298,17 +357,17 @@ class DirectClient:
         plan = DirectReviewPlan(
             protocol_version=DIRECT_API_VERSION,
             review_context_id=review_context_id,
-            resource_revision=self.resource_revision,
+            resource_revision=revision,
             repository=request.repository,
             expected_head_sha=expected_head,
-            knowledge_entry=self._document_ref(raw["knowledge_entry"]),
+            knowledge_entry=self._document_ref(raw["knowledge_entry"], view),
             knowledge_routes=routes,
             mandatory_review_guides=tuple(
-                self._document_ref(path)
+                self._document_ref(path, view)
                 for path in raw.get("mandatory_review_guides") or []
             ),
             document_maps=tuple(
-                self._document_ref(path)
+                self._document_ref(path, view)
                 for path in map_candidates if path.is_file()
             ),
             routing=dict(raw.get("routing") or {}),
@@ -318,8 +377,11 @@ class DirectClient:
             progress_update=dict(raw.get("progress_update") or {}),
             completion_gate=completion_gate,
             diagnostics=dict(raw.get("diagnostics") or {}),
+            carried_findings=request.carried_findings,
+            knowledge_snapshot=view.public_snapshot,
+            knowledge_tree_sha256=view.tree_sha256,
         )
-        self._remember_context(review_context_id, expected_head)
+        self._remember_context(review_context_id, expected_head, carried, view)
         return plan
 
     def validate(
@@ -344,7 +406,17 @@ class DirectClient:
                 missing.append(
                     "expected_head_sha does not match the issued review context"
                 )
-            if self.resource_revision != issued.resource_revision:
+            # Compare against the knowledge tree the plan was issued from, not
+            # whatever is active now: activating a newer snapshot mid-review must
+            # not invalidate a review pinned to the previous one.
+            # Recompute WITHOUT the digest cache: the cached value was filled
+            # at plan time and would hide a file changed or deleted since.
+            pinned = issued.knowledge_view.root
+            if (
+                not pinned.is_dir()
+                or _resource_revision.__wrapped__(str(pinned), str(self._adapters))
+                != issued.resource_revision
+            ):
                 missing.append(
                     "provider resources changed after the review context was issued"
                 )
@@ -363,6 +435,14 @@ class DirectClient:
             existing_feedback_status=request.existing_feedback_status,
             finding_dispositions=list(request.finding_dispositions),
         )
+        from .rechecks import checked_rechecks
+
+        rechecks, recheck_missing = checked_rechecks(
+            issued.carried_findings if issued else (),
+            [item.to_dict() for item in request.finding_rechecks], evidence_head,
+        )
+        details["finding_rechecks"] = rechecks
+        missing.extend(recheck_missing)
         missing.extend(str(item) for item in details.get("missing") or [])
         # Preserve order while avoiding duplicate explanations from overlapping
         # provider and SDK guards.

@@ -502,3 +502,36 @@ def test_a_run_that_died_before_reviewing_still_reports_findings(tmp_path):
     rs.mark(run_dir, rs.FAILED, note="died")
 
     assert contract.build_review_result(run_dir)["findings"] == []
+
+
+@pytest.mark.parametrize("answers", [[], [{"finding_id": "old", "head_sha": "wrong", "outcome": "fixed", "evidence": "guard"}]])
+def test_omitted_or_wrong_head_rechecks_never_claim_complete(tmp_path, answers):
+    result = contract.build_review_result(_run(tmp_path, updates={
+        "pr_head_sha": "a" * 40,
+        "review_carried_findings": [{"finding_id": "old"}],
+        "review_finding_rechecks": answers,
+    }))
+    assert not result["rechecks_complete"]
+    assert not result["finding_rechecks"]
+
+
+@pytest.mark.parametrize("state", [rs.QUEUED, rs.RUNNING, rs.FAILED])
+def test_expected_rechecks_come_from_persisted_request_before_review(tmp_path, state):
+    run_dir = _run(tmp_path, state=state)
+    (run_dir / "request.json").write_text(json.dumps({"params": {"carried_findings": [{
+        "finding_id": "old", "source_head_sha": "b" * 40, "title": "Old blocker"}]}}))
+    result = contract.build_review_result(run_dir)
+    assert not result["rechecks_complete"]
+    assert "missing finding recheck: old" in result["recheck_missing"]
+
+
+@pytest.mark.parametrize("outcome", [[], {}, None, 42])
+def test_malformed_agent_rechecks_become_gaps_instead_of_crashes(tmp_path, outcome):
+    result = contract.build_review_result(_run(tmp_path, updates={
+        "pr_head_sha": "a" * 40,
+        "review_carried_findings": [{"finding_id": "old"}],
+        "review_finding_rechecks": [{"finding_id": "old", "head_sha": "a" * 40,
+            "outcome": outcome, "evidence": "guard"}],
+    }))
+    assert not result["rechecks_complete"]
+    assert result["finding_rechecks"] == []

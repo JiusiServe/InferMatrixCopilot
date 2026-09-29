@@ -1,6 +1,6 @@
 # metrics.py —— 规范
 
-<!-- verified-against: 2026-09-06 -->
+<!-- verified-against: 2026-09-26 -->
 
 `LOC ~493 · 跨切（测量） · refactor-status: oversized`
 
@@ -14,6 +14,7 @@ S（由 incident 得出的安全系数）、C（RQS3e 式的对数成本，基�
 
 ## 公开契约
 `collect_run_metrics(run_dir, settings, status) -> {quality, risk, cost, catq}`。
+`format_metrics_line` 为应用和 CLI 共用的纯格式化函数，不参与评分计算。
 
 ## 不变量
 - **E3**：metrics 是关于一次 run 的**事实**，且**绝不能把这次 run 搞坏** ——

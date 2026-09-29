@@ -177,7 +177,7 @@ class ClaudeCodeTransport(HarnessTransport):
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
-                 role: str = "") -> Reply:
+                 role: str = "", effort: str = "") -> Reply:
         """Tool-less one-shot: built-ins denied, no MCP config, two turns
         (one to think, the cap as a backstop). Runs in the run-less scratch
         of the process cwd — with every tool denied there is nothing to

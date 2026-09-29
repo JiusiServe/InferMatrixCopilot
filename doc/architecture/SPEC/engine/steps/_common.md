@@ -1,11 +1,13 @@
 # engine/steps/_common.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-09-26 -->
 
 `LOC ~300 · step 库基础设施 · refactor-status: ok`
 
 ## 职责
-step 的自注册面，以及各 step 文件共享的跨模块 helper。
+step 的自注册面，以及各 step 文件共享的跨模块 helper。内建 step 模块由
+`steps.register_builtin_steps` 显式加载；加载模块时装饰器收集定义，再写入
+`StepRegistry`。
 
 ## 功能
 `@step`/`register_step` 装饰器 + `_COLLECTED` + `collected()`；
@@ -17,7 +19,7 @@ helper：`repo_path`、`require_repo`、`task_spec`、`from_state`、`published`
 以及上述 helper（含 K3/K4/K7 的守卫 helper）。
 
 ## 不变量
-- step 名重复 → **在 import 时抛错**（**A4**）。
+- step 名重复 → **在显式装配期间加载 step 模块时抛错**（**A4**）。
 - 这是 step 共享 helper 的**唯一**归处 —— step 模块从这里 import，
   **绝不互相 import**（**A2**）。
 - helper 保持轻薄、对副作用诚实、且仓库中立。

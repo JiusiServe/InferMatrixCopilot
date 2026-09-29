@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-09-22 -->
+<!-- verified-against: 2026-09-28 -->
 
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
@@ -19,12 +19,15 @@
 - Direct：`DirectReviewRequest` → `DirectClient.plan()` → `DirectReviewPlan`；
   `read_document(document_id, offset, max_bytes)`；
   `DirectCompletionRequest` → `validate()` → `DirectCompletionDecision`。
-- Strict：`StrictRuntime(settings_overrides=...)`，以及
+- Strict：`StrictRuntime(config=StrictRuntimeConfig(...))`，以及
   `capabilities` / `readiness` / `reserve_review`（`start_review` 别名）/
-  `get_status` / `get_result` / `close`。
+  `get_status` / `get_result` / `close`。旧 `settings_overrides` 暂作兼容入口；
+  新配置显式绑定完整仓库名、checkout、允许根、backend 和可选 run root。
+  `StrictPollResult.review` 提供类型化结构结果，`payload` 保持旧 wire 兼容。
 - Quality：同一 `StrictRuntime` 接受 typed `QualityReviewRequest`，提供
   `quality_readiness` / `reserve_quality_review`（`start_quality_review` 别名）/
   `get_quality_result`；机械信号只是 bounded hints，结果固定绑定 expected head。
+  `QualityPollResult.review` 投影类型化质量结果；非法结构触发 `ResultDecodeError`。
 - Knowledge：宿主把不可信输入投影成 `KnowledgeEvidenceEvent` / `KnowledgeEvidenceBatch`，
   再依次调用 `KnowledgeCurator.build_prompt()`、自己的 model adapter、
   `validate_proposals()` 与 `apply()`。返回值为 typed
@@ -36,7 +39,8 @@
 
 - **公开 import 无副作用**：单纯 import `sdk.v1` 不加载 `config`、legacy
   `contract`、`direct_routing` 或任一 server；Direct provider 实现在调用
-  `plan`/`validate` 时才加载，Strict server 在构造 `StrictRuntime` 时才加载。
+  `plan`/`validate` 时才加载；构造 `StrictRuntime` 加载 headless RunService，
+  不加载 CLI 或 MCP transport。
 - **只跨 document ID，不跨 provider filesystem path**：知识入口、route、guide、
   map 与 fallback 均为相对 knowledge-root 的 ID；`read_document` 拒绝 absolute、
   traversal 与 bundle 外路径。Strict result 丢弃私有 `report_path`，保留 report
@@ -54,8 +58,9 @@
 - **Strict findings 绑定发布结果**：`get_result` 的 `findings` 对最终发布集合逐条返回
   `finding_id`、最终 `severity`、`anchor` 与 `head_sha`，保持顺序及重复 identity。
   identity 以文件路径与完整归一化文本生成，行号变动不改变 identity；它不与
-  `finding_dispositions` 按 anchor 拼接。当前没有 carried-finding recheck，缺失旧
-  finding 不代表已修复；不得承诺 `head_recheck` 或 `findings_missing_carried` 字段。
+  `finding_dispositions` 按 anchor 拼接。Direct 1.1 / Strict 1.3 对传入的
+  carried finding 返回独立、绑定当前 head 的显式 `finding_rechecks`；缺失或
+  `unverified` 的答案不代表已修复，详见下方 carried-finding recheck 契约。
 - **知识规则由 provider 唯一定义**：catalog 只暴露当前仓库 owner 与 general 的
   owner rule page document ID —— 每个 owner 的 `rules.md` 入口页及其
   `type: rule` 的 `rules-<topic>.md` 专题页（`catalog_entries()` 附每页
@@ -79,10 +84,10 @@
   `flock` 串行化；等待后的 SHA 复核让第二个 stale writer 失败，不会覆盖首个结果。
 - **知识 orchestration 留在宿主**：SDK 不 clone、调用 model、管理 ledger、commit、
   push、开 PR 或 schedule。ReviewBot 必须向 `KnowledgeCurator` 传 dedicated work
-  checkout，并继续拥有重试、artifact 与 fork publication；SDK 也绝不写 packaged
+  checkout，并继续拥有重试、artifact 与本地补丁导出；SDK 也绝不写 packaged
   knowledge tree。
-- SDK、Direct、Quality API 版本常量为 `1.0.0`；Strict 为 `1.2.0`
-  （1.1 新增 `finding_dispositions`；1.2 新增 `findings`），Knowledge 为 `1.1.0`
+- SDK、Quality API 版本常量为 `1.0.0`；Direct 为 `1.1.0`，Strict 为 `1.3.0`
+  （1.1 新增 `finding_dispositions`；1.2 新增 `findings`；1.3 新增显式 recheck），Knowledge 为 `1.1.0`
   （1.1 向后兼容地新增 `catalog_entries()` / `KnowledgeCatalogEntry` 与容量预检），
   distribution 为 `0.2.0`；`Capabilities.knowledge_api_version` 与
   `supports_knowledge_curation` 组成 ReviewBot 的 paired-release 握手，避免只按
@@ -94,7 +99,8 @@
 
 `sdk.v1.models` 为纯 stdlib 模型；`direct` import-time 只依赖模型与资源解析，
 函数调用时才向下进入 `direct_routing`；`strict` 构造时才向下进入
-`Settings`/`CopilotMCP`。`knowledge` 只依赖 stdlib、公开模型和显式 work checkout，
+headless `app.RunService`。`sdk.v1.knowledge` 是兼容导出，实际实现位于
+`knowledge_service.curation`；后者只依赖 stdlib、公开模型和显式 work checkout，
 并以 subprocess 运行上述两个固定 validator。任何 server 都不得被 SDK package
 initializer 反向 import，provider domain 也不得反向依赖 ReviewBot。
 
@@ -108,3 +114,22 @@ fence、strict proposal shape/ID/source/page 校验、typed index accounting、a
 写入、固定 validator 顺序、missing-validator fail-closed、multi-page byte rollback、
 tamper/stale detection 与两个 curator 的 writer serialization；测试只创建临时
 knowledge checkout，不改仓库真实 `knowledge/`。
+
+## Carried finding rechecks
+
+Direct 1.1 / Strict 1.3 accept typed `CarriedFinding` inputs (unique IDs, source head, severity, location, title and evidence). Direct binds the carried set into its issued context and validates `FindingRecheck` answers. Strict passes the set through the policy allowlist, performs a read-only recheck against the frozen PR head, and persists answers for the public structured result. Every carried ID needs an explicit outcome: `fixed`, `still_affected`, or `unverified`. Missing evidence is never a fix.
+
+## 2026-09-28 知识视图
+`DirectClient` 每次 `plan` 解析一个 `KnowledgeView`，文档引用与 `resource_revision` 均取自该视图；`validate` 按计划时钉住的知识根校验资源未变，激活新快照不会使进行中的 review 失效；`diagnostics.knowledge_snapshot` 报告所用快照。`read_document(..., review_context_id=...)` 从该 review 计划时钉住的知识树读取（含分页），未签发的 context id 被拒绝；不带 context id 时读当前激活树。
+
+## 2026-09-28 退役规则不再提供
+`DirectClient` 返回的文档内容与 `sha256` 均基于去掉退役规则后的服务文本（无退役规则时与磁盘字节一致）。
+
+## 2026-09-28 trace/1 导出
+`sdk.v1` 导出 `TraceStore`、`TRACE_SCHEMA`、`trace_context`、`redact`（见 `trace_store.md`），RB 用同一 schema
+记录 review 的模型调用、判定与结果；导入它们不加载 `config`/`contract`/`mcp_server` 等私有模块。
+
+## 2026-09-28 计划携带知识快照
+`DirectReviewPlan` 新增 `knowledge_snapshot`（激活快照 ID、`packaged` 或 `unverified`，从不暴露开发树路径）
+与 `knowledge_tree_sha256`（已验证快照的清单树哈希，否则为空）。同一 `review_context_id` 下的文档读取都来自这份
+快照，RB 应随每次 review 记录这两个值。

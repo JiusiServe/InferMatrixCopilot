@@ -224,3 +224,13 @@ push:
   default_remote: origin
   protected_branches: [main, master]
   allowed: false
+
+# Knowledge service: declared but disabled until afd-plugin has its own
+# calibration set and has run through a shadow period (rollout stage P3b).
+knowledge_lifecycle:
+  enabled: false
+  mode: shadow
+  knowledge_dir: repos/afd-plugin
+  release:
+    trigger: none
+  upstream_visibility: public

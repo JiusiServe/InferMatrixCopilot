@@ -82,17 +82,34 @@ def dest_for(repo: Path | str, pr: int, sha: str, *,
     return base / f"{Path(repo).name}-{owner_tag(repo)}-pr{int(pr)}-{sha[:12]}"
 
 
-# A destination this module produced: `<name>-<owner8>-pr<n>-<sha12>`. The
+def mutable_dest_for(repo: Path | str, pr: int, run_dir: Path | str, *,
+                     root: Path | None = None) -> Path:
+    """A private mutable PR worktree, keyed to one run rather than one head.
+
+    Report-only rebase changes HEAD locally, so the immutable review-tree key
+    cannot be reused: another reader at the original head could see edits.
+    The run-directory identity remains stable across resume and distinct from
+    every other run of the same PR.
+    """
+    base = Path(root) if root is not None else worktree_root()
+    run_tag = hashlib.sha256(canonical(run_dir).encode("utf-8")).hexdigest()[:12]
+    return base / f"{Path(repo).name}-{owner_tag(repo)}-pr{int(pr)}-run{run_tag}"
+
+
+# Destinations this module produced: immutable `<name>-<owner8>-pr<n>-<sha12>`
+# or mutable `<name>-<owner8>-pr<n>-run<run12>`. The
 # reaper removes ONLY these. The worktrees root is a shared scratch directory
 # that has held other tooling's trees under other naming schemes for a long
 # time, and a sweep that deleted anything it found there would destroy work it
 # knows nothing about — as one did, before this guard existed.
 _MANAGED_DEST = re.compile(r"-[0-9a-f]{8}-pr\d+-[0-9a-f]{12}\Z")
+_MUTABLE_DEST = re.compile(r"-[0-9a-f]{8}-pr\d+-run[0-9a-f]{12}\Z")
 
 
 def is_managed_dest(dest: Path | str) -> bool:
     """Whether `dest` is a worktree this module keys, and may therefore reap."""
-    return bool(_MANAGED_DEST.search(Path(dest).name))
+    name = Path(dest).name
+    return bool(_MANAGED_DEST.search(name) or _MUTABLE_DEST.search(name))
 
 
 def lock_path(dest: Path | str) -> Path:
@@ -132,6 +149,18 @@ def owned_by(repo: Path, dest: Path, sha: str, git: GitRunner) -> tuple[bool, st
     Both halves matter: the git-dir check catches a tree belonging to a
     different clone that landed on this path, and the HEAD check catches a torn
     or interrupted materialization."""
+    same_repo, reason = owned_by_repository(repo, dest, git)
+    if not same_repo:
+        return False, reason
+    code, head = git(dest, "rev-parse", "HEAD")
+    if code != 0 or head.strip() != sha:
+        return False, f"head {head.strip()[:12] or '?'} != {sha[:12]}"
+    return True, "owned"
+
+
+def owned_by_repository(repo: Path, dest: Path,
+                        git: GitRunner) -> tuple[bool, str]:
+    """Check Git ownership without requiring an immutable HEAD."""
     code, common = git(dest, "rev-parse", "--git-common-dir")
     if code != 0:
         return False, "not a git worktree"
@@ -147,10 +176,44 @@ def owned_by(repo: Path, dest: Path, sha: str, git: GitRunner) -> tuple[bool, st
         mine_path = Path(repo) / mine_path
     if canonical(common_path) != canonical(mine_path):
         return False, "worktree belongs to a different repository"
-    code, head = git(dest, "rev-parse", "HEAD")
-    if code != 0 or head.strip() != sha:
-        return False, f"head {head.strip()[:12] or '?'} != {sha[:12]}"
     return True, "owned"
+
+
+def materialize_mutable(repo: Path, sha: str, dest: Path, git: GitRunner, *,
+                        timeout: float = 300.0) -> tuple[bool, str]:
+    """Create or reuse one run's private worktree without touching a foreign path.
+
+    A reused tree may have a rebased HEAD; the caller resets it only when the
+    checkout step itself is being retried. A completed checkout is replayed
+    from the checkpoint on resume and keeps its in-progress work.
+    """
+    require_file_locking()
+    fd = _open_lock(dest)
+    try:
+        if not _flock_blocking(fd, fcntl.LOCK_EX, timeout):
+            return False, f"worktree lock busy for {timeout:.0f}s"
+        try:
+            # A symlink to the source checkout passes the common-git-dir check,
+            # but resetting it would rewrite the user's live files. Never
+            # follow a redirected private destination, including broken links.
+            if dest.is_symlink() or canonical(dest) == canonical(repo):
+                return False, "private worktree path is redirected"
+            if dest.exists():
+                ok, why = owned_by_repository(repo, dest, git)
+                if not ok:
+                    return False, f"private worktree path is not owned ({why})"
+                return True, "reused private worktree"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            code, out = git(repo, "worktree", "add", "--detach", str(dest), sha)
+            if code != 0:
+                return False, f"worktree add failed: {out[:300]}"
+            return True, "created private worktree"
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    except OSError as exc:
+        return False, f"worktree error: {exc}"
+    finally:
+        os.close(fd)
 
 
 def materialize(repo: Path, sha: str, dest: Path, git: GitRunner, *,

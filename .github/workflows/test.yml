@@ -12,6 +12,7 @@ name: tests
 on:
   push:
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -36,9 +37,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      # pytest lives in the `dev` extra; `mcp` is needed for the MCP server tests.
+      # pytest lives in the `dev` extra; `mcp` is needed for the MCP server tests;
+      # `kb` (cryptography) for the knowledge service's signing.
       - name: Install
-        run: pip install -e ".[dev,mcp]"
+        run: pip install -e ".[dev,mcp,kb]"
 
       - name: Unit tests
         run: python -m pytest -q
@@ -181,6 +183,12 @@ jobs:
       # behind before this check existed.
       - name: SPEC coverage and freshness
         run: python tools/check_spec_freshness.py --strict
+
+      # A reminder, not a gate: a stale bundle keeps kb-gate at its previous
+      # strictness. Regenerating it is a .github/** change (CODEOWNERS review).
+      - name: kb-gate bundle matches its source
+        continue-on-error: true
+        run: python tools/build_kb_gate_bundle.py --check
 
       # Written, tested, and until now invoked only from prose (AGENTS.md, DEVELOPMENT.md).
       - name: Knowledge linters

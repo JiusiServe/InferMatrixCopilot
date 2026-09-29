@@ -37,6 +37,8 @@ from .registry import PROVIDERS
 _BRIDGE_SERVER = "infermatrix-tools"
 
 
+_EFFORTS = ("minimal", "low", "medium", "high", "xhigh")
+
 class CodexTransport(HarnessTransport):
     """codex CLI (exec mode) as a Strict backend."""
 
@@ -73,7 +75,7 @@ class CodexTransport(HarnessTransport):
         ]
 
     def _run(self, text: str, *, cwd: str, timeout_s: float, model: str = "",
-             mcp_spec: Path | None = None) -> tuple[list[dict], bool]:
+             mcp_spec: Path | None = None, effort: str = "") -> tuple[list[dict], bool]:
         """One CLI invocation → (parsed events, timed_out). Prompt on stdin
         (the ``-`` positional; argv has a 128KiB per-arg limit)."""
         cmd = [self.require_cli(), "exec", "--json", "-s", "read-only",
@@ -81,6 +83,10 @@ class CodexTransport(HarnessTransport):
         selected = model or self.settings.strict_backend_model
         if selected:
             cmd += ["-m", selected]
+        if effort:
+            if effort not in _EFFORTS:
+                raise ValueError(f"codex reasoning effort must be one of {_EFFORTS}: {effort!r}")
+            cmd += ["-c", f'model_reasoning_effort="{effort}"']
         if mcp_spec is not None:
             cmd += self._mcp_overrides(mcp_spec)
         cmd += ["-"]
@@ -176,7 +182,7 @@ class CodexTransport(HarnessTransport):
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
-                 role: str = "") -> Reply:
+                 role: str = "", effort: str = "") -> Reply:
         """Tool-less one-shot in an empty scratch cwd (read-only sandbox +
         nothing to read = contained)."""
         import tempfile
@@ -184,7 +190,8 @@ class CodexTransport(HarnessTransport):
         with tempfile.TemporaryDirectory(prefix="imc-codex-oneshot-") as td:
             events, timed_out = self._run(
                 flatten_messages(system, messages), cwd=td,
-                timeout_s=self.settings.strict_backend_timeout_s, model=model)
+                timeout_s=self.settings.strict_backend_timeout_s, model=model,
+                effort=effort)
         usage = self._usage(events)
         text = self._final_text(events)
         return Reply(

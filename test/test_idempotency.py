@@ -12,6 +12,7 @@ import pytest
 
 from infermatrix_copilot import idempotency as idem
 from infermatrix_copilot import run_status as rs
+from infermatrix_copilot.app.reservation import RunReservation
 from infermatrix_copilot.cli.copilot import Copilot
 from infermatrix_copilot.task_spec import TaskSpec
 
@@ -61,6 +62,21 @@ def test_same_key_returns_the_same_run_and_creates_once(settings):
     second, created_second = _reserve(cop, _spec())
     assert first == second
     assert created_first is True and created_second is False
+
+
+def test_headless_reservation_and_copilot_facade_share_keyed_state(settings):
+    spec = _spec()
+    run_id, created = RunReservation(settings).reserve(
+        spec, owner_server_id="S1", owner_server_pid=1234,
+        idempotency_key=KEY,
+    )
+    again, reused = _reserve(Copilot(settings), spec)
+
+    assert created is True and reused is False and again == run_id
+    run_dir = Path(settings.run_root) / run_id
+    assert json.loads((run_dir / "request.json").read_text()) == spec.model_dump()
+    assert rs.read_status(run_dir)["state"] == rs.QUEUED
+    assert len(list(Path(settings.run_root).glob("run-*"))) == 1
 
 
 def test_same_key_still_dedupes_after_the_run_is_terminal(settings):
@@ -355,17 +371,22 @@ def test_reaper_only_touches_worktrees_it_keys(settings, tmp_path, git_repo):
                          capture_output=True, text=True).stdout.strip()
     ours = wt.dest_for(git_repo, 1, sha, root=root)
     assert wt.materialize(git_repo, sha, ours, _git)[0]
+    mutable = wt.mutable_dest_for(git_repo, 1, tmp_path / "run", root=root)
+    assert wt.materialize_mutable(git_repo, sha, mutable, _git)[0]
+    (mutable / "scratch.txt").write_text("disposable rebase scratch")
     # a foreign tree, named the way earlier tooling named them
     foreign = root / "vllm-omni-eval-pr4762"
     assert wt.materialize(git_repo, sha, foreign, _git)[0]
-    for dest in (ours, foreign):
+    for dest in (ours, mutable, foreign):
         os.utime(dest, (0, 0))
 
-    assert wt.is_managed_dest(ours) and not wt.is_managed_dest(foreign)
+    assert wt.is_managed_dest(ours) and wt.is_managed_dest(mutable)
+    assert not wt.is_managed_dest(foreign)
     counts = idem.reap_stale(settings.run_root, worktree_root=root)
     assert not ours.exists()      # ours, aged out
+    assert not mutable.exists()   # disposable mutable tree, aged out
     assert foreign.exists()       # never ours to remove
-    assert counts["worktrees"] == 1
+    assert counts["worktrees"] == 2
 
 
 def test_reaper_leaves_a_held_worktree_and_removes_an_unheld_one(settings,

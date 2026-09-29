@@ -1,6 +1,6 @@
 # knowledge_docs.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-09-28 -->
 
 `LOC ~122 · 供 MCP 面使用的只读知识检索 · refactor-status: ok`
 
@@ -30,3 +30,9 @@
 ## 重构备注
 **保持它不含模型**：这是 Direct MCP 路径与工具桥共用的**唯一**知识读取器，
 在这里加一次模型调用，等于把第二个模型塞进了"server 不跑模型"这条保证里面。
+
+## 2026-09-28 快照校验
+可选 `verify(rel)` 回调在 `read`/`search` 读取每个文件前调用；MCP 传入 `KnowledgeView.path`，快照中缺失或被改动的文件使读取/搜索 fail-closed。
+
+## 2026-09-28 退役规则不再提供
+`read`/`search` 经 `visible_text` 去掉退役规则后再返回。

@@ -1,6 +1,6 @@
 # cli/ —— 规范
 
-<!-- verified-against: 2026-09-06 -->
+<!-- verified-against: 2026-09-28 -->
 
 `LOC ~1420（6 个文件） · 接口 + 编排门面 · refactor-status: ok`
 
@@ -12,11 +12,10 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
 ## 包内布局（一个文件一个关注点）
 - `__init__.py` —— 只再导出 `Copilot`、`main`（见下方公开面）；无逻辑。
 - `__main__.py` —— `python -m infermatrix_copilot.cli` 的对等入口。
-- `copilot.py` —— `Copilot` 编排器（resolve/run_task/run_playbook/run_queue/
-  resume_last/_execute + 内置命令）。
+- `copilot.py` —— 兼容导出 `app.core.Copilot`；编排实现不再属于 CLI。
 - `entry.py` —— `argparse`、`_handle_line`、`main`（把 argv/stdin 变成对 `Copilot`
   的调用）。
-- `utils.py` —— 纯格式化器：`parse_task_params`、`format_metrics_line`。
+- `utils.py` —— `parse_task_params` 和共享 metrics 格式化器的兼容导出。
 - `doctor.py` —— 预检诊断（2026-07 新增）：逐项 ✓/✗，每个失败给出**唯一**确切的修复命令。
 - 子命令：`doctor` 与 `migrate-knowledge`（PR4d 部署期知识迁移；**显式 owner
   动作，零 LLM**，需 `--repo <name>`，支持 report-only；见 RUNBOOK）。
@@ -91,3 +90,6 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
 拆分**已完成**（它曾是内聚拆分候选）。`Copilot` 类完整留在 `copilot.py`，
 好让 resolve→execute 的流程能在一个文件里读完；只有 argparse/REPL 前端（`entry.py`）
 和两个纯格式化器（`utils.py`）搬了出去。K6（`_gate_and_confirm`）已完成，挂在类上。
+
+## 2026-09-28 kb 子命令
+`infermatrix-copilot kb …` 在 argparse 之前分派到 `kb_service.cli.main`（知识服务运维命令），不启动 Copilot/LLM。

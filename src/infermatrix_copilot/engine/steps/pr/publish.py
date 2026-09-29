@@ -16,7 +16,6 @@ from ....push import PushPolicy, guard_push
 from ...step import FailureKind, StepContext, StepResult, StepSpec
 from ..review.anchor import diff_index
 from ..review.anchor import normalize_path as _normalize_path
-from ..review.utils import _review_verdict
 from .._common import gh as _gh
 from .._common import register_step, step
 from .._common import repo_path as _repo_path
@@ -36,6 +35,9 @@ async def _push(ctx: StepContext) -> StepResult:
     (the default), it stays a dry run — reports the command it *would* run, never
     executes. Only with pushes enabled does it run the git command; a non-zero
     exit returns ESCALATE with the stderr tail."""
+    if _task_spec(ctx).get("kind") in {"pr_review", "pr_quality"}:
+        return StepResult(False, FailureKind.FORBIDDEN,
+                          "Review and quality tasks have comment-only authority")
     repo = _repo_path(ctx)
     raw = ctx.state.get("push_policy")
     policy = raw if isinstance(raw, PushPolicy) else PushPolicy(**(raw or {}))
@@ -44,6 +46,17 @@ async def _push(ctx: StepContext) -> StepResult:
     decision = guard_push(policy, list(protected))
     if not decision.allowed:
         return StepResult(False, FailureKind.FORBIDDEN, decision.reason)
+    if _task_spec(ctx).get("kind") in {"pr_debug", "pr_rebase"}:
+        from ....review.change_set import ChangeSet, ChangeSetError
+
+        approval = ctx.state.get("approved_change_set") or {}
+        try:
+            current = ChangeSet.capture(repo, str(approval.get("base_sha") or ""))
+        except ChangeSetError as exc:
+            return StepResult(False, FailureKind.FORBIDDEN, f"pre-push approval unavailable: {exc}")
+        if current.head_sha != approval.get("head_sha"):
+            return StepResult(False, FailureKind.FORBIDDEN,
+                              "PR head changed after patch review; review the new commit")
     if not ctx.settings.allow_push:
         return StepResult(True, summary=f"dry-run (ALLOW_PUSH=0): {' '.join(decision.command)}",
                           outputs={"dry_run": True, "command": list(decision.command)})
@@ -228,22 +241,8 @@ def _fallback_section(comments: list[dict], reason: str = "") -> str:
 
 def _event_for_review(comments: list[dict], pr_state: str = "",
                       review_text: str = "") -> str:
-    """Translate the product verdict to a submitted GitHub review event."""
-    if comments:
-        verdict = _review_verdict(comments, pr_state)
-    else:
-        match = re.search(
-            r"\*\*Verdict:\*\*\s*(REQUEST CHANGES|COMMENT|APPROVE)",
-            review_text or "", re.IGNORECASE)
-        verdict = match.group(1).upper() if match else _review_verdict([], pr_state)
-    event = {
-        "REQUEST CHANGES": "REQUEST_CHANGES",
-        "COMMENT": "COMMENT",
-        "APPROVE": "APPROVE",
-    }.get(verdict, "COMMENT")
-    if str(pr_state).upper() != "OPEN" and event != "COMMENT":
-        return "COMMENT"
-    return event
+    """A review assessment never changes GitHub approval/blocking state."""
+    return "COMMENT"
 
 
 def _review_payload(state: dict, *, current_head: str = "") -> tuple[dict, int]:

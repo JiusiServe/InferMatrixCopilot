@@ -1,8 +1,8 @@
 # engine/worktrees.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-09-26 -->
 
-`LOC ~231 · PR-time worktree：身份、物化、持有 · refactor-status: ok`
+`LOC ~294 · PR-time worktree：身份、物化、持有 · refactor-status: ok`
 
 ## 职责
 PR 快照 worktree 的三条性质，每条都对应一个修掉的真实事故：
@@ -20,9 +20,14 @@ checkout 之间碰撞，force-remove 曾删掉一个活评审的树）、
 `owned_by(repo, dest, sha, git)`；`materialize(repo, sha, dest, git,
 timeout=300)`；`hold(dest, run_dir)`；`held_paths()`；`GitRunner` 类型别名
 （git 以可调用注入 —— 本模块不含 subprocess 策略，可测）。
+`mutable_dest_for(repo, pr, run_dir)` 和 `materialize_mutable(repo, sha, dest,
+git, timeout=300)` 专供 report-only PR rebase：每个 run 独占一棵可变的 detached
+worktree，允许本地 rebase，又不会改配置的 checkout 或复用评审的不可变快照。
+`owned_by_repository(repo, dest, git)` 在可变树的 HEAD 改动后核对归属。
 
 ## 不变量
-- **reaper 只删匹配 `_MANAGED_DEST`（`-hex8-prN-hex12` 后缀）的树**：
+- **reaper 只删匹配 `_MANAGED_DEST`（`-hex8-prN-hex12` 后缀）或
+  `_MUTABLE_DEST`（`-hex8-prN-runhex12` 后缀）的树**：
   worktrees 根是共享 scratch，长期存着其他工具的树 —— 一次"见什么删什么"
   的扫描曾经毁掉过别人的工作，这个守卫因此存在。
 - `materialize` 对 git 级失败**绝不抛**（调用方决定 block 还是降级），
@@ -33,6 +38,11 @@ timeout=300)`；`hold(dest, run_dir)`；`held_paths()`；`GitRunner` 类型别�
   恰是 head 门要防的"评错树"。
 - 复用验证：`--git-common-dir` 必须解析回请求方仓库自己的 git dir **且**
   HEAD == sha；force-remove 只对外来/撕裂的树成立，绝不对同身份的活树。
+- 可变树按 run_dir 分键，复用时只核对仓库归属（rebase 会改变 HEAD），
+  拒绝 symlink、重定向到配置 checkout 的路径及外来仓库；调用方仅在 checkout
+  step 重试时可重置此树。后续 step 经 checkpoint 恢复路径，并在树被清理后
+  fail closed，绝不退回 live checkout。调用方还要确认 HEAD 保持 detached，
+  防止重置或 rebase 意外移动共享仓库里的命名分支。
 - `hold()` 幂等（进程内 memo），经 `lifecycle.register_finalizer` 在每条
   退出路径释放，进程死亡时内核兜底 —— 崩掉的 run 绝不永久钉住一棵树。
 - **持有挂在"使用"而不是"创建"上**（`engine/steps/_common.py::repo_path`
@@ -42,7 +52,7 @@ timeout=300)`；`hold(dest, run_dir)`；`held_paths()`；`GitRunner` 类型别�
 ## 边界 —— 不属于这里
 无 subprocess 策略（git runner 注入）；无 run 生命周期逻辑（持有原语之外
 —— 那是 `engine/lifecycle.py`）；何时物化/何时 block 是
-`engine/steps/pr/fetch.py` 的决定。
+`engine/steps/pr/fetch.py` 和 `engine/steps/pr/rebase.py` 的决定。
 
 ## 依赖（允许）
 stdlib（hashlib/os/re/time/pathlib）+ `.lifecycle`
@@ -50,9 +60,9 @@ stdlib（hashlib/os/re/time/pathlib）+ `.lifecycle`
 
 ## 测试
 `test_pr_steps.py`（materialize 创建与复用、同 basename 仓库分键、
-拒绝外来树、fetch_diff 端到端钉住）；`test_idempotency.py`
-（reaper 只碰自己键出的树、放过被持有的树）。
+拒绝外来树、fetch_diff 端到端钉住、report-only rebase 的隔离与 resume）；
+`test_idempotency.py`（reaper 只碰自己键出的不可变及可变树、放过被持有的树）。
 
 ## 重构备注
-新模块（PR2）。键格式与 `_MANAGED_DEST` 必须同步演进 —— 改其一忘其二，
+新模块（PR2）。键格式与 `_MANAGED_DEST` / `_MUTABLE_DEST` 必须同步演进 —— 改其一忘其二，
 reaper 就会开始放过（或误删）新格式的树。

@@ -1,0 +1,18 @@
+# Knowledge service release sweep for ONE repository: T1 structure, T2/T3
+# re-check of every active rule against the release diff, purge of rules
+# retired at least one release ago. Every change set goes through the gate;
+# a sweep-wide circuit breaker sends them all to people. Candidate.
+name: kb-sweep
+version: 1
+status: candidate
+provenance:
+  created_by: human
+  source: knowledge-base redesign (Copilot owns the knowledge base), v7
+task_kinds: [knowledge_maintenance]
+repos: []
+requires: []
+params:
+  repo: "knowledge repository name"
+steps:
+  - {id: sweep, step: knowledge.sweep}
+success: the release is swept (or none was due); change sets gated and staged

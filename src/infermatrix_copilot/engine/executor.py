@@ -157,10 +157,16 @@ class Executor:
             # safety-bearing (`force_push`, `pre_push`) — so they override the
             # run-scoped ones rather than the other way round.
             step_params = {**task_params, **pstep.params}
-            results = await asyncio.gather(
-                *(self._run_step(spec, step_params, state, item, pstep.id)
-                  for item in items)
-            )
+            if spec.risk in {"write_workspace", "push", "knowledge"}:
+                # Foreach items share one checkout and run state. A writer must
+                # finish before the next item can edit or commit that checkout.
+                results = [await self._run_step(spec, step_params, state, item, pstep.id)
+                           for item in items]
+            else:
+                results = await asyncio.gather(
+                    *(self._run_step(spec, step_params, state, item, pstep.id)
+                      for item in items)
+                )
             result = _merge(results)
             outcome.step_results[pstep.id] = result
             self.trace.record(

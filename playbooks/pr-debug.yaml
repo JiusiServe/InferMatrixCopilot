@@ -14,7 +14,7 @@ params:
   max_groups: {type: int, default: 6}
 steps:
   - {id: guard, step: workspace.guard_clean}
-  - {id: checkout, step: pr.checkout_branch, params: {force_push: false}}
+  - {id: checkout, step: pr.checkout_branch, params: {force_push: false}, when: not report_only}
   - {id: fetch_ci, step: pr.fetch_ci_failures}
   - {id: group, step: pr.group_failures}
   - {id: debug, step: agent.debug_group, foreach: failure_groups, when: not report_only}

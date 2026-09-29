@@ -29,6 +29,7 @@ REVIEWBOT_RELEASE_MANIFEST (optional only when safely discoverable beside that
 venv) · REVIEWBOT_ENV_FILE (optional; loaded first, hard overrides win) ·
 REVIEWBOT_TIMEOUT_S=1800 · REVIEWBOT_EVAL_ROOT (tests only) ·
 REVIEWBOT_EVAL_ALLOW_UNPAIRED=1 (non-month throwaway runs only)
+REVIEWBOT_EVAL_ARCHIVED_REPLAY=1 (frozen, now-merged dataset PRs)
 Flags: --dry-run (print the plan, touch nothing) · --preflight (doctor only)
 """
 from __future__ import annotations
@@ -54,6 +55,8 @@ import yaml
 HERE = Path(os.environ.get("REVIEWBOT_EVAL_ROOT") or Path(__file__).parent)
 DATASET = HERE / "vllm_omni_dataset.yaml"
 EXPECTED_HEADS = HERE / "goal-eval" / "expected_pr_heads.json"
+EXPECTED_BASES = HERE / "goal-eval" / "expected_pr_bases.json"
+ARCHIVED_REPLAY = HERE / "reviewbot_archived_replay.py"
 GT = HERE / "gt"
 ARMS = HERE / "arms"
 STATE_DIR = HERE.parent / "raw" / "reviewbot_state"
@@ -140,14 +143,29 @@ class ReleaseValidationError(RuntimeError):
     """The selected interpreter is not the manifest's paired artifact."""
 
 
-def build_config(child_env: dict[str, str], release: dict[str, Any]) -> dict:
+def build_config(
+    child_env: dict[str, str], release: dict[str, Any], *,
+    archived_bases_sha256: str | None = None,
+    archived_diffs_sha256: str | None = None,
+    archived_adapter_sha256: str | None = None,
+) -> dict:
     """Stable arm identity from paired artifacts and behavior-only settings."""
-    return {
+    config = {
         "release": release,
         "review_context_mode": "no_discussion",
         "post_mode": "shadow",
         "env": {key: child_env.get(key, "") for key in _BEHAVIOR_KEYS},
     }
+    if archived_bases_sha256 is not None:
+        if archived_diffs_sha256 is None or archived_adapter_sha256 is None:
+            raise ValueError("archived replay requires all source fingerprints")
+        config["archived_replay"] = {
+            "mode": "frozen_open_pr_v1",
+            "bases_sha256": "sha256:" + archived_bases_sha256,
+            "diffs_sha256": "sha256:" + archived_diffs_sha256,
+            "adapter_sha256": "sha256:" + archived_adapter_sha256,
+        }
+    return config
 
 
 def _canonical_distribution(value: str) -> str:
@@ -159,6 +177,16 @@ def _file_digest(path: Path) -> str:
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _frozen_diffs_digest(items: list[int]) -> str:
+    digest = hashlib.sha256()
+    for pr in items:
+        path = GT / f"pr{pr}.diff"
+        digest.update(path.name.encode("ascii") + b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
     return digest.hexdigest()
 
 
@@ -614,6 +642,9 @@ class Runner:
         self.allow_unpaired = (
             os.environ.get("REVIEWBOT_EVAL_ALLOW_UNPAIRED") == "1"
         )
+        self.archived_replay = (
+            os.environ.get("REVIEWBOT_EVAL_ARCHIVED_REPLAY") == "1"
+        )
         env_file_value = os.environ.get("REVIEWBOT_ENV_FILE", "").strip()
         env_file = Path(env_file_value).expanduser() if env_file_value else None
         # An explicitly selected env file loads first; the measurement contract
@@ -637,10 +668,18 @@ class Runner:
                 "PYTHONSAFEPATH": "1",
             }
         )
+        if self.archived_replay:
+            child["REVIEWBOT_EVAL_ARCHIVED_REPLAY"] = "1"
+        else:
+            child.pop("REVIEWBOT_EVAL_ARCHIVED_REPLAY", None)
         self.child_env = child
         self.expected = {
             int(k): v for k, v in json.loads(EXPECTED_HEADS.read_text()).items()
         }
+        self.bases = (
+            {int(k): v for k, v in json.loads(EXPECTED_BASES.read_text()).items()}
+            if self.archived_replay else {}
+        )
         self.items = dataset_items()
         self.failures: list[str] = []
         self._lock = threading.Lock()
@@ -699,7 +738,18 @@ class Runner:
                     + os.pathsep
                     + self.child_env.get("PATH", "")
                 )
-            self.config = build_config(self.child_env, release)
+            self.config = build_config(
+                self.child_env, release,
+                archived_bases_sha256=(
+                    _file_digest(EXPECTED_BASES) if self.archived_replay else None
+                ),
+                archived_diffs_sha256=(
+                    _frozen_diffs_digest(self.items) if self.archived_replay else None
+                ),
+                archived_adapter_sha256=(
+                    _file_digest(ARCHIVED_REPLAY) if self.archived_replay else None
+                ),
+            )
         return self.config
 
     def close(self) -> None:
@@ -760,6 +810,16 @@ class Runner:
 
     # --- invocation ---
 
+    def _review_command(self, pr: int) -> list[str]:
+        if self.archived_replay:
+            return [
+                self.python, str(ARCHIVED_REPLAY), "--pr", str(pr),
+                "--expected-head", self.expected[pr],
+                "--base", self.bases[pr],
+                "--diff", str(GT / f"pr{pr}.diff"),
+            ]
+        return [self.python, "-m", "omni_reviewbot", "review", "--pr", str(pr)]
+
     def preflight(self) -> None:
         config = self.ensure_config()
         if config["env"]["AGENT_PROVIDER"] == "cursor" and not os.environ.get(
@@ -776,6 +836,15 @@ class Runner:
                 sys.exit(f"pr{n} missing from {EXPECTED_HEADS}")
             if not (GT / f"pr{n}.diff").is_file():
                 sys.exit(f"gt/pr{n}.diff missing — cannot validate diff range")
+            if self.archived_replay and (
+                n not in self.bases
+                or not isinstance(self.bases[n], str)
+                or not _SHA.fullmatch(self.bases[n])
+                or not _SHA.fullmatch(self.expected[n])
+            ):
+                sys.exit(f"pr{n} has no valid archived base/head pin")
+        if self.archived_replay and not ARCHIVED_REPLAY.is_file():
+            sys.exit(f"archived replay script missing: {ARCHIVED_REPLAY}")
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         doctor = subprocess.run(
             [self.python, "-m", "omni_reviewbot", "doctor"],
@@ -794,7 +863,7 @@ class Runner:
         if out_md.exists() and out_md.stat().st_size > 0:
             return
         completed = subprocess.run(
-            [self.python, "-m", "omni_reviewbot", "review", "--pr", str(pr)],
+            self._review_command(pr),
             cwd=STATE_DIR, env=self.child_env,
             capture_output=True, text=True, timeout=self.timeout, check=False,
         )

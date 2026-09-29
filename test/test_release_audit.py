@@ -353,3 +353,156 @@ def test_cli_modes_and_json_output(tmp_path):
     assert main(common + ["--mode", "enforce"]) == 1
     assert main(common + ["--mode", "report-only"]) == 0
     assert json.loads(output.read_text(encoding="utf-8"))["result"] == "drift"
+
+
+def _generated(fixture, **overrides):
+    kwargs = dict(
+        upstream_repo=fixture["upstream"],
+        from_ref=str(fixture["old"]),
+        to_ref=str(fixture["new"]),
+        baseline_path=fixture["baseline"],
+        adapter_manifest_path=fixture["manifest"],
+        knowledge_root=fixture["knowledge"],
+        project_root=fixture["project"],
+        baseline_source="generated",
+    )
+    kwargs.update(overrides)
+    return audit_release(**kwargs)
+
+
+def _stale_baseline(fixture) -> None:
+    """The committed baseline still points at the previous release."""
+    path = fixture["baseline"]
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["upstream"]["audited_sha"] = str(fixture["old"])
+    data["upstream"]["previous_audited_sha"] = "0" * 40
+    data["inventories"] = {name: {"count": 0, "sha256": "0"} for name in data["inventories"]}
+    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+
+def test_generated_baseline_does_not_block_on_an_unadvanced_committed_baseline(tmp_path):
+    fixture = _fixture(tmp_path)
+    _stale_baseline(fixture)
+    committed = _audit(fixture)
+    kinds = {i["kind"] for i in committed.data["issues"]}
+    assert {"baseline_pin_mismatch", "inventory_mismatch"} <= kinds
+
+    generated = _generated(fixture)
+    enforced = {i["kind"] for i in generated.data["issues"]}
+    reconciliation = {i["kind"] for i in generated.data["reconciliation"]}
+    assert enforced == {"stale_knowledge_source"}  # the knowledge page cites removed paths
+    assert {"committed_baseline_behind", "committed_inventory_differs"} <= reconciliation
+    assert not ({"baseline_pin_mismatch", "baseline_from_mismatch", "inventory_mismatch"} & enforced)
+    assert generated.data["generated_baseline"]["upstream"]["audited_sha"] == fixture["new"]
+    assert generated.data["baseline_source"] == "generated"
+
+
+def test_generated_baseline_is_clean_once_knowledge_is_fixed(tmp_path):
+    fixture = _fixture(tmp_path)
+    _stale_baseline(fixture)
+    page = fixture["knowledge"] / "repos" / "vllm-omni" / "components" / "owner" / "rules.md"
+    page.write_text(
+        "---\ntitle: \"owner\"\nsources: [vllm_omni/deploy/renamed.yaml]\n---\n\n# Owner\n",
+        encoding="utf-8",
+    )
+    generated = _generated(fixture)
+    assert generated.data["issues"] == []
+    assert generated.data["result"] == "clean"
+    assert generated.data["reconciliation"]  # the adapter baseline PR is still owed
+    # unrouted upstream paths are baseline maintenance, reported not enforced
+    upstream = fixture["upstream"]
+    (upstream / "unowned").mkdir()
+    (upstream / "unowned" / "f.txt").write_text("x\n", encoding="utf-8")
+    fixture["new"] = _commit(upstream, "unowned")
+    generated = _generated(fixture)
+    assert generated.data["issues"] == []
+    assert {"kind": "unmatched_path", "path": "unowned/f.txt"} in generated.data["reconciliation"]
+
+
+def test_cli_generated_mode_exits_zero_on_reconciliation_only(tmp_path):
+    fixture = _fixture(tmp_path)
+    _stale_baseline(fixture)
+    page = fixture["knowledge"] / "repos" / "vllm-omni" / "components" / "owner" / "rules.md"
+    page.write_text("---\ntitle: \"owner\"\nsources: []\n---\n\n# Owner\n", encoding="utf-8")
+    argv = [
+        "--from", str(fixture["old"]), "--to", str(fixture["new"]),
+        "--repo", str(fixture["upstream"]), "--baseline", str(fixture["baseline"]),
+        "--adapter-manifest", str(fixture["manifest"]),
+        "--knowledge-root", str(fixture["knowledge"]), "--project-root", str(fixture["project"]),
+        "--mode", "enforce",
+    ]
+    assert main(argv) == 1  # committed: the stale baseline blocks
+    assert main(argv + ["--baseline-source", "generated"]) == 0
+
+
+def test_repo_neutral_plugin_loader(tmp_path):
+    from infermatrix_copilot.knowledge_service.release_audit import (
+        ReleaseAuditPluginError, load_release_auditor, run_release_audit,
+    )
+
+    fixture = _fixture(tmp_path)
+    adapter = Path(__file__).resolve().parents[1] / "adapters" / "vllm_omni"
+    entry = load_release_auditor(adapter, "release_audit.py")
+    assert entry.__name__ == "audit_for_knowledge"
+    result = run_release_audit(
+        adapter, "release_audit.py",
+        upstream_repo=fixture["upstream"], from_ref=str(fixture["old"]),
+        to_ref=str(fixture["new"]), knowledge_root=fixture["knowledge"],
+        project_root=fixture["project"],
+    )
+    assert result.to_sha == fixture["new"]
+    assert result.data["baseline_file"] == "release_baseline.yaml"      # the baseline companion's target
+    assert (adapter / result.data["baseline_file"]).is_file()
+    kinds = {i["kind"] for i in result.issues}
+    # the real adapter baseline is used, so its owner documents are absent
+    # from this fixture project; only knowledge-document kinds are enforced
+    assert "stale_knowledge_source" in kinds
+    assert kinds <= {"stale_knowledge_source", "knowledge_metadata_error", "owner_document_missing"}
+    for bad in ("../x.py", "/abs.py", "release_baseline.yaml", "missing.py"):
+        import pytest
+        with pytest.raises(ReleaseAuditPluginError):
+            load_release_auditor(adapter, bad)
+
+
+def test_release_audit_plugin_ships_in_the_adapter_tree():
+    root = Path(__file__).resolve().parents[1]
+    assert (root / "adapters" / "vllm_omni" / "release_audit.py").is_file()
+    import tools.vllm_omni_release_audit as shim
+    assert shim.audit_release.__module__ == "infermatrix_adapter_vllm_omni_release_audit"
+
+
+def test_generated_mode_reports_a_differing_previous_sha(tmp_path):
+    fixture = _fixture(tmp_path)
+    data = yaml.safe_load(fixture["baseline"].read_text(encoding="utf-8"))
+    data["upstream"]["previous_audited_sha"] = "f" * 40
+    fixture["baseline"].write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    assert "baseline_from_mismatch" in {i["kind"] for i in _audit(fixture).data["issues"]}
+    generated = _generated(fixture)
+    assert {"kind": "committed_previous_differs", "baseline": "f" * 40,
+            "target": fixture["old"]} in generated.data["reconciliation"]
+
+
+def test_plugin_loader_rejects_malformed_reports():
+    import pytest
+    from infermatrix_copilot.knowledge_service.release_audit import (
+        ReleaseAuditPluginError, _result,
+    )
+
+    good = {
+        "upstream": {"from": {"sha": "a" * 40}, "to": {"sha": "b" * 40}},
+        "issues": [], "reconciliation": [],
+        "generated_baseline": {"upstream": {"audited_sha": "b" * 40}},
+    }
+    assert _result(good).enforced_clean
+    broken = [
+        {**good, "issues": ""},
+        {**good, "reconciliation": {}},
+        {**good, "issues": [{"no_kind": 1}]},
+        {**good, "upstream": {"from": {"sha": None}, "to": {"sha": "b" * 40}}},
+        {k: v for k, v in good.items() if k != "generated_baseline"},
+        {**good, "generated_baseline": {"upstream": {"audited_sha": "c" * 40}}},
+        "not a mapping",
+    ]
+    for report in broken:
+        with pytest.raises(ReleaseAuditPluginError):
+            _result(report)
