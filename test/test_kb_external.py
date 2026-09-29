@@ -80,6 +80,15 @@ def _add_rule_files():
         base, [Op("add", PAGE, "DEMO-2a", _rule("DEMO-2a", "PR #11"))], release="v1", today="2026-09-28").files.items()}
 
 
+def _daily(rt):
+    """One daily pass (forced: in real time a day passes between two)."""
+    return poll_external(rt, force=True)
+
+
+def _findings(tmp_path, number):
+    return [item["body"]["comment"] for item in _items(tmp_path, "post_findings") if item["body"]["pr"] == number]
+
+
 def _verdict(tmp_path, rt):
     envelope = _items(tmp_path, "merge")[-1]["body"]["verdict"]
     return verify("kb-gate-verdict", envelope, load_public_key(public_key_text(rt.outbox._key.public_key())))
@@ -88,11 +97,11 @@ def _verdict(tmp_path, rt):
 def test_a_human_knowledge_pr_passes_the_auto_gate_and_gets_a_verdict(tmp_path):
     rt, lifecycle, origin = _setup(tmp_path)
     head = _open_human_pr(rt, origin, 7, _add_rule_files())
-    (event,) = poll_external(rt)
+    (event,) = _daily(rt)
     assert "auto pr_open" in event
     (changeset,) = [cs for cs in rt.ledger.changesets("demo", ("pr_open",)) if cs["kind"] == "external"]
     assert changeset["pr_number"] == 7 and changeset["head_sha"] == head
-    assert poll_external(rt) == []                       # judged once per head
+    assert _daily(rt) == []                       # judged once per head
     assert merge.advance(rt, lifecycle) == [f"merge issued {changeset['id']}"]
     verdict = _verdict(tmp_path, rt)
     merge_base = _git(origin, "merge-base", "main", head)
@@ -104,19 +113,20 @@ def test_a_human_knowledge_pr_passes_the_auto_gate_and_gets_a_verdict(tmp_path):
 def test_paths_outside_the_governed_pages_need_a_maintainer(tmp_path):
     rt, lifecycle, origin = _setup(tmp_path)
     head = _open_human_pr(rt, origin, 8, {"knowledge/tools/check.md": "tool notes\n"})
-    (event,) = poll_external(rt)
+    (event,) = _daily(rt)
     assert event.endswith("to people")
-    assert "kb:human-approved" in rt.ledger.human_queue("demo")[-1]["reason"]
-    assert poll_external(rt) == []                       # once per head
+    assert rt.ledger.human_queue("demo") == []            # the author is told, not people's queue
+    assert "kb:human-approved" in _findings(tmp_path, 8)[-1] and "not passed" in _findings(tmp_path, 8)[-1]
+    assert len(_daily(rt)) == 1                           # not passed: checked again the next day
     # a maintainer approves the CURRENT head and labels it: a human-approved verdict
     rt.github.open[8]["labels"] = [{"name": "kb:human-approved"}]
     rt.github.reviews[8] = [{"id": 99, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
     head2 = _open_human_pr(rt, origin, 8, {"knowledge/tools/check.md": "tool notes v2\n"},
                            labels=("kb:human-approved",))
     rt.github.reviews[8] = [{"id": 99, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
-    assert poll_external(rt) == []                       # approval is for the old head: wait
+    assert _daily(rt) == []                       # approval is for the old head: wait
     rt.github.reviews[8].append({"id": 100, "state": "APPROVED", "commit_id": head2, "user": {"login": "alice"}})
-    (event,) = poll_external(rt)
+    (event,) = _daily(rt)
     assert "human-approved pr_open" in event
     (changeset,) = [cs for cs in rt.ledger.changesets("demo", ("pr_open",)) if cs["kind"] == "external"]
     merge.advance(rt, lifecycle)
@@ -132,7 +142,7 @@ def test_approvals_by_non_maintainers_or_later_retracted_do_not_count(tmp_path):
     rt.github.reviews[9] = [{"id": 1, "state": "APPROVED", "commit_id": head, "user": {"login": "mallory"}},
                             {"id": 2, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}},
                             {"id": 3, "state": "DISMISSED", "commit_id": head, "user": {"login": "alice"}}]
-    assert poll_external(rt) == []
+    assert _daily(rt) == []
 
 
 def test_a_pr_branched_before_main_changed_the_same_page_must_be_rebased(tmp_path):
@@ -142,22 +152,22 @@ def test_a_pr_branched_before_main_changed_the_same_page_must_be_rebased(tmp_pat
     page.write_text(page.read_text() + "\n<!-- main moved -->\n")
     _git(origin, "add", "-A")
     _git(origin, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-q", "-m", "main moves")
-    (event,) = poll_external(rt)
-    assert event.endswith("to people") and "rebased" in rt.ledger.human_queue("demo")[-1]["reason"]
+    (event,) = _daily(rt)
+    assert event.endswith("to people") and "rebased" in _findings(tmp_path, 10)[-1]
 
 
 def test_a_new_head_is_judged_again_and_drafts_and_our_own_prs_are_skipped(tmp_path):
     rt, lifecycle, origin = _setup(tmp_path)
     _open_human_pr(rt, origin, 11, _add_rule_files(), draft=True)
-    assert poll_external(rt) == []
+    assert _daily(rt) == []
     rt.github.open[11]["draft"] = False
-    assert len(poll_external(rt)) == 1
+    assert len(_daily(rt)) == 1
     (first,) = [cs for cs in rt.ledger.changesets("demo", ("pr_open",)) if cs["kind"] == "external"]
     head2 = _open_human_pr(rt, origin, 11, {**_add_rule_files(), "knowledge/repos/demo/core/_index.md":
                                             "# core\n\n- [rules](rules.md)\n"})
     assert merge.advance(rt, lifecycle) == [f"head_changed {first['id']}"]
     assert rt.ledger.human_queue("demo") == []           # an author pushing is not an incident
-    (event,) = poll_external(rt)
+    (event,) = _daily(rt)
     assert "PR #11" in event
     assert rt.ledger.changesets("demo", ("pr_open",))[-1]["head_sha"] == head2
     # a PR the service opened itself is never judged as external
@@ -166,7 +176,7 @@ def test_a_new_head_is_judged_again_and_drafts_and_our_own_prs_are_skipped(tmp_p
                            human_reason="", drafted_events=[])
     rt.ledger.update_changeset(ours, pr_number=12)
     _open_human_pr(rt, origin, 12, _add_rule_files())
-    assert all("PR #12" not in event for event in poll_external(rt))
+    assert all("PR #12" not in event for event in _daily(rt))
 
 
 def _local_gate(tmp_path, rt, number):
@@ -196,13 +206,13 @@ def test_verdicts_for_external_prs_pass_the_publishers_local_gate(tmp_path):
     rt, lifecycle, origin = _setup(tmp_path)
     rt.clock = __import__("time").time          # verdict windows are checked against the real clock
     _open_human_pr(rt, origin, 7, _add_rule_files())
-    poll_external(rt)
+    _daily(rt)
     merge.advance(rt, lifecycle)
     assert _local_gate(tmp_path, rt, 7) == []
 
     head = _open_human_pr(rt, origin, 8, {"knowledge/tools/check.md": "tool notes\n"}, labels=("kb:human-approved",))
     rt.github.reviews[8] = [{"id": 100, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
-    assert [e for e in poll_external(rt) if "PR #7" in e] == []   # a merge in flight is not judged again
+    assert [e for e in _daily(rt) if "PR #7" in e and "findings" not in e] == []   # not judged again
     rt.ledger.update_changeset(rt.ledger.changesets("demo", ("merge_requested",))[0]["id"], status="merged")
     merge.advance(rt, lifecycle)
     with pytest.raises(VerdictError, match="only auto verdicts merge"):
@@ -217,7 +227,7 @@ def test_a_retraction_on_a_later_page_of_reviews_is_seen(tmp_path):
     rt.github.reviews[20] = [{"id": 1, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}},
                              *noise,
                              {"id": 2, "state": "CHANGES_REQUESTED", "commit_id": head, "user": {"login": "alice"}}]
-    assert poll_external(rt) == []
+    assert _daily(rt) == []
 
 
 def test_an_auto_verdict_needs_a_current_judge_calibration(tmp_path):
@@ -228,25 +238,25 @@ def test_an_auto_verdict_needs_a_current_judge_calibration(tmp_path):
     rt, lifecycle, origin = _setup(tmp_path)
     rt.registry["demo"] = replace(rt.registry["demo"], calibration_set="missing")
     _open_human_pr(rt, origin, 21, _add_rule_files())
-    (event,) = poll_external(rt)
+    (event,) = _daily(rt)
     assert event.endswith("calibration_required")
-    assert poll_external(rt) == []                       # not re-judged (no paid judge calls) until calibrated
+    assert _daily(rt) == []                       # not re-judged (no paid judge calls) until calibrated
     _calibrate(tmp_path, rt, rt.registry["demo"])
-    (event,) = poll_external(rt)
+    (event,) = _daily(rt)
     assert event.endswith("auto pr_open")
 
 
 def test_a_head_sent_to_people_can_be_approved_without_a_new_push(tmp_path):
     rt, lifecycle, origin = _setup(tmp_path)
     head = _open_human_pr(rt, origin, 30, {"knowledge/tools/y.md": "y\n"})
-    (event,) = poll_external(rt)
+    (event,) = _daily(rt)
     assert event.endswith("to people")
-    assert poll_external(rt) == []
+    assert len(_daily(rt)) == 1                           # still not passing: checked again the next day
     rt.github.open[30]["labels"] = [{"name": "kb:human-approved"}]
     rt.github.reviews[30] = [{"id": 7, "state": "APPROVED", "commit_id": head, "user": {"login": "alice"}}]
-    (event,) = poll_external(rt)
+    (event,) = _daily(rt)
     assert "human-approved pr_open" in event
-    assert poll_external(rt) == []
+    assert _daily(rt) == []
 
 
 def test_rules_an_external_pr_retires_enter_the_retirement_ledger(tmp_path):
@@ -258,7 +268,7 @@ def test_rules_an_external_pr_retires_enter_the_retirement_ledger(tmp_path):
                                             evidence="PR #13")], release="v1", today="2026-09-28").files
     _open_human_pr(rt, origin, 41, {f"knowledge/{rel}": text for rel, text in retired.items()})
     rt.registry["demo"] = __import__("dataclasses").replace(rt.registry["demo"], retire_ratio=1.0)
-    events = poll_external(rt)
+    events = _daily(rt)
     assert "auto pr_open" in events[0], (events, rt.ledger.human_queue("demo"))
     (changeset,) = [cs for cs in rt.ledger.changesets("demo", ("pr_open",)) if cs["kind"] == "external"]
     assert changeset["detail"]["retirements"] == [{"rule_id": "DEMO-1a", "page": PAGE}]
@@ -278,5 +288,65 @@ def test_our_own_prs_are_never_judged_as_external_in_any_status(tmp_path):
                                human_reason="", drafted_events=[])
         rt.ledger.update_changeset(ours, pr_number=number)
         _open_human_pr(rt, origin, number, _add_rule_files())
-    assert poll_external(rt) == []
+    assert _daily(rt) == []
     assert not _items(tmp_path, "merge")
+
+
+def test_other_peoples_prs_are_checked_once_a_day_not_on_every_push(tmp_path):
+    rt, lifecycle, origin = _setup(tmp_path)
+    _open_human_pr(rt, origin, 40, {"knowledge/tools/z.md": "z\n"})
+    judged = lambda: [e for e in poll_external(rt) if e.startswith("external ")]  # noqa: E731
+    assert len(judged()) == 1                             # the first pass of the day
+    _open_human_pr(rt, origin, 40, {"knowledge/tools/z.md": "z2\n"})   # the author pushes
+    assert judged() == []                                 # not until the next day
+    start = rt.clock()
+    rt.clock = lambda: start + 24 * 3600
+    assert len(judged()) == 1
+
+
+def test_one_findings_comment_says_why_a_pr_is_not_merged(tmp_path):
+    rt, lifecycle, origin = _setup(tmp_path)
+    _open_human_pr(rt, origin, 41, _add_rule_files())
+    (event,) = _daily(rt)
+    assert "auto pr_open" in event
+    (comment,) = _findings(tmp_path, 41)
+    assert comment.startswith("<!-- kb-findings:v1 -->") and "**passed**" in comment
+    assert not _items(tmp_path, "post_verdict")
+
+
+def test_a_pass_that_fails_half_way_never_checks_a_pr_twice_that_day(tmp_path):
+    import pytest
+
+    from infermatrix_copilot.kb_service import external
+
+    rt, lifecycle, origin = _setup(tmp_path)
+    _open_human_pr(rt, origin, 50, {"knowledge/tools/a.md": "a\n"})
+    _open_human_pr(rt, origin, 51, _add_rule_files())
+    real = external.run_gate
+    external.run_gate = lambda **kw: (_ for _ in ()).throw(RuntimeError("judge crashed"))
+    try:
+        with pytest.raises(RuntimeError):
+            poll_external(rt)                       # PR 50 was checked, then PR 51 crashed
+    finally:
+        external.run_gate = real
+    events = poll_external(rt)                      # the scheduler's next tick, same day
+    assert [e for e in events if "PR #50" in e] == [] and any("PR #51" in e for e in events)
+
+
+def test_a_pr_spanning_repositories_is_told_through_one_that_publishes(tmp_path):
+    from dataclasses import replace
+
+    rt, lifecycle, origin = _setup(tmp_path)
+    rt.registry["other"] = replace(lifecycle, repo="other", full_name="org/other", knowledge_dir="repos/other")
+    rt.ledger.ensure_repo("other", "auto_merge")
+    files = {**_add_rule_files(), "knowledge/repos/other/x.md": "# x\n"}
+    _open_human_pr(rt, origin, 60, files)
+    (event,) = _daily(rt)
+    assert event.endswith("to people")
+    (comment,) = _findings(tmp_path, 60)
+    assert "spans several repositories" in comment
+    # with a private upstream among its scopes nothing public may be written
+    rt.registry["other"] = replace(rt.registry["other"], upstream_visibility="private", mode="shadow")
+    _open_human_pr(rt, origin, 61, files)
+    _daily(rt)
+    assert _findings(tmp_path, 61) == []

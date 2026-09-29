@@ -57,8 +57,9 @@ COMPANION_BRANCH = re.compile(r"kb/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+-companion-[0-
 HOLD_LABEL = "kb:hold"
 PUSHING = frozenset({"open_pr", "open_companion_pr"})
 # retried until done, never acked as failed: stops (pause, close) and reports
-# (open_issue: a transient GitHub error must not lose a sweep report)
-RETRIED = frozenset({"pause", "close", "open_issue"})
+# (open_issue, post_findings: a transient GitHub error must not lose a sweep
+# report or an author's findings)
+RETRIED = frozenset({"pause", "close", "open_issue", "post_findings"})
 
 
 class MergeUncertain(RuntimeError):
@@ -670,6 +671,44 @@ class Publisher:
             return False
         return after.get("state") == "OPEN" and not after.get("mergeQueueEntry") \
             and not after.get("autoMergeRequest")
+
+    def _login(self) -> str:
+        if not getattr(self, "_me", ""):
+            self._me = json.loads(self.github.gh("api", "user"))["login"]
+        return self._me
+
+    def _do_post_findings(self, item: OutboxItem) -> dict:
+        """ONE findings comment per PR, edited in place on every daily check:
+        the comment of ours that carries the marker is updated, else created."""
+        number, marker = int(item.body["pr"]), str(item.body["marker"])
+        comment = str(item.body["comment"])
+        if marker not in comment:
+            raise PublishError("a findings comment must carry its marker")
+        revision = float(item.body.get("revision") or item.issued_at)
+        posted = self.state_dir / "findings" / f"{number}.json"
+        try:
+            latest = float(json.loads(posted.read_text(encoding="utf-8"))["revision"]) if posted.is_file() else 0.0
+        except (OSError, ValueError, KeyError, TypeError):
+            latest = 0.0  # unreadable (written atomically, so only by hand): this item decides
+            self._trace(event="findings_record_unreadable", pr=number)
+        if latest > revision:
+            return {"pr": number, "superseded": True}  # a newer findings comment is already there
+        existing = json.loads(self.github.gh("api", "--paginate", "--slurp",
+                                             f"repos/{self.github.repository}/issues/{number}/comments"))
+        flat = [c for page in existing for c in (page if isinstance(page, list) else [page])]
+        mine = [c for c in flat if marker in str(c.get("body") or "")
+                and (c.get("user") or {}).get("login") == self._login()]
+        if mine:
+            self.github.gh("api", "-X", "PATCH", f"repos/{self.github.repository}/issues/comments/{mine[0]['id']}",
+                           "-F", "body=@-", input=comment)
+        else:
+            self.github.gh("pr", "comment", str(number), "--repo", self.github.repository, "--body-file", "-",
+                           input=comment)
+        posted.parent.mkdir(parents=True, exist_ok=True)
+        tmp = posted.with_name(f".{posted.name}.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps({"revision": revision, "item": item.id}), encoding="utf-8")
+        os.replace(tmp, posted)  # atomic: a crash leaves the old record or the new one
+        return {"pr": number}
 
     def _do_close(self, item: OutboxItem) -> dict:
         number = str(item.body["pr"])

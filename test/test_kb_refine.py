@@ -127,7 +127,7 @@ def test_a_refinement_is_never_staged_twice(tmp_path):
                 if cs["kind"] == "refine"]) == 1
 
 
-def test_an_external_pr_refused_by_the_local_gate_goes_to_people(tmp_path):
+def test_an_external_pr_refused_by_the_local_gate_is_told_why(tmp_path):
     rt, lifecycle = _flow_runtime(tmp_path)
     owner = rt.ledger.acquire_lease("t")
     cs = rt.ledger.new_changeset_id("demo", "external")
@@ -138,7 +138,9 @@ def test_an_external_pr_refused_by_the_local_gate_goes_to_people(tmp_path):
     merge.apply_acks(rt, [{"item_id": "m1", "kind": "merge", "changeset_id": cs, "ok": False,
                            "error": "local gate: L1 x", "problems": ["L1 x"]}])
     assert rt.ledger.changeset(cs)["status"] == "gate_failed"
-    assert rt.ledger.human_queue("demo")
+    assert rt.ledger.human_queue("demo") == []           # its author is told, and it is checked again daily
+    (findings,) = [item["body"] for item in _items(tmp_path, "post_findings")]
+    assert findings["pr"] == 7 and "- L1 x" in findings["comment"]
     assert json.dumps(rt.ledger.changeset(cs)["detail"]["gate_problems"]) == '["L1 x"]'
 
 

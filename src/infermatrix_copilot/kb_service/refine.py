@@ -26,8 +26,12 @@ REFINABLE = ("intake", "rebuild", "refine")
 def reasons_of(changeset: dict) -> list[str]:
     """Everything the gate said against this change, most specific first."""
     detail = changeset["detail"]
-    reasons = [str(p) for p in detail.get("gate_problems") or []]
-    decision = detail.get("decision") or {}
+    return list(dict.fromkeys([str(p) for p in detail.get("gate_problems") or []]
+                              + reasons_from_decision(detail.get("decision") or {})))[:30]
+
+
+def reasons_from_decision(decision: dict) -> list[str]:
+    reasons: list[str] = []
     for issue in decision.get("l1_issues") or []:
         reasons.append(f"L1 {issue.get('code')} {issue.get('path', '')} {issue.get('detail', '')}".strip())
     for block in decision.get("blocks") or []:

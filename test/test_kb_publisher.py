@@ -41,6 +41,8 @@ class FakeGh:
         self.fail_disable_auto = 0               # the next N `--disable-auto` calls fail
         self.fail_dequeue = 0                    # the next N dequeue mutations fail
         self.raise_on_query = 0                  # the next N GraphQL queries crash the command (OSError)
+        self.issue_comments: dict[int, list[dict]] = {}
+        self.fail_comments = 0                   # the next N comment writes fail
 
     def _by_branch(self, branch: str) -> list[dict]:
         return [pr for pr in self.prs.values() if pr["headRefName"] == branch and pr["state"] == "OPEN"]
@@ -72,8 +74,24 @@ class FakeGh:
                               "baseRefName": pr.get("baseRefName", "main"), "mergeCommit": pr.get("mergeCommit"),
                               "autoMergeRequest": {"mergeMethod": "MERGE"} if pr.get("auto") else None,
                               "labels": [{"name": name} for name in pr["labels"]]})
+        elif args[:2] == ["pr", "comment"] and self.fail_comments:
+            self.fail_comments -= 1
+            return subprocess.CompletedProcess(argv, 1, b"", b"HTTP 502")
         elif args[:2] == ["pr", "comment"]:
             self.comments.append((int(args[2]), input.decode()))
+            thread = self.issue_comments.setdefault(int(args[2]), [])
+            thread.append({"id": 1000 + len(self.comments), "body": input.decode(), "user": {"login": "tzhouam"}})
+        elif args[:2] == ["api", "user"]:
+            out = json.dumps({"login": "tzhouam"})
+        elif args[:3] == ["api", "--paginate", "--slurp"]:
+            number = int(args[3].split("/issues/")[1].split("/")[0])
+            out = json.dumps([self.issue_comments.get(number, [])])
+        elif args[:3] == ["api", "-X", "PATCH"]:
+            comment_id = int(args[3].rsplit("/", 1)[1])
+            for thread in self.issue_comments.values():
+                for comment in thread:
+                    if comment["id"] == comment_id:
+                        comment["body"] = input.decode()
         elif args[:2] == ["pr", "ready"]:
             if "--undo" in args and "undo" in self.fail:
                 self.fail.discard("undo")   # fails once
@@ -602,3 +620,112 @@ def test_acks_carry_the_documented_fields(tmp_path):
     assert envelope["purpose"] == "kb-ack"
     assert set(envelope["payload"]) == {"item_id", "kind", "changeset_id", "ok", "pr", "head_sha", "branch", "error"}
     assert sign  # the envelope format is the shared signing module's
+
+
+def test_the_findings_comment_is_created_once_and_then_edited_in_place(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
+    pub.run_once()
+    _collect(rt)
+    gh.issue_comments[42] = [{"id": 7, "body": "<!-- kb-findings:v1 --> spoofed by someone else",
+                              "user": {"login": "mallory"}}]
+    from infermatrix_copilot.kb_service.external import post_findings
+    post_findings(rt, lifecycle, 42, "a" * 40, "failed", ["L1 x"])
+    assert pub.run_once()["performed"] == 1
+    ours = [c for c in gh.issue_comments[42] if c["user"]["login"] == "tzhouam"]
+    assert len(ours) == 1 and "- L1 x" in ours[0]["body"]
+    assert gh.issue_comments[42][0]["body"].endswith("spoofed by someone else")   # never edited
+    post_findings(rt, lifecycle, 42, "b" * 40, "pr_open", [])
+    assert pub.run_once()["performed"] == 1
+    ours = [c for c in gh.issue_comments[42] if c["user"]["login"] == "tzhouam"]
+    assert len(ours) == 1 and "**passed**" in ours[0]["body"]                        # the same comment, edited
+
+
+def test_a_findings_comment_that_fails_to_post_is_retried_not_dropped(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
+    pub.run_once()
+    _collect(rt)
+    from infermatrix_copilot.kb_service.external import post_findings
+    post_findings(rt, lifecycle, 42, "a" * 40, "failed", ["L1 x"])
+    gh.fail_comments = 1
+    assert pub.run_once()["failed"] == 1
+    assert not list((tmp_path / "state" / "inbox" / "acks").glob("*.json"))   # not answered: kept
+    assert pub.run_once()["performed"] == 1
+    assert any("- L1 x" in c["body"] for c in gh.issue_comments[42])
+
+
+def test_an_older_findings_comment_never_overwrites_a_newer_one(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
+    pub.run_once()
+    _collect(rt)
+    from infermatrix_copilot.kb_service.external import post_findings
+    now = rt.clock()
+    post_findings(rt, lifecycle, 42, "a" * 40, "pr_open", [])                 # older: passed
+    rt.clock = lambda: now + 60
+    post_findings(rt, lifecycle, 42, "a" * 40, "gate_failed", ["L1 newer"])  # newer: refused
+    gh.fail_comments = 1                                                      # the older one fails first
+    pub.run_once()
+    pub.run_once()                                                            # the older one retried
+    ours = [c for c in gh.issue_comments[42] if c["user"]["login"] == "tzhouam"]
+    assert len(ours) == 1 and "- L1 newer" in ours[0]["body"]
+
+
+def test_undelivered_findings_are_issued_again_after_they_expire(tmp_path):
+    from infermatrix_copilot.kb_service.external import post_findings, renew_findings
+
+    rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
+    pub.run_once()
+    _collect(rt)
+    post_findings(rt, lifecycle, 42, "a" * 40, "failed", ["L1 x"])
+    assert renew_findings(rt) == []                                          # not expired yet
+    now = rt.clock()
+    rt.clock = pub.clock = rt.outbox._clock = lambda: now + 25 * 3600         # the publisher was down for a day
+    rt.outbox.refresh_control()
+    assert renew_findings(rt) == ["findings reissued PR #42"]
+    pub.run_once()
+    assert any("- L1 x" in c["body"] for c in gh.issue_comments[42])
+    _collect(rt)
+    rt.clock = pub.clock = rt.outbox._clock = lambda: now + 50 * 3600
+    assert renew_findings(rt) == []                                          # delivered: never again
+
+
+def test_renewed_findings_keep_their_revision_across_a_scope_change(tmp_path):
+    from dataclasses import replace
+
+    from infermatrix_copilot.kb_service.external import post_findings, renew_findings
+
+    rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
+    pub.run_once()
+    _collect(rt)
+    other = replace(lifecycle, repo="other", full_name="org/other", knowledge_dir="repos/other")
+    rt.registry["other"] = other
+    rt.ledger.ensure_repo("other", "auto_merge")
+    pub.repo_flags = {**pub.repo_flags, "other": (True, True)}
+    rt.outbox.refresh_control()
+    now = rt.clock()
+    post_findings(rt, other, 42, "a" * 40, "failed", ["old: spans A+B"])          # never delivered
+    rt.clock = rt.outbox._clock = pub.clock = lambda: now + 60
+    post_findings(rt, lifecycle, 42, "b" * 40, "gate_failed", ["new: only B"])     # the PR narrowed its scope
+    for path in (tmp_path / "state" / "outbox").glob("[0-9]*.json"):              # the old item was lost
+        if "old: spans" in path.read_text():
+            path.unlink()
+    pub.run_once()
+    _collect(rt)
+    rt.clock = rt.outbox._clock = pub.clock = lambda: now + 30 * 3600
+    rt.outbox.refresh_control()
+    assert renew_findings(rt) == []            # one record per PR: the newest, already delivered
+    ours = [c for c in gh.issue_comments[42] if c["user"]["login"] == "tzhouam"]
+    assert len(ours) == 1 and "new: only B" in ours[0]["body"]
+
+
+def test_an_unreadable_revision_record_does_not_block_findings(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
+    pub.run_once()
+    _collect(rt)
+    record = tmp_path / "publisher" / "findings" / "42.json"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text('{"revision": 17')                                           # truncated by hand
+    from infermatrix_copilot.kb_service.external import post_findings
+    post_findings(rt, lifecycle, 42, "a" * 40, "failed", ["L1 x"])
+    assert pub.run_once()["performed"] == 1
+    assert any("- L1 x" in c["body"] for c in gh.issue_comments[42])
+    assert json.loads(record.read_text())["revision"] > 17                         # rewritten whole

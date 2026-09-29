@@ -96,6 +96,11 @@ def apply_acks(rt, acks: list[dict]) -> None:
     late ack for a superseded duplicate, or one arriving after the change set
     moved on, changes nothing."""
     for ack in acks:
+        if ack.get("kind") == "post_findings" and "invalid" not in ack:
+            from .external import findings_delivered
+
+            findings_delivered(rt, ack)
+            continue
         changeset_id = str(ack.get("changeset_id") or "")
         if not changeset_id or "invalid" in ack:
             continue
@@ -255,8 +260,15 @@ def _apply_merge_ack(rt, changeset: dict, ack: dict) -> None:
         else:
             rt.ledger.update_changeset(changeset_id, status="gate_failed", pending_item=None,
                                        detail={**changeset["detail"], "gate_problems": problems})
-            rt.ledger.enqueue_human(repo, f"local gate refused PR #{changeset['pr_number']}: {text[:400]}",
-                                    changeset_id)
+            if changeset["kind"] == "external" and not any(m in text for m in CONFIG_MERGE):
+                # someone else's PR: its author is told why (checked again daily)
+                from .external import post_findings
+
+                post_findings(rt, rt.registry.get(repo), int(changeset["pr_number"]), str(changeset["head_sha"]),
+                              "gate_failed", [str(p) for p in problems] or [text[:400]])
+            else:
+                rt.ledger.enqueue_human(repo, f"local gate refused PR #{changeset['pr_number']}: {text[:400]}",
+                                        changeset_id)
         _outcome(rt, changeset, "gate_failed", problems=problems[:20])
 
 
