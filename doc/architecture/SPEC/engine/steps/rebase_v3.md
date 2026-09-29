@@ -1,6 +1,6 @@
 # engine/steps/rebase_v3.py —— 规范
 
-<!-- verified-against: 2026-09-19 -->
+<!-- verified-against: 2026-09-29 -->
 
 `LOC ~2204 · step 库（v3 rebase 装配层） · refactor-status: oversized`
 
@@ -60,6 +60,8 @@ step —— 薄的受治理 wrapper，substate-first、类型化失败、发布�
   unstaged+untracked 字节+mode+symlink）→ 复跑/本地验证 → patch policy；自动
   patch 不得修改 assertion/tolerance，test 文件编辑必须有明确本地 passed。
   被拒、验证失败或策略违规的尝试**回滚**。
+- debug agent 的 prompt 与 `rebase_module` 同源选择：`debug_prompt_template_live`
+  优先，缺省回落 `debug_prompt_template`。
 - 空/损坏 manifest ⇒ `manifest_empty`（push gate 阻塞，绝不空洞通过）；
   不可运行的命令归 STRUCTURAL —— 绝不借 bash rc=0 假通过。
 - **A5**：一切仓库知识来自 adapter manifest；parity 词汇泄漏上限 14，

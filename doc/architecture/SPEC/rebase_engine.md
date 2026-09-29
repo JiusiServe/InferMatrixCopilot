@@ -1,6 +1,6 @@
 # rebase_engine/ —— 规范
 
-<!-- verified-against: 2026-09-21 -->
+<!-- verified-against: 2026-09-29 -->
 
 `LOC ~7500（26 个模块） · repo-rebase-v3 的原生 rebase 引擎 · refactor-status: ok`
 
@@ -31,7 +31,7 @@
 | `path_sync.py` | 模块路径图同步 + manifest modules 段重写 + L2 决定应用 |
 | `phase1_steps.py` | phase-1 组合（归类 + 路径同步），父级报告文件名不变 |
 | `plan_review.py` | L4 计划评审后端（注入的 LLM client，父级形状的结果） |
-| `prompt_builder.py` | 模块/调试 prompt 渲染 —— 等输入下与父级字节一致（golden 钉住） |
+| `prompt_builder.py` | 模块/调试 prompt 渲染 —— 等输入下与父级字节一致（golden 钉住）；`*_live` 变体不受 parity 钉 |
 | `push_gate.py` | 推送闸裁决：结构性 vs 断言失败的确定性分类（Rev 8 §2.3） |
 | `push_to_ci.py` | commit+push-to-CI 编排：preflight、WAL 卫生、C4 双闸、单一传输 |
 | `push_wal.py` | 推送 WAL：先落盘的 intent、精确 OID 三分对账、回滚数据 |
@@ -98,6 +98,8 @@ runner/LLM/CI client 全部可注入 —— 每个模块都能离线测试。
   坐标随 round 持久化，供恢复和审计使用。
 - 自动 debug agent 不能修改 assertion/tolerance oracle；任何 test 文件编辑只有
   在对应本地验证明确 passed 时才可进入远端重试。拒绝的尝试由调用方恢复快照。
+- 调试 prompt 优先用 adapter 的 `debug_prompt_template_live`，缺省才回落到父级
+  `debug_prompt_template`；后者保持父级原文，作为 parity golden 的比较基准。
 - **A5** —— 全包仓库中立：仓库值经 `WheelSpec`/`PinSpec`/`ManifestSpec`/
   `ModulePromptData`/`tool_schemas.json`/hooks 注入；`test_repo_neutral_core` 钉住。
 
