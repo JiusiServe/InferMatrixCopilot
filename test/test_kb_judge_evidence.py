@@ -158,3 +158,48 @@ def test_a_retirement_keeps_the_pr_that_justifies_it():
                '<!-- kb:rule status=retired since=v0 retired_at=v1 reason=upstream-removed evidence="PR #11" -->\n')
     shown = [e["source_reference"] for e in ev.for_rule(retired, EVIDENCE, None)]
     assert shown == ["PR #10", "PR #11"]
+
+
+
+def test_a_renamed_and_edited_file_keeps_its_removed_lines(tmp_path):
+    from infermatrix_copilot.kb_service.upstream_facts import MirrorObserver
+
+    up = tmp_path / "up"
+    up.mkdir()
+    _git(up, "init", "-q", "-b", "main")
+    body = "".join(f"line {i}\n" for i in range(40))
+    _commit(up, "pkg/old_name.py", body + "def removed_behaviour():\n    pass\n", "base")
+    _git(up, "checkout", "-q", "-b", "feature")
+    _git(up, "mv", "pkg/old_name.py", "pkg/new_name.py")
+    head = _commit(up, "pkg/new_name.py", body, "rename, drop removed_behaviour")
+    _git(up, "update-ref", "refs/pull/9/head", head)
+    _git(up, "checkout", "-q", "main")
+    _git(up, "-c", "user.name=t", "-c", "user.email=t@e", "merge", "-q", "--squash", "feature")
+    merged = _commit(up, "pkg/new_name.py", body, "squash (#9)")
+    observer = MirrorObserver(tmp_path / "mirror.git", "org/up", lambda n: {}, url=str(up))
+    patch = observer.pr_diff(9, merged, "pkg/new_name.py")
+    assert "rename from pkg/old_name.py" in patch and "-def removed_behaviour():" in patch
+    assert "+line 0" not in patch                                            # not shown as all-new
+    assert observer.pr_diff(9, merged, "pkg/old_name.py") == patch
+
+
+
+def test_paths_with_spaces_and_non_ascii_names_are_found(tmp_path):
+    from infermatrix_copilot.kb_service.upstream_facts import MirrorObserver
+
+    up = tmp_path / "up"
+    up.mkdir()
+    _git(up, "init", "-q", "-b", "main")
+    _commit(up, "README.md", "x\n", "base")
+    _git(up, "checkout", "-q", "-b", "feature")
+    _commit(up, "docs/my guide.md", "spaced\n", "a spaced name")
+    head = _commit(up, "docs/说明.md", "非 ASCII\n", "a non-ASCII name")
+    _git(up, "update-ref", "refs/pull/5/head", head)
+    _git(up, "checkout", "-q", "main")
+    _git(up, "-c", "user.name=t", "-c", "user.email=t@e", "merge", "-q", "--squash", "feature")
+    _git(up, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-q", "-m", "squash (#5)")
+    merged = _git(up, "rev-parse", "HEAD")
+    observer = MirrorObserver(tmp_path / "mirror.git", "org/up", lambda n: {}, url=str(up))
+    assert "+spaced" in observer.pr_diff(5, merged, "docs/my guide.md")
+    assert "+非 ASCII" in observer.pr_diff(5, merged, "docs/说明.md")
+    assert observer.pr_diff(5, merged, "README.md") == ""                   # not the PR's

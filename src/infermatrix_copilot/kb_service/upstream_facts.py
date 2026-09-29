@@ -79,7 +79,31 @@ class MirrorObserver:
         its head. Right for squash, merge-commit and rebase merges alike (for a
         rebase merge ``merge_sha`` is only the LAST rebased commit)."""
         base, head = self._pr_range(number, merge_sha)
-        return self._git("diff", "--no-color", "-U3", base, head, "--", path).stdout
+        pair = self._pr_files(number, base, head).get(path)
+        if pair is None:
+            return ""
+        # both sides of a rename in the pathspec: rename detection stays on
+        return self._git("diff", "--no-color", "-U3", "-M", base, head, "--", *dict.fromkeys(pair)).stdout
+
+    def _pr_files(self, number: int, base: str, head: str) -> dict[str, tuple[str, ...]]:
+        """Every path the PR touches -> (old path, new path), from NUL-separated
+        name-status (no quoting, so spaces and non-ASCII names are exact)."""
+        cache = self.__dict__.setdefault("_files", {})
+        if number not in cache:
+            fields = self._git("diff", "-M", "--name-status", "-z", base, head).stdout.split("\0")
+            pairs: dict[str, tuple[str, ...]] = {}
+            k = 0
+            while k < len(fields) and fields[k]:
+                status = fields[k]
+                if status[:1] in ("R", "C"):
+                    old, new = fields[k + 1], fields[k + 2]
+                    k += 3
+                else:
+                    old = new = fields[k + 1]
+                    k += 2
+                pairs[old] = pairs[new] = (old, new)
+            cache[number] = pairs
+        return cache[number]
 
     def _pr_range(self, number: int, merge_sha: str) -> tuple[str, str]:
         cache = self.__dict__.setdefault("_ranges", {})
