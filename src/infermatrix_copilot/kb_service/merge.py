@@ -32,6 +32,10 @@ from ..knowledge_service.verdict import build_verdict, manifest_from_files
 IN_FLIGHT = ("pr_requested", "pr_open", "merge_requested", "rebuild_needed")
 # margin for the publisher's clock when deciding an item has certainly expired
 CLOCK_SKEW = 5 * 60
+# the publisher could not confirm the signed upstream facts: signed again and
+# retried each round, to people once it kept failing this long (design v8 §8.2)
+FACTS_MERGE = "upstream facts:"
+FACTS_ESCALATE_AFTER = 24 * 3600
 # local-gate refusals the service answers by rebuilding on current main
 REBUILD_GATE = ("context changed since the verdict", "pages changed since the consistency judgement",
                 "does not merge cleanly", "signed patch manifest does not match")
@@ -194,6 +198,22 @@ def _apply_merge_ack(rt, changeset: dict, ack: dict) -> None:
                            ack.get("problems") or [])
         return
     text = " ".join([str(ack.get("error") or ""), *map(str, ack.get("problems") or [])])
+    detail = {k: v for k, v in changeset["detail"].items() if k != "facts_failing_since"}
+    if FACTS_MERGE in text:
+        since = float(changeset["detail"].get("facts_failing_since") or rt.clock())
+        if rt.clock() - since >= FACTS_ESCALATE_AFTER:
+            rt.ledger.update_changeset(changeset_id, status="gate_failed", pending_item=None,
+                                       detail={**detail, "gate_problems": [text[:400]]})
+            rt.ledger.enqueue_human(repo, f"PR #{changeset['pr_number']}: the publisher could not confirm its "
+                                          f"upstream facts for 24 hours: {text[:300]}", changeset_id)
+            _outcome(rt, changeset, "gate_failed", problems=[text[:400]])
+        else:
+            rt.ledger.update_changeset(changeset_id, status="pr_open", pending_item=None,
+                                       detail={**detail, "facts_failing_since": since})
+        return
+    if detail != changeset["detail"]:  # any other answer ends a run of fact failures
+        rt.ledger.update_changeset(changeset_id, detail=detail)
+        changeset = rt.ledger.changeset(changeset_id)
     if any(m in text for m in REBUILD_GATE):
         rt.ledger.update_changeset(changeset_id, status="rebuild_needed", pending_item=None,
                                    detail={**changeset["detail"], "rebuild_because": text[:500]})
@@ -243,7 +263,7 @@ def sign_verdict(rt, changeset: dict) -> dict:
     verdict = build_verdict(
         repository=knowledge_repository(), pr=int(changeset["pr_number"]), head_sha=changeset["head_sha"],
         context_base_sha=detail["base_sha"], manifest=manifest, blocks=blocks, consistency=consistency,
-        release=detail["release"], upstream={}, facts=[],
+        release=detail["release"], upstream=decision.get("upstream") or {}, facts=decision.get("facts") or [],
         models={"generator": detail["generator"], "judge": detail["judge"]},
         source="auto", issued_at=rt.clock(),
     )

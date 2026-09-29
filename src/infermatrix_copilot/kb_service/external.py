@@ -286,7 +286,8 @@ def _poll(rt, owner: str, *, force: bool = False) -> list[str]:
                             external_texts=rt.knowledge.external_texts(main_sha), evidence=evidence,
                             gateway=rt.gateway, judge=rt.judge, release=release,
                             repo_dir=lifecycle.knowledge_dir, protected_rules=lifecycle.protected_rules,
-                            retire_ratio=lifecycle.retire_ratio, max_files=lifecycle.max_files)
+                            retire_ratio=lifecycle.retire_ratio, max_files=lifecycle.max_files,
+                            facts=rt.upstream_facts(lifecycle))
         detail.update(source="auto", generator="human", judge=rt.judge.label(), decision=decision.to_dict(),
                       **_lifecycle_bookkeeping(decision.l1, head_files))
         status = {"pass": "pr_open", "fail": "failed", "human": "human"}[decision.status]
