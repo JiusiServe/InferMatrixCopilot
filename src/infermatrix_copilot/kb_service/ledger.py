@@ -282,6 +282,12 @@ class Ledger:
             "SELECT value FROM cursors WHERE repo=? AND name=?", (repo, name)).fetchone()
         return row["value"] if row else None
 
+    def cursors_with_prefix(self, repo: str, prefix: str) -> dict[str, str]:
+        rows = self._conn.execute("SELECT name, value FROM cursors WHERE repo=? AND name LIKE ? ESCAPE '\\'",
+                                  (repo, prefix.replace("\\", "\\\\").replace("%", "\\%")
+                                   .replace("_", "\\_") + "%")).fetchall()
+        return {row["name"]: row["value"] for row in rows}
+
     def set_cursor(self, repo: str, name: str, value: str) -> None:
         with self.tx() as cur:
             cur.execute(

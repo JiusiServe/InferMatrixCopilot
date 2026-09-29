@@ -37,12 +37,12 @@ from ..knowledge_service.signing import canonical_json, sign, verify
 
 ITEM_KINDS = (
     "open_pr", "open_companion_pr", "post_verdict", "enqueue",
-    "update_branch", "pause", "close", "open_issue", "merge",
+    "update_branch", "pause", "close", "open_issue", "merge", "post_findings",
 )
 ALWAYS_EXECUTABLE = frozenset({"pause", "close"})
 ITEM_TTL = {
     "open_pr": 24 * 3600, "open_companion_pr": 24 * 3600,
-    "post_verdict": 30 * 60, "enqueue": 30 * 60, "merge": 30 * 60,
+    "post_verdict": 30 * 60, "enqueue": 30 * 60, "merge": 30 * 60, "post_findings": 24 * 3600,
     "update_branch": 24 * 3600, "pause": 24 * 3600, "close": 24 * 3600,
     "open_issue": 7 * 24 * 3600,
 }
