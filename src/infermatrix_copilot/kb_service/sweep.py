@@ -13,7 +13,7 @@
 
 A sweep-wide circuit breaker (more than ``retire_ratio`` of the repository's
 active rules retired, or more than ``max_files`` files touched across the
-sweep) sends every sweep change set to people instead of the merge queue.
+sweep) sends every sweep change set to people instead of to the publisher.
 """
 
 from __future__ import annotations

@@ -80,10 +80,9 @@ def gate(clone: Path, *, repository: str, repo: str, pr: dict, head_sha: str, ma
         final = git.merge_tree(main_sha, head_sha)
     except GateError as exc:
         return [str(exc)]
-    ctx = Context(git=git, github=None, repository=repository, public_key=public_key,
-                  holds_loader=lambda: {}, codeowners=[], now=now)
+    ctx = Context(git=git, repository=repository, now=now)
     problems += verify_change(ctx, pr=pr, head_sha=head_sha, pre=base, post=head_sha, final=final,
-                              effective_base=main_sha, stage="local", verdict=verdict, check_holds=False)
+                              effective_base=main_sha, verdict=verdict)
     problems += tree_problems(git, main_sha, final)
     return problems
 
@@ -99,9 +98,8 @@ def post_merge_problems(clone: Path, *, repository: str, pr: dict, head_sha: str
     if len(parents) != 2 or parents[1] != head_sha:
         return [f"merge commit {merge_sha[:12]} is not a merge of the verified head"]
     first = parents[0]
-    ctx = Context(git=git, github=None, repository=repository, public_key=public_key,
-                  holds_loader=lambda: {}, codeowners=[], now=now)
+    ctx = Context(git=git, repository=repository, now=now)
     landed = {**pr, "state": "open"}  # it was open when it merged
     problems = verify_change(ctx, pr=landed, head_sha=head_sha, pre=first, post=merge_sha, final=merge_sha,
-                             effective_base=first, stage="local", verdict=verdict, check_holds=False)
+                             effective_base=first, verdict=verdict)
     return problems + tree_problems(git, first, merge_sha)

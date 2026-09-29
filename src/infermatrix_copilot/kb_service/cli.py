@@ -10,7 +10,6 @@
     kb serve [--once]                 the scheduler (holds the single-writer lease)
     kb activate                       activate the knowledge snapshot of the repository's main now
     kb rollback --to SHA              point `active` back at an earlier snapshot
-    kb holds-server [--host H] [--port P]                           serve ONLY the signed hold list (read-only)
     kb traces [--kind K] [--changeset ID] [--rule ID] [--limit N]   query trace/1 records
     kb replay --record ID --model PROVIDER:MODEL[:EFFORT]           re-ask a recorded call
     kb export --out FILE [--role judge|generator]                   dataset (calibration-safe)
@@ -81,18 +80,8 @@ def _outbox(state_dir: Path, ledger):
     return Outbox(state_dir, _signing_key(), ledger, clock=time.time)
 
 
-def _public(registry) -> set[str]:
-    return {name for name, lifecycle in registry.items() if lifecycle.publishes}
-
-
-def _unconfirmed(ledger, repo: str) -> int:
-    from .merge import pause_unconfirmed
-
-    return pause_unconfirmed(ledger, repo)
-
-
 def _refresh(state_dir: Path, ledger, registry) -> None:
-    _outbox(state_dir, ledger).transition(lambda: None, public_repos=_public(registry))
+    _outbox(state_dir, ledger).transition(lambda: None)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -120,9 +109,6 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("activate")
     rollback = sub.add_parser("rollback")
     rollback.add_argument("--to", required=True)
-    holds = sub.add_parser("holds-server")
-    holds.add_argument("--host", default="127.0.0.1", help="bind address; put TLS in front of it")
-    holds.add_argument("--port", type=int, default=8765)
     traces = sub.add_parser("traces")
     traces.add_argument("--kind")
     traces.add_argument("--changeset")
@@ -154,11 +140,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "publish":
         return _publish(args)
-    if args.command == "holds-server":
-        from .holds_server import serve_holds
-
-        serve_holds(_state_dir(args.state_dir), host=args.host, port=args.port)
-        return 0
     if args.command in {"traces", "replay", "export"}:
         return _traces_command(args, _state_dir(args.state_dir))
 
@@ -174,11 +155,9 @@ def main(argv: list[str] | None = None) -> int:
                 "active_snapshot": ledger.active_snapshot(),
                 "repos": [
                     {**row, "configured": row["repo"] in registry or row["repo"] == "*",
-                     "open_changesets": len(ledger.changesets(row["repo"], ("open", "pr_open", "signed", "queued")))
+                     "open_changesets": len(ledger.changesets(row["repo"], ("pr_open", "merge_requested")))
                      if row["repo"] != "*" else None,
-                     "human_queue": len(ledger.human_queue(row["repo"])) if row["repo"] != "*" else None,
-                     # a breaker/rollback is not done while any of these remain
-                     "pause_unconfirmed": _unconfirmed(ledger, row["repo"]) if row["repo"] != "*" else None}
+                     "human_queue": len(ledger.human_queue(row["repo"])) if row["repo"] != "*" else None}
                     for row in ledger.all_repo_states()
                 ],
             }
@@ -193,28 +172,12 @@ def main(argv: list[str] | None = None) -> int:
             # the state change and its signed publication happen under one
             # interprocess lock, so no concurrent refresh can publish a
             # pre-pause control record after the pause
+            # (the publisher is the only merger: a pause needs nothing on GitHub)
             if args.command == "pause":
                 generation = _outbox(state_dir, ledger).transition(
-                    lambda: ledger.bump_generation(repo, pause=True, reason=args.reason),
-                    public_repos=_public(registry))
-                # the pause itself: dequeue + draft every open knowledge PR
-                from . import merge
-
-                outbox = _outbox(state_dir, ledger)
-                paused_repos = list(registry) if repo == "*" else [repo]
-                issued = sum(merge.pause_open_prs(ledger, outbox, r, args.reason) for r in paused_repos)
-                print(f"pause items issued for {issued} open knowledge PR(s)")
+                    lambda: ledger.bump_generation(repo, pause=True, reason=args.reason))
             else:
-                from . import merge
-
-                def _resume():
-                    generation = ledger.resume(repo)
-                    for name in (list(registry) if repo == "*" else [repo]):
-                        merge.resume_paused_prs(ledger, name)
-                    return generation
-
-                # paused PRs leave the hold list in the same published transition
-                generation = _outbox(state_dir, ledger).transition(_resume, public_repos=_public(registry))
+                generation = _outbox(state_dir, ledger).transition(lambda: ledger.resume(repo))
             print(f"{args.command}d {repo}: generation {generation}")
             return 0
         if args.command == "control":

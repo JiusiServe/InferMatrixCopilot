@@ -1,4 +1,4 @@
-"""The kb-gate verdict: what the knowledge service signs and the verifier checks.
+"""The gate verdict: what the knowledge service signs and the publisher's local gate checks.
 
 A verdict binds a decision to ONE pull request state:
 
@@ -6,15 +6,15 @@ A verdict binds a decision to ONE pull request state:
   72-hour issue window (it must first verify within it);
 * the complete patch manifest: every changed path with change type, pre-image
   and post-image git blob IDs and file modes, compared independently of any
-  base SHA (so a queued PR is checked against what the queue actually applies);
+  base SHA (so it is checked against what the merge actually applies);
 * the per-block judgements for every rule and prose block L1 produced, the
   change-set consistency judgement with the page hashes it saw, and the
   context base those judgements were made against;
 * upstream fact attestations (the verifier re-checks public upstreams);
-* who decided: ``auto`` (L1 + L2 + consistency) or ``human-approved`` (with the
-  approving review IDs and reviewers).
+* who decided: always ``auto`` (L1 + L2 + consistency); there is no
+  human-approved path (design v8).
 
-Standard library only (plus ``signing`` for the envelope): vendored by kb-gate.
+Standard library only (plus ``signing`` for the envelope).
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from typing import Any, Iterable, Mapping
 
 SCHEMA = "kb-gate-verdict/1"
 ISSUE_WINDOW_SECONDS = 72 * 3600
-SOURCES = ("auto", "human-approved")
+SOURCES = ("auto",)
 _SHA40 = re.compile(r"[0-9a-f]{40}")
 
 
@@ -91,14 +91,11 @@ def canonical_manifest(entries: Iterable[Mapping[str, Any]]) -> list[dict]:
 def build_verdict(*, repository: str, pr: int, head_sha: str, context_base_sha: str,
                   manifest: list[dict], blocks: list[dict], consistency: list[dict],
                   release: str, upstream: dict, facts: list[dict], models: dict,
-                  source: str = "auto", review_ids: tuple[int, ...] = (),
-                  reviewers: tuple[str, ...] = (), issued_at: float) -> dict:
+                  source: str = "auto", issued_at: float) -> dict:
     if source not in SOURCES:
         raise VerdictError(f"source must be one of {SOURCES}")
     if not _SHA40.fullmatch(head_sha) or not _SHA40.fullmatch(context_base_sha):
         raise VerdictError("head_sha and context_base_sha must be 40-character hex SHAs")
-    if source == "human-approved" and not (review_ids and reviewers):
-        raise VerdictError("a human-approved verdict names its approving reviews")
     for block in blocks:
         if block.get("verdict") != "pass":
             raise VerdictError(f"only passing blocks are signed: {block.get('block_id')}")
@@ -115,8 +112,6 @@ def build_verdict(*, repository: str, pr: int, head_sha: str, context_base_sha: 
         "valid_until": float(issued_at) + ISSUE_WINDOW_SECONDS,
         "nonce": secrets.token_hex(16),
         "source": source,
-        "review_ids": [int(value) for value in review_ids],
-        "reviewers": list(reviewers),
         "release": release,
         "upstream": upstream,
         "manifest": canonical_manifest(manifest),

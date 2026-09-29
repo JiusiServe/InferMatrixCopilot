@@ -4,9 +4,9 @@
 > | | |
 > |---|---|
 > | **状态** | 🚧 分阶段落地。已合并：Direct 路由多仓库化与按请求知识视图（#203）、Knowledge Ops API 2.0 与 L1（#204）、generated-baseline 发版审计（#205）、服务核心（#206）、intake 与质量门（#207）；本 PR 加入合并流程、快照激活、发版巡检与调度器；本页随后续 PR 更新 |
-> | **做什么** | 知识的创建、维护、退役、删除与发版巡检全部在 Copilot；每次变更经质量门，通过即经合并队列自动合并；ReviewBot 只读消费 |
+> | **做什么** | 知识的创建、维护、退役、删除与发版巡检全部在 Copilot；每次变更经质量门，通过后由发布器在本地门禁复核合并结果再合并；ReviewBot 只读消费 |
 > | **怎么开关** | 每个仓库在 `adapters/<repo>/manifest.yaml` 的 `knowledge_lifecycle`（人工审阅的高风险段）中设置 `enabled` 与 `mode: shadow\|auto_merge` |
-> | **设计** | 经 GPT-6 sol 评审批准的设计文档（知识库管理重构设计，多仓库，v7） |
+> | **设计** | 经 GPT-6 sol 评审批准的设计文档（知识库管理重构设计，多仓库，v8） |
 > | **硬边界** | bot 主机不持有任何 GitHub 写凭据；所有 GitHub 写动作由 GPU 盒上的发布器以 owner 账号执行，且只执行服务签名、未过期、代际有效的 outbox 项；私有上游仓库只能 shadow，不产生任何公开产物 |
 
 ## 组成
@@ -15,23 +15,24 @@
 |---|---|---|
 | 仓库配置与注册表 | `kb_service/config.py` | 解析每个 adapter 的 `knowledge_lifecycle`；`general/` 由服务配置 |
 | 账本 | `kb_service/ledger.py` | 单个 SQLite（`$KB_STATE_DIR/kb.db`），所有表按 `repo` 分区；单实例租约；代际号 |
-| 签名 | `knowledge_service/signing.py` | Ed25519 信封，按用途（判定、outbox、控制记录、暂停清单、回执）隔离签名 |
-| outbox | `kb_service/outbox.py` | 服务写签名项、控制记录与暂停清单；发布器执行前用 `check_item` 复核 |
+| 签名 | `knowledge_service/signing.py` | Ed25519 信封，按用途（判定、outbox、控制记录、回执）隔离签名 |
+| outbox | `kb_service/outbox.py` | 服务写签名项与控制记录；发布器执行前用 `check_item` 复核 |
 | CLI | `infermatrix-copilot kb …` | `keygen`、`status`、`pause`、`resume`、`control` |
 
 ## 代际与暂停
 
 任何暂停、熔断、回滚或切回 `shadow` 都会使该仓库（或全局 `*`）代际 +1，并立即重签
-控制记录与暂停清单。发布器只执行代际与当前一致、未过期（`enqueue`/`post_verdict`
-30 分钟，其余 24 小时）且控制记录签发不超过 10 分钟的项；`pause` 与 `close` 总是可执行。
+控制记录。发布器只执行代际与当前一致、未过期（`merge` 30 分钟，其余 24 小时）且控制记录签发
+不超过 10 分钟的项；`close` 与 `open_revert_pr` 总是可执行。
 只有 `auto_merge` 仓库会产生非停止类写动作：`shadow` 只记录“将要做什么”，不开 PR、
 不发评论；模式变化本身也会使代际 +1。
-暂停清单发布在服务的公开 HTTP 端点，kb-gate 在合并队列中读取它，过期或不可达即失败。
+发布器是知识 PR 唯一的合并方，所以暂停只需停止下发 `merge`，并在合并前复读控制记录：
+不需要出队、转 draft、暂停标签或 GitHub 端的暂停清单。
 
 ## 运维
 
 ```bash
-infermatrix-copilot kb keygen --out /etc/infermatrix-kb/service.pem   # 公钥提交到 .github/kb-gate.pub
+infermatrix-copilot kb keygen --out /etc/infermatrix-kb/service.pem   # 公钥交给发布器（KB_SERVICE_PUBKEY）
 export KB_SIGNING_KEY=/etc/infermatrix-kb/service.pem KB_STATE_DIR=/var/lib/infermatrix-kb
 infermatrix-copilot kb status
 infermatrix-copilot kb pause --repo vllm-omni --reason "rollback drill"
@@ -73,40 +74,16 @@ T1/T2/T3 与 purge，每个规则页一个变更集，全部经过质量门。
 评审服务读取知识：将 `KNOWLEDGE_ROOT` 指向 `$KB_STATE_DIR/active`。
 
 
-## 仓库端门禁 `kb-gate`
+## 本地门禁（取代 v7 的仓库端 `kb-gate`）
 
-必需检查 `kb-gate`（`.github/workflows/kb-gate.yml`）只从受 CODEOWNERS 保护的验证包
-`.github/kb-gate/` 运行，从不导入 `src/`、`tools/`、`knowledge/tools/`。
+仓库端没有知识门禁的工作流、验证包、CODEOWNERS、合并队列或 ruleset：发布器在合并前于
+`merge-tree(main, head)` 上运行 `knowledge_service.gate_verifier.verify_change`（签名判定、清单一致、L1、
+逐块与一致性判定、上下文未变），通过才合并，合并后再检查落地的提交。只接受 `auto` 判定，
+没有 `human-approved` 路径：改动受治理页面以外路径的知识 PR 不会被自动合并，作者会在发现评论里被要求拆分。
+绕过发布器直接合并或推送的知识变更由每轮审计发现、暂停并撤回（见上文）。
 
-- **PR 预检**：`pull_request_target`、带判定标记的评论或手动触发；在当前 `main` 上验证后，
-  把 `kb-gate` 状态发布到 PR head。只决定能否入队。
-- **merge group**：名为 `kb-gate` 的作业逐段验证将要落地的提交；失败则 PR 被移出队列。
-- 未触碰 `knowledge/` 的 PR 总是通过；知识 PR 需要有效签名判定、清单一致、L1 通过、
-  暂停清单新鲜且未命中（见 SPEC `knowledge_service.md` 的 kb-gate 验证器一节）。
-
-修改验证逻辑后重新生成验证包（属于 `.github/**` 改动，需要知识维护者审批）：
-
-```bash
-python tools/build_kb_gate_bundle.py          # 重新生成
-python tools/build_kb_gate_bundle.py --check  # CI 提醒（非阻塞）
-python tools/build_kb_gate_bundle.py --lock   # 从 PyPI 重新按哈希固定依赖
-```
-
-暂停清单端点（bot 主机）：
-
-```bash
-infermatrix-copilot kb holds-server --port 8765   # 只提供 GET /holds.json，默认绑定 127.0.0.1
-# 反向代理加 TLS，例如 Caddy：  handle /kb/holds.json { rewrite * /holds.json; reverse_proxy 127.0.0.1:8765 }
-```
-
-切换前的负责人步骤：提交 `.github/kb-gate.pub`（`kb keygen` 的公钥）；在
-`.github/kb-gate/config.json` 填入暂停清单的公开 HTTPS 地址（`$KB_STATE_DIR/public/holds.json`）；
-仓库 admin 开启合并队列（merge commit）并配置两个 ruleset：
-- `main-gate`（无 bypass）：必须经合并队列合并，必需检查 `kb-gate` 限定 GitHub Actions 来源，禁止删除与强推；
-- `main-code-owners`：要求 PR、Code Owner 审阅、新推送后需重新批准；bypass 仅 @tzhouam（唯一维护者，
-  GitHub 不允许作者批准自己的 PR，其本人对 `.github/**` 等路径的修改经此 bypass 合并，但仍受 `main-gate` 约束）。
-唯一维护者意味着 `human-approved` 路径只适用于他人开的 PR；服务自己开的 PR 若转人工，由负责人关闭或修改后重新过门。
-在此之前，所有触碰 `knowledge/` 的 PR 都会被 `kb-gate` 拒绝（失败即关闭），代码 PR 不受影响。
+切换前的负责人步骤：`main` 必须允许发布器直接合并（不开合并队列、不开自动合并）；
+按设计 §P3 的顺序关闭 v7 遗留的自动合并并卸载 v7 发布器。
 
 ## 发布器（GPU 盒）
 

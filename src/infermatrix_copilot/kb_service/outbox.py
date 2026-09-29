@@ -8,8 +8,6 @@ service state directory::
     outbox/<id>.json      signed item (purpose kb-outbox-item)
     outbox/control.json   signed control record, refreshed every minute
     inbox/acks/<id>.json  the publisher's result for an item
-    public/holds.json     signed hold list, served read-only over HTTP; the
-                          kb-gate verifier fails knowledge segments it names
 
 Staleness is enforced on both sides. Each item carries the repository's and the
 global generation at issue time and an expiry; any pause, circuit break,
@@ -36,21 +34,18 @@ from typing import Any, Iterator
 from ..knowledge_service.signing import canonical_json, sign, verify
 
 ITEM_KINDS = (
-    "open_pr", "open_companion_pr", "post_verdict", "enqueue",
-    "update_branch", "pause", "close", "open_issue", "merge", "post_findings", "open_revert_pr",
+    "open_pr", "open_companion_pr", "close", "open_issue", "merge", "post_findings", "open_revert_pr",
 )
 # they only ever stop or undo: executable while a repository is paused (a
 # revert is issued BECAUSE the repository was paused for an unknown change)
-ALWAYS_EXECUTABLE = frozenset({"pause", "close", "open_revert_pr"})
+ALWAYS_EXECUTABLE = frozenset({"close", "open_revert_pr"})
 ITEM_TTL = {
     "open_pr": 24 * 3600, "open_companion_pr": 24 * 3600,
-    "post_verdict": 30 * 60, "enqueue": 30 * 60, "merge": 30 * 60, "post_findings": 24 * 3600,
-    "open_revert_pr": 24 * 3600,
-    "update_branch": 24 * 3600, "pause": 24 * 3600, "close": 24 * 3600,
+    "merge": 30 * 60, "post_findings": 24 * 3600,
+    "open_revert_pr": 24 * 3600, "close": 24 * 3600,
     "open_issue": 7 * 24 * 3600,
 }
 CONTROL_MAX_AGE = 10 * 60
-HOLDS_MAX_AGE = 10 * 60
 
 
 class OutboxError(RuntimeError):
@@ -112,7 +107,7 @@ class OutboxItem:
 
 
 class Outbox:
-    """Service side: write signed items, control records, holds; read acks."""
+    """Service side: write signed items and control records; read acks."""
 
     def __init__(self, state_dir: str | Path, key, ledger, *, clock):
         self.root = Path(state_dir)
@@ -158,10 +153,6 @@ class Outbox:
     def acks_dir(self) -> Path:
         return self.root / "inbox" / "acks"
 
-    @property
-    def holds_path(self) -> Path:
-        return self.root / "public" / "holds.json"
-
     def issue(self, repo: str, kind: str, body: dict) -> OutboxItem:
         if kind not in ITEM_KINDS:
             raise OutboxError(f"unknown outbox item kind: {kind}")
@@ -197,40 +188,13 @@ class Outbox:
             atomic_write_json(self.outbox_dir / "control.json", sign("kb-control", payload, self._key))
             return payload
 
-    def transition(self, change, *, public_repos: set[str]) -> Any:
-        """Apply a ledger state change (pause/resume/mode) and republish the
-        control record and hold list, all under the publication lock."""
+    def transition(self, change) -> Any:
+        """Apply a ledger state change (pause/resume/mode) and re-sign the
+        control record at once, under the publication lock."""
         with self.publication_lock():
             result = change()
             self.refresh_control()
-            sequence = int(self._ledger.get_cursor("*", "holds_sequence") or 0) + 1
-            self._ledger.set_cursor("*", "holds_sequence", str(sequence))
-            self.publish_holds(sequence=sequence, public_repos=public_repos)
             return result
-
-    def publish_holds(self, *, sequence: int, public_repos: set[str]) -> dict:
-        """Signed hold list: paused repositories and PRs whose change sets are
-        paused. It is served publicly, so ONLY repositories in ``public_repos``
-        (public upstreams) may appear; a private upstream's name, pause state
-        or PRs never do (it publishes nothing, so it has no PR to hold)."""
-        with self.publication_lock():
-            return self._publish_holds(sequence, frozenset(public_repos))
-
-    def _publish_holds(self, sequence: int, public_repos: frozenset[str]) -> dict:
-        states = [row for row in self._ledger.all_repo_states()
-                  if row["repo"] == "*" or row["repo"] in public_repos]
-        paused = [row["repo"] for row in states if row["paused"] and row["repo"] != "*"]
-        global_hold = any(row["repo"] == "*" and row["paused"] for row in states)
-        prs = sorted({
-            int(cs["pr_number"])
-            for row in states if row["repo"] != "*"
-            for cs in self._ledger.changesets(row["repo"], ("paused",))
-            if cs["pr_number"] is not None
-        })
-        payload = {"issued_at": self._clock(), "sequence": sequence, "global": global_hold,
-                   "repos": sorted(paused), "prs": prs}
-        atomic_write_json(self.holds_path, sign("kb-holds", payload, self._key))
-        return payload
 
     def collect_acks(self, public_key) -> list[dict]:
         """Read publisher acks (signed by the PUBLISHER's key), record them, remove the files."""
@@ -284,11 +248,3 @@ def check_item(envelope: Any, control_envelope: Any, public_key, *, now: float,
     if current["mode"] != "auto_merge" or not repo_auto_merge:
         raise OutboxError(f"repository is not in auto_merge mode (control: {current['mode']})")
     return item
-
-
-def verify_holds(envelope: Any, public_key, *, now: float) -> dict:
-    """Used by the kb-gate verifier: a stale or unverifiable hold list fails closed."""
-    holds = verify("kb-holds", envelope, public_key)
-    if now - float(holds["issued_at"]) > HOLDS_MAX_AGE:
-        raise OutboxError("hold list is stale")
-    return holds

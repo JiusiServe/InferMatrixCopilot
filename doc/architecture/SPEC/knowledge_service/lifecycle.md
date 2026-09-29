@@ -1,6 +1,6 @@
 # knowledge_service/lifecycle.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-29 -->
 
 `LOC ~330 · 规则页数据模型与生命周期尾注 · refactor-status: stable`
 
@@ -17,7 +17,7 @@ with_footer/body_without_footer/content_sha256/citations`、`Footer.parse/render
 无退役规则时逐字节原样返回）。
 
 ## 不变量
-- 仅依赖标准库与 PyYAML、不 import 包内其他模块：kb-gate 验证包原样携带。
+- 仅依赖标准库与 PyYAML、不 import 包内其他模块。
 - 尾注键未知、重复、格式错误或状态约束不满足时抛 `LifecycleError`。
 
 ## 测试

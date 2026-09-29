@@ -15,7 +15,7 @@ from infermatrix_copilot.kb_service.config import (
 )
 from infermatrix_copilot.kb_service.ledger import Ledger, LeaseError
 from infermatrix_copilot.kb_service.outbox import (
-    CONTROL_MAX_AGE, Outbox, OutboxError, check_item, verify_holds,
+    CONTROL_MAX_AGE, Outbox, OutboxError, check_item,
 )
 from infermatrix_copilot.knowledge_service.signing import (
     SignatureError, generate_private_key, load_private_key, load_public_key,
@@ -171,20 +171,20 @@ def _check(world, item, **kw):
 
 def test_publisher_accepts_a_fresh_item(world):
     _clock, _ledger, outbox, _public, _state = world
-    item = outbox.issue("demo", "enqueue", {"pr": 5, "head": "b" * 40})
+    item = outbox.issue("demo", "merge", {"pr": 5, "head": "b" * 40})
     outbox.refresh_control()
     assert _check(world, item).body["pr"] == 5
 
 
 def test_generation_bump_voids_everything_issued_before_it(world):
     _clock, ledger, outbox, _public, _state = world
-    enqueue = outbox.issue("demo", "enqueue", {"pr": 5})
-    pause = outbox.issue("demo", "pause", {"pr": 5})
+    merge = outbox.issue("demo", "merge", {"pr": 5})
+    close = outbox.issue("demo", "close", {"pr": 5})
     ledger.bump_generation("demo", pause=False, reason="")  # rollback / shadow switch
     outbox.refresh_control()
     with pytest.raises(OutboxError, match="stale generation"):
-        _check(world, enqueue)
-    assert _check(world, pause).kind == "pause"  # stopping is always allowed
+        _check(world, merge)
+    assert _check(world, close).kind == "close"  # stopping is always allowed
     global_old = outbox.issue("demo", "open_pr", {})
     ledger.bump_generation("*", pause=False, reason="")
     outbox.refresh_control()
@@ -202,10 +202,10 @@ def test_generation_bump_voids_everything_issued_before_it(world):
 def test_publisher_refusals(world, case, message):
     clock, ledger, outbox, _public, _state = world
     kw = {}
-    item = outbox.issue("demo", "enqueue", {"pr": 5})
+    item = outbox.issue("demo", "merge", {"pr": 5})
     if case == "paused":
         ledger.bump_generation("demo", pause=True, reason="x")
-        item = outbox.issue("demo", "enqueue", {"pr": 5})
+        item = outbox.issue("demo", "merge", {"pr": 5})
     outbox.refresh_control()
     if case == "expired":
         clock.now += 31 * 60
@@ -230,19 +230,6 @@ def test_forged_item_is_refused(world):
     path.write_text(json.dumps(envelope), encoding="utf-8")
     with pytest.raises(SignatureError):
         _check(world, item)
-
-
-def test_hold_list_names_paused_repos_and_prs_and_expires(world):
-    clock, ledger, outbox, public, state = world
-    cs = ledger.create_changeset("demo", "intake")
-    ledger.update_changeset(cs, status="paused", pr_number=42)
-    ledger.bump_generation("demo", pause=True, reason="breaker")
-    outbox.publish_holds(sequence=1, public_repos={"demo"})
-    holds = verify_holds(_read(state / "public" / "holds.json"), public, now=clock.now)
-    assert holds["repos"] == ["demo"] and holds["prs"] == [42] and not holds["global"]
-    clock.now += 11 * 60
-    with pytest.raises(OutboxError, match="stale"):
-        verify_holds(_read(state / "public" / "holds.json"), public, now=clock.now)
 
 
 def test_acks_must_be_signed_by_the_publisher(world, tmp_path):
@@ -278,8 +265,6 @@ def test_kb_cli_pause_resume_refreshes_signed_control(tmp_path, monkeypatch, cap
     assert cli_main(["kb", "pause", "--repo", "vllm-omni", "--reason", "drill"]) == 0
     control = verify("kb-control", _read(tmp_path / "state" / "outbox" / "control.json"), public)
     assert control["repos"]["vllm-omni"]["paused"] is True
-    holds = verify("kb-holds", _read(tmp_path / "state" / "public" / "holds.json"), public)
-    assert holds["repos"] == ["vllm-omni"]
     assert cli_main(["kb", "resume", "--repo", "vllm-omni"]) == 0
     control = verify("kb-control", _read(tmp_path / "state" / "outbox" / "control.json"), public)
     assert control["repos"]["vllm-omni"]["paused"] is False
@@ -293,26 +278,26 @@ def test_kb_cli_pause_resume_refreshes_signed_control(tmp_path, monkeypatch, cap
 
 def test_mode_round_trip_voids_items_issued_before_it(world):
     _clock, ledger, outbox, _public, _state = world
-    enqueue = outbox.issue("demo", "enqueue", {"pr": 5})
+    merge = outbox.issue("demo", "merge", {"pr": 5})
     assert ledger.ensure_repo("demo", "shadow") is True
     assert ledger.ensure_repo("demo", "shadow") is False  # no change, no bump
     assert ledger.ensure_repo("demo", "auto_merge") is True
     outbox.refresh_control()
     with pytest.raises(OutboxError, match="stale generation"):
-        _check(world, enqueue)
+        _check(world, merge)
 
 
 @pytest.mark.parametrize("mode", ["disabled", "shadow"])
-@pytest.mark.parametrize("kind", ["open_pr", "open_companion_pr", "update_branch", "enqueue", "post_verdict"])
+@pytest.mark.parametrize("kind", ["open_pr", "open_companion_pr", "merge", "post_findings"])
 def test_only_auto_merge_repos_get_non_stop_writes(world, mode, kind):
     _clock, ledger, outbox, _public, _state = world
     ledger.ensure_repo("demo", mode)
     item = outbox.issue("demo", kind, {})
-    stop = outbox.issue("demo", "pause", {})
+    stop = outbox.issue("demo", "close", {})
     outbox.refresh_control()
     with pytest.raises(OutboxError, match="not in auto_merge"):
         _check(world, item)
-    assert _check(world, stop).kind == "pause"
+    assert _check(world, stop).kind == "close"
 
 
 def test_overlapping_refresh_cannot_undo_a_completed_pause(world, tmp_path):
@@ -321,7 +306,7 @@ def test_overlapping_refresh_cannot_undo_a_completed_pause(world, tmp_path):
     import threading
 
     clock, _ledger, outbox, public, state = world
-    stale_enqueue = outbox.issue("demo", "enqueue", {"pr": 5})
+    stale_merge = outbox.issue("demo", "merge", {"pr": 5})
     key = outbox._key
     read_done, may_write = threading.Event(), threading.Event()
     errors: list[BaseException] = []
@@ -346,8 +331,7 @@ def test_overlapping_refresh_cannot_undo_a_completed_pause(world, tmp_path):
         try:
             ledger = Ledger(state / "kb.db", clock=clock)
             Outbox(state, key, ledger, clock=clock).transition(
-                lambda: ledger.bump_generation("demo", pause=True, reason="breaker"),
-                public_repos={"demo"})
+                lambda: ledger.bump_generation("demo", pause=True, reason="breaker"))
         except BaseException as exc:  # pragma: no cover
             errors.append(exc)
 
@@ -365,33 +349,4 @@ def test_overlapping_refresh_cannot_undo_a_completed_pause(world, tmp_path):
     control = verify("kb-control", _read(state / "outbox" / "control.json"), public)
     assert control["repos"]["demo"]["paused"] is True
     with pytest.raises(OutboxError):
-        _check(world, stale_enqueue)
-
-
-def test_private_repos_never_appear_in_the_public_hold_list(tmp_path, monkeypatch, capsys):
-    import shutil
-
-    from infermatrix_copilot.cli.entry import main as cli_main
-
-    adapters = tmp_path / "adapters"
-    shutil.copytree(ROOT / "adapters", adapters)
-    secret = adapters / "secret_repo"
-    secret.mkdir()
-    (secret / "manifest.yaml").write_text(yaml.safe_dump({
-        "name": "secret_repo",
-        "repo": {"full_name": "org/secret-repo", "path": "/x"},
-        "knowledge": {"repo_subdir": "repos/secret-repo"},
-        "knowledge_lifecycle": {"enabled": True, "mode": "shadow", "upstream_visibility": "private"},
-    }), encoding="utf-8")
-    key_path = tmp_path / "service.pem"
-    assert cli_main(["kb", "keygen", "--out", str(key_path)]) == 0
-    public = load_public_key(capsys.readouterr().out.strip())
-    monkeypatch.setenv("KB_SIGNING_KEY", str(key_path))
-    monkeypatch.setenv("KB_STATE_DIR", str(tmp_path / "state"))
-    monkeypatch.setenv("ADAPTERS_DIR", str(adapters))
-    assert cli_main(["kb", "pause", "--repo", "secret-repo", "--reason", "drill"]) == 0
-    assert cli_main(["kb", "pause", "--repo", "vllm-omni", "--reason", "drill"]) == 0
-    raw = (tmp_path / "state" / "public" / "holds.json").read_text(encoding="utf-8")
-    assert "secret" not in raw
-    holds = verify("kb-holds", json.loads(raw), public)
-    assert holds["repos"] == ["vllm-omni"]
+        _check(world, stale_merge)

@@ -1,4 +1,4 @@
-# vllm-omni kb-gate calibration set
+# vllm-omni judge calibration set
 
 `infermatrix-copilot kb calibrate --repo vllm-omni` runs the pinned judge over
 these cases exactly as the knowledge gate does. The repository may leave

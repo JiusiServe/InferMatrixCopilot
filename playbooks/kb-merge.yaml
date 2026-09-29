@@ -1,6 +1,7 @@
 # Knowledge service merge flow for ONE repository: apply publisher acks, sign
-# verdicts for opened PRs, enqueue once the PR-stage kb-gate passes (one queued
-# knowledge PR per repository), record merges. Candidate: scheduler-driven.
+# verdicts for opened PRs and hand them to the publisher in a merge item (its
+# local gate decides; one merge in flight per repository), record merges.
+# Candidate: scheduler-driven.
 name: kb-merge
 version: 1
 status: candidate

@@ -128,6 +128,8 @@ class FakeGh:
             elif args[args.index("--remove-label") + 1] in labels:
                 labels.remove(args[args.index("--remove-label") + 1])
         elif args[:2] == ["pr", "close"]:
+            if "close" in self.fail:
+                return subprocess.CompletedProcess(argv, 1, b"", b"HTTP 502")
             self.prs[int(args[2])]["state"] = "CLOSED"
         elif args[:2] == ["api", "graphql"] and args[3].startswith("query=query("):
             if self.raise_on_query:
@@ -256,41 +258,24 @@ def test_open_pr_refuses_paths_outside_governed_knowledge_pages(tmp_path):
     assert all(not a["ok"] and "outside governed knowledge pages" in a["error"] for a in acks)
 
 
-def test_post_verdict_enqueue_pause_and_close(tmp_path):
+def test_close_is_performed_once_and_a_closed_pr_is_left_alone(tmp_path):
     rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
     pub.run_once()
-    head = gh.prs[42]["headRefOid"]
-    _issue(rt, lifecycle, changeset_id, "post_verdict", pr=42, head_sha="f" * 40, comment="stale")
-    _issue(rt, lifecycle, changeset_id, "post_verdict", pr=42, head_sha=head, comment="<!-- kb-gate:verdict:v1 -->")
-    summary = pub.run_once()
-    assert summary["performed"] == 1 and summary["failed"] == 1
-    assert gh.comments == [(42, "<!-- kb-gate:verdict:v1 -->")]
-    gh.prs[42]["isDraft"] = True                                   # paused earlier, then resumed
-    rt.outbox.refresh_control()
-    _issue(rt, lifecycle, changeset_id, "enqueue", pr=42, head_sha=head)
-    assert pub.run_once()["performed"] == 1
-    assert gh.prs[42]["isDraft"] is False and gh.prs[42]["queued"] is True
-    _issue(rt, lifecycle, changeset_id, "pause", pr=42, reason="drill")
-    assert pub.run_once()["performed"] == 1
-    assert gh.prs[42]["queued"] is False and gh.prs[42]["isDraft"] is True and "kb:hold" in gh.prs[42]["labels"]
     _issue(rt, lifecycle, changeset_id, "close", pr=42, reason="superseded")
-    _issue(rt, lifecycle, changeset_id, "pause", pr=42, reason="after close")
-    assert pub.run_once()["performed"] == 2 and gh.prs[42]["state"] == "CLOSED"
-
-
-def test_pause_is_performed_even_while_the_repository_is_paused(tmp_path):
-    rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
-    pub.run_once()
-    _collect(rt)                    # the PR is open, so the pause applies to it
-    rt.outbox.transition(lambda: rt.ledger.bump_generation(lifecycle.repo, pause=True, reason="drill"),
-                         public_repos={lifecycle.repo})
-    merge.pause_open_prs(rt.ledger, rt.outbox, lifecycle.repo, "drill")
-    _collect(rt)
-    assert pub.run_once()["performed"] == 1 and gh.prs[42]["isDraft"] is True
-    _collect(rt)
-    assert rt.ledger.changeset(changeset_id)["status"] == "paused"
-
-
+    assert pub.run_once()["performed"] == 1 and gh.prs[42]["state"] == "CLOSED"
+    _issue(rt, lifecycle, changeset_id, "close", pr=42, reason="again")
+    assert pub.run_once()["performed"] == 1 and gh.prs[42]["state"] == "CLOSED"
+def test_a_pause_stops_merges_without_touching_the_pr(tmp_path):
+    """The publisher is the only merger: a pause is the new generation alone,
+    nothing is dequeued, drafted or labelled; stops (close) still run."""
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    rt.outbox.transition(lambda: rt.ledger.bump_generation(lifecycle.repo, pause=True, reason="drill"))
+    calls = len(gh.calls)
+    assert pub.run_once()["performed"] == 0
+    assert gh.calls[calls:] == [] and gh.prs[42]["state"] == "OPEN" and not gh.prs[42]["isDraft"]
+    assert merge.advance(rt, lifecycle) == []                     # nothing is signed while paused
+    _issue(rt, lifecycle, changeset_id, "close", pr=42, reason="drill")
+    assert pub.run_once()["performed"] == 1 and gh.prs[42]["state"] == "CLOSED"
 def _merge_ready(tmp_path):
     """The service's PR is open and its merge item (with a signed verdict) is issued."""
     rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
@@ -426,30 +411,18 @@ def test_an_unsettled_recovery_blocks_the_item_until_github_answers(tmp_path):
 
 
 def test_a_paused_then_resumed_pr_merges(tmp_path):
-    rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
-    pub.run_once()
-    _collect(rt)
-    head = gh.prs[42]["headRefOid"]
-    rt.github.prs[42] = {"number": 42, "state": "open", "merged": False, "head": {"sha": head}}
-    rt.outbox.transition(lambda: rt.ledger.bump_generation(lifecycle.repo, pause=True, reason="drill"),
-                         public_repos={lifecycle.repo})
-    merge.pause_open_prs(rt.ledger, rt.outbox, lifecycle.repo, "drill")
-    pub.run_once()
-    _collect(rt)
-    assert gh.prs[42]["isDraft"] and "kb:hold" in gh.prs[42]["labels"]
-
-    def _resume():
-        rt.ledger.resume(lifecycle.repo)
-        merge.resume_paused_prs(rt.ledger, lifecycle.repo)
-    rt.outbox.transition(_resume, public_repos={lifecycle.repo})
-    rt.github.prs[42]["draft"] = True
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    rt.outbox.transition(lambda: rt.ledger.bump_generation(lifecycle.repo, pause=True, reason="drill"))
+    assert pub.run_once()["performed"] == 0                       # the old item is refused, never acked
+    rt.outbox.transition(lambda: rt.ledger.resume(lifecycle.repo))
+    now = rt.clock()
+    rt.clock = rt.outbox._clock = pub.clock = lambda: now + 36 * 60   # the refused item expired
+    assert merge.advance(rt, lifecycle) == [f"merge_expired {changeset_id}"]
     assert merge.advance(rt, lifecycle) == [f"merge issued {changeset_id}"]
-    assert pub.run_once()["performed"] == 1
-    assert gh.prs[42]["state"] == "MERGED" and "kb:hold" not in gh.prs[42]["labels"]
+    rt.outbox.refresh_control()
+    assert pub.run_once()["performed"] == 1 and gh.prs[42]["state"] == "MERGED"
     _collect(rt)
     assert rt.ledger.changeset(changeset_id)["status"] == "merged"
-
-
 def test_a_second_publisher_does_nothing_while_one_runs(tmp_path):
     import fcntl
     import os
@@ -474,8 +447,7 @@ def test_a_pause_issued_while_the_gate_ran_stops_the_merge(tmp_path):
 
     def gate_then_pause(*args, **kwargs):
         problems = real(*args, **kwargs)
-        rt.outbox.transition(lambda: rt.ledger.bump_generation(lifecycle.repo, pause=True, reason="drill"),
-                             public_repos={lifecycle.repo})
+        rt.outbox.transition(lambda: rt.ledger.bump_generation(lifecycle.repo, pause=True, reason="drill"))
         return problems
     local_gate.gate = gate_then_pause
     try:
@@ -486,22 +458,16 @@ def test_a_pause_issued_while_the_gate_ran_stops_the_merge(tmp_path):
     assert not any(call[:2] == ["pr", "merge"] for call in gh.calls)
 
 
-def test_a_failed_pause_is_retried_not_acknowledged(tmp_path):
+def test_a_failed_close_is_retried_not_acknowledged(tmp_path):
     rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
     pub.run_once()
     _collect(rt)
-    gh.prs[42]["queued"] = True
-    gh.fail.add("undo")
-    rt.outbox.transition(lambda: rt.ledger.bump_generation(lifecycle.repo, pause=True, reason="drill"),
-                         public_repos={lifecycle.repo})
-    merge.pause_open_prs(rt.ledger, rt.outbox, lifecycle.repo, "drill")
+    gh.fail.add("close")
+    _issue(rt, lifecycle, changeset_id, "close", pr=42, reason="superseded")
     assert pub.run_once()["failed"] == 1
     assert not list((tmp_path / "state" / "inbox" / "acks").glob("*.json"))   # nothing answered
-    assert pub.run_once()["performed"] == 1 and gh.prs[42]["isDraft"] is True
-    _collect(rt)
-    assert rt.ledger.changeset(changeset_id)["status"] == "paused"
-
-
+    gh.fail.discard("close")
+    assert pub.run_once()["performed"] == 1 and gh.prs[42]["state"] == "CLOSED"
 @pytest.mark.parametrize("control", [{"payload": {"issued_at": "invalid"}}, [], {"payload": []}, "x"])
 def test_malformed_control_records_and_items_never_stop_the_publisher(tmp_path, control):
     rt, _lifecycle, _changeset_id, pub, gh = _setup(tmp_path)
@@ -514,16 +480,12 @@ def test_malformed_control_records_and_items_never_stop_the_publisher(tmp_path, 
     assert summary["skipped"] == 1 and summary["performed"] == 1
 
 
-def test_a_verdict_is_not_posted_while_the_hold_label_cannot_be_removed(tmp_path):
-    rt, lifecycle, changeset_id, pub, gh = _setup(tmp_path)
-    pub.run_once()
-    head = gh.prs[42]["headRefOid"]
-    gh.prs[42]["labels"].append("kb:hold")
-    gh.fail.add("remove-label")
-    _issue(rt, lifecycle, changeset_id, "post_verdict", pr=42, head_sha=head, comment="verdict")
-    assert pub.run_once()["failed"] == 1 and gh.comments == []
-
-
+def test_a_draft_pr_is_never_readied_or_merged(tmp_path):
+    rt, lifecycle, changeset_id, pub, gh, head = _merge_ready(tmp_path)
+    gh.prs[42]["isDraft"] = True
+    assert pub.run_once()["failed"] == 1
+    assert gh.prs[42]["state"] == "OPEN" and gh.prs[42]["isDraft"] is True
+    assert not any(call[:2] in (["pr", "merge"], ["pr", "ready"]) for call in gh.calls)
 def test_transport_failures_keep_the_daemon_alive_and_resend_later(tmp_path):
     rt, _lifecycle, changeset_id, pub, gh = _setup(tmp_path)
     real = pub.transport

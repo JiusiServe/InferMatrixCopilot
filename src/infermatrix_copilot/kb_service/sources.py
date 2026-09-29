@@ -122,7 +122,7 @@ class KnowledgeRepo:
         return dest
 
     def raw_manifest(self, old: str, new: str) -> list[dict]:
-        """Every changed path as a kb-gate manifest entry (renames are D + A),
+        """Every changed path as a verdict manifest entry (renames are D + A),
         the exact form the verifier recomputes."""
         out = self._git("diff", "--raw", "-z", "--no-renames", "--no-abbrev", old, new).split(b"\0")
         entries, zero = [], "0" * 40

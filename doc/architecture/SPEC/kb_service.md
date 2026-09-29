@@ -10,11 +10,10 @@
   `LifecycleConfigError`）；`load_registry` 返回按仓库名的注册表，`general` 由服务配置。
 - `ledger`：单个 SQLite，所有表按 `repo` 分区；心跳租约保证单实例；模式变化即代际 +1；
   `bump_generation` 使该仓库（或 `*`）之前签发的 outbox 项全部失效，可同时暂停。
-- `outbox`：服务端签发 outbox 项、控制记录与暂停清单，读取发布器签名的回执；
+- `outbox`：服务端签发 outbox 项与控制记录，读取发布器签名的回执；
   发布器端 `check_item`（签名、控制记录新鲜度、过期、代际、暂停、私有上游；
   只有 auto_merge 仓库才有非停止类写动作，shadow 与 disabled 一律不发布；
-  `pause`/`close` 总可执行）；
-  `verify_holds` 供 kb-gate 使用（过期即失败）。
+  `close`/`open_revert_pr` 总可执行）。
 - `cli`：`infermatrix-copilot kb keygen|status|pause|resume|control`。
 
 ## 不变量
@@ -43,23 +42,22 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 - `runner`：经标准 executor 运行 `kb-*` playbook。CLI 新增 `kb run`、`kb calibrate`。
 
 ## 2026-09-28 合并流程、激活、巡检与调度
-- `merge`：publisher 回执推进状态（pr_requested → pr_open → verdict_posted → queued → merged）；
-  对 PR 的精确 head 签发 kb-gate 判定（清单、逐块、一致性）并经 outbox `post_verdict` 发布；
-  PR 阶段 `kb-gate` 成功后才发 `enqueue`，每仓库同时至多 1 个排队；head 变化 → human；
-  关闭未合并 → closed；合并后记录退役以便下个发版 purge。`pause_open_prs` 发出出队 + 转 draft 项。
+- `merge`：publisher 回执推进状态（pr_requested → pr_open → merge_requested → merged，v8 见下文）；
+  对 PR 的精确 head 签发判定（清单、逐块、一致性），随 `merge` 项交给发布器，每仓库同时至多 1 个；head 变化 → human；
+  关闭未合并 → closed；合并后记录退役以便下个发版 purge。
 - `activate`：每个 main SHA 生成不可变快照（`snapshots/<sha>/knowledge` + MANIFEST），
   加载校验、树级检查、各仓库 `_routes.yaml` 可加载后原子切换 `active`；支持回滚；保留最近 10 个及当前激活。
 - `sweep`：发版触发（首次只记录基线）/ 兜底周期；T1 结构报告（唯一自动修复是补索引链接）；
   T2/T3 按规则页让生成器对照发版 diff 逐条给出 keep/edit/replace/retire；purge；全局熔断强制 human。
-- `scheduler`（`kb serve`）：终身持有租约；每 tick 重签控制记录与暂停清单、处理回执、按仓库
-  advance/intake/sweep（仓库间隔离）、main 变化即激活；24 小时内 2 个知识 PR 被人关闭 → 暂停该仓库并出队。
-- CLI：`kb serve [--once]`、`kb activate`、`kb rollback --to SHA`；`kb pause` 同时为已开 PR 发暂停项。
+- `scheduler`（`kb serve`）：终身持有租约；每 tick 重签控制记录、处理回执、按仓库
+  advance/intake/sweep（仓库间隔离）、main 变化即激活；24 小时内 2 个知识 PR 被人关闭 → 暂停该仓库。
+- CLI：`kb serve [--once]`、`kb activate`、`kb rollback --to SHA`；`kb pause`/`kb resume` 只改代际与暂停状态。
 - 每个变更集记录其待回执的 outbox 项（`pending_item`）：未过期时不重复签发；回执只作用于与之匹配的项和
   对应的前置状态，迟到的重复项回执不改变状态。
 - 回滚后写入 `rollback_pin`：调度器不会重新激活被回滚的那个 main，只有更新的 main 才会激活。
 - 巡检按页记录进度（`sweep_progress`）：页面评估失败与“保持”区分，失败页在下次重试，3 次后交给人；
   所有页面落定后基线才推进；兜底巡检只做 T1 与 purge。
-- 熔断暂停与状态变化在同一加锁事务中发布控制记录与暂停清单。
+- 熔断暂停与状态变化在同一加锁事务中发布控制记录。
 
 
 ## 2026-09-28 发布器
@@ -71,12 +69,10 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   绝不猜测是否已执行；`open_pr` 只复用 head 恰为重建提交的已打开 PR（companion 还须是 draft）；
   提交由签名内容在 `base_sha` 上用临时索引重建，日期取自该项，重试得到同一 SHA；分支已存在且内容不同则拒绝，
   绝不覆盖。路径必须是受治理的知识页面（`knowledge/{repos/<r>,general}/**.md|yaml`，无 `..`）。
-- 恢复：`post_verdict` 只在未暂停、当前代际下签发，发布它时先移除 `kb:hold` 标签并确认已移除，再发布评论，使评论触发的预检不再因暂停标签失败。
-  失败的 `pause`/`close` 不回执，留在 outbox 中每轮重试直到成功；格式错误的控制记录或项目记入 trace 并跳过。
+- 恢复：失败的 `close`/`open_issue`/`post_findings` 不回执，留在 outbox 中每轮重试直到成功；格式错误的控制记录或项目记入 trace 并跳过。
   SSH 读取或回执失败只记入 trace，不终止进程；完成记录保留，下一轮重发回执而不重复动作。
-- 动作：`open_pr`/`open_companion_pr`（始终 draft）、`post_verdict` 与 `enqueue`/`update_branch`（先核对 PR
-  仍打开且 head 未变；`enqueue` 先把 draft 转为 ready，再 `gh pr merge --auto --match-head-commit`）、
-  `pause`（程序 P：出队 → 关闭自动合并 → 转 draft，确认已是 draft，再加 `kb:hold`）、`close`。
+- 动作：`open_pr`、`open_companion_pr`（始终 draft）、`merge`（v8，见下文）、`post_findings`、`open_revert_pr`、
+  `open_issue`、`close`。
 - 双重门控：无 `ALLOW_POST=1` 只记录将要执行的动作；推送分支还需 `ALLOW_PUSH=1`。无法验证或不可执行的项
   既不执行也不回执。每轮与每个决定都写入 `traces/publisher.jsonl`。
 - 测试：`test_kb_publisher.py`（端到端 open_pr → ack → pr_open、dry-run、崩溃后不重复执行、伪造/未配置/过期、
@@ -97,55 +93,32 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 - CLI：`kb traces`、`kb replay --record ID --model P:M[:E]`、`kb export --out FILE`。
 
 ## 2026-09-28 过期判定：重签、重建或转人工
-`merge.advance` 记录每次签发判定的时间（`verdict_issued_at`）与入队时间（`queued_at`），并处理不再能通过门禁的判定：
-- 判定签发超过 48 小时（有效期 72 小时）：`verdict_posted` 直接回到 `pr_open` 重签；`queued` 以及入队 2 小时仍未合并的
-  PR **不按计时释放队列名额**，而是先下发 `pause`（出队 + 转 draft），其回执把它送回 `pr_open`，再重签并重新入队。
-- 尚未过期的 `enqueue` 项未回执时不重签（其回执决定：进入 `queued` 后走上面的出队路径）。
-- PR 阶段 `kb-gate` 失败（只看签发当前判定之后发布的状态），按描述（验证器的第一个问题）分类：暂停清单/不可达/
-  验证器错误、我们自己暂停留下的 `kb:hold` 等瞬时问题 → 等待；判定过期或
-  缺失 → 重签；上下文改变、一致性页面变化、无法干净合并、清单不符 → **重建**：只有持有租约的调度器执行，在当前 main
-  上重新应用同样的操作并重新过质量门，暂存为 `rebuild` 变更集（证据带 `rebuild of <旧 id>` 标记，与暂存原子写入，
-  中断后再次执行会找到它而不会重复暂存）。只有重建**通过**质量门才取代旧 PR：旧变更集进入 `superseding`，`close` 项
-  过期即重发，直到观测到 PR 已关闭才记为 `superseded`（不计入被人工推翻的熔断）；重建未通过、操作无法再应用或没有
-  可重放的操作 → `rebuild_failed` 并转人工，旧 PR 保持打开。其他失败（变更本身有问题）→ `gate_failed` 并转人工一次。
-
-## 2026-09-28 外部知识 PR（来源④）与 human-approved 判定
-`external.poll_external`（调度器按 intake 间隔、全局未暂停时调用，需持有租约）处理知识仓库中**非服务创建**、非 draft、
-触碰 `knowledge/` 的打开 PR，每个 head 在每条路径（auto / human）上只评一次（auto 路径转人工的 head 在维护者审批后
-无需新推送即可按 human 路径重新评判）：
-- `kb:human-approved` 且知识维护者（main 上 `.github/kb-gate/` 的 CODEOWNERS）对**当前 head** 的审批仍有效（同一人的
-  后续审阅覆盖之前的）→ 只在受治理页面上跑 L1（审批替代白名单与 L2，不替代其余 L1）→ 签发 `human-approved` 判定，
-  绑定这些审阅。
-- 否则全部路径须为受治理页面 → 以**当前 main 加上 PR 改动**完整过质量门（L1、L2、一致性）→ 通过则签发 `auto` 判定。
-  PR 的前像必须等于 main（否则队列落地的改动与签名不同），不等则请作者 rebase。
+（v8 改写）发布器本地门禁拒绝 `merge` 时按理由分类（见“v8：发布器本地门禁与合并”）：瞬时问题 → 回到 `pr_open` 重签；
+上下文改变、一致性页面变化、无法干净合并、清单不符 → **重建**：只有持有租约的调度器执行，在当前 main
+上重新应用同样的操作并重新过质量门，暂存为 `rebuild` 变更集（证据带 `rebuild of <旧 id>` 标记，与暂存原子写入，
+中断后再次执行会找到它而不会重复暂存）。只有重建**通过**质量门才取代旧 PR：旧变更集进入 `superseding`，`close` 项
+过期即重发，直到观测到 PR 已关闭才记为 `superseded`（不计入被人工推翻的熔断）；重建未通过、操作无法再应用或没有
+可重放的操作 → `rebuild_failed` 并转人工，旧 PR 保持打开。变更本身的问题见“v8：精炼—复检”。
+## 2026-09-28 外部知识 PR（来源④）
+（v8 改写：没有 human-approved 路径，每日复检见下文）`external.poll_external`（调度器、全局未暂停时调用，需持有租约）
+处理知识仓库中**非服务创建**、非 draft、触碰 `knowledge/` 的打开 PR，每个 head 只评一次：
+- 全部路径须为受治理页面 → 以**当前 main 加上 PR 改动**完整过质量门（L1、L2、一致性）→ 通过则签发 `auto` 判定。
+  PR 的前像必须等于 main（否则合并落地的改动与签名不同），不等则请作者 rebase。
   与服务自己的 PR 一样，`auto` 判定要求当前通过的评审校准；否则记为 `calibration_required`，校准恢复后才重新评判
-  （期间不重复调用付费评审）。维护者审批读取全部分页的审阅，后续页上的撤回同样生效。
-- 其余情况（跨多个仓库、白名单外路径未经审批、L1 失败、质量门未通过）转人工，每个 head 一次。
-- 判定清单直接取自 git（`merge-base..head` 的完整原始 diff），覆盖白名单外路径；`context_base_sha` 为评判时的 main。
+  （期间不重复调用付费评审）。
+- 其余情况（跨多个仓库、受治理页面以外的路径——要求作者拆分、质量门未通过）不合并，理由写入发现评论。
+- 判定清单直接取自 git（`merge-base..head` 的完整原始 diff）；`context_base_sha` 为评判时的 main。
 - 暂存为 `external` 变更集后走普通合并流程。作者推送新 head → `head_changed`（不转人工）；上下文失效 → `stale_context`；
-  两者都在下次轮询时重新评判。签发后维护者撤回审批（最新审阅不再批准该 head）→ 转人工并下发 `pause`（出队 + draft）；
-  在 pause 回执成功前保持原状态（继续占用队列名额），回执后才记为 `approval_withdrawn`，剩余审批不会让同一 head 重新暂存。外部 PR 没有操作列表，L1 发现的退役/删除规则写入 `retirements`/`purges`，合并后同样进入
+  两者都在下次复检时重新评判。外部 PR 没有操作列表，L1 发现的退役/删除规则写入 `retirements`/`purges`，合并后同样进入
   退役账本（之后的发版巡检据此 purge）。作者关闭自己的 PR 不计入熔断。只触碰非受治理知识路径的 PR 归入 `general`（若其接收
   人工 PR），否则归入第一个接收人工 PR 的仓库。
-
 ## 2026-09-28 每日合并审计
 `audit.audit_main`（调度器每 24 小时）沿 main 的 first-parent 历史从上次审计的提交向后检查：每个相对第一父改动了
 `knowledge/` 的提交，都必须是账本已记录合并的变更集。证明只看结构、从不信提交信息：提交 SHA 为某变更集的 merge SHA，或它是双亲
-合并、第二父正是某个已合并变更集记录的 head（合并队列落地的形态），且它对知识的改动恰好就是该 head 的改动（改动的每个
+合并、第二父正是某个已合并变更集记录的 head，且它对知识的改动恰好就是该 head 的改动（改动的每个
 知识路径都在该 PR 的改动内且内容与 head 相同；夹带额外改动的合并同样被发现）。否则（admin bypass、直接推送、账本漏记）对其涉及的仓库暂停自动合并（改动在仓库范围之外 → 全局暂停）、
-出队其打开的知识 PR 并转人工；不在 `auto_merge` 的仓库只写 `unrecorded_merge` trace。首次运行只记录基线；晚于
+并转人工；不在 `auto_merge` 的仓库只写 `unrecorded_merge` trace。首次运行只记录基线；晚于
 2 小时宽限期的提交留到下次，避免与调度器记录合并赛跑。暂停逻辑与熔断共用 `Scheduler._pause`。
-
-## 2026-09-29 暂停清单端点
-`holds_server`（`kb holds-server`）只以 `GET/HEAD /holds.json` 提供 `<state_dir>/public/holds.json`（`Cache-Control: no-store`），
-其余路径一律 404，不列目录、不跟随路径、不接受写入；清单尚不存在时返回 503（门禁视为不可达并失败关闭）。默认只绑定
-`127.0.0.1`，由 bot 主机的反向代理加 TLS 后对外，URL 写入 `.github/kb-gate/config.json` 的 `holds_url`。
-
-## 2026-09-29 暂停以观测确认
-`pause_open_prs` 记录每个暂停请求的时间与原因。回执只代表发布器的说法：状态 `paused` 的变更集只有在 GitHub 显示该 PR
-为 draft 时才记为已确认（draft 不能在合并队列中，也不能再次入队）；否则重发 `pause`。请求 5 分钟后仍未回执或未确认 →
-转人工一次，附出队与 `gh pr ready <n> --undo` 命令。`kb status` 报告每个仓库 `pause_unconfirmed` 数量，熔断/回滚在其归零
-前不算完成；`kb resume` 清除这些记录。
 
 ## 2026-09-29 巡检汇总 issue
 每次巡检完成（`complete`）后，`report.publish_summary` 把汇总（T1 发现、修复的索引、保留/失败的页面、变更集及其状态、
@@ -164,7 +137,7 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
 质量门唯一的问题是"知识目录外引用了本次退役/替换/删除的规则"时（非巡检暂存、非强制人工），`companion.stage_companion`
 自动起草配套变更：被替换规则的 ID 改为新 ID；引用已退役规则的列表项/表格行删除，其余提及去掉 ID；只改配套白名单
 （`skills/`、`plugins/`、`adapters/`、`doc/`、`playbooks/`）。配套 PR 经 `open_companion_pr` 以 draft 创建并打 `kb:companion`
-标签，进入人工队列；发布器拒绝在其上执行 `post_verdict`/`enqueue`（ready 与合并只能由人完成），且拒绝白名单外路径
+标签，进入人工队列；发布器拒绝在其上执行 `merge`（ready 与合并只能由人完成），且拒绝白名单外路径
 （`knowledge/`、`.github/`、`src/`、`tools/`）。知识变更集处于 `companion_pending`（规则保持 active）；配套 PR 合并后，调度器
 在当前 main 上重建它（外部引用已清零 → 正常过门与发布）；配套 PR 被关闭则知识变更转人工，且不计入熔断。
 
@@ -197,23 +170,22 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
 事件 ID 与记录的 `event_id` 一致，重复投递幂等。
 
 ## 2026-09-29 v8：发布器本地门禁与合并
-- 服务不再发布判定评论、不再等待 GitHub `kb-gate` 状态、不再入合并队列：`pr_open` 时签发绑定 PR/head 的判定，随
+- 服务不发布判定评论、不等待 GitHub 状态检查、不入合并队列：`pr_open` 时签发绑定 PR/head 的判定，随
   `merge` 项交给发布器（每仓库同时至多一个 `merge_requested`）。回执：成功 → `merged`（合并 SHA、落地后复核结果）；
   落地后复核失败 → 暂停该仓库并转人工；拒绝 → 按理由分为重建（上下文/页面哈希变化、无法干净合并、清单不符 →
   `rebuild_needed`，由持有租约的调度器在当前 main 上重建）、瞬时（main 持续变化、控制记录变化、git/gh 问题 → 回到
   `pr_open` 重签）、变更本身的问题（→ `gate_failed`，转人工，从不按原样重试）。未回执的 `merge` 过期后回到 `pr_open`。
-  v7 的 `verdict_posted`/`queued` 记录按 `pr_open` 重签。
 - 落地后复核：回执中的 `passed`/`failed` 为终态（`failed` 暂停该仓库并转人工），即使 GitHub 先显示已合并、回执后到也照常处理；
   `unknown`（发布器无法运行，或崩溃后恢复的合并）由服务 `verify_merged` 在自己的克隆上重跑，无法运行则下一轮重试。
 - `local_gate`：发布器在自己安装的 Copilot 版本上，对 `main` tip 与 PR head 的合并树运行 `gate_verifier.verify_change`
-  （直接传入已验签的判定、不读暂停清单），另要求每个路径都在该项所属仓库的知识目录内、判定来源为 `auto`，并检查合并树
+  （直接传入已验签的判定），另要求每个路径都在该项所属仓库的知识目录内、判定来源为 `auto`，并检查合并树
   无新增树级问题；`post_merge_problems` 在 GitHub 实际生成的合并提交上重跑。
 - 发布器 `merge`：整轮持有跨进程 `flock`（第二个实例直接退出）；验签与绑定 → PR 打开且目标为 `main`、head 一致 →
   取 main 与 PR head 跑本地门禁 → main 变化则重来（至多 3 次）→ 重读控制记录（暂停/代际变化即放弃）→ 写合并意图 →
   `gh pr merge --merge --match-head-commit` → 读取合并提交并做落地后复核。合并之后的任何异常都不会变成失败回执；
   每轮开始先恢复有意图无完成记录的项（已合并则补发回执，未合并则丢弃意图、下一轮重试）。
-  `gh pr merge` 报错时无法确定是否已合并：保留意图、不写记录也不回执，由下一轮恢复向 GitHub 确认。遗留的 `kb:hold`
-  标签（v7 暂停留下）在合并前移除并确认。
+  `gh pr merge` 报错时无法确定是否已合并：保留意图、不写记录也不回执，由下一轮恢复向 GitHub 确认。draft PR
+  从不被转为 ready 或合并（瞬时拒绝，作者转回 ready 后再合并）。
   只有 GitHub 显示 `MERGED` 才算合并：若 `main` 要求合并队列或开启了自动合并，`gh pr merge` 只会入队——此时关闭自动合并并
   拒绝（转人工，要求 `main` 允许发布器直接合并）；只有经 GraphQL 确认既不在合并队列中（必要时 `dequeuePullRequest`）也没有自动合并，才记为拒绝，否则保留意图，由恢复流程继续取消或接收
   后来发生的合并。存在未结的合并意图时该项跳过，直到恢复流程从 GitHub 得到结果。
@@ -259,3 +231,16 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
 - 激活本身（`activate()`，含 `kb activate`）核对从当前激活快照到目标 SHA 的每个知识提交都可信（首次激活除外），否则
   `ActivationError`；调度器在激活前做同样的检查并只记录 `activation_blocked`。入 intake 的候选事件带上该提交的 diff。
 - 尚未实现：`kb accept-unknown`（接受未知提交内容而不撤回），目前通过合并精确撤回（服务开出的或手工的）解除。
+
+## 2026-09-29 v8：移除 v7 的 GitHub 端机制
+- 删除：`.github/workflows/kb-gate.yml`、`.github/kb-gate/` 验证包与 `tools/build_kb_gate_bundle.py`、`.github/CODEOWNERS`、
+  暂停清单（`publish_holds`/`verify_holds`/`holds_server`/`kb holds-server`、签名用途 `kb-holds`）、`human-approved` 路径
+  （维护者审批、`kb:human-approved`、`approval_withdrawn`）、outbox 项 `post_verdict`/`enqueue`/`pause`/`update_branch` 及其
+  发布器动作、暂停确认（`pause_open_prs`/`pause_unconfirmed`/`resume_paused_prs`、`kb status` 的 `pause_unconfirmed`）、
+  状态 `verdict_posted`/`queued`/`paused`（v7 从未在生产启用自动合并，没有需要迁移的记录）。
+- 暂停只由代际与暂停状态表达：服务不再签发 `merge`，发布器在执行前与合并前两次拒绝旧代际或暂停仓库的项；
+  暂停期间仍跟踪 PR 的合并、关闭与撤回，恢复后下一轮为同一 head 重签判定。
+- 判定只有 `auto` 来源（`verdict.SOURCES`），不再带 `review_ids`/`reviewers`。
+- 测试：`test_kb_local_gate_verifier.py`（取代 `test_kb_gate_verifier.py`；本地门禁上的重放/过期/伪造/非 auto 来源、清单与块表、
+  混合路径与可执行位、跨仓库、上下文失效、落地树中的悬空引用）；`test_kb_publisher.py`（暂停不触碰 PR、恢复后重签合并、
+  draft 不合并、`close` 重试）；`test_kb_external.py`（受治理页面以外的路径从不合并）。

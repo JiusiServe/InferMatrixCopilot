@@ -115,13 +115,11 @@ def test_the_publisher_keeps_companions_to_their_whitelist_and_never_merges_them
     assert gh.prs[number]["isDraft"] is True and "kb:companion" in gh.prs[number]["labels"]
     head = gh.prs[number]["headRefOid"]
     rt.outbox.refresh_control()
-    rt.outbox.issue("demo", "enqueue", {"changeset_id": "cok", "pr": number, "head_sha": head})
-    rt.outbox.issue("demo", "post_verdict", {"changeset_id": "cok", "pr": number, "head_sha": head,
-                                             "comment": "x"})
-    assert pub.run_once()["failed"] == 2
-    assert gh.prs[number]["isDraft"] is True and not gh.prs[number]["queued"]
+    rt.outbox.issue("demo", "merge", {"changeset_id": "cok", "pr": number, "head_sha": head})
+    assert pub.run_once()["failed"] == 1
+    assert gh.prs[number]["isDraft"] is True and gh.prs[number]["state"] == "OPEN"
     acks = [json.loads(p.read_text())["payload"] for p in (tmp_path / "state" / "inbox" / "acks").glob("*.json")]
-    assert all("only by people" in a["error"] for a in acks if a["kind"] in ("enqueue", "post_verdict"))
+    assert all("only by people" in a["error"] for a in acks if a["kind"] == "merge")
 
 
 def test_a_rebuild_that_fails_to_fetch_is_retried_and_the_companion_stays_open(tmp_path):
@@ -182,8 +180,8 @@ def test_an_unlabelled_companion_is_still_never_merged_by_automation(tmp_path):
                       "queued": False, "body": ""}
     for path in list((tmp_path / "state" / "outbox").glob("[0-9]*.json")):
         path.unlink()
-    rt.outbox.issue("demo", "enqueue", {"changeset_id": "x", "pr": number, "head_sha": "e" * 40})
-    assert pub.run_once()["failed"] == 1 and gh.prs[number]["isDraft"] and not gh.prs[number]["queued"]
+    rt.outbox.issue("demo", "merge", {"changeset_id": "x", "pr": number, "head_sha": "e" * 40})
+    assert pub.run_once()["failed"] == 1 and gh.prs[number]["isDraft"] and gh.prs[number]["state"] == "OPEN"
 
 
 def _companion_open(tmp_path, rt, lifecycle, publisher, knowledge_id, pr):
@@ -205,11 +203,10 @@ def test_a_companion_merged_during_a_pause_is_rebuilt_after_resume(tmp_path):
     collect_events(rt, lifecycle)
     knowledge_id = run_intake(rt, lifecycle)
     companion_id = _companion_open(tmp_path, rt, lifecycle, publisher, knowledge_id, 53)
-    rt.outbox.transition(lambda: rt.ledger.bump_generation("demo", pause=True, reason="drill"),
-                         public_repos={"demo"})
+    rt.outbox.transition(lambda: rt.ledger.bump_generation("demo", pause=True, reason="drill"))
     assert merge.advance(rt, lifecycle) == []
     assert rt.ledger.changeset(knowledge_id)["status"] == "companion_pending"
-    rt.outbox.transition(lambda: rt.ledger.resume("demo"), public_repos={"demo"})
+    rt.outbox.transition(lambda: rt.ledger.resume("demo"))
     events = merge.advance(rt, lifecycle)
     assert any(e.startswith(f"rebuilt {knowledge_id}") or e == f"rebuild_failed {knowledge_id}" for e in events)
     assert rt.ledger.changeset(companion_id)["status"] == "merged"

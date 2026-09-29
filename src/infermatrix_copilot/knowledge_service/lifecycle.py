@@ -15,7 +15,7 @@ lifecycle existed. Parsing then rendering an untouched page returns its exact
 bytes, so an operation changes only the sections it targets.
 
 This module needs only the standard library and PyYAML and imports nothing
-else from the package: the ``kb-gate`` verifier bundle vendors it verbatim.
+else from the package.
 """
 
 from __future__ import annotations

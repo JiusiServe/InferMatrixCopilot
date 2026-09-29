@@ -3,7 +3,7 @@
 It runs on the GPU box as the repository owner, through that user's existing
 ``gh`` login, which never leaves the box and never enters a model environment.
 The knowledge service holds no GitHub write credential; this is the only place
-knowledge PRs are opened, commented on, queued, paused or closed.
+knowledge PRs are opened, commented on, merged or closed.
 
 One round (``kb publish --once``; without it, a round per interval):
 
@@ -54,12 +54,11 @@ COMPANION_LABEL = "kb:companion"
 # companions are recognized by their branch too (kb/<repo>/<repo>-companion-<id>),
 # so a label that failed to apply cannot make one mergeable by automation
 COMPANION_BRANCH = re.compile(r"kb/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+-companion-[0-9a-f]+")
-HOLD_LABEL = "kb:hold"
 PUSHING = frozenset({"open_pr", "open_companion_pr", "open_revert_pr"})
-# retried until done, never acked as failed: stops (pause, close) and reports
+# retried until done, never acked as failed: a stop (close) and reports
 # (open_issue, post_findings: a transient GitHub error must not lose a sweep
 # report or an author's findings)
-RETRIED = frozenset({"pause", "close", "open_issue", "post_findings"})
+RETRIED = frozenset({"close", "open_issue", "post_findings"})
 
 
 class MergeUncertain(RuntimeError):
@@ -418,14 +417,6 @@ class Publisher:
         return "performed" if ack["ok"] else "failed"
 
     # the actions ---------------------------------------------------------------
-    def _checked_head(self, item: OutboxItem) -> dict:
-        pr = self.github.pr(int(item.body["pr"]))
-        if pr.get("state") != "OPEN":
-            raise PublishError(f"PR #{item.body['pr']} is {pr.get('state')}")
-        if pr.get("headRefOid") != item.body["head_sha"]:
-            raise PublishError(f"PR #{item.body['pr']} head moved to {str(pr.get('headRefOid'))[:12]}")
-        return pr
-
     def _do_open_pr(self, item: OutboxItem, *, draft: bool = False, allowed: re.Pattern = GOVERNED_PATH,
                     what: str = "governed knowledge pages") -> dict:
         body = item.body
@@ -504,54 +495,6 @@ class Publisher:
         if labelled or COMPANION_BRANCH.fullmatch(str(pr.get("headRefName") or "")):
             raise PublishError("a companion PR is readied and merged only by people")
 
-    def _do_post_verdict(self, item: OutboxItem) -> dict:
-        """A verdict is only issued for an unpaused repository, under its current
-        generation, so posting one also lifts an earlier pause's kb:hold label
-        (first, so the precheck the comment triggers no longer sees it)."""
-        self._refuse_companion(self._checked_head(item))
-        number = str(item.body["pr"])
-        self.github.gh("pr", "edit", number, "--repo", self.github.repository, "--remove-label", HOLD_LABEL,
-                       ok_fail=True)  # fails when the label is absent; what matters is checked next
-        if HOLD_LABEL in {str(label.get("name")) for label in self.github.pr(int(number)).get("labels") or []}:
-            raise PublishError(f"PR #{number} still carries {HOLD_LABEL}; the gate would reject it")
-        self.github.gh("pr", "comment", number, "--repo", self.github.repository,
-                       "--body-file", "-", input=str(item.body["comment"]))
-        return {"pr": int(item.body["pr"]), "head_sha": item.body["head_sha"]}
-
-    def _do_enqueue(self, item: OutboxItem) -> dict:
-        pr = self._checked_head(item)
-        self._refuse_companion(pr)
-        number = str(item.body["pr"])
-        if pr.get("isDraft"):  # a resumed PR was turned into a draft by its pause
-            self.github.gh("pr", "ready", number, "--repo", self.github.repository)
-        self.github.gh("pr", "merge", number, "--repo", self.github.repository, "--merge", "--auto",
-                       "--match-head-commit", str(item.body["head_sha"]))
-        return {"pr": int(number), "head_sha": item.body["head_sha"]}
-
-    def _do_pause(self, item: OutboxItem) -> dict:
-        """Procedure P: out of the merge queue, then draft (the guarantee), then
-        the kb:hold label (a record only)."""
-        number = str(item.body["pr"])
-        pr = self.github.pr(int(number))
-        if pr.get("state") != "OPEN":
-            return {"pr": int(number)}  # merged or closed already: nothing to stop
-        self.github.gh("api", "graphql", "-f", "query=mutation($id:ID!){dequeuePullRequest(input:{id:$id})"
-                       "{clientMutationId}}", "-f", f"id={pr['id']}", ok_fail=True)
-        self.github.gh("pr", "merge", number, "--repo", self.github.repository, "--disable-auto", ok_fail=True)
-        if not pr.get("isDraft"):
-            self.github.gh("pr", "ready", number, "--repo", self.github.repository, "--undo")
-        if not self.github.pr(int(number)).get("isDraft"):
-            raise PublishError(f"PR #{number} is still not a draft")
-        self.github.gh("pr", "edit", number, "--repo", self.github.repository, "--add-label", HOLD_LABEL,
-                       ok_fail=True)
-        return {"pr": int(number)}
-
-    def _do_update_branch(self, item: OutboxItem) -> dict:
-        self._checked_head(item)
-        self.github.gh("api", "-X", "PUT", f"repos/{self.github.repository}/pulls/{item.body['pr']}/update-branch",
-                       "-f", f"expected_head_sha={item.body['head_sha']}")
-        return {"pr": int(item.body["pr"])}
-
     def _do_open_issue(self, item: OutboxItem) -> dict:
         """One issue per title (a sweep report): an existing one is reused."""
         title = str(item.body["title"])
@@ -587,26 +530,19 @@ class Publisher:
 
         body = item.body
         number, head = int(body["pr"]), str(body["head_sha"])
-        verdict = local_gate.check_verdict(body["verdict"], self.service_public_key,
+        pr = self.github.pr(number)
+        self._refuse_companion(pr)  # whatever the item carries
+        verdict = local_gate.check_verdict(body.get("verdict"), self.service_public_key,
                                            repository=self.github.repository, pr=number, head_sha=head,
                                            now=self.clock())
-        pr = self.github.pr(number)
         if pr.get("state") != "OPEN":
             raise PublishError(f"PR #{number} is {pr.get('state')}")
         if pr.get("baseRefName") != "main":
             raise GateRefused([f"PR #{number} targets {pr.get('baseRefName')}, not main"])
         if pr.get("headRefOid") != head:
             raise PublishError(f"PR #{number} head moved to {str(pr.get('headRefOid'))[:12]}")
-        self._refuse_companion(pr)
-        labels = {str(label.get("name")) for label in pr.get("labels") or []}
-        if HOLD_LABEL in labels:
-            # a v7 pause left it: a merge item exists only for an unpaused
-            # repository under its current generation, so the hold is over
-            self.github.gh("pr", "edit", str(number), "--repo", self.github.repository,
-                           "--remove-label", HOLD_LABEL, ok_fail=True)
-            pr = self.github.pr(number)
-            if HOLD_LABEL in {str(label.get("name")) for label in pr.get("labels") or []}:
-                raise PublishError(f"PR #{number} still carries {HOLD_LABEL}; retried next round")
+        if pr.get("isDraft"):  # its author marked it work in progress: never readied by automation
+            raise PublishError(f"not merging: PR #{number} is a draft")
         remote = self._ensure_clone()
         rest = {"number": number, "state": "open", "head": {"sha": head}, "draft": bool(pr.get("isDraft")),
                 "labels": pr.get("labels") or []}
@@ -631,8 +567,6 @@ class Publisher:
         else:
             raise PublishError(f"main kept moving while PR #{number} was checked; retried next round")
         self._recheck_control()
-        if pr.get("isDraft"):  # a v7 pause left it a draft; GitHub will not merge a draft
-            self.github.gh("pr", "ready", str(number), "--repo", self.github.repository)
         intent = self._intent_path(item.id)
         intent.parent.mkdir(parents=True, exist_ok=True)
         intent.write_text(json.dumps({"pr": number, "head_sha": head, "changeset_id": body["changeset_id"],

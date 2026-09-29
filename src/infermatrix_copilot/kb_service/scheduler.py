@@ -65,13 +65,10 @@ class Scheduler:
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-    def _public_repos(self) -> set[str]:
-        return {name for name, lc in self.rt.registry.items() if lc.publishes}
-
     def tick(self) -> None:
         rt = self.rt
         if rt.outbox is not None:
-            rt.outbox.transition(lambda: None, public_repos=self._public_repos())
+            rt.outbox.transition(lambda: None)
             if rt.publisher_public_key is not None:
                 merge.apply_acks(rt, rt.outbox.collect_acks(rt.publisher_public_key))
         for lifecycle in rt.registry.values():
@@ -188,20 +185,18 @@ class Scheduler:
             self._pause(lifecycle.repo, f"overturn breaker: {len(recent)} knowledge PRs closed unmerged within 24h")
 
     def _pause(self, repo: str, reason: str) -> None:
-        """Pause a repository ("*": all of them) and dequeue its open PRs."""
+        """Pause a repository ("*": all of them): no merge is issued, and the
+        publisher refuses items of the older generation."""
         rt = self.rt
         if rt.ledger.repo_state(repo)["paused"]:
             rt.ledger.enqueue_human(repo if repo != "*" else next(iter(rt.registry)), reason)
             return
         # publish the pause in the same locked transition as the state change,
-        # so the publisher and the gate see it at once, then dequeue open PRs
+        # so the publisher sees it at once
         if rt.outbox is not None:
-            rt.outbox.transition(lambda: rt.ledger.bump_generation(repo, pause=True, reason=reason),
-                                 public_repos=self._public_repos())
+            rt.outbox.transition(lambda: rt.ledger.bump_generation(repo, pause=True, reason=reason))
         else:
             rt.ledger.bump_generation(repo, pause=True, reason=reason)
-        for name in ([repo] if repo != "*" else [lc.repo for lc in rt.registry.values()]):
-            merge.pause_open_prs(rt.ledger, rt.outbox, name, reason)
         rt.ledger.enqueue_human(repo if repo != "*" else next(iter(rt.registry)), reason)
         self._record(repo, "paused", reason=reason)
 
