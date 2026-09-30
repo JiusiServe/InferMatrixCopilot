@@ -1,6 +1,6 @@
 # improve/ —— 规范（元改进引擎）
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-01 -->
 
 `设计：/data/zhoutaichang/copilot/meta-improvement-engine-design.md v1（GPT-6 sol 批准 2026-09-29） · refactor-status: building (P0–P4 已落地)`
 
@@ -25,6 +25,8 @@
 | `stats.py` | P2 | 配对、按 item 聚类的 t 区间（移植 `paired_analysis.py`）、所需 item 数、五种标签、Cohen κ |
 | `adapters/review_eval.py` | P2 | eval 评审适配器：导入 `judge_val` 配对 verdict 为 `judge_verdict` outcome；`gold_match` 判官（3 票多数、hit 须逐字引用）写 `gold_match` outcome；`match()` 只读记录 |
 | `adapters/rb_review.py` | P2 | RB 生产适配器：PR 线程代理标签（accepted/disputed/silent）→ finding 级有效性，`descriptive_only`，无金标、不注册实验 |
+| `adapters/kb_intake.py` | P2+ | 知识起草（`kb-intake.draft`）适配器：结果 = 生产质量门本身写的 `gate_block`/`gate_summary` outcome；finding 级有效性 = L2 判定（pass=valid、fail=invalid、unsure=unlabeled），评审级分数 = `net_pass`/`gate_score`/`precision`/`yield_pass`/`fail`/`human`/`empty`；金标 = 该 item 上在位生成器通过门禁的规则（`gold_from_incumbent` → `write_gold`，按内容版本化），`gold_match` 判官 3 票多数、hit 须逐字引用，空稿不调判官直接 miss |
+| `workflows/kb-intake.yaml` | P2+ | 起草步骤的声明：static/step_call，item `{repo}#{pr}`，指纹覆盖 `kb_service/intake.py`、`KB_GENERATOR`/`KB_DRAFT_STRATEGY`、`zcode_reasoning_level`、copilot_sha；`kb_service.runtime` 为每次起草盖上 workflow/unit_id/item/fingerprint |
 | `forensics.py` | P2 | 覆盖矩阵（确定性）、S0–S10 阶段分类法、取证 agent（只读 trace 工具、全部输出围栏为不可信数据、必须引用记录 id）、双家族交叉复核（不一致 = disputed）、整改清单、测量健康 |
 | `meta.py` | P2 | 冻结元基准：`eval/dataset/meta/cases`（trace + 人工阶段标签）与 `meta/lints`（注入缺陷样本）的导出与加载 |
 | `budget.py` | P3 | 周包络（美元 + 判官次数，按 ISO 周持久化、跨进程加锁）：每次模型调用发出前按最坏情况预留（输入 = 请求字节数 ≥ token 数、输出 = `max_tokens`、无价格即拒绝）、返回后结算；`结算 > 预留` 记 `budget_breach` 并中止；`governed()`/`current_governor()` 供 `LLM.create` 与 `run_judge` 使用 |
@@ -52,4 +54,4 @@
 - lint 只读 trace，不调模型；无证据形态的 lint 不猜。
 
 ## 测试
-`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`、`test_improve_p3.py`、`test_improve_p4.py`。
+`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`、`test_improve_p3.py`、`test_improve_p4.py`、`test_improve_kb_intake_adapter.py`。
