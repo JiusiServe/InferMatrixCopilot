@@ -201,3 +201,313 @@ owners:
   - README.md
   - README_CN.md
   - .doc_project_maintainer/
+- owner: launch
+  path: repos/jiuwenswarm/components/launch/_index.md
+  signals:
+  - start_services
+  - jiuwenswarm-start
+  - debug launcher
+  - multi-instance
+  - --dotenv
+  - --name
+  - jiuwenswarm-init
+  - init workspace
+  - dotenv_early
+  - SSE patch
+  - ModelArts
+  - compat alias
+  - desktop
+  - 桌面端
+  - desktop app
+  - 窗口
+  - 关闭行为
+  - 最小化到托盘
+  - 全屏
+  - 自动更新
+  scope_prefixes:
+  - jiuwenswarm/acp/
+  - jiuwenswarm/app.py
+  - jiuwenswarm/channels/acp/
+  - jiuwenswarm/cli/
+  - jiuwenswarm/debug_launcher.py
+  - jiuwenswarm/dotenv_early.py
+  - jiuwenswarm/init_workspace.py
+  - jiuwenswarm/llm_provider_compat_patch.py
+  - jiuwenswarm/llm_sse_patch.py
+  - jiuwenswarm/start_services.py
+  - jiuwenswarm/channels/desktop/
+  - jiuwenswarm/instance_manager/
+- owner: gateway-channels-2
+  path: repos/jiuwenswarm/components/gateway-channels/_index.md
+  signals:
+  - cli
+  - chat
+  - 命令行
+  - CLI 频道
+  - gateway client
+  - websocket
+  - tui
+  - renderer
+  - jsonl
+  - spinner
+  - SIGINT
+  - 受信目录
+  - process_cli
+  - process cli
+  - CLI
+  - REPL
+  - slash command
+  - 斜杠命令
+  - one-shot
+  - machine mode
+  scope_prefixes:
+  - jiuwenswarm/channels/cli/
+  - jiuwenswarm/channels/process_cli/
+- owner: common-core
+  path: repos/jiuwenswarm/components/common-core/_index.md
+  signals:
+  - common
+  - config
+  - 配置
+  - 模型选择
+  - model catalog
+  - mode
+  - 工作区
+  - cron
+  - updater
+  - doctor
+  - hooks
+  - kv cache
+  - ACP
+  - acp
+  - stdio
+  - AcpStdioClient
+  - Codex
+  - Codex CLI
+  - acp_agents
+  - JSON-RPC
+  scope_prefixes:
+  - jiuwenswarm/common/_build_config.py
+  - jiuwenswarm/common/chat_final.py
+  - jiuwenswarm/common/cleanup.py
+  - jiuwenswarm/common/client/
+  - jiuwenswarm/common/coding_memory_paths.py
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/common/context_keys.py
+  - jiuwenswarm/common/context_window.py
+  - jiuwenswarm/common/cron_session.py
+  - jiuwenswarm/common/cron_team_completion.py
+  - jiuwenswarm/common/debug_dump.py
+  - jiuwenswarm/common/external_cli_catalog.py
+  - jiuwenswarm/common/external_cli_runtime.py
+  - jiuwenswarm/common/git_safe_directory.py
+  - jiuwenswarm/common/hooks_config.py
+  - jiuwenswarm/common/kv_cache_affinity_config.py
+  - jiuwenswarm/common/log_preview.py
+  - jiuwenswarm/common/mcp_config.py
+  - jiuwenswarm/common/media_capability_config.py
+  - jiuwenswarm/common/mode_matrix.py
+  - jiuwenswarm/common/model_catalog.py
+  - jiuwenswarm/common/model_config_validation.py
+  - jiuwenswarm/common/model_errors.py
+  - jiuwenswarm/common/model_migration.py
+  - jiuwenswarm/common/model_selection.py
+  - jiuwenswarm/common/model_vendor_registry.py
+  - jiuwenswarm/common/openrouter_attribution.py
+  - jiuwenswarm/common/permission_tools.py
+  - jiuwenswarm/common/playwright_mcp_runtime.py
+  - jiuwenswarm/common/process_supervision.py
+  - jiuwenswarm/common/projectless_workspace.py
+  - jiuwenswarm/common/protocol_ids.py
+  - jiuwenswarm/common/reasoning_config.py
+  - jiuwenswarm/common/reasoning_injector.py
+  - jiuwenswarm/common/runtime_log_filter.py
+  - jiuwenswarm/common/runtime_workspace.py
+  - jiuwenswarm/common/security/
+  - jiuwenswarm/common/session_message.py
+  - jiuwenswarm/common/stage_timer.py
+  - jiuwenswarm/common/startup_diagnostics.py
+  - jiuwenswarm/common/task_loop_config.py
+  - jiuwenswarm/common/team_artifacts.py
+  - jiuwenswarm/common/todo_snapshot.py
+  - jiuwenswarm/common/tool_display.py
+  - jiuwenswarm/common/tool_ownership.py
+  - jiuwenswarm/common/updater.py
+  - jiuwenswarm/common/updater_restart_helper.py
+  - jiuwenswarm/common/upgrade_executor.py
+  - jiuwenswarm/common/utils.py
+  - jiuwenswarm/common/version.py
+  - jiuwenswarm/common/version_source.py
+  - jiuwenswarm/common/work_mode.py
+  - jiuwenswarm/common/ws_diagnostics.py
+  - jiuwenswarm/common/ws_limits.py
+  - jiuwenswarm/common/acp/
+  - jiuwenswarm/common/config_panel/
+  - jiuwenswarm/common/schema/
+- owner: login-auth
+  path: repos/jiuwenswarm/components/login-auth/_index.md
+  signals:
+  - 登录
+  - 华为账号
+  - Account Kit
+  - OAuth
+  - PKCE
+  - id_token
+  - refresh_token
+  - 免费模型
+  - 积分
+  - APIG
+  - 远端配置
+  - auth
+  scope_prefixes:
+  - jiuwenswarm/common/auth/
+- owner: extensions-plugins
+  path: repos/jiuwenswarm/components/extensions-plugins/_index.md
+  signals:
+  - extension
+  - 扩展
+  - plugin
+  - 应用插件
+  - hook
+  - registry
+  - loader
+  - manifest
+  - yuanrong
+  - openYuanRong
+  - clawee
+  - sandbox
+  - agentos
+  - AgentOS router
+  - 沙箱
+  - ssh relay
+  - ephemeral key
+  - third agent
+  - agent manager
+  - stale cleanup
+  scope_prefixes:
+  - jiuwenswarm/extensions/agent_client/
+  - jiuwenswarm/extensions/application_host.py
+  - jiuwenswarm/extensions/callback_compat.py
+  - jiuwenswarm/extensions/clawee.py
+  - jiuwenswarm/extensions/hook_event.py
+  - jiuwenswarm/extensions/hooks_context.py
+  - jiuwenswarm/extensions/loader.py
+  - jiuwenswarm/extensions/manager.py
+  - jiuwenswarm/extensions/registry.py
+  - jiuwenswarm/extensions/sdk/
+  - jiuwenswarm/extensions/types.py
+  - jiuwenswarm/extensions/yuanrong_frontend_client.py
+  - jiuwenswarm/extensions/agentos/
+  - jiuwenswarm/extensions/video_duplex/
+- owner: observability
+  path: repos/jiuwenswarm/components/observability/_index.md
+  signals:
+  - observability
+  - trajectory
+  - 轨迹
+  - OTLP
+  - trace
+  - span
+  - sink
+  - SQLite
+  - retention
+  - 保留
+  - turn
+  - session delete
+  scope_prefixes:
+  - jiuwenswarm/observability/
+- owner: agent-runtime
+  path: repos/jiuwenswarm/components/agent-runtime/_index.md
+  signals:
+  - runtime
+  - AgentRuntime
+  - session create/switch/fork
+  - session.delete
+  - plan mode
+  - model catalog
+  - permission snapshot
+  - MCP reference
+  - push handler
+  - process CLI
+  - agent definition
+  - 运行时
+  - session
+  - 会话
+  - coordinator
+  - execution
+  - cancel
+  - close_session
+  - scheduler
+  - run_stream
+  scope_prefixes:
+  - jiuwenswarm/runtime/agent_definition.py
+  - jiuwenswarm/runtime/context.py
+  - jiuwenswarm/runtime/events.py
+  - jiuwenswarm/runtime/evolution.py
+  - jiuwenswarm/runtime/host_services.py
+  - jiuwenswarm/runtime/interaction.py
+  - jiuwenswarm/runtime/mcp_references.py
+  - jiuwenswarm/runtime/mode_catalog.py
+  - jiuwenswarm/runtime/model_catalog.py
+  - jiuwenswarm/runtime/permission_catalog.py
+  - jiuwenswarm/runtime/plan.py
+  - jiuwenswarm/runtime/request.py
+  - jiuwenswarm/runtime/service.py
+  - jiuwenswarm/runtime/session_catalog.py
+  - jiuwenswarm/runtime/session_delete.py
+  - jiuwenswarm/runtime/session_input.py
+  - jiuwenswarm/runtime/session_lifecycle.py
+  - jiuwenswarm/runtime/session_provisioner.py
+  - jiuwenswarm/runtime/session/
+- owner: cron-scheduling
+  path: repos/jiuwenswarm/components/cron-scheduling/_index.md
+  signals:
+  - cron
+  - 定时任务
+  - cron job
+  - cron 表达式
+  - etcd
+  - 主备
+  - HA
+  - cron store
+  - work_mode
+  - proactive
+  - 钉钉推送
+  - timezone
+  scope_prefixes:
+  - jiuwenswarm/runtime/cron/
+- owner: symphony-orchestration
+  path: repos/jiuwenswarm/components/symphony-orchestration/_index.md
+  signals:
+  - symphony
+  - graph build
+  - 图谱构建
+  - fingerprint
+  - 能力指纹
+  - evolution
+  - 经验演进
+  - experience candidate
+  - recipe
+  - skill taxonomy
+  - skill retrieval
+  - orchestration
+  - 演化
+  - overlay
+  - 动态图谱
+  - dynamic graph
+  - plan outcome
+  - failure attribution
+  - 失败归因
+  - skill packs
+  scope_prefixes:
+  - jiuwenswarm/symphony/adapter.py
+  - jiuwenswarm/symphony/build.py
+  - jiuwenswarm/symphony/config.py
+  - jiuwenswarm/symphony/experience.py
+  - jiuwenswarm/symphony/graph_state.py
+  - jiuwenswarm/symphony/graph_storage.py
+  - jiuwenswarm/symphony/llm.py
+  - jiuwenswarm/symphony/service.py
+  - jiuwenswarm/symphony/skill_retrieval/
+  - jiuwenswarm/symphony/evolution/
+  - jiuwenswarm/symphony/shared/
