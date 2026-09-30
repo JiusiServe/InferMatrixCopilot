@@ -586,6 +586,16 @@ class Settings(BaseSettings):
     # the review bot's GitHub login, so its own replies never count as the
     # author accepting or disputing a finding
     improve_rb_bot_login: str = ""
+    # Publication (design §9.2): the engine holds no GitHub token; proposal
+    # actions are files in this outbox that the maintainer routine's `propose`
+    # routine picks up. Unset = the publish step is a no-op even when both
+    # post gates are open. `improve_proposal_repo` names the repository the
+    # proposal issues go to ("owner/name"); required for publication.
+    improve_outbox_dir: str = ""
+    improve_proposal_repo: str = ""
+    # The frozen meta-benchmark the engine measures itself against (§11.2);
+    # a shadow self-experiment gets a staged copy through IMPROVE_META_DIR.
+    improve_meta_dir: str = "eval/dataset/meta"
 
     # Metrics (eval/METRICS_RESEARCH.md) — per-run metrics.json: CATQ = Q·S/C.
     # Reference budgets are EXPLICIT deployment assumptions (RQS3e precedent):

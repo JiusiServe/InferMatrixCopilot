@@ -47,6 +47,24 @@ async def _stage_items(ctx: StepContext) -> StepResult:
                       outputs={"staged": sorted(snapshots), "state_updates": updates})
 
 
+@step("improve.mode", "deterministic", "read",
+      "Publish the run's mode: a weekly cycle, or one meta-benchmark case (self-experiment).")
+async def _mode(ctx: StepContext) -> StepResult:
+    """`--task-param meta_case=<case>` turns the playbook into the engine's
+    own forensics unit over ONE frozen case: `improve_meta` gates every
+    cycle step off and `improve_item` (`meta:<case>`) keys the unit."""
+    from ._common import task_spec
+
+    params = (task_spec(ctx).get("params") or {}) if isinstance(task_spec(ctx), dict) else {}
+    case = str(ctx.params.get("meta_case") or params.get("meta_case") or "").strip()
+    if case and ("/" in case or case.startswith(".")):
+        return StepResult(False, FailureKind.BLOCKED, f"meta_case must be a case name, got {case!r}")
+    updates = {"improve_meta": bool(case), "meta_case": case, "improve_item": f"meta:{case}" if case else "cycle"}
+    ctx.state.update(updates)
+    return StepResult(True, summary=f"mode: {'meta case ' + case if case else 'weekly cycle'}",
+                      outputs={"state_updates": updates})
+
+
 def _ledger_dir(ctx: StepContext) -> Path:
     from ...improve.cycle import ledger_dir_for
 
@@ -158,12 +176,130 @@ def _forensics_agents(ctx: StepContext) -> dict:
     return agents
 
 
+def _outbox(ctx: StepContext):
+    from ...improve.publish import ProposalOutbox
+
+    root = str(ctx.params.get("outbox_dir") or getattr(ctx.settings, "improve_outbox_dir", "") or "")
+    return ProposalOutbox(Path(root).expanduser()) if root else None
+
+
+@step("improve.sync", "deterministic", "read",
+      "Read the routine's acks and observations back into the ledger (issue urls, touches, holds, landings).")
+async def _sync(ctx: StepContext) -> StepResult:
+    """Local bookkeeping only: the outbox directory is the engine's own.
+    Publishes `improve_sync`."""
+    import time
+
+    from ...improve.ledger import Ledger
+    from ...improve.publish import sync
+
+    outbox = _outbox(ctx)
+    if outbox is None:
+        return StepResult(True, summary="no outbox configured (improve_outbox_dir): nothing to sync",
+                          outputs={"state_updates": {"improve_sync": {}}})
+    store = _trace_store(ctx)
+    report = sync(Ledger(_ledger_dir(ctx), store), outbox, store, now=time.time())
+    updates = {"improve_sync": report}
+    ctx.state.update(updates)
+    return StepResult(True, summary=(f"sync: {len(report['acked'])} ack(s), {len(report['touched'])} touched, "
+                                     f"{len(report['landed'])} landed, holds {report['holds'] or 'none'}"),
+                      outputs={"sync": report, "state_updates": updates})
+
+
+@step("improve.publish", "script", "push",
+      "Hand publishable proposals to the maintainer routine's outbox (explicit post flag + ALLOW_POST).")
+async def _publish(ctx: StepContext) -> StepResult:
+    """The cycle's only outward write (design §11.1 rule 1), double-gated
+    like `pr.post_review`: without the task's `post` intent nothing is
+    planned as a write; with it but ALLOW_POST=0 the plan is printed as a
+    dry run; with both, action files are written and every proposal that
+    fails the linter is refused and recorded. Publishes `improve_publish`."""
+    import time
+
+    from ...improve.ledger import Ledger
+    from ...improve.publish import PublishError, plan, publish
+    from ._common import task_spec
+
+    spec = task_spec(ctx)
+    store = _trace_store(ctx)
+    if store is None:
+        return StepResult(False, FailureKind.BLOCKED, "no trace store (set TRACE_STORE_ROOT)")
+    ledger_dir = _ledger_dir(ctx)
+    ledger = Ledger(ledger_dir, store)
+    repo = str(ctx.params.get("repo") or getattr(ctx.settings, "improve_proposal_repo", "") or "")
+    now = time.time()
+    if not spec.get("post"):
+        preview = plan(ledger, store, repo=repo or "?", now=now, ledger_ref=str(ledger_dir))
+        updates = {"improve_publish": {"mode": "not-requested", "would": len(preview["actions"]),
+                                       "refused": preview["refused"], "held": preview["held"]}}
+        ctx.state.update(updates)
+        return StepResult(True, summary=f"not publishing (post flag not set); {len(preview['actions'])} action(s) "
+                                        f"would be written, {len(preview['refused'])} refused by the linter",
+                          outputs={"plan": preview, "state_updates": updates})
+    outbox = _outbox(ctx)
+    if outbox is None:
+        return StepResult(False, FailureKind.BLOCKED, "post requested but no outbox configured (improve_outbox_dir)")
+    dry_run = not bool(ctx.settings.allow_post)
+    try:
+        report = publish(ledger, store, outbox, repo=repo, now=now, ledger_ref=str(ledger_dir), dry_run=dry_run)
+    except PublishError as exc:
+        return StepResult(False, FailureKind.BLOCKED, str(exc))
+    updates = {"improve_publish": {"mode": "dry-run" if dry_run else "written", "actions": len(report["actions"]),
+                                   "written": report["written"], "refused": report["refused"], "held": report["held"],
+                                   "waiting": report["waiting"]}}
+    ctx.state.update(updates)
+    if dry_run:
+        return StepResult(True, summary=f"dry-run (ALLOW_POST=0): would write {len(report['actions'])} outbox action(s) "
+                                        f"for {repo}; {len(report['refused'])} refused by the linter",
+                          outputs={"dry_run": True, "plan": report, "state_updates": updates})
+    for path in report["written"]:
+        ctx.trace.record("outbox_written", what="proposal action", path=path, repo=repo)
+    return StepResult(True, summary=f"wrote {len(report['written'])} outbox action(s) for {repo}; "
+                                    f"{len(report['refused'])} refused by the linter, {len(report['held'])} workflow(s) on hold",
+                      outputs={"plan": report, "state_updates": updates})
+
+
+async def _meta_forensics(ctx: StepContext, store, case_name: str) -> StepResult:
+    """The engine's own unit: attribute one frozen meta case with the
+    configured investigator families and record the comparison with the
+    human labels (`meta_eval`). The case is read from `improve_meta_dir`
+    (a staged copy under IMPROVE_META_DIR in a shadow child)."""
+    from ...improve.budget import BudgetRefused, governed
+    from ...improve.cycle import governor_for
+    from ...improve.meta import load_cases, run_case
+    from ...trace_store import bind_store
+
+    meta_dir = Path(str(ctx.params.get("meta_dir") or getattr(ctx.settings, "improve_meta_dir", "") or "eval/dataset/meta")).expanduser()
+    cases = {c.name: c for c in load_cases(meta_dir)}
+    case = cases.get(case_name)
+    if case is None:
+        return StepResult(False, FailureKind.BLOCKED, f"no meta case {case_name!r} under {meta_dir}")
+    agents = _forensics_agents(ctx)
+    if not agents:
+        return StepResult(False, FailureKind.BLOCKED, "no LLM configured for the forensics agents")
+    governor = governor_for(ctx.settings, _ledger_dir(ctx))
+    ctx.governor = governor
+    try:
+        with bind_store(store), governed(governor):
+            result = run_case(store, case, agents, meta_dir=meta_dir, max_cells=int(ctx.params.get("max_cells") or 40))
+    except BudgetRefused as exc:
+        return StepResult(False, FailureKind.BLOCKED, f"budget exhausted: {exc}")
+    summary = {k: result.get(k) for k in ("case", "cells", "attributed", "agreement", "kappa", "lint_recall", "disputed")}
+    updates = {"improve_meta_eval": summary}
+    ctx.state.update(updates)
+    return StepResult(True, summary=f"meta case {case_name}: {result['attributed']}/{result['cells']} cells attributed, "
+                                    f"agreement {result['agreement']}, kappa {result['kappa']}, lint recall {result['lint_recall']}",
+                      outputs={"meta_eval": result, "state_updates": updates})
+
+
 @step("improve.forensics", "agent", "read",
       "Tier 2: coverage matrices + stage-of-loss attribution for workflows with an outcome adapter.")
 async def _forensics(ctx: StepContext) -> StepResult:
     """For each Tier 2 workflow in the last cycle's window: import outcomes,
     build the gold × unit matrix, attribute every miss with two agent
-    families, rank the punch list. Params: `workflow` (restrict), `max_cells`.
+    families, rank the punch list and open one Tier 2 proposal per stage
+    with a loss. Params: `workflow` (restrict), `max_cells`. In meta mode
+    (`improve_meta`) the step is the engine's own unit over one frozen case.
     Publishes `improve_forensics` (punch lists + measurement health)."""
     from ...improve.adapters import load_adapter
     from ...improve.enroll import declarations_for
@@ -172,11 +308,14 @@ async def _forensics(ctx: StepContext) -> StepResult:
     from ...trace_store import bind_store, trace_context
 
     from ...improve.budget import BudgetRefused, governed
-    from ...improve.cycle import governor_for
+    from ...improve.cycle import governor_for, open_tier2_proposals
+    from ...improve.ledger import Ledger
 
     store = _trace_store(ctx)
     if store is None:
         return StepResult(False, FailureKind.BLOCKED, "no trace store (set TRACE_STORE_ROOT)")
+    if ctx.state.get("improve_meta"):
+        return await _meta_forensics(ctx, store, str(ctx.state.get("meta_case") or ""))
     cycle = ctx.state.get("improve_cycle") or {}
     since, until = cycle.get("since"), cycle.get("until")
     if since is None or until is None:
@@ -217,6 +356,12 @@ async def _forensics(ctx: StepContext) -> StepResult:
                     attributions = []
                 entry["punch_list"] = punch_list(attributions, golds, {u.unit_id: u for u in wf_units})
                 entry["measurement"] = measurement_health(attributions)
+                # one Tier 2 proposal per stage with a loss (design §9.2),
+                # carrying the suggested pre-registration; proxy-labelled
+                # for a descriptive-only workflow
+                entry["proposals"] = open_tier2_proposals(
+                    Ledger(_ledger_dir(ctx), store), _ledger_dir(ctx), name, entry["punch_list"],
+                    descriptive_only=entry["descriptive_only"], items=sorted(golds))
             elif cells and not agents:
                 entry["skipped"] = "no LLM configured for the forensics agents"
             results[name] = entry

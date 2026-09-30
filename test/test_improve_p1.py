@@ -530,14 +530,20 @@ def test_workflow_improve_is_a_read_only_l2_kind_with_a_vetted_playbook(tmp_path
     spec = TaskSpec(kind="workflow_improve", repo="demo")
     assert spec.tier == "L2" and spec.read_only
     registry = register_builtin_steps(StepRegistry())
-    for name in ("improve.preflight", "improve.lint", "improve.ledger", "improve.stage_items"):
-        assert registry.get(name).risk == "read"
+    # design §13.6: every improve.* step is read-only except the publisher
+    for name in ("improve.mode", "improve.preflight", "improve.sync", "improve.lint", "improve.experiments",
+                 "improve.forensics", "improve.ledger", "improve.stage_items"):
+        assert registry.get(name).risk == "read", name
+    assert registry.get("improve.publish").risk == "push"
     store = PlaybookStore(PLAYBOOKS, registry)
     store.load()
     pb = store.get("workflow-improve")
-    assert pb is not None and [s.step for s in pb.steps][:5] == ["improve.preflight", "improve.lint",
-                                                                   "improve.experiments", "improve.forensics",
-                                                                   "improve.ledger"]
+    assert pb is not None and [s.step for s in pb.steps] == ["improve.mode", "improve.preflight", "improve.sync",
+                                                              "improve.lint", "improve.experiments", "improve.forensics",
+                                                              "improve.ledger", "improve.publish", "report.final_summary"]
+    # the meta mode gates every cycle step off; forensics and the report always run
+    assert [s.when for s in pb.steps if s.step not in ("improve.mode", "improve.forensics", "report.final_summary")] \
+        == ["not improve_meta"] * 6
     resolution = Planner(store, registry).resolve(spec)
     assert resolution.mode == "reuse" and resolution.playbook.name == "workflow-improve"
 

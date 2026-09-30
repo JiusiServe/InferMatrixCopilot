@@ -228,7 +228,7 @@ def _run_cycle_locked(store: TraceStore, settings: Any, ledger_dir: Path, *, now
                         workflow, tier=1, lint=lint_id, evidence=evidence,
                         claim=(f"{lint_id} ({desc}) worsened: {entry['rate']:.0%} of units this cycle "
                                f"vs {prev_rate:.0%} last cycle ({entry['units']} units)"),
-                        loss=entry["rate"] - prev_rate,
+                        loss=entry["rate"] - prev_rate, rate_at_open=float(entry["rate"]),
                         proxy=(workflow == "rb-review.review"))
                     proposals_opened.append({"workflow": workflow, "id": proposal.id, "lint": lint_id,
                                              "claim": proposal.claim})
@@ -278,6 +278,43 @@ def _run_cycle_locked(store: TraceStore, settings: Any, ledger_dir: Path, *, now
                               "origin": origin, "deferred": sorted(deferred_now),
                               "counted": {**kept, **counted_now}})
     return report
+
+
+def open_tier2_proposals(ledger: Ledger, ledger_dir: Path, workflow: str, punch_list: list[dict], *,
+                         descriptive_only: bool, items: list[str], metric: str = "recall_gold",
+                         min_effect: float = 0.05) -> list[dict]:
+    """One proposal per punch-list stage with a loss (design §9.2: one fix,
+    one PR), each carrying a suggested pre-registration: the metric, the
+    items with gold, the item count the historical sd requires and what the
+    arm's fingerprint should cover for that stage. S0 (unattributable) and
+    S10 (measurement) never become proposals; a descriptive-only workflow's
+    proposals are proxy-labelled."""
+    from .experiments import PRIOR_SD, _historical_sd
+    from .publish import STAGE_HINTS
+    from . import stats
+
+    opened = []
+    for bucket in punch_list:
+        stage = str(bucket.get("stage") or "")
+        loss = int(bucket.get("loss") or 0)
+        if stage in ("S0", "S10") or loss < 1:
+            continue
+        evidence = list(dict.fromkeys(rid for c in bucket.get("cells") or [] for rid in c.get("evidence") or []))[:12]
+        if not evidence:
+            continue
+        sd = _historical_sd(ledger_dir, workflow, metric) or PRIOR_SD
+        suggestion = {} if descriptive_only else {
+            "metric": metric, "direction": "higher", "min_effect": min_effect,
+            "n_required": stats.items_required(sd, min_effect), "sd_item": sd,
+            "covers": STAGE_HINTS.get(stage, ""), "items": sorted(items)[:30]}
+        units = {c.get("unit_id") for c in bucket.get("cells") or []}
+        claim = (f"{stage} ({bucket.get('description', '')}): {loss} missed gold entr{'y' if loss == 1 else 'ies'} "
+                 f"lost at this stage" + (f" ({bucket.get('disputed')} disputed)" if bucket.get("disputed") else ""))
+        proposal = ledger.open_proposal(workflow, tier=2, stage=stage, claim=claim, evidence=evidence, loss=float(loss),
+                                        proxy=descriptive_only, suggestion=suggestion)
+        opened.append({"workflow": workflow, "id": proposal.id, "stage": stage, "loss": loss, "units": len(units),
+                       "claim": proposal.claim})
+    return opened
 
 
 def _write_report(ledger_dir: Path, report: dict) -> Path:

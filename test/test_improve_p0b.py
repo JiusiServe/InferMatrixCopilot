@@ -134,7 +134,7 @@ def test_shadow_env_is_an_allowlist_with_a_one_off_path(tmp_path, monkeypatch):
     assert not any(k.startswith(("GH_", "GITHUB_")) for k in env)
     assert "SLACK_TOKEN" not in env and "KB_SIGNING_PAT" not in env and "RANDOM_VAR" not in env
     assert env["ANTHROPIC_API_KEY"] == "sk-ant-ok" and env["ECO_API_KEY"] == "k" and env["HOME"] == "/home/t"
-    assert env["PATH"] == str(exe) and env["REPO_PATHS"] == f"demo={tmp_path / 's'}"
+    assert env["PATH"] == str(exe) and json.loads(env["REPO_PATHS"]) == {"demo": str(tmp_path / "s")}   # what Settings parses
     assert env["ALLOW_POST"] == "0" and env["ALLOW_PUSH"] == "0" and env["IMPROVE_SHADOW"] == "1"
     assert env["PR_CONTEXT_SOURCE"] == "snapshot"
     assert env["IMPROVE_GOVERNED"] == "1" and env["IMPROVE_LEDGER_DIR"] == str(tmp_path / "ledger")

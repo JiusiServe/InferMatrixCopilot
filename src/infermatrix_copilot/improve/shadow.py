@@ -23,6 +23,7 @@ a layer. `assert_boundaries` checks an environment before dispatch and
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -124,7 +125,8 @@ def shadow_env(*, shadow_dir: str | Path, run_dir: str | Path, trace_root: str |
         if _SECRET_NAME.search(key):
             continue
     out["PATH"] = str(executables_dir)
-    out["REPO_PATHS"] = f"{repo_name}={shadow_dir}"
+    # the JSON form Settings parses (alias -> checkout): the child's only repo
+    out["REPO_PATHS"] = json.dumps({repo_name: str(shadow_dir)})
     out["TRACE_STORE_ROOT"] = str(trace_root)
     out["IMPROVE_SHADOW"] = "1"
     out["PR_CONTEXT_SOURCE"] = "snapshot"
