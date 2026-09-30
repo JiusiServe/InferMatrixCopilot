@@ -68,6 +68,16 @@ _MD_REF = re.compile(r"(?m)^ {0,3}\[(?P<label>[^\]\n]+)\]:[ \t]*(?:<(?P<angle>[^
 # a reference definition counts only where it is used: [text][label], [label][], [label]
 _REF_FULL = re.compile(r"\[(?P<text>[^\]\n]+)\]\[(?P<label>[^\]\n]*)\]")
 _REF_SHORT = re.compile(r"\[(?P<label>[^\]\n]+)\](?![(\[:])")
+# navigation needs the whole link: an unescaped "[" opening a non-blank label
+# (not an image "![", not "\["); anything less is not counted as a link
+_NAV_LABEL = r"(?<![\\!\]])\[(?P<text>(?:[^\[\]\\\n]|\\.)*[^\s\[\]\\](?:[^\[\]\\\n]|\\.)*)\]"
+_NAV_LINK = re.compile(_NAV_LABEL + r"\(\s*(?:<(?P<angle>[^>\n]*)>|(?P<target>[^)\s]+))"
+                       + _LINK_TITLE + r"\s*\)")
+_NAV_REF_FULL = re.compile(_NAV_LABEL + r"\[(?P<label>[^\]\n]*)\]")
+_NAV_REF_SHORT = re.compile(r"(?<![\\!\]])\[(?P<label>[^\[\]\n]*[^\s\[\]][^\[\]\n]*)\](?![(\[:])")
+# 4+ columns of indentation outside a nested list item: indented code
+_INDENTED = re.compile(r"(?: {4}| {0,3}\t)")
+_LIST_ITEM = re.compile(r"\s*(?:[-*+]|\d{1,9}[.)])\s")
 # Link visibility, fail-closed. No Markdown parser is complete, so the checks
 # split by direction: every link-like text counts when checking that links
 # resolve (a link "hidden in code" is still checked), and only a CERTAINLY
@@ -78,6 +88,61 @@ _REF_SHORT = re.compile(r"\[(?P<label>[^\]\n]+)\](?![(\[:])")
 _FENCE_LIKE = re.compile(r"^[\s>*+\-\d.)]*(?:`{3,}|~{3,})")
 _BLOCK_START = re.compile(r" {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d{1,9}[.)]\s|>)")
 _TABLE_ROW = re.compile(r" {0,3}\|")
+_TOP_LIST_ITEM = re.compile(r" {0,3}(?:[-*+]|\d{1,9}[.)])\s")
+_CONTAINER_PREFIX = re.compile(r"[ \t>]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+[ \t>]*)*")
+_CLOSED_COMMENT = re.compile(r"<!--.*?-->[ \t]*")
+
+
+_ANGLE_DEST_BEFORE = re.compile(r"(?:\]\(\s*|(?m:^) {0,3}\[[^\]\n]+\]:[ \t]*)$")
+_AUTOLINK = re.compile(r"<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^<>\s]*>")
+
+
+def _open_tag(text: str) -> bool:
+    """``text`` ends inside an HTML comment or tag. A tag closes only at a ">"
+    outside its quoted attribute values. Markdown's own angle brackets (a
+    ``<destination>`` of a link or definition, an autolink) are not tags."""
+    state, quote, k = "", "", 0
+    while k < len(text):
+        if state == "comment":
+            end = text.find("-->", k)
+            if end < 0:
+                return True
+            state, k = "", end + 3
+            continue
+        ch = text[k]
+        if state == "tag":
+            if quote:
+                quote = "" if ch == quote else quote
+            elif ch in "\"'":
+                quote = ch
+            elif ch == ">":
+                state = ""
+        elif text.startswith("<!--", k):
+            state, k = "comment", k + 4
+            continue
+        elif ch == "<":
+            end = text.find(">", k)
+            if end > k and "\n" not in text[k:end] and (
+                    _ANGLE_DEST_BEFORE.search(text, 0, k) or _AUTOLINK.match(text, k)):
+                k = end + 1
+                continue
+            if k + 1 < len(text) and re.match(r"[A-Za-z/!?]", text[k + 1]):
+                state = "tag"
+        k += 1
+    return state != ""
+
+
+def _hazard(line: str) -> bool:
+    """A line that may change how the lines after it render: a fence, an HTML
+    block (content starting with "<" after any container prefix, except one
+    closed comment), or a tag or comment left open. Nothing after a hazard
+    counts as certainly visible."""
+    if _FENCE_LIKE.match(line):
+        return True
+    content = line[_CONTAINER_PREFIX.match(line).end():]
+    if content.startswith("<") and not _CLOSED_COMMENT.fullmatch(content):
+        return True
+    return _open_tag(line)
 _TABLE_DELIM = re.compile(r" {0,3}\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*")
 
 
@@ -99,9 +164,11 @@ def _certainly_visible(text: str, pos: int) -> bool:
     line_end = text.find("\n", pos)
     line_end = len(text) if line_end < 0 else line_end
     lines = text[:line_end].split("\n")
-    if any(_FENCE_LIKE.match(line) for line in lines):
+    if any(_hazard(line) for line in lines):
         return False
     line = lines[-1]
+    if _in_html_comment(text, pos) or _indented_code(lines):
+        return False
     if _table_body_row(lines, len(lines) - 1):
         cell_start = max((m.end() for m in re.finditer(r"(?<!\\)\|", line[:pos - line_start])), default=0)
         return "`" not in line[cell_start:pos - line_start]
@@ -110,6 +177,32 @@ def _certainly_visible(text: str, pos: int) -> bool:
         start -= 1
     block_start = sum(len(item) + 1 for item in lines[:start])
     return "`" not in text[block_start:pos]
+
+
+def _in_html_comment(text: str, pos: int) -> bool:
+    opened = text.rfind("<!--", 0, pos)
+    if opened < 0:
+        return False
+    closed = text.find("-->", opened + 4)
+    return closed < 0 or closed >= pos
+
+
+def _indented_code(lines: list[str]) -> bool:
+    """The last line may be indented code: 4+ columns of indentation, unless it
+    is a list item inside a real list, i.e. its block (no blank line between)
+    starts at a top-level list item (fail-closed)."""
+    if not _INDENTED.match(lines[-1]):
+        return False
+    if not _LIST_ITEM.match(lines[-1]):
+        return True
+    k = len(lines) - 2
+    while k >= 0 and lines[k].strip():
+        if _TOP_LIST_ITEM.match(lines[k]):
+            return False
+        if not (_INDENTED.match(lines[k]) and _LIST_ITEM.match(lines[k])):
+            return True
+        k -= 1
+    return True
 
 
 def _block_span(text: str, pos: int) -> tuple[int, int]:
@@ -129,10 +222,10 @@ def _block_span(text: str, pos: int) -> tuple[int, int]:
 
 
 def _block_context(text: str, pos: int) -> tuple[str, tuple[str, ...]]:
-    """The block holding ``pos`` and the fence-like lines before it: the same
-    block after the same fences renders the same way."""
+    """The block holding ``pos`` and the hazard lines before it: the same block
+    after the same hazards renders the same way."""
     start, end = _block_span(text, pos)
-    return text[start:end], tuple(line for line in text[:start].split("\n") if _FENCE_LIKE.match(line))
+    return text[start:end], tuple(line for line in text[:start].split("\n") if _hazard(line))
 
 
 def _contexts(text: str) -> set[tuple[str, tuple[str, ...]]]:
@@ -468,8 +561,21 @@ def _link_occurrences(directory: str, text: str, *, certain: bool = False
     def target_of(match) -> str:
         return match.group("angle") if match.group("angle") is not None else match.group("target")
 
-    def keep(pos: int) -> bool:
-        return not certain or _certainly_visible(text, pos)
+    def keep(match) -> bool:
+        # visible where it starts, and no backtick anywhere in the link text
+        # itself (one there opens a code span that swallows the link)
+        # and no markup in or open before it on its line (a comment or a tag
+        # attribute swallows what looks like a link)
+        if not certain:
+            return True
+        line_start = text.rfind("\n", 0, match.start()) + 1
+        body = match.group(0)
+        if "angle" in match.re.groupindex and match.group("angle") is not None:
+            # the <destination> delimiters are link syntax, not markup
+            lo, hi = match.start("angle") - 1 - match.start(), match.end("angle") + 1 - match.start()
+            body = body[:lo] + match.group("angle") + body[hi:]
+        return (_certainly_visible(text, match.start()) and "`" not in body and "<" not in body
+                and not _open_tag(text[line_start:match.start()]))
 
     # every definition of a label: which one renders depends on which are in
     # code, so resolution checks all of them, and navigation trusts a label
@@ -477,17 +583,20 @@ def _link_occurrences(directory: str, text: str, *, certain: bool = False
     definitions: dict[str, list] = {}
     for m in _MD_REF.finditer(text):
         definitions.setdefault(m.group("label").strip().lower(), []).append(m)
+    # resolution reads every "](" and "[..]" form; navigation only whole links
+    link, full, short = (_NAV_LINK, _NAV_REF_FULL, _NAV_REF_SHORT) if certain \
+        else (_MD_LINK, _REF_FULL, _REF_SHORT)
     used = [(m.group("label").strip().lower() or m.group("text").strip().lower(), m.start())
-            for m in _REF_FULL.finditer(text) if keep(m.start())]
+            for m in full.finditer(text) if keep(m)]
     used += [(m.group("label").strip().lower(), m.start())
-             for m in _REF_SHORT.finditer(text) if keep(m.start())]
+             for m in short.finditer(text) if keep(m)]
     found: list[tuple[str, tuple[int, ...]]] = [
-        (target_of(m), (m.start(),)) for m in _MD_LINK.finditer(text) if keep(m.start())]
+        (target_of(m), (m.start(),)) for m in link.finditer(text) if keep(m)]
     for label, pos in used:
         defs = definitions.get(label, [])
         if not certain:
             found += [(target_of(m), (pos, m.start())) for m in defs]
-        elif len(defs) == 1 and keep(defs[0].start()):
+        elif len(defs) == 1 and keep(defs[0]):
             found.append((target_of(defs[0]), (pos, defs[0].start())))
     out = []
     for raw, positions in found:
