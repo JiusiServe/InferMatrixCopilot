@@ -128,6 +128,15 @@ review_routes:
 - prefix: afd_plugin/v1/worker/npu/attention_worker.py
   owner: attention-runtime
   doc: repos/afd-plugin/components/attention-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/attention_metadata.py
+  owner: attention-runtime
+  doc: repos/afd-plugin/components/attention-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/attention_model_runner_v2.py
+  owner: attention-runtime
+  doc: repos/afd-plugin/components/attention-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/npu/attention_model_runner_v2.py
+  owner: attention-runtime
+  doc: repos/afd-plugin/components/attention-runtime/architecture.md
 - prefix: afd_plugin/v1/worker/ffn_model_runner.py
   owner: ffn-runtime
   doc: repos/afd-plugin/components/ffn-runtime/architecture.md
@@ -138,6 +147,9 @@ review_routes:
   owner: ffn-runtime
   doc: repos/afd-plugin/components/ffn-runtime/architecture.md
 - prefix: afd_plugin/v1/worker/npu/ffn_worker.py
+  owner: ffn-runtime
+  doc: repos/afd-plugin/components/ffn-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/ffn_metadata.py
   owner: ffn-runtime
   doc: repos/afd-plugin/components/ffn-runtime/architecture.md
 - prefix: afd_plugin/connectors/
