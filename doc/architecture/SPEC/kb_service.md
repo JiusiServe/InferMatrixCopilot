@@ -387,7 +387,7 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   `\#`，代码块里的此类行缩进一个空格 —— 没有任何行以 `#` 开头，`RULE_HEADING`/`ANY_RULE_HEADING` 永远匹配不到，
   模型写的 `## Overview` 或 `## SERV-1 — x` 不会变成规则 ID。模型提出的 owner 页必须
   是本仓库目录下已有或本阶段创建的页面，指向其他仓库的页面一律丢弃并记入 notes。仓库标签不在 `doc/knowledge/SCHEMA.md` 分类法里、种子不存在、生成模型不可用或无价格 → 记录为 `blocked`，
-  不产生 PR。同输入摘要重跑直接返回记录；已发布记录的输入变了则拒绝。`deepen`/`harvest-calibration` 抛
+  不产生 PR。同输入摘要重跑直接返回记录；已发布记录的输入变了则拒绝。`harvest-calibration` 抛
   `NotImplementedError`。测试：`test_kb_init_skeleton.py`、`test_kb_init_config.py`。
 
 ## 2026-09-30 kb init：阶段共用流程与阶段 2（modules）
@@ -413,3 +413,24 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   仓库入口页链接；`components/` 已存在却没有入口页时组直接放在仓库目录下。`_routes.yaml` 只追加（保留开头注释块，
   `routes_append_only` 校验不重排、不改名、不删除）。预算用完或超过卡片上限时，已写的卡片照常成 PR，剩下的模块进
   `unfinished`；报告里列出仍无路由的模块。测试：`test_kb_init_modules.py`。
+
+## 2026-09-30 kb init：阶段 3（deepen）与 shadow 开关
+- `init_support.UpstreamPin.first_parent_changes(pin, count=, max_age_days=)`：钉点 first-parent 历史里最近 `count` 个
+  提交各自改动的文件（合并提交对其第一父提交），且不早于**钉点提交时间**之前 `max_age_days` 天——窗口只由钉点决定，
+  与时钟无关（沿 first-parent 的提交时间不一定递减：过期的提交跳过而不是就此停止；路径用 `-z` 读取，非 ASCII 文件名不被
+  引号转义）；合并/squash 式默认分支上每个 first-parent 提交就是一个合入的 PR。这就是设计 §7.3 的 PR 窗口，从镜像离线
+  读取（不走 GitHub API，没有速率限制）。
+- `init_deepen`（阶段 3）：按窗口内源文件改动数（`make_include`：源根、`exclude`、语言后缀）给模块排序，从高到低：没有路由
+  的模块跳过（记入 notes）；路由 owner 已承载规则的模块跳过（对指标无增益）——owner **承载规则**指 owner 页本身有生效规则，
+  或（仅当 owner 是入口页/prose 页时）**同一目录**下有含生效规则的页（不看子目录，否则任何组件有了规则仓库入口就算承载；
+  owner 本身是规则页却没有生效规则时不承载，不看兄弟页）。其余模块每个
+  一次生成调用：模块代码带行号、字节上限（这是深度阶段，读代码本身），产出带行范围证据的规则 → 证据必须在本模块文件内 →
+  共用筛查（D5、钉点证据与声明、落位、咨询性判定）→ 经 `ops.apply_operations` 追加到 owner 的规则页（owner 页本身是规则页
+  时用它，否则用旁边的 `rules.md`；已有规则只追加、不修改，满页转兄弟页）。每写完一个模块重算承载规则的 PR 加权覆盖率，
+  达到 `coverage_target`、预算用完或热模块用尽即停。报告：路由/承载规则两种覆盖率的 before/after、窗口 PR 数、仍无规则的热路径（`uncovered_hot`：没有承载规则的 owner 到达的
+  源文件，包括已路由但 owner 无规则的；`unrouted_hot` 另列完全无路由的）。
+- 同一 PR 打开 shadow：`flip_to_shadow` 对 adapter manifest 做**文本**编辑，只改 `knowledge_lifecycle` 块里同缩进的
+  `enabled`（→ `true`，缺失则插在块头下）与 `mode`（→ `shadow`）两行，注释、顺序与其他行逐字保留；没有该块 → 在任何模型调用
+  之前 `blocked`。`_check_flip` 校验：只能改这一个 manifest，`check_flip_to_shadow`（除这两个键外解析值不变、head 开启且为
+  shadow），并在 head manifest 上跑 `config.parse_lifecycle`（开启、shadow、仍服务同一个知识目录）。已开启且为 shadow 时不改，
+  记入 notes。测试：`test_kb_init_deepen.py`。

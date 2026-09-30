@@ -139,6 +139,22 @@ def declaration(line: str, language: str) -> str:
     return text
 
 
+def scan_modules(tree: Path, init, language: str, record: InitRecord) -> dict[str, dict]:
+    """The modules of the pinned tree (design §7.1); a missing or unknown
+    language scans nothing and says so on the record's checklist."""
+    from ..profiles.establish import scan_modules_at_depth
+
+    if not language:
+        record.checklist.append("the adapter declares no repo.language: modules were not scanned")
+        return {}
+    modules = scan_modules_at_depth(tree, language, source_roots=init.source_roots,
+                                    depth=init.module_depth, min_loc=init.min_module_loc, exclude=init.exclude)
+    if not modules:
+        roots = ", ".join(init.source_roots) or "the repository root"
+        record.checklist.append(f"no {language} source files under {roots}: no module to map")
+    return modules
+
+
 def _module_prefixes(key: str, files: list[str]) -> list[str]:
     """Route prefixes that reach exactly a module: its directory, or (for the
     repository root, which no prefix can name without routing everything) its
@@ -239,18 +255,7 @@ class _Modules(_Stage):
 
     # -- modules -----------------------------------------------------------------
     def _scan(self, tree: Path, language: str) -> dict[str, dict]:
-        from ..profiles.establish import scan_modules_at_depth
-
-        init = self.lifecycle.init
-        if not language:
-            self.record.checklist.append("the adapter declares no repo.language: modules were not scanned")
-            return {}
-        modules = scan_modules_at_depth(tree, language, source_roots=init.source_roots,
-                                        depth=init.module_depth, min_loc=init.min_module_loc, exclude=init.exclude)
-        if not modules:
-            roots = ", ".join(init.source_roots) or "the repository root"
-            self.record.checklist.append(f"no {language} source files under {roots}: no module to map")
-        return modules
+        return scan_modules(tree, self.lifecycle.init, language, self.record)
 
     def _absorb(self, modules: dict[str, dict], uncovered: list[str]) -> list[str]:
         """Append each partly-routed module to the owner that reaches most of
