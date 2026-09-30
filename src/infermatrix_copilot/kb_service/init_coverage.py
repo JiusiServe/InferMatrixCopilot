@@ -8,7 +8,14 @@ knowledge routes reach:
   ``scope_prefixes`` in ``_routes.yaml``;
 * **PR-weighted coverage** — over a window of merged PRs, the share of changed
   source files (counted once per PR that changed them) that route to an owner
-  (*routed*), and to an owner whose page carries rules (*rule-bearing*).
+  (*routed*), and whose MOST SPECIFIC owner's page carries rules
+  (*rule-bearing*; see ``most_specific``).
+
+Specificity matters because prefixes nest: a catch-all owner (``pkg/``) reaches
+every file a component owner (``pkg/sub/``) reaches. If any matching owner's
+rules counted, one rule on the catch-all page would make the whole package
+rule-bearing and the metric would stop measuring anything (kb init pilot,
+2026-09-30: 10% -> 100% from one module's rules).
 
 An empty population counts as fully covered (ratio 1.0): there is nothing a
 route could miss.
@@ -80,6 +87,49 @@ def routes_file(path: str, owners: Sequence[Owner]) -> list[Owner]:
     return [o for o in owners if any(path.startswith(p) for p in o.prefixes)]
 
 
+def _page_depth(owner: Owner) -> int:
+    return len(PurePosixPath(owner.path).parts)
+
+
+def most_specific(path: str, owners: Sequence[Owner]) -> list[Owner]:
+    """The owners that own ``path`` most specifically, in routing order: those
+    whose longest matching prefix is the longest of all matches; among those,
+    the ones whose page lies deepest in the knowledge tree (a component's own
+    page, not an aggregate entry page that lists the same area). Ties on both
+    return every tied owner; no match returns []."""
+    best: tuple[int, int] | None = None
+    out: list[Owner] = []
+    for owner in owners:
+        length = max((len(p) for p in owner.prefixes if path.startswith(p)), default=-1)
+        if length < 0:
+            continue
+        key = (length, _page_depth(owner))
+        if best is None or key > best:
+            best, out = key, [owner]
+        elif key == best:
+            out.append(owner)
+    return out
+
+
+def shadowing(owners: Sequence[Owner]) -> list[tuple[str, str, str, str]]:
+    """``(owner, prefix, other owner, other prefix)`` for every prefix that is a
+    strict ancestor of another owner's prefix: the broader owner still routes
+    those files, but only the more specific one counts for them (and gets
+    their rules)."""
+    out = []
+    for owner in owners:
+        for prefix in owner.prefixes:
+            if not prefix.endswith("/"):
+                continue   # a file prefix names one file, never an ancestor
+            for other in owners:
+                if other is owner:
+                    continue
+                for inner in other.prefixes:
+                    if inner != prefix and inner.startswith(prefix):
+                        out.append((owner.owner, prefix, other.owner, inner))
+    return out
+
+
 def module_coverage(modules: Mapping[str, Mapping], owners: Sequence[Owner]) -> Coverage:
     covered, uncovered = [], []
     for key in sorted(modules):
@@ -121,9 +171,12 @@ def make_include(source_roots: Sequence[str], exclude: Sequence[str],
 def pr_weighted_coverage(prs: Sequence[Sequence[str]], owners: Sequence[Owner], *,
                          include: Callable[[str], bool],
                          rule_pages: set[str] | None = None) -> PrCoverage:
-    """Each file a PR changes counts once for that PR. ``rule_pages`` are the
-    knowledge paths (as ``_routes.yaml`` names them) holding at least one
-    active rule; without them nothing is rule-bearing."""
+    """Each file a PR changes counts once for that PR. A file is *routed* when
+    any owner reaches it, and *rule-bearing* when one of its ``most_specific``
+    owners has its path in ``rule_pages`` (the knowledge paths, as
+    ``_routes.yaml`` names them, holding at least one active rule; without
+    them nothing is rule-bearing). A broader owner's rules never count for a
+    file a more specific owner reaches."""
     pages = rule_pages or set()
     total = routed = rule_bearing = 0
     missed: Counter[str] = Counter()
@@ -135,7 +188,7 @@ def pr_weighted_coverage(prs: Sequence[Sequence[str]], owners: Sequence[Owner], 
             hits = routes_file(path, owners)
             if hits:
                 routed += 1
-                if any(o.path in pages for o in hits):
+                if any(o.path in pages for o in most_specific(path, hits)):
                     rule_bearing += 1
             else:
                 missed[path] += 1

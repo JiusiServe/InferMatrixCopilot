@@ -1076,10 +1076,30 @@ class _Skeleton(_Stage):
         if not owners:
             owners.append({"owner": _slug(self.lifecycle.repo), "path": f"{self.repo_dir}/{INDEX_NAME}",
                            "signals": [self.lifecycle.repo], "scope_prefixes": self._root_prefixes()})
+        self._note_shadowing(owners)
         header = (f"# Direct-mode owner routing for {self.lifecycle.repo}, written by kb init "
                   f"(pin {self.record.pin[:12]}).\n")
         self.head[path] = header + yaml.safe_dump({"schema_version": 1, "owners": owners},
                                                   allow_unicode=True, sort_keys=False)
+
+    def _note_shadowing(self, owners: list[dict]) -> None:
+        """A prefix that is an ancestor of another owner's prefix (e.g. a bare
+        package directory next to its components) stays as the least specific
+        owner: routing still reaches it, but coverage and new rules go to the
+        more specific owner (``init_coverage.most_specific``). Say so, so the
+        owner can narrow it."""
+        from .init_coverage import Owner, shadowing
+
+        table = [Owner(str(o["owner"]), str(o["path"]), tuple(o.get("scope_prefixes") or [])) for o in owners]
+        broad: dict[tuple[str, str], list[str]] = {}
+        for owner, prefix, other, _inner in shadowing(table):
+            broad.setdefault((owner, prefix), [])
+            if other not in broad[(owner, prefix)]:
+                broad[(owner, prefix)].append(other)
+        for (owner, prefix), others in sorted(broad.items()):
+            self.record.checklist.append(
+                f"owner {owner}: prefix {prefix} is an ancestor of the prefixes of {', '.join(others)}; "
+                f"those files count for the more specific owner only — narrow it if it is a catch-all")
 
     def _checklist(self) -> None:
         """Findings on the pages that already existed (never edited by init)."""

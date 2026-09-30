@@ -4,8 +4,10 @@ shadow flip (design kb-init §7.3, §9 PR 3).
 Depth pass. The PR window is the pin's own first-parent history (bounded by
 ``init.pr_window_count`` / ``pr_window_max_age_days``, measured from the
 pin's commit time). Modules are taken by churn in that window, highest first;
-a module whose route owner already bears rules is skipped (it adds nothing to
-the metric). For each other module one generator call reads its code at the
+a module's owner is the one that owns most of its files MOST SPECIFICALLY
+(``init_coverage.most_specific``: a catch-all prefix never wins over a
+component's), and a module whose owner already bears rules is skipped (it adds
+nothing to the metric). For each other module one generator call reads its code at the
 pin (byte-bounded, with line numbers) and proposes rules with line-ranged
 evidence; the rules go through the shared screening — the docs redundancy
 filter (D5), evidence inside the module, pinned claims, placement, the
@@ -32,7 +34,7 @@ import yaml
 
 from ..knowledge_service.lifecycle import LifecycleError, Page
 from .init_budget import BudgetExhausted
-from .init_coverage import Owner, load_owners, make_include, pr_weighted_coverage, routes_file
+from .init_coverage import Owner, load_owners, make_include, most_specific, pr_weighted_coverage
 from .init_modules import scan_modules
 from .init_stages import ROUTES_NAME, _Candidate, _fence, _numbered, _one_line, _Stage, _title_of
 from .init_support import InitError, InitRecord, generate
@@ -174,20 +176,25 @@ class _Deepen(_Stage):
         return [(k, n) for k, n in churn_by_module(filtered, modules) if n > 0]
 
     def _without_rules(self, prs, owners: list[Owner], include) -> list[tuple[str, int]]:
-        """Changed source files of the window no rule-bearing owner reaches
-        (unrouted, or routed to owners without rules), by PR count."""
+        """Changed source files of the window whose most specific owners bear
+        no rules (unrouted, or routed to owners without rules), by PR count."""
         bearing = self._rule_pages(owners)
         missed: Counter[str] = Counter()
         for files in prs:
             for path in sorted({PurePosixPath(f.strip().strip("/")).as_posix() for f in files}):
-                if include(path) and not any(o.path in bearing for o in routes_file(path, owners)):
+                if include(path) and not any(o.path in bearing for o in most_specific(path, owners)):
                     missed[path] += 1
         return sorted(missed.items(), key=lambda item: (-item[1], item[0]))
 
     @staticmethod
     def _owner(files: list[str], owners: list[Owner]) -> Owner | None:
-        """The owner reaching most of a module's files (routing order breaks ties)."""
-        counts = {o.owner: sum(1 for f in files if o in routes_file(f, owners)) for o in owners}
+        """The owner that owns most of a module's files most specifically
+        (routing order breaks ties): a broader owner that merely also reaches
+        them never takes a component's rules."""
+        counts = {o.owner: 0 for o in owners}
+        for path in files:
+            for owner in most_specific(path, owners):
+                counts[owner.owner] += 1
         return max((o for o in owners if counts[o.owner]), key=lambda o: counts[o.owner], default=None)
 
     # -- rule pages ------------------------------------------------------------------
