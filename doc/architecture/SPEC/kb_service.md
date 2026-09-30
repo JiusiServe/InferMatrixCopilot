@@ -299,3 +299,5 @@ diff 时保留原摘录（证据不会因此变得更"好过"）。只扩展带 
 x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `ModelUnavailable`，并作为失败记录（不会成为训练样本）。
 `ModelReply.cost_usd` 取自 `usage["cost_usd"]`（未知为 None），trace 记录同时写入 `cost_usd` 与 `max_budget_usd`。
 不传上限的现有调用方行为不变：该参数根本不会发给 transport。
+`runtime.trace_recorder` 把阈值与花费持久化到 `model_call` 记录的 `result.max_budget_usd` / `result.cost_usd`
+（未设或未知为 null），包括 transport 抛错的失败记录。

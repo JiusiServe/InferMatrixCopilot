@@ -128,7 +128,12 @@ def trace_recorder(traces):
                 outputs={"reply": entry["reply"]},
                 model={k: entry.get(k, "") for k in ("role", "provider", "model", "effort", "served_model")},
                 usage=entry.get("usage") or {}, seconds=entry.get("seconds"),
-                result={"stop_reason": entry.get("stop_reason", "")}, error=entry.get("error", ""))
+                # spend: the requested stop threshold and the reported cost
+                # (None when unset/unknown), on failures too
+                result={"stop_reason": entry.get("stop_reason", ""),
+                        "max_budget_usd": entry.get("max_budget_usd"),
+                        "cost_usd": entry.get("cost_usd")},
+                error=entry.get("error", ""))
         except Exception:  # noqa: BLE001 - tracing never breaks a model call
             pass
 

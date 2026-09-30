@@ -22,8 +22,10 @@ ANTHROPIC_BASE_URL, and never see the host's CLAUDECODE marker.
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
@@ -41,6 +43,17 @@ from .registry import PROVIDERS
 _BUILTIN_DENY = ("Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,"
                  "NotebookEdit,Task,TodoWrite")
 _BRIDGE_SERVER = "infermatrix-tools"
+
+
+def budget_arg(value: float) -> str:
+    """The threshold as the CLI argument, EXACTLY: the float's shortest
+    round-trip decimal in plain (never scientific) notation. Fixed-precision
+    formatting would move the boundary: `.4f` turned 0.00001 into "0.0000"
+    (no threshold at all) and 0.12345 into "0.1235" (a higher one)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) \
+            or not math.isfinite(value) or not value > 0:
+        raise ValueError(f"max_budget_usd must be a positive finite number, got {value!r}")
+    return format(Decimal(repr(float(value))), "f")
 
 
 class ClaudeCodeTransport(HarnessTransport):
@@ -69,9 +82,7 @@ class ClaudeCodeTransport(HarnessTransport):
         if selected:
             cmd += ["--model", selected]
         if max_budget_usd is not None:
-            if not max_budget_usd > 0:
-                raise ValueError(f"max_budget_usd must be positive, got {max_budget_usd!r}")
-            cmd += ["--max-budget-usd", f"{max_budget_usd:.4f}"]
+            cmd += ["--max-budget-usd", budget_arg(max_budget_usd)]
         if mcp_config is not None:
             cmd += ["--mcp-config", str(mcp_config), "--strict-mcp-config",
                     "--allowedTools", f"mcp__{_BRIDGE_SERVER}"]
