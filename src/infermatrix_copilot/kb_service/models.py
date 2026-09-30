@@ -2,8 +2,8 @@
 
 The generator drafts knowledge changes; the judge (a different model family)
 grades them. Both are pinned by (provider, model, reasoning effort) and
-recorded on every call. An unavailable backend, a timeout or an unparseable
-reply raises ``ModelUnavailable``; the caller leaves the work queued. It never
+recorded on every call. An unavailable backend, a timeout, a call stopped
+at its spend cap or an unparseable reply raises ``ModelUnavailable``; the caller leaves the work queued. It never
 switches to a weaker model: a verdict must always say which model made it.
 """
 
@@ -61,6 +61,7 @@ class ModelReply:
     served_model: str
     usage: dict
     seconds: float
+    cost_usd: float | None = None  # the transport's reported spend (None: unknown)
 
 
 def parse_json_object(text: str) -> dict:
@@ -104,28 +105,47 @@ class ModelGateway:
         return transport
 
     def call_json(self, role: ModelRole, *, system: str, prompt: str,
-                  validate: Callable[[dict], None] | None = None) -> ModelReply:
+                  validate: Callable[[dict], None] | None = None,
+                  max_budget_usd: float | None = None) -> ModelReply:
+        """``max_budget_usd`` is a per-call STOP THRESHOLD, not a hard cap:
+        the transport starts no further API request once the call's spend
+        reaches it, but the request that crosses it is billed in full. A
+        caller enforcing a hard ceiling must reserve the threshold plus one
+        request's worst case before calling. Requesting a threshold from a
+        transport that cannot stop at one (``stops_at_spend`` False) is
+        refused before dispatch; it is never approximated with ``max_tokens``."""
         transport = self._transport(role.provider)
+        cap: dict = {}
+        if max_budget_usd is not None:
+            if not max_budget_usd > 0:
+                raise ModelUnavailable(f"{role.label()}: max_budget_usd must be positive")
+            if not getattr(transport, "stops_at_spend", False):
+                raise ModelUnavailable(f"{role.provider} cannot stop a call at a spend threshold")
+            cap = {"max_budget_usd": max_budget_usd}
         started = time.time()
         identity = {"role": role.name, "requested": role.label(), "provider": role.provider,
                     "model": role.model, "effort": role.effort}
         try:
             reply = transport.complete(
                 system=system, messages=[{"role": "user", "content": prompt}],
-                model=role.model, effort=role.effort, role=role.name)
+                model=role.model, effort=role.effort, role=role.name, **cap)
         except Exception as exc:  # the transport's own failure modes
             if self._recorder is not None:
                 self._recorder({**identity, "served_model": "", "stop_reason": "", "usage": {},
+                                "cost_usd": None, "max_budget_usd": max_budget_usd,
                                 "seconds": round(time.time() - started, 3), "system": system,
                                 "prompt": prompt, "reply": "", "error": str(exc)[:2000]})
             raise ModelUnavailable(f"{role.label()} failed: {exc}") from exc
         seconds = time.time() - started
         text = "".join(getattr(block, "text", "") or "" for block in getattr(reply, "blocks", []))
+        usage = dict(getattr(reply, "usage", {}) or {})
+        cost = usage.get("cost_usd")
+        cost_usd = float(cost) if isinstance(cost, (int, float)) and not isinstance(cost, bool) else None
         record = {
             **identity,
             "served_model": getattr(reply, "model", "") or "",
             "stop_reason": getattr(reply, "stop_reason", ""),
-            "usage": dict(getattr(reply, "usage", {}) or {}),
+            "usage": usage, "cost_usd": cost_usd, "max_budget_usd": max_budget_usd,
             "seconds": round(seconds, 3), "system": system, "prompt": prompt, "reply": text,
         }
         # the record carries the call's FINAL verdict: a truncated, empty,
@@ -133,7 +153,9 @@ class ModelGateway:
         # never becomes a training example
         failure: ModelUnavailable | None = None
         data: dict = {}
-        if getattr(reply, "stop_reason", "") == "max_tokens" or not text.strip():
+        if getattr(reply, "stop_reason", "") == "max_budget":
+            failure = ModelUnavailable(f"{role.label()} stopped at its spend threshold ${max_budget_usd}")
+        elif getattr(reply, "stop_reason", "") == "max_tokens" or not text.strip():
             failure = ModelUnavailable(f"{role.label()} timed out or returned nothing")
         else:
             try:
@@ -149,4 +171,4 @@ class ModelGateway:
             self._recorder({**record, "error": str(failure) if failure else ""})
         if failure is not None:
             raise failure
-        return ModelReply(role, data, text, record["served_model"], record["usage"], seconds)
+        return ModelReply(role, data, text, record["served_model"], usage, seconds, cost_usd)

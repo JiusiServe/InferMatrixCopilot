@@ -1,6 +1,6 @@
 # providers/base.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-30 -->
 
 `LOC ~161 · provider 层契约 + 子进程环境白名单 · refactor-status: ok`
 
@@ -53,3 +53,10 @@ stdlib + `..scopes.ToolScope`。它是一个叶子契约模块。
 
 ## 2026-09-28
 `complete()` 接受 `effort`（推理强度）：codex 以 `-c model_reasoning_effort="<effort>"` 生效并校验取值；其他 transport 接受并忽略（模型 id 已决定推理预算）。
+
+## 2026-09-30 单次调用花费阈值（不是硬上限）
+`complete()` 接受 `max_budget_usd`，类属性 `stops_at_spend`（默认 False）声明 CLI 是否会在本次调用花费达到阈值后**不再发起**
+新的 API 请求。越过阈值的那一个请求仍会完成并计费，所以超出量最多一个请求 —— 这是阈值，不是硬上限；
+需要硬上限的调用方要预留"阈值 + 单个请求的最坏情况"。不支持的 transport 接受并忽略该参数，调用方必须先检查
+`stops_at_spend`（知识服务的 gateway 会拒绝）。不得出现声称能硬性限制单次调用花费的属性。
+`max_tokens` 对 CLI transport 不是花费上限。transport 报告的本次花费放在 `Reply.usage["cost_usd"]`（未知时不出现）。

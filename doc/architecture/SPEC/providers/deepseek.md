@@ -1,6 +1,6 @@
 # providers/deepseek.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-30 -->
 
 `LOC ~502 · harness transport（dsh，API-keyed） · refactor-status: oversized`
 
@@ -59,3 +59,6 @@ stdlib + `.base` + `.registry` + `..agent_loop` + `..llm` 的类型 + dsh SDK（
 
 ## 2026-09-28
 `complete()` 接受并忽略 `effort`（与 base 契约一致）。
+
+## 2026-09-30
+`complete()` 接受并忽略 `max_budget_usd`；`stops_at_spend` 为 False。

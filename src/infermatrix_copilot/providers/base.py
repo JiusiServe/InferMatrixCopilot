@@ -140,18 +140,35 @@ class HarnessTransport:
         return None
 
     # -- contract ------------------------------------------------------------
+    # True only where the CLI itself stops a `complete(max_budget_usd=...)`
+    # call from STARTING another API request once its spend reaches the
+    # threshold. The request that crosses it still completes and is billed,
+    # so this bounds the overshoot to one request; it is not a hard ceiling.
+    # `max_tokens` is no spend bound at all for CLI transports.
+    stops_at_spend: bool = False
+
     def run_session(self, req: AgentSessionRequest):
         """Run one delegated agent step; returns `agent_loop.AgentOutcome`."""
         raise NotImplementedError
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
-                 role: str = "", effort: str = ""):
+                 role: str = "", effort: str = "",
+                 max_budget_usd: float | None = None):
         """One-shot tool-less completion; returns a normalized `llm.Reply`.
 
         `effort` is a reasoning-effort pin (`low`/`medium`/`high`/`xhigh`) for
         transports whose CLI takes one (codex); the others accept and ignore
-        it, because their model id already fixes the reasoning budget."""
+        it, because their model id already fixes the reasoning budget.
+
+        `max_budget_usd` is a stop threshold where the CLI honours one
+        (`stops_at_spend`): no further API request starts once the call's
+        spend reaches it, but the request that crosses it is still billed. A
+        caller that needs a hard ceiling reserves the threshold PLUS one
+        request's worst case. Transports without it accept and ignore the
+        argument, so callers must check `stops_at_spend` first (the knowledge
+        service's gateway refuses them). The call's cost, when the transport
+        reports one, is `Reply.usage["cost_usd"]`."""
         raise NotImplementedError
 
 

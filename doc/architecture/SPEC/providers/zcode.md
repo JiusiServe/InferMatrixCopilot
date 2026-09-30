@@ -49,3 +49,5 @@ stdlib + `.base` + `..agent_loop.AgentOutcome` + `..llm` 的类型与 `ModelMism
 ## 测试
 `test_provider_zcode.py`（离线，事件形状取自 zcode 0.16.9 实跑）；2026-09-30 用真实 zcode 做过
 一次端到端冒烟（工具桥 `read_file` 被调用，`bridge_trace.jsonl` 有记录）。
+
+`complete()` 接受并忽略 `max_budget_usd`；`stops_at_spend` 为 False（CLI 无花费阈值，`ModelGateway` 请求阈值时在派发前拒绝）。
