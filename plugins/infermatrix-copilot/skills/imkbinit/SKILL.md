@@ -85,10 +85,21 @@ Publishing needs `ALLOW_PUSH=1`, `ALLOW_POST=1` and
 these are missing instead of setting them. Then run the command without
 `--dry-run`. A private upstream always runs as a dry run.
 
-If the run fails because the stage is not implemented yet (the run directory
-the CLI prints has a report saying `lands in a later PR`), say so plainly: name the stage and that the
-earlier stages are complete. Then stop. Never work around a missing stage by
-hand.
+What each stage opens:
+
+- `skeleton`: the map, the doc invariants and the seeds.
+- `modules`: one map card for every unrouted module.
+- `deepen`: code rules for the hot modules, plus the adapter flip to
+  `enabled: true, mode: shadow`.
+- `harvest-calibration`: turns the merged review into
+  `adapters/<adapter>/kb-calibration/cases/*.json`. It refuses to open a PR
+  with fewer than five bad cases from the owner or from mutations.
+
+`auto_merge` still needs `kb calibrate` and the shadow period. The skill never
+flips it.
+
+If the CLI or its run report blocks the stage, report the reason and stop.
+Never work around it by hand.
 
 ## 4. Report
 

@@ -18,8 +18,11 @@ def test_imkbinit_skill_drives_one_stage_through_the_cli() -> None:
     # publishing counts only merged PRs; a dry run also counts dry-run records
     assert "`MERGED`" in text and "`status: dry_run`" in text
     assert "Dry-run records don't count, so a previewed stage is published\n  next rather than skipped." in text
-    # a stage the installed CLI does not implement yet is reported, not faked
-    assert "not implemented yet" in text and "Never work around a missing stage by\nhand." in text
+    # every stage runs; the skill never works around a blocked one or flips auto_merge
+    assert "later PR" not in text and "not implemented" not in text
+    assert "fewer than five bad cases" in text
+    assert "`auto_merge` still needs `kb calibrate` and the shadow period. The skill never\nflips it." in text
+    assert "Never work around it by hand." in text
     # dry run by default; publishing only on request, with the double gate
     assert "<imc> kb init <repo> --stage <next> --dry-run" in text
     # the MCP-only install puts no CLI on PATH: the skill resolves a launcher
