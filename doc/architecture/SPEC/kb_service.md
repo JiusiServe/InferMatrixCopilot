@@ -302,3 +302,10 @@ diff 时保留原摘录（证据不会因此变得更"好过"）。只扩展带 
 （(0, 1]，缺省 0.85）、`budget_usd`（>0，缺省 30）、`judge_call_usd`（≥0，缺省 0.50）。`validate_seeds(init,
 knowledge_root)` 是运行时检查：种子必须是知识树中已存在的文件或目录，解析后不得逃出知识根目录，逐条返回问题。
 解析只做静态校验，不读知识树。测试：`test_kb_init_config.py`。
+
+## 2026-09-30 adapter 生命周期开关检查（kb init）
+`lifecycle_flip.check_lifecycle_flip(base_yaml, head_yaml, allowed=)`：两版 manifest 解析后删去允许的键路径，
+其余必须完全相等（比较解析值，注释与格式可保留）；`FLIP_KEYS` = `knowledge_lifecycle.enabled/mode`，
+`CALIBRATION_KEYS` = `knowledge_lifecycle.calibration_set`。`check_flip_to_shadow` 另要求 head 为
+`enabled: true` 且 `mode` 为 shadow（缺省即 shadow）。知识 L1 的白名单只含 `knowledge/`，adapter 这一处改动由它单独校验；
+调用方还需在 head adapter 上跑 `config.parse_lifecycle`。测试：`test_kb_lifecycle_flip.py`。
