@@ -63,12 +63,11 @@ def read_roots_for(settings: Any, shadow_dir: str | Path) -> tuple[str, ...]:
 def declared_shadow_tools(settings: Any, playbook: str, step: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """`(shadow_tools, shadow_executables)` from the workflow declaration of
     `<playbook>.<step>`, or `((), DEFAULT_EXECUTABLES)` when undeclared."""
-    from .enroll import load_declarations, lookup
+    from .enroll import declarations_for, lookup
 
-    extra = [d for d in (getattr(settings, "improve_workflows_dirs", "") or "").split(os.pathsep) if d.strip()]
     # an ensemble lens runs as `<step>#<lens>`: the declaration is the step's
     step = step.split("#", 1)[0]
-    decl = lookup(load_declarations(extra), playbook, step)
+    decl = lookup(declarations_for(settings), playbook, step)
     if decl is None:
         return (), DEFAULT_EXECUTABLES
     return decl.shadow_tools, decl.shadow_executables

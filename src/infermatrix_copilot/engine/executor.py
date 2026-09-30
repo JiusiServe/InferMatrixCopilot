@@ -264,9 +264,45 @@ class Executor:
                 last = StepResult(False, FailureKind.BLOCKED,
                                   f"unhandled error: {type(exc).__name__}: {exc}")
             if last.ok or last.failure is not FailureKind.RETRYABLE:
+                self._record_step_decision(spec, unit, attempt, last)
                 return last
             self.trace.record("step_retry", spec=spec.name, attempt=attempt)
+        self._record_step_decision(spec, unit, attempts, last)
         return last  # exhausted retries
+
+    @staticmethod
+    def _record_step_decision(spec, unit: dict, attempt: int, result: StepResult | None) -> None:
+        """The unit's terminal ``decision`` record (trace/1): every step call
+        ends with one, carrying the rendered artifact a reviewer or judge
+        would see (`review_text`, `answer_draft`) and the published findings,
+        so an outcome adapter judges what was actually produced — never an
+        empty body. Written only when a store is bound; never raises."""
+        from ..trace_store import current_store, trace_context
+
+        store = current_store()
+        if store is None or result is None:
+            return
+        outputs = result.outputs or {}
+        blobs: dict[str, str] = {}
+        for key, name in (("review_text", "review"), ("answer_draft", "answer"), ("report_text", "report")):
+            text = outputs.get(key)
+            if isinstance(text, str) and text.strip():
+                blobs[name] = text
+        findings = []
+        for f in (outputs.get("review_comments") or [])[:60]:
+            if isinstance(f, dict):
+                findings.append({k: (str(f[k])[:200] if isinstance(f.get(k), str) else f.get(k))
+                                 for k in ("id", "file", "path", "line", "severity", "comment", "title", "disposition")
+                                 if k in f})
+        try:
+            with trace_context(attempt=attempt, **unit):
+                store.append("decision", outputs=blobs,
+                             result={"type": "step_result", "step": spec.name, "status": "ok" if result.ok else "failed",
+                                     "failure": result.failure.value if result.failure else "",
+                                     "summary": str(result.summary or "")[:300],
+                                     "findings": findings, "verdict": str(outputs.get("review_verdict") or "")})
+        except Exception:  # noqa: BLE001 - capture never changes a step's outcome
+            pass
 
 
     # -- trace/1 unit context ---------------------------------------------------
@@ -275,11 +311,9 @@ class Executor:
         loud configuration error, never a silent Tier 1 downgrade)."""
         cached = getattr(self, "_decls", None)
         if cached is None:
-            from ..improve.enroll import load_declarations
+            from ..improve.enroll import declarations_for
 
-            extra = [d for d in (getattr(self.settings, "improve_workflows_dirs", "") or "")
-                     .split(os.pathsep) if d.strip()]
-            cached = load_declarations(extra)
+            cached = declarations_for(self.settings)
             self._decls = cached
         return cached
 

@@ -1,7 +1,7 @@
 # PR review, the diff-review agent loop (dynamic): the copilot's eval arms and
-# any production pr-review run. Tier 2 comparative (design §6.1) once the
-# outcome adapter lands (P2); until then the adapter line is absent and the
-# workflow is Tier 1 with a fingerprint.
+# any production pr-review run. Tier 2 comparative (design §6.1): the adapter
+# reads the paired judge's verdicts and the gold_match records; it needs the
+# curated gold set (eval/dataset/gt/curated) to build a coverage matrix.
 workflow: pr-review.agent.review_diff
 kind: dynamic
 unit: agent_loop
@@ -19,6 +19,7 @@ fingerprint:
     - knowledge_snapshot
     - copilot_sha
 capture: full
+outcome_adapter: infermatrix_copilot.improve.adapters.review_eval:ReviewEvalAdapter
 tier2_min_items: 8
 shadow_tools: [doc_read, doc_search, repo_map, repo_docs, diff_stat, file_at_base,
                show_commit, search_history, calc]

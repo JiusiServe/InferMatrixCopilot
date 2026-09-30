@@ -569,6 +569,19 @@ class Settings(BaseSettings):
     # the hard weekly envelope (P3 enforces it per model call)
     improve_budget_usd_week: float = 20.0
     improve_budget_judge_calls_week: int = 300
+    # the eval review adapter's inputs (design §6.1): the GT directory holding
+    # gt/curated/<item>.gold.json, the judgment sets, and the arm name whose
+    # verdicts belong to this copilot's units
+    improve_gt_dir: str = ""
+    improve_judgments_dir: str = ""
+    improve_eval_arm: str = ""
+    # the gold_match judge: "api:<model>" (through LLM.create) or
+    # "cli:<provider>:<model>" (cursor|claude|codex, tool-less); empty = no
+    # gold matching, cells stay unlabeled
+    improve_judge: str = ""
+    # the review bot's GitHub login, so its own replies never count as the
+    # author accepting or disputing a finding
+    improve_rb_bot_login: str = ""
 
     # Metrics (eval/METRICS_RESEARCH.md) — per-run metrics.json: CATQ = Q·S/C.
     # Reference budgets are EXPLICIT deployment assumptions (RQS3e precedent):

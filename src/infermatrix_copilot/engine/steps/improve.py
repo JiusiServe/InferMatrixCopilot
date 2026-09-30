@@ -128,3 +128,155 @@ async def _ledger_summary(ctx: StepContext) -> StepResult:
                      f"{len(open_)} live proposal(s)" + (f", HOLD: {wl.hold}" if wl.hold else ""))
     summary = "\n".join(lines) or "no workflows in the ledger yet"
     return StepResult(True, summary=summary[:400], outputs={"ledger_summary": summary})
+
+
+def _forensics_agents(ctx: StepContext) -> dict:
+    """Two investigator families from the configured tiers (eco and, when
+    configured, performance); one family only when that is all there is —
+    the report then says `single_family`."""
+    from ...agent_loop import run_agent
+
+    if ctx.llm is None or not getattr(ctx.llm, "available", False):
+        return {}
+    agents = {}
+    for mode in ("eco", "performance"):
+        try:
+            target = ctx.settings.tier_target(mode)
+        except Exception:  # noqa: BLE001 - an unconfigured tier is simply absent
+            continue
+        family = f"{target.provider_id or target.source}:{target.model}"
+        if family in agents:
+            continue
+        llm = ctx.llm.for_target(target) if hasattr(ctx.llm, "for_target") else ctx.llm
+
+        def make(llm_=llm, model_=target.model):
+            def agent(system, prompt, scope, extra_tools, max_iters):
+                return run_agent(llm_, system=system, prompt=prompt, scope=scope, trace=ctx.trace,
+                                 model=model_, max_iters=max_iters, extra_tools=extra_tools).text
+            return agent
+        agents[family] = make()
+    return agents
+
+
+@step("improve.forensics", "agent", "read",
+      "Tier 2: coverage matrices + stage-of-loss attribution for workflows with an outcome adapter.")
+async def _forensics(ctx: StepContext) -> StepResult:
+    """For each Tier 2 workflow in the last cycle's window: import outcomes,
+    build the gold × unit matrix, attribute every miss with two agent
+    families, rank the punch list. Params: `workflow` (restrict), `max_cells`.
+    Publishes `improve_forensics` (punch lists + measurement health)."""
+    from ...improve.adapters import load_adapter
+    from ...improve.enroll import declarations_for
+    from ...improve.forensics import attribute, coverage_matrix, measurement_health, punch_list, unit_scores
+    from ...improve.reader import collect_units
+    from ...trace_store import bind_store, trace_context
+
+    store = _trace_store(ctx)
+    if store is None:
+        return StepResult(False, FailureKind.BLOCKED, "no trace store (set TRACE_STORE_ROOT)")
+    cycle = ctx.state.get("improve_cycle") or {}
+    since, until = cycle.get("since"), cycle.get("until")
+    if since is None or until is None:
+        return StepResult(False, FailureKind.BLOCKED, "improve.forensics needs the cycle window (run improve.lint first)")
+    only = str(ctx.params.get("workflow") or "")
+    decls = declarations_for(ctx.settings)
+    agents = _forensics_agents(ctx)
+    results: dict = {}
+    with bind_store(store), trace_context(playbook="workflow-improve", run_id=ctx.run_dir.name):
+        units, _ = collect_units(store, float(since), float(until))
+        for name, decl in decls.items():
+            if not decl.tier2 or (only and name != only):
+                continue
+            wf_units = [u for u in units.values() if u.workflow == name]
+            if len(wf_units) < decl.tier2_min_items and not ctx.params.get("force"):
+                results[name] = {"skipped": f"{len(wf_units)} units < tier2_min_items {decl.tier2_min_items}"}
+                continue
+            adapter = load_adapter(decl.outcome_adapter, **_adapter_kwargs(ctx, decl))
+            collected = _collect_outcomes(ctx, adapter, wf_units, store)
+            outcomes: dict = {}
+            cells, golds = coverage_matrix(adapter, wf_units, store, outcomes=outcomes)
+            scored = unit_scores(adapter, wf_units, outcomes, golds)
+            entry: dict = {"units": len(wf_units), "cells": len(cells), "collected": collected,
+                           "outcomes": len(outcomes), "finding_labels": scored["findings"],
+                           "scores": scored["units"],
+                           "misses": sum(1 for c in cells if c.status == "miss"),
+                           "unlabeled": sum(1 for c in cells if c.status == "unlabeled"),
+                           "descriptive_only": bool(getattr(adapter, "descriptive_only", False)),
+                           "families": sorted(agents), "single_family": len(agents) < 2}
+            if cells and agents:
+                attributions = attribute(store, {u.unit_id: u for u in wf_units}, golds, cells, agents=agents,
+                                         max_cells=int(ctx.params.get("max_cells") or 40))
+                entry["punch_list"] = punch_list(attributions, golds, {u.unit_id: u for u in wf_units})
+                entry["measurement"] = measurement_health(attributions)
+            elif cells and not agents:
+                entry["skipped"] = "no LLM configured for the forensics agents"
+            results[name] = entry
+    ctx.state["improve_forensics"] = results
+    done = [n for n, r in results.items() if "punch_list" in r]
+    return StepResult(True, summary=f"forensics: {len(done)} workflow(s) attributed, "
+                                    f"{sum(1 for r in results.values() if 'skipped' in r)} skipped",
+                      outputs={"forensics": results, "state_updates": {"improve_forensics": results}})
+
+
+def _adapter_kwargs(ctx: StepContext, decl) -> dict:
+    """Construction arguments per adapter, from settings/params (never
+    secrets): the eval adapter needs the GT and judgment dirs and the arm
+    name; the bot adapter needs nothing."""
+    if decl.outcome_adapter.endswith(":ReviewEvalAdapter"):
+        return {"gt_dir": str(ctx.params.get("gt_dir") or getattr(ctx.settings, "improve_gt_dir", "") or "eval/dataset/gt"),
+                "judgments_dir": ctx.params.get("judgments_dir") or getattr(ctx.settings, "improve_judgments_dir", "") or None,
+                "arm": str(ctx.params.get("arm") or getattr(ctx.settings, "improve_eval_arm", "") or "")}
+    if decl.outcome_adapter.endswith(":RbReviewAdapter"):
+        return {"bot_login": str(getattr(ctx.settings, "improve_rb_bot_login", "") or "")}
+    return {}
+
+
+def _judge_spec(ctx: StepContext):
+    """The gold_match judge from settings.improve_judge: "api:<model>" or
+    "cli:<provider>:<model>"; None when unset (cells stay unlabeled and the
+    report says so)."""
+    from ...improve.judges import JudgeSpec
+
+    raw = str(ctx.params.get("judge") or getattr(ctx.settings, "improve_judge", "") or "")
+    if not raw:
+        return None
+    parts = raw.split(":")
+    if parts[0] == "api" and len(parts) == 2:
+        return JudgeSpec("api", parts[1])
+    if parts[0] == "cli" and len(parts) == 3:
+        return JudgeSpec("cli", parts[2], provider=parts[1])
+    raise ValueError(f"improve_judge must be api:<model> or cli:<provider>:<model>, got {raw!r}")
+
+
+def _collect_outcomes(ctx: StepContext, adapter, units, store) -> dict:
+    """Outcome collection BEFORE the matrix: the bot adapter fetches thread
+    labels inside fetch(); the eval adapter imports the paired judge's
+    verdicts and, when a judge is configured, decides every undecided gold
+    entry with gold_match. Nothing here is fabricated: without a judge the
+    cells stay unlabeled and the report counts them."""
+    from ...improve.adapters.review_eval import ReviewEvalAdapter
+    from ...improve.judges import JudgeError
+
+    summary = {"verdicts": 0, "gold_matched": 0, "judge": "", "errors": []}
+    if not isinstance(adapter, ReviewEvalAdapter):
+        return summary
+    judge = _judge_spec(ctx)
+    if judge is not None:
+        adapter.judge = judge
+        adapter.llm = ctx.llm if judge.kind == "api" else None
+        adapter.governor = getattr(ctx, "governor", None)
+        summary["judge"] = f"{judge.kind}:{judge.provider + ':' if judge.provider else ''}{judge.model}"
+    for unit in units:
+        try:
+            summary["verdicts"] += adapter.collect_judge_verdicts(unit, store)
+        except Exception as exc:  # noqa: BLE001 - one bad judgment file must not stop the rest
+            summary["errors"].append(f"{unit.unit_id}: verdicts: {exc}"[:200])
+        gold = adapter.gold(unit.item)
+        if gold is None or judge is None:
+            continue
+        try:
+            summary["gold_matched"] += adapter.gold_match(unit, gold, store)
+        except JudgeError as exc:
+            summary["errors"].append(f"{unit.unit_id}: gold_match: {exc}"[:200])
+    summary["inconclusive"] = len(getattr(adapter, "inconclusive", []) or [])
+    return summary

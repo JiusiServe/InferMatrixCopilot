@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from ..trace_store import TraceStore, bind_store, file_lock, trace_context
-from .enroll import load_declarations
+from .enroll import declarations_for
 from .ledger import Ledger
 from .lints import Baseline, Finding, catalogue, run_lints, unit_usd
 from .reader import UNIT_LOOKBACK, Unit, collect_units, cursor_path, week_bounds
@@ -136,8 +136,7 @@ def _run_cycle_locked(store: TraceStore, settings: Any, ledger_dir: Path, *, now
         since = float(cursor.get("until") or week_bounds(now)[0])
     if until is None:
         until = now
-    declarations = load_declarations(environ={}) if not getattr(settings, "improve_workflows_dirs", "") else \
-        load_declarations([d for d in settings.improve_workflows_dirs.split(":") if d])
+    declarations = declarations_for(settings)
     started = time.time()
     with bind_store(store), trace_context(playbook="workflow-improve", run_id=f"cycle-{int(now)}"):
         # the engine's own records are units too (self-enrolment, design §11.2):
