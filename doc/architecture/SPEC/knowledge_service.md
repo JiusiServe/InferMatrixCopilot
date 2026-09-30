@@ -48,6 +48,11 @@ library only.
 ## 2026-09-28 T1 索引修复
 L1 的索引检查允许为目录中已存在但未列入索引的页面补链接（巡检 T1 修复），新页面仍必须被链接。
 
+## 2026-09-30 kb init 的 L1 bootstrap 模式
+`l1.check_changeset(..., bootstrap=)` 只供 `kb init`（`kb_service/init_stages.py`）：允许在新目录新建
+`_index.md`、修改共享的 `repos/_index.md`；`l1.check_index_links(base, head)` 检查 init 改动的索引链接。
+细节见 [l1](knowledge_service/l1.md)。服务门禁与发布器从不传 `bootstrap`。
+
 ## 2026-09-28 知识验证器（v8：发布器本地门禁）
 `gate_verifier.verify_change(ctx, pr=, head_sha=, pre=, post=, final=, effective_base=, verdict=)` 是发布器本地门禁
 （`kb_service.local_gate`）在合并前与合并后运行的检查；v7 的仓库端 `kb-gate` 工作流、`.github/kb-gate/` 验证包、

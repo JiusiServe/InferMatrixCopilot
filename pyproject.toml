@@ -10,6 +10,7 @@ dependencies = [
     "anthropic>=0.34",
     "openai>=1.50",
     "rich>=13.0",
+    "markdown-it-py>=3",
 ]
 
 [project.optional-dependencies]
