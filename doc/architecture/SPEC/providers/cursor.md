@@ -1,6 +1,6 @@
 # providers/cursor.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-30 -->
 
 `LOC ~207 · harness transport（Cursor 订阅） · refactor-status: ok`
 
@@ -48,3 +48,6 @@ scope 约束，native 调用只被**记录**。
 
 ## 2026-09-28
 `complete()` 接受并忽略 `effort`（与 base 契约一致）。
+
+## 2026-09-30
+`complete()` 接受并忽略 `max_budget_usd`；`stops_at_spend` 为 False（CLI 无花费阈值）。
