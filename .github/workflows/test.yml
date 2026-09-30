@@ -91,6 +91,8 @@ jobs:
           if loaded:
               sys.exit(f"public SDK import loaded private implementation: {loaded}")
           caps = get_capabilities()
+          if "vllm-gr" not in caps.supported_repositories:
+              sys.exit("installed SDK omits vLLM-GR review support")
           dist_version = importlib.metadata.version("infermatrix-copilot")
           if not (__version__ == dist_version == caps.distribution_version == "0.2.0"):
               sys.exit(
