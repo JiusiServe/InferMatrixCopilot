@@ -539,12 +539,12 @@ def test_private_upstream_is_always_a_dry_run(world):
     assert record.status == "dry_run" and any("private" in n for n in record.notes)
 
 
-def test_publishing_needs_both_flags_and_later_stages_are_not_here(world):
+def test_publishing_needs_both_flags_and_stages_need_their_predecessors(world):
     assert not publishing_allowed({"ALLOW_PUSH": "1"}) and publishing_allowed({"ALLOW_PUSH": "1", "ALLOW_POST": "1"})
     with pytest.raises(InitError, match="ALLOW_PUSH"):
         run_stage(_runtime(world), _lifecycle(), "skeleton", dry_run=False)
-    with pytest.raises(NotImplementedError):
-        run_stage(_runtime(world), _lifecycle(), "harvest-calibration", dry_run=True)
+    record = run_stage(_runtime(world), _lifecycle(), "harvest-calibration", dry_run=True)
+    assert record.status == "blocked" and "run the skeleton stage first" in record.problems
     with pytest.raises(InitError, match="no knowledge_lifecycle.init"):
         run_stage(_runtime(world), RepoLifecycle(repo="toy", full_name="o/toy", enabled=False, mode="shadow",
                                                  knowledge_dir="repos/toy"), "skeleton", dry_run=True)

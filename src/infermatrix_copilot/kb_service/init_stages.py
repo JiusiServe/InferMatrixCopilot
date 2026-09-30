@@ -5,7 +5,8 @@ Stages, each one human-merged PR (design §9):
 1. ``skeleton`` — the routing map (``_index.md``, ``_routes.yaml``,
    ``architecture.md``), rules for cross-doc invariants, adapted seed pages
    and links to ``general/`` seeds. (This module.)
-2. ``modules`` / 3. ``deepen`` / ``harvest-calibration`` — later PRs.
+2. ``modules`` (``init_modules``) / 3. ``deepen`` (``init_deepen``) /
+   ``harvest-calibration`` (``init_harvest``, after the deepen PR merged).
 
 This is the ONLY module that calls ``check_changeset(bootstrap=True)``
 (pinned by a test): init creates new-directory indexes the service never may.
@@ -156,7 +157,11 @@ def _stage_class(stage: str) -> type:
         from .init_deepen import _Deepen
 
         return _Deepen
-    raise NotImplementedError(f"stage {stage} lands in a later PR")
+    if stage == "harvest-calibration":
+        from .init_harvest import _Harvest
+
+        return _Harvest
+    raise InitError(f"unknown stage {stage!r}")
 
 
 # -- helpers -----------------------------------------------------------------------
@@ -615,8 +620,12 @@ class _Stage:
                 except BudgetExhausted as exc:
                     self._judge_stopped = True
                     self.record.unfinished += [f"judge {c.rule_id}: {exc}" for c, _ in ready[index:]]
+            # the judged text and its pinned evidence ride along: the calibration
+            # harvest needs them for rules the owner deleted or the judge stripped
             self.record.verdicts[candidate.rule_id] = {"verdict": label, "reasons": reasons, "model": model,
-                                                       "text_sha": text_sha, "page": candidate.page}
+                                                       "text_sha": text_sha, "page": candidate.page,
+                                                       "section": candidate.section,
+                                                       "evidence": [e.to_dict() for e in entries]}
             if label == "fail":
                 self._drop(candidate, "advisory judge: fail " + json.dumps(reasons, ensure_ascii=False)[:300])
                 continue
