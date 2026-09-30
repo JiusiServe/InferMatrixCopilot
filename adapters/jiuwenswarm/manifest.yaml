@@ -36,6 +36,9 @@ knowledge_lifecycle:
     trigger: none
   upstream_visibility: public
   init:
+    # deepen stops on this per-stage cap; the default $30 reaches ~5 owner groups
+    # (~$6 each), far short of this repository's ~20 routed owners
+    budget_usd: 60
     seeds:
       # linked, never copied: repo-neutral design-review rules
       - general/review/rules.md
