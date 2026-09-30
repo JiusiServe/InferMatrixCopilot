@@ -1,0 +1,123 @@
+---
+title: "AFD plugin 仓库规则"
+created: 2026-09-30
+updated: 2026-09-30
+type: rule
+tags: [afd-plugin]
+sources: []
+---
+
+# AFD plugin 仓库规则
+
+## AFD-I1 — 新增或重命名 connector 时，必须同时更新 factory 注册、配置白名单和 connector 自有 schema
+
+- 只在 `AFDConnectorFactory` 注册还不够。配置层另有一份硬编码白名单，它不是从注册表推导出来的。名字不在白名单里的 connector，会在配置校验阶段被拒绝。
+- 检查 PR 是否同时更新了以下内容：白名单、README 里 `connector` 可选值的说明、README 的 connector 支持表。
+- 新 connector 必须实现 `parse_extra_config()`，schema 是封闭的，未知字段直接报错。原因是 `compat/npu/feature_validation.py` 会通过 factory 复用同一个 schema 做前置校验，不能在别处另写一套校验。
+- 实现要放进对应的后端包：只用于 GPU 的放 `afd_plugin.connectors.gpu`，只用于 NPU 的放 `afd_plugin.connectors.npu`。
+- factory 的注册方法仍是 draft。不要在文档里把它写成公开扩展契约。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
+
+## AFD-I2 — 判断走控制面驱动还是 connector 驱动，只能看 `connector.control_plane` 是否为 `None`
+
+- 不能用 `isinstance` 或 connector 类名来选择执行路径（`CAP-INV-001`）。调用 `send_dp_metadata_list()`、`recv_dp_metadata_list()` 或 `update_state_from_dp_metadata()` 之前，必须先检查 `control_plane`。
+- GPU 只支持控制面驱动：`GPUFFNModelRunner` 构造时会断言 `control_plane` 不为 `None`；GPU daemon 遇到 `None` 会抛 `NotImplementedError`。所以任何新的 GPU connector 都必须在构造阶段装好 `AFDControlPlane`。
+- `control_plane is None` 的 connector（目前只有 `CAMAsyncAFDConnector`）不能进 FFN graph cache 路径，因为 cache key 依赖 DP metadata。这类 connector 必须保持 eager-only。Attention 在这种情况下会跳过 DP metadata 协调，所以路由和 token 元数据必须随 dispatch payload 一起发送。
+- 控制面对象属于 connector，没有独立的生命周期。不要给它单独加 close 或所有权逻辑。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
+
+## AFD-I3 — connector 构造只做轻量工作，跨角色的集合通信必须等权重加载完成后再做
+
+- 构造函数和 `parse_extra_config()` 里不能创建进程组、communicator、算子注册，也不能加载 CANN 算子。这些都属于 `init_afd_connector()`。
+- Attention 端：`init_afd_connector()` 必须放在 `load_model()` 末尾，并且在 ubatch wrapper 安装之后。
+- FFN 端：`init_afd_connector()` 必须在 `initialize_from_config()` 里调用，位置在空 KV-cache 初始化之后、daemon 线程启动之前。
+- 如果把 rendezvous 提前到 `init_device()` 或构造阶段，两个角色的权重加载就不能再重叠。无论怎么改，rendezvous 都必须在 Attention 显存 profiling 和首次 forward 之前完成。
+- 对未初始化或只初始化了一部分的 connector，`close()` 必须安全，并且之后仍能再次关闭。connector 的改动要附带清理测试，以及重试或重新初始化测试。
+- 缺少原生算子时，要在 connector 初始化时报错，不能在包 import 时报错。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
+
+## AFD-I4 — 保持 CPU-safe import 边界：没有 CUDA、vLLM 或 torch_npu 时，默认测试也必须能跑
+
+- `vllm` 是可选 extra，默认的 `uv run pytest` 要能在没有 CUDA 的环境里运行。
+- 以下模块在 import 时不能引入 torch、vLLM 或 torch_npu：顶层包、通用配置和校验、版本检查、graph policy helper（`v1/worker/cuda_graph.py` 里的 `validate_cuda_graph_mode()`）。
+- `AFDConnectorFactory` 只保存懒加载器。新增 connector 时，不能在 factory 模块顶层 import CUDA 或 Ascend 的具体实现。
+- 只针对 CUDA 的插件注册路径不能 import vLLM-Ascend。Ascend 的 patch 必须等 Ascend 插件完成平台初始化之后再应用。
+- `afd_plugin._C_ascend` 只能在 connector 初始化时由 `ensure_cam_p2p_ops_available()` 懒加载。
+- CUDA 和 Ascend 的 runtime 模块可以直接 import 设备依赖。依赖 NPU 的测试属于 Ascend 环境的测试套件，不属于默认 CPU 测试。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
+
+## AFD-I7 — `compute_gate_on_attention` 允许什么值，要同时看 connector、runner 版本和模型
+
+  - `P2pNcclAFDConnector`（CUDA V1）：`true` 和 `false` 都可以。
+  - `CAMP2pAFDConnector`：通用字段和 `connector_extra_config` 里的同名字段都必须是 `false`。
+  - `CAMAsyncAFDConnector`：文档里的配置要求通用字段为 `true`，开启 `async_moe_ubatching` 时也要求 `true`。
+  - 任何 ModelRunnerV2 配对都要求 `false`。
+  - Qwen3 MoE 和 Qwen3.5/Qwen3.6 MoE 都拒绝 `true`。
+- 修改其中一个维度的校验时，要核对另外两个维度，不能只在 connector parser 或只在模型层做校验。V2 的限制由 Attention 和 FFN 两个角色共用同一个校验器。
+- 通用字段 `compute_gate_on_attention` 是模型路由的选择开关；CAMP2P 的同名局部字段是算子契约。两者不能互相替代。
+- 同步更新 README 的模型表、connector 表和 Known gaps。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
+
+## AFD-I8 — README 和设计文档对 ModelRunnerV2 的说法相互矛盾，改动 V2 时必须明确对齐
+
+  - 设计文档和 E2E 契约描述了受支持的 CUDA V2（`AFDAttentionModelRunnerV2`），CI 在 `l4_4` 上按节点 ID 运行 `afd-v2-*-dp2` 和 `afd-v2-*-tp2` 四个用例。
+  - Ascend V2 只有单元测试证据。
+- 涉及 V2 的 PR 要说明以哪份文档为准，并同步修改另一份。
+- 不能依据 README 删除 V2 代码路径或 CI 用例，也不能宣称 Ascend V2 经过了硬件验证。
+- V2 的约束由 Attention 和 FFN 共用同一个校验器，只改一端属于缺陷。约束包括：
+  - `compute_gate_on_attention=false`；
+  - PP、PCP、DCP 均为 1；
+  - 角色 rank 数等于 DP x TP；
+  - 静态 EP；
+  - 不用 DBO 或 ubatching；
+- 图模式有平台差异：CUDA V2 只支持 eager 和 `FULL_DECODE_ONLY`，Ascend V2 还支持 `FULL`。不要把 Ascend 的 `FULL` 放宽到 CUDA。另外 README 的 connector 表把 CAMP2P 写成只支持 `FULL_DECODE_ONLY`，修改时要一并对齐。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
+
+## AFD-I9 — AFD metadata 只能放在 `forward_context.additional_kwargs['afd_metadata']`
+
+- CUDA 和 Ascend、Attention 和 FFN、V1 和 V2，全部读写同一个键。不要重新引入 NPU 独立的 metadata 镜像，也不要新增其他 forward context 属性。
+- Ascend FFN 有两条路径：V1 用 `set_ascend_forward_context`；V2 配对用原生 `set_forward_context` 加 MRV2 profile override。修改 `compat/npu/forward_context.py` 时，两条路径都要测。
+- CUDA 空闲 DP rank 走的 dummy-batch 路径会绕过 `_model_forward()`，metadata 在这条路径上是惰性安装的。修改 metadata 的安装位置时，要检查这条路径。
+- `AFDForwardContextMetadata` 的结构和其中的 live connector 引用都不是稳定 API（#86、#88、#105 仍未解决）。不要在对外接口里承诺它们。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
+
+## AFD-I10 — 修改控制面 payload 的字段，发送端、接收端和编解码都要同步
+
+- `AFDControlPayload` 只能携带插件自有的原始数据：整数 stage key、token count 列表、max count，以及 graph、warmup、profile 布尔标志。它经 JSON 编码后，先发长度再发 `uint8` tensor。不能序列化 vLLM 的 `DPMetadata` 或其他 vLLM 内部对象（`XFER-INV-001`）。
+- 新增字段时（`is_profile` 就是一个例子），以下内容都要一起更新：
+  - `P2pNcclAFDControlPlane`（NCCL）和 `CAMP2pAFDControlPlane`（Gloo）；
+  - Attention 的所有发送点：非 ubatch、原生 ubatch、padded full-graph、V2 的 capture 和 replay hook；
+  - FFN daemon 的 profile、warmup、capture、replay 分支；
+  - 如果字段影响形状，还要改 `make_ffn_graph_key()` 或 ACL graph key。
+- 控制面必须先调用 `update_state_from_dp_metadata()` 更新本地 connector 状态，再发送。FFN 必须在进入 `torch.cuda.graph(...)` 或 `torch.npu.graph(...)` 之前完成状态更新，控制面的副作用不能被录进图里。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
+
+## AFD-I11 — worker 自动选择和显式指定 worker 路径必须同时可用
+
+- `worker_cls="auto"` 在上游平台规范化之后，由 `compat/patches/config_validation.py` 映射到 CUDA 或标准 Ascend 的角色 worker。显式指定的 worker 路径和非 AFD 配置不能被改写。
+- 显式 AFD worker 路径仍然接受（兼容旧命令），但不是稳定接口。
+- 不要删掉 NPU worker 里非 SP 场景的 all-to-all 修正。auto 路径在配置规范化时已经做了同样的改写，但显式指定 worker 的旧式启动还依赖 worker 里这份修正作为兜底。
+- `config_validation` 和其他核心 patch 在同一个 best-effort `try` 块里导入，失败时可能只在 debug 日志里出现，映射就静默丢了。因此 worker 初始化遇到隐式或错误的 worker class 时，必须明确报错，不能猜。
+- 没有 `--afd-config` 这个参数。配置只能从 `additional_config["afd"]` 进入（`afd_role` 等兼容别名除外）。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
+
+## AFD-I12 — E2E：分清 PR 门禁、每周门禁和只在本地跑的用例
+
+- PR 门禁用例最多使用 4 个设备，AFD 门禁用例必须是 2A2F。2A1F 用例（包括 README 本地冒烟示例里的 `afd-eager-2a1f`）不能加入 PR 门禁。
+  - 一处说 2A1F 用例 “run outside CI”；
+  - 另一处的每周门禁包含 DeepSeek `afd-graph-dbo-2a1f`，以及 Qwen3 MoE 和 Qwen3.6 的用例，其中 Qwen3.6 套件是 2A1F。
+  - 修改 CI 选择时，要同步更新 `docs/design/module/e2e_testing.md` 和 `tests/e2e/README.md`，不要让这处矛盾继续扩大。
+- 按通用规则，harness 升级到 `SIGKILL` 就必须判用例失败。通过 `/proc/*/environ` 标记扫描再发 `SIGKILL` 的例外，只适用于 NPU async CAM 场景（`afd-eager-async-cam`、`afd-dsv4-flash-async-cam-dp2tp4-ep8`）。新场景不能沿用这个例外。
+- CI 不能设置 `AFD_GSM8K_LIMIT`，也不能调低 `AFD_GSM8K_THRESHOLD`。DBO 场景需要 12 路并发、至少 24 个样本，并断言至少记录到一次实际运行的双 ubatch 步骤。
+- 门禁用例不能用 `skip` 或 `xfail`。新行为需要单元测试加真实硬件证据；Ascend V2 目前只有单元测试证据，不能当作先例。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
