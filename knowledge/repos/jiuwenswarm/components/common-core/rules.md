@@ -1,0 +1,44 @@
+---
+title: "jiuwenswarm/common 审查规则：配置读写事务、跨仓契约与持久化键稳定性"
+created: 2026-09-30
+updated: 2026-09-30
+type: rule
+tags: [jiuwenswarm]
+sources: []
+---
+
+# jiuwenswarm/common 审查规则：配置读写事务、跨仓契约与持久化键稳定性
+
+## JIUWENSW-I1 — `jiuwenswarm/common/config.py::update_config` 的 mutator 不能再次进入写锁，返回值决定是否写盘
+
+- `_CONFIG_WRITE_LOCK`（`threading.Lock`）和 portalocker 文件锁都不可重入。如果 mutator 里调用了任何经过 `update_config` 或 `config_write_lock` 的函数（如 `update_ttse_enabled_in_config`、`save_models_candidate`、`update_permissions_*`），同一线程会一直阻塞，到 `lock_timeout` 后抛出 `TimeoutError`，写入失败。
+- mutator 的返回值才是要 dump 的对象。返回 `None` 表示不写盘（`delete_*` 没命中时就靠它跳过）。新写的 mutator 如果漏了 `return data`，修改会被悄悄丢掉。
+- mutator 内抛出异常会中止写入。校验（`raise_if_invalid`、重复 id 检查）必须放在 mutator 里面或调用之前，不能放到 `update_config` 返回之后。
+- 写盘后要读出来展示的数据，应在 `update_config` 返回后另发一次调用，不要在 mutator 里读。
+
+<!-- kb:rule status=active since=init-f0a69728c96b -->
+
+## JIUWENSW-I4 — 新增的 config.yaml 写入口必须走 `update_config` 加 `dump_yaml_round_trip`，不要复制裸读改写的写法
+
+- AgentServer 和 Gateway 两个进程会同时写同一个 config.yaml。`update_channel_in_config`、`update_browser_in_config`、`set_auto_memory_enabled` 这类裸 `load_yaml_round_trip` 到 `dump_yaml_round_trip` 的写法不持锁，会覆盖另一个进程的修改。新代码不要照抄这种写法；PR 改到这些旧函数时，优先迁移到 `update_config`。
+- 不要使用 `set_config`（直接 `open(..., "w")` 后 `yaml.safe_dump`），也不要自己开文件写。这种写法不是原子的，读者可能读到写了一半的文件，还会丢掉注释和引号风格。
+- `dump_yaml_round_trip` 的临时文件必须和目标文件放在同一目录（`os.replace` 不能跨文件系统），异常路径要删掉 tmp 文件。不要去掉 `_atomic_replace` 对 Windows `PermissionError` 的重试。
+- `_CONFIG_YAML_PATH`、`_load_yaml_round_trip`、`_dump_yaml_round_trip` 是下游模块在导入的兼容别名，不能删除或改名。
+
+<!-- kb:rule status=active since=init-f0a69728c96b -->
+
+## JIUWENSW-I13 — 读取开关时注意字符串布尔值；evolution 开关只有一个来源
+
+- 通过 `${VAR:-false}` 注入的值是字符串，而 `bool("false")` 为 True。可能来自环境变量替换的新开关应使用 `coerce_config_bool`。`is_subagent_runtime_enabled` 里的 `bool(...)` 就有这个问题，不要照抄。
+- `_get_evolution_config` 有意只读 `react.evolution`，不读顶层的 `evolution`，也不读环境变量覆盖，以免残留的部署变量改变运行中 agent 的能力。`get_skill_evolution_enabled` 和 `get_evolution_auto_save_enabled` 用 `is True` 严格判断。PR 不能把旧路径或 env 回退加回来。
+
+<!-- kb:rule status=active since=init-f0a69728c96b -->
+
+## JIUWENSW-I17 — `jiuwenswarm/common/client/` 下的抽象接口是跨仓库契约，改签名必须和 Gateway 副本同步
+
+- `AgentServerClient` 和 `ThirdAgent` 在 Gateway 仓库里各有一份副本，两边靠 E2A 线协议对齐。修改方法名、keyword-only 参数或返回类型时，必须同步 Gateway 副本和所有实现（WebSocket、AgentOS Router 等）。
+- 新增 `@abstractmethod` 会让所有没实现它的子类无法实例化。可选能力应提供默认实现（参考 `ThirdAgent.normalize_agent_type`）。
+- `send_request` 的 `timeout=None` 表示使用客户端默认值。实现方必须采用调用方传入的更大值（例如 cron 的 `timeout_seconds`），不能再被内层默认值提前截断。
+- `UnsupportedThirdAgent` 的返回形状（`ok` 为 False，带 `error`，`code` 为 UNSUPPORTED）是调用方依赖的约定。`normalize_agent_type` 只对内置的 jiuwenswarm 不区分大小写，registry 里的名称保留原大小写。
+
+<!-- kb:rule status=active since=init-f0a69728c96b -->

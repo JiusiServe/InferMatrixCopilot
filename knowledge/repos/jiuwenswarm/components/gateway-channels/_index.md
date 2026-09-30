@@ -20,3 +20,5 @@ sources: []
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
 | cli、chat、命令行、CLI 频道、gateway client、websocket、tui、renderer、jsonl、spinner、SIGINT、… | 入口 | `jiuwenswarm/channels/cli/`、`jiuwenswarm/channels/process_cli/` |
+
+- [Process CLI 频道（jiuwenswarm/channels/process_cli）审查规则](rules.md)

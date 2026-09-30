@@ -22,3 +22,5 @@ sources: []
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
 | common、config、配置、模型选择、model catalog、mode、工作区、cron、updater、doctor、hooks、kv cache… | 入口 | `jiuwenswarm/common/_build_config.py`、`jiuwenswarm/common/chat_final.py`、`jiuwenswarm/common/cleanup.py` |
+
+- [jiuwenswarm/common 审查规则：配置读写事务、跨仓契约与持久化键稳定性](rules.md)
