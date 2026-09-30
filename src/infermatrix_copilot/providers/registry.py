@@ -1,8 +1,9 @@
 """Provider registry — the one table of ways to reach a model.
 
-All four ids resolve to shipped transports (M1 cursor, M2 claude-code,
-M3 codex — doc/features/provider-registry.md). `_UNSHIPPED` remains the
-mechanism for declaring a future backend before its transport lands:
+Every id resolves to a shipped transport (M1 cursor, M2 claude-code,
+M3 codex, then deepseek and zcode — doc/features/provider-registry.md).
+`_UNSHIPPED` remains the mechanism for declaring a future backend before its
+transport lands:
 `transport_for` raises its milestone pointer so `strict_readiness`/doctor
 report "not yet shipped" instead of a run failing mid-flight.
 """
@@ -60,6 +61,17 @@ PROVIDERS: dict[str, ProviderSpec] = {
             capabilities=frozenset({
                 "sandbox_read_only", "system_prompt", "api_keyed"}),
             default_model="deepseek-v4-pro"),
+        # zcode serves the host's configured default model and has no
+        # per-run selector, so `default_model` stays empty and
+        # STRICT_BACKEND_MODEL is checked against the served model instead
+        # (providers/zcode.py). No `sandbox_read_only`: containment is the
+        # tool denylist plus the post-session allowlist audit.
+        ProviderSpec(
+            id="zcode", kind="harness",
+            display="Z.AI (GLM) subscription via zcode CLI",
+            cli_names=("zcode",),
+            capabilities=frozenset({
+                "mcp_tools", "builtin_tools_off", "usage_reporting"})),
     )
 }
 
@@ -116,6 +128,10 @@ def transport_for_id(settings, provider_id: str) -> HarnessTransport:
         from .deepseek import DeepSeekHarnessTransport
 
         return DeepSeekHarnessTransport(settings)
+    if spec.id == "zcode":
+        from .zcode import ZCodeTransport
+
+        return ZCodeTransport(settings)
     from .codex import CodexTransport
 
     return CodexTransport(settings)

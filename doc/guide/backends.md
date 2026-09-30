@@ -10,6 +10,7 @@
 > | Codex | ✅ `$imreview` → [`hosts/codex.md`](hosts/codex.md) | ✅ `STRICT_BACKEND=codex` |
 > | Cursor | ✅ `/imreview` → [`hosts/cursor.md`](hosts/cursor.md) | ✅ `STRICT_BACKEND=cursor` |
 > | DeepSeek（dsh） | ✗ | ✅ `STRICT_BACKEND=deepseek` |
+> | ZCode（GLM） | ✗ | ✅ `STRICT_BACKEND=zcode` |
 > | api（Anthropic/OpenAI 兼容） | ✗ | ✅ 默认 |
 >
 > 一句话判据：**宿主提供模型给你用；后端是 copilot 拿去用的模型。**
@@ -39,7 +40,7 @@ Agent 订阅（Claude Pro/Max、ChatGPT、Cursor）而没有裸 API Key 的用�
 两者住在同一张注册表 `providers/registry.py` 里，走同一条解析路径、同一套
 trace 词汇。**用 `api` 时行为逐字节不变**（平价棘轮）。
 
-## 2. 五个后端
+## 2. 六个后端
 
 | id | kind | 凭据 | 能力 | 验证程度 |
 |---|---|---|---|---|
@@ -47,7 +48,8 @@ trace 词汇。**用 `api` 时行为逐字节不变**（平价棘轮）。
 | `cursor` | harness | 订阅（`cursor-agent` CLI） | `mcp_tools` `usage_reporting` | 已实测 |
 | `claude-code` | harness | 订阅（`claude` CLI） | `mcp_tools` `builtin_tools_off` `max_turns` `system_prompt` `usage_reporting` `cost_reporting` | 订阅认证下实测 |
 | `codex` | harness | 订阅（`codex` CLI） | `mcp_tools` `sandbox_read_only` `usage_reporting` | **仅离线测试**（开发机无 ChatGPT 登录，readiness 会报出登录缺口） |
-| `deepseek`（dsh） | harness | **API Key** | `sandbox_read_only` `system_prompt` `api_keyed`——**注意没有 `mcp_tools`**，见下 | 最新加入 |
+| `deepseek`（dsh） | harness | **API Key** | `sandbox_read_only` `system_prompt` `api_keyed`——**注意没有 `mcp_tools`**，见下 | 已实测 |
+| `zcode` | harness | 订阅（`zcode` CLI，Z.AI OAuth） | `mcp_tools` `builtin_tools_off` `usage_reporting`——**模型不能按次指定**，见下 | 2026-09-30 实测（zcode 0.16.9） |
 
 `claude-code` 的能力集最全；`codex` 与 `deepseek` 靠 OS 级只读沙箱而不是关闭
 内置工具；`cursor` 两者都做不到，因此额外配了事后审计（见 §5）。
@@ -68,6 +70,19 @@ trace 词汇。**用 `api` 时行为逐字节不变**（平价棘轮）。
    > **由此而来的一条硬规矩：跑在原生 bash 上的 arm，绝不能被标成"tools
    > bridged"。** 本轮战役已经测到过三个 arm 与其标签不符。
 
+**`zcode` 也有两处要记住**：
+
+1. **它没有按次选模型的开关。** 没有 `--model`；实测 `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE`
+   也改不了实际服务的模型。它用宿主上 zcode 自己配置的缺省模型（在 zcode TUI 里用
+   `/model` 设）。所以对 `zcode` 而言 `STRICT_BACKEND_MODEL` 是一条**断言**：会话结束后
+   与流里 `session.updated` 报出的 `modelId` 比对（不区分大小写），不一致时按
+   `MODEL_MISMATCH_POLICY` 处理（缺省 `fail`，抛 `ModelMismatchError`）。
+2. **会话 cwd 是我们自己的临时目录，不是 PR worktree。** zcode 会从 cwd 加载 `.env`，
+   并从 cwd 往上到 git 根发现 `zcode.json` / `.zcode/config.json`——项目配置能声明
+   stdio MCP server（也就是命令），zcode 不经信任确认就会连上。在 PR checkout 里跑，
+   等于让被审的 PR 配置审稿人。所以仓库按绝对路径读取，prompt 里写明 checkout 位置；
+   工具桥写在临时目录的 `.zcode/config.json` 里。
+
 ## 3. 怎么选
 
 **默认用 `api`。** 它是唯一行为完全确定、成本可测、且所有评测结论都建立其上的
@@ -85,7 +100,7 @@ trace 词汇。**用 `api` 时行为逐字节不变**（平价棘轮）。
 
 ```bash
 # ~/.infermatrix-copilot/.env
-STRICT_BACKEND=api            # api | cursor | claude-code | codex | deepseek
+STRICT_BACKEND=api            # api | cursor | claude-code | codex | deepseek | zcode
 # STRICT_BACKEND_MODEL=       # harness 内部的模型 id（可选，见下）
 # STRICT_BACKEND_CONCURRENCY=2  # 并发 harness 会话数
 # STRICT_BACKEND_CLI=         # 二进制路径覆盖（否则走 PATH 查找）
@@ -126,7 +141,8 @@ REVIEW_LENS_BACKENDS=adversary=claude-code:...,round2=claude-code:...
   桥提供内置工具 + `doc_search`/`doc_read` + 按需 `repo_map` + 考古工具组；
   **skill/memory 检索刻意不开放**——那两个能提知识 candidate，跨进程写入口没有开。
   **例外：`deepseek` 用不了这座桥**（见 §2），它的调用落在审计轨迹之外。
-- **能关内置工具的就关**（`builtin_tools_off`，claude-code）；
+- **能关内置工具的就关**（`builtin_tools_off`，claude-code；zcode 用 `--mode plan` +
+  `--disallowed-tools` 剥到只剩读工具，并对照读工具白名单做事后审计）；
   **关不掉的用 OS 级只读沙箱**（`sandbox_read_only`，codex / deepseek）。
 - **两者都做不到的（cursor-agent）额外上事后审计**（`providers/audit.py`）：
   检查文件读取是否越出会话的容纳根（PR-time worktree + run 目录），只读 scope

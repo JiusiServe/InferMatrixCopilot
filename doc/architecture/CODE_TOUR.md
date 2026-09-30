@@ -417,8 +417,8 @@ infermatrix-copilot --resume                           # 从首个未完成 step
 **要么**整包委托给一个厂商 harness。两条腿共用同一个 prompt、同一份 scope、
 同一套 trace 词汇——分叉点只在"谁拥有工具循环"。
 
-- **`providers/registry.py`**(107)——唯一的一张表:`PROVIDERS` 五条
-  `ProviderSpec`(`api` / `cursor` / `claude-code` / `codex` / `deepseek`),
+- **`providers/registry.py`**(107)——唯一的一张表:`PROVIDERS` 六条
+  `ProviderSpec`(`api` / `cursor` / `claude-code` / `codex` / `deepseek` / `zcode`),
   `resolve_provider` 读 `STRICT_BACKEND`,`transport_for_id` 取传输实现。
   未发布的后端登记进 `_UNSHIPPED`,于是 readiness/doctor 报"尚未发布",
   而不是让一次 run 跑到一半才失败。
@@ -430,7 +430,7 @@ infermatrix-copilot --resume                           # 从首个未完成 step
   **`sanitized_env()`** 是安全要点:子进程环境是白名单,厂商 CLI 必须保住自己
   HOME 里的订阅认证,但**绝不能继承我们的 `ANTHROPIC_BASE_URL`**——这类机器上
   它往往指向某个网关,继承过去会悄悄把厂商流量改道。
-- 四个传输,各自的治理姿态不同,差别全在"内置工具能不能关":
+- 各传输的治理姿态不同,差别全在"内置工具能不能关":
   **`claude_code.py`**(205)能关(`builtin_tools_off`),`--max-turns` 直接
   承载我们的迭代预算,并回报 `modelUsage`/成本;
   **`codex.py`**(197)关不掉,改用 OS 级 `--sandbox read-only`;
@@ -438,7 +438,10 @@ infermatrix-copilot --resume                           # 从首个未完成 step
   `cursor-agent --print --force --output-format stream-json`,**prompt 走
   STDIN**(argv 单参数 128KiB 上限,证据包超得轻松),因此额外配事后审计;
   **`deepseek.py`**(442)是唯一 **api-keyed 的 harness**(SDK 驱动、PATH 上
-  没有二进制、要 `DEEPSEEK_HARNESS_API_KEY`),用最小 composition 保证沙箱干净。
+  没有二进制、要 `DEEPSEEK_HARNESS_API_KEY`),用最小 composition 保证沙箱干净;
+  **`zcode.py`** 用 `--mode plan` + `--disallowed-tools` 剥到只剩读工具并做白名单
+  事后审计,会话 cwd 是自有临时目录(zcode 会从 cwd 读 `.env` 和项目 MCP 配置),
+  模型不能按次指定,`STRICT_BACKEND_MODEL` 在它这里是对实际服务模型的断言。
 - **`providers/audit.py`**(109)——**侦测型**兜底,只服务于关不掉内置工具的
   后端(今天是 cursor):事后检查文件读取是否越出容纳根(PR-time worktree +
   run 目录)、只读 scope 下是否出现 write/edit。从 Composer 评测臂产品化而来
