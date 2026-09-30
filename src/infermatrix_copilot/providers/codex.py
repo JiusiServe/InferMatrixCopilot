@@ -182,7 +182,8 @@ class CodexTransport(HarnessTransport):
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
-                 role: str = "", effort: str = "") -> Reply:
+                 role: str = "", effort: str = "",
+                 max_budget_usd: float | None = None) -> Reply:
         """Tool-less one-shot in an empty scratch cwd (read-only sandbox +
         nothing to read = contained)."""
         import tempfile

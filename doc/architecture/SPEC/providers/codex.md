@@ -1,6 +1,6 @@
 # providers/codex.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-30 -->
 
 `LOC ~197 · harness transport（ChatGPT 订阅） · refactor-status: ok`
 
@@ -42,3 +42,6 @@ OS 级控制可用的后端；把两者混同，会模糊掉"当前实际生效�
 
 ## 2026-09-28
 `complete()` 接受 `effort`（推理强度）：codex 以 `-c model_reasoning_effort="<effort>"` 生效并校验取值；其他 transport 接受并忽略（模型 id 已决定推理预算）。
+
+## 2026-09-30
+`complete()` 接受并忽略 `max_budget_usd`；`stops_at_spend` 为 False（CLI 无花费阈值）。

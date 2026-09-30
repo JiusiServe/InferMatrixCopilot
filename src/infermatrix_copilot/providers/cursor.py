@@ -203,7 +203,8 @@ class CursorTransport(HarnessTransport):
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
-                 role: str = "", effort: str = "") -> Reply:
+                 role: str = "", effort: str = "",
+                 max_budget_usd: float | None = None) -> Reply:
         """Tool-less one-shot. Runs in an EMPTY scratch cwd so cursor-agent's
         native tools have nothing to read — the containment for calls that
         need no repo at all (intent, reducer, repair)."""
