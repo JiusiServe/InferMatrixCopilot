@@ -52,7 +52,7 @@ from ..knowledge_service.l1 import check_changeset
 from ..knowledge_service.lifecycle import LifecycleError, Page
 from ..knowledge_service.pinned_claims import Evidence
 from .gate import changes_between
-from .init_stages import MAX_EXCERPT_BYTES, _Candidate, _Stage
+from .init_stages import MAX_EXCERPT_BYTES, _Candidate, _Stage, adapter_missing
 from .init_support import STAGES, InitError, InitRecord
 
 CALIBRATION_DIR = "kb-calibration"
@@ -320,7 +320,7 @@ class _Harvest(_Stage):
         manifest_path = self._manifest_path()
         before = self._manifest_text()
         if before is None:
-            return self._blocked([f"{manifest_path} does not exist in the knowledge repository at the base"])
+            return self._blocked([adapter_missing(manifest_path)])
         try:
             after = set_calibration_set(before)
         except InitError as exc:

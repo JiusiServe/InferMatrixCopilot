@@ -41,7 +41,9 @@ from ..knowledge_service.lifecycle import LifecycleError, Page
 from .init_budget import BudgetExhausted
 from .init_coverage import Owner, load_owners, make_include, most_specific, pr_weighted_coverage
 from .init_modules import scan_modules
-from .init_stages import ROUTES_NAME, _Candidate, _fence, _numbered, _one_line, _Stage, _title_of
+from .init_stages import (
+    ROUTES_NAME, _Candidate, _fence, _numbered, _one_line, _Stage, _title_of, adapter_missing,
+)
 from .init_support import InitError, InitRecord, generate
 
 MAX_CODE_BYTES = 100_000
@@ -331,7 +333,7 @@ class _Deepen(_Stage):
         path = self._manifest_path()
         before = self._manifest_text()
         if before is None:
-            return {}, [f"{path} does not exist in the knowledge repository at the base"]
+            return {}, [adapter_missing(path)]
         try:
             after = flip_to_shadow(before)
         except InitError as exc:

@@ -147,6 +147,13 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
     return stage_class(rt, lifecycle, dry_run=dry_run, pin=pin, notes=notes, author=author).run()
 
 
+def adapter_missing(path: str) -> str:
+    """The one message every stage gives when the adapter manifest is not in
+    the knowledge repository at the base: adapters ship in their own PR, merged
+    before kb init runs, and a stage never guesses what an absent one says."""
+    return f"{path} does not exist in the knowledge repository at the base"
+
+
 def _stage_class(stage: str) -> type:
     if stage == "skeleton":
         return _Skeleton
@@ -324,8 +331,14 @@ class _Stage:
         init = lc.init
         self.repo_dir = lc.knowledge_dir
         base_sha = rt.knowledge.fetch()
+        self._base_sha = base_sha
         main = rt.knowledge.knowledge_files(base_sha)
         chain = self._chain()
+        self.overlay = dict(chain.repo_files)
+        # every stage reads the adapter here (language, the flips); an unmerged
+        # adapter PR must block, never degrade to "no language" — and never be
+        # papered over by a record cached from a run before this check
+        adapter_missing_problem = adapter_missing(self._manifest_path()) if self._manifest_text() is None else ""
         upstream = rt.upstream(lc.repo, lc.full_name)
         upstream.sync()
         pin = upstream.resolve(self.pin or chain.pin or "HEAD")
@@ -340,7 +353,7 @@ class _Stage:
                 raise InitError("a publication of this stage is pending (pushed, PR not confirmed); re-run "
                                 f"without --dry-run to finish it, or remove {record_path} to start over")
             return self._resume(previous)
-        if previous is not None and previous.inputs_digest == digest \
+        if previous is not None and previous.inputs_digest == digest and not adapter_missing_problem \
                 and previous.status in ("dry_run", "published", "empty"):
             return previous
         if previous is not None and previous.pr.get("number") and previous.inputs_digest != digest:
@@ -353,8 +366,9 @@ class _Stage:
             self.record.notes.append(f"pinned at {pin[:12]}, not at the earlier stages' {chain.pin[:12]}")
         self.budget = Budget(init.budget_usd)
         self.base = {**main, **chain.knowledge}
-        self.overlay = dict(chain.repo_files)
         problems = chain.problems + self._precheck()
+        if adapter_missing_problem:
+            problems.append(adapter_missing_problem)
         if problems:
             return self._blocked(problems)
         schema = rt.knowledge.show(base_sha, "doc/knowledge/SCHEMA.md")
@@ -466,7 +480,7 @@ class _Stage:
         path = self._manifest_path()
         if path in self.overlay:
             return self.overlay[path]
-        return self.rt.knowledge.show(self.record.kb_base_sha, path)
+        return self.rt.knowledge.show(self._base_sha, path)
 
     def _language(self) -> str:
         """The adapter's ``repo.language`` ("" when it declares none)."""

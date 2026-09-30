@@ -500,7 +500,8 @@ def test_model_headings_in_generated_prose_never_become_rules(world):
 
 def test_a_repo_tag_missing_from_the_taxonomy_blocks(world):
     lifecycle = RepoLifecycle(repo="newrepo", full_name="o/new", enabled=False, mode="shadow",
-                              knowledge_dir="repos/newrepo", init=InitConfig())
+                              knowledge_dir="repos/newrepo", init=InitConfig(),
+                              adapter_dir=Path("adapters/toy"))   # its adapter IS at the base; only the tag is missing
     gateway = FakeGateway()
     record = run_stage(_runtime(world, gateway), lifecycle, "skeleton", dry_run=True)
     assert record.status == "blocked" and "taxonomy" in record.problems[0]
@@ -534,6 +535,32 @@ def test_missing_seed_blocks(world):
     lifecycle = RepoLifecycle(**{**lifecycle.__dict__, "init": InitConfig(seeds=("repos/other/nope.md",))})
     record = run_stage(_runtime(world), lifecycle, "skeleton", dry_run=True)
     assert record.status == "blocked" and "does not exist" in record.problems[0]
+
+
+def test_an_adapter_missing_at_the_base_blocks_the_skeleton(world):
+    """Regression (jiuwenswarm pilot, 2026-09-30): the adapter PR was not
+    merged, so its manifest was absent from the knowledge repository at the
+    base; the modules stage then read "no language" and ran empty instead of
+    blocking. Every stage now blocks before any model call."""
+    lifecycle = RepoLifecycle(**{**_lifecycle().__dict__, "adapter_dir": Path("adapters/nope")})
+    gateway = FakeGateway()
+    record = run_stage(_runtime(world, gateway), lifecycle, "skeleton", dry_run=True)
+    assert record.status == "blocked"
+    assert record.problems == ["adapters/nope/manifest.yaml does not exist in the knowledge repository at the base"]
+    assert gateway.calls == []
+
+
+def test_an_adapter_missing_at_the_base_is_not_hidden_by_a_cached_record(world):
+    """A record from a run before this check (same inputs digest: the digest
+    never covered the manifest) must not be returned as if the stage passed."""
+    record = run_stage(_runtime(world), _lifecycle(), "skeleton", dry_run=True)
+    assert record.status == "dry_run", record.problems
+    lifecycle = RepoLifecycle(**{**_lifecycle().__dict__, "adapter_dir": Path("adapters/nope")})
+    gateway = FakeGateway()
+    again = run_stage(_runtime(world, gateway), lifecycle, "skeleton", dry_run=True)
+    assert again.status == "blocked"
+    assert again.problems == ["adapters/nope/manifest.yaml does not exist in the knowledge repository at the base"]
+    assert gateway.calls == []
 
 
 def test_private_upstream_is_always_a_dry_run(world):
