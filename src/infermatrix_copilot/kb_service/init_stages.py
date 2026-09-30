@@ -189,6 +189,44 @@ def _schema_tags(text: str | None) -> set[str]:
     return set(re.findall(r"`([^`]+)`", match.group(1))) if match else set()
 
 
+_ATX = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+(?P<text>.*?))?[ \t]*#*[ \t]*$")
+_FENCE = re.compile(r"^ {0,3}(?P<run>`{3,}|~{3,})(?P<rest>.*)$")
+
+
+def neutral_headings(text: str) -> str:
+    """``text`` with no line starting with ``#``, so that no heading in
+    generated prose can ever be parsed as a rule (``lifecycle.RULE_HEADING``,
+    ``_TOP_RULE`` and ``ANY_RULE_HEADING`` all anchor on a ``#`` in column 0):
+    an ATX heading outside code becomes a bold paragraph, any other line that
+    starts with ``#`` is escaped (``\\#``), and inside a fence such a line is
+    indented by one space (the code reads the same)."""
+    out: list[str] = []
+    fence: str | None = None   # the opening run (character and length) of the open code fence
+    for line in text.splitlines():
+        marker = _FENCE.match(line)
+        if fence is None and marker and not (marker.group("run")[0] == "`" and "`" in marker.group("rest")):
+            fence = marker.group("run")          # CommonMark: a backtick info string has no backtick
+            out.append(line)
+            continue
+        if fence is not None and marker and marker.group("run")[0] == fence[0] \
+                and len(marker.group("run")) >= len(fence) and not marker.group("rest").strip():
+            fence = None                         # closes only with the same character, as long, nothing after
+            out.append(line)
+            continue
+        if fence is not None:
+            out.append(" " + line if line.startswith("#") else line)
+            continue
+        heading = _ATX.match(line)
+        if heading is not None and line.lstrip().startswith("#"):
+            title = (heading.group("text") or "").strip()
+            out.append(f"**{title}**" if title else "")
+        elif line.startswith("#"):
+            out.append("\\" + line)
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
 def _relative_link(from_dir: str, target: str) -> str:
     return os.path.relpath(target, from_dir).replace(os.sep, "/")
 
@@ -655,12 +693,15 @@ class _Skeleton:
         self._routes(plan)
 
     def _d5_prose(self, text: str) -> str:
+        """Generated prose for a non-rule page: lines the docs already say are
+        dropped, and no line may be read as a rule heading (see
+        ``neutral_headings``)."""
         from ..profiles.establish import is_redundant
 
         kept = [line for line in text.splitlines()
                 if not line.strip() or line.lstrip().startswith("#") or "](" in line
                 or not is_redundant(line, self.corpus)]
-        return "\n".join(kept).strip()
+        return neutral_headings("\n".join(kept).strip())
 
     def _extend_index(self, index: str, links: list[tuple[str, str]]) -> None:
         text = self.head[index]
@@ -678,7 +719,7 @@ class _Skeleton:
         intro = self._d5_prose(str(plan.get("index_intro") or ""))
         if intro:
             lines += [intro, ""]
-        lines += [f"## {_one_line(plan.get('contents_heading')) or 'Contents'}", ""]
+        lines += [f"**{_one_line(plan.get('contents_heading')) or 'Contents'}**", ""]
         entries: list[tuple[str, str]] = []
         directory = self.repo_dir
         for path in sorted(p for p in self.head if str(PurePosixPath(p).parent) == directory

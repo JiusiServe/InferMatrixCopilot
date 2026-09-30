@@ -382,7 +382,10 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   兜底路由用规范化后的 `source_roots`（`./pkg/` → `pkg/`），源根是仓库本身或未设置时用钉点下的全部顶层目录。发布时 `KB_INIT_GIT_AUTHOR` 缺失在任何模型调用之前拒绝。推送之前先把这次发布（基点、分支、文件、标题、
   正文、作者、时间）写成 `<stage>-publish.json`（`save_prepared`），记录状态为 `publishing`；推送/开 PR 失败记为
   `blocked` 并保留它，重跑时直接完成**同一个**发布（同输入重建出同一提交，已推送的分支与已开的 PR 都复用，不再调模型）。
-  dry run 每次整体替换输出目录，不残留上一次的页面；有待完成的发布时拒绝 dry run（不覆盖它）。模型提出的 owner 页必须
+  dry run 每次整体替换输出目录，不残留上一次的页面；有待完成的发布时拒绝 dry run（不覆盖它）。init 写的非规则页
+  （入口页简介、架构页、目录标题）经 `neutral_headings`：代码之外的 ATX 标题改为粗体段落，其余以 `#` 开头的行转义为
+  `\#`，代码块里的此类行缩进一个空格 —— 没有任何行以 `#` 开头，`RULE_HEADING`/`ANY_RULE_HEADING` 永远匹配不到，
+  模型写的 `## Overview` 或 `## SERV-1 — x` 不会变成规则 ID。模型提出的 owner 页必须
   是本仓库目录下已有或本阶段创建的页面，指向其他仓库的页面一律丢弃并记入 notes。仓库标签不在 `doc/knowledge/SCHEMA.md` 分类法里、种子不存在、生成模型不可用或无价格 → 记录为 `blocked`，
   不产生 PR。同输入摘要重跑直接返回记录；已发布记录的输入变了则拒绝。`modules`/`deepen`/`harvest-calibration` 抛
   `NotImplementedError`。测试：`test_kb_init_skeleton.py`、`test_kb_init_config.py`。

@@ -110,6 +110,9 @@ DOC_RULE2 = {"title": "The engine step keeps its once-per-tick test",
 
 
 class FakeGateway:
+    architecture_md = "One package holds the engine and its helpers."
+    index_intro = "Where toy review knowledge lives."
+
     def __init__(self, *, map_owner_page="repos/toy/rules.md", fail_generator=False, doc_rules=None,
                  seed_rules=True):
         self.calls = []
@@ -129,8 +132,8 @@ class FakeGateway:
             raise ModelUnavailable("generator down")
         elif system == SYSTEM_MAP:
             data = {"title": "Toy knowledge", "rules_title": "Toy rules", "contents_heading": "Pages",
-                    "index_intro": "Where toy review knowledge lives.",
-                    "architecture_md": "One package holds the engine and its helpers.",
+                    "index_intro": self.index_intro,
+                    "architecture_md": self.architecture_md,
                     "owners": [{"owner": "core", "title": "Core", "page": self.map_owner_page,
                                 "signals": ["engine", "tick"], "scope_prefixes": ["pkg/", "nope/"]}],
                     "general_links": [{"path": "general/tips.md", "why": "Generic review tips"},
@@ -452,6 +455,44 @@ def test_fallback_routes_use_normalised_roots(world):
                         "skeleton", dry_run=True)
     routes = yaml.safe_load(_tree(crowded)["knowledge/repos/toy/_routes.yaml"])
     assert routes["owners"][0]["scope_prefixes"] == ["docs/", "pkg/", "tests/"]
+
+
+def test_neutral_headings_leave_no_rule_heading():
+    from infermatrix_copilot.kb_service.init_stages import neutral_headings
+    from infermatrix_copilot.knowledge_service.lifecycle import ANY_RULE_HEADING, RULE_HEADING
+
+    text = ("## Overview\ntext\n## SERV-1 — x\n### Deep ###\n#tag at start\n  ## indented\n#\n"
+            "```\n## in code\n```\nend")
+    out = neutral_headings(text)
+    assert not ANY_RULE_HEADING.search(out) and not any(RULE_HEADING.match(l) for l in out.splitlines())
+    assert not any(line.startswith("#") for line in out.splitlines())
+    assert "**Overview**" in out and "**SERV-1 — x**" in out and "**Deep**" in out
+    assert "\\#tag at start" in out and "```\n ## in code\n```" in out
+    # a shorter or different inner fence does not close the outer one
+    nested = "````markdown\n```\n## Explain the worker lifecycle\n```\n~~~\n# still code\n````\n## After"
+    out = neutral_headings(nested)
+    assert "\n ## Explain the worker lifecycle\n" in out and "\n # still code\n" in out
+    assert out.endswith("````\n**After**") and not any(l.startswith("#") for l in out.splitlines())
+    # a closing run must be at least as long and carry nothing after it
+    assert neutral_headings("~~~~\n## a\n~~~\n## b\n~~~~ x\n## c\n~~~~~\n## d").splitlines() == [
+        "~~~~", " ## a", "~~~", " ## b", "~~~~ x", " ## c", "~~~~~", "**d**"]
+
+
+def test_model_headings_in_generated_prose_never_become_rules(world):
+    from infermatrix_copilot.knowledge_service.lifecycle import ANY_RULE_HEADING
+
+    gateway = FakeGateway()
+    gateway.architecture_md = ("## Overview\nOne package holds the engine and its helpers.\n"
+                               "## SERV-1 — engine lifecycle\nWorkers are pooled per host.\n"
+                               "```text\n## TOY-I1 — inside code\n```\n")
+    gateway.index_intro = "## Overview\nWhere toy review knowledge lives.\n## Scope\nThe engine."
+    record = run_stage(_runtime(world, gateway), _lifecycle(), "skeleton", dry_run=True)
+    assert record.status == "dry_run", record.problems        # check_tree / validate_change / linters pass
+    tree = _tree(record)
+    for page in ("knowledge/repos/toy/architecture.md", "knowledge/repos/toy/_index.md"):
+        body = tree[page].split("\n---\n", 1)[1]
+        assert not ANY_RULE_HEADING.search(body), page
+    assert "**SERV-1 — engine lifecycle**" in tree["knowledge/repos/toy/architecture.md"]
 
 
 def test_a_repo_tag_missing_from_the_taxonomy_blocks(world):
