@@ -88,12 +88,17 @@ def test_the_repository_root_module_is_never_one_prefix():
 
 # -- deepen targets the most specific owner ---------------------------------------------
 
+def _group_owners(module: str, owners, prs) -> list[str]:
+    groups, _ = _Deepen._groups(prs, {module: MODULES[module]}, owners, lambda p: True)
+    return [o.owner for _, o, _, _ in groups]
+
+
 def test_deepen_gives_a_component_module_to_its_component_owner():
-    assert _Deepen._owner(MODULES["pkg/connectors/"]["files"], OWNERS) == CONN
-    assert _Deepen._owner(["pkg/worker/runner.py", "pkg/worker/dbo.py"], OWNERS + [
-        Owner("platforms", "repos/r/components/platforms/_index.md", ("pkg/worker/dbo.py",))]).owner in {
-        "worker", "platforms"}
-    assert _Deepen._owner(MODULES["pkg/"]["files"], OWNERS) == AGG
+    assert _group_owners("pkg/connectors/", OWNERS, [["pkg/connectors/cam.py"]]) == ["connectors"]
+    platforms = Owner("platforms", "repos/r/components/platforms/_index.md", ("pkg/worker/dbo.py",))
+    assert _group_owners("pkg/worker/", OWNERS + [platforms],
+                         [["pkg/worker/runner.py", "pkg/worker/dbo.py"]]) == ["platforms", "worker"]
+    assert _group_owners("pkg/", OWNERS, [["pkg/plugin.py"]]) == ["components"]
 
 
 def test_the_pilot_shape_keeps_coverage_honest():
@@ -111,7 +116,8 @@ def test_the_pilot_shape_keeps_coverage_honest():
            ["pkg/plugin.py", "pkg/utils/a.py"], ["pkg/connectors/cam.py"]]
     include = make_include(["pkg/"], [])
     before = pr_weighted_coverage(prs, owners, include=include, rule_pages=set())
-    hottest = _Deepen._owner(MODULES["pkg/connectors/"]["files"], owners)
+    groups, _ = _Deepen._groups(prs, MODULES, owners, include)
+    hottest = next(o for key, o, _, _ in groups if key == "pkg/connectors/")
     assert hottest == CONN                           # not the aggregate that also lists pkg/connectors/
     after = pr_weighted_coverage(prs, owners, include=include, rule_pages={hottest.path})
     assert before.rule_bearing_ratio == 0.0

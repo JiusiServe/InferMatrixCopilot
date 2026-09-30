@@ -429,16 +429,21 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   与时钟无关（沿 first-parent 的提交时间不一定递减：过期的提交跳过而不是就此停止；路径用 `-z` 读取，非 ASCII 文件名不被
   引号转义）；合并/squash 式默认分支上每个 first-parent 提交就是一个合入的 PR。这就是设计 §7.3 的 PR 窗口，从镜像离线
   读取（不走 GitHub API，没有速率限制）。
-- `init_deepen`（阶段 3）：按窗口内源文件改动数（`make_include`：源根、`exclude`、语言后缀）给模块排序，从高到低：没有路由
-  的模块跳过（记入 notes）；模块的 owner 是以**最具体**方式（`most_specific`）拥有其文件最多的 owner——同时也覆盖它的更宽
-  owner 从不拿走组件的规则；该 owner 已承载规则的模块跳过（对指标无增益）——owner **承载规则**指 owner 页本身有生效规则，
-  或（仅当 owner 是入口页/prose 页时）**同一目录**下有含生效规则的页（不看子目录，否则任何组件有了规则仓库入口就算承载；
-  owner 本身是规则页却没有生效规则时不承载，不看兄弟页）。其余模块每个
-  一次生成调用：模块代码带行号、字节上限（这是深度阶段，读代码本身），产出带行范围证据的规则 → 证据必须在本模块文件内 →
-  共用筛查（D5、钉点证据与声明、落位、咨询性判定）→ 经 `ops.apply_operations` 追加到 owner 的规则页（owner 页本身是规则页
-  时用它，否则用旁边的 `rules.md`；已有规则只追加、不修改，满页转兄弟页）。每写完一个模块重算承载规则的 PR 加权覆盖率，
-  达到 `coverage_target`、预算用完或热模块用尽即停。报告：路由/承载规则两种覆盖率的 before/after、窗口 PR 数、仍无规则的热路径（`uncovered_hot`：没有承载规则的 owner 到达的
-  源文件（按最具体 owner 判断），包括已路由但 owner 无规则的；`unrouted_hot` 另列完全无路由的）。
+- `init_deepen`（阶段 3）：工作单位是**组**——一个模块里最具体 owner（`most_specific`，并列时取路由顺序第一个）相同的
+  文件（`_groups`）。所以一个模块的文件分属多个 owner 时，每个 owner 各深化一次，热文件不会因为它所在模块的多数 owner
+  已有规则而被漏掉（afd-plugin 试点：`attention_model_runner.py` 等热文件的最具体 owner 与模块多数 owner 不同，按模块
+  循环永远到不了它们）。组按窗口内这些文件的改动数（`make_include`：源根、`exclude`、语言后缀）降序（同数按模块、owner）：
+  没有路由的热文件记入 notes（前 5 个）；owner 已承载规则的组跳过（对指标无增益，计数记入 notes）——owner **承载规则**指
+  owner 页本身有生效规则，或（仅当 owner 是入口页/prose 页时）**同一目录**下有含生效规则的页（不看子目录，否则任何组件
+  有了规则仓库入口就算承载；owner 本身是规则页却没有生效规则时不承载，不看兄弟页）。其余组每个一次生成调用：只给**该组**
+  的文件（带行号、字节上限；这是深度阶段，读代码本身），产出带行范围证据的规则 → 证据必须在本组文件内 → 共用筛查（D5、
+  钉点证据与声明、落位、咨询性判定）→ 经 `ops.apply_operations` 追加到 owner 的规则页（owner 页本身是规则页时用它，否则用
+  旁边的 `rules.md`；已有规则只追加、不修改，满页转兄弟页）。每写完一组重算承载规则的 PR 加权覆盖率，达到
+  `coverage_target`、预算用完或热组用尽即停，并**总是**在 notes（因而在 PR 正文）里写一条 `deepen stopped: …`：达到目标；
+  预算用完（剩余组进 `unfinished`，标 `module <m> (owner <o>)`）；或“每个热组都已访问；未达目标（X% < Y%）”——低于目标时
+  附上仍无规则的最热文件（前 5 个）。低于目标从不静默结束。报告：路由/承载规则两种覆盖率的 before/after、窗口 PR 数、仍无
+  规则的热路径（`uncovered_hot`：最具体 owner 不承载规则的源文件，包括已路由但 owner 无规则的；`unrouted_hot` 另列完全
+  无路由的）。
 - 同一 PR 打开 shadow：`flip_to_shadow` 对 adapter manifest 做**文本**编辑，只改 `knowledge_lifecycle` 块里同缩进的
   `enabled`（→ `true`，缺失则插在块头下）与 `mode`（→ `shadow`）两行，注释、顺序与其他行逐字保留；没有该块 → 在任何模型调用
   之前 `blocked`。`_check_flip` 校验：只能改这一个 manifest，`check_flip_to_shadow`（除这两个键外解析值不变、head 开启且为

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from pathlib import Path
 
 import pytest
 import yaml
@@ -103,7 +104,7 @@ def test_deepen_stops_at_the_coverage_target_and_still_flips(world):
     record = run_stage(_runtime(world, gateway), _modules_lifecycle(coverage_target=0.01), "deepen", dry_run=True)
     assert record.status == "dry_run", record.problems
     assert not [c for c in gateway.calls if c["system"] == SYSTEM_CODE_RULES]
-    assert any("coverage target" in n for n in record.notes)
+    assert any(n.startswith("deepen stopped: coverage target 1% reached") for n in record.notes)
     assert set(_tree(record)) == {"adapters/toy/manifest.yaml"}
 
 
@@ -115,8 +116,12 @@ def test_an_exhausted_budget_keeps_the_rules_written_and_lists_the_rest(world):
     _chain(world, gateway)
     record = run_stage(_runtime(world, gateway), _modules_lifecycle(budget_usd=6.0), "deepen", dry_run=True)
     assert record.status == "dry_run", record.problems
-    assert [u.split(":")[0] for u in record.unfinished][:1] == ["module pkg/"], (record.unfinished, record.notes)
+    assert [u.split(":")[0] for u in record.unfinished][:1] == ["module pkg/ (owner core)"], \
+        (record.unfinished, record.notes)
     assert record.coverage["pr_rule_bearing"]["after"] < 1.0
+    # the stop is explained, with the numbers and the hottest files still without rules
+    stop = next(n for n in record.notes if n.startswith("deepen stopped: "))
+    assert "budget exhausted" in stop and "target not reached (" in stop and "pkg/util.py (2)" in stop
     # routed, but still without rules: reported, not hidden behind "routed"
     assert "pkg/util.py" in [path for path, _ in record.coverage["uncovered_hot"]]
     assert record.coverage["unrouted_hot"] == []
@@ -234,6 +239,102 @@ def test_the_pr_window_reads_any_file_name_and_skips_out_of_order_times(tmp_path
     pin = _dated_commit(repo, "b c.py", pin_time)
     window = UpstreamPin(repo / ".git", "o/up").first_parent_changes(pin, count=10, max_age_days=5)
     assert window == [["b c.py"], ["café.py"]]
+
+
+# -- groups: a module is deepened once per most specific owner (afd-plugin pilot) -------
+
+class FirstFileGateway(CodeGateway):
+    """Code rules cite the first file the call was shown (so a group's rule
+    always lies in that group's files), and name it in the title."""
+
+    no_rules = False
+
+    def call_json(self, role, *, system, prompt, validate=None, max_budget_usd=None):
+        if system != SYSTEM_CODE_RULES:
+            return super().call_json(role, system=system, prompt=prompt, validate=validate,
+                                     max_budget_usd=max_budget_usd)
+        self.calls.append({"role": role.name, "system": system, "prompt": prompt, "max_budget_usd": max_budget_usd})
+        payload = json.loads(prompt.split("\n", 1)[1].rsplit("</untrusted_data>", 1)[0])
+        first = payload["files"][0]["path"]
+        data = {"page_title": "Engine rules",
+                "rules": [] if self.no_rules else [{
+                    "title": f"Keep the contract of {first}",
+                    "body": f"- 强制：`{first}` keeps its return value stable across ticks.",
+                    "evidence": [{"path": first, "start": 1, "end": 2}]}]}
+        if validate is not None:
+            validate(data)
+        return ModelReply(role, data, json.dumps(data), role.model, {}, 0.1, cost_usd=0.01)
+
+
+def _two_owner_kb(world) -> None:
+    """An existing knowledge base whose routes split pkg/ between two component
+    owners, neither with rules yet: engine owns the package, util owns one file."""
+    routes = ("schema_version: 1\nowners:\n"
+              "- owner: engine\n  path: repos/toy/components/engine/_index.md\n  signals: [engine]\n"
+              "  scope_prefixes: [pkg/]\n"
+              "- owner: util\n  path: repos/toy/components/util/_index.md\n  signals: [util]\n"
+              "  scope_prefixes: [pkg/util.py]\n")
+    _commit(world["origin"], {
+        "knowledge/repos/toy/_index.md": _index("Toy", "toy", "- [Components](components/_index.md)\n"),
+        "knowledge/repos/toy/_routes.yaml": routes,
+        "knowledge/repos/toy/components/_index.md": _index(
+            "Components", "toy", "- [Engine](engine/_index.md)\n- [Util](util/_index.md)\n"),
+        "knowledge/repos/toy/components/engine/_index.md": _index("Engine", "toy", "The engine.\n"),
+        "knowledge/repos/toy/components/util/_index.md": _index("Util", "toy", "The helpers.\n"),
+        "knowledge/repos/_index.md": ("---\ntitle: \"Repositories\"\ncreated: 2026-09-01\nupdated: 2026-09-01\n"
+                                      "type: index\ntags: [other]\nsources: []\n---\n\n# Repositories\n\n"
+                                      "- [other](other/_index.md)\n- [toy](toy/_index.md)\n"),
+    }, "two component owners share pkg/")
+    for i in range(2):
+        _commit(world["upstream"], {"pkg/core.py": f"class Engine:\n    def step(self):\n        return 1\n# r{i}\n"},
+                f"core {i}")
+    _commit(world["upstream"], {"pkg/util.py": "def helper():\n    return 2\n\n# tick helper\n"}, "util")
+
+
+def test_a_module_split_between_owners_is_deepened_for_each(world):
+    _world_with_tools(world)
+    _two_owner_kb(world)
+    gateway = FirstFileGateway(doc_rules=[])
+    _chain(world, gateway)
+    record = run_stage(_runtime(world, gateway), _modules_lifecycle(), "deepen", dry_run=True)
+    assert record.status == "dry_run", record.problems
+    shown = [json.loads(c["prompt"].split("\n", 1)[1].rsplit("</untrusted_data>", 1)[0])
+             for c in gateway.calls if c["system"] == SYSTEM_CODE_RULES]
+    pkg_calls = [[f["path"] for f in p["files"]] for p in shown if p["module"] == "pkg/"]
+    assert pkg_calls == [["pkg/core.py"], ["pkg/util.py"]]     # one call per owner, hottest first
+    tree = _tree(record)
+    engine = Page.parse(tree["knowledge/repos/toy/components/engine/rules.md"])
+    util = Page.parse(tree["knowledge/repos/toy/components/util/rules.md"])
+    assert "pkg/core.py" in engine.rules()[0].text and "pkg/util.py" in util.rules()[0].text
+
+
+def test_a_pass_that_ends_below_the_target_says_so(world):
+    _world_with_tools(world)
+    _two_owner_kb(world)
+    gateway = FirstFileGateway(doc_rules=[])
+    gateway.no_rules = True                                  # the model finds nothing to write
+    _chain(world, gateway)
+    record = run_stage(_runtime(world, gateway), _modules_lifecycle(), "deepen", dry_run=True)
+    assert record.unfinished == []
+    stop = next(n for n in record.notes if n.startswith("deepen stopped: "))
+    assert stop.startswith("deepen stopped: every hot group visited; target not reached (")
+    assert "hottest files without rules: pkg/core.py (3), pkg/util.py (2)" in stop   # the root commit counts too
+    body = (Path(record.pr["dry_run_dir"]) / "PR_BODY.md").read_text(encoding="utf-8")
+    assert "every hot group visited; target not reached" in body
+
+
+def test_groups_split_a_module_by_most_specific_owner_and_list_unrouted_files():
+    from infermatrix_copilot.kb_service.init_coverage import Owner
+
+    engine = Owner("engine", "repos/t/components/engine/_index.md", ("pkg/",))
+    util = Owner("util", "repos/t/components/util/_index.md", ("pkg/util.py",))
+    modules = {"pkg/": {"files": ["pkg/core.py", "pkg/util.py", "pkg/cold.py"]},
+               "tools/": {"files": ["tools/x.py"]}}
+    prs = [["pkg/core.py", "pkg/util.py"], ["pkg/core.py"], ["tools/x.py"], ["README.md"]]
+    groups, unrouted = _Deepen._groups(prs, modules, [engine, util], lambda p: p.endswith(".py"))
+    assert [(k, o.owner, files, n) for k, o, files, n in groups] == [
+        ("pkg/", "engine", ["pkg/core.py", "pkg/cold.py"], 2), ("pkg/", "util", ["pkg/util.py"], 1)]
+    assert unrouted == [("tools/x.py", 1)]
 
 
 def test_routes_and_rules_stay_valid_yaml(world):
