@@ -43,18 +43,26 @@ def _git(repo: Path, *args: str, timeout: int = 30) -> tuple[int, str]:
     return out.returncode, (out.stdout or out.stderr or "").strip()
 
 
-def _merge_base(repo: Path) -> str:
-    """The PR's base commit: merge-base of HEAD with the default branch.
-    Cached per repo path — worktrees are immutable for the life of a review."""
-    cached = _merge_base_cache.get(str(repo))
+def _merge_base(repo: Path, base_tip: str = "") -> str:
+    """The PR's base commit: `merge-base(<base tip>, HEAD)` when the step
+    knows the pinned base tip (the target branch as fetched — the SAME
+    semantics as `pr.fetch_diff`'s `_pinned_diff`, so the tools and the diff
+    agree even when the target branch advanced after the PR forked, and for
+    a PR whose target is not the default branch), else the legacy guess over
+    the conventional default-branch names. Cached per (repo, base tip) —
+    worktrees are immutable for the life of a review."""
+    key = f"{repo}|{base_tip}"
+    cached = _merge_base_cache.get(key)
     if cached:
         return cached
-    for ref in _BASE_REFS:
-        code, out = _git(repo, "merge-base", "HEAD", ref)
+    refs = (base_tip,) if base_tip else _BASE_REFS
+    for ref in refs:
+        code, out = _git(repo, "merge-base", ref, "HEAD")
         if code == 0 and _SHA_RE.match(out):
-            _merge_base_cache[str(repo)] = out
+            _merge_base_cache[key] = out
             return out
-    raise RuntimeError("could not resolve a merge-base with the default branch")
+    raise RuntimeError("could not resolve a merge-base with "
+                       + (f"the pinned base {base_tip[:12]}" if base_tip else "the default branch"))
 
 
 _merge_base_cache: dict[str, str] = {}
@@ -121,16 +129,20 @@ def _calc(expr: str, **_: object) -> str:
 
 # -- the tool set ------------------------------------------------------------
 
-def review_repo_tools(repo: Path | None) -> dict[str, ToolDef]:
+def review_repo_tools(repo: Path | None, base_tip: str = "") -> dict[str, ToolDef]:
     """Change-archaeology + numeric-probe tools for one PR-time worktree.
-    Returns {} when there is no repo checkout (evidence-only runs)."""
+    `base_tip` (the pinned target-branch commit published by `pr.fetch_diff`
+    as `pr_base_sha`) binds every "at the base" answer to that commit's
+    merge-base with HEAD. Returns {} when there is no repo checkout
+    (evidence-only runs)."""
     if repo is None:
         return {}
+    base_tip = str(base_tip or "")
 
     def diff_stat(**_: object) -> str:
         """`git diff --stat <merge-base> HEAD` — the complete changed-file
         list with sizes, independent of any diff-text truncation."""
-        base = _merge_base(repo)
+        base = _merge_base(repo, base_tip)
         code, out = _git(repo, "diff", "--stat", base, "HEAD")
         if code != 0:
             return f"git failed: {out[:400]}"
@@ -140,7 +152,7 @@ def review_repo_tools(repo: Path | None) -> dict[str, ToolDef]:
         """Read a file's content AT THE MERGE-BASE (pre-PR state), windowed
         like read_file. `(absent at base)` for files the PR added."""
         rel = _safe_rel_path(path)
-        base = _merge_base(repo)
+        base = _merge_base(repo, base_tip)
         code, out = _git(repo, "show", f"{base}:{rel}", timeout=30)
         if code != 0:
             return (f"(absent at base {base[:12]})"

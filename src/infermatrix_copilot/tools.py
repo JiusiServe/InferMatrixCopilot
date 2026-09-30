@@ -145,6 +145,12 @@ class ToolDef:
     input_schema: dict
     handler: Callable[..., str]
     write_path_arg: str | None = None  # arg holding the path a write lands on
+    # arg holding the path a READ touches, for extras that read the tree:
+    # under a scope with `read_roots` it is fenced like the builtin reads
+    read_path_arg: str | None = None
+    # the tool writes through an internal store rather than a path argument
+    # (a knowledge candidate, a cache): a strict (shadow) scope refuses it
+    internal_write: bool = False
     # Optional audit classifier for tools whose FAILURES are ordinary return
     # values (parent-shaped {"error": ...} strings): dispatch keeps the
     # transport payload ok=True (the bytes ARE the tool result) but records
@@ -314,9 +320,18 @@ def tool_definitions_for(scope: ToolScope | None,
         if t.name in names
     ]
     for t in (extra or {}).values():
+        if scope is not None and scope.strict_extras and (
+                t.name not in scope.allowed_tools or t.internal_write):
+            continue  # never advertised: a strict scope filters BEFORE the model sees it
         defs.append({"name": t.name, "description": t.description,
                      "input_schema": t.input_schema})
     return defs
+
+
+def _refuse(name: str, reason: str, trace: RunTrace | None) -> dict:
+    if trace:
+        trace.record("tool_refused", tool=name, reason=reason)
+    return {"ok": False, "error": f"refused: {reason}", "out_of_scope": False}
 
 
 def dispatch(
@@ -375,7 +390,24 @@ def _dispatch(
         # them). Opt-in scoping extension: an extra ToolDef that declares
         # `write_path_arg` gets the same write-path enforcement as builtins
         # (read-only refusal, writable wall, out-of-scope recording); extras
-        # without the declaration keep the historical bypass unchanged.
+        # without the declaration keep the historical bypass unchanged —
+        # EXCEPT under a strict scope (shadow runs), where an extra must be
+        # in the allowlist, must not write through an internal store, and
+        # has its declared read path fenced like a builtin read.
+        if scope is not None and scope.strict_extras:
+            if name not in scope.allowed_tools:
+                return _refuse(name, f"extra tool '{name}' not allowed in strict scope '{scope.name}'", trace)
+            if tool.internal_write:
+                return _refuse(name, f"extra tool '{name}' writes through an internal store", trace)
+        if tool.read_path_arg and scope is not None and scope.read_roots:
+            read_path = args.get(tool.read_path_arg)
+            if isinstance(read_path, str) and read_path:
+                if not os.path.isabs(read_path) and scope.root:
+                    read_path = os.path.join(scope.root, read_path)
+                    args = {**args, tool.read_path_arg: read_path}  # the handler sees the resolved path
+                decision = scope.check_read(read_path)
+                if not decision.allowed:
+                    return _refuse(name, decision.reason, trace)
         write_path = (args.get(tool.write_path_arg)
                       if tool.write_path_arg else None)
         out_of_scope = False
@@ -435,10 +467,16 @@ def _dispatch(
     if scope is not None:
         decision = scope.check(name, write_path=write_path)
         if not decision.allowed:
-            if trace:
-                trace.record("tool_refused", tool=name, reason=decision.reason)
-            return {"ok": False, "error": f"refused: {decision.reason}", "out_of_scope": False}
+            return _refuse(name, decision.reason, trace)
         out_of_scope = decision.out_of_scope
+        # the read fence: a builtin read/exec path must resolve inside the
+        # scope's read roots (realpath first, so `..` and symlinks cannot
+        # escape) — a shadow run may read its checkout and nothing else
+        read_path = args.get(_PATH_ARGS.get(name, ""))
+        if scope.read_roots and write_path is None and isinstance(read_path, str) and read_path:
+            decision = scope.check_read(read_path)
+            if not decision.allowed:
+                return _refuse(name, decision.reason, trace)
 
     try:
         result = tool.handler(**args)

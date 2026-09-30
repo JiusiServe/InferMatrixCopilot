@@ -161,6 +161,18 @@ class Executor:
                 continue
 
             spec = self.registry.get(pstep.step)
+            if getattr(self.settings, "improve_shadow", False) and spec.risk not in ("read", "report"):
+                # a shadow (experiment) run may never reach a writing or
+                # posting step, whatever the playbook says: refused at the
+                # execution boundary, recorded, and the run stops as blocked
+                # so the experiment is marked invalid (design §8.2 layer 2)
+                self.trace.record("step_refused", step=pstep.id, spec=spec.name, risk=spec.risk,
+                                  reason="shadow run refuses non-read steps")
+                outcome.status = "blocked"
+                outcome.blocked_reason = (f"shadow run refused step '{pstep.id}' ({spec.name}, "
+                                          f"risk={spec.risk}): only read/report steps may run")
+                state["shadow_violation"] = outcome.blocked_reason
+                return outcome
             items = state.get(pstep.foreach, [None]) if pstep.foreach else [None]
             if pstep.foreach and not isinstance(items, list):
                 items = [items]

@@ -64,6 +64,13 @@ def write_bridge_spec(*, run_dir: Path, step_name: str, scope: ToolScope,
             "root": scope.root,
             "path_scope": {"writable": list(ps.writable),
                            "primary": list(ps.primary)} if ps else None,
+            # the shadow fences travel with the scope: a bridge that restored
+            # permissive defaults would let a harness read the source object
+            # store and call undeclared extras (design §8.2)
+            "read_roots": list(scope.read_roots),
+            "deny_prefixes": list(scope.deny_prefixes),
+            "strict_extras": bool(scope.strict_extras),
+            "executables": list(scope.executables),
         },
         "repo": repo,
         "run_dir": str(run_dir),
@@ -97,6 +104,10 @@ def load_bridge_spec(path: Path) -> tuple[ToolScope, dict]:
                              primary=tuple(ps["primary"])) if ps else None,
         read_only=bool(s["read_only"]),
         root=str(s.get("root") or ""),
+        read_roots=tuple(str(r) for r in s.get("read_roots") or ()),
+        deny_prefixes=tuple(str(r) for r in s.get("deny_prefixes") or ()),
+        strict_extras=bool(s.get("strict_extras", False)),
+        executables=tuple(str(e) for e in s.get("executables") or ()),
     )
     return scope, data
 

@@ -8,6 +8,7 @@ but out-of-scope (write inside writable but outside the module's primary files
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import Path
@@ -72,6 +73,36 @@ class ToolScope:
                     # agent works in repo-relative paths — e.g. from the diff —
                     # while the actual tree may be a per-PR worktree it can't
                     # hardcode). Empty = resolve against process cwd (legacy).
+    # Shadow-run fences (meta-improvement design §8.2). All default to "off",
+    # which is exactly today's behaviour.
+    read_roots: tuple[str, ...] = ()     # when set, every READ/exec path must
+                                         # realpath under one of these (symlinks
+                                         # and `..` resolved first)
+    deny_prefixes: tuple[str, ...] = ()  # realpath prefixes always refused
+                                         # (a `--shared` clone's .git/)
+    strict_extras: bool = False          # step-provided extras must be in
+                                         # allowed_tools; internal-write extras
+                                         # are refused outright
+    executables: tuple[str, ...] = ()    # the shadow PATH whitelist (enforced by
+                                         # the shadow environment; recorded here
+                                         # so the scope is self-describing)
+
+    def check_read(self, path: str | Path) -> Decision:
+        """Rule on a read/exec path: allowed unless `read_roots` is set and the
+        resolved path (symlinks and `..` followed) lies outside every root or
+        under a denied prefix."""
+        if not self.read_roots:
+            return Decision(True)
+        real = os.path.realpath(str(path))
+        for prefix in self.deny_prefixes:
+            p = os.path.realpath(prefix)
+            if real == p or real.startswith(p + os.sep):
+                return Decision(False, reason=f"path under a denied prefix: {real}")
+        for root in self.read_roots:
+            r = os.path.realpath(root)
+            if real == r or real.startswith(r + os.sep):
+                return Decision(True)
+        return Decision(False, reason=f"path outside read roots of scope '{self.name}': {real}")
 
     def check(self, tool: str, write_path: str | Path | None = None) -> Decision:
         """Rule on a `tool` call: refused if the tool is not in `allowed_tools`;
@@ -117,3 +148,18 @@ def post_plan_scope(
         allowed_tools=READ_TOOLS | WRITE_TOOLS | EXEC_TOOLS,
         path_scope=PathScope(writable=writable, primary=primary),
     )
+
+
+def shadow_scope(shadow_dir: str | Path, *, tools: tuple[str, ...] | frozenset[str] = (),
+                 extra_read_roots: tuple[str, ...] = (), executables: tuple[str, ...] = (),
+                 name: str = "shadow") -> ToolScope:
+    """The scope of a shadow (experiment) run: builtin read tools plus the
+    workflow's declared shadow tools, read-only, every read confined to the
+    shadow checkout (and the read-only knowledge/adapter roots), the clone's
+    `.git/` denied (a `--shared` clone's alternates file names the source
+    repository's object store), extras enforced strictly."""
+    root = _norm(shadow_dir)
+    return ToolScope(
+        name=name, allowed_tools=READ_TOOLS | frozenset(tools), read_only=True, root=root,
+        read_roots=(root, *(_norm(r) for r in extra_read_roots)),
+        deny_prefixes=(f"{root}/.git",), strict_extras=True, executables=tuple(executables))
