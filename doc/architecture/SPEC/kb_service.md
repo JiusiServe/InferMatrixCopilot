@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-09-30 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -291,3 +291,14 @@ diff 时保留原摘录（证据不会因此变得更"好过"）。只扩展带 
 `merged_pr` 事件的证据新增 `merge_commit_sha`（旧事件经 `pull()` 查询）。`run_gate(evidence_for=...)` 由 `gate_and_stage`
 与事实证明共用同一个观测者（一次镜像同步）。首个线上运行中"所给 diff 在…之前截断"是 L2 判 unsure/fail 的主要原因，
 而整批 10 个 PR 的证据（约 105 KB）对每条规则都重复发送；按规则取证据后约 11 KB + 所引 PR 的完整 diff。
+
+## 2026-09-30 `kb init` 的 adapter 配置
+`knowledge_lifecycle.init`（可选子映射，严格校验，未知键抛 `LifecycleConfigError`）解析为 `InitConfig`，挂在
+`RepoLifecycle.init`（缺省为 `None`）：`seeds`（知识库相对路径，只能是 `general/...` 或 `repos/<其他仓库>/...`，
+不得指向本仓库、不得为绝对路径或含空段/`.`/`..`，不得重复）、`doc_globs`（缺省 `DEFAULT_DOC_GLOBS` =
+`README*`、`docs/**/*.md`（与 `profiles/establish.build_doc_corpus` 一致）加 `CONTRIBUTING.md`、`AGENTS.md`）、
+`source_roots`（缺省取同一 manifest 的 `ut_coverage.source_roots`）、`exclude`、`module_depth`（≥1，缺省 2）、
+`min_module_loc`（≥0，缺省 300）、`pr_window: {count, max_age_days}`（>0，缺省 200 / 180）、`coverage_target`
+（(0, 1]，缺省 0.85）、`budget_usd`（>0，缺省 30）、`judge_call_usd`（≥0，缺省 0.50）。`validate_seeds(init,
+knowledge_root)` 是运行时检查：种子必须是知识树中已存在的文件或目录，解析后不得逃出知识根目录，逐条返回问题。
+解析只做静态校验，不读知识树。测试：`test_kb_init_config.py`。
