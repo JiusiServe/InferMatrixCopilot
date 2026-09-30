@@ -26,7 +26,10 @@ with open(os.path.join(here, "capture.json"), "w") as f:
                "config": open(config).read() if os.path.exists(config) else "",
                "attached": open(attach).read() if attach else "",
                "env_key": os.environ.get("ANTHROPIC_API_KEY", ""),
-               "data_dir": os.environ.get("ZCODE_DATA_BASE_DIR", "")}, f)
+               "data_dir": os.environ.get("ZCODE_DATA_BASE_DIR", ""),
+               "personal": os.environ.get("ZCODE_PERSONAL_PROVIDER_CONFIG_FILE", ""),
+               "personal_text": open(os.environ["ZCODE_PERSONAL_PROVIDER_CONFIG_FILE"]).read()
+               if os.environ.get("ZCODE_PERSONAL_PROVIDER_CONFIG_FILE") else ""}, f)
 if os.path.exists(os.path.join(here, "sleep")):
     time.sleep(10)
 if os.path.exists(os.path.join(here, "fail")):
@@ -305,3 +308,90 @@ def test_complete_runs_in_scratch_without_bridge(tmp_path):
     assert capture["config"] == ""
     prompt = next(a for a in capture["argv"] if a.startswith("--prompt="))
     assert "CLASSIFY" in prompt and "[USER]\nhi" in prompt
+
+
+# -- per-run model pin ------------------------------------------------------------
+
+def _host_config(tmp_path: Path, monkeypatch, provider: str = "account:test-plan") -> Path:
+    base = tmp_path / "data"
+    path = base / ".zcode" / "v2" / "provider_config.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"schemaVersion": 1, "config": {
+        "providerConfigRules": {"providerRules": [{"id": "keep-me", "apiKey": "sk-host-secret"}]},
+        "modelConfigRules": {"providerModelRules": [], "manualProviderModelRules": []},
+        "providerOrder": [provider],
+        "defaultModelSelection": {"providerId": provider, "modelId": "GLM-5.3",
+                                  "options": {"reasoningLevel": "max"}}}}), encoding="utf-8")
+    monkeypatch.setenv("ZCODE_DATA_BASE_DIR", str(base))
+    return path
+
+
+def test_complete_pins_the_model_through_a_session_provider_config(tmp_path, monkeypatch):
+    host = _host_config(tmp_path, monkeypatch)
+    before = host.read_text(encoding="utf-8")
+    transport = _transport(tmp_path, strict_backend_model="GLM-5.3-Flash")
+    reply = transport.complete(system="S", messages=[{"role": "user", "content": "hi"}])
+    assert reply.model == "GLM-5.3-Flash"
+    cap = _capture(tmp_path)
+    # the pin rides a file INSIDE the session scratch dir, never the host's file
+    assert cap["personal"] and "imc-zcode-oneshot-" in cap["personal"]
+    written = json.loads(cap["personal_text"])
+    assert written["config"]["defaultModelSelection"] == {
+        "providerId": "account:test-plan", "modelId": "GLM-5.3-Flash",
+        "options": {"reasoningLevel": "max"}}
+    # only the host's provider id is carried over: its provider rules (which
+    # may hold API keys) never enter a read root of the session
+    assert written["config"]["providerConfigRules"] == {"providerRules": []}
+    assert "providerOrder" not in written["config"]
+    assert "keep-me" not in cap["personal_text"] and "sk-host-secret" not in cap["personal_text"]
+    assert host.read_text(encoding="utf-8") == before
+
+
+def test_pin_writes_the_catalog_casing_of_the_requested_model(tmp_path, monkeypatch):
+    _host_config(tmp_path, monkeypatch)
+    transport = _transport(tmp_path, strict_backend_model="glm-5.3-flash")
+    reply = transport.complete(system="S", messages=[{"role": "user", "content": "hi"}])
+    assert reply.model == "GLM-5.3-Flash"           # the fake serves the catalog id; the assertion is case-insensitive
+    written = json.loads(_capture(tmp_path)["personal_text"])
+    assert written["config"]["defaultModelSelection"]["modelId"] == "GLM-5.3-Flash"
+    # the bundled catalog under the zcode home wins over the built-in list; unknown ids pass through
+    catalog = tmp_path / "data" / ".zcode" / "v2" / "runtime" / "provider" / "bundled" / "zcode-builtin.json"
+    catalog.parent.mkdir(parents=True)
+    catalog.write_text(json.dumps({"config": {"builtinModelIds": ["GLM-9-Ultra"]}}), encoding="utf-8")
+    assert transport.canonical_model_id("glm-9-ultra") == "GLM-9-Ultra"
+    assert transport.canonical_model_id("not-a-model") == "not-a-model"
+
+
+def test_run_session_pins_the_request_model_at_the_configured_level(tmp_path, monkeypatch):
+    _host_config(tmp_path, monkeypatch)
+    transport = _transport(tmp_path, zcode_reasoning_level="high")
+    req = _request(tmp_path, with_bridge=False)
+    req = type(req)(**{**req.__dict__, "model": "GLM-5.3-Flash"})
+    transport.run_session(req)
+    written = json.loads(_capture(tmp_path)["personal_text"])
+    assert written["config"]["defaultModelSelection"]["modelId"] == "GLM-5.3-Flash"
+    assert written["config"]["defaultModelSelection"]["options"] == {"reasoningLevel": "high"}
+
+
+def test_no_requested_model_leaves_the_host_default_alone(tmp_path, monkeypatch):
+    _host_config(tmp_path, monkeypatch)
+    transport = _transport(tmp_path)
+    transport.complete(system="S", messages=[{"role": "user", "content": "hi"}])
+    assert _capture(tmp_path)["personal"] == ""
+
+
+def test_pin_without_a_host_config_names_the_coding_plan_provider(tmp_path, monkeypatch):
+    monkeypatch.setenv("ZCODE_DATA_BASE_DIR", str(tmp_path / "empty"))
+    transport = _transport(tmp_path, strict_backend_model="GLM-5.3-Flash",
+                           zcode_provider_id="")
+    transport.complete(system="S", messages=[{"role": "user", "content": "hi"}])
+    written = json.loads(_capture(tmp_path)["personal_text"])
+    assert written["config"]["defaultModelSelection"]["providerId"] == \
+        "account:bigmodel-individual-coding-plan"
+    assert written["config"]["modelConfigRules"] == {"providerModelRules": [],
+                                                     "manualProviderModelRules": []}
+
+
+def test_settings_reject_an_unknown_reasoning_level():
+    with pytest.raises(Exception):
+        Settings(_env_file=None, zcode_reasoning_level="ludicrous")
