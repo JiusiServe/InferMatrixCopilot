@@ -1,0 +1,160 @@
+# Direct-mode owner routing for afd-plugin, written by kb init (pin 9cae2d2ddaae).
+schema_version: 1
+owners:
+- owner: components
+  path: repos/afd-plugin/components/_index.md
+  signals:
+  - components
+  scope_prefixes:
+  - afd_plugin/connectors/
+  - afd_plugin/model_executor/
+  - afd_plugin/compat/
+- owner: attention-runtime
+  path: repos/afd-plugin/components/attention-runtime/_index.md
+  signals:
+  - attention runtime
+  scope_prefixes:
+  - afd_plugin/v1/worker/attention_model_runner.py
+- owner: connectors
+  path: repos/afd-plugin/components/connectors/_index.md
+  signals:
+  - connectors
+  scope_prefixes:
+  - afd_plugin/connectors/
+  - afd_plugin/distributed/
+- owner: ffn-runtime
+  path: repos/afd-plugin/components/ffn-runtime/_index.md
+  signals:
+  - ffn runtime
+  scope_prefixes:
+  - afd_plugin/v1/worker/ffn_model_runner.py
+- owner: model-integration
+  path: repos/afd-plugin/components/model-integration/_index.md
+  signals:
+  - model integration
+  scope_prefixes:
+  - afd_plugin/model_executor/
+- owner: plugin-boundary
+  path: repos/afd-plugin/components/plugin-boundary/_index.md
+  signals:
+  - plugin boundary
+  scope_prefixes:
+  - afd_plugin/__init__.py
+  - afd_plugin/v1/__init__.py
+- owner: execution-platforms
+  path: repos/afd-plugin/components/execution-platforms/_index.md
+  signals:
+  - cuda graph
+  - acl graph
+  - graph
+  - FULL_DECODE_ONLY
+  - DBO
+  - ubatch
+  - profiler
+  - npu
+  - ascend
+  - csrc
+  - aclnn
+  - a2e
+  - e2a
+  - CANN
+  - build
+  - MLA graph
+  - stream
+  scope_prefixes:
+  - afd_plugin/compat/profiler.py
+  - afd_plugin/compat/npu/forward_context.py
+  - afd_plugin/compat/npu/ops.py
+  - afd_plugin/compat/npu/profiler.py
+  - afd_plugin/v1/worker/cuda_graph.py
+  - afd_plugin/v1/worker/dbo.py
+  - afd_plugin/v1/worker/npu/forward_context.py
+  - afd_plugin/v1/worker/npu/mla_graph.py
+  - afd_plugin/v1/worker/npu/npu_ubatch_wrapper.py
+  - afd_plugin/v1/worker/npu/ubatch_utils.py
+  - afd_plugin/v1/worker/npu/ubatching.py
+  - csrc/
+  - setup.py
+  - MANIFEST.in
+  - docs/design/module/execution_platforms.md
+  - docs/npu/CAM_ASYNC_ROUTED_OPS.md
+  - tests/unit/compat/test_profiler.py
+  - tests/unit/compat/test_ascend_ops.py
+  - tests/unit/compat/npu/test_profiler.py
+  - tests/unit/package/test_ascend_build_files.py
+  - tests/unit/v1/worker/test_cuda_graph.py
+  - tests/unit/v1/worker/test_dbo.py
+  - tests/unit/v1/worker/test_npu_mla_graph.py
+  - tests/unit/v1/worker/test_npu_device_contract.py
+  - tests/unit/v1/worker/test_npu_runtime.py
+- owner: compatibility
+  path: repos/afd-plugin/components/compatibility/_index.md
+  signals:
+  - patch
+  - monkey patch
+  - compat
+  - bump vllm
+  - vllm upgrade
+  - vllm-ascend
+  - EngineCore
+  - engine core
+  - async dp
+  - config_validation
+  - force load balance
+  - routing simulator
+  - upstream
+  scope_prefixes:
+  - afd_plugin/compat/
+  - afd_plugin/model_executor/routing_simulator.py
+  - docs/design/module/compatibility_and_patches.md
+  - tests/unit/compat/
+  - tests/unit/model_executor/test_routing_simulator.py
+- owner: e2e-ci
+  path: repos/afd-plugin/rules.md
+  signals:
+  - e2e
+  - ci
+  - buildkite
+  - github actions
+  - workflow
+  - gsm8k
+  - accuracy
+  - e2e runner
+  - test
+  - docker
+  - pre-commit
+  - lint
+  scope_prefixes:
+  - tests/e2e/
+  - tests/conftest.py
+  - tests/unit/test_e2e_runner.py
+  - tests/unit/test_e2e_process_utils.py
+  - tests/unit/test_dsv4_e2e.py
+  - .agents/skills/run-e2e/
+  - .buildkite/
+  - .github/
+  - docker/
+  - docs/design/module/e2e_testing.md
+  - docs/npu/TESTING.md
+  - .pre-commit-config.yaml
+  - .markdownlint.yaml
+- owner: docs-recipes
+  path: repos/afd-plugin/rules.md
+  signals:
+  - docs
+  - readme
+  - recipe
+  - design doc
+  - AGENTS.md
+  - support matrix
+  - known gaps
+  - deployment
+  - guide
+  scope_prefixes:
+  - README.md
+  - recipe/
+  - docs/
+  - AGENTS.md
+  - CLAUDE.md
+  - .claude/
+  - .agents/

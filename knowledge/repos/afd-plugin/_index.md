@@ -44,3 +44,6 @@ sources:
 | 核对 connector/graph/DBO 当前支持组合 | [execution-platforms](components/execution-platforms/architecture.md) | v0.26 CUDA/Ascend 平台现状 |
 
 默认 briefing 只加载本入口和仓库规则；深层 owner 页面由 changed-file route 或 `doc_search` / `doc_read` 按需读取。
+- [AFD plugin 评审规则：上游漂移与跨文档隐含不变量](rules-seed-vllm-omni-rebase-upstream-api-drift.md)
+- [适用于任何 AFD PR review 的通用规则。先读这一页，再读本仓库的 rules.md 和对应的组件 owner 页。](../../general/review/rules.md)
+- [以下情况读这一页，判断是否应先改上游：新增或刷新 compat patch、复制 vLLM/vLLM-Ascend 函数，或在 MoE routing、graph、forward context 上偏离原生实现。](../../general/review/guides/upstream-first-for-algorithm.md)
