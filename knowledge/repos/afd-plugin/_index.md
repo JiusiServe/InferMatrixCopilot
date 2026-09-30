@@ -44,3 +44,7 @@ sources:
 | 核对 connector/graph/DBO 当前支持组合 | [execution-platforms](components/execution-platforms/architecture.md) | v0.26 CUDA/Ascend 平台现状 |
 
 默认 briefing 只加载本入口和仓库规则；深层 owner 页面由 changed-file route 或 `doc_search` / `doc_read` 按需读取。
+- [AFD plugin 仓库规则](rules-init.md)
+- [上游 API 漂移与兼容边界（afd-plugin）](rules-seed-vllm-omni-rebase-upstream-api-drift.md)
+- [每次审查 AFD PR 都先套用的通用审查规则。AFD 特有的门禁再看本仓库的规则页。](../../general/review/rules.md)
+- [以下情况先读这页，判断是否应该先改上游：新增或刷新 compat patch、从 vLLM/vLLM-Ascend 复制函数，或在插件里重写上游逻辑（MoE routing、DP metadata、graph capture、EngineC](../../general/review/guides/upstream-first-for-algorithm.md)

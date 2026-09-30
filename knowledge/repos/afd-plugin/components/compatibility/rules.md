@@ -1,7 +1,7 @@
 ---
 title: "AFD compatibility 规则"
 created: 2026-08-06
-updated: 2026-08-06
+updated: 2026-09-30
 type: rule
 tags: [afd-plugin, components, compatibility, review]
 sources:
@@ -33,3 +33,25 @@ confidence: high
 - 验收：当前 pinned signature 对齐，故意缺失字段不会被 fallback 吞掉，保存的 original 不会在 reload 时被 wrapper 覆盖。
 
 patch 生命周期见 [architecture](architecture.md)，版本支持声明见 [仓库规则](../../rules.md)。
+
+## AFD-I5 — 升级 vLLM 或 vLLM-Ascend 基线时，需要同步修改多个文件并做完整审计
+
+- vLLM 目标版本出现在三个地方：`pyproject.toml` 的 extra pin、`afd_plugin/compat/vllm.py` 的版本检查、README（Overview、Known gaps、GPU installation）。三处必须一致。
+- 插件注册用 `strict=False` 调版本检查，版本不符只告警。不能把“注册成功”当作新版本受支持的证据（`PATCH-INV-003`）。
+  - `engine_core.py` 和 `npu/force_load_balance.py` 没有 patch 内的版本守卫，只能靠 review 把关。
+  - `async_dp_engine.py` 里复制的 coordinator 只在 `0.26.0` 精确版本下生效，守卫要跟着更新。
+  - `attention_model_runner.py` 里规避 DBO metadata cache 的代码：等 vLLM #48659 进入 pin 的版本后删除。
+  - 连接器进程组用到的私有 PyTorch 和 vLLM 符号。
+- `pyproject.toml` 没有声明 vLLM-Ascend 依赖。刷新 Ascend 侧时，必须引用确切的 vLLM-Ascend 源码 commit（当前是 `80d8c194f`），同步 README 的 Ascend 基线表，并附上 NPU 单元测试和 E2E 证据。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
+
+## AFD-I6 — 临时替换上游符号的代码必须在 `finally` 里还原，并登记到兼容文档
+
+- 这类临时替换包括：包装 `create_forward_context`、在 `Worker.init_device()` 期间替换 runner 符号、包装 V2 capture 的输入准备、安装 full-graph replay hook、给 DBO 临时关闭 metadata cache。它们都必须在 `finally` 里恢复符号和 runner 状态，异常路径也要恢复。
+- 需要有测试覆盖恢复逻辑和错误路径。参考 `test_attention_model_runner.py` 对 DBO 规避代码的覆盖。
+- 新增的这类替换要写进 `docs/design/module/compatibility_and_patches.md` 的 scoped adaptation 列表，否则升级审计会漏掉它。
+- 需要在整个进程生效的替换，应放到 `afd_plugin/compat/patches/`，并走 patch 审查流程。反过来，AFD 自己的功能不要借全局 hook 藏进 patch 模块。
+- 保存了原函数的 patch，在模块重载时不能用自己的 wrapper 覆盖已保存的原函数。
+
+<!-- kb:rule status=active since=init-9cae2d2ddaae -->
