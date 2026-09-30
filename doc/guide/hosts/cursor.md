@@ -19,7 +19,7 @@ cd InferMatrixCopilot
 install.cmd                                     # Windows
 ```
 
-安装器自动识别 Cursor 并注册 MCP 与四个 Skill。**装完重启 Cursor。**
+安装器自动识别 Cursor 并注册 MCP 与五个 Skill。**装完重启 Cursor。**
 
 手动配置（安装器没识别到，或你要自己接管）时，模板在
 [`integrations/config-templates/cursor/mcp.json`](../../../integrations/config-templates/cursor/mcp.json)。

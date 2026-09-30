@@ -48,7 +48,7 @@ install.cmd --repo-path D:\path\to\vllm-omni
 ```
 
 安装器**自动识别本机的 Codex、Claude Code 和 Cursor**，为识别到的每一个注册
-MCP 与四个 Skill（`imreview` / `imdesign` / `imcifix` / `imupdate`），并创建
+MCP 与五个 Skill（`imreview` / `imdesign` / `imcifix` / `imupdate` / `imkbinit`），并创建
 `~/.infermatrix-copilot/.env`。
 
 **装完必须重启宿主。**

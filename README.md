@@ -4,7 +4,7 @@
 审查和维护代码，而不只是做一遍通用检查。上游发版或目录变化后，还能更新
 这套知识，避免 Agent 继续按旧路径和旧清单工作。
 
-它提供四个常用 Skill：
+它提供五个常用 Skill：
 
 - `imreview`：审查 PR 或本地改动时，找到相关模型、组件和维护者规则，让审查
   不只停留在通用检查。
@@ -12,6 +12,8 @@
 - `imcifix`：从 GitHub issue 出发，在本地复现、最小修复并针对性验证。
 - `imupdate`：上游变化后更新模型清单、registry、deploy、路径路由和
   source pin，避免继续按旧知识工作。
+- `imkbinit`：为新接入的仓库分阶段初始化知识库（`kb init`：骨架 → 模块 →
+  深化 → 校准集），每阶段一个 PR，由人审阅合并后再进入下一阶段。
 
 copilot 本身与具体仓库无关：每个仓库的知识住在自己的 adapter
 （`adapters/<repo>/`）和知识切片（`knowledge/repos/<repo>/`）里，playbook
@@ -52,7 +54,7 @@ install.cmd --repo-path D:\path\to\vllm-omni
 
 Windows 也可以直接双击 `install.cmd`。`--repo-path` 可选，用于同时写入 Strict
 使用的本地 checkout。安装器会识别本机的 Codex、Claude Code 和 Cursor，注册
-MCP 与四个 Skill，并创建 `~/.infermatrix-copilot/.env`。
+MCP 与五个 Skill，并创建 `~/.infermatrix-copilot/.env`。
 
 安装后重启 Agent。Codex 使用 `$imreview`，Claude Code 和 Cursor 使用
 `/imreview`；Direct 不需要 API Key。若 Agent 没有主动调用，直接说：
@@ -305,6 +307,10 @@ Strict 对应的 CI / issue 工作流：
 - `imdesign`：写代码前生成协同设计包（问题、方案、接口变化和验证计划），
   不自动改代码。例：`/imdesign 给 scheduler 加抢占开关，先理清接口边界`，
   Codex 用 `$imdesign …`。
+- `imkbinit`：新仓库的知识库初始化。`/imkbinit afd-plugin`（Codex 用
+  `$imkbinit afd-plugin`）按 adapter 的 `knowledge_lifecycle.init` 配置运行
+  下一个 `kb init` 阶段，默认 dry-run；明确要求发布时才开 PR（需要
+  `ALLOW_PUSH=1`、`ALLOW_POST=1`、`KB_INIT_GIT_AUTHOR`）。每阶段停下等人合并。
 - 新仓库接入：`./infermatrix-copilot -p "profile the repo"` 建立 DRAFT
   profile；接入内容放在 `adapters/<repo>/` 和 `knowledge/repos/<repo>/`，
   不需要修改 `src/`。
