@@ -17,6 +17,9 @@
                             ledger, report; dry-run — proposals stay local)
     improve ledger          [--workflow W] [--ledger-dir DIR]   show the ledgers
     improve lints           the Tier 1 lint catalogue (ids, versions, origins)
+    improve gold draft --item repo#N [--gt-dir DIR]   draft a curated gold file from raw comments
+    improve gold check [--gt-dir DIR]                  validate every curated gold file
+    improve meta lint-check [--meta-dir DIR]           every meta lint sample triggers its lint
 
 The writer-quiescence gate (design §7.1). Pause flags alone do not stop an
 intake or sweep that is already running, so the gate requires evidence that
@@ -99,6 +102,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="infermatrix-copilot improve",
                                      description="operate the meta-improvement engine's trace index")
     sub = parser.add_subparsers(dest="command", required=True)
+    for name in ("gold", "meta"):
+        p = sub.add_parser(name)
+        p.add_argument("action", choices=["draft", "check"] if name == "gold" else ["lint-check"])
+        p.add_argument("--item", default="")
+        p.add_argument("--gt-dir", default="eval/dataset/gt")
+        p.add_argument("--meta-dir", default="eval/dataset/meta")
     for name in ("migrate-index", "rebuild-index", "rollback-index", "compare-index", "verify-index",
                  "cycle", "ledger", "lints"):
         p = sub.add_parser(name)
@@ -119,6 +128,8 @@ def main(argv: list[str] | None = None) -> int:
         if name == "ledger":
             p.add_argument("--workflow", default=None)
     args = parser.parse_args(argv)
+    if args.command in ("gold", "meta"):
+        return _gold_meta_commands(args)
     if args.command == "lints":
         from .lints import catalogue
 
@@ -186,6 +197,43 @@ def _cycle_commands(args) -> int:
                      ensure_ascii=False, indent=1, default=str))
     print(f"report: {ledger_dir / 'reports'}", file=sys.stderr)
     return 0
+
+
+def _gold_meta_commands(args) -> int:
+    from .gold import CURATED_DIRNAME, load_gold, write_draft
+
+    if args.command == "gold" and args.action == "draft":
+        if not args.item:
+            print("gold draft needs --item repo#N", file=sys.stderr)
+            return 2
+        path = write_draft(Path(args.gt_dir), args.item)
+        print(json.dumps({"drafted": str(path)}))
+        return 0
+    if args.command == "gold":
+        problems = {}
+        curated = Path(args.gt_dir) / CURATED_DIRNAME
+        for path in sorted(curated.glob("*.gold.json")):
+            try:
+                gold = load_gold(path)
+                problems[path.name] = "ok" if gold.status == "curated" else "draft (not used)"
+            except Exception as exc:  # noqa: BLE001 - reported, not raised
+                problems[path.name] = f"INVALID: {exc}"
+        print(json.dumps(problems, ensure_ascii=False, indent=1))
+        return 0 if not any(v.startswith("INVALID") for v in problems.values()) else 1
+    from ..trace_store import TraceStore
+    from .lints import Baseline, run_lints
+    from .meta import lint_samples
+
+    report = {}
+    ok = True
+    for lint_id, units in lint_samples(Path(args.meta_dir)).items():
+        for unit in units:
+            found = {f.lint for f in run_lints(unit, TraceStore(Path(args.meta_dir) / "lints" / lint_id), Baseline())}
+            hit = lint_id in found
+            ok &= hit
+            report[f"{lint_id}/{unit.unit_id}"] = "ok" if hit else f"MISSED (found {sorted(found)})"
+    print(json.dumps(report, ensure_ascii=False, indent=1))
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":  # pragma: no cover

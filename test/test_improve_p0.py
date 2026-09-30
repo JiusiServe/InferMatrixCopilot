@@ -436,7 +436,7 @@ def test_builtin_declarations_load_and_malformed_ones_are_refused(tmp_path):
     review = decls["pr-review.agent.review_diff"]
     assert review.kind == "dynamic" and review.unit == "agent_loop" and review.capture == "full"
     assert review.playbook == "pr-review" and review.target == "agent.review_diff"
-    assert not review.tier2 and "diff_stat" in review.shadow_tools
+    assert review.tier2 and review.outcome_adapter.endswith(":ReviewEvalAdapter") and "diff_stat" in review.shadow_tools
     assert lookup(decls, "pr-review", "agent.review_diff") is review
     assert lookup(decls, "pr-review", "pr.fetch_diff") is None
     assert decls["rb-review.review"].shadow_tools == ()

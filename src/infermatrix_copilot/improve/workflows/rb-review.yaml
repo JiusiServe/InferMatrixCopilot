@@ -13,5 +13,6 @@ fingerprint:
     - knowledge_snapshot
     - copilot_sha
 capture: full
+outcome_adapter: infermatrix_copilot.improve.adapters.rb_review:RbReviewAdapter
 tier2_min_items: 8
 shadow_tools: []

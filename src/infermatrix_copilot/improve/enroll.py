@@ -152,3 +152,12 @@ def item_for(decl: WorkflowDeclaration, state: dict) -> str:
         return decl.item_key.format_map(values)
     except (KeyError, IndexError, ValueError):
         return ""
+
+
+def declarations_for(settings: Any, environ: dict | None = None) -> dict[str, WorkflowDeclaration]:
+    """The declarations every part of the engine must agree on: the builtin
+    directory, ``IMPROVE_WORKFLOWS_DIRS`` and ``settings.improve_workflows_dirs``
+    (os.pathsep separated). The executor, the shadow hardening, the cycle and
+    the forensics step all go through here."""
+    extra = [d for d in str(getattr(settings, "improve_workflows_dirs", "") or "").split(os.pathsep) if d.strip()]
+    return load_declarations(extra, environ=environ)

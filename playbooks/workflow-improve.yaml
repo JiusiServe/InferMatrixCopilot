@@ -14,6 +14,7 @@ params: {}
 steps:
   - {id: preflight, step: improve.preflight}
   - {id: lint, step: improve.lint}
+  - {id: forensics, step: improve.forensics}
   - {id: ledger, step: improve.ledger}
   - {id: report, step: report.final_summary}
 success: one cycle recorded (decision type=cycle), the per-workflow ledgers

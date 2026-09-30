@@ -535,7 +535,8 @@ def test_workflow_improve_is_a_read_only_l2_kind_with_a_vetted_playbook(tmp_path
     store = PlaybookStore(PLAYBOOKS, registry)
     store.load()
     pb = store.get("workflow-improve")
-    assert pb is not None and [s.step for s in pb.steps][:3] == ["improve.preflight", "improve.lint", "improve.ledger"]
+    assert pb is not None and [s.step for s in pb.steps][:4] == ["improve.preflight", "improve.lint",
+                                                                   "improve.forensics", "improve.ledger"]
     resolution = Planner(store, registry).resolve(spec)
     assert resolution.mode == "reuse" and resolution.playbook.name == "workflow-improve"
 
