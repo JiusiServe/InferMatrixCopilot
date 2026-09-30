@@ -38,6 +38,7 @@ import re
 from pathlib import Path
 
 from .run_trace import RunTrace
+from . import trace_store
 from .scopes import PathScope, ToolScope
 from .tools import _PATH_ARGS, TOOLS, dispatch
 
@@ -67,6 +68,12 @@ def write_bridge_spec(*, run_dir: Path, step_name: str, scope: ToolScope,
         "repo": repo,
         "run_dir": str(run_dir),
         "trace_path": str(Path(run_dir) / "bridge_trace.jsonl"),
+        # trace/1 capture continuity: the bridge is a separate process the
+        # harness CLI launches, so the parent's bound store and unit context
+        # travel in the spec (paths and context fields only, never secrets)
+        "trace_store_root": str(trace_store.current_store().root)
+        if trace_store.current_store() is not None else "",
+        "trace_context": trace_store.current_context(),
         # Optional rebase surface (see `_rebase_extra`). Carries PATHS and
         # model identity only: no api_key and no child env, so nothing
         # secret lands in this file — the bridge process reads credentials
@@ -302,6 +309,24 @@ def make_dispatcher(scope: ToolScope, roots: tuple[str, ...], trace: RunTrace,
     return _call
 
 
+def traced_call(call, spec: dict):
+    """Wrap the bridge dispatcher so each tool call runs under the parent's
+    trace/1 store and unit context (from the spec); without a root in the
+    spec the wrapper is the identity. Bound per call, not per process: the
+    MCP server may serve calls from more than one thread."""
+    root = str(spec.get("trace_store_root") or "")
+    context = dict(spec.get("trace_context") or {})
+    if not root:
+        return call
+    store = trace_store.TraceStore(Path(root))
+
+    def bound(name: str, args: dict):
+        with trace_store.bind_store(store), trace_store.trace_context(**context):
+            return call(name, args)
+
+    return bound
+
+
 def build_server(spec_path: Path):
     """Build the FastMCP server for one spec. Import of the MCP SDK is local
     so the module stays importable (spec read/write) without the extra."""
@@ -323,8 +348,8 @@ def build_server(spec_path: Path):
                                   or ("edit_file", "run_pytest",
                                       "run_precommit")),
                             trace=trace)
-    _call = make_dispatcher(scope, roots, trace,
-                            extra=rebase_extra or None, gate=gate)
+    _call = traced_call(make_dispatcher(scope, roots, trace,
+                                        extra=rebase_extra or None, gate=gate), spec)
 
     mcp = FastMCP("infermatrix-tool-bridge")
     # `dispatch` resolves `extra` BEFORE the builtin registry, so a name the
