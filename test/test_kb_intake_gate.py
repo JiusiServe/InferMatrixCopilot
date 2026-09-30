@@ -92,6 +92,17 @@ def test_default_roles_are_pinned_and_cross_family(monkeypatch):
         roles_from_env()
 
 
+def test_parse_json_object_accepts_raw_newlines_inside_strings():
+    """Regression (kb init pilot, 2026-09-30): the generator wrote an ASCII
+    diagram with literal newlines inside a JSON string; strict parsing
+    rejected a well-formed answer and the stage stopped."""
+    fenced = '```json\n{"architecture_md": "A\n  -> B\n\tC", "n": 1}\n```'
+    assert parse_json_object(fenced) == {"architecture_md": "A\n  -> B\n\tC", "n": 1}
+    assert parse_json_object('{"a": "x\ny"}') == {"a": "x\ny"}
+    with pytest.raises(ModelUnavailable):
+        parse_json_object('{"a": "unterminated\n')
+
+
 def test_parse_json_object_and_unavailable():
     assert parse_json_object('text\n```json\n{"a": 1}\n```') == {"a": 1}
     with pytest.raises(ModelUnavailable):

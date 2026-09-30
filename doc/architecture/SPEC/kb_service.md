@@ -298,3 +298,6 @@ diff 时保留原摘录（证据不会因此变得更"好过"）。只扩展带 
 `CALIBRATION_KEYS` = `knowledge_lifecycle.calibration_set`。`check_flip_to_shadow` 另要求 head 为
 `enabled: true` 且 `mode` 为 shadow（缺省即 shadow）。知识 L1 的白名单只含 `knowledge/`，adapter 这一处改动由它单独校验；
 调用方还需在 head adapter 上跑 `config.parse_lifecycle`。测试：`test_kb_lifecycle_flip.py`。
+
+## 2026-09-30 模型回复解析
+`models.parse_json_object` 取裸 JSON 对象或最后一个 ```json 围栏块，用 `json.loads(strict=False)`：字符串里的原始控制字符（多行值里的换行、制表符，例如图示）按数据接受，不再把结构正确的回答判为 `ModelUnavailable`。测试：`test_kb_intake_gate.py`。
