@@ -266,3 +266,4 @@ knowledge_lifecycle:
     # does not read (its knowledge stays with the execution-platforms owner)
     source_roots: [afd_plugin/]
     exclude: ["*/__init__.py", "*/py.typed"]
+  calibration_set: kb-calibration
