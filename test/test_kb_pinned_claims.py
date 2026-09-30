@@ -159,3 +159,22 @@ def test_an_unreadable_tree_is_an_error(upstream):
     obs = PinnedObserver(repo, "o/up", pin, pull=_pulls({}))
     with pytest.raises(FactsError):
         obs.path_exists(pin, "pkg/core.py")
+
+
+def test_an_unreadable_history_is_an_error_not_a_later_merge(upstream):
+    repo, first, pin, later = upstream
+    (repo / ".git" / "objects" / first[:2] / first[2:]).unlink()  # the pin's parent is gone
+    obs = PinnedObserver(repo, "o/up", pin, pull=_pulls({}))
+    with pytest.raises(FactsError):
+        obs.is_ancestor(later)  # git cannot walk the pin's history: no answer, not "no"
+    assert not obs.is_ancestor("0" * 40)  # an unknown commit is still simply not an ancestor
+
+
+def test_a_corrupt_candidate_commit_is_an_error_not_unknown(upstream):
+    repo, _, pin, later = upstream
+    path = repo / ".git" / "objects" / later[:2] / later[2:]
+    path.chmod(0o644)
+    path.write_bytes(b"not a zlib stream")
+    obs = PinnedObserver(repo, "o/up", pin, pull=_pulls({}))
+    with pytest.raises(FactsError):
+        obs.is_ancestor(later)

@@ -66,10 +66,10 @@ class PinnedObserver:
         self._commits: set[str] = set()
         self._require_commit(pin)
 
-    def _git(self, *args: str) -> subprocess.CompletedProcess:
+    def _git(self, *args: str, input: bytes | None = None) -> subprocess.CompletedProcess:
         try:
             return subprocess.run(["git", "-C", str(self.repo_dir), *args],
-                                  capture_output=True, check=False)
+                                  capture_output=True, check=False, input=input)
         except OSError as exc:
             raise FactsError(f"git unavailable: {exc}") from exc
 
@@ -127,10 +127,32 @@ class PinnedObserver:
         return self._pull(self.repository, number)
 
     def is_ancestor(self, sha: str) -> bool:
-        """``sha`` is the pin or one of its ancestors (an unknown SHA is not)."""
+        """``sha`` is the pin or one of its ancestors (an unknown SHA is not).
+        Raises ``FactsError`` when git cannot answer, so a read failure is
+        retried rather than reported as a PR merged after the pin. git exits
+        1 both for "not an ancestor" and when it could not read the history
+        walk (it then only prints ``error: Could not read``), so a 1 counts
+        as "no" only with a silent stderr."""
         if not _SHA.fullmatch(sha or ""):
             return False
-        return self._git("merge-base", "--is-ancestor", sha, self.pin).returncode == 0
+        # --batch-check says "<sha> missing" with a silent stderr only when the
+        # object is absent; a corrupt object ALSO prints "missing" but reports
+        # the unpack error on stderr, and that is a read failure, not absence
+        check = self._git("cat-file", "--batch-check", input=f"{sha}\n".encode())
+        answer = check.stdout.decode(errors="replace").split()
+        if check.returncode != 0 or check.stderr.strip():
+            raise FactsError(f"cannot read {sha[:12]}: {check.stderr.decode(errors='replace')[:300]}")
+        if answer[1:2] == ["missing"]:
+            return False  # a commit this mirror does not have: unknown, so not an ancestor
+        if answer[1:2] != ["commit"]:
+            return False  # a blob/tree/tag id is not a merge commit
+        proc = self._git("merge-base", "--is-ancestor", sha, self.pin)
+        if proc.returncode == 0:
+            return True
+        if proc.returncode == 1 and not proc.stderr.strip():
+            return False
+        raise FactsError(f"cannot decide whether {sha[:12]} is an ancestor of {self.pin[:12]}: "
+                         f"{proc.stderr.decode(errors='replace')[:300]}")
 
 
 def check_rules(rule_texts: Mapping[str, str], observer: PinnedObserver) -> list[str]:
