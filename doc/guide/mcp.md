@@ -58,6 +58,7 @@ $imupdate <local path, repository name, alias, or URL>
 ```text
 plugins/infermatrix-copilot/skills/imreview/SKILL.md
 plugins/infermatrix-copilot/skills/imupdate/SKILL.md
+plugins/infermatrix-copilot/skills/imkbinit/SKILL.md
 ```
 
 核心 MCP 配置：

@@ -139,7 +139,7 @@ cd InferMatrixCopilot
 install.cmd --repo-path D:\path\to\vllm-omni  # Windows
 ```
 
-安装器识别本机的 Codex / Claude Code / Cursor，注册 MCP 与四个 Skill，并创建
+安装器识别本机的 Codex / Claude Code / Cursor，注册 MCP 与五个 Skill，并创建
 `~/.infermatrix-copilot/.env`。未识别到已知 Agent 时生成标准
 `infermatrix-copilot.mcp.json` 供其他 MCP 客户端导入。装完**重启 Agent**。
 
