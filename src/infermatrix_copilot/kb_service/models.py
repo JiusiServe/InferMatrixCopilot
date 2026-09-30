@@ -64,12 +64,15 @@ class ModelReply:
 
 
 def parse_json_object(text: str) -> dict:
-    """The reply's JSON object: a bare object, or the last fenced ```json block."""
+    """The reply's JSON object: a bare object, or the last fenced ```json block.
+    Raw control characters inside strings (a newline in a multi-line value,
+    e.g. a diagram) are accepted: models write them, and they are data, not
+    structure (``strict=False``)."""
     text = text.strip()
     candidates = [text] + [m.group(1) for m in _JSON_FENCE.finditer(text)][::-1]
     for candidate in candidates:
         try:
-            value = json.loads(candidate)
+            value = json.loads(candidate, strict=False)
         except ValueError:
             continue
         if isinstance(value, dict):
