@@ -387,5 +387,29 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   `\#`，代码块里的此类行缩进一个空格 —— 没有任何行以 `#` 开头，`RULE_HEADING`/`ANY_RULE_HEADING` 永远匹配不到，
   模型写的 `## Overview` 或 `## SERV-1 — x` 不会变成规则 ID。模型提出的 owner 页必须
   是本仓库目录下已有或本阶段创建的页面，指向其他仓库的页面一律丢弃并记入 notes。仓库标签不在 `doc/knowledge/SCHEMA.md` 分类法里、种子不存在、生成模型不可用或无价格 → 记录为 `blocked`，
-  不产生 PR。同输入摘要重跑直接返回记录；已发布记录的输入变了则拒绝。`modules`/`deepen`/`harvest-calibration` 抛
+  不产生 PR。同输入摘要重跑直接返回记录；已发布记录的输入变了则拒绝。`deepen`/`harvest-calibration` 抛
   `NotImplementedError`。测试：`test_kb_init_skeleton.py`、`test_kb_init_config.py`。
+
+## 2026-09-30 kb init：阶段共用流程与阶段 2（modules）
+- `init_stages._Stage`：各阶段共用的流程——钉点、记录、前序阶段链、规则筛查与落位、确定性检查（`_conclude`）、发布；
+  子类只设 `STAGE` 并实现 `_build`。**阶段链**（设计 §9）：前序每个阶段都必须已合并（记录为 `published` 且
+  `gh pr view` 为 `MERGED`，此时 main 已含它），或者（仅当本阶段是 dry run 时）是 dry run——其快照（`<stage>-dryrun/tree`）
+  叠加在 main 上作为本阶段的基底，并随本阶段的变更一起交给知识树校验器；`empty`（没有可改的）直接放行。未合并、只 dry
+  run 却要发布、未运行或处于 blocked/publishing 的前序阶段 → `blocked`，不调模型。后续阶段缺省沿用前序阶段的钉点
+  （`--pin` 可改，改了记入 notes）；链的状态进入输入摘要。阶段没有任何改动时记为 `empty`（不是错误）。
+  `InitRecord.coverage` 是阶段的覆盖率报告，PR 正文渲染成 before/after 表。适配器 manifest 从前序 dry run 的改动或知识
+  仓库基点读取（`adapters/<adapter 目录名>/manifest.yaml`）；`repo.language` 决定模块扫描的语言。
+- `init_modules`（阶段 2）：在钉点树上 `scan_modules_at_depth`（`source_roots`、`module_depth`、`min_module_loc`、
+  `exclude`；adapter 未声明语言或语言未知 → 不扫描，进清单）。按当前 `_routes.yaml` 算模块覆盖率。未覆盖的模块由深到浅：
+  已被某个 owner 部分覆盖的，**吸收**进覆盖其文件最多的 owner（只在该 owner 的 `scope_prefixes` 末尾追加模块目录；仓库
+  根模块因前缀不能表达，逐文件追加）；完全无人覆盖的，每个模块一次有界的生成调用（文件名、符号签名、文件开头的 docstring
+  或注释块，字节上限；从不给函数体：签名正则匹配整行，`declaration` 截掉函数体——
+  花括号语言（JavaScript、Go、Rust）在整行**最早**的 `{`/`=>`/`;`/单独的 `=` 处截断，不去词法分析字符串、注释或正则字面量
+  （函数体不可能出现在它们之前，默认值可能被截短，这是失败即关闭的取舍）；Python 在括号、字符串与行尾 `#` 注释之外的
+  第一个 `:` 处截断；单行函数也只留声明）写一张**地图卡片**：prose 页（`type: architecture`），目的、入口、关键文件（只保留该
+  模块真实存在的文件）、要读的文档（只保留文档集里的文件）、路由前缀；分节用加粗标签而非标题（知识格式把任何
+  `## <Word> …` 标题当作规则 ID）。卡片进入组：已有的 `components/<group>/`（入口页只追加链接，已有 owner 只追加前缀），
+  或新组（新目录、自己的 `_index.md` 与新的路由 owner），新组由上级入口页链接；`components/` 不存在时新建其入口页并由
+  仓库入口页链接；`components/` 已存在却没有入口页时组直接放在仓库目录下。`_routes.yaml` 只追加（保留开头注释块，
+  `routes_append_only` 校验不重排、不改名、不删除）。预算用完或超过卡片上限时，已写的卡片照常成 PR，剩下的模块进
+  `unfinished`；报告里列出仍无路由的模块。测试：`test_kb_init_modules.py`。

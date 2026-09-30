@@ -40,7 +40,7 @@ from ..knowledge_service.ops import (
 from ..knowledge_service.pinned_claims import Evidence, check_rules, evidence_for
 from .init_budget import Budget, BudgetExhausted, PriceError
 from .init_support import (
-    AUTHOR_ENV, STAGES, InitError, InitPublisher, InitRecord, InitRuntime, claim_problems, classify_verdict,
+    AUTHOR_ENV, KNOWLEDGE_PREFIX, STAGES, InitError, InitPublisher, InitRecord, InitRuntime, claim_problems, classify_verdict,
     collect_docs, generate, inputs_digest, judge, knowledge_changes, load_prepared, other_path_problems,
     parse_author, publishing_allowed, run_knowledge_validators, save_prepared,
 )
@@ -128,8 +128,7 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
     record (also saved under ``<state_dir>/init/<repo>/<stage>.json``)."""
     if stage not in STAGES:
         raise InitError(f"unknown stage {stage!r}; one of {STAGES}")
-    if stage != "skeleton":
-        raise NotImplementedError(f"stage {stage} lands in a later PR")
+    stage_class = _stage_class(stage)
     if lifecycle.init is None:
         raise InitError(f"{lifecycle.repo}: the adapter has no knowledge_lifecycle.init block")
     if not lifecycle.full_name:
@@ -143,7 +142,17 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
         if not publishing_allowed(rt.environ):
             raise InitError("publishing needs ALLOW_PUSH=1 and ALLOW_POST=1 (or pass --dry-run)")
         author = parse_author(rt.environ.get(AUTHOR_ENV, ""))   # refused before any model call
-    return _Skeleton(rt, lifecycle, dry_run=dry_run, pin=pin, notes=notes, author=author).run()
+    return stage_class(rt, lifecycle, dry_run=dry_run, pin=pin, notes=notes, author=author).run()
+
+
+def _stage_class(stage: str) -> type:
+    if stage == "skeleton":
+        return _Skeleton
+    if stage == "modules":
+        from .init_modules import _Modules
+
+        return _Modules
+    raise NotImplementedError(f"stage {stage} lands in a later PR")
 
 
 # -- helpers -----------------------------------------------------------------------
@@ -242,49 +251,82 @@ class _Candidate:
 
 
 @dataclass
-class _Skeleton:
+class _Chain:
+    """What the earlier stages contribute to this one's base (design §9: each
+    stage branches from main after the previous PR merges; a dry run chains on
+    the previous stages' dry-run output instead)."""
+
+    knowledge: dict[str, str] = field(default_factory=dict)   # knowledge-relative -> text (dry-run overlay)
+    repo_files: dict[str, str] = field(default_factory=dict)  # repository-relative -> text (for the validators)
+    key: str = ""
+    pin: str | None = None
+    problems: list[str] = field(default_factory=list)
+
+
+def _dry_run_files(record: InitRecord) -> dict[str, str]:
+    """Repository-relative files of a stage's dry-run snapshot."""
+    root = Path(str(record.pr.get("dry_run_dir") or "")) / "tree"
+    if not record.pr.get("dry_run_dir") or not root.is_dir():
+        raise InitError(f"the {record.stage} dry run left no snapshot ({root})")
+    return {p.relative_to(root).as_posix(): p.read_text(encoding="utf-8")
+            for p in sorted(root.rglob("*")) if p.is_file() and not p.name.endswith(".DELETED")}
+
+
+@dataclass
+class _Stage:
+    """The flow every ``kb init`` stage shares: pin, record, the earlier
+    stages' chain, rule screening and placement, the deterministic checks and
+    the publication. Subclasses set ``STAGE`` and implement ``_build``."""
+
+    STAGE = ""
+
     rt: InitRuntime
     lifecycle: Any
     dry_run: bool
     pin: str | None
     notes: list[str] = field(default_factory=list)
     author: tuple[str, str] | None = None     # (name, email) of the PR commit; None in a dry run
-    _seed_titles: dict[str, str] = field(default_factory=dict)
+    _titles: dict[str, str] = field(default_factory=dict)
     _judge_stopped: bool = False
 
-    # -- the flow -------------------------------------------------------------
     def run(self) -> InitRecord:
-        rt, lc = self.rt, self.lifecycle
+        rt, lc, stage = self.rt, self.lifecycle, self.STAGE
         init = lc.init
         self.repo_dir = lc.knowledge_dir
         base_sha = rt.knowledge.fetch()
-        self.base = rt.knowledge.knowledge_files(base_sha)
+        main = rt.knowledge.knowledge_files(base_sha)
+        chain = self._chain()
         upstream = rt.upstream(lc.repo, lc.full_name)
         upstream.sync()
-        pin = upstream.resolve(self.pin or "HEAD")
-        digest = inputs_digest(stage="skeleton", repo=lc.repo, pin=pin, kb=base_sha, init=repr(init),
-                               generator=rt.generator.label(), judge=rt.judge.label(), dry_run=self.dry_run)
-        previous = InitRecord.load(rt.state_dir, lc.repo, "skeleton")
+        pin = upstream.resolve(self.pin or chain.pin or "HEAD")
+        digest = inputs_digest(stage=stage, repo=lc.repo, pin=pin, kb=base_sha, init=repr(init),
+                               generator=rt.generator.label(), judge=rt.judge.label(), dry_run=self.dry_run,
+                               chain=chain.key)
+        record_path = InitRecord.path(rt.state_dir, lc.repo, stage)
+        previous = InitRecord.load(rt.state_dir, lc.repo, stage)
         if previous is not None and previous.pr.get("prepared") and previous.status in ("publishing", "blocked"):
             # pushed (or about to be) but not confirmed: finish THAT publication, never re-run the stage
             if self.dry_run:
                 raise InitError("a publication of this stage is pending (pushed, PR not confirmed); re-run "
-                                "without --dry-run to finish it, or remove "
-                                f"{InitRecord.path(rt.state_dir, lc.repo, 'skeleton')} to start over")
+                                f"without --dry-run to finish it, or remove {record_path} to start over")
             return self._resume(previous)
-        if previous is not None and previous.inputs_digest == digest and previous.status in ("dry_run", "published"):
+        if previous is not None and previous.inputs_digest == digest \
+                and previous.status in ("dry_run", "published", "empty"):
             return previous
         if previous is not None and previous.pr.get("number") and previous.inputs_digest != digest:
-            raise InitError(f"a published skeleton record exists (PR #{previous.pr['number']}); remove "
-                            f"{InitRecord.path(rt.state_dir, lc.repo, 'skeleton')} to start over")
-        self.record = InitRecord(stage="skeleton", repo=lc.repo, pin=pin, kb_base_sha=base_sha,
+            raise InitError(f"a published {stage} record exists (PR #{previous.pr['number']}); remove "
+                            f"{record_path} to start over")
+        self.record = InitRecord(stage=stage, repo=lc.repo, pin=pin, kb_base_sha=base_sha,
                                  inputs_digest=digest, started_at=float(int(rt.clock())),
                                  dry_run=self.dry_run, notes=list(self.notes))
+        if chain.pin and pin != chain.pin:
+            self.record.notes.append(f"pinned at {pin[:12]}, not at the earlier stages' {chain.pin[:12]}")
         self.budget = Budget(init.budget_usd)
-        missing = [s for s in init.seeds if s not in self.base
-                   and not any(p.startswith(s.rstrip("/") + "/") for p in self.base)]
-        if missing:
-            return self._blocked([f"seed {s} does not exist in the knowledge tree" for s in missing])
+        self.base = {**main, **chain.knowledge}
+        self.overlay = dict(chain.repo_files)
+        problems = chain.problems + self._precheck()
+        if problems:
+            return self._blocked(problems)
         schema = rt.knowledge.show(base_sha, "doc/knowledge/SCHEMA.md")
         if lc.repo not in _schema_tags(schema):
             return self._blocked([f"tag {lc.repo!r} is not in the doc/knowledge/SCHEMA.md taxonomy; add it "
@@ -294,8 +336,10 @@ class _Skeleton:
         self.release = f"init-{pin[:12]}"
         try:
             self.observer = upstream.observer(pin, pull=rt.pull)
+            self.upstream = upstream
             with tempfile.TemporaryDirectory(prefix="kb-init-") as scratch:
                 tree = upstream.export(pin, Path(scratch) / "tree")
+                self._inputs(tree)
                 return self._build(tree)
         except (ModelUnavailable, PriceError, FactsError) as exc:
             return self._blocked([f"{type(exc).__name__}: {exc}"])
@@ -303,13 +347,68 @@ class _Skeleton:
             self.record.spent_usd = round(self.budget.spent_usd, 6)
             self.record.save(rt.state_dir)
 
+    def _chain(self) -> _Chain:
+        """Every earlier stage must be merged, or (for a dry run of this one)
+        at least dry-run; a dry-run stage's snapshot is overlaid on main."""
+        chain = _Chain()
+        parts: list[str] = []
+        publisher = None
+        for stage in STAGES[:STAGES.index(self.STAGE)]:
+            record = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, stage)
+            if record is None:
+                chain.problems.append(f"run the {stage} stage first")
+                continue
+            chain.pin = record.pin or chain.pin
+            if record.status == "published":
+                number = record.pr.get("number")
+                publisher = publisher or InitPublisher(self.rt.knowledge.path, _knowledge_repository(),
+                                                       run=self.rt.gh_run)
+                try:
+                    state = publisher.pr_state(int(number))
+                except (InitError, TypeError, ValueError) as exc:
+                    chain.problems.append(f"cannot read the state of the {stage} PR #{number}: {exc}")
+                    continue
+                if state != "MERGED":
+                    chain.problems.append(f"merge the {stage} PR #{number} before running {self.STAGE} "
+                                          f"(it is {state or 'in an unknown state'})")
+                    continue
+                chain.knowledge.clear()   # main holds it, and every stage before it
+                chain.repo_files.clear()
+                parts.append(f"{stage}:merged:{number}")
+            elif record.status == "empty":
+                parts.append(f"{stage}:empty:{record.inputs_digest}")
+            elif record.status == "dry_run":
+                if not self.dry_run:
+                    chain.problems.append(f"the {stage} stage was only a dry run; publish it and merge its PR "
+                                          f"before publishing {self.STAGE}")
+                    continue
+                try:
+                    files = _dry_run_files(record)
+                except InitError as exc:
+                    chain.problems.append(str(exc))
+                    continue
+                for rel, text in files.items():
+                    chain.repo_files[rel] = text
+                    if rel.startswith(KNOWLEDGE_PREFIX):
+                        chain.knowledge[rel[len(KNOWLEDGE_PREFIX):]] = text
+                parts.append(f"{stage}:dry_run:{record.inputs_digest}")
+            else:
+                chain.problems.append(f"the {stage} stage is {record.status}; finish it first")
+        chain.key = ";".join(parts)
+        return chain
+
+    def _precheck(self) -> list[str]:
+        """Stage-specific problems found before any work (none by default)."""
+        return []
+
     def _blocked(self, problems: list[str]) -> InitRecord:
         self.record.status = "blocked"
         self.record.problems = problems
         self.record.save(self.rt.state_dir)
         return self.record
 
-    def _build(self, tree: Path) -> InitRecord:
+    def _inputs(self, tree: Path) -> None:
+        """What every stage reads from the pinned tree and the base."""
         from ..profiles.establish import build_doc_corpus
 
         init = self.lifecycle.init
@@ -321,46 +420,59 @@ class _Skeleton:
         self.existing = {p: t for p, t in self.base.items() if p.startswith(self.repo_dir + "/")}
         self.new_repo = not self.existing
         self.head: dict[str, str] = dict(self.base)
-        rules_page = self._rules_page()
+
+    def _build(self, tree: Path) -> InitRecord:  # pragma: no cover - every stage overrides it
+        raise NotImplementedError
+
+    def _manifest_path(self) -> str:
+        """The adapter manifest, repository-relative."""
+        adapter = self.lifecycle.adapter_dir
+        name = Path(adapter).name if adapter else self.lifecycle.repo.replace("-", "_")
+        return f"adapters/{name}/manifest.yaml"
+
+    def _manifest_text(self) -> str | None:
+        """The adapter manifest as this stage's base has it (an earlier dry
+        run's edit, else the knowledge repository at the base commit)."""
+        path = self._manifest_path()
+        if path in self.overlay:
+            return self.overlay[path]
+        return self.rt.knowledge.show(self.record.kb_base_sha, path)
+
+    def _language(self) -> str:
+        """The adapter's ``repo.language`` ("" when it declares none)."""
         try:
-            plan = self._map_call(rules_page)
-        except BudgetExhausted as exc:
-            self.record.unfinished.append(f"map: {exc}")
-            plan = {}
-        candidates = self._doc_rules(rules_page)
-        candidates += self._seed_rules()
-        self.plan = plan
-        kept = self._screen(candidates)
-        self._write_rules(kept)
-        self._write_map(plan)
-        self._checklist()
-        written = {c.rule_id: c.section for c in kept}
-        evidence = [Evidence.from_dict(e) for c in kept for e in c.evidence]
-        problems = validate_change(self.base, self.head, observer=self.observer, rules=written,
-                                   evidence=evidence)
-        changed = {"knowledge/" + p: t for p, t in self.head.items() if self.base.get(p) != t}
-        if not changed:
-            problems.append("the stage produced no change")
-        if not problems:
-            problems = run_knowledge_validators(self.rt.knowledge, self.record.kb_base_sha, changed)
+            manifest = yaml.safe_load(self._manifest_text() or "") or {}
+        except yaml.YAMLError:
+            return ""
+        repo = manifest.get("repo") if isinstance(manifest, dict) else None
+        return str((repo or {}).get("language") or "") if isinstance(repo, dict) else ""
+
+    def _conclude(self, rules: Mapping[str, str], evidence: list[Evidence],
+                  other: Mapping[str, tuple[str | None, str | None]] | None = None,
+                  check_other=None) -> InitRecord:
+        """The deterministic checks of the change (design §9.3), then the
+        publication. ``other`` are repository paths outside ``knowledge/``
+        (before, after) that ``check_other`` must accept."""
+        problems = validate_change(self.base, self.head, observer=self.observer, rules=rules,
+                                   evidence=evidence, other=other, check_other=check_other)
+        changed: dict[str, str] = {KNOWLEDGE_PREFIX + p: t for p, t in self.head.items() if self.base.get(p) != t}
+        for path, (before, after) in (other or {}).items():
+            if after is not None and after != before:
+                changed[path] = after
         self.record.files = sorted(changed)
+        if not changed and not problems:
+            self.record.status = "empty"
+            self.record.notes.append(f"the {self.STAGE} stage found nothing to change")
+            self.record.save(self.rt.state_dir)
+            return self.record
+        if not problems:
+            problems = run_knowledge_validators(self.rt.knowledge, self.record.kb_base_sha,
+                                                {**self.overlay, **changed})
         if problems:
             return self._blocked(problems)
         return self._publish(changed)
 
-    # -- inputs ------------------------------------------------------------------
-    def _rules_page(self) -> tuple[str, bool]:
-        """(page for doc-invariant rules, whether it already exists)."""
-        path = f"{self.repo_dir}/rules.md"
-        return path, path in self.base
-
-    def _pages_offered(self, rules_page: str) -> list[str]:
-        pages = sorted(p for p in self.existing if p.endswith(".md"))
-        for extra in (f"{self.repo_dir}/{INDEX_NAME}", f"{self.repo_dir}/architecture.md", rules_page):
-            if extra not in pages:
-                pages.append(extra)
-        return pages
-
+    # -- model inputs and calls -----------------------------------------------------
     def _doc_payload(self) -> list[dict]:
         out, used = [], 0
         for path, text in self.docs:
@@ -375,35 +487,6 @@ class _Skeleton:
         sample = self.existing.get(f"{self.repo_dir}/{INDEX_NAME}") or self.base.get(REPOS_INDEX) or ""
         return sample[:1500]
 
-    # -- model calls -------------------------------------------------------------
-    def _map_call(self, rules_page: tuple[str, bool]) -> dict:
-        offered = self._pages_offered(rules_page[0])
-        general = sorted(p for p in self.base if p.startswith("general/") and p.endswith(".md")
-                         and any(p == s or p.startswith(s.rstrip("/") + "/") for s in self.lifecycle.init.seeds))
-        payload = {
-            "repository": self.lifecycle.full_name, "top_level": self.layout, "docs": self._doc_payload(),
-            "existing_pages": {p: self.existing[p][:1500] for p in offered if p in self.existing},
-            "offered_pages": offered, "offered_general_pages": general,
-            "language_sample": self._language_sample(),
-        }
-
-        def validate(data: dict) -> None:
-            for key in ("title", "rules_title"):
-                if not isinstance(data.get(key), str) or not data[key].strip():
-                    raise ValueError(f"{key} must be a non-empty string")
-            for key in ("index_intro", "architecture_md", "contents_heading"):
-                if not isinstance(data.get(key, ""), str):
-                    raise ValueError(f"{key} must be a string")
-            if not isinstance(data.get("owners", []), list) or not isinstance(data.get("general_links", []), list):
-                raise ValueError("owners and general_links must be lists")
-
-        reply = generate(self.rt, self.budget, self.lifecycle.init, system=SYSTEM_MAP,
-                         prompt=_fence(payload), validate=validate)
-        plan = dict(reply.data)
-        plan["_offered"] = offered
-        plan["_general"] = general
-        return plan
-
     def _rules_call(self, payload: dict) -> dict:
         def validate(data: dict) -> None:
             rules = data.get("rules")
@@ -417,7 +500,6 @@ class _Skeleton:
         return generate(self.rt, self.budget, self.lifecycle.init, system=SYSTEM_RULES,
                         prompt=_fence(payload), validate=validate).data
 
-    # -- rule candidates ---------------------------------------------------------
     def _id_source(self):
         taken = set(all_rule_ids(self.base)) | all_tombstoned_ids(self.base)
         prefixes = Counter(m.group(1) for rid in all_rule_ids(self.existing)
@@ -446,60 +528,6 @@ class _Skeleton:
                 continue
             rid = next(self._ids)
             out.append(_Candidate(rid, page, title, body, evidence, origin))
-        return out
-
-    def _doc_rules(self, rules_page: tuple[str, bool]) -> list[_Candidate]:
-        self._ids = self._id_source()
-        if not self.docs:
-            self.record.notes.append("no documentation matched doc_globs: no doc-invariant rules")
-            return []
-        payload = {"repository": self.lifecycle.full_name, "top_level": self.layout,
-                   "docs": self._doc_payload(), "language_sample": self._language_sample()}
-        try:
-            data = self._rules_call(payload)
-        except BudgetExhausted as exc:
-            self.record.unfinished.append(f"doc invariants: {exc}")
-            return []
-        return self._to_candidates(data, rules_page[0], "docs")
-
-    def _seed_pages(self) -> list[str]:
-        pages = []
-        for seed in self.lifecycle.init.seeds:
-            if not seed.startswith("repos/"):
-                continue
-            prefix = seed.rstrip("/")
-            for path in sorted(self.base):
-                if (path == prefix or path.startswith(prefix + "/")) and path.endswith(".md"):
-                    try:
-                        if Page.parse(self.base[path]).frontmatter_data().get("type") == "rule":
-                            pages.append(path)
-                    except (LifecycleError, yaml.YAMLError):
-                        continue
-        return list(dict.fromkeys(pages))
-
-    def _seed_rules(self) -> list[_Candidate]:
-        pages = self._seed_pages()
-        if len(pages) > MAX_SEED_PAGES:
-            self.record.unfinished += [f"seed {p}: over the {MAX_SEED_PAGES}-page cap" for p in pages[MAX_SEED_PAGES:]]
-            pages = pages[:MAX_SEED_PAGES]
-        out = []
-        for origin in pages:
-            payload = {"repository": self.lifecycle.full_name, "top_level": self.layout,
-                       "docs": self._doc_payload(), "adapt_from": {"path": origin, "text": self.base[origin][:24_000]},
-                       "language_sample": self._language_sample()}
-            try:
-                data = self._rules_call(payload)
-            except BudgetExhausted as exc:
-                self.record.unfinished.append(f"seed {origin}: {exc}")
-                break
-            slug = _slug(origin.removeprefix("repos/").removesuffix(".md"))
-            page = f"{self.repo_dir}/rules-seed-{slug}.md"
-            found = self._to_candidates(data, page, origin)
-            if found:
-                self._seed_titles[page] = _one_line(data.get("page_title")) or _title_of(self.base[origin], slug)
-                self.record.seeds.append({"origin": origin, "kb_sha": self.record.kb_base_sha,
-                                          "new_page": page, "new_rule_ids": [c.rule_id for c in found]})
-            out += found
         return out
 
     # -- screening: D5, evidence, pinned claims, advisory judge ---------------------
@@ -551,7 +579,7 @@ class _Skeleton:
         running tree, so a page that fills up sends the next rules to a sibling
         page and the judge always sees every rule where it will be written."""
         ready: list[tuple[_Candidate, list[Evidence]]] = []
-        running = dict(self.base)
+        running = dict(self.head)
         for candidate in candidates:
             body = self._d5(candidate)
             if body is None:
@@ -594,9 +622,12 @@ class _Skeleton:
 
     # -- writing -------------------------------------------------------------------
     def _page_title(self, page: str) -> str:
-        if page in self._seed_titles:
-            return self._seed_titles[page]
-        return _one_line(self.plan.get("rules_title")) or f"{self.lifecycle.repo} rules"
+        if page in self._titles:
+            return self._titles[page]
+        return self._default_page_title(page)
+
+    def _default_page_title(self, page: str) -> str:
+        return f"{self.lifecycle.repo} rules"
 
     def _overflow_page(self, page: str, tree: Mapping[str, str]) -> str:
         """The sibling page that takes rules once ``page`` is full: the next
@@ -608,7 +639,7 @@ class _Skeleton:
             name = f"{stem}.md" if n == 1 and path.name == "rules.md" else f"{stem}-{n + 1}.md"
             sibling = str(path.with_name(name))
             if sibling not in self.base:   # init's own page (new or still filling) or a fresh one
-                self._seed_titles.setdefault(sibling, f"{self._page_title(page)} ({n + 1})")
+                self._titles.setdefault(sibling, f"{self._page_title(page)} ({n + 1})")
                 return sibling
         raise LifecycleError(f"no free sibling page for {page}")
 
@@ -667,6 +698,191 @@ class _Skeleton:
         except LifecycleError as exc:
             raise InitError(f"the kept rules could not be written together: {exc}") from exc
 
+    def _d5_prose(self, text: str) -> str:
+        """Generated prose for a non-rule page: lines the docs already say are
+        dropped, and no line may be read as a rule heading (see
+        ``neutral_headings``)."""
+        from ..profiles.establish import is_redundant
+
+        kept = [line for line in text.splitlines()
+                if not line.strip() or line.lstrip().startswith("#") or "](" in line
+                or not is_redundant(line, self.corpus)]
+        return neutral_headings("\n".join(kept).strip())
+
+    # -- output ----------------------------------------------------------------------
+    def _publish(self, changed: dict[str, str]) -> InitRecord:
+        rt, lc, record = self.rt, self.lifecycle, self.record
+        stage = self.STAGE
+        title = f"kb init({lc.repo}): {stage}"
+        body = render_pr_body(record, lc)
+        publisher = InitPublisher(rt.knowledge.path, _knowledge_repository(), run=rt.gh_run)
+        if self.dry_run:
+            dest = InitRecord.path(rt.state_dir, lc.repo, stage).with_name(f"{stage}-dryrun")
+            InitPublisher.dry_run(dest, changed, title=title, body=body)
+            record.pr = {"dry_run_dir": str(dest)}
+            record.status = "dry_run"
+        else:
+            prepared = save_prepared(
+                InitRecord.path(rt.state_dir, lc.repo, stage).with_name(f"{stage}-publish.json"),
+                base_sha=record.kb_base_sha, branch=f"kb/init-{lc.repo}-{stage}", files=changed,
+                title=title, body=body, author=self.author, when=record.started_at)
+            record.status = "publishing"
+            record.pr = {"prepared": str(prepared)}
+            record.save(rt.state_dir)
+            return self._finish(record, publisher)
+        record.save(rt.state_dir)
+        return record
+
+    def _finish(self, record: InitRecord, publisher: InitPublisher) -> InitRecord:
+        """Push and open the prepared publication (idempotent: the same
+        prepared change rebuilds the same commit, an already pushed branch
+        with that commit is reused, and so is an open PR carrying it)."""
+        prepared = record.pr["prepared"]
+        try:
+            opened = publisher.open_pr(**load_prepared(prepared))
+        except InitError as exc:
+            record.status = "blocked"
+            record.problems = [f"publishing failed: {exc}; re-run the stage to retry this exact change"]
+            record.save(self.rt.state_dir)
+            return record
+        record.pr = {**opened, "prepared": prepared}
+        record.status = "published"
+        record.problems = []
+        record.save(self.rt.state_dir)
+        return record
+
+    def _resume(self, previous: InitRecord) -> InitRecord:
+        self.record = previous
+        previous.notes.append("resumed a prepared publication; no model was called again")
+        publisher = InitPublisher(self.rt.knowledge.path, _knowledge_repository(), run=self.rt.gh_run)
+        return self._finish(previous, publisher)
+
+
+@dataclass
+class _Skeleton(_Stage):
+    """Stage 1: the routing map, doc-invariant rules and seeds (design §4–§6)."""
+
+    STAGE = "skeleton"
+
+    def _precheck(self) -> list[str]:
+        return [f"seed {s} does not exist in the knowledge tree" for s in self.lifecycle.init.seeds
+                if s not in self.base and not any(p.startswith(s.rstrip("/") + "/") for p in self.base)]
+
+    def _build(self, tree: Path) -> InitRecord:
+        rules_page = self._rules_page()
+        try:
+            plan = self._map_call(rules_page)
+        except BudgetExhausted as exc:
+            self.record.unfinished.append(f"map: {exc}")
+            plan = {}
+        candidates = self._doc_rules(rules_page)
+        candidates += self._seed_rules()
+        self.plan = plan
+        kept = self._screen(candidates)
+        self._write_rules(kept)
+        self._write_map(plan)
+        self._checklist()
+        written = {c.rule_id: c.section for c in kept}
+        evidence = [Evidence.from_dict(e) for c in kept for e in c.evidence]
+        return self._conclude(written, evidence)
+
+    def _default_page_title(self, page: str) -> str:
+        return _one_line(getattr(self, "plan", {}).get("rules_title")) or f"{self.lifecycle.repo} rules"
+
+    def _rules_page(self) -> tuple[str, bool]:
+        """(page for doc-invariant rules, whether it already exists)."""
+        path = f"{self.repo_dir}/rules.md"
+        return path, path in self.base
+
+    def _pages_offered(self, rules_page: str) -> list[str]:
+        pages = sorted(p for p in self.existing if p.endswith(".md"))
+        for extra in (f"{self.repo_dir}/{INDEX_NAME}", f"{self.repo_dir}/architecture.md", rules_page):
+            if extra not in pages:
+                pages.append(extra)
+        return pages
+
+    def _map_call(self, rules_page: tuple[str, bool]) -> dict:
+        offered = self._pages_offered(rules_page[0])
+        general = sorted(p for p in self.base if p.startswith("general/") and p.endswith(".md")
+                         and any(p == s or p.startswith(s.rstrip("/") + "/") for s in self.lifecycle.init.seeds))
+        payload = {
+            "repository": self.lifecycle.full_name, "top_level": self.layout, "docs": self._doc_payload(),
+            "existing_pages": {p: self.existing[p][:1500] for p in offered if p in self.existing},
+            "offered_pages": offered, "offered_general_pages": general,
+            "language_sample": self._language_sample(),
+        }
+
+        def validate(data: dict) -> None:
+            for key in ("title", "rules_title"):
+                if not isinstance(data.get(key), str) or not data[key].strip():
+                    raise ValueError(f"{key} must be a non-empty string")
+            for key in ("index_intro", "architecture_md", "contents_heading"):
+                if not isinstance(data.get(key, ""), str):
+                    raise ValueError(f"{key} must be a string")
+            if not isinstance(data.get("owners", []), list) or not isinstance(data.get("general_links", []), list):
+                raise ValueError("owners and general_links must be lists")
+
+        reply = generate(self.rt, self.budget, self.lifecycle.init, system=SYSTEM_MAP,
+                         prompt=_fence(payload), validate=validate)
+        plan = dict(reply.data)
+        plan["_offered"] = offered
+        plan["_general"] = general
+        return plan
+
+    def _doc_rules(self, rules_page: tuple[str, bool]) -> list[_Candidate]:
+        self._ids = self._id_source()
+        if not self.docs:
+            self.record.notes.append("no documentation matched doc_globs: no doc-invariant rules")
+            return []
+        payload = {"repository": self.lifecycle.full_name, "top_level": self.layout,
+                   "docs": self._doc_payload(), "language_sample": self._language_sample()}
+        try:
+            data = self._rules_call(payload)
+        except BudgetExhausted as exc:
+            self.record.unfinished.append(f"doc invariants: {exc}")
+            return []
+        return self._to_candidates(data, rules_page[0], "docs")
+
+    def _seed_pages(self) -> list[str]:
+        pages = []
+        for seed in self.lifecycle.init.seeds:
+            if not seed.startswith("repos/"):
+                continue
+            prefix = seed.rstrip("/")
+            for path in sorted(self.base):
+                if (path == prefix or path.startswith(prefix + "/")) and path.endswith(".md"):
+                    try:
+                        if Page.parse(self.base[path]).frontmatter_data().get("type") == "rule":
+                            pages.append(path)
+                    except (LifecycleError, yaml.YAMLError):
+                        continue
+        return list(dict.fromkeys(pages))
+
+    def _seed_rules(self) -> list[_Candidate]:
+        pages = self._seed_pages()
+        if len(pages) > MAX_SEED_PAGES:
+            self.record.unfinished += [f"seed {p}: over the {MAX_SEED_PAGES}-page cap" for p in pages[MAX_SEED_PAGES:]]
+            pages = pages[:MAX_SEED_PAGES]
+        out = []
+        for origin in pages:
+            payload = {"repository": self.lifecycle.full_name, "top_level": self.layout,
+                       "docs": self._doc_payload(), "adapt_from": {"path": origin, "text": self.base[origin][:24_000]},
+                       "language_sample": self._language_sample()}
+            try:
+                data = self._rules_call(payload)
+            except BudgetExhausted as exc:
+                self.record.unfinished.append(f"seed {origin}: {exc}")
+                break
+            slug = _slug(origin.removeprefix("repos/").removesuffix(".md"))
+            page = f"{self.repo_dir}/rules-seed-{slug}.md"
+            found = self._to_candidates(data, page, origin)
+            if found:
+                self._titles[page] = _one_line(data.get("page_title")) or _title_of(self.base[origin], slug)
+                self.record.seeds.append({"origin": origin, "kb_sha": self.record.kb_base_sha,
+                                          "new_page": page, "new_rule_ids": [c.rule_id for c in found]})
+            out += found
+        return out
+
     def _write_map(self, plan: dict) -> None:
         lc = self.lifecycle
         index = f"{self.repo_dir}/{INDEX_NAME}"
@@ -691,17 +907,6 @@ class _Skeleton:
             self._new_index(index, plan, new_links)
         self._link_repo()  # also repairs an existing repository the shared list misses
         self._routes(plan)
-
-    def _d5_prose(self, text: str) -> str:
-        """Generated prose for a non-rule page: lines the docs already say are
-        dropped, and no line may be read as a rule heading (see
-        ``neutral_headings``)."""
-        from ..profiles.establish import is_redundant
-
-        kept = [line for line in text.splitlines()
-                if not line.strip() or line.lstrip().startswith("#") or "](" in line
-                or not is_redundant(line, self.corpus)]
-        return neutral_headings("\n".join(kept).strip())
 
     def _extend_index(self, index: str, links: list[tuple[str, str]]) -> None:
         text = self.head[index]
@@ -887,53 +1092,6 @@ class _Skeleton:
                 if not any(path.startswith(d + "/") for d in owned_dirs):
                     self.record.checklist.append(f"no route reaches {path}")
 
-    # -- output ----------------------------------------------------------------------
-    def _publish(self, changed: dict[str, str]) -> InitRecord:
-        rt, lc, record = self.rt, self.lifecycle, self.record
-        title = f"kb init({lc.repo}): skeleton"
-        body = render_pr_body(record, lc)
-        publisher = InitPublisher(rt.knowledge.path, _knowledge_repository(), run=rt.gh_run)
-        if self.dry_run:
-            dest = InitRecord.path(rt.state_dir, lc.repo, "skeleton").with_name("skeleton-dryrun")
-            InitPublisher.dry_run(dest, changed, title=title, body=body)
-            record.pr = {"dry_run_dir": str(dest)}
-            record.status = "dry_run"
-        else:
-            prepared = save_prepared(
-                InitRecord.path(rt.state_dir, lc.repo, "skeleton").with_name("skeleton-publish.json"),
-                base_sha=record.kb_base_sha, branch=f"kb/init-{lc.repo}-skeleton", files=changed,
-                title=title, body=body, author=self.author, when=record.started_at)
-            record.status = "publishing"
-            record.pr = {"prepared": str(prepared)}
-            record.save(rt.state_dir)
-            return self._finish(record, publisher)
-        record.save(rt.state_dir)
-        return record
-
-    def _finish(self, record: InitRecord, publisher: InitPublisher) -> InitRecord:
-        """Push and open the prepared publication (idempotent: the same
-        prepared change rebuilds the same commit, an already pushed branch
-        with that commit is reused, and so is an open PR carrying it)."""
-        prepared = record.pr["prepared"]
-        try:
-            opened = publisher.open_pr(**load_prepared(prepared))
-        except InitError as exc:
-            record.status = "blocked"
-            record.problems = [f"publishing failed: {exc}; re-run the stage to retry this exact change"]
-            record.save(self.rt.state_dir)
-            return record
-        record.pr = {**opened, "prepared": prepared}
-        record.status = "published"
-        record.problems = []
-        record.save(self.rt.state_dir)
-        return record
-
-    def _resume(self, previous: InitRecord) -> InitRecord:
-        self.record = previous
-        previous.notes.append("resumed a prepared publication; no model was called again")
-        publisher = InitPublisher(self.rt.knowledge.path, _knowledge_repository(), run=self.rt.gh_run)
-        return self._finish(previous, publisher)
-
 
 _TOKEN = re.compile(r"[a-z][a-z0-9_]{3,}")
 _COMMON = frozenset({"this", "that", "with", "from", "when", "only", "must", "into", "test", "tests",
@@ -989,6 +1147,28 @@ def _knowledge_repository() -> str:
     return knowledge_repository()
 
 
+def _ratio(value) -> str:
+    return f"{float(value) * 100:.1f}%" if isinstance(value, (int, float)) else "n/a"
+
+
+def _coverage_lines(coverage: dict) -> list[str]:
+    """The coverage report of a stage (design §7) as PR-body lines."""
+    lines = ["Coverage:", "", "| metric | before | after |", "|---|---|---|"]
+    for key, label in (("modules", "modules routed"), ("pr_routed", "PR-weighted, routed"),
+                       ("pr_rule_bearing", "PR-weighted, rule-bearing")):
+        item = coverage.get(key)
+        if isinstance(item, dict):
+            lines.append(f"| {label} | {_ratio(item.get('before'))} | {_ratio(item.get('after'))} |")
+    lines.append("")
+    for key, label in (("unrouted", "Modules no route reaches"), ("uncovered_hot", "Hot paths without rules")):
+        items = coverage.get(key) or []
+        if items:
+            lines += [f"{label}:", ""] + [f"- `{i if isinstance(i, str) else i[0]}`"
+                                          + ("" if isinstance(i, str) else f" ({i[1]} PRs)") for i in items[:30]]
+            lines.append("")
+    return lines
+
+
 def render_pr_body(record: InitRecord, lifecycle) -> str:
     """The PR body: the init record in reviewable form (design §9)."""
     lines = [
@@ -1017,6 +1197,8 @@ def render_pr_body(record: InitRecord, lifecycle) -> str:
         lines += ["<details><summary>Dropped rules</summary>", ""]
         lines += [f"- {d['rule_id']}: {d['why']}" for d in record.dropped]
         lines += ["", "</details>", ""]
+    if record.coverage:
+        lines += _coverage_lines(record.coverage)
     if record.checklist:
         lines += ["Needs human edit:", ""] + [f"- [ ] {item}" for item in record.checklist] + [""]
     if record.unfinished:
