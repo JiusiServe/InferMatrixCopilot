@@ -329,10 +329,15 @@ knowledge_root)` 是运行时检查：种子必须是知识树中已存在的文
 `scope_prefixes` 前缀匹配、保持路由顺序；`module_coverage(modules, owners)` —— 模块内**每个**源文件都被某个 owner 前缀
 覆盖才算覆盖；`make_include(source_roots, exclude, suffixes=())` 构造变更路径过滤器（测试/文档等一律由调用方的
 `exclude` glob 表达，不内置任何仓库字面量）；`pr_weighted_coverage(prs, owners, include=, rule_pages=)` —— 每个 PR
-改动的每个文件计一次，`routed` = 被某 owner 覆盖，`rule_bearing` = 覆盖它的 owner 页在 `rule_pages`（含有效规则的页）
-中，`uncovered_hot` 按次数降序、路径升序；`churn_by_module(prs, modules)` 按最长模块前缀归属（已折叠目录归到折入的
+改动的每个文件计一次，`routed` = 被某 owner 覆盖，`rule_bearing` = 它的**最具体** owner（`most_specific`）的页在
+`rule_pages`（含有效规则的页）中，`uncovered_hot` 按次数降序、路径升序；`churn_by_module(prs, modules)` 按最长模块前缀归属（已折叠目录归到折入的
 祖先），降序。空集合的比例记为 1.0（没有可漏的路由）。`ROOT_MODULE` 与 `profiles.establish.ROOT_MODULE` 相同，
 由测试钉住（本包不依赖 `profiles`）。源根与变更路径按与 `profiles.establish.normalize_root` 相同的规则规范化（`.`、`./` 表示仓库根，接纳一切路径）。测试：`test_kb_init_coverage.py`。
+`most_specific(path, owners)`：匹配前缀最长的 owner；前缀一样长时取页面在知识树里最深的（组件自己的页，而不是列出同一
+区域的聚合入口页）；两者都相同才并列返回。`shadowing(owners)`：列出每个是其他 owner 前缀的**严格祖先**的目录前缀
+（文件前缀不算祖先）。为什么：前缀会嵌套，兜底前缀（`pkg/`）能到达组件前缀（`pkg/sub/`）到达的每个文件；若任一匹配 owner
+的规则都算，兜底页上的一条规则就让整个包都“承载规则”，指标失去意义（kb init 试点 2026-09-30：一个模块的规则让承载率
+10% → 100%）。测试：`test_kb_init_owner_specificity.py`。
 
 
 ## 2026-09-30 单次调用花费阈值（kb init 预算硬上限的一块积木）
@@ -377,7 +382,8 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   仓库未登记时登记到 `repos/_index.md`（`INIT_PATHS` 允许这一个共享文件）；`_routes.yaml` 只在不存在时生成：先由
   已有子目录入口页**确定性**地得出 owner（页中反引号里、在钉点存在、落在 `source_roots` 内的代码路径；`pkg/**` 即目录
   `pkg/`），再补模型提出的 owner（scope 前缀须在钉点存在）→ 已有页面的问题进清单（钉点下不成立的声明、与文档重复的行、
-  没有路由到达的页、表格索引的样式）→ 检查 → dry run 或 PR。钉点缺省取上游镜像的 `HEAD`（远端默认分支，不假设
+  没有路由到达的页、表格索引的样式；某 owner 的目录前缀是其他 owner 前缀的祖先时提示收窄——这些文件只算给更具体的
+  owner）→ 检查 → dry run 或 PR。钉点缺省取上游镜像的 `HEAD`（远端默认分支，不假设
   `main`；每次同步都按 `ls-remote --symref` 刷新镜像的 `HEAD`，默认分支改名或删除后也跟得上）。没有可用 owner 时的
   兜底路由用规范化后的 `source_roots`（`./pkg/` → `pkg/`），源根是仓库本身或未设置时用钉点下的全部顶层目录。发布时 `KB_INIT_GIT_AUTHOR` 缺失在任何模型调用之前拒绝。推送之前先把这次发布（基点、分支、文件、标题、
   正文、作者、时间）写成 `<stage>-publish.json`（`save_prepared`），记录状态为 `publishing`；推送/开 PR 失败记为
@@ -400,8 +406,12 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   仓库基点读取（`adapters/<adapter 目录名>/manifest.yaml`）；`repo.language` 决定模块扫描的语言。
 - `init_modules`（阶段 2）：在钉点树上 `scan_modules_at_depth`（`source_roots`、`module_depth`、`min_module_loc`、
   `exclude`；adapter 未声明语言或语言未知 → 不扫描，进清单）。按当前 `_routes.yaml` 算模块覆盖率。未覆盖的模块由深到浅：
-  已被某个 owner 部分覆盖的，**吸收**进覆盖其文件最多的 owner（只在该 owner 的 `scope_prefixes` 末尾追加模块目录；仓库
-  根模块因前缀不能表达，逐文件追加）；完全无人覆盖的，每个模块一次有界的生成调用（文件名、符号签名、文件开头的 docstring
+  已被某个 owner 部分覆盖的，**吸收**进以**最具体**方式覆盖其文件最多的 owner（路由顺序打平）：只在该 owner 的
+  `scope_prefixes` 末尾追加覆盖本模块**尚无路由的自有文件**的前缀（`cover_prefixes`）——安全时用模块目录，否则每个文件取
+  模块与它之间最高的安全目录，再不行用文件本身；目录**安全**指其下每个已扫描文件都属于本模块、其下没有别的模块、也没有
+  **其他** owner 的前缀，所以新前缀永远不会是吞掉别的模块或 owner 的祖先（有子模块的模块，如包根目录或仓库根，从不以自身
+  目录路由）。需要超过 `MAX_ABSORB_PREFIXES`（20）个前缀的模块不吸收，改写地图卡片；卡片的新 owner 前缀同样由
+  `cover_prefixes` 得出；完全无人覆盖的，每个模块一次有界的生成调用（文件名、符号签名、文件开头的 docstring
   或注释块，字节上限；从不给函数体：签名正则匹配整行，`declaration` 截掉函数体——
   花括号语言（JavaScript、Go、Rust）在整行**最早**的 `{`/`=>`/`;`/单独的 `=` 处截断，不去词法分析字符串、注释或正则字面量
   （函数体不可能出现在它们之前，默认值可能被截短，这是失败即关闭的取舍）；Python 在括号、字符串与行尾 `#` 注释之外的
@@ -420,14 +430,15 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   引号转义）；合并/squash 式默认分支上每个 first-parent 提交就是一个合入的 PR。这就是设计 §7.3 的 PR 窗口，从镜像离线
   读取（不走 GitHub API，没有速率限制）。
 - `init_deepen`（阶段 3）：按窗口内源文件改动数（`make_include`：源根、`exclude`、语言后缀）给模块排序，从高到低：没有路由
-  的模块跳过（记入 notes）；路由 owner 已承载规则的模块跳过（对指标无增益）——owner **承载规则**指 owner 页本身有生效规则，
+  的模块跳过（记入 notes）；模块的 owner 是以**最具体**方式（`most_specific`）拥有其文件最多的 owner——同时也覆盖它的更宽
+  owner 从不拿走组件的规则；该 owner 已承载规则的模块跳过（对指标无增益）——owner **承载规则**指 owner 页本身有生效规则，
   或（仅当 owner 是入口页/prose 页时）**同一目录**下有含生效规则的页（不看子目录，否则任何组件有了规则仓库入口就算承载；
   owner 本身是规则页却没有生效规则时不承载，不看兄弟页）。其余模块每个
   一次生成调用：模块代码带行号、字节上限（这是深度阶段，读代码本身），产出带行范围证据的规则 → 证据必须在本模块文件内 →
   共用筛查（D5、钉点证据与声明、落位、咨询性判定）→ 经 `ops.apply_operations` 追加到 owner 的规则页（owner 页本身是规则页
   时用它，否则用旁边的 `rules.md`；已有规则只追加、不修改，满页转兄弟页）。每写完一个模块重算承载规则的 PR 加权覆盖率，
   达到 `coverage_target`、预算用完或热模块用尽即停。报告：路由/承载规则两种覆盖率的 before/after、窗口 PR 数、仍无规则的热路径（`uncovered_hot`：没有承载规则的 owner 到达的
-  源文件，包括已路由但 owner 无规则的；`unrouted_hot` 另列完全无路由的）。
+  源文件（按最具体 owner 判断），包括已路由但 owner 无规则的；`unrouted_hot` 另列完全无路由的）。
 - 同一 PR 打开 shadow：`flip_to_shadow` 对 adapter manifest 做**文本**编辑，只改 `knowledge_lifecycle` 块里同缩进的
   `enabled`（→ `true`，缺失则插在块头下）与 `mode`（→ `shadow`）两行，注释、顺序与其他行逐字保留；没有该块 → 在任何模型调用
   之前 `blocked`。`_check_flip` 校验：只能改这一个 manifest，`check_flip_to_shadow`（除这两个键外解析值不变、head 开启且为

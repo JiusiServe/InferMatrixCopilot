@@ -5,8 +5,14 @@ Breadth pass over the pinned tree. Modules are directories at most
 their parent (``profiles.establish.scan_modules_at_depth``). A module is
 covered when every one of its files reaches a route owner:
 
-* a module some owner already partly reaches is **absorbed**: its prefix is
-  appended to that owner's ``scope_prefixes`` (append-only, never reordered);
+* a module some owner already partly reaches is **absorbed** into the owner
+  that reaches most of its files most specifically: prefixes covering exactly
+  the module's own unrouted files are appended to that owner's
+  ``scope_prefixes`` (append-only, never reordered). A prefix never names an
+  ancestor of another module or of another owner's prefix — the module
+  directory when that is safe, else the highest safe directories inside it,
+  else single files (``cover_prefixes``); a module that would need more than
+  ``MAX_ABSORB_PREFIXES`` of them gets a map card instead;
 * every other module gets a **map card** — a prose page (purpose, entry points,
   key files, the docs to read, its routes) written from one bounded generator
   call that sees file names, symbol signatures and leading docstrings only —
@@ -28,7 +34,7 @@ import yaml
 
 from ..knowledge_service.ops import INDEX_NAME, index_line
 from .init_budget import BudgetExhausted
-from .init_coverage import ROOT_MODULE, Owner, load_owners, module_coverage, routes_file
+from .init_coverage import ROOT_MODULE, Owner, load_owners, module_coverage, most_specific, routes_file
 from .init_stages import (
     _SLUG, ROUTES_NAME, _fence, _one_line, _page_frontmatter, _slug, _Stage, _title_of,
 )
@@ -40,6 +46,7 @@ MAX_SIGNATURES_PER_FILE = 40
 MAX_LEADING_DOC = 600
 MAX_CARDS = 80
 MAX_ITEMS = 12
+MAX_ABSORB_PREFIXES = 20
 _DOCSTRING = re.compile(r'\A(?:\s*#[^\n]*\n|\s*\n)*\s*[rRuUbB]?("""|\'\'\')(?P<doc>.*?)\1', re.DOTALL)
 
 SYSTEM_CARD = """You write the map card of ONE code module of a software repository. A
@@ -155,11 +162,44 @@ def scan_modules(tree: Path, init, language: str, record: InitRecord) -> dict[st
     return modules
 
 
-def _module_prefixes(key: str, files: list[str]) -> list[str]:
-    """Route prefixes that reach exactly a module: its directory, or (for the
-    repository root, which no prefix can name without routing everything) its
-    files one by one."""
-    return sorted(files) if key == ROOT_MODULE else [key]
+def cover_prefixes(key: str, target: list[str], all_files: list[str], owners: list[Owner],
+                   module_keys, *, members: list[str] | None = None, owner: str | None = None) -> list[str]:
+    """The fewest route prefixes that reach ``target`` (files of module ``key``,
+    a subset of its ``members``, default the target itself) and no scanned
+    file of any other module, for ``owner`` (None: a new owner). A directory
+    is safe when every scanned file under it is a member, no other module lies
+    under it and no OTHER owner's prefix sits at or under it — so a new prefix
+    can never be an ancestor that swallows another module or owner (a module
+    with child modules, e.g. a package root, is never routed by its own
+    directory). The module directory is used when safe; otherwise each target
+    file takes the highest safe directory between the module and itself, or
+    its own path."""
+    wanted = set(target)
+    own = set(members) if members is not None else wanted
+    others = [m for m in module_keys if m not in (key, ROOT_MODULE)]
+    prefixes = [p for o in owners if o.owner != owner for p in o.prefixes]
+
+    def safe(directory: str) -> bool:
+        return (not any(f.startswith(directory) and f not in own for f in all_files)
+                and not any(m.startswith(directory) for m in others)
+                and not any(p.startswith(directory) for p in prefixes))
+
+    if key != ROOT_MODULE and safe(key):
+        return [key]
+    base = 0 if key == ROOT_MODULE else len(key.rstrip("/").split("/"))
+    out: list[str] = []
+    for path in sorted(wanted):
+        if any(path.startswith(p) for p in out):
+            continue
+        parts = path.split("/")[:-1]
+        chosen = path
+        for depth in range(base + 1, len(parts) + 1):   # directories below the module, top down
+            directory = "/".join(parts[:depth]) + "/"
+            if safe(directory):
+                chosen = directory
+                break
+        out.append(chosen)
+    return sorted(set(out))
 
 
 def _owners(doc: dict) -> list[Owner]:
@@ -223,6 +263,7 @@ class _Modules(_Stage):
         language = self._language()
         modules = self._scan(tree, language)
         before = module_coverage(modules, _owners(self.routes))
+        self.all_files = sorted({f for m in modules.values() for f in m["files"]})
         leftovers = self._absorb(modules, before.uncovered)
         self.root, self.groups = self._groups()
         cards: list[_Card] = []
@@ -236,6 +277,7 @@ class _Modules(_Stage):
                 self.record.unfinished += [f"module {k}: {exc}" for k in leftovers[index:]]
                 break
             if card is not None:
+                card.prefixes = self._cover(key, modules)
                 if card.group not in self.groups:
                     card.group = self._new_group_slug(card.group)
                     self.groups[card.group] = {"index": f"{self.root}/{card.group}/{INDEX_NAME}",
@@ -257,22 +299,41 @@ class _Modules(_Stage):
     def _scan(self, tree: Path, language: str) -> dict[str, dict]:
         return scan_modules(tree, self.lifecycle.init, language, self.record)
 
+    def _cover(self, key: str, modules: dict[str, dict], owner: str | None = None) -> list[str]:
+        """Prefixes for the module's own files no owner routes yet, to be added
+        to ``owner`` (None: a new owner)."""
+        owners = _owners(self.routes)
+        members = list(modules[key]["files"])
+        unrouted = [f for f in members if not routes_file(f, owners)]
+        return cover_prefixes(key, unrouted, self.all_files, owners, modules, members=members, owner=owner)
+
     def _absorb(self, modules: dict[str, dict], uncovered: list[str]) -> list[str]:
-        """Append each partly-routed module to the owner that reaches most of
-        its files; return the modules no owner reaches at all (deepest first,
-        so a nested module gets its own card before its parent)."""
+        """Append each partly-routed module's unrouted files to the owner that
+        reaches most of its files MOST SPECIFICALLY (routing order breaks
+        ties); return the modules to card: those no owner reaches at all, and
+        those whose unrouted files would need too many prefixes (deepest
+        first, so a nested module gets its own card before its parent)."""
         leftovers = []
         for key in sorted(uncovered, key=lambda k: (-k.count("/"), k)):
             files = modules[key]["files"]
             owners = _owners(self.routes)
-            counts = {o.owner: sum(1 for f in files if o in routes_file(f, owners)) for o in owners}
+            counts = {o.owner: 0 for o in owners}
+            for path in files:
+                for owner in most_specific(path, owners):
+                    counts[owner.owner] += 1
             best = max((o for o in owners if counts[o.owner]), key=lambda o: counts[o.owner], default=None)
             if best is None:
                 leftovers.append(key)
                 continue
+            cover = self._cover(key, modules, best.owner)
+            if len(cover) > MAX_ABSORB_PREFIXES:
+                self.record.notes.append(f"module {key}: {len(cover)} prefixes would be needed to absorb it "
+                                         f"into owner {best.owner}; it gets its own map card")
+                leftovers.append(key)
+                continue
             entry = next(o for o in self.routes["owners"] if str(o["owner"]) == best.owner)
             prefixes = list(entry.get("scope_prefixes") or [])
-            added = [p for p in _module_prefixes(key, files) if p not in prefixes]
+            added = [p for p in cover if p not in prefixes]
             entry["scope_prefixes"] = prefixes + added
             self.record.notes.append(f"module {key}: absorbed into owner {best.owner} ({', '.join(added)})")
         return sorted(leftovers)
@@ -362,7 +423,7 @@ class _Modules(_Stage):
         headings = {k: _one_line((data.get("headings") or {}).get(k)).replace("*", "") or v
                     for k, v in _DEFAULT_HEADINGS.items()}
         return _Card(
-            module=key, prefixes=_module_prefixes(key, files), title=_one_line(data["title"]),
+            module=key, prefixes=[], title=_one_line(data["title"]),
             purpose=self._d5_prose(str(data.get("purpose") or "")),
             entry_points=items("entry_points", in_module, "what"), key_files=items("key_files", in_module, "what"),
             docs=items("docs", doc_paths, "why"),
