@@ -50,3 +50,4 @@ knowledge_lifecycle:
     doc_globs: [README_CN.md, TESTING.md, "docs/zh/**/*.md", jiuwenbox/README_CN.md]
     source_roots: [jiuwenswarm/, jiuwenbox/src/jiuwenbox/]
     exclude: ["*/tests/*", "*/__init__.py", "*/resources/*", "*/node_modules/*"]
+  calibration_set: kb-calibration
