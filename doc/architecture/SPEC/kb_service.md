@@ -474,3 +474,6 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   `blocked`；`check_lifecycle_flip(allowed=CALIBRATION_KEYS)` + head 上 `parse_lifecycle` 且其 `calibration_set` 为
   `kb-calibration`）。分支 `kb/init-<repo>-harvest-calibration`。`auto_merge` 仍需 `kb calibrate` 与 shadow 观察期。
   测试：`test_kb_init_harvest.py`。
+
+## 2026-09-30 新索引每页只登记一次（kb init）
+`init_stages.unlink_listed(text, listed)`：新建 `_index.md` 时，生成的导语里指向目录清单已列出页面的行内链接改成纯文本标签（支持尖括号目标与标题；锚点、`./` 忽略；图片与其他目标不动）。改写后再用 `l1.link_targets`（CommonMark 解析器）核验：若仍有指向清单页面的链接（改写不认识的写法，如引用式链接），整段可选导语丢弃并记入清单，绝不登记两次。目录清单是每个页面唯一的登记，知识树校验拒绝同一页面登记两次。回归来自 jiuwenswarm 试点。测试：`test_kb_init_skeleton.py`。
