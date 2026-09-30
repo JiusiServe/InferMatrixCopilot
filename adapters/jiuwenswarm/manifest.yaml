@@ -29,7 +29,7 @@ push:
 # Knowledge service: declared but disabled; kb init's third PR flips it to
 # shadow after human review (design kb-init §9).
 knowledge_lifecycle:
-  enabled: false
+  enabled: true
   mode: shadow
   knowledge_dir: repos/jiuwenswarm
   release:
