@@ -406,7 +406,7 @@ def test_strict_runtime_public_capabilities_smoke(tmp_path):
         caps = runtime.capabilities()
 
     assert caps.distribution_version == "0.2.0"
-    assert caps.strict_api_version == "1.3.0"
+    assert caps.strict_api_version == "1.4.0"
     assert caps.knowledge_api_version == KNOWLEDGE_API_VERSION
     assert caps.supports_knowledge_curation is True
 

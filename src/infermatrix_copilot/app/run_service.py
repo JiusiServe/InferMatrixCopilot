@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import json
 import os
-import queue
 import subprocess
 import sys
 import threading
 import uuid
+from collections import deque
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .. import contract
 from .. import idempotency as idem
@@ -25,7 +25,7 @@ from .request_policy import (
     PolicyError, authorize_repo_path, enforce_mcp_policy,
     enforce_quality_review_policy, enforce_strict_review_policy,
 )
-from ..task_spec import READ_ONLY_KINDS
+from ..task_spec import READ_ONLY_KINDS, TaskSpec
 from .core import Copilot
 from .reservation import RunReservation
 
@@ -42,10 +42,66 @@ def read_knowledge_pin(run_dir: str | Path) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+# The conflict key of a run whose request cannot be read or keyed: such runs
+# fail at launch anyway, and sharing one key keeps them from overlapping each
+# other rather than guessing what they touch.
+UNKEYED = ("?", None)
+
+
+class RunQueue:
+    """FIFO run queue for N workers that never hands out two runs with the
+    same conflict key at once.
+
+    A run whose key is busy stays queued, in order, and does not hold a
+    worker: the worker takes the oldest run whose key is free, so one busy PR
+    cannot stall reviews of other PRs behind it. Keys are computed at enqueue
+    (the request is persisted before any run is enqueued)."""
+
+    def __init__(self, key_for: Callable[[str], Any]):
+        self._key_for = key_for
+        self._cond = threading.Condition()
+        self._pending: deque[tuple[str, bool, Any]] = deque()
+        self._busy: set[Any] = set()
+
+    def put(self, item: tuple[str, bool]) -> None:
+        run_id, strict_compat = item
+        try:
+            key = self._key_for(run_id)
+            hash(key)
+        except Exception:  # noqa: BLE001 - a reserved run must still enqueue
+            key = UNKEYED
+        with self._cond:
+            self._pending.append((run_id, strict_compat, key))
+            self._cond.notify_all()
+
+    def take(self) -> tuple[str, bool, Any]:
+        """Block until a run with a free key is queued; claim its key."""
+        with self._cond:
+            while True:
+                for index, item in enumerate(self._pending):
+                    if item[2] not in self._busy:
+                        del self._pending[index]
+                        self._busy.add(item[2])
+                        return item
+                self._cond.wait()
+
+    def done(self, key: Any) -> None:
+        """Release a key claimed by `take`, waking workers blocked on it."""
+        with self._cond:
+            self._busy.discard(key)
+            self._cond.notify_all()
+
+    def snapshot(self) -> tuple[list[str], set[Any]]:
+        """Queued run ids and busy keys (tests/diagnostics)."""
+        with self._cond:
+            return [item[0] for item in self._pending], set(self._busy)
+
+
 class RunService:
-    """The server core: a serialized run queue over isolated subprocesses, plus
-    ownership-aware reconciliation. Framework-agnostic (no `mcp` import) so it is
-    unit-testable without a live protocol connection."""
+    """The server core: a run queue drained by `STRICT_MAX_WORKERS` workers
+    over isolated subprocesses, plus ownership-aware reconciliation.
+    Framework-agnostic (no `mcp` import) so it is unit-testable without a live
+    protocol connection."""
 
     def __init__(self, settings: Settings | None = None):
         """Wire reservation and workflow services, register this server's
@@ -59,16 +115,19 @@ class RunService:
         self.pid = os.getpid()
         rs.register_server(self.run_root, self.server_id, self.pid)
         rs.startup_reconcile(self.run_root)
+        # One sweep at a time per service: with several workers finishing
+        # runs, overlapping sweeps would only race each other for the same
+        # entries and refs.
+        self._reap_lock = threading.Lock()
         self._reap()
-        self._q: queue.Queue[tuple[str, bool]] = queue.Queue()
-        self._worker = threading.Thread(target=self._worker_loop, daemon=True,
-                                        name="imx-mcp-worker")
-        self._worker.start()
-
-    # one worker thread drains the queue, so Strict runs are strictly serial.
-    # The handshake reports this rather than letting a bot infer concurrency
-    # from the fact that `start` returns immediately.
-    MAX_STRICT_WORKERS = 1
+        self.max_strict_workers = int(self.settings.strict_max_workers)
+        self._q = RunQueue(self._conflict_key)
+        self._workers = [
+            threading.Thread(target=self._worker_loop, daemon=True,
+                             name=f"imx-mcp-worker-{i}")
+            for i in range(self.max_strict_workers)]
+        for worker in self._workers:
+            worker.start()
 
     def _reap(self) -> None:
         """Bound what the idempotency index and PR-time worktrees accumulate.
@@ -76,27 +135,64 @@ class RunService:
         Best-effort by construction: this runs at startup and after each
         terminal run, and a sweep that cannot complete must never stop a server
         from serving or a run from finishing."""
+        if not self._reap_lock.acquire(blocking=False):
+            return  # a sweep is already running; the next terminal run retries
         try:
             idem.reap_stale(self.run_root,
                             retention_days=self.settings.idem_retention_days,
                             repo_paths=list(self.settings.repo_paths.values()))
         except Exception:  # noqa: BLE001 — housekeeping, never load-bearing
             pass
+        finally:
+            self._reap_lock.release()
 
     def capabilities(self) -> dict:
         """The version/capability handshake — see `contract.capabilities`."""
         from ..engine.lifecycle import fcntl as _fcntl
 
         return contract.capabilities(
-            max_strict_workers=self.MAX_STRICT_WORKERS,
+            max_strict_workers=self.max_strict_workers,
             supports_file_locking=_fcntl is not None)
 
-    # -- worker: one run at a time, each an isolated subprocess ---------------
+    # -- workers: up to N runs at a time, each an isolated subprocess --------
+    def _conflict_key(self, run_id: str) -> tuple[str, Any]:
+        """The resource a run must not share with a concurrently executing one:
+        its checkout plus its PR (``None`` for issue tasks, which work in the
+        live checkout itself).
+
+        Runs on one PR head share one PR-time worktree (engine/worktrees.py
+        keys it by repo+PR+sha), and harness sessions write their tool-bridge
+        config into their working directory — cursor's `.cursor/mcp.json` has
+        one fixed path per tree — so two such runs overlapping would bind one
+        run's agent to the other run's tool scope and trace. Different PRs get
+        different trees and may run side by side."""
+        try:
+            spec = json.loads((self.run_root / run_id / "request.json")
+                              .read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            spec = None
+        if not isinstance(spec, dict):
+            return UNKEYED
+        repo = str(spec.get("repo") or self.settings.default_repo)
+        try:
+            # the resolver execution itself uses (frozen path, REPO_PATHS,
+            # then the adapter manifest), so an implicit request and an
+            # explicit one naming the same checkout get the same key
+            checkout = self.copilot.repository_context.repo_path_for(
+                TaskSpec.model_validate(spec))
+        except Exception:  # noqa: BLE001 - such a run fails at launch anyway
+            checkout = str(spec.get("repo_path") or "")
+        where = str(Path(checkout).expanduser().resolve()) if checkout \
+            else f"repo:{repo}"
+        pr = spec.get("pr")
+        return (where, None if pr is None else str(pr))
+
     def _worker_loop(self) -> None:
-        """Drain the queue forever, launching one run subprocess at a time. A
-        launch failure marks the run failed but never kills the worker."""
+        """Drain the queue forever, launching one run subprocess at a time per
+        worker. A launch failure marks the run failed but never kills the
+        worker, and always frees the run's conflict key."""
         while True:
-            run_id, strict_compat = self._q.get()
+            run_id, strict_compat, key = self._q.take()
             try:
                 self._launch(run_id, strict_compat=strict_compat)
             except Exception as exc:  # noqa: BLE001 - worker must survive
@@ -106,7 +202,7 @@ class RunService:
                 except Exception:
                     pass
             finally:
-                self._q.task_done()
+                self._q.done(key)
 
     def _launch(self, run_id: str, *, strict_compat: bool = False) -> None:
         """Run one reserved run as `python -m infermatrix_copilot --execute-reserved
