@@ -1,0 +1,64 @@
+{
+ "base": {
+  "repos/afd-plugin/components/compatibility/rules.md": "---\ntitle: \"AFD compatibility 规则\"\ncreated: 2026-08-06\nupdated: 2026-09-30\ntype: rule\ntags: [afd-plugin, components, compatibility, review]\nsources:\n  - \"afd-plugin@a432692:AGENTS.md\"\n  - \"afd-plugin@a432692:afd_plugin/compat/**\"\n  - \"afd-plugin@a432692:docs/design/module/compatibility_and_patches.md\"\nconfidence: high\n---\n\n# AFD compatibility 规则\n\n这些规则从 [仓库规则](../../rules.md) 迁入最近 owner，保留原有稳定 ID。\n\n## AFD-3a — patch 必须 upstream-first 且可移除\n\n触发：新增 patch、修改已有 patch 或升级 vLLM/vLLM-Ascend。\n\n- 必须记录精确 upstream file/symbol/version/signature，优先复制对应版本函数，并保持签名和返回类型。\n- AFD 差异必须用 `# ### PATCH START: ...` / `# ### PATCH END: ...` 标出；函数上方必须说明 patch reason、行为变化和 upstream/移除条件。\n- 禁止在便利的全局 hook 中放置本应属于 AFD model、worker 或 connector 的功能。\n- 验收：AFD 和 non-AFD 分支、初始化/失败/shutdown 及需要时的 reload/idempotence 都有 focused tests，并写明移除路径。\n\n## AFD-3b — 上游 API drift 必须直接暴露\n\n触发：访问 vLLM/vLLM-Ascend 结构、添加 fallback 或选择 original-function delegation。\n\n- 必须直接访问预期上游函数和字段，让静态检查和原始错误暴露缺失/改名。\n- 禁止用宽泛 `getattr`、`hasattr`、`Any`、`object` 或 `_original_*` delegation 掩盖 drift。只有 `AGENTS.md` 明确允许的超大/不适合内联函数例外才可 delegation，且必须就地解释。\n- 验收：当前 pinned signature 对齐，故意缺失字段不会被 fallback 吞掉，保存的 original 不会在 reload 时被 wrapper 覆盖。\n\npatch 生命周期见 [architecture](architecture.md)，版本支持声明见 [仓库规则](../../rules.md)。\n\n## AFD-I6 — 临时替换上游符号的代码必须在 `finally` 里还原，并登记到兼容文档\n\n- 这类临时替换包括：包装 `create_forward_context`、在 `Worker.init_device()` 期间替换 runner 符号、包装 V2 capture 的输入准备、安装 full-graph replay hook、给 DBO 临时关闭 metadata cache。它们都必须在 `finally` 里恢复符号和 runner 状态，异常路径也要恢复。\n- 需要有测试覆盖恢复逻辑和错误路径。参考 `test_attention_model_runner.py` 对 DBO 规避代码的覆盖。\n- 新增的这类替换要写进 `docs/design/module/compatibility_and_patches.md` 的 scoped adaptation 列表，否则升级审计会漏掉它。\n- 需要在整个进程生效的替换，应放到 `afd_plugin/compat/patches/`，并走 patch 审查流程。反过来，AFD 自己的功能不要借全局 hook 藏进 patch 模块。\n- 保存了原函数的 patch，在模块重载时不能用自己的 wrapper 覆盖已保存的原函数。\n\n<!-- kb:rule status=active since=init-9cae2d2ddaae -->\n"
+ },
+ "evidence": [
+  {
+   "kind": "upstream_text",
+   "source_reference": "vllm-project/afd-plugin@9cae2d2ddaae:README.md:L58-L58",
+   "text": "| `CAMP2pAFDConnector` | Ascend NPU | Decode | Sync | `FULL_DECODE_ONLY` ACL graph | Uses HCCL/CAMP2P custom ops. Ascend ops build by default on NPU platforms. See the [synchronous DeepSeek V3.2 recipe](recipe/npu/CAMP2pAFDConnector/deepseek_v3_2/README.md). |"
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "vllm-project/afd-plugin@9cae2d2ddaae:README.md:L68-L70",
+   "text": "- vLLM/vLLM-Ascend model runner v2 is not supported.\n- GPU and NPU E2E tests are opt-in and require real hardware plus model weights.\n- GPU CUDA graph support is limited to `FULL_DECODE_ONLY`."
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "vllm-project/afd-plugin@9cae2d2ddaae:README.md:L180-L185",
+   "text": "GPU model runner v2 is not supported. Select model runner v1 before starting\neither GPU role:\n\n```bash\nexport VLLM_USE_V2_MODEL_RUNNER=0\n```"
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "vllm-project/afd-plugin@9cae2d2ddaae:docs/design/module/attention_runtime.md:L139-L162",
+   "text": "## ModelRunnerV2 boundary\n\nModelRunnerV2 is an upstream runtime selection, not an AFD configuration key.\nOn Attention, the V2 runners are thin subclasses of the native CUDA or Ascend\nrunner: native V2 retains request state, input preparation, Attention/KV\nexecution, sampling, and output ownership. `AFDMetadataProviderMixin` adds the\nconnector-facing sidecar, DP control payload, transaction IDs, and capture\nmetadata without porting V1 execution methods.\n\nThe supported V2 deployment is deliberately narrower than V1:\n\n| Constraint | CUDA V2 | Ascend V2 |\n| --- | --- | --- |\n| Connector | Synchronous `P2pNcclAFDConnector` | Synchronous `CAMP2pAFDConnector` |\n| Gate placement | `compute_gate_on_attention=false` | `compute_gate_on_attention=false` |\n| Parallelism | PP=PCP=DCP=1; configured role ranks equal DP x TP; static EP enabled | Same |\n| Excluded features | Elastic EP, EPLB, sequence-parallel MoE, compile SP, DBO, and ubatching | Same |\n| Graph execution | Eager or `FULL_DECODE_ONLY` | Eager, `FULL`, or `FULL_DECODE_ONLY` |\n| Model | Must resolve to a registered AFD architecture | Same |\n\nBoth roles validate the paired V2 topology, but only Attention uses the native\nV2 model runner. FFN remains connector-driven and uses its existing AFD runner\nsurface. CUDA V2 has DP2/TP2 eager and graph E2E evidence; the current Ascend\nV2 contract has focused unit evidence but no repository hardware E2E case."
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "vllm-project/afd-plugin@9cae2d2ddaae:docs/design/module/ffn_runtime.md:L129-L148",
+   "text": "## ModelRunnerV2 pairing\n\nFFN remains connector-driven when the upstream configuration selects\nModelRunnerV2. It does not adopt native V2 request state or scheduler-driven\nexecution:\n\n- CUDA temporarily substitutes `GPUFFNModelRunner` at the native V2\n  construction seam inside `Worker.init_device()`; the existing AFD runner is\n  still the runtime object.\n- Ascend always constructs `AFDNPUFFNModelRunner`. When V2 is selected, its\n  connector-driven forward enters the upstream MRV2 forward-context shape so\n  Ascend-specific state is installed in `additional_kwargs`.\n- Both workers run the same V2 topology and feature validator as the paired\n  Attention role before constructing communication resources.\n\nThe V2 pair therefore requires the synchronous platform connector,\n`compute_gate_on_attention=false`, PP/PCP/DCP size 1, configured role ranks\nequal to DP x TP, static EP, a registered AFD model, and no DBO or ubatching.\nCUDA uses `P2pNcclAFDConnector`; Ascend uses `CAMP2pAFDConnector`. These limits\ndescribe the pair even though only Attention inherits a native V2 runner."
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "vllm-project/afd-plugin@9cae2d2ddaae:docs/design/module/e2e_testing.md:L105-L110",
+   "text": "| `afd-v2-eager-dp2` | CUDA ModelRunnerV2 eager, Attention DP2 + FFN DP2 | 4 | V2 data-parallel lifecycle and accuracy. |\n| `afd-v2-graph-dp2` | CUDA ModelRunnerV2 graph, Attention DP2 + FFN DP2 | 4 | V2 data-parallel full-decode graph path. |\n| `afd-v2-eager-tp2` | CUDA ModelRunnerV2 eager, Attention TP2 + FFN TP2 | 4 | V2 tensor-parallel lifecycle and accuracy. |\n| `afd-v2-graph-tp2` | CUDA ModelRunnerV2 graph, Attention TP2 + FFN TP2 | 4 | V2 tensor-parallel full-decode graph path. |\n\nCUDA CI runs the legacy and ModelRunnerV2 matrices as separate jobs with a"
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "vllm-project/afd-plugin@9cae2d2ddaae:docs/design/module/e2e_testing.md:L147-L151",
+   "text": "The ModelRunnerV2 matrix is CUDA-only in the current E2E harness. Its local\n1A1F cases are `afd-v2-eager-1a1f` and `afd-v2-graph-1a1f`; CI selects the four\nDP2/TP2 cases listed above by exact node ID on `l4_4`. The Ascend\nModelRunnerV2 implementation currently has focused unit evidence but no E2E\ncase, so it is not included in the hardware gate."
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "vllm-project/afd-plugin@9cae2d2ddaae:docs/design/module/execution_platforms.md:L281-L285",
+   "text": "The NPU V2 runner supports eager, `FULL`, and `FULL_DECODE_ONLY`. Like CUDA V2,\nit publishes descriptor-matched warmup/capture control outside formal graph\ncapture and installs an instance-scoped pre-replay hook because native full\nreplay creates no `ForwardContext`. V2 does not use `AscendUBatchWrapper` and\nrejects DBO/ubatching."
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "vllm-project/afd-plugin@9cae2d2ddaae:docs/design/module/execution_platforms.md:L341-L348",
+   "text": "| CUDA V2 + `P2pNcclAFDConnector` | Eager or `FULL_DECODE_ONLY` native V2 CUDA Graph | DBO and ubatching rejected | `compute_gate_on_attention=false`; PP/CP, elastic EP, EPLB, SP MoE, and compile SP rejected; role ranks equal DP x TP | DeepSeek-V2-Lite eager/graph DP2 and TP2 accuracy E2E, plus focused V2 unit tests |\n| Ascend V1 + `CAMP2pAFDConnector` | Eager or current ACL Graph path | Native DBO, exactly two ubatches | Common and connector-local `compute_gate_on_attention=false`; `connector_extra_config.quant_mode=0`; plugin CANN ops required | Backend-neutral DeepSeek-V2-Lite eager/graph/DBO accuracy cases plus NPU runtime, graph, ops, connector, and profiler unit tests |\n| Ascend V2 + `CAMP2pAFDConnector` | Eager, `FULL`, or `FULL_DECODE_ONLY` native V2 ACL Graph | DBO and ubatching rejected | `compute_gate_on_attention=false`; PP/CP, elastic EP, EPLB, SP MoE, and compile SP rejected; role ranks equal DP x TP | Focused runner, context, validation, and device-contract unit tests; no repository hardware E2E case |\n| Ascend + `CAMAsyncAFDConnector` | Eager only | Native DBO rejected; optional AFD-managed MoE ubatching uses exactly two request or token-balanced stages | Experimental v0.26 port; `async=true`; documented path uses common `compute_gate_on_attention=true`; token mode requires Attention TP > 1; model runner v1 PCP is unsupported; prefill and decode context parallelism are unsupported; `connector_extra_config.dynamicQuant` is 0 or 1; plugin-owned async CAM ops required | Focused unit coverage; pre-fix DP3TP2/EP2 six-case E2E matrix; post-fix full 61-layer DP2TP8+EP16 token-split run reached `0.9522` strict match on the complete GSM8K evaluation |\n\nAll rows target vLLM 0.26.0. Hardware validation exists for CUDA V1/V2 and the\nrecorded Ascend V1 paths; the Ascend V2 row is an implemented, unit-tested\ncontract rather than a hardware-validated claim. GPU/NPU rank topology and"
+  }
+ ],
+ "expected": "reject",
+ "head": {
+  "repos/afd-plugin/components/compatibility/rules.md": "---\ntitle: \"AFD compatibility 规则\"\ncreated: 2026-08-06\nupdated: 2026-09-30\ntype: rule\ntags: [afd-plugin, components, compatibility, review]\nsources:\n  - \"afd-plugin@a432692:AGENTS.md\"\n  - \"afd-plugin@a432692:afd_plugin/compat/**\"\n  - \"afd-plugin@a432692:docs/design/module/compatibility_and_patches.md\"\nconfidence: high\n---\n\n# AFD compatibility 规则\n\n这些规则从 [仓库规则](../../rules.md) 迁入最近 owner，保留原有稳定 ID。\n\n## AFD-3a — patch 必须 upstream-first 且可移除\n\n触发：新增 patch、修改已有 patch 或升级 vLLM/vLLM-Ascend。\n\n- 必须记录精确 upstream file/symbol/version/signature，优先复制对应版本函数，并保持签名和返回类型。\n- AFD 差异必须用 `# ### PATCH START: ...` / `# ### PATCH END: ...` 标出；函数上方必须说明 patch reason、行为变化和 upstream/移除条件。\n- 禁止在便利的全局 hook 中放置本应属于 AFD model、worker 或 connector 的功能。\n- 验收：AFD 和 non-AFD 分支、初始化/失败/shutdown 及需要时的 reload/idempotence 都有 focused tests，并写明移除路径。\n\n## AFD-3b — 上游 API drift 必须直接暴露\n\n触发：访问 vLLM/vLLM-Ascend 结构、添加 fallback 或选择 original-function delegation。\n\n- 必须直接访问预期上游函数和字段，让静态检查和原始错误暴露缺失/改名。\n- 禁止用宽泛 `getattr`、`hasattr`、`Any`、`object` 或 `_original_*` delegation 掩盖 drift。只有 `AGENTS.md` 明确允许的超大/不适合内联函数例外才可 delegation，且必须就地解释。\n- 验收：当前 pinned signature 对齐，故意缺失字段不会被 fallback 吞掉，保存的 original 不会在 reload 时被 wrapper 覆盖。\n\npatch 生命周期见 [architecture](architecture.md)，版本支持声明见 [仓库规则](../../rules.md)。\n\n## AFD-I6 — 临时替换上游符号的代码必须在 `finally` 里还原，并登记到兼容文档\n\n- 这类临时替换包括：包装 `create_forward_context`、在 `Worker.init_device()` 期间替换 runner 符号、包装 V2 capture 的输入准备、安装 full-graph replay hook、给 DBO 临时关闭 metadata cache。它们都必须在 `finally` 里恢复符号和 runner 状态，异常路径也要恢复。\n- 需要有测试覆盖恢复逻辑和错误路径。参考 `test_attention_model_runner.py` 对 DBO 规避代码的覆盖。\n- 新增的这类替换要写进 `docs/design/module/compatibility_and_patches.md` 的 scoped adaptation 列表，否则升级审计会漏掉它。\n- 需要在整个进程生效的替换，应放到 `afd_plugin/compat/patches/`，并走 patch 审查流程。反过来，AFD 自己的功能不要借全局 hook 藏进 patch 模块。\n- 保存了原函数的 patch，在模块重载时不能用自己的 wrapper 覆盖已保存的原函数。\n\n<!-- kb:rule status=active since=init-9cae2d2ddaae -->\n\n## AFD-I5 — 升级 vLLM 或 vLLM-Ascend 基线时，需要同步修改多个文件并做完整审计\n\n- vLLM 目标版本出现在三个地方：`pyproject.toml` 的 extra pin、`afd_plugin/compat/vllm.py` 的版本检查、README（Overview、Known gaps、GPU installation）。三处必须一致。\n- 插件注册用 `strict=False` 调版本检查，版本不符只告警。不能把“注册成功”当作新版本受支持的证据（`PATCH-INV-003`）。\n  - `engine_core.py` 和 `npu/force_load_balance.py` 没有 patch 内的版本守卫，只能靠 review 把关。\n  - `async_dp_engine.py` 里复制的 coordinator 只在 `0.26.0` 精确版本下生效，守卫要跟着更新。\n  - `attention_model_runner.py` 里规避 DBO metadata cache 的代码：等 vLLM #48659 进入 pin 的版本后删除。\n  - 连接器进程组用到的私有 PyTorch 和 vLLM 符号。\n- `pyproject.toml` 没有声明 vLLM-Ascend 依赖。刷新 Ascend 侧时，必须引用确切的 vLLM-Ascend 源码 commit（当前是 `80d8c194f`），同步 README 的 Ascend 基线表，并附上 NPU 单元测试和 E2E 证据。\n\n<!-- kb:rule status=active since=init-9cae2d2ddaae -->\n"
+ },
+ "id": "init-synthetic-sibling_evidence-skeleton-AFD-I5",
+ "mutation": "sibling_evidence",
+ "note": "kb init synthetic bad case from good rule AFD-I5: evidence swapped for AFD-I8's (another module)",
+ "rule_id": "AFD-I5",
+ "source": "synthetic",
+ "stage": "skeleton",
+ "synthetic": true,
+ "verdict": "pass"
+}
