@@ -333,3 +333,56 @@ knowledge_root)` 是运行时检查：种子必须是知识树中已存在的文
 中，`uncovered_hot` 按次数降序、路径升序；`churn_by_module(prs, modules)` 按最长模块前缀归属（已折叠目录归到折入的
 祖先），降序。空集合的比例记为 1.0（没有可漏的路由）。`ROOT_MODULE` 与 `profiles.establish.ROOT_MODULE` 相同，
 由测试钉住（本包不依赖 `profiles`）。源根与变更路径按与 `profiles.establish.normalize_root` 相同的规则规范化（`.`、`./` 表示仓库根，接纳一切路径）。测试：`test_kb_init_coverage.py`。
+
+
+## 2026-09-30 单次调用花费阈值（kb init 预算硬上限的一块积木）
+`ModelGateway.call_json(..., max_budget_usd=x)`：x 是**停止阈值**，不是硬上限 —— 花费达到 x 后不再发起新请求，但越过 x 的
+那个请求照样计费。硬上限由调用方负责：调用前预留 x + 单个请求的最坏情况。transport 的 `stops_at_spend` 为 False 时在发出调用
+**之前**抛 `ModelUnavailable("<provider> cannot stop a call at a spend threshold")`（fail-closed，绝不用 `max_tokens` 近似）；
+x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `ModelUnavailable`，并作为失败记录（不会成为训练样本）。
+`ModelReply.cost_usd` 取自 `usage["cost_usd"]`（未知为 None），trace 记录同时写入 `cost_usd` 与 `max_budget_usd`。
+不传上限的现有调用方行为不变：该参数根本不会发给 transport。
+`runtime.trace_recorder` 把阈值与花费持久化到 `model_call` 记录的 `result.max_budget_usd` / `result.cost_usd`
+（未设或未知为 null），包括 transport 抛错的失败记录。
+
+## 2026-09-30 kb init：阶段 1（skeleton）、运行时、预算与发布
+设计见 kb-init 设计 v3。`kb init REPO --stage S [--dry-run] [--pin SHA]` 经 playbook `kb-init`（单步
+`knowledge.init`）运行；`kb init REPO --suggest-seeds` 只打印候选种子（不调模型）。CLI 在打开任何账本**之前**分派
+`init`：kb init 从不碰服务的 `kb.db`、outbox、`kb serve`/`kb publish`。
+
+- `init_budget`：`Budget(limit)` 的 `reserve(amount)` 在调用**之前**预留，放不下抛 `BudgetExhausted`；块内
+  `charge(cost)` 记实际花费，未知/非法花费或块内异常按整笔预留计。生成调用预留 = 阈值 `generator_call_usd` +
+  单个请求最坏值 `input_bytes × 1.25 × in_price + max_output_tokens × out_price`（claude 的 `--max-budget-usd`
+  只拦下一个请求）。价格表 `DEFAULT_PRICES`（claude-opus-5-5 = $4/$20 每百万 token、128000 输出上限，2026-09-25
+  标价）可由 `KB_INIT_PRICES` JSON 覆盖；没有价格的生成模型在任何调用之前被拒（`PriceError`）。判定调用按
+  `judge_call_usd` 固定记账 —— 这是记账约定，不是花费上限。
+- `config.InitConfig` 增加 `generator_call_usd`（>0，缺省 2.0）与 `harness_overhead_bytes`（≥0，缺省 200000）。
+- `init_support`：`InitRuntime`（自己的运行时：registry、`ModelGateway`（trace 写到 `<state>/init/traces`）、
+  知识库克隆 `KB_INIT_KNOWLEDGE_CLONE` 或 `<state>/init/knowledge-repo`、价格表、环境）；`InitRecord`（每阶段一个
+  `<state>/init/<repo>/<stage>.json`：钉点、知识库基点、输入摘要、花费、种子来源、逐规则证据、判定、丢弃原因、清单、
+  问题、未完成项、PR）；`UpstreamPin`（上游 bare 镜像、`resolve`、只读 `export`（拒绝链接与越界成员）、
+  `PinnedObserver`）；`collect_docs`；`generate`/`judge`（先预留）；`claim_problems`（设计 §9.1）；
+  `other_path_problems`（`knowledge/` 之外的路径必须在 `INIT_PATHS` 内且有专门检查）；`run_knowledge_validators`
+  （在基点树叠加改动后跑 CI 同款的 `check_knowledge_tree.py` 与 `check_wiki_lint.py`）；`InitPublisher`
+  （临时索引在确切基点上构建一个确定性提交，推到**必须不存在**的分支 —— `--force-with-lease=<ref>:`，经 `gh`
+  开 PR 并确认 head；dry run 把树与 PR 正文写到本地）。只在 `ALLOW_PUSH=1` 且 `ALLOW_POST=1` 时发布；私有上游
+  永远 dry run。与 kb 发布器一样不经 `push.guard_push`：它推的是全新分支、从不强推、只写 `INIT_PATHS`。
+- `init_stages`（唯一允许调用 `check_changeset(bootstrap=True)` 的模块，由 L1 测试钉住）：`run_stage` 与
+  `validate_change`（设计 §9.3：L1 changeset（bootstrap）、`check_tree`、`check_index_links`、钉点声明与证据、
+  `knowledge/` 之外的路径）。skeleton：文档语料 → 地图调用（入口页、架构页、owner 路由、general 链接）→ 文档不变量
+  调用 → 每个 `repos/<other>/` 种子规则页一次改写调用 → 逐条筛查：D5 去掉与文档重复的行、证据在钉点可取且哈希入记录、
+  钉点声明成立、在一棵逐条累积的树上落位（页满则转到兄弟页 `rules-doc-invariants.md` / `<stem>-<n>.md`，**先落位再
+  判定**，判定看到的就是规则最终所在的页）→ 咨询性判定（fail 剔除，unsure/unjudged 标出）→ 经 `ops.apply_operations`
+  写入（新规则页先建壳并登记到目录索引；已有规则只追加，从不修改）→ 新目录建 `_index.md`、已有目录只追加链接、
+  仓库未登记时登记到 `repos/_index.md`（`INIT_PATHS` 允许这一个共享文件）；`_routes.yaml` 只在不存在时生成：先由
+  已有子目录入口页**确定性**地得出 owner（页中反引号里、在钉点存在、落在 `source_roots` 内的代码路径；`pkg/**` 即目录
+  `pkg/`），再补模型提出的 owner（scope 前缀须在钉点存在）→ 已有页面的问题进清单（钉点下不成立的声明、与文档重复的行、
+  没有路由到达的页、表格索引的样式）→ 检查 → dry run 或 PR。钉点缺省取上游镜像的 `HEAD`（远端默认分支，不假设
+  `main`；每次同步都按 `ls-remote --symref` 刷新镜像的 `HEAD`，默认分支改名或删除后也跟得上）。没有可用 owner 时的
+  兜底路由用规范化后的 `source_roots`（`./pkg/` → `pkg/`），源根是仓库本身或未设置时用钉点下的全部顶层目录。发布时 `KB_INIT_GIT_AUTHOR` 缺失在任何模型调用之前拒绝。推送之前先把这次发布（基点、分支、文件、标题、
+  正文、作者、时间）写成 `<stage>-publish.json`（`save_prepared`），记录状态为 `publishing`；推送/开 PR 失败记为
+  `blocked` 并保留它，重跑时直接完成**同一个**发布（同输入重建出同一提交，已推送的分支与已开的 PR 都复用，不再调模型）。
+  dry run 每次整体替换输出目录，不残留上一次的页面；有待完成的发布时拒绝 dry run（不覆盖它）。模型提出的 owner 页必须
+  是本仓库目录下已有或本阶段创建的页面，指向其他仓库的页面一律丢弃并记入 notes。仓库标签不在 `doc/knowledge/SCHEMA.md` 分类法里、种子不存在、生成模型不可用或无价格 → 记录为 `blocked`，
+  不产生 PR。同输入摘要重跑直接返回记录；已发布记录的输入变了则拒绝。`modules`/`deepen`/`harvest-calibration` 抛
+  `NotImplementedError`。测试：`test_kb_init_skeleton.py`、`test_kb_init_config.py`。

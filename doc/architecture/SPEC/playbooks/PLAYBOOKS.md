@@ -1,6 +1,6 @@
 # playbooks/*.yaml —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-09-30 -->
 
 `9 个文件 · 声明式编排数据 · refactor-status: ok`
 
@@ -57,3 +57,7 @@ success, steps[]`。
 
 ## kb-merge / kb-sweep / kb-activate（candidate）
 知识服务的合并推进、发版巡检与快照激活；candidate 状态，由 `kb serve` 调度或 `kb run` 手动运行。
+
+## kb-init（candidate）
+为一个仓库建知识库：单步 `knowledge.init`，每次运行一个阶段（skeleton → modules → deepen + 生命周期开关 →
+harvest-calibration），每阶段一个由人合并的 PR。只由 `kb init REPO --stage S` 运行，不经 `kb serve`，不写服务账本。

@@ -149,3 +149,40 @@ async def activate_snapshot(ctx: StepContext) -> StepResult:
         return StepResult(False, FailureKind.ESCALATE, f"activation refused: {exc}")
     return StepResult(True, summary=f"active snapshot {sha}",
                       outputs={"state_updates": {"kb_active_snapshot": sha, "kb_snapshot_path": str(snapshot)}})
+
+
+def _init_runtime(ctx: StepContext):
+    """kb init's own runtime: never the service's (that opens kb.db), and it
+    serves disabled repositories — bootstrapping one is the point."""
+    from pathlib import Path
+
+    from ...kb_service.cli import DEFAULT_STATE_DIR
+    from ...kb_service.init_support import InitRuntime
+
+    return InitRuntime.from_env(ctx.settings, state_dir=Path(_STATE_DIR or DEFAULT_STATE_DIR))
+
+
+@step("knowledge.init", kind="agent", risk="knowledge",
+      description="kb init: bootstrap one repository's knowledge base, one human-merged stage at a time")
+async def init_stage(ctx: StepContext) -> StepResult:
+    from ...kb_service.init_stages import run_stage
+    from ...kb_service.init_support import InitError
+
+    repo = str(ctx.params.get("repo") or ctx.state.get("kb_repo") or "")
+    stage = str(ctx.params.get("stage") or "")
+    dry_run = str(ctx.params.get("dry_run", "true")).lower() not in ("0", "false", "no")
+    pin = str(ctx.params.get("pin") or "") or None
+    try:
+        rt = _init_runtime(ctx)
+        lifecycle = rt.registry.get(repo)
+        if lifecycle is None:
+            return StepResult(False, FailureKind.BLOCKED, f"no adapter declares knowledge repo {repo!r}")
+        record = run_stage(rt, lifecycle, stage, dry_run=dry_run, pin=pin)
+    except (InitError, NotImplementedError) as exc:
+        return StepResult(False, FailureKind.BLOCKED, str(exc))
+    updates = {"kb_init_stage": stage, "kb_init_status": record.status, "kb_init_pr": dict(record.pr)}
+    if record.status == "blocked":
+        return StepResult(False, FailureKind.BLOCKED, "; ".join(record.problems)[:2000],
+                          outputs={"state_updates": updates})
+    return StepResult(True, summary=f"kb init {stage} for {repo}: {record.status}",
+                      outputs={"state_updates": updates})

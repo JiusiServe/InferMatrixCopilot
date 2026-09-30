@@ -32,14 +32,38 @@ def fact_id(prefix: str, text: str) -> str:
     return f"{prefix}-{hashlib.sha1(text.encode()).hexdigest()[:8]}"
 
 
+def doc_files(repo: Path, globs: Sequence[str]) -> list[Path]:
+    """Regular files under ``repo`` matching any of ``globs`` (``Path.glob``
+    patterns, ``**`` allowed), in glob order then path order, each once,
+    never outside ``repo`` (a symlink that leaves the tree is skipped)."""
+    root = repo.resolve()
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for pattern in globs:
+        for path in sorted(repo.glob(pattern)):
+            try:
+                resolved = path.resolve()
+            except OSError:
+                continue
+            if not path.is_file() or not resolved.is_relative_to(root) or resolved in seen:
+                continue
+            seen.add(resolved)
+            out.append(path)
+    return out
+
+
 def build_doc_corpus(repo: Path, *, max_files: int = 50,
-                     max_chars: int = 400_000) -> str:
-    """Normalized text of the repo's own documentation (README* + docs/)."""
+                     max_chars: int = 400_000, globs: Sequence[str] | None = None) -> str:
+    """Normalized text of the repo's own documentation (README* + docs/, or
+    the files ``globs`` names — see ``doc_files``)."""
     texts: list[str] = []
     total = 0
-    candidates = sorted(repo.glob("README*")) + sorted((repo / "docs").rglob("*.md")
-                                                       if (repo / "docs").exists()
-                                                       else [])
+    if globs is not None:
+        candidates = doc_files(repo, globs)
+    else:
+        candidates = sorted(repo.glob("README*")) + sorted((repo / "docs").rglob("*.md")
+                                                           if (repo / "docs").exists()
+                                                           else [])
     for path in candidates[:max_files]:
         try:
             text = path.read_text(encoding="utf-8", errors="replace")

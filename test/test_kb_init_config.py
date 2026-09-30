@@ -42,6 +42,7 @@ def test_empty_init_gets_defaults(tmp_path):
     assert (init.module_depth, init.min_module_loc) == (2, 300)
     assert (init.pr_window_count, init.pr_window_max_age_days) == (200, 180)
     assert (init.coverage_target, init.budget_usd, init.judge_call_usd) == (0.85, 30.0, 0.50)
+    assert (init.generator_call_usd, init.harness_overhead_bytes) == (2.0, 200_000)
     assert init.seeds == init.source_roots == init.exclude == ()
 
 
@@ -57,6 +58,8 @@ def test_full_init_parses(tmp_path):
         "coverage_target": 1,
         "budget_usd": 5,
         "judge_call_usd": 0,
+        "generator_call_usd": 0.25,
+        "harness_overhead_bytes": 0,
     })).init
     assert init.seeds == ("general/review/x.md", "repos/other/ci")
     assert init.doc_globs == ("README.md",)
@@ -65,6 +68,7 @@ def test_full_init_parses(tmp_path):
     assert (init.module_depth, init.min_module_loc) == (3, 0)
     assert (init.pr_window_count, init.pr_window_max_age_days) == (50, 30)
     assert (init.coverage_target, init.budget_usd, init.judge_call_usd) == (1.0, 5.0, 0.0)
+    assert (init.generator_call_usd, init.harness_overhead_bytes) == (0.25, 0)
 
 
 def test_source_roots_default_to_ut_coverage(tmp_path):
@@ -108,6 +112,10 @@ def test_source_roots_default_to_ut_coverage(tmp_path):
     ({"judge_call_usd": float("nan")}, "judge_call_usd must be a finite number"),
     ({"judge_call_usd": float("inf")}, "judge_call_usd must be a finite number"),
     ({"coverage_target": float("nan")}, "coverage_target must be a finite number"),
+    ({"generator_call_usd": 0}, "generator_call_usd must be > 0"),
+    ({"generator_call_usd": float("inf")}, "generator_call_usd must be a finite number"),
+    ({"harness_overhead_bytes": -1}, "harness_overhead_bytes must be an integer >= 0"),
+    ({"harness_overhead_bytes": 1.5}, "harness_overhead_bytes must be an integer"),
 ])
 def test_invalid_init_is_rejected(tmp_path, init, message):
     with pytest.raises(LifecycleConfigError, match=message):
