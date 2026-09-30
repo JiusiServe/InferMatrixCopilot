@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import posixpath
 import re
 import tempfile
 from collections import Counter
@@ -247,6 +248,26 @@ def neutral_headings(text: str) -> str:
 
 def _relative_link(from_dir: str, target: str) -> str:
     return os.path.relpath(target, from_dir).replace(os.sep, "/")
+
+
+_INLINE_LINK = re.compile(r"(?<!!)\[(?P<label>[^\[\]\n]*)\]\((?P<target><[^<>\n]*>|[^()\s]+)"
+                          r"(?:\s+(?:\"[^\"\n]*\"|'[^'\n]*'))?\)")
+
+
+def unlink_listed(text: str, listed: set[str]) -> str:
+    """``text`` with every inline link to a ``listed`` target (anchor and
+    ``./`` ignored) turned into its label. A new index registers each page
+    exactly once, in its contents list (the knowledge-tree validator refuses a
+    second link), so generated intro prose may name those pages but not link
+    them."""
+    def plain(match: re.Match) -> str:
+        target = match.group("target")
+        target = target[1:-1] if target.startswith("<") else target
+        target = target.split("#", 1)[0]
+        target = target[2:] if target.startswith("./") else target
+        return match.group("label") if target in listed else match.group(0)
+
+    return _INLINE_LINK.sub(plain, text)
 
 
 @dataclass
@@ -964,6 +985,20 @@ class _Skeleton(_Stage):
             entries.append((_title_of(self.head[path], PurePosixPath(path).parent.name),
                             f"{PurePosixPath(path).parent.name}/{INDEX_NAME}"))
         entries += [e for e in links if e[1] not in {x[1] for x in entries}]
+        if intro:  # the contents list is each page's one registration
+            from ..knowledge_service.l1 import link_targets
+
+            listed = {link for _, link in entries}
+            at = lines.index(intro)
+            lines[at] = unlink_listed(intro, listed)
+            resolved = {posixpath.normpath(posixpath.join(directory, link)) for link in listed}
+            if link_targets(directory, lines[at]) & resolved:
+                # a link form the rewrite does not know survived (the parser
+                # is the authority): drop the optional intro rather than
+                # register a page twice
+                del lines[at:at + 2]
+                self.record.checklist.append(f"{index}: the generated intro linked listed pages in a form "
+                                             "kb init could not rewrite; it was left out, add one by hand")
         lines += [f"- [{t}]({link})" for t, link in entries]
         self.head[index] = "\n".join(lines) + "\n"
 

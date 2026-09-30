@@ -407,6 +407,12 @@ def _links(text: str) -> list[str]:
     return out
 
 
+def link_targets(directory: str, text: str) -> set[str]:
+    """Knowledge-relative paths ``text`` (a page in ``directory``) links to,
+    as a CommonMark renderer makes its links (see ``_link_targets``)."""
+    return set(_link_targets(directory, text).values())
+
+
 def _link_targets(directory: str, text: str) -> dict[str, str]:
     """Relative links of an index: {destination without anchor: resolved
     knowledge-relative path}. URLs and anchor-only links are not targets; a

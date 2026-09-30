@@ -771,3 +771,54 @@ def test_the_pr_body_reports_the_spend_it_accounted(world):
     assert record.spent_usd > 0
     body = (Path(record.pr["dry_run_dir"]) / "PR_BODY.md").read_text(encoding="utf-8")
     assert f"- Model spend (accounted): ${record.spent_usd:.2f}" in body
+
+
+# -- a new index registers each page once ------------------------------------------
+
+def test_unlink_listed_turns_only_listed_links_into_labels():
+    from infermatrix_copilot.kb_service.init_stages import unlink_listed
+
+    text = ("Read [the map](architecture.md), [rules](./rules.md#top) and [docs](https://x.y/a.md); "
+            "![img](architecture.md) stays; [other](../other/_index.md) stays.")
+    out = unlink_listed(text, {"architecture.md", "rules.md"})
+    assert out == ("Read the map, rules and [docs](https://x.y/a.md); "
+                   "![img](architecture.md) stays; [other](../other/_index.md) stays.")
+
+
+def test_a_new_index_links_each_page_once_even_when_the_intro_links_it(world):
+    """Regression (jiuwenswarm pilot, 2026-09-30): the model's intro linked
+    architecture.md and the contents list linked it again; the knowledge-tree
+    validator refuses a page registered twice, and the stage blocked."""
+    gateway = FakeGateway()
+    gateway.index_intro = "Start with [the architecture](architecture.md), then [the rules](./rules.md)."
+    record = run_stage(_runtime(world, gateway), _lifecycle(), "skeleton", dry_run=True)
+    assert record.status == "dry_run", record.problems
+    index = _tree(record)["knowledge/repos/toy/_index.md"]
+    assert index.count("](architecture.md)") == 1 and index.count("](rules.md)") == 1
+    assert "Start with the architecture, then the rules." in index
+
+
+def test_unlink_listed_handles_angle_destinations_and_titles():
+    from infermatrix_copilot.kb_service.init_stages import unlink_listed
+
+    text = "See [arch](<architecture.md>) and [r](rules.md 'the rules') and [s](<./rules.md#x> \"t\")."
+    assert unlink_listed(text, {"architecture.md", "rules.md"}) == "See arch and r and s."
+
+
+def test_a_new_index_drops_an_intro_whose_listed_links_it_cannot_rewrite(world):
+    gateway = FakeGateway()
+    gateway.index_intro = "Start with [the architecture][a].\n\n[a]: architecture.md"
+    record = run_stage(_runtime(world, gateway), _lifecycle(), "skeleton", dry_run=True)
+    assert record.status == "dry_run", record.problems
+    index = _tree(record)["knowledge/repos/toy/_index.md"]
+    assert index.count("architecture.md") == 1 and "Start with" not in index
+    assert any("could not rewrite" in c for c in record.checklist)
+
+
+def test_a_new_index_rewrites_an_angle_link_in_the_intro(world):
+    gateway = FakeGateway()
+    gateway.index_intro = "Read [architecture](<architecture.md>) first."
+    record = run_stage(_runtime(world, gateway), _lifecycle(), "skeleton", dry_run=True)
+    assert record.status == "dry_run", record.problems
+    index = _tree(record)["knowledge/repos/toy/_index.md"]
+    assert "Read architecture first." in index and index.count("architecture.md") == 1
