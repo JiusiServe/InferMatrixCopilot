@@ -21,3 +21,16 @@ def test_jiuwenswarm_adapter_is_a_disabled_empty_kb_pilot():
     assert validate_seeds(init, knowledge_root()) == []
     # the empty-KB path: kb init creates the tree, this PR must not
     assert not (knowledge_root() / "repos" / "jiuwenswarm").exists()
+
+
+def test_jiuwenswarm_tag_is_in_the_knowledge_taxonomy():
+    # kb init refuses to write pages whose repo tag the taxonomy lacks
+    # (check_wiki_lint reads doc/knowledge/SCHEMA.md), so the tag is declared first
+    import importlib.util
+    from pathlib import Path
+
+    lint_path = Path(__file__).resolve().parents[1] / "knowledge" / "tools" / "check_wiki_lint.py"
+    spec = importlib.util.spec_from_file_location("check_wiki_lint", lint_path)
+    lint = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lint)
+    assert "jiuwenswarm" in lint.taxonomy()
