@@ -235,6 +235,7 @@ def _run_intake_locked(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: i
     from ..trace_store import accepted_key, trace_context
 
     accepted: dict[int, str] = {}  # event -> the accepted generator call's key
+    fingerprint = draft_fingerprint(rt)
     for event in events:
         rt.ledger.heartbeat(owner)  # model calls are slow; keep the lease live
         try:
@@ -242,7 +243,8 @@ def _run_intake_locked(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: i
             # attempt link exactly the call whose reply became the change to
             # the decision that later stages it
             key, holder = draft_key_for_event(lifecycle.repo, event["id"]), {}
-            with trace_context(draft_key=key, _accepted=holder, step="draft"):
+            with trace_context(draft_key=key, _accepted=holder, step="draft",
+                               **draft_unit_context(lifecycle.repo, event, fingerprint)):
                 drafts.append(draft_changes(
                     repo=lifecycle.repo, repo_dir=lifecycle.knowledge_dir, event_id=event["id"],
                     evidence=event["payload"], files=base, gateway=rt.gateway,
@@ -284,6 +286,42 @@ def _run_intake_locked(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: i
 def draft_key_for_event(repo: str, event_id) -> str:
     """Unique per drafting: a redrafted event never shares a key with an earlier try."""
     return f"event:{repo}:{event_id}:{uuid.uuid4().hex[:8]}"
+
+
+DRAFT_WORKFLOW = "kb-intake.draft"
+
+
+def draft_fingerprint(rt: KbRuntime) -> str:
+    """The drafting step's declared configuration fingerprint (the meta-
+    improvement engine's ``kb-intake.draft`` declaration: drafting code,
+    generator, strategy), or "" when the engine is absent — the unit then
+    stays Tier 1, it is never mislabelled."""
+    try:
+        from ..improve.enroll import declarations_for
+        from ..improve.fingerprint import compute
+
+        decl = declarations_for(getattr(rt.gateway, "_settings", None)).get(DRAFT_WORKFLOW)
+        if decl is None:
+            return ""
+        fingerprint, _manifest = compute(decl, getattr(rt.gateway, "_settings", None), environ=dict(os.environ))
+        return fingerprint
+    except Exception:  # noqa: BLE001 - tracing must never stop an intake
+        return ""
+
+
+def draft_unit_context(repo: str, event: dict, fingerprint: str) -> dict:
+    """The trace context that makes one drafting a unit the engine can pair:
+    ``{repo}#{pr}`` as the item for an upstream PR, the event id otherwise."""
+    import re
+
+    from ..trace_store import current_context
+
+    reference = str((event.get("payload") or {}).get("source_reference") or "")
+    m = re.fullmatch(r"PR #(\d+)", reference)
+    item = f"{repo}#{m.group(1)}" if m else f"{repo}#event:{event.get('id')}"
+    run_id = str(current_context().get("run_id") or "intake")
+    return {"workflow": DRAFT_WORKFLOW, "unit_id": f"{run_id}:draft:{event.get('id')}", "item": item,
+            "fingerprint": fingerprint or None, "pr": int(m.group(1)) if m else None}
 
 
 def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind: str, base: dict,

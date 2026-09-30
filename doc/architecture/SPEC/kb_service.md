@@ -35,9 +35,19 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   （合并 PR、PR 证据有界摘录、release/tag）、本机 Copilot 运行经验收件目录。
 - `intake`：每个事件由生成器起草类型化操作（只允许 add/edit_same_meaning/replace/retire），
   `apply_operations` 必须接受，最多两轮带精确错误的修复；多事件合并为一个变更集。
+  起草策略由 `KB_DRAFT_STRATEGY` 选（`v1` 缺省；进入工作流指纹）。`v2`：系统提示写明门禁要求的契约
+  （判断顺序、段落模板、字段类型严格的操作）；每个相关页面附 `language`、`style_example`、`capacity` 与
+  整棵树内未用的 `suggested_rule_ids`（`suggest_rule_ids`，含墓碑）；回复先经 `normalize_reply` 机械修正
+  （布尔字段、add 的 new_page、标题与 rule_id 不一致、撞 ID 改用建议 ID、缺引用补 `^[<source_reference>]`）
+  再校验，规则只能落在相关 owner 页或其目录下的 `rules*.md`（`allowed_pages`，否则精确反馈重试）；
+  非空草稿再由同一生成器按门禁维度自检（`verify_draft`，`VERIFY_SYSTEM`）：自检结果可用且能应用则替换，
+  为空则撤稿，不可用则保留原稿并记录。`v1` 的提示与行为逐字节不变。任何策略都不含仓库专名：语言、范例、ID
+  家族都来自目标仓库自己的页面。
 - `gate`：L1 → 逐块 L2（每类块只问适用维度）→ 按 owner 目录的一致性检查；
   外部引用、protected、熔断（按仓库计算）、任何不确定 → human；L1 失败不调用模型。
 - `runtime`：collect → intake → gate → publish；shadow 只记录；变更集文件存 `changesets/<id>.json`。
+  每次起草的 trace 上下文带 `workflow=kb-intake.draft`、`unit_id=<run>:draft:<event>`、`item={repo}#{pr}`
+  与声明指纹（`draft_fingerprint`，引擎缺席时为空 → Tier 1），使生产起草成为元改进引擎可配对的单元。
 - `calibration`：按仓库的校准集评分（坏样例须全部拦下、好样例误拒 ≤ 20%）。
 - `runner`：经标准 executor 运行 `kb-*` playbook。CLI 新增 `kb run`、`kb calibrate`。
 

@@ -51,6 +51,8 @@ infermatrix-copilot kb calibrate --repo vllm-omni                  # 评审模�
 模型：`KB_GENERATOR`（默认 `claude-code:claude-opus-5-5`）、`KB_JUDGE`（默认
 `codex:gpt-6-sol:medium`）。每次模型调用写入 `$KB_STATE_DIR/traces/model_calls.jsonl`。
 
+起草策略：`KB_DRAFT_STRATEGY`（`v1` 缺省，`v2` = 契约化提示 + 树内未用 ID 建议 + 机械归一化 + 同模型按门禁维度自检；见 SPEC `kb_service.md`）。策略与生成器一起进入 `kb-intake.draft` 的工作流指纹；`eval/kb_distill/` 是在同一批事件上配对比较生成器×策略的离线基准。
+
 运行经验（来源②）：`pr_debug` 的已验证修复记录经 `KB_BUGFIX_DIR`（同机，与运行侧 `KNOWLEDGE_INTAKE_DIR`
 配为同一目录）与 `KB_BUGFIX_MAILBOX`（异机，`owner/repo#N`，只接受 `KB_BUGFIX_AUTHORS` 列出的作者）进入 intake。
 
