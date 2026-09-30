@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-09-30 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -291,3 +291,10 @@ diff 时保留原摘录（证据不会因此变得更"好过"）。只扩展带 
 `merged_pr` 事件的证据新增 `merge_commit_sha`（旧事件经 `pull()` 查询）。`run_gate(evidence_for=...)` 由 `gate_and_stage`
 与事实证明共用同一个观测者（一次镜像同步）。首个线上运行中"所给 diff 在…之前截断"是 L2 判 unsure/fail 的主要原因，
 而整批 10 个 PR 的证据（约 105 KB）对每条规则都重复发送；按规则取证据后约 11 KB + 所引 PR 的完整 diff。
+
+## 2026-09-30 adapter 生命周期开关检查（kb init）
+`lifecycle_flip.check_lifecycle_flip(base_yaml, head_yaml, allowed=)`：两版 manifest 解析后删去允许的键路径，
+其余必须完全相等（比较解析值，注释与格式可保留）；`FLIP_KEYS` = `knowledge_lifecycle.enabled/mode`，
+`CALIBRATION_KEYS` = `knowledge_lifecycle.calibration_set`。`check_flip_to_shadow` 另要求 head 为
+`enabled: true` 且 `mode` 为 shadow（缺省即 shadow）。知识 L1 的白名单只含 `knowledge/`，adapter 这一处改动由它单独校验；
+调用方还需在 head adapter 上跑 `config.parse_lifecycle`。测试：`test_kb_lifecycle_flip.py`。
