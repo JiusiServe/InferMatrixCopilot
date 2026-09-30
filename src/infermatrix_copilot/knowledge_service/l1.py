@@ -483,6 +483,8 @@ def check_index_links(base: Mapping[str, str], head: Mapping[str, str]) -> list[
                 continue
             if resolved == ".." or resolved.startswith(("../", "/")):
                 issues.append(Issue("index_link_escapes", path, written))
+            elif resolved in (".", ""):
+                continue  # the knowledge root itself: a directory every tree has
             elif resolved not in head and not any(d == resolved or d.startswith(resolved + "/")
                                                   for d in head_dirs):
                 issues.append(Issue("index_link_broken", path, written))
