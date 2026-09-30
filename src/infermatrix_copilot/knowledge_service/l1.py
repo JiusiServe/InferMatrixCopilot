@@ -26,7 +26,8 @@ may be created in a directory that had no files before, and the shared
 ``check_index_links(base, head)`` is the init-side link check for the index
 edits that bootstrap produces.
 
-Standard library + PyYAML + ``lifecycle``/``ops`` only.
+Standard library + PyYAML + ``lifecycle``/``ops``; ``check_index_links`` (and the
+bootstrap index check) also uses markdown-it-py, imported lazily.
 """
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Iterable, Mapping
+from urllib.parse import unquote, urlsplit
 
 import yaml
 
@@ -59,178 +61,6 @@ _REGULAR_MODE = "100644"
 _INDEX_LINE = re.compile(r"- \[[^\]\n]+\]\((?P<file>[^)/\s]+\.md)\)")
 # bootstrap only: the shared list of repositories, edited to link a new one
 _REPOS_INDEX = "knowledge/repos/_index.md"
-# inline links (optional <angle> target and "title" / 'title' / (title)) and
-# reference definitions; any other "](" is unparsed and refused by the link check
-_LINK_TITLE = r"""(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\)))?"""
-_MD_LINK = re.compile(r"\]\(\s*(?:<(?P<angle>[^>\n]*)>|(?P<target>[^)\s]+))" + _LINK_TITLE + r"\s*\)")
-_MD_REF = re.compile(r"(?m)^ {0,3}\[(?P<label>[^\]\n]+)\]:[ \t]*(?:<(?P<angle>[^>\n]*)>|(?P<target>\S+))"
-                     + _LINK_TITLE + r"[ \t]*$")
-# a reference definition counts only where it is used: [text][label], [label][], [label]
-_REF_FULL = re.compile(r"\[(?P<text>[^\]\n]+)\]\[(?P<label>[^\]\n]*)\]")
-_REF_SHORT = re.compile(r"\[(?P<label>[^\]\n]+)\](?![(\[:])")
-# navigation needs the whole link: an unescaped "[" opening a non-blank label
-# (not an image "![", not "\["); anything less is not counted as a link
-_NAV_LABEL = r"(?<![\\!\]])\[(?P<text>(?:[^\[\]\\\n]|\\.)*[^\s\[\]\\](?:[^\[\]\\\n]|\\.)*)\]"
-_NAV_LINK = re.compile(_NAV_LABEL + r"\(\s*(?:<(?P<angle>[^>\n]*)>|(?P<target>[^)\s]+))"
-                       + _LINK_TITLE + r"\s*\)")
-_NAV_REF_FULL = re.compile(_NAV_LABEL + r"\[(?P<label>[^\]\n]*)\]")
-_NAV_REF_SHORT = re.compile(r"(?<![\\!\]])\[(?P<label>[^\[\]\n]*[^\s\[\]][^\[\]\n]*)\](?![(\[:])")
-# 4+ columns of indentation outside a nested list item: indented code
-_INDENTED = re.compile(r"(?: {4}| {0,3}\t)")
-_LIST_ITEM = re.compile(r"\s*(?:[-*+]|\d{1,9}[.)])\s")
-# Link visibility, fail-closed. No Markdown parser is complete, so the checks
-# split by direction: every link-like text counts when checking that links
-# resolve (a link "hidden in code" is still checked), and only a CERTAINLY
-# visible link counts as navigation (for "is the page linked" and "was the link
-# kept"). Certainly visible: no fence-like line at or before it, and no
-# backtick before it in its block (paragraph, list item, heading, quote, or
-# table cell, which a code span cannot cross).
-_FENCE_LIKE = re.compile(r"^[\s>*+\-\d.)]*(?:`{3,}|~{3,})")
-_BLOCK_START = re.compile(r" {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d{1,9}[.)]\s|>)")
-_TABLE_ROW = re.compile(r" {0,3}\|")
-_TOP_LIST_ITEM = re.compile(r" {0,3}(?:[-*+]|\d{1,9}[.)])\s")
-_CONTAINER_PREFIX = re.compile(r"[ \t>]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+[ \t>]*)*")
-_CLOSED_COMMENT = re.compile(r"<!--.*?-->[ \t]*")
-
-
-_ANGLE_DEST_BEFORE = re.compile(r"(?:\]\(\s*|(?m:^) {0,3}\[[^\]\n]+\]:[ \t]*)$")
-_AUTOLINK = re.compile(r"<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^<>\s]*>")
-
-
-def _open_tag(text: str) -> bool:
-    """``text`` ends inside an HTML comment or tag. A tag closes only at a ">"
-    outside its quoted attribute values. Markdown's own angle brackets (a
-    ``<destination>`` of a link or definition, an autolink) are not tags."""
-    state, quote, k = "", "", 0
-    while k < len(text):
-        if state == "comment":
-            end = text.find("-->", k)
-            if end < 0:
-                return True
-            state, k = "", end + 3
-            continue
-        ch = text[k]
-        if state == "tag":
-            if quote:
-                quote = "" if ch == quote else quote
-            elif ch in "\"'":
-                quote = ch
-            elif ch == ">":
-                state = ""
-        elif text.startswith("<!--", k):
-            state, k = "comment", k + 4
-            continue
-        elif ch == "<":
-            end = text.find(">", k)
-            if end > k and "\n" not in text[k:end] and (
-                    _ANGLE_DEST_BEFORE.search(text, 0, k) or _AUTOLINK.match(text, k)):
-                k = end + 1
-                continue
-            if k + 1 < len(text) and re.match(r"[A-Za-z/!?]", text[k + 1]):
-                state = "tag"
-        k += 1
-    return state != ""
-
-
-def _hazard(line: str) -> bool:
-    """A line that may change how the lines after it render: a fence, an HTML
-    block (content starting with "<" after any container prefix, except one
-    closed comment), or a tag or comment left open. Nothing after a hazard
-    counts as certainly visible."""
-    if _FENCE_LIKE.match(line):
-        return True
-    content = line[_CONTAINER_PREFIX.match(line).end():]
-    if content.startswith("<") and not _CLOSED_COMMENT.fullmatch(content):
-        return True
-    return _open_tag(line)
-_TABLE_DELIM = re.compile(r" {0,3}\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*")
-
-
-def _table_body_row(lines: list[str], k: int) -> bool:
-    """``lines[k]`` is a body row of a pipe table: a run of pipe lines that
-    starts after a blank line (a table does not interrupt a paragraph), whose
-    second line is a delimiter row, and ``lines[k]`` comes after it."""
-    if not _TABLE_ROW.match(lines[k]):
-        return False
-    first = k
-    while first > 0 and _TABLE_ROW.match(lines[first - 1]):
-        first -= 1
-    return (k >= first + 2 and (first == 0 or not lines[first - 1].strip())
-            and _TABLE_DELIM.fullmatch(lines[first + 1]) is not None)
-
-
-def _certainly_visible(text: str, pos: int) -> bool:
-    line_start = text.rfind("\n", 0, pos) + 1
-    line_end = text.find("\n", pos)
-    line_end = len(text) if line_end < 0 else line_end
-    lines = text[:line_end].split("\n")
-    if any(_hazard(line) for line in lines):
-        return False
-    line = lines[-1]
-    if _in_html_comment(text, pos) or _indented_code(lines):
-        return False
-    if _table_body_row(lines, len(lines) - 1):
-        cell_start = max((m.end() for m in re.finditer(r"(?<!\\)\|", line[:pos - line_start])), default=0)
-        return "`" not in line[cell_start:pos - line_start]
-    start = len(lines) - 1  # walk back to the first line of the block
-    while start > 0 and not _BLOCK_START.match(lines[start]) and lines[start - 1].strip():
-        start -= 1
-    block_start = sum(len(item) + 1 for item in lines[:start])
-    return "`" not in text[block_start:pos]
-
-
-def _in_html_comment(text: str, pos: int) -> bool:
-    opened = text.rfind("<!--", 0, pos)
-    if opened < 0:
-        return False
-    closed = text.find("-->", opened + 4)
-    return closed < 0 or closed >= pos
-
-
-def _indented_code(lines: list[str]) -> bool:
-    """The last line may be indented code: 4+ columns of indentation, unless it
-    is a list item inside a real list, i.e. its block (no blank line between)
-    starts at a top-level list item (fail-closed)."""
-    if not _INDENTED.match(lines[-1]):
-        return False
-    if not _LIST_ITEM.match(lines[-1]):
-        return True
-    k = len(lines) - 2
-    while k >= 0 and lines[k].strip():
-        if _TOP_LIST_ITEM.match(lines[k]):
-            return False
-        if not (_INDENTED.match(lines[k]) and _LIST_ITEM.match(lines[k])):
-            return True
-        k -= 1
-    return True
-
-
-def _block_span(text: str, pos: int) -> tuple[int, int]:
-    """Offsets of the whole block holding ``pos`` (a table body row is its
-    own block)."""
-    lines = text.split("\n")
-    k = text.count("\n", 0, pos)
-    start = end = k
-    if not _table_body_row(lines, k):
-        while start > 0 and not _BLOCK_START.match(lines[start]) and lines[start - 1].strip():
-            start -= 1
-        while end + 1 < len(lines) and lines[end + 1].strip() \
-                and not _BLOCK_START.match(lines[end + 1]) and not _table_body_row(lines, end + 1):
-            end += 1
-    offset = sum(len(line) + 1 for line in lines[:start])
-    return offset, offset + len("\n".join(lines[start:end + 1]))
-
-
-def _block_context(text: str, pos: int) -> tuple[str, tuple[str, ...]]:
-    """The block holding ``pos`` and the hazard lines before it: the same block
-    after the same hazards renders the same way."""
-    start, end = _block_span(text, pos)
-    return text[start:end], tuple(line for line in text[:start].split("\n") if _hazard(line))
-
-
-def _contexts(text: str) -> set[tuple[str, tuple[str, ...]]]:
-    starts = [0] + [m.end() for m in re.finditer("\n", text)]
-    return {_block_context(text, pos) for pos in starts}
 
 
 @dataclass(frozen=True)
@@ -550,93 +380,47 @@ def _index_mechanical(path: str, base_text: str | None, head_text: str | None,
                             f"index lines must cover new pages {expected_new} and only link unlisted pages; got {files}"))
 
 
-def _link_occurrences(directory: str, text: str, *, certain: bool = False
-                      ) -> list[tuple[str, str, tuple[int, ...]]]:
-    """Relative links of an index as (written target without anchor, resolved
-    knowledge-relative path, positions of the link text and, for a reference,
-    its definition). URLs and anchor-only links are not targets; a link that
-    leaves the knowledge tree resolves to a path starting ``..``. ``certain``
-    keeps only links that are certainly visible (see above); a reference
-    counts only where it is used."""
-    def target_of(match) -> str:
-        return match.group("angle") if match.group("angle") is not None else match.group("target")
+_MARKDOWN = None
 
-    def keep(match) -> bool:
-        # visible where it starts, and no backtick anywhere in the link text
-        # itself (one there opens a code span that swallows the link)
-        # and no markup in or open before it on its line (a comment or a tag
-        # attribute swallows what looks like a link)
-        if not certain:
-            return True
-        line_start = text.rfind("\n", 0, match.start()) + 1
-        body = match.group(0)
-        if "angle" in match.re.groupindex and match.group("angle") is not None:
-            # the <destination> delimiters are link syntax, not markup
-            lo, hi = match.start("angle") - 1 - match.start(), match.end("angle") + 1 - match.start()
-            body = body[:lo] + match.group("angle") + body[hi:]
-        return (_certainly_visible(text, match.start()) and "`" not in body and "<" not in body
-                and not _open_tag(text[line_start:match.start()]))
 
-    # every definition of a label: which one renders depends on which are in
-    # code, so resolution checks all of them, and navigation trusts a label
-    # only when it has exactly one definition and that one is visible
-    definitions: dict[str, list] = {}
-    for m in _MD_REF.finditer(text):
-        definitions.setdefault(m.group("label").strip().lower(), []).append(m)
-    # resolution reads every "](" and "[..]" form; navigation only whole links
-    link, full, short = (_NAV_LINK, _NAV_REF_FULL, _NAV_REF_SHORT) if certain \
-        else (_MD_LINK, _REF_FULL, _REF_SHORT)
-    used = [(m.group("label").strip().lower() or m.group("text").strip().lower(), m.start())
-            for m in full.finditer(text) if keep(m)]
-    used += [(m.group("label").strip().lower(), m.start())
-             for m in short.finditer(text) if keep(m)]
-    found: list[tuple[str, tuple[int, ...]]] = [
-        (target_of(m), (m.start(),)) for m in link.finditer(text) if keep(m)]
-    for label, pos in used:
-        defs = definitions.get(label, [])
-        if not certain:
-            found += [(target_of(m), (pos, m.start())) for m in defs]
-        elif len(defs) == 1 and keep(defs[0]):
-            found.append((target_of(defs[0]), (pos, defs[0].start())))
-    out = []
-    for raw, positions in found:
-        target = raw.split("#", 1)[0]
-        if not target or "://" in target or target.startswith("mailto:"):
-            continue
-        resolved = ".." if target.startswith("/") else \
-            posixpath.normpath(posixpath.join(directory, target))  # absolute: never inside
-        out.append((target, resolved, positions))
+def _links(text: str) -> list[str]:
+    """The link destinations a CommonMark renderer (with GitHub's pipe tables)
+    makes of ``text``, as written (still percent-encoded). The parser settles
+    what a hand-written matcher cannot: reference definitions, titles, escapes,
+    code spans and blocks, HTML blocks and comments. Images are not links, and
+    neither is anything in an image's alt text."""
+    global _MARKDOWN
+    if _MARKDOWN is None:
+        from markdown_it import MarkdownIt  # lazy: only index checks need it
+
+        _MARKDOWN = MarkdownIt("commonmark").enable("table")
+    out: list[str] = []
+
+    def walk(tokens) -> None:
+        for token in tokens:
+            if token.type == "link_open":
+                out.append(str(token.attrGet("href") or ""))
+            if token.children and token.type != "image":
+                walk(token.children)
+
+    walk(_MARKDOWN.parse(text))
     return out
 
 
-def _link_targets(directory: str, text: str, *, certain: bool = False) -> dict[str, str]:
-    """{written target: resolved path} of ``_link_occurrences``."""
-    return {written: resolved for written, resolved, _ in _link_occurrences(directory, text, certain=certain)}
-
-
-def _dropped_links(directory: str, before: str, after: str) -> set[str]:
-    """Links ``before`` has that ``after`` may no longer show, fail-closed: a
-    link is kept only when it is certainly visible in ``after``, or every block
-    it sits in is unchanged in ``after`` after the same fence-like lines."""
-    raw_after = _link_targets(directory, after)
-    visible_after = _link_targets(directory, after, certain=True)
-    contexts_after = _contexts(after)
-    dropped = set()
-    for written, _resolved, positions in _link_occurrences(directory, before):
-        if written not in raw_after:
-            dropped.add(written)
-        elif written not in visible_after and not all(
-                _block_context(before, pos) in contexts_after for pos in positions):
-            dropped.add(written)
-    return dropped
-
-
-def _unparsed_links(text: str) -> set[str]:
-    """Each "](" no inline-link pattern accounts for, as its line: link syntax
-    the checker cannot read is refused rather than skipped."""
-    parsed = {m.start() for m in _MD_LINK.finditer(text)}
-    return {text[text.rfind("\n", 0, i) + 1:].split("\n", 1)[0].strip()
-            for i in (m.start() for m in re.finditer(r"\]\(", text)) if i not in parsed}
+def _link_targets(directory: str, text: str) -> dict[str, str]:
+    """Relative links of an index: {destination without anchor: resolved
+    knowledge-relative path}. URLs and anchor-only links are not targets; a
+    link that leaves the knowledge tree resolves to a path starting ``..``,
+    and an absolute one keeps its own normalised ``/...`` path (both escape)."""
+    out: dict[str, str] = {}
+    for href in _links(text):
+        parts = urlsplit(href)  # split first: an encoded "#" or ":" is part of the name
+        if parts.scheme or parts.netloc or not parts.path:
+            continue
+        target = unquote(parts.path)
+        out[target] = posixpath.normpath(target) if target.startswith("/") else \
+            posixpath.normpath(posixpath.join(directory, target))
+    return out
 
 
 def _dir_entries(head: Mapping[str, str], directory: str) -> list[str]:
@@ -660,7 +444,7 @@ def _index_created(path: str, base: Mapping[str, str], head: Mapping[str, str],
         issues.append(Issue("index_added_or_deleted", path,
                             "an index may be created only for a new directory"))
         return
-    linked = set(_link_targets(directory, head[path], certain=True).values())
+    linked = set(_link_targets(directory, head[path]).values())
     for entry in _dir_entries(head, directory):
         if entry not in linked:
             issues.append(Issue("index_missing", path, f"{entry} is not linked"))
@@ -668,7 +452,7 @@ def _index_created(path: str, base: Mapping[str, str], head: Mapping[str, str],
         parent = posixpath.join(posixpath.dirname(directory), INDEX_NAME)
         # a parent index created in the same change set reports its own children
         if parent in base and parent in head and path not in set(
-                _link_targets(posixpath.dirname(parent), head[parent], certain=True).values()):
+                _link_targets(posixpath.dirname(parent), head[parent]).values()):
             issues.append(Issue("index_missing", parent, f"the new {path} is not linked"))
     blocks.append(Block("prose", path, "", "prose", _sha(head[path])))
 
@@ -678,6 +462,8 @@ def check_index_links(base: Mapping[str, str], head: Mapping[str, str]) -> list[
     link the change adds resolves inside the knowledge tree to a file (or a
     directory) of ``head``; a changed index keeps every link it had; every
     page or child index new in ``head`` is linked from its parent index.
+    Links are what a CommonMark renderer makes (``_links``): text in code, a
+    comment or an HTML block is not a link, so moving a link there drops it.
     Links an index already had are not re-judged (some point into doc/)."""
     issues: list[Issue] = []
     head_dirs = {posixpath.dirname(p) for p in head}
@@ -687,14 +473,15 @@ def check_index_links(base: Mapping[str, str], head: Mapping[str, str]) -> list[
         directory = posixpath.dirname(path)
         before = _link_targets(directory, base.get(path) or "")
         after = _link_targets(directory, head[path])
-        for line in sorted(_unparsed_links(head[path]) - _unparsed_links(base.get(path) or "")):
-            issues.append(Issue("index_link_unparsed", path, line[:120]))
-        for written in sorted(_dropped_links(directory, base.get(path) or "", head[path])):
-            issues.append(Issue("index_link_dropped", path, written))
+        kept = set(after.values())
+        for written, resolved in sorted(before.items()):
+            if resolved not in kept:
+                issues.append(Issue("index_link_dropped", path, written))
+        had = set(before.values())
         for written, resolved in sorted(after.items()):
-            if written in before:
+            if resolved in had:
                 continue
-            if resolved == ".." or resolved.startswith("../"):
+            if resolved == ".." or resolved.startswith(("../", "/")):
                 issues.append(Issue("index_link_escapes", path, written))
             elif resolved not in head and not any(d == resolved or d.startswith(resolved + "/")
                                                   for d in head_dirs):
@@ -710,7 +497,7 @@ def check_index_links(base: Mapping[str, str], head: Mapping[str, str]) -> list[
             if directory:  # the knowledge root has no index
                 issues.append(Issue("index_unlinked", page, f"{parent} does not exist"))
             continue
-        if page not in set(_link_targets(directory, head[parent], certain=True).values()):
+        if page not in set(_link_targets(directory, head[parent]).values()):
             issues.append(Issue("index_unlinked", page, f"{parent} does not link it"))
     return issues
 
