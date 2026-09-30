@@ -27,3 +27,4 @@ sources: []
 | afd-plugin | `vllm-project/afd-plugin` | [afd-plugin](afd-plugin/_index.md) |
 | Jianghan roleplay data pipeline | 私有项目 | [jianghan-roleplay-data-pipeline](jianghan-roleplay-data-pipeline/_index.md) |
 | vLLM-GR | `JiusiServe/vllm-gr` | [vllm-gr](vllm-gr/_index.md) |
+| jiuwenswarm | `openJiuwen-ai/jiuwenswarm` | [jiuwenswarm](jiuwenswarm/_index.md) |

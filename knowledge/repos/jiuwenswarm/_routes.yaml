@@ -1,0 +1,203 @@
+# Direct-mode owner routing for jiuwenswarm, written by kb init (pin f0a69728c96b).
+schema_version: 1
+owners:
+- owner: gateway-channels
+  path: repos/jiuwenswarm/architecture.md
+  signals:
+  - gateway
+  - 网关
+  - channel
+  - 频道
+  - channel_manager
+  - message_handler
+  - feishu
+  - 飞书
+  - wechat
+  - 微信
+  - xiaoyi
+  - 小艺
+  - /join
+  - HITT
+  scope_prefixes:
+  - jiuwenswarm/gateway/
+- owner: protocols
+  path: repos/jiuwenswarm/architecture.md
+  signals:
+  - E2A
+  - E2AEnvelope
+  - E2AResponse
+  - A2A
+  - agent card
+  - ACP
+  - JSON-RPC
+  - session/prompt
+  - protocol
+  - 协议
+  scope_prefixes:
+  - jiuwenswarm/common/e2a/
+  - jiuwenswarm/gateway/channel_manager/protocol/
+  - scripts/run_gateway_acp.sh
+  - scripts/run_gateway_acp.cmd
+- owner: a2ui
+  path: repos/jiuwenswarm/architecture.md
+  signals:
+  - A2UI
+  - a2ui
+  - 生成式界面
+  - client_event
+  - surface
+  - renderer
+  - finalizer
+  scope_prefixes:
+  - jiuwenswarm/server/runtime/a2ui/
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/
+  - tests/unit_tests/a2ui/
+  - tests/system_tests/test_a2ui_system_flow.py
+- owner: agent-server-runtime
+  path: repos/jiuwenswarm/architecture.md
+  signals:
+  - AgentServer
+  - agentserver
+  - agent server
+  - runtime
+  - 运行时
+  - agent_adapter
+  - mode
+  - work_mode
+  - 模式
+  scope_prefixes:
+  - jiuwenswarm/server/
+- owner: agents-team
+  path: repos/jiuwenswarm/architecture.md
+  signals:
+  - team
+  - swarm
+  - 集群模式
+  - leader
+  - teammate
+  - swarmflow
+  - rails
+  - harness
+  - skill
+  - 技能
+  - memory
+  - 记忆
+  - prompt
+  scope_prefixes:
+  - jiuwenswarm/agents/
+- owner: auto-harness
+  path: repos/jiuwenswarm/architecture.md
+  signals:
+  - auto-harness
+  - auto harness
+  - AutoHarness
+  - evolve
+  - evolution
+  - 演进
+  - 自演进
+  - harness package
+  - schedule
+  - issue fix
+  scope_prefixes:
+  - docs/zh/AutoHarness.md
+- owner: web-frontend
+  path: repos/jiuwenswarm/architecture.md
+  signals:
+  - web
+  - frontend
+  - 前端
+  - UI
+  - websocket
+  - react
+  - npm
+  - 页面
+  scope_prefixes:
+  - jiuwenswarm/channels/web/
+- owner: config-resources
+  path: repos/jiuwenswarm/architecture.md
+  signals:
+  - config
+  - 配置
+  - config.yaml
+  - .env
+  - 环境变量
+  - init
+  - jiuwenswarm-init
+  - model provider
+  - 模型配置
+  scope_prefixes:
+  - jiuwenswarm/resources/
+- owner: subpackages
+  path: repos/jiuwenswarm/architecture.md
+  signals:
+  - jiuwenbox
+  - sdk
+  - sdks
+  - packages
+  - TUI
+  - jiuwenswarm-tui
+  scope_prefixes:
+  - jiuwenbox/
+  - packages/
+  - sdks/
+- owner: tests-ci
+  path: repos/jiuwenswarm/rules.md
+  signals:
+  - test
+  - tests
+  - 测试
+  - pytest
+  - UT
+  - 单元测试
+  - CI
+  - coverage
+  - 覆盖率
+  scope_prefixes:
+  - tests/
+  - pytest.ini
+  - run_tests.sh
+  - TESTING.md
+  - .gitcode/
+- owner: packaging-deploy
+  path: repos/jiuwenswarm/rules.md
+  signals:
+  - dependency
+  - deps
+  - 依赖
+  - bump
+  - release
+  - 发布
+  - version
+  - wheel
+  - pip
+  - uv
+  - docker
+  - deploy
+  - 部署
+  scope_prefixes:
+  - pyproject.toml
+  - uv.lock
+  - MANIFEST.in
+  - Makefile
+  - Dockerfile.claw
+  - .dockerignore
+  - docker/
+  - deploy/
+  - third_party/
+  - OPEN_SOURCE_SOFTWARE_NOTICE.md
+  - LICENSE
+- owner: docs
+  path: repos/jiuwenswarm/rules.md
+  signals:
+  - docs
+  - doc
+  - 文档
+  - README
+  - FAQ
+  - 指南
+  - guide
+  scope_prefixes:
+  - docs/
+  - README.md
+  - README_CN.md
+  - .doc_project_maintainer/
