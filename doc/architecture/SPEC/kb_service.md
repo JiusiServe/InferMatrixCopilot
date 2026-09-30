@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-09-30 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -291,3 +291,14 @@ diff 时保留原摘录（证据不会因此变得更"好过"）。只扩展带 
 `merged_pr` 事件的证据新增 `merge_commit_sha`（旧事件经 `pull()` 查询）。`run_gate(evidence_for=...)` 由 `gate_and_stage`
 与事实证明共用同一个观测者（一次镜像同步）。首个线上运行中"所给 diff 在…之前截断"是 L2 判 unsure/fail 的主要原因，
 而整批 10 个 PR 的证据（约 105 KB）对每条规则都重复发送；按规则取证据后约 11 KB + 所引 PR 的完整 diff。
+
+## 2026-09-30 kb init：覆盖率度量
+`init_coverage`（纯函数，stdlib + PyYAML，不调模型）：`load_owners(routes_yaml_text)` 读 `_routes.yaml` 的 `owners`
+（schema_version 1；`models` 按名称匹配，不参与覆盖率；格式错误抛 `ValueError`）；`routes_file(path, owners)` 按
+`scope_prefixes` 前缀匹配、保持路由顺序；`module_coverage(modules, owners)` —— 模块内**每个**源文件都被某个 owner 前缀
+覆盖才算覆盖；`make_include(source_roots, exclude, suffixes=())` 构造变更路径过滤器（测试/文档等一律由调用方的
+`exclude` glob 表达，不内置任何仓库字面量）；`pr_weighted_coverage(prs, owners, include=, rule_pages=)` —— 每个 PR
+改动的每个文件计一次，`routed` = 被某 owner 覆盖，`rule_bearing` = 覆盖它的 owner 页在 `rule_pages`（含有效规则的页）
+中，`uncovered_hot` 按次数降序、路径升序；`churn_by_module(prs, modules)` 按最长模块前缀归属（已折叠目录归到折入的
+祖先），降序。空集合的比例记为 1.0（没有可漏的路由）。`ROOT_MODULE` 与 `profiles.establish.ROOT_MODULE` 相同，
+由测试钉住（本包不依赖 `profiles`）。源根与变更路径按与 `profiles.establish.normalize_root` 相同的规则规范化（`.`、`./` 表示仓库根，接纳一切路径）。测试：`test_kb_init_coverage.py`。
