@@ -240,7 +240,7 @@ push:
 # Knowledge service: declared but disabled until afd-plugin has its own
 # calibration set and has run through a shadow period (rollout stage P3b).
 knowledge_lifecycle:
-  enabled: false
+  enabled: true
   mode: shadow
   knowledge_dir: repos/afd-plugin
   release:

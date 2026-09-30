@@ -36,3 +36,4 @@ sources:
 | 理解初始化、请求和 control metadata 流 | [architecture](architecture.md) | v0.26 当前运行实现 |
 | 调查模型内 handoff | [model-integration](../model-integration/architecture.md) | 角色感知层构造和 metadata consumer |
 | 调查 graph/DBO | [execution-platforms](../execution-platforms/architecture.md) | 平台 wrapper、capture 和 replay |
+- [afd_plugin/v1/worker 审查规则：AFD 事务元数据、控制面发送与 runner 生命周期](rules.md)

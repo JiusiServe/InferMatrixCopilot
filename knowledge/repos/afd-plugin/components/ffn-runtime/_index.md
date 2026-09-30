@@ -36,3 +36,4 @@ sources:
 | 理解 daemon、step selection 和 shutdown | [architecture](architecture.md) | control-plane 与 connector-driven 两条路径 |
 | 审查 EngineCore 适配 | [compatibility](../compatibility/rules.md) | patch 和 non-AFD 分支门禁 |
 | 调查 FFN 模型计算 | [model-integration](../model-integration/architecture.md) | role-aware 构造和权重边界 |
+- [FFN 角色运行时（worker / model runner）审查规则](rules.md)
