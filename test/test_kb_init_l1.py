@@ -306,3 +306,12 @@ def test_only_kb_init_may_pass_bootstrap():
         if path not in allowed and re.search(r"bootstrap\s*=\s*True", path.read_text(encoding="utf-8"))
     ]
     assert offenders == []
+
+
+def test_index_links_accept_the_knowledge_root_and_its_directories():
+    base = _base()
+    head = dict(base)
+    head["repos/old/_index.md"] += "- [Knowledge](../..)\n- [Knowledge](../../)\n- [Repos](..)\n"
+    assert check_index_links(base, head) == []
+    head["repos/old/_index.md"] += "- [Above](../../..)\n"
+    assert [(i.code, i.detail) for i in check_index_links(base, head)] == [("index_link_escapes", "../../..")]
