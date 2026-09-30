@@ -28,3 +28,4 @@ sources: []
 - [JiuwenSwarm 仓库审查规则](rules.md)
 - [每次审查 jiuwenswarm 的 PR 都先读这份通用审查规则；本仓库自己的约束在 rules 页。](../../general/review/rules.md)
 - [PR 新增或修改测试、或 CI 失败时读。先看 tests/ 下已有的用例（如 tests/unit_tests/a2ui/）和 pytest.ini 的约定；TESTING.md 里有过期路径，不能照抄。](../../general/ci/guides/inspect-existing-tests-first.md)
+- [jiuwenswarm components](components/_index.md)
