@@ -136,6 +136,35 @@ def _try_lock_exclusive(fd: int) -> bool:
         return False
 
 
+@contextmanager
+def file_lock(path: str | Path, *, blocking: bool = True, timeout: float = 30.0) -> Iterator[bool]:
+    """Cross-process exclusive lock on ``path`` (an ``flock`` / ``msvcrt``
+    region, released by the OS when the holder exits; the file is never
+    unlinked). Yields True when held. Non-blocking: yields False at once when
+    another holder has it. Blocking: polls up to ``timeout`` seconds, then
+    yields False. Used by the improvement engine for its ledgers and cycle."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+    held = False
+    try:
+        if os.fstat(fd).st_size == 0:
+            os.write(fd, b"\0")
+        deadline = time.monotonic() + timeout
+        while True:
+            held = _try_lock_exclusive(fd)
+            if held or not blocking or time.monotonic() >= deadline:
+                break
+            time.sleep(0.02)
+        try:
+            yield held
+        finally:
+            if held:
+                _unlock(fd)
+    finally:
+        os.close(fd)
+
+
 def _unlock(fd: int) -> None:
     try:
         import fcntl

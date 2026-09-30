@@ -58,6 +58,23 @@ class Scheduler:
             return True
         return False
 
+    def _improve_cycle(self):
+        """Run the weekly improvement cycle when its slot has passed; the
+        settings come from the runtime when it carries them, else the env."""
+        rt = self.rt
+        if rt.traces is None:
+            return None
+        settings = getattr(rt, "settings", None)
+        if settings is None:
+            from ..config import Settings
+
+            settings = Settings()
+        if not getattr(settings, "improve_enabled", False):
+            return None
+        from ..improve.cycle import ledger_dir_for, maybe_run_weekly
+
+        return maybe_run_weekly(rt.traces, settings, ledger_dir_for(settings), now=rt.clock())
+
     def _record(self, repo: str, event: str, **detail) -> None:
         entry = {"at": self.rt.clock(), "repo": repo, "event": event, **detail}
         self.log.append(entry)
@@ -79,6 +96,14 @@ class Scheduler:
                 self._repo_tick(lifecycle)
             except Exception as exc:  # isolate repositories from each other
                 self._record(lifecycle.repo, "error", error=repr(exc), trace=traceback.format_exc()[-2000:])
+        try:  # the meta-improvement engine's weekly cycle (design §4): same
+              # lease, its own slot, isolated like every other tick item
+            report = self._improve_cycle()
+            if report is not None:
+                self._record("*", "improve_cycle", units=report.get("units"),
+                             proposals=len(report.get("proposals_opened") or []))
+        except Exception as exc:
+            self._record("*", "error", error=repr(exc), trace=traceback.format_exc()[-2000:])
         if self._due("archive", self.archive_every):
             try:  # the weekly off-machine copy of the traces (pulled by the publisher)
                 archive = make_archive(rt)

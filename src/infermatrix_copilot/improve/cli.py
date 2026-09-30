@@ -12,6 +12,11 @@
     improve compare-index   read-only: rebuild a throwaway copy and diff it
                             against the live index (safe with live writers)
     improve verify-index    read-only: id sets and schema-2 columns vs the records
+    improve cycle           [--since EPOCH] [--until EPOCH] [--force] [--ledger-dir DIR]
+                            run one weekly cycle now (Tier 1 lints, baselines,
+                            ledger, report; dry-run — proposals stay local)
+    improve ledger          [--workflow W] [--ledger-dir DIR]   show the ledgers
+    improve lints           the Tier 1 lint catalogue (ids, versions, origins)
 
 The writer-quiescence gate (design §7.1). Pause flags alone do not stop an
 intake or sweep that is already running, so the gate requires evidence that
@@ -94,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="infermatrix-copilot improve",
                                      description="operate the meta-improvement engine's trace index")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("migrate-index", "rebuild-index", "rollback-index", "compare-index", "verify-index"):
+    for name in ("migrate-index", "rebuild-index", "rollback-index", "compare-index", "verify-index",
+                 "cycle", "ledger", "lints"):
         p = sub.add_parser(name)
         p.add_argument("--trace-root", default=None, help="trace store root (TRACE_STORE_ROOT / KB_STATE_DIR/traces)")
         if name in ("migrate-index", "rebuild-index", "rollback-index"):
@@ -104,7 +110,22 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--no-backup", action="store_true")
         if name == "rebuild-index":
             p.add_argument("--to-schema", type=int, default=None, help="0 (pin downgrade) or the current schema")
+        if name in ("cycle", "ledger"):
+            p.add_argument("--ledger-dir", default=None)
+        if name == "cycle":
+            p.add_argument("--since", type=float, default=None)
+            p.add_argument("--until", type=float, default=None)
+            p.add_argument("--force", action="store_true", help="run even when improve_enabled is off (operator)")
+        if name == "ledger":
+            p.add_argument("--workflow", default=None)
     args = parser.parse_args(argv)
+    if args.command == "lints":
+        from .lints import catalogue
+
+        print(json.dumps(catalogue(), ensure_ascii=False, indent=1))
+        return 0
+    if args.command in ("cycle", "ledger"):
+        return _cycle_commands(args)
     store = _store(args)
     try:
         if args.command == "migrate-index":
@@ -127,6 +148,44 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(json.dumps(report, ensure_ascii=False, indent=1, default=str))
     return 0 if report.get("ok", True) else 1
+
+
+
+def _ledger_dir(args) -> Path:
+    from ..config import Settings
+    from .cycle import ledger_dir_for
+
+    return Path(args.ledger_dir).expanduser() if args.ledger_dir else ledger_dir_for(Settings())
+
+
+def _cycle_commands(args) -> int:
+    from ..config import Settings
+    from .cycle import CycleRefused, run_cycle
+    from .ledger import Ledger
+
+    ledger_dir = _ledger_dir(args)
+    if args.command == "ledger":
+        ledger = Ledger(ledger_dir)
+        names = [args.workflow] if args.workflow else ledger.workflows()
+        out = {}
+        for name in names:
+            wl = ledger.load(name)
+            out[name] = {"tier": wl.tier, "declared": wl.declared, "hold": wl.hold, "cycles": wl.cycles[-4:],
+                         "proposals": [{"id": p.id, "state": p.state, "lint": p.lint, "stage": p.stage,
+                                        "claim": p.claim, "issue": p.issue} for p in wl.proposals]}
+        print(json.dumps(out, ensure_ascii=False, indent=1, default=str))
+        return 0
+    store = _store(args)
+    try:
+        report = run_cycle(store, Settings(), ledger_dir, since=args.since, until=args.until,
+                           dry_run=True, force=args.force)
+    except CycleRefused as exc:
+        print(json.dumps({"refused": str(exc)}), file=sys.stderr)
+        return 1
+    print(json.dumps({k: report[k] for k in ("at", "since", "until", "units", "proposals_opened", "seconds")},
+                     ensure_ascii=False, indent=1, default=str))
+    print(f"report: {ledger_dir / 'reports'}", file=sys.stderr)
+    return 0
 
 
 if __name__ == "__main__":  # pragma: no cover

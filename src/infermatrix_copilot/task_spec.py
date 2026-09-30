@@ -13,11 +13,14 @@ from pydantic import BaseModel, Field, field_validator
 
 TaskKind = Literal[
     "repo_rebase", "pr_rebase", "pr_debug", "pr_review", "pr_quality",
-    "issue_answer", "issue_filter", "repo_profile",
+    "issue_answer", "issue_filter", "repo_profile", "workflow_improve",
 ]
 
 READ_ONLY_KINDS: frozenset[str] = frozenset({
     "pr_review", "pr_quality", "issue_answer", "issue_filter",
+    # the meta-improvement cycle reads traces and writes only its own ledger
+    # and trace records; `post` (P4) is the proposal-issue gate
+    "workflow_improve",
 })
 
 # blast-radius tier per kind (design §3.2): L0 reuse-locked, L1 adapt-vetted, L2 generate
@@ -32,6 +35,7 @@ KIND_TIER: dict[str, str] = {
     # profile establishment reads the target repo but writes knowledge
     # (adapters/<repo>/) — confirm-gated like other write-capable kinds
     "repo_profile": "L2",
+    "workflow_improve": "L2",
 }
 
 # A git commit id in full form. Callers that pin a snapshot (the MCP Strict
