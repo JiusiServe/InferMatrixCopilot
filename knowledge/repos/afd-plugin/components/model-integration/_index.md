@@ -36,3 +36,4 @@ sources:
 | 理解 registry、角色构造、metadata 和权重加载 | [architecture](architecture.md) | DeepSeek-oriented 当前实现 |
 | 调查 caller 生命周期 | [Attention](../attention-runtime/architecture.md) / [FFN](../ffn-runtime/architecture.md) | runner-owned context 和 step |
 | 调查 transfer state | [connectors](../connectors/architecture.md) | payload/context 与资源 owner |
+- [AFD 模型包装（afd_plugin/model_executor/models）评审规则](rules.md)
