@@ -500,3 +500,30 @@ Direct 的路由优先级是：知识侧 `repos/<repo>/_routes.yaml` 存在则�
 - 没有 routes 文件也没有 `review_routes` 的仓库：modules / deepen `blocked`（消息指明两种来源都没有）。
 测试：`test_kb_init_manifest_routed.py`（manifest 路由的 toy：三阶段 dry run 不写 `_routes.yaml`、规则落在 owner 页、
 briefing 文档不动、清单含建议项、覆盖率来源；知识侧路由的 toy 行为不变）。
+
+## 2026-10-01 路由到的页面必须带 Direct 快速入口（kb init）
+Direct 的产品就是内嵌地图：知识侧 `_routes.yaml` 路由到的每个 owner 页都要有 `## … Direct …` 段
+（`direct_routing._direct_quick_map_text`：第一个这样的标题到下一个 `## `，正文非空、≤3500 字符），
+`test_every_routed_page_yields_a_quick_map` 逐页把关；#265 路由到的页面没有。`init_quick_maps`：
+- `render_quick_map(page_text, signals=, prefixes=, key_files=)`：确定性渲染 `## 代码快速入口（Direct）`（标题以格式的 ID
+  扫描器 `ANY_RULE_HEADING` 读不成 ID 的词开头——`## Direct …` 会被读成 ID `Direct`、两页即 `duplicate_rule_id`；Direct 只要求标题行含 Direct）
+  （第二行是标记 `<!-- kb-init:quick-map -->`）：页面上每条 active 规则一行（触发行或标题 | 规则 ID |
+  规则里反引号命名的路径，否则 owner 前缀），没有规则的页面（地图卡、入口页）一行（触发词 | 入口 | 关键文件或前缀）；
+  ≤3000 字符，超出从末尾丢行并补一行 `| … | … | … |`，绝不超过 3500。
+- `with_quick_map(page_text, section)`：就地替换 init 自己写的段（带标记），没有则插到标题后第一个 `## ` 段之前；
+  没有标记的 Direct 段是人写的地图，原样保留。该标题不含 ` — `，永远不是规则标题
+  （`RULE_HEADING` / `_TOP_RULE`），L1 把它当 prose 块，页面上的规则不受影响。
+- `_Stage._refresh_quick_maps()`（`_conclude` 开头，三阶段共用）：head 里 routes 文件的每个 owner 页，本阶段改动过的
+  重新渲染（deepen 追加规则后行数随之更新；init 段之后页面新增的内容——如追加到入口页的索引行——保留在段尾），
+  还没有地图的补上，未改动且已有地图的不动（路由前缀漂移不制造改动）；`mapped()` 只在加上地图仍在页面容量内时
+  返回结果，否则该页不写并作为阻断问题上报（不能留下少一行的旧地图）；briefing 文档不写（记入清单，随后被检查挡下）；skeleton 从既有 `_index.md`
+  推导 owner 时跳过 briefing 文档（清单），`_owners_with_room` 把没有容量放地图的既有 owner 页改指到本阶段承接了
+  它溢出规则的页（`_place` 记录的 `_spilled_from`；同目录的其他新页——比如种子页——装的是别的知识，不算），没有这样的页就
+  丢弃该 owner 并记入清单。
+- 容量：`_apply` 在 `apply_operations` 之后把每个写入的规则页连同渲染出的地图（按 routes 文件里该页 owner 的真实触发词与前缀，`_map_inputs`）一起过 `page_over_capacity`（`_check_capacity_with_map`），超出即报 page full，由 `_place` 溢出到同级页——地图每条规则一行，只量规则会让页面
+  在加地图后越界；manifest 路由的仓库不写地图，也就不按地图量（否则装得下的规则会被溢出到 manifest 不路由的页面，
+  Direct 看不到它）。
+- 阻断检查：`validate_change(..., quick_map_pages=owner_pages(routes_text))` → `quick_map_problems`
+  用生产提取器逐页检查，缺页或 `unavailable` 即 blocked 并点名页面；本次写入或改动的页面被服务端截断（`truncated`，CI 拒绝新增的截断）也 blocked。manifest 路由的仓库没有 routes 文件、
+  不检查（Direct 的 manifest 回退对其页面报 `read_required`）。
+测试：`test_kb_init_quick_maps.py`。

@@ -287,7 +287,15 @@ def _signal_matches(text: str, signal: str) -> bool:
 
 
 def _direct_quick_map(path: str, max_chars: int = 3500) -> tuple[str, str]:
-    """Return the embedded Direct code map and its status, never the whole page.
+    """Return the embedded Direct code map of the page at ``path`` and its
+    status (``_direct_quick_map_text`` on the file's text)."""
+    return _direct_quick_map_text(Path(path).read_text(encoding="utf-8"), max_chars)
+
+
+def _direct_quick_map_text(text: str, max_chars: int = 3500) -> tuple[str, str]:
+    """Return the embedded Direct code map in ``text`` and its status, never
+    the whole page. Text-taking so a producer (kb init) can check a page it
+    has not written to disk yet against the same extraction the server runs.
 
     Status is ``ok`` / ``truncated`` / ``unavailable``. The last two both mean the
     host cannot rely on the excerpt alone.
@@ -298,7 +306,7 @@ def _direct_quick_map(path: str, max_chars: int = 3500) -> tuple[str, str]:
     A partial map presented as whole is the same lie as a missing one, just harder
     to notice.
     """
-    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    lines = text.splitlines()
     start = next(
         (
             index for index, line in enumerate(lines)

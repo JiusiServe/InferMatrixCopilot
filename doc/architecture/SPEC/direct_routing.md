@@ -1,6 +1,6 @@
 # direct_routing.py —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-10-01 -->
 
 `LOC ~880 · Direct 模式完整策略包与仓库中立的知识路由 · refactor-status: stable`
 
@@ -21,7 +21,7 @@ Direct policy bundle）、`direct_knowledge_routes`、
 - **repo 守卫最先跑**：不支持的仓库在任何路由计算之前被拒 —— 修的是一个
   真实历史 bug（守卫曾排在空 intent 提前返回之后，向不支持的仓库泄漏
   owner 知识）。
-- **quick map fail-closed**：`_direct_quick_map` 返回内嵌代码地图与状态
+- **quick map fail-closed**：`_direct_quick_map(path)` 读文件后委托给 `_direct_quick_map_text(text)`（同一提取逻辑；kb init 用后者在落盘前检查它要路由的页面）返回内嵌代码地图与状态
   `{ok, truncated, unavailable}`，`truncated` 不是装饰 —— 把残图当全图
   与缺图同罪、且更难察觉；`_direct_route` 据此置
   `read_required = status != "ok"`（"自己去打开"是真回退，"什么都不给
