@@ -234,3 +234,23 @@ knowledge_lifecycle:
   release:
     trigger: none
   upstream_visibility: public
+  # kb init (doc/design: kb-init-design.md §3). Read by `kb init afd-plugin`
+  # only; the service ignores it. Values checked against upstream
+  # vllm-project/afd-plugin main on 2026-09-30.
+  init:
+    seeds:
+      # linked, never copied: the repo-neutral review rules every vLLM-plugin
+      # review applies (design reuse, compatibility, tests-with-the-change)
+      - general/review/rules.md
+      # linked: afd-plugin wraps vLLM workers/model runners; algorithm-level
+      # choices must be checked against upstream vLLM first
+      - general/review/guides/upstream-first-for-algorithm.md
+      # adapt-copied: afd_plugin/compat/** and the v1 worker subclasses track
+      # vLLM releases, so the vLLM upstream API-drift patterns (renamed
+      # params, constructor migrations, subclass missing new fields) transfer;
+      # claims that do not resolve in afd-plugin are dropped by kb init
+      - repos/vllm-omni/rebase/upstream-api-drift.md
+    # the Python package only: csrc/ is C++/CUDA, which the Python module scan
+    # does not read (its knowledge stays with the execution-platforms owner)
+    source_roots: [afd_plugin/]
+    exclude: ["*/__init__.py", "*/py.typed"]
