@@ -1,6 +1,6 @@
 # knowledge_service/ — provider curation components
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-09-30 -->
 
 The provider owns knowledge curation beneath the public SDK v1 facade.
 `KnowledgeCurator` composes four domain components over one explicit work
@@ -72,3 +72,9 @@ merge group 逐段验证、暂停清单与 `human-approved` 审批核对已于 2
 `recheck(upstream, facts, observer)` 由发布器调用：仓库一致、SHA 为 40 位、每条事实重新观测后逐字段相等，
 签名了不成立的必需事实或格式错误均为问题；上游不可读（未知 SHA、网络、API 错误）抛 `FactsError`，由调用方重试。
 仅标准库。`gate_verifier.verify_change` 不再拒绝带事实的判定（由发布器的 `recheck` 复核）。
+
+## 2026-09-30 钉点声明（pinned_claims）
+`pinned_claims` 供 `kb init` 使用：`PinnedObserver` 在本地克隆上以固定钉点实现 `facts.Observer`（另有
+`is_ancestor`），`check_rules` 在钉点上观测规则声明且要求引用的 PR 已合并进钉点历史，`Evidence` /
+`check_evidence` 把行区间绑定到内容哈希。服务与发布器的 `facts` 路径不变。详见
+[pinned_claims.md](knowledge_service/pinned_claims.md)。
