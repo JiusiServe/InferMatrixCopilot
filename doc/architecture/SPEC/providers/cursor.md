@@ -33,7 +33,7 @@ headless `cursor-agent --print --force --output-format stream-json`，
 stdlib + `.base` + `.registry` + `..agent_loop.AgentOutcome` + `..llm` 的类型。
 
 ## 测试
-`test_provider_cursor.py`。
+`test_provider_cursor.py`；共享 checkout 串行见 `test_run_service_concurrency.py`。
 
 ## 重构备注
 这套调用形状是由 Composer 评测臂（`eval/dataset/run_cursor_arm.py`）验证出来的；
@@ -51,3 +51,14 @@ scope 约束，native 调用只被**记录**。
 
 ## 2026-09-30
 `complete()` 接受并忽略 `max_budget_usd`；`stops_at_spend` 为 False（CLI 无花费阈值）。
+
+### 共享 checkout 上的会话串行（2026-09-30）
+桥配置写在会话 cwd 的**固定路径** `.cursor/mcp.json`，同一目录里两个不同 run 的会话
+会互相覆盖配置，令一方的 agent 绑定到另一个 run 的工具 scope 与 trace。
+带桥的会话若 cwd 是**共享 checkout**（`.git` 为目录的 clone，或未托管的 linked
+worktree），就在该 checkout 的 git dir 里 `imx-cursor-session.lock` 上持
+`flock LOCK_EX` 直到会话结束并清理配置，跨线程/进程/服务串行——issue 任务与
+worktree 物化失败而降级到 live checkout 的 PR run 都在这里。托管的 PR-time
+worktree（repo+PR+sha 分键，run queue 不会让同 PR 的两个 run 并发）与 run 自己的
+目录不加锁。等待上限为会话超时 + 60 s；超时则返回空文本、`truncated`、refusal，
+并记 `capability_gap`（`cursor.exclusive_cwd`），绝不在别人的配置下静默开跑。

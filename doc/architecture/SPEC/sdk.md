@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-09-30 -->
 
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
@@ -22,7 +22,9 @@
 - Strict：`StrictRuntime(config=StrictRuntimeConfig(...))`，以及
   `capabilities` / `readiness` / `reserve_review`（`start_review` 别名）/
   `get_status` / `get_result` / `close`。旧 `settings_overrides` 暂作兼容入口；
-  新配置显式绑定完整仓库名、checkout、允许根、backend 和可选 run root。
+  新配置显式绑定完整仓库名、checkout、允许根、backend、可选 run root 与
+  `max_workers`（默认 1，正整数；即宿主并发执行的 run 数，经 handshake 的
+  `max_strict_workers` 回报）。
   `StrictPollResult.review` 提供类型化结构结果，`payload` 保持旧 wire 兼容。
 - Quality：同一 `StrictRuntime` 接受 typed `QualityReviewRequest`，提供
   `quality_readiness` / `reserve_quality_review`（`start_quality_review` 别名）/
@@ -86,8 +88,9 @@
   push、开 PR 或 schedule。ReviewBot 必须向 `KnowledgeCurator` 传 dedicated work
   checkout，并继续拥有重试、artifact 与本地补丁导出；SDK 也绝不写 packaged
   knowledge tree。
-- SDK、Quality API 版本常量为 `1.0.0`；Direct 为 `1.1.0`，Strict 为 `1.3.0`
-  （1.1 新增 `finding_dispositions`；1.2 新增 `findings`；1.3 新增显式 recheck），Knowledge 为 `1.1.0`
+- SDK、Quality API 版本常量为 `1.0.0`；Direct 为 `1.1.0`，Strict 为 `1.4.0`
+  （1.1 新增 `finding_dispositions`；1.2 新增 `findings`；1.3 新增显式 recheck；
+  1.4 新增 `StrictRuntimeConfig.max_workers`），Knowledge 为 `1.1.0`
   （1.1 向后兼容地新增 `catalog_entries()` / `KnowledgeCatalogEntry` 与容量预检），
   distribution 为 `0.2.0`；`Capabilities.knowledge_api_version` 与
   `supports_knowledge_curation` 组成 ReviewBot 的 paired-release 握手，避免只按

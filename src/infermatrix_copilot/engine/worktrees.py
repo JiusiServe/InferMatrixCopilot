@@ -143,6 +143,20 @@ def _flock_blocking(fd: int, flags: int, timeout: float) -> bool:
             time.sleep(0.05)
 
 
+def touch(dest: Path) -> None:
+    """Mark a reused tree as in use NOW, while the exclusive lock is held.
+
+    The reaper removes trees older than the retention window that no run
+    holds, and a run takes its shared hold only when a later step first uses
+    the tree — so between `materialize` releasing its lock and that hold, an
+    old reused tree looked abandoned. A fresh mtime closes that gap: the
+    reaper re-reads it under its own exclusive lock before removing."""
+    try:
+        os.utime(dest)
+    except OSError:
+        pass  # best-effort; the reaper's lock still guards a held tree
+
+
 def owned_by(repo: Path, dest: Path, sha: str, git: GitRunner) -> tuple[bool, str]:
     """Whether `dest` is a worktree of `repo` currently at `sha`.
 
@@ -202,6 +216,7 @@ def materialize_mutable(repo: Path, sha: str, dest: Path, git: GitRunner, *,
                 ok, why = owned_by_repository(repo, dest, git)
                 if not ok:
                     return False, f"private worktree path is not owned ({why})"
+                touch(dest)
                 return True, "reused private worktree"
             dest.parent.mkdir(parents=True, exist_ok=True)
             code, out = git(repo, "worktree", "add", "--detach", str(dest), sha)
@@ -232,6 +247,7 @@ def materialize(repo: Path, sha: str, dest: Path, git: GitRunner, *,
             if dest.exists():
                 ok, why = owned_by(repo, dest, sha, git)
                 if ok:
+                    touch(dest)
                     return True, f"reused worktree @ {sha[:12]}"
                 # Safe only because the name encodes repo+sha: a mismatch here
                 # is a foreign or torn tree, never another run's live one.

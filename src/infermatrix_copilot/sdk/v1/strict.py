@@ -123,6 +123,7 @@ class StrictRuntime:
                 overrides["strict_backend"] = config.backend
             if config.run_root:
                 overrides["run_root"] = config.run_root
+            overrides["strict_max_workers"] = config.max_workers
         else:
             overrides = settings_overrides or {}
         if overrides.get("_env_file", object()) is None:
