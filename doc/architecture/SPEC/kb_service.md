@@ -359,7 +359,7 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
 - `config.InitConfig` 增加 `generator_call_usd`（>0，缺省 2.0）与 `harness_overhead_bytes`（≥0，缺省 200000）。
 - `init_support`：`InitRuntime`（自己的运行时：registry、`ModelGateway`（trace 写到 `<state>/init/traces`）、
   知识库克隆 `KB_INIT_KNOWLEDGE_CLONE` 或 `<state>/init/knowledge-repo`、价格表、环境）；`InitRecord`（每阶段一个
-  `<state>/init/<repo>/<stage>.json`：钉点、知识库基点、输入摘要、花费、种子来源、逐规则证据、判定、丢弃原因、清单、
+  `<state>/init/<repo>/<stage>.json`：钉点、知识库基点、输入摘要、花费（渲染 PR 正文之前写入，正文报告的就是记录值）、种子来源、逐规则证据、判定、丢弃原因、清单、
   问题、未完成项、PR）；`UpstreamPin`（上游 bare 镜像、`resolve`、只读 `export`（拒绝链接与越界成员）、
   `PinnedObserver`）；`collect_docs`；`generate`/`judge`（先预留）；`claim_problems`（设计 §9.1）；
   `other_path_problems`（`knowledge/` 之外的路径必须在 `INIT_PATHS` 内且有专门检查）；`run_knowledge_validators`
@@ -370,7 +370,7 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
 - `init_stages`（唯一允许调用 `check_changeset(bootstrap=True)` 的模块，由 L1 测试钉住）：`run_stage` 与
   `validate_change`（设计 §9.3：L1 changeset（bootstrap）、`check_tree`、`check_index_links`、钉点声明与证据、
   `knowledge/` 之外的路径）。skeleton：文档语料 → 地图调用（入口页、架构页、owner 路由、general 链接）→ 文档不变量
-  调用 → 每个 `repos/<other>/` 种子规则页一次改写调用 → 逐条筛查：D5 去掉与文档重复的行、证据在钉点可取且哈希入记录、
+  调用 → 每个 `repos/<other>/` 种子内容页（任意类型，`_index.md` 除外）一次改写调用；种子没有内容页记入清单、改写后没有规则记入 notes、预算用尽时本页及其后所有种子记入 unfinished，从不静默跳过 → 逐条筛查：D5 去掉与文档重复的行、证据在钉点可取且哈希入记录、
   钉点声明成立、在一棵逐条累积的树上落位（页满则转到兄弟页 `rules-doc-invariants.md` / `<stem>-<n>.md`，**先落位再
   判定**，判定看到的就是规则最终所在的页）→ 咨询性判定（fail 剔除，unsure/unjudged 标出）→ 经 `ops.apply_operations`
   写入（新规则页先建壳并登记到目录索引；已有规则只追加，从不修改）→ 新目录建 `_index.md`、已有目录只追加链接、
