@@ -403,7 +403,7 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   run 却要发布、未运行或处于 blocked/publishing 的前序阶段 → `blocked`，不调模型。后续阶段缺省沿用前序阶段的钉点
   （`--pin` 可改，改了记入 notes）；链的状态进入输入摘要。阶段没有任何改动时记为 `empty`（不是错误）。
   `InitRecord.coverage` 是阶段的覆盖率报告，PR 正文渲染成 before/after 表。适配器 manifest 从前序 dry run 的改动或知识
-  仓库基点读取（`adapters/<adapter 目录名>/manifest.yaml`）；`repo.language` 决定模块扫描的语言。
+  仓库基点读取（`adapters/<adapter 目录名>/manifest.yaml`）；`repo.language` 决定模块扫描的语言。**每个阶段**（含 skeleton）开始时先要求这个 manifest 在知识仓库基点存在，否则用同一条消息（`adapter_missing`）`blocked`，不调模型：adapter 在自己的 PR 里先合入，缺失绝不退化成"未声明语言"（jiuwenswarm 试点回归）。
 - `init_modules`（阶段 2）：在钉点树上 `scan_modules_at_depth`（`source_roots`、`module_depth`、`min_module_loc`、
   `exclude`；adapter 未声明语言或语言未知 → 不扫描，进清单）。按当前 `_routes.yaml` 算模块覆盖率。未覆盖的模块由深到浅：
   已被某个 owner 部分覆盖的，**吸收**进以**最具体**方式覆盖其文件最多的 owner（路由顺序打平）：只在该 owner 的

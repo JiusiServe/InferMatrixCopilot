@@ -13,6 +13,7 @@ import yaml
 
 from infermatrix_copilot.kb_service.init_modules import SYSTEM_CARD, _leading_doc, declaration, routes_append_only
 from infermatrix_copilot.kb_service.init_stages import run_stage
+from infermatrix_copilot.kb_service.config import RepoLifecycle
 from infermatrix_copilot.kb_service.init_support import InitRecord
 from infermatrix_copilot.kb_service.models import ModelReply
 from infermatrix_copilot.knowledge_service.lifecycle import Page
@@ -201,6 +202,19 @@ def test_cards_join_an_existing_group_append_only(world):
     routes = yaml.safe_load(tree["knowledge/repos/toy/_routes.yaml"])
     tooling = [o for o in routes["owners"] if o["path"] == "repos/toy/components/tooling/_index.md"]
     assert len(tooling) == 1 and set(tooling[0]["scope_prefixes"]) >= {"tools/fmt/", "tools/lint/"}
+
+
+def test_an_adapter_missing_at_the_base_blocks_the_modules_stage(world):
+    """The pilot fail-open: an absent manifest is not "no language"."""
+    _world_with_tools(world)
+    _skeleton(world)
+    lifecycle = RepoLifecycle(**{**_modules_lifecycle().__dict__, "adapter_dir": Path("adapters/nope")})
+    gateway = CardGateway()
+    record = run_stage(_runtime(world, gateway), lifecycle, "modules", dry_run=True)
+    assert record.status == "blocked"
+    assert record.problems == ["adapters/nope/manifest.yaml does not exist in the knowledge repository at the base"]
+    assert not any("no repo.language" in item for item in record.checklist)
+    assert not [c for c in gateway.calls if c["system"] == SYSTEM_CARD]
 
 
 def test_no_language_means_no_scan_and_an_empty_stage(world):
