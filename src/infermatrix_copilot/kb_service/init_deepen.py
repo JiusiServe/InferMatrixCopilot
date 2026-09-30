@@ -3,18 +3,23 @@ shadow flip (design kb-init §7.3, §9 PR 3).
 
 Depth pass. The PR window is the pin's own first-parent history (bounded by
 ``init.pr_window_count`` / ``pr_window_max_age_days``, measured from the
-pin's commit time). Modules are taken by churn in that window, highest first;
-a module's owner is the one that owns most of its files MOST SPECIFICALLY
-(``init_coverage.most_specific``: a catch-all prefix never wins over a
-component's), and a module whose owner already bears rules is skipped (it adds
-nothing to the metric). For each other module one generator call reads its code at the
-pin (byte-bounded, with line numbers) and proposes rules with line-ranged
-evidence; the rules go through the shared screening — the docs redundancy
-filter (D5), evidence inside the module, pinned claims, placement, the
-advisory judge — and are appended to the owner's rule page (never editing an
-existing rule; a full page spills to a sibling). The pass stops when the
-rule-bearing PR-weighted coverage reaches ``init.coverage_target``, the budget
-runs out, or no hot module is left.
+pin's commit time). The unit of work is a GROUP: the files of one module that
+share one most specific owner (``init_coverage.most_specific``: a catch-all
+prefix never wins over a component's), so a module whose files belong to
+several owners is deepened once per owner — a hot file is never left behind
+because its module's majority owner already has rules. Groups are taken by
+churn in the window, highest first; a group whose owner already bears rules is
+skipped (it adds nothing to the metric). For each other group one generator
+call reads the group's code at the pin (byte-bounded, with line numbers) and
+proposes rules with line-ranged evidence; the rules go through the shared
+screening — the docs redundancy filter (D5), evidence inside the group's
+files, pinned claims, placement, the advisory judge — and are appended to the
+owner's rule page (never editing an existing rule; a full page spills to a
+sibling). The pass stops when the rule-bearing PR-weighted coverage reaches
+``init.coverage_target``, the budget runs out, or no hot group is left, and it
+always says which in the record's notes (and so the PR body): a pass never
+ends below the target without the reason and the hottest files still
+without rules.
 
 The same PR turns the repository's knowledge service on in shadow mode: a
 textual edit of exactly the ``enabled`` / ``mode`` lines of the adapter's
@@ -42,6 +47,7 @@ from .init_support import InitError, InitRecord, generate
 MAX_CODE_BYTES = 100_000
 MAX_CODE_FILES = 60
 MAX_HOT_LIST = 30
+MAX_STOP_FILES = 5
 _HEADER = re.compile(r"^knowledge_lifecycle:\s*(?:#.*)?$")
 _KEY_LINE = re.compile(r"^(?P<indent>[ \t]+)(?P<key>enabled|mode):(?P<space>[ \t]*)(?P<value>[^#\n]*?)"
                        r"(?P<comment>[ \t]+#[^\n]*)?(?P<eol>\r?\n?)$")
@@ -127,31 +133,46 @@ class _Deepen(_Stage):
                                                  max_age_days=init.pr_window_max_age_days)
         include = make_include(init.source_roots, init.exclude, suffixes(language))
         before = pr_weighted_coverage(prs, owners, include=include, rule_pages=self._rule_pages(owners))
-        churn = self._churn(prs, modules, include)
+        groups, unrouted = self._groups(prs, modules, owners, include)
+        if unrouted:
+            self.record.notes.append(f"{len(unrouted)} hot source file(s) no route reaches (modules stage), "
+                                     f"no rules: " + ", ".join(f"{p} ({n})" for p, n in unrouted[:MAX_STOP_FILES]))
         self._ids = self._id_source()
         written: dict[str, str] = {}
         evidence = []
         current = before
-        for index, (key, count) in enumerate(churn):
-            if current.rule_bearing_ratio >= init.coverage_target:
-                self.record.notes.append(f"coverage target {init.coverage_target:.0%} reached; "
-                                         f"{len(churn) - index} hot module(s) left as they are")
+        target = init.coverage_target
+        skipped = 0
+        stop = ""
+        for index, (key, owner, files, count) in enumerate(groups):
+            if current.rule_bearing_ratio >= target:
+                stop = (f"coverage target {target:.0%} reached; "
+                        f"{len(groups) - index} hot group(s) left as they are")
                 break
-            files = modules[key]["files"]
-            owner = self._owner(files, owners)
-            if owner is None:
-                self.record.notes.append(f"module {key}: no route reaches it (modules stage), no rules")
-                continue
             if owner.path in self._rule_pages(owners):
-                continue      # its owner already bears rules: nothing to add to the metric
+                skipped += 1  # its owner already bears rules: nothing to add to the metric
+                continue
             try:
                 kept = self._deepen(tree, key, files, owner)
             except BudgetExhausted as exc:
-                self.record.unfinished += [f"module {k}: {exc}" for k, _ in churn[index:]]
+                self.record.unfinished += [f"module {k} (owner {o.owner}): {exc}" for k, o, _, _ in groups[index:]]
+                stop = (f"budget exhausted with {len(groups) - index} hot group(s) left; "
+                        f"{self._short_of(current.rule_bearing_ratio, target)}")
                 break
             written.update({c.rule_id: c.section for c in kept})
             evidence += [e for c in kept for e in c.evidence]
             current = pr_weighted_coverage(prs, owners, include=include, rule_pages=self._rule_pages(owners))
+        if not stop:
+            stop = (f"coverage target {target:.0%} reached; no hot group left"
+                    if current.rule_bearing_ratio >= target
+                    else f"every hot group visited; {self._short_of(current.rule_bearing_ratio, target)}")
+        if current.rule_bearing_ratio < target:
+            hottest = self._without_rules(prs, owners, include)[:MAX_STOP_FILES]
+            if hottest:
+                stop += "; hottest files without rules: " + ", ".join(f"{p} ({n})" for p, n in hottest)
+        self.record.notes.append(f"deepen stopped: {stop}")
+        if skipped:
+            self.record.notes.append(f"{skipped} hot group(s) skipped: their owner already bears rules")
         self.record.coverage = {
             "pr_routed": {"before": round(before.routed_ratio, 4), "after": round(current.routed_ratio, 4)},
             "pr_rule_bearing": {"before": round(before.rule_bearing_ratio, 4),
@@ -168,12 +189,36 @@ class _Deepen(_Stage):
 
     # -- the window ----------------------------------------------------------------
     @staticmethod
-    def _churn(prs, modules, include) -> list[tuple[str, int]]:
-        """Modules by source-file changes in the window, highest first."""
-        from .init_coverage import churn_by_module
+    def _short_of(ratio: float, target: float) -> str:
+        return f"target not reached ({ratio:.0%} < {target:.0%})"
 
-        filtered = [[f for f in files if include(f)] for files in prs]
-        return [(k, n) for k, n in churn_by_module(filtered, modules) if n > 0]
+    @staticmethod
+    def _groups(prs, modules, owners: list[Owner], include
+                ) -> tuple[list[tuple[str, Owner, list[str], int]], list[tuple[str, int]]]:
+        """The hot groups — ``(module, owner, files, churn)`` for every module
+        and most specific owner of some of its files, churn = changes of those
+        files in the window — highest churn first (ties by module, then owner),
+        and the changed source files of modules no route reaches, by churn. A
+        file several owners own equally goes to the first in routing order."""
+        changes: Counter[str] = Counter()
+        for files in prs:
+            for path in {PurePosixPath(f.strip().strip("/")).as_posix() for f in files}:
+                if include(path):
+                    changes[path] += 1
+        grouped: dict[tuple[str, str], tuple[Owner, list[str]]] = {}
+        unrouted: Counter[str] = Counter()
+        for key in sorted(modules):
+            for path in modules[key]["files"]:
+                owner = next(iter(most_specific(path, owners)), None)
+                if owner is None:
+                    if changes[path]:
+                        unrouted[path] = changes[path]
+                    continue
+                grouped.setdefault((key, owner.owner), (owner, []))[1].append(path)
+        groups = [(key, owner, files, sum(changes[f] for f in files))
+                  for (key, _), (owner, files) in grouped.items()]
+        groups = sorted((g for g in groups if g[3] > 0), key=lambda g: (-g[3], g[0], g[1].owner))
+        return groups, sorted(unrouted.items(), key=lambda item: (-item[1], item[0]))
 
     def _without_rules(self, prs, owners: list[Owner], include) -> list[tuple[str, int]]:
         """Changed source files of the window whose most specific owners bear
@@ -185,17 +230,6 @@ class _Deepen(_Stage):
                 if include(path) and not any(o.path in bearing for o in most_specific(path, owners)):
                     missed[path] += 1
         return sorted(missed.items(), key=lambda item: (-item[1], item[0]))
-
-    @staticmethod
-    def _owner(files: list[str], owners: list[Owner]) -> Owner | None:
-        """The owner that owns most of a module's files most specifically
-        (routing order breaks ties): a broader owner that merely also reaches
-        them never takes a component's rules."""
-        counts = {o.owner: 0 for o in owners}
-        for path in files:
-            for owner in most_specific(path, owners):
-                counts[owner.owner] += 1
-        return max((o for o in owners if counts[o.owner]), key=lambda o: counts[o.owner], default=None)
 
     # -- rule pages ------------------------------------------------------------------
     def _active_rules(self, path: str) -> int:
@@ -285,7 +319,7 @@ class _Deepen(_Stage):
         for candidate in self._to_candidates(data, page, f"code:{key}"):
             outside = [e.get("path") for e in candidate.evidence if str(e.get("path") or "") not in inside]
             if outside:
-                self._drop(candidate, f"evidence outside module {key}: {outside}")
+                self._drop(candidate, f"evidence outside module {key}'s files owned by {owner.owner}: {outside}")
                 continue
             candidates.append(candidate)
         kept = self._screen(candidates)
