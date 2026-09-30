@@ -19,6 +19,8 @@ from dataclasses import replace
 from pathlib import Path
 
 from ....review.planner import DEFAULT_STANDARD_LENSES, DEPTHS, plan_review
+from ....ut_coverage import UTCoverageRules, analyze as _ut_analyze
+from ....ut_coverage import cap_gap_comments, render as _ut_render
 from ...step import FailureKind, StepContext, StepResult
 from .._common import gh_read_tools as _gh_read_tools
 from .._common import repo_path as _repo_path
@@ -145,6 +147,17 @@ async def _review_diff(ctx: StepContext) -> StepResult:
             except OSError:
                 continue
 
+    # #164: new public functions no test names — candidates for the lenses
+    # to judge (indirect coverage, trivial, or a real gap), never findings
+    ut_rules = UTCoverageRules.from_manifest(
+        adapter.manifest if adapter is not None else None)
+    ut_report = (await asyncio.to_thread(_ut_analyze, str(diff), ut_rules,
+                                         _repo_path(ctx))
+                 if ut_rules is not None else None)
+    if ut_report is not None:
+        ctx.trace.record("review_ut_candidates", step="agent.review_diff",
+                         **ut_report.to_dict())
+
     common = dict(
         step_name="agent.review_diff",
         purpose=f"Review PR #{spec.get('pr')} like an engaged maintainer: "
@@ -158,14 +171,18 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                   "gate_report": ctx.state.get("gate_report", ""),
                   "sweep_targets": _sweep_targets(str(diff), language),
                   "changed_symbol_consumers": await asyncio.to_thread(
-                      _consumer_sweep, _repo_path(ctx), str(diff))},
+                      _consumer_sweep, _repo_path(ctx), str(diff)),
+                  "untested_public_api": (_ut_render(ut_report)
+                                          if ut_report is not None else "")},
         output_extension={"review_comments":
                           "list of {file, line, anchor_snippet, severity: "
                           "blocker|major|minor|nit, comment, evidence, "
                           "suggestion: optional replacement code for the "
                           "cited lines — the concrete edit, no prose, "
                           "disposition: publish|excluded|duplicate|resolved|"
-                          "no_issue — only publish is published}"},
+                          "no_issue — only publish is published, kind: "
+                          "optional, `untested_api` only for a missing unit "
+                          "test on a listed untested-function candidate}"},
         extra_tools={**_gh_read_tools(_repo_path(ctx)),
                      **review_repo_tools(_repo_path(ctx))},
     )
@@ -301,6 +318,12 @@ async def _review_diff(ctx: StepContext) -> StepResult:
     # finalized set (#141).
     all_candidates = list(output.get("review_comments") or [])
     published, withheld = finalize_review_dispositions(output)
+    # at most three untested-function comments; the rest are named, not lost
+    published, ut_dropped = cap_gap_comments(published, ut_report)
+    if ut_dropped:
+        output["summary"] = (str(output.get("summary") or "").rstrip()
+                             + "\n\nAlso without a unit test: "
+                             + ", ".join(f"`{n}`" for n in ut_dropped) + ".").lstrip()
     output["review_comments"] = published
     output["_withheld_findings"] = withheld
     comments = sorted(output.get("review_comments") or [],

@@ -1,6 +1,6 @@
 # direct_routing.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-29 -->
 
 `LOC ~880 · Direct 模式完整策略包与仓库中立的知识路由 · refactor-status: stable`
 
@@ -47,6 +47,10 @@ Direct policy bundle）、`direct_knowledge_routes`、
   `evidence_head_sha` 7–40 位十六进制、`existing_feedback_status` 枚举、
   `finding_dispositions` 的 anchor/disposition/existing_thread/
   head_recheck 约束。
+- **未测公开函数候选（#164）**：`direct_review_plan(..., diff="")` 有 diff 时带
+  `untested_public_api`（`status=ok` + 候选 + 评审规则），只基于 diff 自身的测试
+  文件——provider 没有 PR head 的 checkout，树内测试搜索由 agent 按 checklist 完成；
+  无 diff 为 `{"status": "no_diff"}`，adapter 关闭时为 `disabled`。
 - 叶子模块：**绝不** import 任何 server 模块
   （`test_contract.py::test_direct_routing_does_not_import_a_server_module`）。
 

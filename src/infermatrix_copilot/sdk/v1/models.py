@@ -229,6 +229,9 @@ class DirectReviewRequest(_Serializable):
     body: str
     changed_paths: tuple[ChangedPath, ...]
     carried_findings: tuple[CarriedFinding, ...] = ()
+    # optional unified diff of the frozen head; enables the provider's
+    # untested-public-function candidates (#164)
+    diff: str = ""
 
 
 @dataclass(frozen=True)
@@ -254,6 +257,9 @@ class DirectReviewPlan(_Serializable):
     # review_context_id) was served from: record it with the review
     knowledge_snapshot: str = ""
     knowledge_tree_sha256: str = ""
+    # new public functions no test in the request's diff names (#164);
+    # {"status": "no_diff"} when the request carried no diff
+    untested_public_api: dict[str, Any] = field(default_factory=dict)
 
 FeedbackStatus = Literal[
     "checked", "disabled", "unavailable", "not_applicable"

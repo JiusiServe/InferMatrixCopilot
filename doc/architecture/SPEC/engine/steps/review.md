@@ -54,6 +54,10 @@ agent、评审结果的有界精炼、评测调优过的 prompt 数据和确定�
   要做的改动、`evidence` 引用该 `[resolved]` 行）；覆盖补充（coverage editor）
   的输入也剔除 `[resolved]` 行。此前按关键词从散文里“提拔”残留，会把明确
   写着不再追究的行发成 P2（#155）。
+- **未测公开函数（#164）**：evidence 带 `untested_public_api`——`ut_coverage.analyze`
+  在 PR-time worktree 上找出无测试引用的新增公开函数，由 lens 判断间接覆盖/trivial/
+  真缺口；评审者把缺测试评论标为 `kind: untested_api`；finalize 之后 `cap_gap_comments`
+  只对这类评论至多保留 3 条，其余名字追加到 summary，其他发现不受影响。
 - **`review_verdict` 是发布的 state 字段，不是散文**：由
   `_review_verdict(review_comments, pr_state)` 计算（**与渲染器同一个
   helper，绝不第二份校准规则**），随 `review_text`/`review_summary`/
