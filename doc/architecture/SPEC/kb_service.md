@@ -311,3 +311,14 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
 不传上限的现有调用方行为不变：该参数根本不会发给 transport。
 `runtime.trace_recorder` 把阈值与花费持久化到 `model_call` 记录的 `result.max_budget_usd` / `result.cost_usd`
 （未设或未知为 null），包括 transport 抛错的失败记录。
+
+## 2026-09-30 `kb init` 的 adapter 配置
+`knowledge_lifecycle.init`（可选子映射，严格校验，未知键抛 `LifecycleConfigError`）解析为 `InitConfig`，挂在
+`RepoLifecycle.init`（缺省为 `None`）：`seeds`（知识库相对路径，只能是 `general/...` 或 `repos/<其他仓库>/...`，
+不得指向本仓库、不得为绝对路径或含空段/`.`/`..`，不得重复）、`doc_globs`（缺省 `DEFAULT_DOC_GLOBS` =
+`README*`、`docs/**/*.md`（与 `profiles/establish.build_doc_corpus` 一致）加 `CONTRIBUTING.md`、`AGENTS.md`）、
+`source_roots`（缺省取同一 manifest 的 `ut_coverage.source_roots`）、`exclude`、`module_depth`（≥1，缺省 2）、
+`min_module_loc`（≥0，缺省 300）、`pr_window: {count, max_age_days}`（>0，缺省 200 / 180）、`coverage_target`
+（(0, 1]，缺省 0.85）、`budget_usd`（>0，缺省 30）、`judge_call_usd`（≥0，缺省 0.50）。`validate_seeds(init,
+knowledge_root)` 是运行时检查：种子必须是知识树中已存在的文件或目录，解析后不得逃出知识根目录，逐条返回问题。
+解析只做静态校验，不读知识树。测试：`test_kb_init_config.py`。
