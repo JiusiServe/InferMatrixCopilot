@@ -14,6 +14,11 @@
     kb traces [--kind K] [--changeset ID] [--rule ID] [--limit N]   query trace/1 records
     kb replay --record ID --model PROVIDER:MODEL[:EFFORT]           re-ask a recorded call
     kb export --out FILE [--role judge|generator]                   dataset (calibration-safe)
+    kb init REPO --stage STAGE [--dry-run] [--pin SHA]
+                                      bootstrap a repository's knowledge base, one
+                                      human-merged stage at a time (skeleton, modules,
+                                      deepen, harvest-calibration); never touches kb.db
+    kb init REPO --suggest-seeds      rank existing knowledge pages worth seeding from (no model call)
     kb publish (--remote HOST:/STATE_DIR | --local DIR) [--once]
                                       the publisher (GPU box, owner's gh login): perform
                                       the signed outbox items; writes need ALLOW_POST=1
@@ -103,6 +108,36 @@ def _refresh(state_dir: Path, ledger, registry) -> None:
     _outbox(state_dir, ledger).transition(lambda: None)
 
 
+def _init_command(args, state_dir: Path) -> int:
+    from ..config import Settings
+
+    if args.suggest_seeds == bool(args.stage):
+        print("kb init: pass exactly one of --stage or --suggest-seeds", file=sys.stderr)
+        return 2
+    if args.suggest_seeds:
+        from .init_stages import suggest_seeds
+        from .init_support import InitError, InitRuntime
+
+        try:
+            rt = InitRuntime.from_env(Settings(), state_dir=state_dir)
+            lifecycle = rt.registry.get(args.repo)
+            if lifecycle is None:
+                print(f"no adapter declares knowledge repo {args.repo!r}", file=sys.stderr)
+                return 2
+            for path, score, shared in suggest_seeds(rt, lifecycle):
+                print(f"{score:6.3f}  {path}  ({', '.join(shared[:8])})")
+        except InitError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        return 0
+    from .runner import run_playbook
+
+    params = {"stage": args.stage, "dry_run": "true" if args.dry_run else "false", "pin": args.pin or ""}
+    outcome, run_dir = run_playbook(Settings(), "kb-init", args.repo, state_dir=state_dir, params=params)
+    print(f"kb init {args.repo} {args.stage}: {outcome.status} ({run_dir})")
+    return 0 if outcome.status == "done" else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="infermatrix-copilot kb")
     parser.add_argument("--state-dir", help="default: $KB_STATE_DIR or ~/.infermatrix-copilot/kb")
@@ -142,6 +177,13 @@ def main(argv: list[str] | None = None) -> int:
     export = sub.add_parser("export")
     export.add_argument("--out", required=True)
     export.add_argument("--role", default="judge", choices=("judge", "generator"))
+    init = sub.add_parser("init")
+    init.add_argument("repo")
+    init.add_argument("--stage", choices=("skeleton", "modules", "deepen", "harvest-calibration"))
+    init.add_argument("--dry-run", action="store_true",
+                      help="write the tree and PR body under the state directory instead of opening a PR")
+    init.add_argument("--pin", help="upstream commit to pin (default: the default branch head)")
+    init.add_argument("--suggest-seeds", action="store_true")
     publish = sub.add_parser("publish")
     where = publish.add_mutually_exclusive_group(required=True)
     where.add_argument("--remote", help="host:/absolute/path of the service state directory (over ssh)")
@@ -163,6 +205,9 @@ def main(argv: list[str] | None = None) -> int:
         return _publish(args)
     if args.command in {"traces", "replay", "export"}:
         return _traces_command(args, _state_dir(args.state_dir))
+    if args.command == "init":
+        # before any ledger is opened: kb init never touches the service's kb.db
+        return _init_command(args, _state_dir(args.state_dir))
 
     state_dir = _state_dir(args.state_dir)
     ledger = _ledger(state_dir)

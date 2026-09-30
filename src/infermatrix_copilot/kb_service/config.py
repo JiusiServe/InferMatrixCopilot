@@ -29,6 +29,7 @@ _KEYS = {
 _INIT_KEYS = {
     "seeds", "doc_globs", "source_roots", "exclude", "module_depth", "min_module_loc",
     "pr_window", "coverage_target", "budget_usd", "judge_call_usd",
+    "generator_call_usd", "harness_overhead_bytes",
 }
 # README* + docs/**/*.md is what profiles/establish.build_doc_corpus reads;
 # the contribution and agent guides carry most cross-doc invariants.
@@ -68,6 +69,10 @@ class InitConfig:
     coverage_target: float = 0.85
     budget_usd: float = 30.0
     judge_call_usd: float = 0.50
+    # per generator call: the spend threshold handed to the transport, and the
+    # bytes its own harness adds to the prompt (for the one-request overshoot bound)
+    generator_call_usd: float = 2.0
+    harness_overhead_bytes: int = 200_000
 
 
 @dataclass(frozen=True)
@@ -176,6 +181,9 @@ def parse_init(section: object, where: str, *, repo: str, manifest: dict) -> Ini
     judge_call = _number(data.get("judge_call_usd", 0.50), f"{where}.judge_call_usd")
     if judge_call < 0:
         raise LifecycleConfigError(f"{where}.judge_call_usd must be >= 0")
+    generator_call = _number(data.get("generator_call_usd", 2.0), f"{where}.generator_call_usd")
+    if generator_call <= 0:
+        raise LifecycleConfigError(f"{where}.generator_call_usd must be > 0")
     return InitConfig(
         seeds=seeds,
         doc_globs=(_strings(data["doc_globs"], f"{where}.doc_globs") if "doc_globs" in data
@@ -190,6 +198,9 @@ def parse_init(section: object, where: str, *, repo: str, manifest: dict) -> Ini
         coverage_target=coverage,
         budget_usd=budget,
         judge_call_usd=judge_call,
+        generator_call_usd=generator_call,
+        harness_overhead_bytes=_int(data.get("harness_overhead_bytes", 200_000),
+                                    f"{where}.harness_overhead_bytes", minimum=0),
     )
 
 
