@@ -1,22 +1,32 @@
 # The meta-improvement engine's weekly cycle (design §4). A vetted reuse
 # playbook, never generated. Every step is read-only toward the target
-# repositories and the trace store (the engine only appends its own records);
-# publication (P4) is a separate `risk: push` step behind the post gate.
+# repositories and the trace store (the engine only appends its own records)
+# except `improve.publish`: `risk: push`, the cycle's only outward write
+# (proposal actions into omni-maintainer's outbox), behind the explicit
+# `post` intent AND ALLOW_POST=1 like `pr.post_review`.
+#
+# With `--task-param meta_case=<case>` the same playbook runs the engine's
+# own forensics role against ONE frozen meta-benchmark case (the shadow
+# self-experiment unit, §11.2): only `improve.forensics` runs.
 name: workflow-improve
-version: 1
+version: 2
 status: active
 provenance:
   created_by: human
-  source: meta-improvement-engine-design.md v1 (sol-approved 2026-09-29), P1 slice
+  source: meta-improvement-engine-design.md v1 (sol-approved 2026-09-29), P1-P4
 task_kinds: [workflow_improve]
 repos: []
 params: {}
 steps:
-  - {id: preflight, step: improve.preflight}
-  - {id: lint, step: improve.lint}
-  - {id: experiments, step: improve.experiments}
+  - {id: mode, step: improve.mode}
+  - {id: preflight, step: improve.preflight, when: not improve_meta}
+  - {id: sync, step: improve.sync, when: not improve_meta}
+  - {id: lint, step: improve.lint, when: not improve_meta}
+  - {id: experiments, step: improve.experiments, when: not improve_meta}
   - {id: forensics, step: improve.forensics}
-  - {id: ledger, step: improve.ledger}
+  - {id: ledger, step: improve.ledger, when: not improve_meta}
+  - {id: publish, step: improve.publish, when: not improve_meta}
   - {id: report, step: report.final_summary}
 success: one cycle recorded (decision type=cycle), the per-workflow ledgers
-  updated, the cycle report written; proposals stay in the ledger until P4
+  updated, the cycle report written, publishable proposals handed to the
+  outbox when the post gates are open

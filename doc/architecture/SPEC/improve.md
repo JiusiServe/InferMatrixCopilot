@@ -2,7 +2,7 @@
 
 <!-- verified-against: 2026-09-30 -->
 
-`设计：/data/zhoutaichang/copilot/meta-improvement-engine-design.md v1（GPT-6 sol 批准 2026-09-29） · refactor-status: building (P0–P3 已落地)`
+`设计：/data/zhoutaichang/copilot/meta-improvement-engine-design.md v1（GPT-6 sol 批准 2026-09-29） · refactor-status: building (P0–P4 已落地)`
 
 ## 职责
 面向任意 trace/1 工作流的"取证—实验—提案"循环。**只提案**：引擎的写权限限于追加自己的 trace/1 记录、
@@ -29,20 +29,27 @@
 | `meta.py` | P2 | 冻结元基准：`eval/dataset/meta/cases`（trace + 人工阶段标签）与 `meta/lints`（注入缺陷样本）的导出与加载 |
 | `budget.py` | P3 | 周包络（美元 + 判官次数，按 ISO 周持久化、跨进程加锁）：每次模型调用发出前按最坏情况预留（输入 = 请求字节数 ≥ token 数、输出 = `max_tokens`、无价格即拒绝）、返回后结算；`结算 > 预留` 记 `budget_breach` 并中止；`governed()`/`current_governor()` 供 `LLM.create` 与 `run_judge` 使用 |
 | `experiments.py` | P3 | 预注册（Tier 2 且非 descriptive-only、API 后端、指纹 diff 非空且不触及元基准、每个 item 有金标、按历史 sd 算 `n_required`、成本预留）→ 影子运行（stage → 每 item×replicate×臂 一个子进程、`PR_SNAPSHOT_FILE` 交接、指纹核对、L13/预算/崩溃隔离）→ 配对判定（`n_retained` 重算功效、五种标签、`experiment_verdict` 记录、提案状态推进） |
-| `cli.py` | P0–P3 | `improve migrate-index|rebuild-index|rollback-index|compare-index|verify-index|cycle|ledger|lints|gold draft/check|meta lint-check|budget|experiment register/run/list` |
+| `publish.py` | P4 | 提案发布：引用只以记录 id + blob 哈希（`excerpt_for` 逐字摘录 ≤20 行、脱敏、`verify_excerpt` 可由哈希复原）；`lint_proposal` 拒绝任何不可解析引用（Tier 1 ≥3 条记录，Tier 2 S1–S9 + 损失量）；固定 issue 模板（主张/阶段/损失/证据/建议预注册/账本/marker）；`ProposalOutbox` 文件协议 `improve-outbox/1`（`actions/` 引擎写、`acks/` 与 `inbox/` maintainer routine 写）；`plan`/`publish`（open/update/close，hold 暂停发布、待 ack 不重发）；`sync`（ack → issue 与已发布状态；inbox → 人类触碰、`maintainer: hold`、合并 PR → landed、GitHub 关闭 → closed；Tier 1 landed 在后一周期 lint 率低于开单时才 close） |
+| `adapters/meta_bench.py` | P4 | 引擎自身的结果适配器（§11.2）：金标 = 元基准 case 的人工阶段标签；outcome = `meta_eval` 记录；hit = 标签一致、disputed = 双家族不一致、S0 = unlabeled；`review_scores` = κ、lint 召回；`human_labelled`（无判官） |
+| `workflows/workflow-improve.yaml` | P4 | 引擎自登记：`workflow-improve.improve.forensics`，item `{improve_item}`（周期为 `cycle`、自实验为 `meta:<case>`），指纹覆盖取证/lint/统计/适配器源码与模型 |
+| `cli.py` | P0–P4 | `improve migrate-index|rebuild-index|rollback-index|compare-index|verify-index|cycle|ledger|lints|gold draft/check|meta lint-check/bench|budget|experiment register/run/list|publish [--dry-run]|sync` |
 
 ## 接入点
 - 执行器：`settings.trace_store_root` 非空时绑定 store 并为每步绑定单元上下文；`settings.improve_shadow` 下拒绝非 read/report 步骤。
 - `tools.dispatch` / `LLM.create` / `HarnessLLM.create` / `run_harness_step` / MCP bridge：全保真采集。
 - `kb serve` 调度器：每 tick 调 `_improve_cycle()`，周度槽位到达即跑一次周期（与知识服务同一租约、异常隔离）。
-- 任务种类 `workflow_improve`（L2，READ_ONLY_KINDS）；playbook `workflow-improve`（preflight → lint → experiments → forensics → ledger → report）。
+- 任务种类 `workflow_improve`（L2，READ_ONLY_KINDS）；playbook `workflow-improve`（mode → preflight → sync → lint → experiments → forensics → ledger → publish → report）；`improve.publish` 是唯一 `risk=push` 步骤，与 `pr.post_review` 同样过"TaskSpec `post` 且 ALLOW_POST=1"双门，否则 dry-run 打印将写的 outbox 动作。
 - `LLM.create`：绑定了 governor 时先预留再发请求，失败释放、成功结算；`improve.experiments` 与 `improve.forensics` 都在 `governed()` 内运行。
-- `improve.forensics` 步骤：对每个有结果适配器的工作流建覆盖矩阵、用两个模型家族归因每个 miss、产出整改清单；单元数低于 `tier2_min_items` 或无 LLM 时跳过并说明。
+- `improve.forensics` 步骤：对每个有结果适配器的工作流建覆盖矩阵、用两个模型家族归因每个 miss、产出整改清单并按阶段各开一条 Tier 2 提案（`cycle.open_tier2_proposals`，带建议预注册；descriptive-only 工作流的提案标 proxy、无建议）；单元数低于 `tier2_min_items` 或无 LLM 时跳过并说明。`--task-param meta_case=<case>` 时（`improve.mode` 发布 `improve_meta`）只跑取证步骤：对一个冻结 case 归因并写 `meta_eval` outcome——这就是自实验的影子单元（`experiments.meta_run_unit` / `_meta_stage` 只把 case 与 lint 样本复制进影子目录，不带任何叙述材料）。
+- `improve.sync`（read）读回 acks/inbox；`improve.publish`（**`risk="push"`**，唯一外向写）：无 `post` 意图只预览、有意图但 `ALLOW_POST=0` 为 dry-run、二者俱备才写 `improve_outbox_dir` 下的动作文件（`improve_proposal_repo` 必填）；影子运行被执行器在步骤前拒绝。
+- 自实验：`experiments.run` 对 `human_labelled` 适配器不要求判官；`_find_unit` 优先取声明工作流的单元。
 
 ## 不变量
-- P1 周期永远 dry-run：提案只在账本与 trace 里，不上 GitHub（P4）。
+- 周期内唯一外向写是 `improve.publish` 写入 outbox 的提案动作；引擎不持有 GitHub 令牌，issue 的开/改/关由 maintainer routine 执行并以 ack 回报。
+- 未通过 `lint_proposal` 的提案永不发布（记 `proposal_lint_failed`）；hold 只暂停发布，lint 与实验照常。
+- 元基准只读：任何触及 `eval/dataset/meta` 的指纹 diff 或 `IMPROVE_*` 覆盖在注册时被拒。
 - 引擎自身的记录（`playbook=workflow-improve`）是下一周期的 Tier 1 单元（自登记）。
 - lint 只读 trace，不调模型；无证据形态的 lint 不猜。
 
 ## 测试
-`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`、`test_improve_p3.py`。
+`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`、`test_improve_p3.py`、`test_improve_p4.py`。

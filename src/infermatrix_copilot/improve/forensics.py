@@ -22,7 +22,7 @@ from typing import Any, Callable
 
 from ..scopes import ToolScope
 from ..tools import ToolDef
-from ..trace_store import TraceStore, current_store
+from ..trace_store import TraceStore, current_context, current_store
 from .adapters import Gold, Match, Outcome
 from .reader import Unit
 
@@ -228,9 +228,15 @@ def attribute(store: TraceStore, units: dict[str, Unit], golds: dict[str, Gold],
         primary.other = {r.by: {"stage": r.stage, "mechanism": r.mechanism} for r in results[1:]}
         out.append(primary)
         sink = current_store() or store
+        # the record belongs to the CALLER's unit when one is bound (the
+        # engine's own forensics unit over a meta case keeps its own item);
+        # the investigated unit and item are named in the result
+        ctx = {"playbook": "workflow-improve"}
+        if not current_context().get("item"):
+            ctx["item"] = unit.item
         try:
-            sink.append("decision", context={"playbook": "workflow-improve", "item": unit.item},
-                        result={"type": "forensic_case", "workflow": unit.workflow, "unit_id": unit.unit_id,
+            sink.append("decision", context=ctx,
+                        result={"type": "forensic_case", "workflow": unit.workflow, "unit_id": unit.unit_id, "item": unit.item,
                                 "gold_id": cell.gold_id, "stage": primary.stage, "disputed": disputed,
                                 "mechanism": primary.mechanism, "evidence": list(primary.evidence),
                                 "families": {r.by: r.stage for r in results}})

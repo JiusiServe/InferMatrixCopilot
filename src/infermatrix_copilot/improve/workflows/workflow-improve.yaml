@@ -1,0 +1,29 @@
+# The engine's own forensics role (design §11.2, self-enrolment): every
+# `improve.forensics` step call is a unit — a cycle's Tier 2 pass in
+# production, or ONE frozen meta-benchmark case in a shadow self-experiment
+# (`--task-param meta_case=<case>`, item `meta:<case>`). The outcome adapter
+# scores a meta case by the stage labels' agreement with the HUMAN labels
+# (recall_gold = share of cells agreed, kappa_review = Cohen's kappa) and the
+# Tier 1 catalogue's recall on the injected lint samples (lint_recall_review).
+# No judge is involved: the labels are human, so the cross-family rule for
+# self-experiments is satisfied by construction. The benchmark is read-only
+# to the engine; a fingerprint diff touching it refuses registration.
+workflow: workflow-improve.improve.forensics
+kind: dynamic
+unit: step_call
+item_key: "{improve_item}"
+fingerprint:
+  covers:
+    - playbook_yaml_sha
+    - settings: [agent_model, eco_model, performance_model, llm_max_tokens]
+    - prompts: ["improve/forensics.py", "improve/lints.py", "improve/stats.py", "improve/adapters/*.py",
+                "improve/meta.py"]
+    - routing: [ECO_MODEL, PERFORMANCE_MODEL]
+    - resolved_models
+    - tools
+    - copilot_sha
+capture: full
+outcome_adapter: infermatrix_copilot.improve.adapters.meta_bench:MetaBenchAdapter
+tier2_min_items: 3
+shadow_tools: [trace_get, trace_blob, trace_query]
+shadow_executables: [python3, git, grep]

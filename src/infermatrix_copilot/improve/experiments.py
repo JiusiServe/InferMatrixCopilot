@@ -32,6 +32,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -329,7 +330,13 @@ def _adapter_kwargs(settings: Any, decl: WorkflowDeclaration) -> dict:
         return {"gt_dir": str(getattr(settings, "improve_gt_dir", "") or "eval/dataset/gt"),
                 "judgments_dir": getattr(settings, "improve_judgments_dir", "") or None,
                 "arm": str(getattr(settings, "improve_eval_arm", "") or "")}
+    if decl.outcome_adapter.endswith(":MetaBenchAdapter"):
+        return {"meta_dir": str(getattr(settings, "improve_meta_dir", "") or "eval/dataset/meta")}
     return {}
+
+
+def _meta_dir(settings: Any) -> Path:
+    return Path(str(getattr(settings, "improve_meta_dir", "") or "eval/dataset/meta")).expanduser()
 
 
 # -- running ----------------------------------------------------------------------------------
@@ -396,6 +403,47 @@ def _terminal_invalid(ledger_dir: Path, exp: Experiment, governor, settings, err
     return exp
 
 
+def meta_argv(playbook: str, repo: str, case: str, *extra: str) -> list[str]:
+    """The child's command line. The child's REPO_PATHS exposes exactly one
+    alias (shadow_env), so the task names it: without `repo=` run_playbook
+    falls back to default_repo and refuses the run as an unknown alias
+    before any step."""
+    return [sys.executable, "-m", "infermatrix_copilot", "--yes", "--playbook", playbook,
+            "--task-param", f"repo={repo}", "--task-param", f"meta_case={case}", *extra]
+
+
+def meta_run_unit(*, side: str, item: str, replicate: int, env: dict, snapshot_path: Path, shadow_dir: Path,
+                  run_root: Path, playbook: str, repo: str, pr: int, timeout: int = 3600) -> dict:
+    """Run one self-experiment unit: the copilot as a subprocess in the
+    shadow environment on ONE staged meta case (`--task-param meta_case=`),
+    reading only the staged copy through IMPROVE_META_DIR."""
+    argv = meta_argv(playbook, repo, item[len("meta:"):])
+    child_env = {**env, "IMPROVE_META_DIR": str(Path(shadow_dir) / "meta"), "RUN_ROOT": str(run_root)}
+    proc = subprocess.run(argv, cwd=str(shadow_dir), env=child_env, capture_output=True, text=True, timeout=timeout)
+    return {"rc": proc.returncode, "stdout": (proc.stdout or "")[-2000:], "stderr": (proc.stderr or "")[-2000:],
+            "tag": env.get("IMPROVE_UNIT_TAG", "")}
+
+
+def _meta_stage(settings, item: str, *, shadow_root: Path, run_dir: Path) -> dict:
+    """Stage one meta case for a self-experiment: a copy of the case and the
+    lint samples under the shadow directory (nothing narrative), the
+    snapshot file only naming the item."""
+    from .meta import stage_case
+
+    if not item.startswith("meta:"):
+        raise ValueError(f"a self-experiment item is 'meta:<case>', got {item!r}")
+    case = item[len("meta:"):]
+    shadow_dir = shadow_root / re.sub(r"[^A-Za-z0-9._-]+", "_", case)
+    shadow_dir.mkdir(parents=True, exist_ok=True)
+    stage_case(_meta_dir(settings), case, shadow_dir / "meta")
+    snapshots = run_dir / "snapshots"
+    snapshots.mkdir(parents=True, exist_ok=True)
+    snapshot_path = snapshots / f"{re.sub(r'[^A-Za-z0-9._-]+', '_', item)}.json"
+    snapshot_path.write_text(json.dumps({"item": item, "meta_case": case}), encoding="utf-8")
+    return {"repo": "meta", "pr": 0, "shadow_dir": str(shadow_dir), "snapshot_path": str(snapshot_path),
+            "meta_dir": str(shadow_dir / "meta")}
+
+
 def _run_locked(store, settings, ledger_dir: Path, exp: Experiment, *, run_unit, stage, governor, now,
                 shadow_store, judge_llm) -> Experiment:
     from .judges import judge_spec_from
@@ -404,20 +452,26 @@ def _run_locked(store, settings, ledger_dir: Path, exp: Experiment, *, run_unit,
     decls = declarations_for(settings)
     decl = decls[exp.workflow]
     adapter = load_adapter(decl.outcome_adapter, **_adapter_kwargs(settings, decl))
-    # the judge is configured from settings (api:<model> / cli:<provider>:<model>);
-    # without one no metric can be produced and the experiment is invalid, said so
     if governor is None:
         from .cycle import governor_for
 
         governor = governor_for(settings, ledger_dir)
-    judge = judge_spec_from(settings)
-    if judge is None:
-        return _terminal_invalid(ledger_dir, exp, governor, settings,
-                                 "no judge configured (settings.improve_judge): the shadow reviews cannot be scored")
-    adapter.judge = judge
-    adapter.governor = governor
-    if judge.kind == "api":
-        adapter.llm = judge_llm if judge_llm is not None else _api_llm(settings)
+    # a human-labelled benchmark (the engine's own) needs no judge: the
+    # labels are the gold; every other workflow is scored by the configured
+    # judge (api:<model> / cli:<provider>:<model>) and is invalid without one
+    human_labelled = bool(getattr(adapter, "human_labelled", False))
+    if human_labelled:
+        stage = stage or _meta_stage
+        run_unit = run_unit or meta_run_unit
+    else:
+        judge = judge_spec_from(settings)
+        if judge is None:
+            return _terminal_invalid(ledger_dir, exp, governor, settings,
+                                     "no judge configured (settings.improve_judge): the shadow reviews cannot be scored")
+        adapter.judge = judge
+        adapter.governor = governor
+        if judge.kind == "api":
+            adapter.llm = judge_llm if judge_llm is not None else _api_llm(settings)
     # the child's budget is THIS governor's: same ledger directory, same
     # envelopes — and no arm may override the budget configuration
     budget_keys = {k for k in (*exp.arm_overrides, *exp.incumbent_overrides) if k.upper().startswith("IMPROVE_")}
@@ -477,7 +531,7 @@ def _run_locked(store, settings, ledger_dir: Path, exp: Experiment, *, run_unit,
                 if rc != 0:
                     excluded[key] = f"subprocess failed rc={rc}: {str((outcome or {}).get('stderr') or '')[-160:]}"
                     continue
-                unit = _find_unit(shadow_store, tag)
+                unit = _find_unit(shadow_store, tag, workflow=decl.workflow)
                 if unit is None:
                     excluded[key] = "no traced unit carrying this run's tag"
                     continue
@@ -500,7 +554,8 @@ def _run_locked(store, settings, ledger_dir: Path, exp: Experiment, *, run_unit,
             continue
         for rep in sorted(set(sides.get("arm", {})) | set(sides.get("incumbent", {}))):
             arm_unit, inc_unit = sides.get("arm", {}).get(rep), sides.get("incumbent", {}).get(rep)
-            if exp.metric.endswith("_review") and arm_unit is not None and inc_unit is not None:
+            if exp.metric.endswith("_review") and arm_unit is not None and inc_unit is not None \
+                    and hasattr(adapter, "paired_verdict"):
                 try:
                     adapter.paired_verdict(arm_unit, inc_unit, gold, shadow_store,
                                            experiment_id=exp.experiment_id, replicate=rep)
@@ -557,9 +612,11 @@ def _provider_error(text: str) -> bool:
     return any(p in low for p in _PROVIDER_ERR) or any(f" {c} " in f" {low} " for c in ("500", "502", "503", "504"))
 
 
-def _find_unit(shadow_store: TraceStore, tag: str) -> Unit | None:
+def _find_unit(shadow_store: TraceStore, tag: str, *, workflow: str = "") -> Unit | None:
     """The unit whose trace context carries exactly this run's tag (the
-    executor stamps IMPROVE_UNIT_TAG into every unit of a shadow child)."""
+    executor stamps IMPROVE_UNIT_TAG into every unit of a shadow child):
+    the one enrolled in the experiment's workflow when there is one (a
+    child run has other, undeclared units too), else the latest."""
     from .reader import records_between, unit_key
 
     ids = {unit_key(r) for r in records_between(shadow_store, 0.0, float("inf"))
@@ -567,13 +624,14 @@ def _find_unit(shadow_store: TraceStore, tag: str) -> Unit | None:
     if not ids:
         return None
     units = units_between(shadow_store, 0.0, float("inf"), grace=0.0, lookback=0.0)
-    matching = [units[i] for i in ids if i in units and units[i].step == "agent.review_diff"] or \
+    matching = [units[i] for i in ids if i in units and workflow and units[i].workflow == workflow] or \
+        [units[i] for i in ids if i in units and units[i].step == "agent.review_diff"] or \
         [units[i] for i in ids if i in units]
     return max(matching, key=lambda u: u.ended) if matching else None
 
 
 def _score_unit(adapter, unit: Unit, shadow_store: TraceStore, metric: str, gold) -> float | None:
-    if metric == "recall_gold" and getattr(adapter, "judge", None) is not None:
+    if metric == "recall_gold" and getattr(adapter, "judge", None) is not None and hasattr(adapter, "gold_match"):
         adapter.gold_match(unit, gold, shadow_store)     # BudgetRefused propagates: the unit is cut, not guessed
     outcome = adapter.fetch(unit, shadow_store)
     if outcome is None:

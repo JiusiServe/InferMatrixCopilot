@@ -127,12 +127,24 @@ def main(argv: list[str] | None = None) -> int:
     bp = sub.add_parser("budget")
     bp.add_argument("--ledger-dir", default=None)
     bp.add_argument("--trace-root", default=None)
+    for name in ("publish", "sync"):
+        p = sub.add_parser(name, help="proposal publication through the maintainer routine's outbox (publish needs ALLOW_POST=1)")
+        p.add_argument("--ledger-dir", default=None)
+        p.add_argument("--trace-root", default=None)
+        p.add_argument("--outbox-dir", default=None)
+        p.add_argument("--repo", default=None)
+        if name == "publish":
+            p.add_argument("--dry-run", action="store_true", help="plan only; write nothing")
     for name in ("gold", "meta"):
         p = sub.add_parser(name)
-        p.add_argument("action", choices=["draft", "check"] if name == "gold" else ["lint-check"])
+        p.add_argument("action", choices=["draft", "check"] if name == "gold" else ["lint-check", "bench"])
         p.add_argument("--item", default="")
         p.add_argument("--gt-dir", default="eval/dataset/gt")
         p.add_argument("--meta-dir", default="eval/dataset/meta")
+        if name == "meta":
+            p.add_argument("--case", default="", help="bench: one case (default every case)")
+            p.add_argument("--trace-root", default=None)
+            p.add_argument("--ledger-dir", default=None)
     for name in ("migrate-index", "rebuild-index", "rollback-index", "compare-index", "verify-index",
                  "cycle", "ledger", "lints"):
         p = sub.add_parser(name)
@@ -157,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
         return _gold_meta_commands(args)
     if args.command in ("experiment", "budget"):
         return _experiment_commands(args)
+    if args.command in ("publish", "sync"):
+        return _publish_commands(args)
     if args.command == "lints":
         from .lints import catalogue
 
@@ -247,6 +261,8 @@ def _gold_meta_commands(args) -> int:
                 problems[path.name] = f"INVALID: {exc}"
         print(json.dumps(problems, ensure_ascii=False, indent=1))
         return 0 if not any(v.startswith("INVALID") for v in problems.values()) else 1
+    if args.command == "meta" and args.action == "bench":
+        return _meta_bench(args)
     from ..trace_store import TraceStore
     from .lints import Baseline, run_lints
     from .meta import lint_samples
@@ -261,6 +277,100 @@ def _gold_meta_commands(args) -> int:
             report[f"{lint_id}/{unit.unit_id}"] = "ok" if hit else f"MISSED (found {sorted(found)})"
     print(json.dumps(report, ensure_ascii=False, indent=1))
     return 0 if ok else 1
+
+
+def _meta_bench(args) -> int:
+    """Run the engine's forensics role over the frozen cases in-process
+    (operator use: the acceptance's blind test) and report agreement, kappa
+    and lint recall per case; every model call is traced and governed."""
+    from ..config import Settings
+    from ..llm import LLM
+    from ..trace_store import bind_store, trace_context
+    from .budget import governed
+    from .cycle import governor_for
+    from .meta import load_cases, run_case
+
+    settings = Settings()
+    store = _store(args)
+    meta_dir = Path(args.meta_dir)
+    cases = [c for c in load_cases(meta_dir) if not args.case or c.name == args.case]
+    if not cases:
+        print(json.dumps({"error": f"no cases under {meta_dir}" + (f" named {args.case}" if args.case else "")}), file=sys.stderr)
+        return 1
+    llm = LLM(settings)
+    if not llm.available:
+        print(json.dumps({"error": "no LLM configured for the forensics agents"}), file=sys.stderr)
+        return 1
+    from ..agent_loop import run_agent
+
+    agents = {}
+    for mode in ("eco", "performance"):
+        try:
+            target = settings.tier_target(mode)
+        except Exception:  # noqa: BLE001 - an unconfigured tier is absent
+            continue
+        family = f"{target.provider_id or target.source}:{target.model}"
+        if family in agents:
+            continue
+        member = llm.for_target(target) if hasattr(llm, "for_target") else llm
+
+        def make(llm_=member, model_=target.model):
+            def agent(system, prompt, scope, extra_tools, max_iters):
+                return run_agent(llm_, system=system, prompt=prompt, scope=scope, model=model_, max_iters=max_iters,
+                                 extra_tools=extra_tools).text
+            return agent
+        agents[family] = make()
+    governor = governor_for(settings, _ledger_dir(args))
+    report = {}
+    with bind_store(store), governed(governor):
+        for case in cases:
+            with trace_context(playbook="workflow-improve", step="improve.forensics", run_id=f"bench-{case.name}",
+                               unit_id=f"bench-{case.name}:improve.forensics", item=f"meta:{case.name}",
+                               workflow="workflow-improve.improve.forensics"):
+                result = run_case(store, case, agents, meta_dir=meta_dir)
+            report[case.name] = {k: result.get(k) for k in ("cells", "attributed", "agreement", "kappa", "lint_recall",
+                                                             "disputed", "engine", "human")}
+    print(json.dumps(report, ensure_ascii=False, indent=1, default=str))
+    return 0
+
+
+def _publish_commands(args) -> int:
+    import os
+    import time
+
+    from ..config import Settings
+    from .ledger import Ledger
+    from .publish import ProposalOutbox, PublishError, plan, publish, sync
+
+    settings = Settings()
+    ledger_dir = _ledger_dir(args)
+    store = _store(args)
+    root = args.outbox_dir or getattr(settings, "improve_outbox_dir", "") or ""
+    if not root:
+        print(json.dumps({"error": "no outbox configured (--outbox-dir / IMPROVE_OUTBOX_DIR)"}), file=sys.stderr)
+        return 2
+    outbox = ProposalOutbox(Path(root).expanduser())
+    ledger = Ledger(ledger_dir, store)
+    now = time.time()
+    if args.command == "sync":
+        print(json.dumps(sync(ledger, outbox, store, now=now), ensure_ascii=False, indent=1, default=str))
+        return 0
+    repo = args.repo or getattr(settings, "improve_proposal_repo", "") or ""
+    try:
+        if args.dry_run:
+            report = plan(ledger, store, repo=repo or "?", now=now, ledger_ref=str(ledger_dir))
+            report["dry_run"] = True
+        else:
+            # the CLI is an operator's hand: the same ALLOW_POST gate as the step
+            report = publish(ledger, store, outbox, repo=repo, now=now, ledger_ref=str(ledger_dir),
+                             dry_run=os.environ.get("ALLOW_POST") != "1")
+    except PublishError as exc:
+        print(json.dumps({"refused": str(exc)}), file=sys.stderr)
+        return 1
+    print(json.dumps({k: v for k, v in report.items() if k != "actions"} | {
+        "actions": [{k: a[k] for k in ("id", "action", "proposal", "workflow", "state")} for a in report["actions"]]},
+        ensure_ascii=False, indent=1, default=str))
+    return 0
 
 
 def _kv(pairs: list[str]) -> dict:

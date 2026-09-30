@@ -66,6 +66,21 @@ class Proposal:
     issue: str = ""               # URL once published
     history: list[dict] = field(default_factory=list)
     proxy: bool = False           # RB descriptive-only proposals
+    # Tier 2: the suggested pre-registration (metric, min effect, items
+    # required, what the arm's fingerprint should cover); Tier 1: empty
+    suggestion: dict = field(default_factory=dict)
+    rate_at_open: float = 0.0     # Tier 1: the lint's defect rate when opened (the landed check)
+    # publication bookkeeping (publish.py): the outbox action awaiting an
+    # ack, the state the issue currently shows, whether it is closed
+    pending_action: str = ""
+    pending_since: float = 0.0
+    published_state: str = ""
+    issue_state: str = ""
+    landed_by: str = ""
+    closed_reason: str = ""
+    synced_at: float = 0.0        # the last inbox observation applied
+    channel_hold: bool = False    # this proposal's issue carries a `maintainer: hold` comment
+    hold_url: str = ""
 
 
 @dataclass
@@ -77,6 +92,7 @@ class WorkflowLedger:
     baseline: dict = field(default_factory=lambda: {"usd": [], "seconds": [], "parse_failure_rate": 0.0})
     proposals: list[Proposal] = field(default_factory=list)
     hold: str = ""                                       # maintainer hold reason (pauses publishing)
+    hold_source: str = ""                                # operator | channel (a `maintainer: hold` comment)
     last_human_touch: float = 0.0
 
     def lint_rate(self, lint_id: str, back: int = 0) -> tuple[float, int] | None:
@@ -181,13 +197,16 @@ class Ledger:
 
     # -- proposals ------------------------------------------------------------------
     def open_proposal(self, workflow: str, *, tier: int, claim: str, evidence: list[str],
-                      lint: str = "", stage: str = "", loss: float = 0.0, proxy: bool = False) -> Proposal:
+                      lint: str = "", stage: str = "", loss: float = 0.0, proxy: bool = False,
+                      suggestion: dict | None = None, rate_at_open: float = 0.0) -> Proposal:
         with self.locked(workflow):
             return self._open_proposal(workflow, tier=tier, claim=claim, evidence=evidence, lint=lint,
-                                       stage=stage, loss=loss, proxy=proxy)
+                                       stage=stage, loss=loss, proxy=proxy, suggestion=suggestion,
+                                       rate_at_open=rate_at_open)
 
     def _open_proposal(self, workflow: str, *, tier: int, claim: str, evidence: list[str],
-                       lint: str = "", stage: str = "", loss: float = 0.0, proxy: bool = False) -> Proposal:
+                       lint: str = "", stage: str = "", loss: float = 0.0, proxy: bool = False,
+                       suggestion: dict | None = None, rate_at_open: float = 0.0) -> Proposal:
         ledger = self.load(workflow)
         # one open proposal per (workflow, lint|stage): repeats update, never duplicate
         for p in ledger.proposals:
@@ -195,14 +214,16 @@ class Ledger:
                 p.updated_at = self._clock()
                 p.evidence = list(dict.fromkeys(p.evidence + evidence))[:20]
                 p.loss = max(p.loss, loss)
+                if suggestion:
+                    p.suggestion = dict(suggestion)
                 p.history.append({"at": p.updated_at, "event": "refreshed", "claim": claim[:200]})
                 self.save(ledger)
                 return p
         now = self._clock()
         proposal = Proposal(id=f"prop-{int(now)}-{uuid.uuid4().hex[:6]}", workflow=workflow, tier=tier,
                             claim=claim, lint=lint, stage=stage, loss=loss, evidence=evidence[:20],
-                            opened_at=now, updated_at=now, proxy=proxy,
-                            history=[{"at": now, "event": "opened"}])
+                            opened_at=now, updated_at=now, proxy=proxy, suggestion=dict(suggestion or {}),
+                            rate_at_open=rate_at_open, history=[{"at": now, "event": "opened"}])
         ledger.proposals.append(proposal)
         self.save(ledger)
         self._record("proposal_state", workflow=workflow, proposal=proposal.id, state="open", tier=tier,
@@ -284,9 +305,44 @@ class Ledger:
         return now - max([ledger.last_human_touch] + [p.last_human_touch for p in live]) >= STALE_AFTER \
             and all(p.state == "stale" for p in live)
 
-    def set_hold(self, workflow: str, reason: str) -> None:
+    def set_hold(self, workflow: str, reason: str, *, source: str = "operator") -> None:
         with self.locked(workflow):
             ledger = self.load(workflow)
             ledger.hold = reason
+            ledger.hold_source = source
             self.save(ledger)
-        self._record("hold", workflow=workflow, reason=reason[:200])
+        self._record("hold", workflow=workflow, reason=reason[:200], source=source)
+
+    def clear_hold(self, workflow: str) -> None:
+        with self.locked(workflow):
+            ledger = self.load(workflow)
+            ledger.hold = ""
+            ledger.hold_source = ""
+            self.save(ledger)
+        self._record("hold_cleared", workflow=workflow)
+
+    # publication bookkeeping (never the state: that goes through transition)
+    NOTE_FIELDS = ("issue", "pending_action", "pending_since", "published_state", "issue_state", "landed_by",
+                   "closed_reason", "synced_at", "channel_hold", "hold_url")
+
+    def note(self, workflow: str, proposal_id: str, *, event: str = "", detail: str = "", **fields: Any) -> Proposal:
+        unknown = sorted(set(fields) - set(self.NOTE_FIELDS))
+        if unknown:
+            raise LedgerError(f"note() may not set {unknown}")
+        with self.locked(workflow):
+            ledger = self.load(workflow)
+            for p in ledger.proposals:
+                if p.id == proposal_id:
+                    for key, value in fields.items():
+                        setattr(p, key, value)
+                    if event:
+                        entry = {"at": self._clock(), "event": event}
+                        if detail:
+                            entry["detail"] = detail[:200]
+                        p.history.append(entry)
+                    self.save(ledger)
+                    if event:
+                        self._record("proposal_note", workflow=workflow, proposal=proposal_id, event=event,
+                                     **{k: str(v)[:200] for k, v in fields.items()})
+                    return p
+        raise LedgerError(f"no proposal {proposal_id} in {workflow}")
