@@ -152,6 +152,10 @@ def _stage_class(stage: str) -> type:
         from .init_modules import _Modules
 
         return _Modules
+    if stage == "deepen":
+        from .init_deepen import _Deepen
+
+        return _Deepen
     raise NotImplementedError(f"stage {stage} lands in a later PR")
 
 

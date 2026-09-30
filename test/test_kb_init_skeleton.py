@@ -544,7 +544,7 @@ def test_publishing_needs_both_flags_and_later_stages_are_not_here(world):
     with pytest.raises(InitError, match="ALLOW_PUSH"):
         run_stage(_runtime(world), _lifecycle(), "skeleton", dry_run=False)
     with pytest.raises(NotImplementedError):
-        run_stage(_runtime(world), _lifecycle(), "deepen", dry_run=True)
+        run_stage(_runtime(world), _lifecycle(), "harvest-calibration", dry_run=True)
     with pytest.raises(InitError, match="no knowledge_lifecycle.init"):
         run_stage(_runtime(world), RepoLifecycle(repo="toy", full_name="o/toy", enabled=False, mode="shadow",
                                                  knowledge_dir="repos/toy"), "skeleton", dry_run=True)

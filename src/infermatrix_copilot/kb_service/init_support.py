@@ -191,6 +191,31 @@ class UpstreamPin:
     def observer(self, pin: str, *, pull=None) -> PinnedObserver:
         return PinnedObserver(self.path, self.full_name, pin, pull=pull)
 
+    def first_parent_changes(self, pin: str, *, count: int, max_age_days: int) -> list[list[str]]:
+        """The files each of the last ``count`` first-parent commits up to
+        ``pin`` changed (a merge commit against its first parent), no older
+        than ``max_age_days`` before the PIN's commit time — so the window is
+        a function of the pin, never of the clock. On a merge- or
+        squash-based default branch each first-parent commit is one merged
+        PR (design §7.3's PR window, read from the mirror, offline)."""
+        if count <= 0:
+            return []
+        when = int(self._git("show", "-s", "--format=%ct", pin).decode().strip() or 0)
+        since = when - max_age_days * 86400
+        # -z: every path NUL-terminated and never quoted (non-ASCII names stay
+        # names); \x01 opens each commit's "<sha> <commit time>" header
+        out = self._git("log", "-z", "--first-parent", "-m", "--name-only", "--no-renames",
+                        "--format=%x01%H %ct", f"--max-count={count}", pin)
+        window: list[list[str]] = []
+        for chunk in out.split(b"\x01")[1:]:
+            fields = chunk.split(b"\0")
+            _, _, stamp = fields[0].decode("ascii", "replace").partition(" ")
+            if int(stamp.strip() or 0) < since:
+                continue       # commit times need not decrease along first parents: skip, never stop
+            paths = {f.lstrip(b"\n").decode("utf-8", "replace") for f in fields[1:]}
+            window.append(sorted(p for p in paths if p))
+        return window
+
 
 def collect_docs(root: Path, globs: tuple[str, ...], *, max_files: int = MAX_DOC_FILES,
                  max_bytes: int = MAX_DOC_BYTES) -> list[tuple[str, str]]:
