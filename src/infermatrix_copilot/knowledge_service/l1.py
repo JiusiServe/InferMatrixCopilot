@@ -18,6 +18,14 @@ mappings so the service's gate and the publisher's local gate agree exactly:
                   pages, tombstones. Recomputed here; a mismatch is an issue,
                   never a block a verdict could cover.
 
+``check_changeset`` with ``bootstrap`` set is for ``kb init`` only (the one
+allowed caller is ``kb_service/init_stages.py``; a test pins that). It relaxes
+exactly two rules so a repository's knowledge can be created: an ``_index.md``
+may be created in a directory that had no files before, and the shared
+``repos/_index.md`` may be edited to list a new repository.
+``check_index_links(base, head)`` is the init-side link check for the index
+edits that bootstrap produces.
+
 Standard library + PyYAML + ``lifecycle``/``ops`` only.
 """
 
@@ -25,6 +33,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import posixpath
 import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
@@ -48,6 +57,87 @@ _WHITELIST = (
 _DENY = re.compile(r"knowledge/(?:skills|tools|\.claude)/|knowledge/[^/]+$")
 _REGULAR_MODE = "100644"
 _INDEX_LINE = re.compile(r"- \[[^\]\n]+\]\((?P<file>[^)/\s]+\.md)\)")
+# bootstrap only: the shared list of repositories, edited to link a new one
+_REPOS_INDEX = "knowledge/repos/_index.md"
+# inline links (optional <angle> target and "title" / 'title' / (title)) and
+# reference definitions; any other "](" is unparsed and refused by the link check
+_LINK_TITLE = r"""(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\)))?"""
+_MD_LINK = re.compile(r"\]\(\s*(?:<(?P<angle>[^>\n]*)>|(?P<target>[^)\s]+))" + _LINK_TITLE + r"\s*\)")
+_MD_REF = re.compile(r"(?m)^ {0,3}\[(?P<label>[^\]\n]+)\]:[ \t]*(?:<(?P<angle>[^>\n]*)>|(?P<target>\S+))"
+                     + _LINK_TITLE + r"[ \t]*$")
+# a reference definition counts only where it is used: [text][label], [label][], [label]
+_REF_FULL = re.compile(r"\[(?P<text>[^\]\n]+)\]\[(?P<label>[^\]\n]*)\]")
+_REF_SHORT = re.compile(r"\[(?P<label>[^\]\n]+)\](?![(\[:])")
+# Link visibility, fail-closed. No Markdown parser is complete, so the checks
+# split by direction: every link-like text counts when checking that links
+# resolve (a link "hidden in code" is still checked), and only a CERTAINLY
+# visible link counts as navigation (for "is the page linked" and "was the link
+# kept"). Certainly visible: no fence-like line at or before it, and no
+# backtick before it in its block (paragraph, list item, heading, quote, or
+# table cell, which a code span cannot cross).
+_FENCE_LIKE = re.compile(r"^[\s>*+\-\d.)]*(?:`{3,}|~{3,})")
+_BLOCK_START = re.compile(r" {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d{1,9}[.)]\s|>)")
+_TABLE_ROW = re.compile(r" {0,3}\|")
+_TABLE_DELIM = re.compile(r" {0,3}\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*")
+
+
+def _table_body_row(lines: list[str], k: int) -> bool:
+    """``lines[k]`` is a body row of a pipe table: a run of pipe lines that
+    starts after a blank line (a table does not interrupt a paragraph), whose
+    second line is a delimiter row, and ``lines[k]`` comes after it."""
+    if not _TABLE_ROW.match(lines[k]):
+        return False
+    first = k
+    while first > 0 and _TABLE_ROW.match(lines[first - 1]):
+        first -= 1
+    return (k >= first + 2 and (first == 0 or not lines[first - 1].strip())
+            and _TABLE_DELIM.fullmatch(lines[first + 1]) is not None)
+
+
+def _certainly_visible(text: str, pos: int) -> bool:
+    line_start = text.rfind("\n", 0, pos) + 1
+    line_end = text.find("\n", pos)
+    line_end = len(text) if line_end < 0 else line_end
+    lines = text[:line_end].split("\n")
+    if any(_FENCE_LIKE.match(line) for line in lines):
+        return False
+    line = lines[-1]
+    if _table_body_row(lines, len(lines) - 1):
+        cell_start = max((m.end() for m in re.finditer(r"(?<!\\)\|", line[:pos - line_start])), default=0)
+        return "`" not in line[cell_start:pos - line_start]
+    start = len(lines) - 1  # walk back to the first line of the block
+    while start > 0 and not _BLOCK_START.match(lines[start]) and lines[start - 1].strip():
+        start -= 1
+    block_start = sum(len(item) + 1 for item in lines[:start])
+    return "`" not in text[block_start:pos]
+
+
+def _block_span(text: str, pos: int) -> tuple[int, int]:
+    """Offsets of the whole block holding ``pos`` (a table body row is its
+    own block)."""
+    lines = text.split("\n")
+    k = text.count("\n", 0, pos)
+    start = end = k
+    if not _table_body_row(lines, k):
+        while start > 0 and not _BLOCK_START.match(lines[start]) and lines[start - 1].strip():
+            start -= 1
+        while end + 1 < len(lines) and lines[end + 1].strip() \
+                and not _BLOCK_START.match(lines[end + 1]) and not _table_body_row(lines, end + 1):
+            end += 1
+    offset = sum(len(line) + 1 for line in lines[:start])
+    return offset, offset + len("\n".join(lines[start:end + 1]))
+
+
+def _block_context(text: str, pos: int) -> tuple[str, tuple[str, ...]]:
+    """The block holding ``pos`` and the fence-like lines before it: the same
+    block after the same fences renders the same way."""
+    start, end = _block_span(text, pos)
+    return text[start:end], tuple(line for line in text[:start].split("\n") if _FENCE_LIKE.match(line))
+
+
+def _contexts(text: str) -> set[tuple[str, tuple[str, ...]]]:
+    starts = [0] + [m.end() for m in re.finditer("\n", text)]
+    return {_block_context(text, pos) for pos in starts}
 
 
 @dataclass(frozen=True)
@@ -188,11 +278,13 @@ def _check_routes(path: str, text: str, files: Mapping[str, str]) -> list[Issue]
 
 # -- change-set level ----------------------------------------------------------
 
-def _whitelist_issues(changes: Iterable[Change]) -> list[Issue]:
+def _whitelist_issues(changes: Iterable[Change], bootstrap: bool = False) -> list[Issue]:
     issues = []
     for change in changes:
         path = change.path
-        if not path.startswith(KNOWLEDGE_PREFIX) or _DENY.match(path) \
+        if bootstrap and path == _REPOS_INDEX and change.status == "M":
+            pass  # a new repository is listed in the shared index
+        elif not path.startswith(KNOWLEDGE_PREFIX) or _DENY.match(path) \
                 or not any(p.fullmatch(path) for p in _WHITELIST):
             issues.append(Issue("path_not_whitelisted", path, "only knowledge rule/guide pages, _routes.yaml and _tombstones.yaml auto-merge"))
             continue
@@ -327,7 +419,11 @@ def _classify_page(path: str, base_text: str | None, head_text: str | None,
 
 def _index_mechanical(path: str, base_text: str | None, head_text: str | None,
                       new_pages: set[str], issues: list[Issue], blocks: list[Block],
-                      head: Mapping[str, str] | None = None) -> None:
+                      head: Mapping[str, str] | None = None, *,
+                      base: Mapping[str, str] | None = None, bootstrap: bool = False) -> None:
+    if bootstrap and base_text is None and head_text is not None and head is not None:
+        _index_created(path, base or {}, head, issues, blocks)
+        return
     if base_text is None or head_text is None:
         issues.append(Issue("index_added_or_deleted", path, "index files are never created or deleted by a change set"))
         return
@@ -361,6 +457,155 @@ def _index_mechanical(path: str, base_text: str | None, head_text: str | None,
                             f"index lines must cover new pages {expected_new} and only link unlisted pages; got {files}"))
 
 
+def _link_occurrences(directory: str, text: str, *, certain: bool = False
+                      ) -> list[tuple[str, str, tuple[int, ...]]]:
+    """Relative links of an index as (written target without anchor, resolved
+    knowledge-relative path, positions of the link text and, for a reference,
+    its definition). URLs and anchor-only links are not targets; a link that
+    leaves the knowledge tree resolves to a path starting ``..``. ``certain``
+    keeps only links that are certainly visible (see above); a reference
+    counts only where it is used."""
+    def target_of(match) -> str:
+        return match.group("angle") if match.group("angle") is not None else match.group("target")
+
+    def keep(pos: int) -> bool:
+        return not certain or _certainly_visible(text, pos)
+
+    # every definition of a label: which one renders depends on which are in
+    # code, so resolution checks all of them, and navigation trusts a label
+    # only when it has exactly one definition and that one is visible
+    definitions: dict[str, list] = {}
+    for m in _MD_REF.finditer(text):
+        definitions.setdefault(m.group("label").strip().lower(), []).append(m)
+    used = [(m.group("label").strip().lower() or m.group("text").strip().lower(), m.start())
+            for m in _REF_FULL.finditer(text) if keep(m.start())]
+    used += [(m.group("label").strip().lower(), m.start())
+             for m in _REF_SHORT.finditer(text) if keep(m.start())]
+    found: list[tuple[str, tuple[int, ...]]] = [
+        (target_of(m), (m.start(),)) for m in _MD_LINK.finditer(text) if keep(m.start())]
+    for label, pos in used:
+        defs = definitions.get(label, [])
+        if not certain:
+            found += [(target_of(m), (pos, m.start())) for m in defs]
+        elif len(defs) == 1 and keep(defs[0].start()):
+            found.append((target_of(defs[0]), (pos, defs[0].start())))
+    out = []
+    for raw, positions in found:
+        target = raw.split("#", 1)[0]
+        if not target or "://" in target or target.startswith("mailto:"):
+            continue
+        resolved = ".." if target.startswith("/") else \
+            posixpath.normpath(posixpath.join(directory, target))  # absolute: never inside
+        out.append((target, resolved, positions))
+    return out
+
+
+def _link_targets(directory: str, text: str, *, certain: bool = False) -> dict[str, str]:
+    """{written target: resolved path} of ``_link_occurrences``."""
+    return {written: resolved for written, resolved, _ in _link_occurrences(directory, text, certain=certain)}
+
+
+def _dropped_links(directory: str, before: str, after: str) -> set[str]:
+    """Links ``before`` has that ``after`` may no longer show, fail-closed: a
+    link is kept only when it is certainly visible in ``after``, or every block
+    it sits in is unchanged in ``after`` after the same fence-like lines."""
+    raw_after = _link_targets(directory, after)
+    visible_after = _link_targets(directory, after, certain=True)
+    contexts_after = _contexts(after)
+    dropped = set()
+    for written, _resolved, positions in _link_occurrences(directory, before):
+        if written not in raw_after:
+            dropped.add(written)
+        elif written not in visible_after and not all(
+                _block_context(before, pos) in contexts_after for pos in positions):
+            dropped.add(written)
+    return dropped
+
+
+def _unparsed_links(text: str) -> set[str]:
+    """Each "](" no inline-link pattern accounts for, as its line: link syntax
+    the checker cannot read is refused rather than skipped."""
+    parsed = {m.start() for m in _MD_LINK.finditer(text)}
+    return {text[text.rfind("\n", 0, i) + 1:].split("\n", 1)[0].strip()
+            for i in (m.start() for m in re.finditer(r"\]\(", text)) if i not in parsed}
+
+
+def _dir_entries(head: Mapping[str, str], directory: str) -> list[str]:
+    """Pages directly in ``directory`` and the indexes of its child directories."""
+    prefix = f"{directory}/" if directory else ""
+    out = []
+    for p in sorted(head):
+        if not p.startswith(prefix) or not p.endswith(".md"):
+            continue
+        rest = p[len(prefix):].split("/")
+        if (len(rest) == 1 and rest[0] != INDEX_NAME) or (len(rest) == 2 and rest[1] == INDEX_NAME):
+            out.append(p)
+    return out
+
+
+def _index_created(path: str, base: Mapping[str, str], head: Mapping[str, str],
+                   issues: list[Issue], blocks: list[Block]) -> None:
+    """Bootstrap: an index created for a directory that is new in this change set."""
+    directory = posixpath.dirname(path)
+    if any(p.startswith(f"{directory}/") for p in base):
+        issues.append(Issue("index_added_or_deleted", path,
+                            "an index may be created only for a new directory"))
+        return
+    linked = set(_link_targets(directory, head[path], certain=True).values())
+    for entry in _dir_entries(head, directory):
+        if entry not in linked:
+            issues.append(Issue("index_missing", path, f"{entry} is not linked"))
+    if directory:
+        parent = posixpath.join(posixpath.dirname(directory), INDEX_NAME)
+        # a parent index created in the same change set reports its own children
+        if parent in base and parent in head and path not in set(
+                _link_targets(posixpath.dirname(parent), head[parent], certain=True).values()):
+            issues.append(Issue("index_missing", parent, f"the new {path} is not linked"))
+    blocks.append(Block("prose", path, "", "prose", _sha(head[path])))
+
+
+def check_index_links(base: Mapping[str, str], head: Mapping[str, str]) -> list[Issue]:
+    """Links of every index added or changed from ``base`` to ``head``: each
+    link the change adds resolves inside the knowledge tree to a file (or a
+    directory) of ``head``; a changed index keeps every link it had; every
+    page or child index new in ``head`` is linked from its parent index.
+    Links an index already had are not re-judged (some point into doc/)."""
+    issues: list[Issue] = []
+    head_dirs = {posixpath.dirname(p) for p in head}
+    for path in sorted(p for p in head if posixpath.basename(p) == INDEX_NAME):
+        if base.get(path) == head[path]:
+            continue
+        directory = posixpath.dirname(path)
+        before = _link_targets(directory, base.get(path) or "")
+        after = _link_targets(directory, head[path])
+        for line in sorted(_unparsed_links(head[path]) - _unparsed_links(base.get(path) or "")):
+            issues.append(Issue("index_link_unparsed", path, line[:120]))
+        for written in sorted(_dropped_links(directory, base.get(path) or "", head[path])):
+            issues.append(Issue("index_link_dropped", path, written))
+        for written, resolved in sorted(after.items()):
+            if written in before:
+                continue
+            if resolved == ".." or resolved.startswith("../"):
+                issues.append(Issue("index_link_escapes", path, written))
+            elif resolved not in head and not any(d == resolved or d.startswith(resolved + "/")
+                                                  for d in head_dirs):
+                issues.append(Issue("index_link_broken", path, written))
+    for page in sorted(p for p in head if p not in base and p.endswith(".md")):
+        directory = posixpath.dirname(page)
+        if posixpath.basename(page) == INDEX_NAME:
+            if not directory:
+                continue
+            directory = posixpath.dirname(directory)
+        parent = posixpath.join(directory, INDEX_NAME)
+        if parent not in head:
+            if directory:  # the knowledge root has no index
+                issues.append(Issue("index_unlinked", page, f"{parent} does not exist"))
+            continue
+        if page not in set(_link_targets(directory, head[parent], certain=True).values()):
+            issues.append(Issue("index_unlinked", page, f"{parent} does not link it"))
+    return issues
+
+
 def check_changeset(
     base: Mapping[str, str],
     head: Mapping[str, str],
@@ -368,6 +613,7 @@ def check_changeset(
     *,
     external_texts: Mapping[str, str] | None = None,
     release: str = "",
+    bootstrap: bool = False,
 ) -> ChangesetResult:
     """Gate one change set. ``base``/``head`` map knowledge-relative paths
     (``repos/...``) to text; ``changes`` are repository-relative git changes.
@@ -375,9 +621,9 @@ def check_changeset(
     for references to rules this change retires or purges. ``release`` is the
     trusted current release (from the signed verdict); when given, purges must
     carry it as ``purged_at``. A purge is always rejected in the release that
-    retired the rule."""
+    retired the rule. ``bootstrap`` is for ``kb init`` only (module docstring)."""
     changes = list(changes)
-    issues = _whitelist_issues(changes)
+    issues = _whitelist_issues(changes, bootstrap)
     blocks: list[Block] = []
     retired: list[str] = []
     purged: list[tuple[str, str]] = []  # (rule id, page)
@@ -400,7 +646,8 @@ def check_changeset(
     for path in sorted(knowledge_paths):
         name = PurePosixPath(path).name
         if name == INDEX_NAME:
-            _index_mechanical(path, base.get(path), head.get(path), new_pages, issues, blocks, head)
+            _index_mechanical(path, base.get(path), head.get(path), new_pages, issues, blocks, head,
+                              base=base, bootstrap=bootstrap)
         elif name == TOMBSTONES_NAME:
             tombstone_paths.append(path)
         elif name == ROUTES_NAME:
