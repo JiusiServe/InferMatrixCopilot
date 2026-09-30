@@ -57,7 +57,7 @@ def test_claude_passes_the_cap_only_when_given(tmp_path):
 
     reply = transport.complete(system="S", messages=MESSAGES, max_budget_usd=0.5)
     argv = _argv(tmp_path)
-    assert argv[argv.index("--max-budget-usd") + 1] == "0.5000"
+    assert argv[argv.index("--max-budget-usd") + 1] == "0.5"
     assert reply.usage["cost_usd"] == pytest.approx(0.07)
     assert reply.stop_reason == "end_turn"
 
@@ -152,3 +152,78 @@ def test_gateway_treats_a_call_stopped_at_its_cap_as_unavailable():
 def test_gateway_rejects_a_non_positive_cap():
     with pytest.raises(ModelUnavailable, match="positive"):
         _gateway(_Transport(capped=True)).call_json(ROLE, system="S", prompt="P", max_budget_usd=-1)
+
+
+# -- exact threshold argument ----------------------------------------------------
+
+@pytest.mark.parametrize("value, expected", [
+    (0.00001, "0.00001"),        # `.4f` made this "0.0000": no threshold at all
+    (0.12345, "0.12345"),        # `.4f` made this "0.1235": a HIGHER threshold
+    (1e-9, "0.000000001"),       # never scientific notation
+    (0.5, "0.5"),
+    (3, "3.0"),
+    (1234.5678, "1234.5678"),
+])
+def test_budget_arg_is_exact(value, expected):
+    from decimal import Decimal
+
+    from infermatrix_copilot.providers.claude_code import budget_arg
+
+    arg = budget_arg(value)
+    assert arg == expected
+    assert Decimal(arg) > 0 and float(arg) == float(value)  # never rounded to 0, never moved
+
+
+@pytest.mark.parametrize("bad", [0, -0.1, float("nan"), float("inf"), True, "0.5"])
+def test_budget_arg_rejects_non_positive_or_non_finite(bad):
+    from infermatrix_copilot.providers.claude_code import budget_arg
+
+    with pytest.raises(ValueError):
+        budget_arg(bad)
+
+
+def test_claude_passes_a_tiny_threshold_unrounded(tmp_path):
+    _claude(tmp_path).complete(system="S", messages=MESSAGES, max_budget_usd=0.00001)
+    argv = _argv(tmp_path)
+    assert argv[argv.index("--max-budget-usd") + 1] == "0.00001"
+
+
+# -- persisted through the REAL recorder -------------------------------------------
+
+def _store_gateway(tmp_path, transport):
+    from infermatrix_copilot.kb_service.runtime import trace_recorder
+    from infermatrix_copilot.trace_store import TraceStore
+
+    store = TraceStore(tmp_path / "traces", environ={})
+    return store, ModelGateway(None, transport_factory=lambda provider: transport,
+                               recorder=trace_recorder(store))
+
+
+def test_trace_persists_threshold_and_cost(tmp_path):
+    store, gateway = _store_gateway(tmp_path, _Transport(capped=True))
+    gateway.call_json(ROLE, system="S", prompt="P", max_budget_usd=0.00001)
+    (record,) = store.query(kind="model_call")
+    assert record["result"]["max_budget_usd"] == 0.00001
+    assert record["result"]["cost_usd"] == pytest.approx(0.12)
+
+
+def test_trace_persists_threshold_on_transport_failure(tmp_path):
+    class Exploding(_Transport):
+        def complete(self, **kwargs):
+            raise RuntimeError("cli crashed")
+
+    store, gateway = _store_gateway(tmp_path, Exploding(capped=True))
+    with pytest.raises(ModelUnavailable):
+        gateway.call_json(ROLE, system="S", prompt="P", max_budget_usd=0.25)
+    (record,) = store.query(kind="model_call")
+    assert record["error"]
+    assert record["result"]["max_budget_usd"] == 0.25
+    assert record["result"]["cost_usd"] is None
+
+
+def test_trace_without_a_threshold_records_none(tmp_path):
+    store, gateway = _store_gateway(tmp_path, _Transport(capped=False, usage={}))
+    gateway.call_json(ROLE, system="S", prompt="P")
+    (record,) = store.query(kind="model_call")
+    assert record["result"]["max_budget_usd"] is None
+    assert record["result"]["cost_usd"] is None

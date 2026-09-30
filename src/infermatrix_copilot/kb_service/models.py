@@ -132,6 +132,7 @@ class ModelGateway:
         except Exception as exc:  # the transport's own failure modes
             if self._recorder is not None:
                 self._recorder({**identity, "served_model": "", "stop_reason": "", "usage": {},
+                                "cost_usd": None, "max_budget_usd": max_budget_usd,
                                 "seconds": round(time.time() - started, 3), "system": system,
                                 "prompt": prompt, "reply": "", "error": str(exc)[:2000]})
             raise ModelUnavailable(f"{role.label()} failed: {exc}") from exc
