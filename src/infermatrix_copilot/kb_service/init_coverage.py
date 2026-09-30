@@ -19,6 +19,12 @@ rule-bearing and the metric would stop measuring anything (kb init pilot,
 
 An empty population counts as fully covered (ratio 1.0): there is nothing a
 route could miss.
+
+The owner table comes from ``owner_table``: a knowledge-side ``_routes.yaml``
+when the repository has one, else the adapter manifest's ``review_routes``
+(the precedence ``direct_routing`` applies), else nothing. A repository routed
+by its manifest is measured exactly like one routed by a table; what differs
+is that init never writes its routes (see ``init_stages``).
 """
 
 from __future__ import annotations
@@ -82,9 +88,71 @@ def load_owners(routes_yaml_text: str) -> list[Owner]:
     return out
 
 
+def owners_from_review_routes(manifest: Mapping | None) -> list[Owner]:
+    """The owner table an adapter manifest's ``review_routes`` declares
+    (``{prefix, owner, doc}`` items, the form ``direct_routing`` falls back to
+    when a repository has no knowledge-side ``_routes.yaml``): one owner per
+    (owner, doc) pair in declaration order, its prefixes in declaration order.
+    An owner name that recurs with a second doc is suffixed with that doc's
+    stem so names stay unique. Items without a prefix or a doc are skipped."""
+    routes = (manifest or {}).get("review_routes") or []
+    if not isinstance(routes, list):
+        return []
+    grouped: dict[tuple[str, str], list[str]] = {}
+    for item in routes:
+        if not isinstance(item, dict):
+            continue
+        prefix = str(item.get("prefix") or "").replace("\\", "/").strip()
+        doc = str(item.get("doc") or "").strip()
+        if not prefix or not doc:
+            continue
+        owner = str(item.get("owner") or prefix.rstrip("/")).strip()
+        grouped.setdefault((owner, doc), [])
+        if prefix not in grouped[(owner, doc)]:
+            grouped[(owner, doc)].append(prefix)
+    taken: set[str] = set()
+    out = []
+    for (owner, doc), prefixes in grouped.items():
+        name = owner if owner not in taken else f"{owner}/{PurePosixPath(doc).stem}"
+        n = 1
+        while name in taken:   # two docs with the same stem (components/a/rules.md, components/b/rules.md)
+            n += 1
+            name = f"{owner}/{PurePosixPath(doc).stem}-{n}"
+        taken.add(name)
+        out.append(Owner(name, doc, tuple(prefixes)))
+    return out
+
+
+def owner_table(routes_text: str | None, manifest: Mapping | None) -> tuple[str, list[Owner]]:
+    """Where a repository's routes come from and the owners they define, with
+    the precedence ``direct_routing`` applies: ``("routes_file", ...)`` for a
+    knowledge-side ``_routes.yaml`` that names owners, else ``("manifest", ...)``
+    for adapter ``review_routes``, else ``("none", [])``. Direct falls back to
+    the manifest when the routes file has NO owners, so a valid but empty file
+    defers to manifest routes too (and must stay untouched: filling it would
+    override the manifest); only without manifest routes is an empty file the
+    knowledge-side table init fills. A malformed routes file raises
+    (``load_owners``); it is never silently replaced by the manifest."""
+    file_owners = load_owners(routes_text) if routes_text is not None else None
+    if file_owners:
+        return "routes_file", file_owners
+    manifest_owners = owners_from_review_routes(manifest)
+    if manifest_owners:
+        return "manifest", manifest_owners
+    return ("routes_file", []) if file_owners is not None else ("none", [])
+
+
+def reaches(path: str, prefix: str) -> bool:
+    """``prefix`` covers ``path``. A directory prefix ``pkg/`` also covers the
+    directory itself named without its slash (``facts.claims_in`` strips it
+    from a rule's backticked ``pkg/``), so a rule about a directory reaches
+    the owner of that directory."""
+    return path.startswith(prefix) or (prefix.endswith("/") and path == prefix[:-1])
+
+
 def routes_file(path: str, owners: Sequence[Owner]) -> list[Owner]:
     """Every owner whose scope prefixes reach ``path``, in routing order."""
-    return [o for o in owners if any(path.startswith(p) for p in o.prefixes)]
+    return [o for o in owners if any(reaches(path, p) for p in o.prefixes)]
 
 
 def _page_depth(owner: Owner) -> int:
@@ -100,7 +168,7 @@ def most_specific(path: str, owners: Sequence[Owner]) -> list[Owner]:
     best: tuple[int, int] | None = None
     out: list[Owner] = []
     for owner in owners:
-        length = max((len(p) for p in owner.prefixes if path.startswith(p)), default=-1)
+        length = max((len(p) for p in owner.prefixes if reaches(path, p)), default=-1)
         if length < 0:
             continue
         key = (length, _page_depth(owner))

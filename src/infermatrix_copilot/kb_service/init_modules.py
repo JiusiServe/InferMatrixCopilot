@@ -36,7 +36,7 @@ from ..knowledge_service.ops import INDEX_NAME, index_line
 from .init_budget import BudgetExhausted
 from .init_coverage import ROOT_MODULE, Owner, load_owners, module_coverage, most_specific, routes_file
 from .init_stages import (
-    _SLUG, ROUTES_NAME, _fence, _one_line, _page_frontmatter, _slug, _Stage, _title_of,
+    _SLUG, ROUTES_NAME, _fence, _one_line, _page_frontmatter, _slug, _Stage, _title_of, review_route_line,
 )
 from .init_support import InitError, InitRecord, generate
 
@@ -249,13 +249,23 @@ class _Modules(_Stage):
     def _build(self, tree: Path) -> InitRecord:
         routes_path = f"{self.repo_dir}/{ROUTES_NAME}"
         text = self.base.get(routes_path)
-        if text is None:
-            return self._blocked([f"{routes_path} does not exist: run (and merge) the skeleton stage first"])
-        try:
-            doc = yaml.safe_load(text) or {}
-            load_owners(text)
-        except (ValueError, yaml.YAMLError) as exc:
-            return self._blocked([f"{routes_path} is not a valid route table: {exc}"])
+        if self.route_source == "routes_file":
+            try:
+                doc = yaml.safe_load(text) or {}
+                load_owners(text)
+            except (ValueError, yaml.YAMLError) as exc:
+                return self._blocked([f"{routes_path} is not a valid route table: {exc}"])
+        elif self.route_source == "manifest":
+            # the adapter manifest routes this repository: the same table, kept
+            # in memory only — what this stage would append becomes suggested
+            # review_routes entries, never a routes file (it would take
+            # precedence over the manifest and change every route)
+            doc = {"schema_version": 1, "owners": [
+                {"owner": o.owner, "path": o.path, "signals": [], "scope_prefixes": list(o.prefixes)}
+                for o in self.owners]}
+        else:
+            return self._blocked([f"{routes_path} does not exist and the adapter declares no review_routes: "
+                                  "run (and merge) the skeleton stage first"])
         self.routes_path, self.routes_before = routes_path, doc
         self.routes = copy.deepcopy(doc)
         if not isinstance(self.routes.get("owners"), list):
@@ -289,6 +299,7 @@ class _Modules(_Stage):
             "modules": {"before": round(before.ratio, 4), "after": round(after.ratio, 4), "total": len(modules)},
             "unrouted": after.uncovered,
             "cards": {c.module: c.page for c in cards},
+            "routes_source": self.route_source,
         }
         problems = routes_append_only(self.routes_before, self.routes)
         if problems:
@@ -523,8 +534,28 @@ class _Modules(_Stage):
                 text += f"- [{title}]({link})\n"
         self.head[index] = text
 
+    def _suggest_routes(self) -> None:
+        """Every owner or prefix this stage would have appended to a routes
+        file, as the exact ``review_routes`` entries the adapter manifest
+        lacks (adapters are human-gated: an adapter PR, never a route file)."""
+        before = {str(o["owner"]): o for o in self.routes_before.get("owners") or []}
+        count = 0
+        for owner in self.routes.get("owners") or []:
+            known = before.get(str(owner["owner"]))
+            had = list((known or {}).get("scope_prefixes") or [])
+            for prefix in owner.get("scope_prefixes") or []:
+                if prefix in had:
+                    continue
+                self.record.checklist.append(review_route_line(prefix, str(owner["owner"]), str(owner["path"])))
+                count += 1
+        self.record.notes.append("routes come from the adapter manifest (review_routes): kb init writes no "
+                                 f"{ROUTES_NAME}; {count} review_routes entr{'y is' if count == 1 else 'ies are'} "
+                                 "suggested on the checklist")
+
     def _conclude(self, rules, evidence, other=None, check_other=None) -> InitRecord:
-        if self.routes != self.routes_before:
+        if self.route_source == "manifest":
+            self._suggest_routes()
+        elif self.routes != self.routes_before:
             header = []
             for line in self.base[self.routes_path].splitlines(keepends=True):
                 if not line.startswith("#"):
