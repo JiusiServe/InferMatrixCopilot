@@ -45,7 +45,7 @@ contradictions: [相对路径]         # 可选：与本页冲突的页面
 
 新标签必须先加入此表再使用（防止标签蔓延）：
 
-- 归属：`general`、`vllm-omni`、`afd-plugin`
+- 归属：`general`、`vllm-omni`、`afd-plugin`、`vllm-gr`
 - 工作主题：`review`、`ci`、`docs`、`git`、`debug`、`bug`、`benchmark`、`environment`、
   `remote`、`agents`、`planning`、`dev`、`rebase`
 - 代码/模型轴：`components`、`models`、`diffusion`、`model-executor`、`serving`、
