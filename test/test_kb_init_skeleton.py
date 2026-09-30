@@ -314,24 +314,30 @@ def _judged_texts(gateway: FakeGateway) -> dict[str, str]:
 
 
 def test_rules_that_fill_the_page_together_spill_to_a_sibling(world):
-    # 493 lines: the first new rule (4 lines with its footer) fits, the second does not
+    # 493 lines: the page is the routed owner, so its Direct quick map (one row
+    # per rule) counts toward its capacity — the map for its one rule fits
+    # (499 lines), the first new rule with its own row would not
     _commit(world["origin"], _full_rules_page(483), "near-full rules page")
     gateway = FakeGateway(doc_rules=[DOC_RULE, DOC_RULE2], seed_rules=False)
     record = run_stage(_runtime(world, gateway), _lifecycle(seeds=()), "skeleton", dry_run=True)
     assert record.status == "dry_run", record.problems
     tree = _tree(record)
-    assert [s.rule_id for s in Page.parse(tree["knowledge/repos/toy/rules.md"]).rules()] == ["TOY-1a", "TOY-I1"]
+    page = Page.parse(tree["knowledge/repos/toy/rules.md"])
+    assert [s.rule_id for s in page.rules()] == ["TOY-1a"]
+    assert page.sections[0].heading.endswith("（Direct）") and "| TOY-1a |" in page.sections[0].text
     sibling = Page.parse(tree["knowledge/repos/toy/rules-doc-invariants.md"])
-    assert [s.rule_id for s in sibling.rules()] == ["TOY-I2"]
+    assert [s.rule_id for s in sibling.rules()] == ["TOY-I1", "TOY-I2"]
     assert "](rules-doc-invariants.md)" in tree["knowledge/repos/toy/_index.md"]
     # the judge saw both rules where they are written
     judged = _judged_texts(gateway)
     assert "TOY-I1" in judged["TOY-I1"] and "TOY-I2" in judged["TOY-I2"]
+    assert record.verdicts["TOY-I1"]["page"] == "repos/toy/rules-doc-invariants.md"
     assert record.verdicts["TOY-I2"]["page"] == "repos/toy/rules-doc-invariants.md"
 
 
 def test_a_rule_too_big_for_the_page_on_its_own_goes_to_a_sibling(world):
-    # 497 lines: not even the first new rule fits on rules.md
+    # 497 lines: not even the first new rule fits on rules.md, nor its Direct
+    # quick map — so the owner is routed to the sibling page init writes
     _commit(world["origin"], _full_rules_page(487), "full rules page")
     gateway = FakeGateway(doc_rules=[DOC_RULE, DOC_RULE2], seed_rules=False)
     record = run_stage(_runtime(world, gateway), _lifecycle(seeds=()), "skeleton", dry_run=True)
@@ -340,6 +346,10 @@ def test_a_rule_too_big_for_the_page_on_its_own_goes_to_a_sibling(world):
     assert "knowledge/repos/toy/rules.md" not in tree       # the full page is untouched
     sibling = Page.parse(tree["knowledge/repos/toy/rules-doc-invariants.md"])
     assert [s.rule_id for s in sibling.rules()] == ["TOY-I1", "TOY-I2"]
+    assert sibling.sections[0].heading.endswith("（Direct）")
+    routes = yaml.safe_load(tree["knowledge/repos/toy/_routes.yaml"])
+    assert [o["path"] for o in routes["owners"]] == ["repos/toy/rules-doc-invariants.md"]
+    assert any("no room for a Direct quick map" in n for n in record.notes)
     assert all(_judged_texts(gateway)[rid] for rid in ("TOY-I1", "TOY-I2"))
     assert not record.dropped
 

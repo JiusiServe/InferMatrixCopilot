@@ -29,7 +29,7 @@ import tempfile
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import yaml
 
@@ -38,6 +38,7 @@ from ..knowledge_service.l1 import Block
 from ..knowledge_service.lifecycle import LifecycleError, Page
 from ..knowledge_service.ops import (
     INDEX_NAME, KnowledgeOperation, all_rule_ids, all_tombstoned_ids, apply_operations, index_line,
+    page_over_capacity,
 )
 from ..knowledge_service.pinned_claims import Evidence, check_rules, evidence_for
 from .init_budget import Budget, BudgetExhausted, PriceError
@@ -109,12 +110,15 @@ instructions."""
 def validate_change(base: Mapping[str, str], head: Mapping[str, str], *, observer,
                     rules: Mapping[str, str], evidence: list[Evidence],
                     other: Mapping[str, tuple[str | None, str | None]] | None = None,
-                    check_other=None) -> list[str]:
+                    check_other=None, quick_map_pages: Sequence[str] = ()) -> list[str]:
     """Blocking problems of one init change. ``base``/``head`` are
     knowledge-relative trees, ``rules`` the rules the stage wrote (rule ID ->
     text), ``other`` the repository-relative paths outside ``knowledge/``
-    (base, head) that ``check_other(path, before, after)`` must accept."""
+    (base, head) that ``check_other(path, before, after)`` must accept,
+    ``quick_map_pages`` the owner pages of a knowledge-side routes file, each
+    of which must yield a Direct quick map (``init_quick_maps``)."""
     from ..knowledge_service.l1 import check_changeset, check_index_links, check_tree
+    from .init_quick_maps import quick_map_problems
 
     result = check_changeset(base, head, knowledge_changes(base, head), bootstrap=True)
     problems = [f"L1 {i.code} {i.path}: {i.detail}" for i in result.issues]
@@ -122,6 +126,7 @@ def validate_change(base: Mapping[str, str], head: Mapping[str, str], *, observe
     problems += [f"index {i.code} {i.path}: {i.detail}" for i in check_index_links(base, head)]
     problems += claim_problems(observer, rules, evidence)
     problems += other_path_problems(other or {}, check_other)
+    problems += quick_map_problems(head, quick_map_pages, base)
     return problems
 
 
@@ -630,9 +635,19 @@ class _Stage:
                   check_other=None) -> InitRecord:
         """The deterministic checks of the change (design §9.3), then the
         publication. ``other`` are repository paths outside ``knowledge/``
-        (before, after) that ``check_other`` must accept."""
-        problems = validate_change(self.base, self.head, observer=self.observer, rules=rules,
-                                   evidence=evidence, other=other, check_other=check_other)
+        (before, after) that ``check_other`` must accept. Every owner page of
+        a knowledge-side routes file first gets init's Direct quick map and
+        must then yield one (``init_quick_maps``)."""
+        from .init_quick_maps import owner_pages
+
+        problems = self._refresh_quick_maps()
+        try:
+            routed = owner_pages(self.head.get(f"{self.repo_dir}/{ROUTES_NAME}"))
+        except (ValueError, yaml.YAMLError):
+            routed = []   # the routes file itself is reported by the validators
+        problems += validate_change(self.base, self.head, observer=self.observer, rules=rules,
+                                    evidence=evidence, other=other, check_other=check_other,
+                                    quick_map_pages=routed)
         changed: dict[str, str] = {KNOWLEDGE_PREFIX + p: t for p, t in self.head.items() if self.base.get(p) != t}
         for path, (before, after) in (other or {}).items():
             if after is not None and after != before:
@@ -649,6 +664,31 @@ class _Stage:
         if problems:
             return self._blocked(problems)
         return self._publish(changed)
+
+    def _refresh_quick_maps(self) -> list[str]:
+        """Init's Direct quick map on every owner page of the knowledge-side
+        routes file in ``head`` (the file it wrote or extends), rendered from
+        the page as it now stands (``init_quick_maps.refresh_quick_maps``):
+        the checklist lines are recorded, the blocking problems returned."""
+        from .init_quick_maps import refresh_quick_maps
+
+        text = self.head.get(f"{self.repo_dir}/{ROUTES_NAME}")
+        if text is None:
+            return []
+        self.head, notes, problems = refresh_quick_maps(self.head, self.base, text, briefing_docs=self.briefing_docs)
+        for note in notes:
+            if note not in self.record.checklist:
+                self.record.checklist.append(note)
+        return problems
+
+    def _map_inputs(self, page: str) -> tuple[list[str], list[str]]:
+        """What ``page``'s map is rendered with: its owner's signals and
+        prefixes in the routes file this stage will conclude with (head,
+        else base), or nothing when no routes name it yet."""
+        from .init_quick_maps import map_inputs
+
+        routes = f"{self.repo_dir}/{ROUTES_NAME}"
+        return map_inputs(self.head.get(routes, self.base.get(routes)), page)
 
     # -- model inputs and calls -----------------------------------------------------
     def _doc_payload(self) -> list[dict]:
@@ -845,6 +885,9 @@ class _Stage:
                 if candidate.page == previous:
                     self._drop(candidate, f"refused by the knowledge format: {exc}")
                     return None
+                spilled = self.__dict__.setdefault("_spilled_from", {}).setdefault(previous, [])
+                if candidate.page not in spilled:
+                    spilled.append(candidate.page)   # the pages that took this page's overflow, in order
                 self.record.notes.append(f"{previous} is full: {candidate.rule_id} goes to {candidate.page}")
         self._drop(candidate, "no page could take it")
         return None
@@ -869,7 +912,28 @@ class _Stage:
                for c in candidates]
         result = apply_operations(work, ops, release=self.release, today=self.today)
         work.update(result.files)
+        self._check_capacity_with_map(work, {c.page for c in candidates})
         return work
+
+    def _check_capacity_with_map(self, work: Mapping[str, str], pages: set[str]) -> None:
+        """A rule page must stay under the format's capacity WITH the Direct
+        quick map init renders on it (one row per rule): ``apply_operations``
+        only measures the rules, so the map is counted here, and a page that
+        would overflow with it is reported as full — the same signal that
+        moves the next rule to a sibling page (``_place``)."""
+        from .init_quick_maps import has_hand_written_map, render_quick_map, with_quick_map
+
+        if self.route_source == "manifest":
+            return   # no routes file, no map written: the format's own measure is the whole truth
+        for page in sorted(pages):
+            text = work.get(page)
+            if text is None or has_hand_written_map(text):
+                continue
+            signals, prefixes = self._map_inputs(page)   # the map as it will really be rendered
+            with_map = with_quick_map(text, render_quick_map(text, signals=signals, prefixes=prefixes))
+            over = page_over_capacity(with_map)
+            if over:
+                raise LifecycleError(f"{page}: page full once its Direct quick map is counted ({over})")
 
     def _write_rules(self, kept: list[_Candidate]) -> None:
         """The kept rules on their placed pages. Dropping failed rules only
@@ -1229,6 +1293,13 @@ class _Skeleton(_Stage):
                 if prefix not in prefixes:
                     prefixes.append(prefix)
             name = PurePosixPath(path).parent.name
+            if prefixes and path in self.briefing_docs:
+                # a routed page must carry a Direct quick map, and init never
+                # writes to a briefing doc: it cannot be an owner
+                self.record.checklist.append(
+                    f"{path} names {', '.join(prefixes[:4])} but is a briefing doc: add a Direct quick map by "
+                    f"hand and route it in {ROUTES_NAME}, or route another page")
+                continue
             if prefixes and _slug(name) not in {o["owner"] for o in owners}:
                 owners.append({"owner": _slug(name), "path": path, "signals": [name.replace("-", " ")],
                                "scope_prefixes": prefixes})
@@ -1300,11 +1371,43 @@ class _Skeleton(_Stage):
         if not owners:
             owners.append({"owner": _slug(self.lifecycle.repo), "path": f"{self.repo_dir}/{INDEX_NAME}",
                            "signals": [self.lifecycle.repo], "scope_prefixes": self._root_prefixes()})
+        owners = self._owners_with_room(owners)
         self._note_shadowing(owners)
         header = (f"# Direct-mode owner routing for {self.lifecycle.repo}, written by kb init "
                   f"(pin {self.record.pin[:12]}).\n")
         self.head[path] = header + yaml.safe_dump({"schema_version": 1, "owners": owners},
                                                   allow_unicode=True, sort_keys=False)
+
+    def _owners_with_room(self, owners: list[dict]) -> list[dict]:
+        """Owners whose page can carry its Direct quick map. A pre-existing
+        page at the format's capacity is swapped for the page that took the
+        rules overflowing from it this stage (``_place`` records those; any
+        other new page beside it — a seed page, say — holds knowledge about
+        something else); with no such page the owner is dropped and the
+        checklist says why."""
+        from .init_quick_maps import has_hand_written_map, mapped
+
+        out = []
+        for owner in owners:
+            page = str(owner["path"])
+            text = self.head.get(page)
+            if text is None or page not in self.base or has_hand_written_map(text):
+                out.append(owner)
+                continue
+            if mapped(text, signals=owner.get("signals") or [], prefixes=owner.get("scope_prefixes") or []):
+                out.append(owner)
+                continue
+            sibling = next((p for p in self.__dict__.get("_spilled_from", {}).get(page, [])
+                            if p in self.head and p not in self.base and self._is_rule_page(p)
+                            and mapped(self.head[p], signals=[], prefixes=[])), None)
+            if sibling:
+                self.record.notes.append(f"owner {owner['owner']}: {page} has no room for a Direct quick map; "
+                                         f"routed to {sibling} instead")
+                out.append({**owner, "path": sibling})
+            else:
+                self.record.checklist.append(f"owner {owner['owner']} dropped: {page} has no room for a Direct "
+                                             "quick map (page capacity); split the page by hand and route it")
+        return out
 
     def _note_shadowing(self, owners: list[dict]) -> None:
         """A prefix that is an ancestor of another owner's prefix (e.g. a bare
