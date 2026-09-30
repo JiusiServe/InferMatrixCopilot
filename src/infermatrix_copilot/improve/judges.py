@@ -144,14 +144,13 @@ def governed_subprocess(argv: list[str], *, governor: Any = None, timeout: int =
                         runner: Callable[..., Any] | None = None, input: str | None = None):
     """A judge CLI call: reserved against the judge-call envelope BEFORE it
     starts (a refusal never launches the process), settled after."""
-    if governor is not None:
-        governor.reserve_judge_call()
+    token = governor.reserve_judge_call() if governor is not None else None
     run = runner or subprocess.run
     try:
         return run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=env, input=input)
     finally:
         if governor is not None:
-            governor.settle_judge_call()
+            governor.settle_judge_call(token)
 
 
 def run_judge(spec: JudgeSpec, *, system: str, prompt: str, llm: Any = None, governor: Any = None,
@@ -194,3 +193,18 @@ def run_judge(spec: JudgeSpec, *, system: str, prompt: str, llm: Any = None, gov
     if error:
         raise JudgeError(error)
     return parse_verdict(text)
+
+
+def judge_spec_from(settings: Any, override: str = "") -> JudgeSpec | None:
+    """The gold_match / paired judge from ``settings.improve_judge`` (or an
+    explicit override): ``api:<model>`` or ``cli:<provider>:<model>``; None
+    when unset."""
+    raw = str(override or getattr(settings, "improve_judge", "") or "")
+    if not raw:
+        return None
+    parts = raw.split(":")
+    if parts[0] == "api" and len(parts) == 2:
+        return JudgeSpec("api", parts[1])
+    if parts[0] == "cli" and len(parts) == 3:
+        return JudgeSpec("cli", parts[2], provider=parts[1])
+    raise JudgeError(f"improve_judge must be api:<model> or cli:<provider>:<model>, got {raw!r}")

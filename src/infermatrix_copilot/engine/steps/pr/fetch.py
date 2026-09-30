@@ -583,6 +583,19 @@ def _snapshot_for(ctx: StepContext, pr: int):
     fallback to the network."""
     snap = ctx.state.get("pr_snapshot")
     if not isinstance(snap, dict) or not snap:
+        # a shadow subprocess gets its staged snapshot as a file (the engine
+        # staged it in the parent, before isolation) — a path only, never
+        # a live fetch
+        import os
+
+        path = os.environ.get("PR_SNAPSHOT_FILE", "")
+        if path and Path(path).is_file():
+            try:
+                snap = json.loads(Path(path).read_text(encoding="utf-8"))
+                ctx.state["pr_snapshot"] = snap
+            except (OSError, json.JSONDecodeError) as exc:
+                return StepResult(False, FailureKind.BLOCKED, f"PR_SNAPSHOT_FILE unreadable: {exc}")
+    if not isinstance(snap, dict) or not snap:
         return StepResult(False, FailureKind.BLOCKED,
                           "pr_context_source=snapshot but no staged snapshot in state "
                           "(run improve.stage_items first)")

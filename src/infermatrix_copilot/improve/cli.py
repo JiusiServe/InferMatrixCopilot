@@ -20,6 +20,12 @@
     improve gold draft --item repo#N [--gt-dir DIR]   draft a curated gold file from raw comments
     improve gold check [--gt-dir DIR]                  validate every curated gold file
     improve meta lint-check [--meta-dir DIR]           every meta lint sample triggers its lint
+    improve budget          [--ledger-dir DIR]          the week's envelopes: settled, reserved, remaining
+    improve experiment register --workflow W --hypothesis TEXT --metric M --items a,b,c
+                            --arm KEY=VAL [--arm ...] [--incumbent KEY=VAL ...] [--min-effect X]
+                            [--replicates N] [--direction higher|lower] [--proposal ID]
+    improve experiment run ID          run a registered experiment now (shadow; reserved budget)
+    improve experiment list [--state S]
 
 The writer-quiescence gate (design §7.1). Pause flags alone do not stop an
 intake or sweep that is already running, so the gate requires evidence that
@@ -102,6 +108,25 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="infermatrix-copilot improve",
                                      description="operate the meta-improvement engine's trace index")
     sub = parser.add_subparsers(dest="command", required=True)
+    ex = sub.add_parser("experiment")
+    ex.add_argument("action", choices=["register", "run", "list"])
+    ex.add_argument("id", nargs="?", default="")
+    ex.add_argument("--trace-root", default=None)
+    ex.add_argument("--ledger-dir", default=None)
+    ex.add_argument("--workflow", default="")
+    ex.add_argument("--hypothesis", default="")
+    ex.add_argument("--metric", default="recall_review")
+    ex.add_argument("--items", default="")
+    ex.add_argument("--arm", action="append", default=[])
+    ex.add_argument("--incumbent", action="append", default=[])
+    ex.add_argument("--min-effect", type=float, default=0.05)
+    ex.add_argument("--replicates", type=int, default=3)
+    ex.add_argument("--direction", default="higher")
+    ex.add_argument("--proposal", default="")
+    ex.add_argument("--state", default=None)
+    bp = sub.add_parser("budget")
+    bp.add_argument("--ledger-dir", default=None)
+    bp.add_argument("--trace-root", default=None)
     for name in ("gold", "meta"):
         p = sub.add_parser(name)
         p.add_argument("action", choices=["draft", "check"] if name == "gold" else ["lint-check"])
@@ -130,6 +155,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command in ("gold", "meta"):
         return _gold_meta_commands(args)
+    if args.command in ("experiment", "budget"):
+        return _experiment_commands(args)
     if args.command == "lints":
         from .lints import catalogue
 
@@ -234,6 +261,62 @@ def _gold_meta_commands(args) -> int:
             report[f"{lint_id}/{unit.unit_id}"] = "ok" if hit else f"MISSED (found {sorted(found)})"
     print(json.dumps(report, ensure_ascii=False, indent=1))
     return 0 if ok else 1
+
+
+def _kv(pairs: list[str]) -> dict:
+    out = {}
+    for pair in pairs:
+        key, sep, value = pair.partition("=")
+        if not sep:
+            raise SystemExit(f"override must be KEY=VALUE, got {pair!r}")
+        out[key.strip()] = value
+    return out
+
+
+def _experiment_commands(args) -> int:
+    from ..config import Settings
+    from . import experiments as exps
+    from .cycle import governor_for
+
+    settings = Settings()
+    ledger_dir = _ledger_dir(args)
+    if args.command == "budget":
+        print(json.dumps(governor_for(settings, ledger_dir).remaining(), indent=1))
+        return 0
+    store = _store(args)
+    try:
+        if args.action == "list":
+            rows = [{"id": e.experiment_id, "workflow": e.workflow, "state": e.state, "metric": e.metric,
+                     "n_required": e.n_required, "n_available": e.n_available, "label": e.result.get("label")}
+                    for e in exps.list_experiments(ledger_dir, state=args.state)]
+            print(json.dumps(rows, indent=1))
+            return 0
+        if args.action == "register":
+            exp = exps.register(store, settings, ledger_dir, workflow=args.workflow, hypothesis=args.hypothesis,
+                                metric=args.metric, items=[i for i in args.items.split(",") if i.strip()],
+                                arm_overrides=_kv(args.arm), incumbent_overrides=_kv(args.incumbent),
+                                direction=args.direction, min_effect=args.min_effect, replicates=args.replicates,
+                                proposal_id=args.proposal, governor=governor_for(settings, ledger_dir),
+                                registered_by="owner")
+            print(json.dumps({"registered": exp.experiment_id, "n_required": exp.n_required,
+                              "n_available": exp.n_available, "adequately_powered": exp.adequately_powered,
+                              "cost_estimate_usd": exp.cost_estimate_usd, "fingerprint_diff": exp.fingerprint_diff},
+                             indent=1, default=str))
+            return 0
+        if not args.id:
+            print("experiment run needs an id", file=sys.stderr)
+            return 2
+        from ..trace_store import bind_store
+        from .budget import governed
+
+        governor = governor_for(settings, ledger_dir)
+        with bind_store(store), governed(governor):
+            exp = exps.run(store, settings, ledger_dir, args.id, governor=governor)
+        print(json.dumps({"experiment": exp.experiment_id, "state": exp.state, **exp.result}, indent=1, default=str))
+        return 0
+    except exps.ExperimentError as exc:
+        print(json.dumps({"refused": str(exc)}), file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":  # pragma: no cover

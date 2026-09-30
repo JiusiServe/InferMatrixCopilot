@@ -130,14 +130,18 @@ def test_shadow_env_is_an_allowlist_with_a_one_off_path(tmp_path, monkeypatch):
             "HOME": "/home/t", "PATH": "/usr/bin:/bin", "REPO_PATHS": "demo=/prod/demo",
             "ALLOW_POST": "1", "RANDOM_VAR": "1"}
     env = shadow.shadow_env(shadow_dir=tmp_path / "s", run_dir=tmp_path / "run", trace_root=tmp_path / "t",
-                            executables_dir=exe, repo_name="demo", environ=host)
+                            executables_dir=exe, repo_name="demo", environ=host, ledger_dir=tmp_path / "ledger")
     assert not any(k.startswith(("GH_", "GITHUB_")) for k in env)
     assert "SLACK_TOKEN" not in env and "KB_SIGNING_PAT" not in env and "RANDOM_VAR" not in env
     assert env["ANTHROPIC_API_KEY"] == "sk-ant-ok" and env["ECO_API_KEY"] == "k" and env["HOME"] == "/home/t"
     assert env["PATH"] == str(exe) and env["REPO_PATHS"] == f"demo={tmp_path / 's'}"
     assert env["ALLOW_POST"] == "0" and env["ALLOW_PUSH"] == "0" and env["IMPROVE_SHADOW"] == "1"
     assert env["PR_CONTEXT_SOURCE"] == "snapshot"
+    assert env["IMPROVE_GOVERNED"] == "1" and env["IMPROVE_LEDGER_DIR"] == str(tmp_path / "ledger")
     assert shadow.assert_boundaries(env) == []
+    unmetered = shadow.shadow_env(shadow_dir=tmp_path / "s", run_dir=tmp_path / "run", trace_root=tmp_path / "t",
+                                  executables_dir=exe, repo_name="demo", environ=host)
+    assert any("unmetered" in p for p in shadow.assert_boundaries(unmetered))
     bad = {**env, "GH_TOKEN": "x", "ALLOW_POST": "1", "PATH": f"{exe}:/usr/bin"}
     problems = shadow.assert_boundaries(bad)
     assert any("GH_TOKEN" in p for p in problems) and any("outward" in p for p in problems)
