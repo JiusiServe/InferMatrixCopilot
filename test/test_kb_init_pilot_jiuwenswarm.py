@@ -1,5 +1,7 @@
-"""kb init pilot 2: the jiuwenswarm adapter is loadable, has no knowledge
-pages yet, and its init block parses with seeds that exist (design kb-init §12)."""
+"""kb init pilot 2: the jiuwenswarm adapter is loadable and its init block
+parses with seeds that exist (design kb-init §12). kb init itself creates the
+knowledge tree and later flips the lifecycle to shadow, so neither state is
+pinned here: shadow-only is the invariant."""
 
 from __future__ import annotations
 
@@ -8,19 +10,21 @@ from infermatrix_copilot.kb_service.config import load_registry, validate_seeds
 from infermatrix_copilot.sdk._resources import adapters_root, knowledge_root
 
 
-def test_jiuwenswarm_adapter_is_a_disabled_empty_kb_pilot():
+def test_jiuwenswarm_adapter_is_a_shadow_only_pilot():
     adapter = next(a for a in AdapterRegistry(adapters_root()).all() if a.name == "jiuwenswarm")
     assert adapter.manifest["repo"]["full_name"] == "openJiuwen-ai/jiuwenswarm"
     assert adapter.manifest["push"]["allowed"] is False
     lifecycle = load_registry(adapters_root())["jiuwenswarm"]
-    assert lifecycle.enabled is False and lifecycle.mode == "shadow"
+    assert lifecycle.mode == "shadow" and not lifecycle.auto_merge   # kb init flips `enabled`
     assert lifecycle.upstream_visibility == "public"
     init = lifecycle.init
     assert init is not None
     assert all(seed.startswith("general/") for seed in init.seeds)
     assert validate_seeds(init, knowledge_root()) == []
-    # the empty-KB path: kb init creates the tree, this PR must not
-    assert not (knowledge_root() / "repos" / "jiuwenswarm").exists()
+    # the empty-KB path: the tree is absent until kb init's skeleton PR lands,
+    # and a proper repository entry from then on
+    tree = knowledge_root() / "repos" / "jiuwenswarm"
+    assert not tree.exists() or (tree / "_index.md").is_file()
 
 
 def test_jiuwenswarm_tag_is_in_the_knowledge_taxonomy():
