@@ -254,6 +254,95 @@ def test_moving_a_closing_fence_past_an_unchanged_link_drops_it():
     assert {i.code for i in check_index_links(base, head)} == {"index_link_dropped"}
 
 
+def test_indented_code_html_comments_and_html_blocks_are_not_navigation():
+    base = _base()
+    head = _new_repo(base)
+    core = "repos/new/core/_index.md"
+    for text in (
+        "# core\n\n    [cards](cards.md)\n",                 # indented code
+        "# core\n\n\t[cards](cards.md)\n",                   # tab-indented code
+        "# core\n\n<!-- [cards](cards.md) -->\n",            # HTML comment
+        "# core\n\n<!--\n- [cards](cards.md)\n",             # unclosed comment
+        "# core\n\n<div>\n[cards](cards.md)\n</div>\n",      # HTML block
+    ):
+        head[core] = text
+        issues = {(i.code, i.path) for i in check_index_links(base, head)}
+        assert ("index_unlinked", "repos/new/core/cards.md") in issues, text
+    for text in (
+        "# core\n\n<div>\n- [cards](cards.md)\n</div>\n",   # HTML block across a list item
+        "# core\n\n    - group\n    - [cards](cards.md)\n",  # consecutive indented lines: code
+        "# core\n\ntext <!--\n\n- [cards](cards.md)\n",     # comment left open mid-line
+        "# core\n\n> <div>\n> [cards](cards.md)\n> </div>\n",  # HTML block inside a quote
+        "# core\n\n- [cards <!--](cards.md) -->\n",           # comment swallows the destination
+        '# core\n\n- <span title="[cards](cards.md)">x</span>\n',  # link text in an attribute
+        '# core\n\ntext <span title="\n[cards](cards.md)">x</span>\n',  # tag open across lines
+        '# core\n\ntext <span title=">[cards](cards.md)">x</span>\n',  # ">" inside a quoted value
+    ):
+        head[core] = text
+        issues = {(i.code, i.path) for i in check_index_links(base, head)}
+        assert ("index_unlinked", "repos/new/core/cards.md") in issues, text
+    # angle-bracket destinations are links, inline or in a definition
+    for text in ("# core\n\n- [cards](<cards.md>)\n", "# core\n\n- [Cards][c]\n\n[c]: <cards.md>\n",
+                 '# core\n\nsee <span title="a > b">x</span> and [cards](cards.md)\n'):
+        head[core] = text
+        assert check_index_links(base, head) == [], text
+    # a quote inside an angle destination or an autolink is not an HTML attribute
+    head["repos/new/core/it's.md"] = "# it's\n"
+    for text in ("# core\n\n- [it](<it's.md>)\n- [cards](cards.md)\n",
+                 "# core\n\n- [It][i]\n- [cards](cards.md)\n\n[i]: <it's.md>\n",
+                 "# core\n\nsee <https://example.com/a'b> and [cards](cards.md) and [it](<it's.md>)\n"):
+        head[core] = text
+        assert check_index_links(base, head) == [], text
+    head.pop("repos/new/core/it's.md")
+    # a nested list item indented 4 columns is still a list item
+    head[core] = "# core\n\n- group\n    - [cards](cards.md)\n"
+    assert check_index_links(base, head) == []
+    # a closed comment before the link does not hide it
+    head[core] = "# core\n\n<!-- note -->\n\n- [cards](cards.md)\n"
+    assert check_index_links(base, head) == []
+
+
+def test_moving_a_link_into_indented_code_or_a_comment_drops_it():
+    base = _base()
+    for moved in ("# old\n\n    - [rules](rules.md)\n", "# old\n\n<!-- - [rules](rules.md) -->\n",
+                  "# old\n\n<!--\n\n- [rules](rules.md)\n\n-->\n",
+                  "# old\n\n<div>\n\n- [rules](rules.md)\n\n</div>\n",
+                  '# old\n\ntext <span title=">- [rules](rules.md)">x</span>\n'):
+        head = {**base, "repos/old/_index.md": moved}
+        assert {i.code for i in check_index_links(base, head)} == {"index_link_dropped"}, moved
+
+
+def test_navigation_needs_a_whole_unescaped_link():
+    base = _base()
+    head = _new_repo(base)
+    core = "repos/new/core/_index.md"
+    for text in (
+        "# core\n\n- cards](cards.md)\n",       # no opening bracket
+        "# core\n\n- \\[cards](cards.md)\n",    # escaped bracket
+        "# core\n\n- [](cards.md)\n",           # empty label
+        "# core\n\n- ![cards](cards.md)\n",     # an image, not a link
+        "# core\n\n- [cards `](cards.md)`\n",   # a backtick in the label opens a code span
+        "# core\n\n- [Cards][c]\n\n[c]: `cards.md`\n",
+    ):
+        head[core] = text
+        issues = {(i.code, i.path) for i in check_index_links(base, head)}
+        assert ("index_unlinked", "repos/new/core/cards.md") in issues, text
+    head[core] = "# core\n\n- [cards \\] x](cards.md)\n"   # escaped bracket inside a label is fine
+    assert check_index_links(base, head) == []
+    # and a malformed replacement of an existing link drops it
+    for broken in ("# old\n\n- rules](rules.md)\n", "# old\n\n- [rules `](rules.md)`\n"):
+        head = {**base, "repos/old/_index.md": broken}
+        assert "index_link_dropped" in {i.code for i in check_index_links(base, head)}, broken
+
+
+def test_bootstrap_coverage_uses_the_same_navigation_rules():
+    base = _base()
+    head = _new_repo(base)
+    head["repos/new/core/_index.md"] = "# core\n\n    [cards](cards.md)\n"
+    result = check_changeset(base, head, _changes(base, head), bootstrap=True)
+    assert any(i.code == "index_missing" and "cards.md" in i.detail for i in result.issues)
+
+
 def test_moving_a_link_into_code_drops_it():
     base = _base()
     head = dict(base)
