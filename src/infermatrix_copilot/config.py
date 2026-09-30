@@ -558,6 +558,17 @@ class Settings(BaseSettings):
     # Extra directories of workflow declarations (os.pathsep separated),
     # consulted after the package's builtin improve/workflows/.
     improve_workflows_dirs: str = ""
+    # The weekly cycle (design §4/§10). improve_enabled is THE kill switch;
+    # the slot is `improve_cycle_weekday` (0=Monday) at `improve_cycle_hour`
+    # UTC, after the 04:00 PR-state sweep; the ledgers and reports live under
+    # improve_ledger_dir (default ~/.infermatrix-copilot/improve).
+    improve_enabled: bool = False
+    improve_cycle_weekday: int = 0
+    improve_cycle_hour: int = 5
+    improve_ledger_dir: str = ""
+    # the hard weekly envelope (P3 enforces it per model call)
+    improve_budget_usd_week: float = 20.0
+    improve_budget_judge_calls_week: int = 300
 
     # Metrics (eval/METRICS_RESEARCH.md) — per-run metrics.json: CATQ = Q·S/C.
     # Reference budgets are EXPLICIT deployment assumptions (RQS3e precedent):

@@ -1,0 +1,20 @@
+# The meta-improvement engine's weekly cycle (design §4). A vetted reuse
+# playbook, never generated. Every step is read-only toward the target
+# repositories and the trace store (the engine only appends its own records);
+# publication (P4) is a separate `risk: push` step behind the post gate.
+name: workflow-improve
+version: 1
+status: active
+provenance:
+  created_by: human
+  source: meta-improvement-engine-design.md v1 (sol-approved 2026-09-29), P1 slice
+task_kinds: [workflow_improve]
+repos: []
+params: {}
+steps:
+  - {id: preflight, step: improve.preflight}
+  - {id: lint, step: improve.lint}
+  - {id: ledger, step: improve.ledger}
+  - {id: report, step: report.final_summary}
+success: one cycle recorded (decision type=cycle), the per-workflow ledgers
+  updated, the cycle report written; proposals stay in the ledger until P4
