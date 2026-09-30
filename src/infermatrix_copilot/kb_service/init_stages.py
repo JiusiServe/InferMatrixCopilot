@@ -41,6 +41,7 @@ from ..knowledge_service.ops import (
 )
 from ..knowledge_service.pinned_claims import Evidence, check_rules, evidence_for
 from .init_budget import Budget, BudgetExhausted, PriceError
+from .init_coverage import Owner, most_specific, owner_table, routes_file
 from .init_support import (
     AUTHOR_ENV, KNOWLEDGE_PREFIX, STAGES, InitError, InitPublisher, InitRecord, InitRuntime, claim_problems, classify_verdict,
     collect_docs, generate, inputs_digest, judge, knowledge_changes, load_prepared, other_path_problems,
@@ -49,6 +50,7 @@ from .init_support import (
 from .models import ModelUnavailable
 
 ROUTES_NAME = "_routes.yaml"
+RULES_INIT_NAME = "rules-init.md"   # init's own rule page when the repository's rules page is off limits
 REPOS_INDEX = "repos/_index.md"
 MAX_OWNERS = 12
 MAX_RULES_PER_CALL = 12
@@ -257,6 +259,31 @@ def _relative_link(from_dir: str, target: str) -> str:
     return os.path.relpath(target, from_dir).replace(os.sep, "/")
 
 
+def briefing_docs(manifest: Mapping | None) -> set[str]:
+    """The knowledge pages an adapter injects into every run's prompt
+    (``knowledge.briefing_docs``, ``briefing_docs_extra`` and the deprecated
+    ``performance_briefing_docs``). ``adapters.base`` renders them under a hard
+    character cap that silently truncates: a rule appended there pushes the
+    page after it out of the briefing (afd-plugin, PR #265), so init never
+    writes rule content to them."""
+    kn = (manifest or {}).get("knowledge") if isinstance(manifest, dict) else None
+    out: set[str] = set()
+    for key in ("briefing_docs", "briefing_docs_extra", "performance_briefing_docs"):
+        for item in (kn or {}).get(key) or []:
+            text = str(item or "").strip().lstrip("/")
+            if text:
+                out.add(text)
+    return out
+
+
+def review_route_line(prefix: str, owner: str, doc: str) -> str:
+    """One ``review_routes`` item, in the form the adapter manifest takes
+    (a flow-style YAML mapping), for the checklist of a repository whose
+    routes live in its manifest: adapters are human-gated, so init suggests
+    the exact entry instead of writing a route."""
+    return f"review_routes (adapter PR): {{prefix: {prefix}, owner: {owner}, doc: {doc}}}"
+
+
 _INLINE_LINK = re.compile(r"(?<!!)\[(?P<label>[^\[\]\n]*)\]\((?P<target><[^<>\n]*>|[^()\s]+)"
                           r"(?:\s+(?:\"[^\"\n]*\"|'[^'\n]*'))?\)")
 
@@ -326,6 +353,10 @@ class _Stage:
     _titles: dict[str, str] = field(default_factory=dict)
     _judge_stopped: bool = False
 
+    # the adapter's briefing docs, read from the manifest by run(); a stage built
+    # bare (tests) has none
+    briefing_docs: frozenset[str] = frozenset()
+
     def run(self) -> InitRecord:
         rt, lc, stage = self.rt, self.lifecycle, self.STAGE
         init = lc.init
@@ -384,6 +415,8 @@ class _Stage:
             with tempfile.TemporaryDirectory(prefix="kb-init-") as scratch:
                 tree = upstream.export(pin, Path(scratch) / "tree")
                 self._inputs(tree)
+                if self.route_problem:
+                    return self._blocked([self.route_problem])
                 return self._build(tree)
         except (ModelUnavailable, PriceError, FactsError) as exc:
             return self._blocked([f"{type(exc).__name__}: {exc}"])
@@ -464,6 +497,18 @@ class _Stage:
         self.existing = {p: t for p, t in self.base.items() if p.startswith(self.repo_dir + "/")}
         self.new_repo = not self.existing
         self.head: dict[str, str] = dict(self.base)
+        self.manifest = self._manifest()
+        self.briefing_docs = briefing_docs(self.manifest)
+        self.route_problem = ""
+        routes_path = f"{self.repo_dir}/{ROUTES_NAME}"
+        try:
+            self.route_source, self.owners = owner_table(self.base.get(routes_path), self.manifest)
+        except (ValueError, yaml.YAMLError) as exc:
+            # a malformed routes file is never replaced by the manifest, and no
+            # stage works on it: run() blocks before _build with this message
+            self.route_source, self.owners = "invalid", []
+            self.route_problem = f"{routes_path} is not a valid route table: {exc}"
+        self._top_level: set[str] | None = None
 
     def _build(self, tree: Path) -> InitRecord:  # pragma: no cover - every stage overrides it
         raise NotImplementedError
@@ -482,14 +527,103 @@ class _Stage:
             return self.overlay[path]
         return self.rt.knowledge.show(self._base_sha, path)
 
-    def _language(self) -> str:
-        """The adapter's ``repo.language`` ("" when it declares none)."""
+    def _manifest(self) -> dict:
+        """The adapter manifest as a mapping ({} when absent or malformed)."""
         try:
             manifest = yaml.safe_load(self._manifest_text() or "") or {}
         except yaml.YAMLError:
-            return ""
-        repo = manifest.get("repo") if isinstance(manifest, dict) else None
+            return {}
+        return manifest if isinstance(manifest, dict) else {}
+
+    def _language(self) -> str:
+        """The adapter's ``repo.language`` ("" when it declares none)."""
+        repo = self._manifest().get("repo")
         return str((repo or {}).get("language") or "") if isinstance(repo, dict) else ""
+
+    # -- rule pages ------------------------------------------------------------------
+    def _active_rules(self, path: str) -> int:
+        text = self.head.get(path)
+        if text is None or not path.endswith(".md"):
+            return 0
+        try:
+            return sum(1 for s in Page.parse(text).rules() if s.footer.status == "active")
+        except (LifecycleError, yaml.YAMLError):
+            return 0
+
+    def _is_rule_page(self, path: str) -> bool:
+        try:
+            page = Page.parse(self.head[path])
+            return page.frontmatter_data().get("type") == "rule" or bool(page.rules())
+        except (KeyError, LifecycleError, yaml.YAMLError):
+            return False
+
+    def _rule_page_for(self, owner: Owner) -> str:
+        """Where an owner's new rules go: its own page when that is a rule
+        page (or a rule page the manifest names that does not exist yet), else
+        ``rules.md`` beside it (``rules-code.md`` when a prose ``rules.md`` is
+        in the way)."""
+        if owner.path in self.head and self._is_rule_page(owner.path):
+            return owner.path
+        if owner.path not in self.head and PurePosixPath(owner.path).name.startswith("rules"):
+            return owner.path     # the manifest routes to a rule page init creates
+        directory = str(PurePosixPath(owner.path).parent)
+        for name in ("rules.md", "rules-code.md"):
+            path = f"{directory}/{name}"
+            if path not in self.head or self._is_rule_page(path):
+                return path
+        raise InitError(f"no rule page can be placed beside {owner.path}")
+
+    def _redirect_of(self, page: str) -> str:
+        """Where init's rules for ``page`` live: the page itself, or, when it
+        is one of the adapter's briefing docs (never appended to), init's own
+        rule page beside it. Pure: coverage asks this too."""
+        if page not in self.briefing_docs:
+            return page
+        return str(PurePosixPath(page).with_name(RULES_INIT_NAME))
+
+    def _writable_page(self, page: str) -> str:
+        """``_redirect_of(page)``, noting a redirect on the checklist once."""
+        other = self._redirect_of(page)
+        if other != page:
+            note = (f"{page} is a briefing doc (knowledge.briefing_docs, rendered under a hard cap): "
+                    f"init writes its rules to {other} instead")
+            if note not in self.record.checklist:
+                self.record.checklist.append(note)
+        return other
+
+    def _target_page(self, candidate: "_Candidate", entries: list[Evidence]) -> str:
+        """The page a screened candidate is written to (stages refine it)."""
+        return self._writable_page(candidate.page)
+
+    def _top_level_names(self) -> set[str]:
+        if self._top_level is None:
+            self._top_level = set(self.observer.top_level(self.record.pin))
+        return self._top_level
+
+    def _paths_named(self, candidate: "_Candidate", entries: list[Evidence]) -> list[str]:
+        """The repository paths a rule is about: its evidence lines and every
+        path or ``path::Symbol`` it names in backticks (``facts.claims_in``)."""
+        from ..knowledge_service.facts import claims_in
+
+        paths = [e.path for e in entries]
+        for claim in claims_in(candidate.section, self._top_level_names(), active=True):
+            if claim.kind in ("path", "symbol") and claim.path and claim.path not in paths:
+                paths.append(claim.path)
+        return paths
+
+    def _owner_for(self, paths: list[str]) -> Owner | None:
+        """The owner that most specifically reaches the most of ``paths``
+        (routing order breaks ties); None when no owner reaches any."""
+        counts: dict[str, int] = {}
+        by_name = {o.owner: o for o in self.owners}
+        for path in paths:
+            for owner in most_specific(path, self.owners):
+                counts[owner.owner] = counts.get(owner.owner, 0) + 1
+        if not counts:
+            return None
+        order = [o.owner for o in self.owners]
+        best = max(counts, key=lambda name: (counts[name], -order.index(name)))
+        return by_name[best]
 
     def _conclude(self, rules: Mapping[str, str], evidence: list[Evidence],
                   other: Mapping[str, tuple[str | None, str | None]] | None = None,
@@ -636,6 +770,7 @@ class _Stage:
             if problems:
                 self._drop(candidate, "; ".join(problems))
                 continue
+            candidate.page = self._target_page(candidate, entries)
             placed = self._place(candidate, running)
             if placed is None:
                 continue
@@ -839,9 +974,23 @@ class _Skeleton(_Stage):
         return _one_line(getattr(self, "plan", {}).get("rules_title")) or f"{self.lifecycle.repo} rules"
 
     def _rules_page(self) -> tuple[str, bool]:
-        """(page for doc-invariant rules, whether it already exists)."""
-        path = f"{self.repo_dir}/rules.md"
+        """(page for doc-invariant rules, whether it already exists): the
+        repository's rule page, or init's own ``rules-init.md`` when that page
+        is one of the adapter's briefing docs (never appended to)."""
+        path = self._writable_page(f"{self.repo_dir}/rules.md")
         return path, path in self.base
+
+    def _target_page(self, candidate: _Candidate, entries: list[Evidence]) -> str:
+        """On a repository routed by its adapter manifest, a doc-invariant rule
+        goes to the page of the owner that most specifically reaches the code
+        it is about (its evidence and the paths it names), so Direct serves it
+        where the manifest routes; a rule no owner reaches keeps the rules
+        page. Briefing docs are never written to."""
+        if self.route_source == "manifest" and candidate.origin == "docs":
+            owner = self._owner_for(self._paths_named(candidate, entries))
+            if owner is not None:
+                return self._writable_page(self._rule_page_for(owner))
+        return super()._target_page(candidate, entries)
 
     def _pages_offered(self, rules_page: str) -> list[str]:
         pages = sorted(p for p in self.existing if p.endswith(".md"))
@@ -1085,16 +1234,10 @@ class _Skeleton(_Stage):
                                "scope_prefixes": prefixes})
         return owners[:MAX_OWNERS]
 
-    def _routes(self, plan: dict) -> None:
-        path = f"{self.repo_dir}/{ROUTES_NAME}"
-        if path in self.base:
-            self.record.checklist.append(f"{path} exists: the skeleton stage leaves routes to the modules stage")
-            return
-        owners = self._existing_owners()
-        seen = {o["owner"] for o in owners}
-        owned_pages = {o["path"] for o in owners}
-        if owners:
-            self.record.notes.append("owners from existing pages: " + ", ".join(sorted(seen)))
+    def _plan_owners(self, plan: dict, seen: set[str], owned_pages: set[str]) -> list[dict]:
+        """The generator's owner proposals that hold up: a unique slug, a page
+        of this repository, prefixes that exist at the pin."""
+        owners = []
         for owner in list(plan.get("owners") or [])[:MAX_OWNERS]:
             if not isinstance(owner, dict):
                 continue
@@ -1122,6 +1265,38 @@ class _Skeleton(_Stage):
             signals = [_one_line(s, 60) for s in owner.get("signals") or [] if _one_line(s, 60)][:20]
             seen.add(slug)
             owners.append({"owner": slug, "path": page, "signals": signals, "scope_prefixes": prefixes})
+        return owners
+
+    def _suggest_routes(self, plan: dict) -> None:
+        """A repository routed by its adapter manifest: kb init writes no
+        ``_routes.yaml`` (it would take precedence over the manifest and change
+        every route); the generator's proposals become the exact
+        ``review_routes`` entries the manifest lacks, on the checklist."""
+        self.record.notes.append("routes come from the adapter manifest (review_routes): kb init writes no "
+                                 f"{ROUTES_NAME}; entries it lacks are suggested on the checklist")
+        # a proposal for a page the manifest already routes is welcome here: only
+        # its prefixes the manifest lacks are suggested (none are written)
+        for owner in self._plan_owners(plan, set(), set()):
+            for prefix in owner["scope_prefixes"]:
+                if not routes_file(prefix, self.owners):
+                    self.record.checklist.append(review_route_line(prefix, owner["owner"], owner["path"]))
+        self._note_shadowing([{"owner": o.owner, "path": o.path, "scope_prefixes": list(o.prefixes)}
+                              for o in self.owners])
+
+    def _routes(self, plan: dict) -> None:
+        path = f"{self.repo_dir}/{ROUTES_NAME}"
+        if path in self.base:
+            self.record.checklist.append(f"{path} exists: the skeleton stage leaves routes to the modules stage")
+            return
+        if self.route_source == "manifest":
+            self._suggest_routes(plan)
+            return
+        owners = self._existing_owners()
+        seen = {o["owner"] for o in owners}
+        owned_pages = {o["path"] for o in owners}
+        if owners:
+            self.record.notes.append("owners from existing pages: " + ", ".join(sorted(seen)))
+        owners += self._plan_owners(plan, seen, owned_pages)
         if not owners:
             owners.append({"owner": _slug(self.lifecycle.repo), "path": f"{self.repo_dir}/{INDEX_NAME}",
                            "signals": [self.lifecycle.repo], "scope_prefixes": self._root_prefixes()})
@@ -1177,18 +1352,24 @@ class _Skeleton(_Stage):
                     redundant += 1
                     self.record.checklist.append(f"existing rule {rule_id} restates the docs: {line.strip()[:120]}")
         routes = self.head.get(f"{self.repo_dir}/{ROUTES_NAME}")
+        owned: set[str] = set()
+        hint = ""
         if routes:
             try:
-                owned = {o.get("path") for o in (yaml.safe_load(routes) or {}).get("owners") or []}
+                owned = {str(o.get("path")) for o in (yaml.safe_load(routes) or {}).get("owners") or []}
             except yaml.YAMLError:
                 owned = set()
+        elif self.route_source == "manifest":
+            owned = {o.path for o in self.owners}
+            hint = ": add a review_routes entry pointing at it (adapter PR)"
+        if routes or self.route_source == "manifest":
             owned_dirs = {str(PurePosixPath(p).parent) for p in owned if p and p.endswith("/" + INDEX_NAME)}
             for path in sorted(self.head):
                 if not path.startswith(self.repo_dir + "/") or not path.endswith(".md") \
                         or PurePosixPath(path).name == INDEX_NAME or path in owned:
                     continue
                 if not any(path.startswith(d + "/") for d in owned_dirs):
-                    self.record.checklist.append(f"no route reaches {path}")
+                    self.record.checklist.append(f"no route reaches {path}{hint}")
 
 
 _TOKEN = re.compile(r"[a-z][a-z0-9_]{3,}")
@@ -1251,7 +1432,12 @@ def _ratio(value) -> str:
 
 def _coverage_lines(coverage: dict) -> list[str]:
     """The coverage report of a stage (design §7) as PR-body lines."""
-    lines = ["Coverage:", "", "| metric | before | after |", "|---|---|---|"]
+    lines = ["Coverage:", ""]
+    if coverage.get("routes_source") == "manifest":
+        lines += ["Routes come from the adapter manifest (`review_routes`); kb init writes no `_routes.yaml` "
+                  "and suggests the entries it lacks on the checklist. \"after\" counts those suggestions as "
+                  "if the adapter PR were merged.", ""]
+    lines += ["| metric | before | after |", "|---|---|---|"]
     for key, label in (("modules", "modules routed"), ("pr_routed", "PR-weighted, routed"),
                        ("pr_rule_bearing", "PR-weighted, rule-bearing")):
         item = coverage.get(key)

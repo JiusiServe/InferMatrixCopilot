@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-01 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -477,3 +477,26 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
 
 ## 2026-09-30 新索引每页只登记一次（kb init）
 `init_stages.unlink_listed(text, listed)`：新建 `_index.md` 时，生成的导语里指向目录清单已列出页面的行内链接改成纯文本标签（支持尖括号目标与标题；锚点、`./` 忽略；图片与其他目标不动）。改写后再用 `l1.link_targets`（CommonMark 解析器）核验：若仍有指向清单页面的链接（改写不认识的写法，如引用式链接），整段可选导语丢弃并记入清单，绝不登记两次。目录清单是每个页面唯一的登记，知识树校验拒绝同一页面登记两次。回归来自 jiuwenswarm 试点。测试：`test_kb_init_skeleton.py`。
+
+## 2026-10-01 kb init：由 adapter manifest 路由的仓库（回归：afd-plugin 首次真实运行，PR #265）
+Direct 的路由优先级是：知识侧 `repos/<repo>/_routes.yaml` 存在则用它，否则回退到 adapter manifest 的
+`review_routes`（`{prefix, owner, doc}`）。kb init 不得改变这一优先级下的路由结果，也不得把规则写进 briefing 文档：
+- `init_coverage.owners_from_review_routes(manifest)`：把 `review_routes` 按 (owner, doc) 归组成 `Owner`（path = doc，
+  前缀按声明顺序；同名 owner 的第二个 doc 以 doc 的 stem 作后缀）；`owner_table(routes_text, manifest)` →
+  `("routes_file" | "manifest" | "none", owners)`，与 Direct 同一优先级：routes 文件有 owner 才算 `routes_file`；文件存在但 `owners: []` 时和 Direct 一样退回 manifest（且该文件保持不动——填入 owner 会覆盖 manifest 路由），只有 manifest 也没有路由时空文件才是 init 填写的知识侧表（损坏的 routes 文件抛错，绝不静默换成 manifest）。
+  每个阶段在 `_inputs` 里算出 `route_source` / `owners`，覆盖率、吸收、deepen 分组一律用它。
+- **manifest 路由的仓库**：任何阶段都不写 `_routes.yaml`（写了会覆盖 manifest，把 `ready` 变成 `scope_fallback`、
+  改变金样路由）。skeleton 把生成器的 owner 提案里 manifest 尚未路由的前缀、modules 阶段本要追加的前缀 / 新 owner，
+  一律变成清单项 `review_routes (adapter PR): {prefix, owner, doc}`（`review_route_line`；adapter 是人工把关的，
+  由 adapter PR 落地）；modules 阶段仍写地图卡与分组页，覆盖率的 after 按"这些建议已合入"计算并在 PR 正文说明来源；
+  deepen 阶段把规则写到 manifest 所指的 owner 页（`_rule_page_for`：owner 页是规则页则就地追加，manifest 指向尚不存在的
+  `rules*.md` 则创建它，否则旁边的 `rules.md` / `rules-code.md`）。文档不变量规则的落点：由 `_paths_named`（证据行 +
+  规则正文里反引号命名的路径，`facts.claims_in`）经 `most_specific` 找到最具体覆盖最多路径的 owner（`_owner_for`），
+  无 owner 覆盖的留在规则页。三个阶段都在记录里标 `coverage.routes_source`。
+- **briefing 文档只读**：`briefing_docs(manifest)` = `knowledge.briefing_docs` ∪ `briefing_docs_extra` ∪
+  `performance_briefing_docs`；`adapters.base` 按硬上限渲染它们、超出部分静默截断（afd-plugin 的 16 条规则把索引挤出了
+  briefing）。init 永不向这些页面追加规则或正文（`_writable_page` 改写到同目录的 `rules-init.md` 并记入清单；仓库规则页是
+  briefing 文档时 skeleton 的规则页就是 `rules-init.md`）；索引登记行不在此限（知识树校验要求新页面登记）。
+- 没有 routes 文件也没有 `review_routes` 的仓库：modules / deepen `blocked`（消息指明两种来源都没有）。
+测试：`test_kb_init_manifest_routed.py`（manifest 路由的 toy：三阶段 dry run 不写 `_routes.yaml`、规则落在 owner 页、
+briefing 文档不动、清单含建议项、覆盖率来源；知识侧路由的 toy 行为不变）。

@@ -15,7 +15,11 @@ proposes rules with line-ranged evidence; the rules go through the shared
 screening — the docs redundancy filter (D5), evidence inside the group's
 files, pinned claims, placement, the advisory judge — and are appended to the
 owner's rule page (never editing an existing rule; a full page spills to a
-sibling). The pass stops when the rule-bearing PR-weighted coverage reaches
+sibling; a briefing doc is never written to). Owners come from the
+repository's ``_routes.yaml`` or, when it has none, from the adapter
+manifest's ``review_routes`` (``init_coverage.owner_table``): a repository
+routed by its manifest is deepened onto the pages the manifest routes to.
+The pass stops when the rule-bearing PR-weighted coverage reaches
 ``init.coverage_target``, the budget runs out, or no hot group is left, and it
 always says which in the record's notes (and so the PR body): a pass never
 ends below the target without the reason and the hottest files still
@@ -37,9 +41,8 @@ from pathlib import Path, PurePosixPath
 
 import yaml
 
-from ..knowledge_service.lifecycle import LifecycleError, Page
 from .init_budget import BudgetExhausted
-from .init_coverage import Owner, load_owners, make_include, most_specific, pr_weighted_coverage
+from .init_coverage import Owner, make_include, most_specific, pr_weighted_coverage
 from .init_modules import scan_modules
 from .init_stages import (
     ROUTES_NAME, _Candidate, _fence, _numbered, _one_line, _Stage, _title_of, adapter_missing,
@@ -119,13 +122,10 @@ class _Deepen(_Stage):
 
         init = self.lifecycle.init
         routes_path = f"{self.repo_dir}/{ROUTES_NAME}"
-        text = self.base.get(routes_path)
-        if text is None:
-            return self._blocked([f"{routes_path} does not exist: run (and merge) the earlier stages first"])
-        try:
-            owners = load_owners(text)
-        except (ValueError, yaml.YAMLError) as exc:
-            return self._blocked([f"{routes_path} is not a valid route table: {exc}"])
+        if self.route_source == "none":
+            return self._blocked([f"{routes_path} does not exist and the adapter declares no review_routes: "
+                                  "run (and merge) the earlier stages first"])
+        owners = self.owners   # the routes file, or the adapter manifest's review_routes (same precedence as Direct)
         flip, problems = self._flip()
         if problems:
             return self._blocked(problems)
@@ -183,6 +183,7 @@ class _Deepen(_Stage):
             "uncovered_hot": [list(item) for item in self._without_rules(prs, owners, include)[:MAX_HOT_LIST]],
             "unrouted_hot": [list(item) for item in current.uncovered_hot[:MAX_HOT_LIST]],
             "target": init.coverage_target,
+            "routes_source": self.route_source,
         }
         from ..knowledge_service.pinned_claims import Evidence
 
@@ -234,15 +235,6 @@ class _Deepen(_Stage):
         return sorted(missed.items(), key=lambda item: (-item[1], item[0]))
 
     # -- rule pages ------------------------------------------------------------------
-    def _active_rules(self, path: str) -> int:
-        text = self.head.get(path)
-        if text is None or not path.endswith(".md"):
-            return 0
-        try:
-            return sum(1 for s in Page.parse(text).rules() if s.footer.status == "active")
-        except (LifecycleError, yaml.YAMLError):
-            return 0
-
     def _rule_pages(self, owners: list[Owner]) -> set[str]:
         """Owner paths that bear rules: the page itself holds an active rule,
         or (an entry or prose page) a page in the SAME directory does — never a
@@ -253,32 +245,16 @@ class _Deepen(_Stage):
             if self._active_rules(owner.path):
                 bearing.add(owner.path)
                 continue
+            redirected = self._redirect_of(owner.path)
+            if redirected != owner.path and self._active_rules(redirected):
+                bearing.add(owner.path)   # a briefing doc's rules live beside it
+                continue
             if owner.path in self.head and self._is_rule_page(owner.path):
                 continue    # a rule page owns its rules itself: an empty one bears none
             directory = PurePosixPath(owner.path).parent
             if any(PurePosixPath(p).parent == directory and self._active_rules(p) for p in self.head):
                 bearing.add(owner.path)
         return bearing
-
-    def _is_rule_page(self, path: str) -> bool:
-        try:
-            page = Page.parse(self.head[path])
-            return page.frontmatter_data().get("type") == "rule" or bool(page.rules())
-        except (KeyError, LifecycleError, yaml.YAMLError):
-            return False
-
-    def _rule_page_for(self, owner: Owner) -> str:
-        """Where an owner's new rules go: its own page when that is a rule
-        page, else ``rules.md`` beside it (``rules-code.md`` when a prose
-        ``rules.md`` is in the way)."""
-        if owner.path in self.head and self._is_rule_page(owner.path):
-            return owner.path
-        directory = str(PurePosixPath(owner.path).parent)
-        for name in ("rules.md", "rules-code.md"):
-            path = f"{directory}/{name}"
-            if path not in self.head or self._is_rule_page(path):
-                return path
-        raise InitError(f"no rule page can be placed beside {owner.path}")
 
     # -- one module --------------------------------------------------------------------
     def _code_payload(self, tree: Path, files: list[str]) -> list[dict]:
