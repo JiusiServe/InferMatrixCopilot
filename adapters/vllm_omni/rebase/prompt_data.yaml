@@ -6,10 +6,42 @@
 # doc/DRIFT_TRIAGE.md for the pre-cutover decision — do NOT "fix" one side
 # to match the other here.
 template: module_rebase.prompt.tmpl
-# live variant: identical except the two prose references to the retired
-# shell wrapper name imx-omni-pytest instead (recorded divergence — the
-# parity template above stays parent-verbatim for the byte-equality pin)
+# live variant: wrapper-name fixes plus release/API checks. The parity
+# template above stays parent-verbatim for the byte-equality pin.
 template_live: module_rebase.live.prompt.tmpl
+# Live debug guidance may evolve without changing the pinned parent-parity
+# prompt/goldens. The old template remains the comparison fixture below.
+debug_prompt_template_live: |
+  ## Debug: fix failing test for module `{module}`
+
+  ### Test
+  {test_path}
+
+  ### Traceback
+  ```
+  {traceback}
+  ```
+
+  ### Your task
+  1. Find the first causal traceback and every failed test in this job. Group
+     jobs by failure signature, not job label; one startup error can fail
+     several jobs, and one job can contain independent failures.
+  2. Compare the exact traceback and test node with recent main and branch
+     builds when those logs are available. If main's last build predates a
+     merged main change, inspect that change before calling the failure a
+     rebase regression. Separate assertion failures, latency-only failures,
+     cancellation, and broken reporting steps. Record unknown attribution
+     when evidence is insufficient; do not weaken thresholds or skip tests.
+  3. Read the target vLLM API and `git show origin/main:<path>` for Omni intent.
+     Fix the smallest confirmed rebase-specific cause. After a startup API
+     fix, inspect adjacent constructor, override, result-field, dummy-run,
+     and async-output contracts that the first crash could have masked.
+  4. Reproduce with a targeted test using the real upstream API when possible,
+     then run the owning suite. Report the exact validated commit and whether
+     a new remote CI build has reached a terminal result.
+  5. Write MODULE_DONE {module} to the signal file only after verification.
+
+  MODULE={module}
 
 # command template for PYTEST_COMMANDS / IMPORT_CHECK lines; goldens set this
 # to the parent's run_module_pytest.sh path to prove byte-parity, live runs

@@ -22,6 +22,25 @@ Goal: make `{OMNI_FILES}` compatible with upstream while preserving vllm-omni in
 7. **No-op fail-fast:** if output unchanged across **two** consecutive repair attempts, stop.
 8. Repeated identical `TypeError` / ctor args on one stack → **one** kwargs/wiring fix, then re-verify.
 
+## Release transition and adjacent API checks (live rebase)
+- If the target is a published vLLM release, compare its tag SHA with the
+  commit-pinned wheel and container tags before retaining any temporary wheel,
+  torch/FlashInfer, or ABI repair block. Keep a repair only when the released
+  artifact still needs it. Check CI and production images, ROCm/XPU variants,
+  Python dependency bounds, and source-install docs as one version set. Keep
+  already published Omni/version examples paired with their historical vLLM;
+  leave separately released platform pins alone unless their matching release
+  exists.
+- Import and signature checks do not exercise every override. For a changed
+  upstream class or `execute_model`/output path, compare *all* Omni constructors,
+  overridden method signatures, required result fields, and conversions with
+  the installed target API. Include dummy/profile/capture and async-output paths
+  before declaring a startup fix complete. Use a CPU regression against the
+  real upstream constructor or method, then run the owning test suite.
+- When a test fixture bypasses `__init__`, initialize newly required fields in
+  that fixture to the real disabled-feature defaults. Do not add production
+  fallbacks solely to satisfy an incomplete mock.
+
 **Engine / unpack:** Fix return-shape, kwargs, ordering at the real omni engine boundary; keep `shutdown` kwargs in sync with upstream.
 
 **Diffusion / subprocess:** `StageDiffusionProc died during handshake` → full worker traceback; handshake/init vs OOM; one controlled retry if GPU contention is plausible.

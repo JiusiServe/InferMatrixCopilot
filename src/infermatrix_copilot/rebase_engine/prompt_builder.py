@@ -33,6 +33,7 @@ class ModulePromptData:
     template_live: str = ""
     pytest_wrapper_live: str = ""
     debug_prompt_template: str = ""
+    debug_prompt_template_live: str = ""
     module_vllm_paths: Mapping[str, str] = field(default_factory=dict)
     module_omni_files: Mapping[str, str] = field(default_factory=dict)
     module_test_map: Mapping[str, Sequence[str]] = field(default_factory=dict)
@@ -49,6 +50,8 @@ class ModulePromptData:
                    template_live=data.get("template_live", ""),
                    pytest_wrapper_live=data.get("pytest_wrapper_live", ""),
                    debug_prompt_template=data.get("debug_prompt_template", ""),
+                   debug_prompt_template_live=data.get(
+                       "debug_prompt_template_live", ""),
                    module_vllm_paths=data.get("module_vllm_paths", {}),
                    module_omni_files=data.get("module_omni_files", {}),
                    module_test_map=data.get("module_test_map", {}),

@@ -218,6 +218,18 @@ tip，即 tag `v0.28.0` = `2cf0a691`，并校验预编译 wheel 可用）：
 构建；对 schedule-only 流水线，按 adapter 声明
 （`rebase.ci.ignore_branch_filters`）直接创建构建。
 
+**上游正式发版后的收尾**：冻结 release tag 的完整 SHA，核对 CI/生产镜像、
+ROCm/XPU 变体、Python 依赖范围和源码安装文档指向同一版本。仅在正式产物仍需要时
+保留候选版的临时 wheel/依赖修补；既有发布版示例维持其原配 vLLM 版本，
+独立发版的平台 pin 要单独核实。模块导入检查
+不能证明所有构造函数和运行路径兼容：对照已安装的目标 vLLM API，审查 Omni 的
+override、必填输出字段、dummy/profile/capture 与异步输出转换，并用真实上游类写
+小型回归测试。远端 CI 只对精确提交下结论；按具体 traceback 和测试节点比较最近
+main/分支构建。如果 main 构建早于刚合入的改动，还要追溯该改动，再决定失败归属。
+延迟超阈值但正确性通过的结果单独记录并复测，不直接归为功能回归。
+合并目标仓库的最新 main 后，还要复核 PR review/comment 与安装文档；最终
+说明和 Buildkite 结果必须对应实际推送的同一个 commit。
+
 ## 快速上手 3 · 更新知识库
 
 上游发版或目录变化后，用 `imupdate` 把**结构事实**（模型清单、registry、
