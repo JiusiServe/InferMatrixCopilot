@@ -227,3 +227,19 @@ def test_trace_without_a_threshold_records_none(tmp_path):
     (record,) = store.query(kind="model_call")
     assert record["result"]["max_budget_usd"] is None
     assert record["result"]["cost_usd"] is None
+
+
+def test_every_transport_accepts_a_spend_threshold():
+    """Every one-shot transport takes ``max_budget_usd`` (most accept and
+    ignore it); only one that stops at a threshold may claim to."""
+    import inspect
+
+    from infermatrix_copilot.providers import deepseek, zcode
+
+    transports = [HarnessTransport, ClaudeCodeTransport, CodexTransport, CursorTransport]
+    transports += [obj for module in (deepseek, zcode) for obj in vars(module).values()
+                   if isinstance(obj, type) and issubclass(obj, HarnessTransport)
+                   and obj is not HarnessTransport]
+    for cls in transports:
+        assert "max_budget_usd" in inspect.signature(cls.complete).parameters, cls.__name__
+        assert cls.stops_at_spend is (cls is ClaudeCodeTransport), cls.__name__
