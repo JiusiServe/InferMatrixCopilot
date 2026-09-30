@@ -7,7 +7,7 @@
 ## 职责
 - `PinnedObserver(repo_dir, repository, pin, pull=)`：在本地 git 仓库（bare 或非 bare）上实现
   `facts.Observer`，`head()` 固定返回钉住的 SHA；`top_level` / `path_exists` / `file_text` 读 git
-  对象，`pull(n)` 默认走 `gh api repos/{repo}/pulls/{n}`（可注入）。另加协议之外的
+  对象，`pull(n)` 默认走 `gh api repos/{repo}/pulls/{n}`（可注入；任何查询失败——没有 `gh`、网络错误、非对象回答——都归一为 `FactsError`，原有的 `FactsError` 原样抛出）。另加协议之外的
   `is_ancestor(sha)`：`sha` 是钉点或其祖先（非 40 位 SHA、镜像中不存在的对象、非 commit 对象为 False；候选对象损坏（`cat-file --batch-check` 同样输出 missing 但 stderr 报解包错误），或 git 读不到钉点历史（`merge-base` 此时也以 1 退出、只在 stderr 报 `Could not read`）时抛 `FactsError`，不把读失败当成"合入在钉点之后"）。钉点必须是 40 位
   且在仓库中存在的提交，否则构造即抛 `FactsError`。
 - `check_rules(rule_texts, observer)`：对每条（活跃）规则用 `facts.claims_in` 抽取声明，按

@@ -124,7 +124,18 @@ class PinnedObserver:
         return proc.stdout.decode("utf-8", "replace")
 
     def pull(self, number: int) -> dict:
-        return self._pull(self.repository, number)
+        """The PR as GitHub reports it. Every lookup failure (no ``gh``, a
+        network error, a malformed answer) is a ``FactsError``: the upstream
+        could not be read, so the caller retries instead of crashing."""
+        try:
+            data = self._pull(self.repository, number)
+        except FactsError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - normalise any lookup failure
+            raise FactsError(f"{self.repository} PR #{number}: {type(exc).__name__}: {exc}"[:400]) from exc
+        if not isinstance(data, dict):
+            raise FactsError(f"{self.repository} PR #{number}: unexpected answer")
+        return data
 
     def is_ancestor(self, sha: str) -> bool:
         """``sha`` is the pin or one of its ancestors (an unknown SHA is not).

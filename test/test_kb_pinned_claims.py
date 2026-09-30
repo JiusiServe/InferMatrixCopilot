@@ -178,3 +178,31 @@ def test_a_corrupt_candidate_commit_is_an_error_not_unknown(upstream):
     obs = PinnedObserver(repo, "o/up", pin, pull=_pulls({}))
     with pytest.raises(FactsError):
         obs.is_ancestor(later)
+
+
+@pytest.mark.parametrize("failure", [FileNotFoundError("gh"), ConnectionError("reset"), ValueError("bad json")])
+def test_a_pr_lookup_failure_is_a_facts_error(upstream, failure):
+    repo, _, pin, _ = upstream
+
+    def pull(repository, number):
+        raise failure
+
+    obs = PinnedObserver(repo, "o/up", pin, pull=pull)
+    with pytest.raises(FactsError):
+        obs.pull(7)
+    with pytest.raises(FactsError):
+        check_rules({"R-1": "Fixed in ^[PR #7]"}, obs)
+
+
+def test_a_pr_lookup_keeps_its_own_facts_error_and_rejects_non_objects(upstream):
+    repo, _, pin, _ = upstream
+    original = FactsError("o/up PR #7: not found")
+
+    def pull(repository, number):
+        raise original
+
+    with pytest.raises(FactsError) as raised:
+        PinnedObserver(repo, "o/up", pin, pull=pull).pull(7)
+    assert raised.value is original
+    with pytest.raises(FactsError):
+        PinnedObserver(repo, "o/up", pin, pull=lambda r, n: ["not", "a", "pr"]).pull(7)
