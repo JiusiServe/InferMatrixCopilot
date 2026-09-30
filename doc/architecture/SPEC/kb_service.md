@@ -387,8 +387,7 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   `\#`，代码块里的此类行缩进一个空格 —— 没有任何行以 `#` 开头，`RULE_HEADING`/`ANY_RULE_HEADING` 永远匹配不到，
   模型写的 `## Overview` 或 `## SERV-1 — x` 不会变成规则 ID。模型提出的 owner 页必须
   是本仓库目录下已有或本阶段创建的页面，指向其他仓库的页面一律丢弃并记入 notes。仓库标签不在 `doc/knowledge/SCHEMA.md` 分类法里、种子不存在、生成模型不可用或无价格 → 记录为 `blocked`，
-  不产生 PR。同输入摘要重跑直接返回记录；已发布记录的输入变了则拒绝。`harvest-calibration` 抛
-  `NotImplementedError`。测试：`test_kb_init_skeleton.py`、`test_kb_init_config.py`。
+  不产生 PR。同输入摘要重跑直接返回记录；已发布记录的输入变了则拒绝。测试：`test_kb_init_skeleton.py`、`test_kb_init_config.py`。
 
 ## 2026-09-30 kb init：阶段共用流程与阶段 2（modules）
 - `init_stages._Stage`：各阶段共用的流程——钉点、记录、前序阶段链、规则筛查与落位、确定性检查（`_conclude`）、发布；
@@ -434,3 +433,28 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   之前 `blocked`。`_check_flip` 校验：只能改这一个 manifest，`check_flip_to_shadow`（除这两个键外解析值不变、head 开启且为
   shadow），并在 head manifest 上跑 `config.parse_lifecycle`（开启、shadow、仍服务同一个知识目录）。已开启且为 shadow 时不改，
   记入 notes。测试：`test_kb_init_deepen.py`。
+
+## 2026-09-30 kb init：校准集收割（harvest-calibration）
+- 各阶段的 `InitRecord.verdicts[rule_id]` 除 verdict/reasons/model/text_sha/page 外还保存**判定时的规则全文**
+  （`section`）与钉点证据（`evidence`），被判 fail 剥离或被 owner 删除的规则也能复原成用例；缺这两项的旧记录使收割
+  `blocked`（重跑该阶段的 dry run 即可）。
+- `init_harvest._Harvest`（设计 §11）：要求 skeleton、modules、deepen 都已合并（dry run 链在它们的 dry-run 快照上）。
+  逐条比对判定文本与 main（或 dry-run 链）上的规则：`kept`（同 ID 规则去掉 footer 后与判定文本一致）/`changed`/`absent`，
+  按 `label_for` 打标：pass+kept、unsure+kept、unjudged+kept → good（`source: owner`）；fail（已剥离）→ bad
+  （`source: judge`）；pass 被删改 → bad（`source: owner`、`override: true`）；unsure/unjudged 被删改 → bad
+  （`source: owner`）；fail 被 owner 手工加回 → 不打标。**被改写**的规则，用例用的是判定时的文本。
+- 用例是 `calibration.load_cases` 的形状，自包含：`base` = 该规则所在页（main 上持有它的页，否则判定时的页）去掉该规则，
+  连同同目录 `_index.md`；`head` = 经 `ops.apply_operations` 加回判定文本；只保留变动的文件；单独过不了 L1（非 bootstrap）
+  的用例不收并记入 notes。证据从对应记录钉点的镜像**重新读取**行范围原文（`upstream_text`）。用例 ID 带阶段
+  （`init-<good|bad>-<stage>-<rule>`）：一个阶段剥离的规则 ID 可能在后面的阶段被重新分配。
+- 变异（`synthetic: true`、`source: synthetic`、`mutation`）：bad 少于 good、或 owner 的 bad 不足 `MIN_TRUSTED_BAD`（5）时，
+  对 good 规则按规则 ID 种子的确定顺序补齐：`broken_path`（第一个反引号路径换成 `removed-<name>`，钉点上确实不存在才算）、
+  `shifted_range`（证据范围整体移开；移开后仍显示同样原文的不算）、`negated`（强制↔禁止、MUST NOT↔MUST、must not↔must、never↔always）、
+  `sibling_evidence`（换成另一模块规则的证据）；每个（规则, 变异）至多一个。owner 或变异来的 bad 少于 5 → `blocked`
+  （裁判自己的 fail 不能校准它自己）；一个 good 用例都没有（owner 删改了所有规则）→ `blocked`（`kb calibrate` 没有 good 用例
+  永远不通过）。
+- 只写 `adapters/<adapter>/kb-calibration/cases/*.json`（新文件，永不覆盖已有用例；`load_cases` 能读）与 manifest 的
+  `knowledge_lifecycle.calibration_set: kb-calibration`（`set_calibration_set` 文本编辑一行，已有同值不改，已命名别的集合 →
+  `blocked`；`check_lifecycle_flip(allowed=CALIBRATION_KEYS)` + head 上 `parse_lifecycle` 且其 `calibration_set` 为
+  `kb-calibration`）。分支 `kb/init-<repo>-harvest-calibration`。`auto_merge` 仍需 `kb calibrate` 与 shadow 观察期。
+  测试：`test_kb_init_harvest.py`。
