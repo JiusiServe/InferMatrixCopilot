@@ -344,6 +344,16 @@ class Settings(BaseSettings):
     # eval arms (the frozen dataset's ground truth IS the review discussion;
     # PR_CONTEXT_MODE=no_discussion keeps candidate inputs baseline-equivalent).
     pr_context_mode: Literal["full", "no_discussion"] = "full"
+    # Where pr.fetch_diff / pr.gate_check / pr.fetch_ci_failures get their
+    # inputs: "live" calls gh/git (today's behaviour); "snapshot" reads the
+    # staged item snapshot in state (`pr_snapshot`, written by
+    # improve.stage_items) and never touches the network — the shadow
+    # experiment path (meta-improvement design §8.2).
+    pr_context_source: Literal["live", "snapshot"] = "live"
+    # IMPROVE_SHADOW=1 marks a shadow (experiment) run: the executor refuses
+    # every step whose risk is not read/report, the agent runtime hardens the
+    # tool scope, repo_map caches in the run dir. Set only by the engine.
+    improve_shadow: bool = False
     skills_top_k: int = 3
 
     # Ensemble agent steps (run_agent_step_ensemble): perspective-diverse

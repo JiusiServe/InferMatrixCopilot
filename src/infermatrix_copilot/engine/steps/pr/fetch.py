@@ -377,6 +377,10 @@ def _diff_at_head(ctx: StepContext, repo: Path, pr: int, base_ref: str,
         base_sha, err = _fetch_pinned(repo, pr, base_ref, head_sha,
                                       ctx.run_dir.name)
         if not err:
+            # the pinned base TIP (not the merge-base): the review tools bind
+            # their merge-base to it, so tools and diff agree (design §8.2)
+            ctx.state["pr_base_sha"] = base_sha
+            ctx.state["pr_base_ref"] = base_ref
             text, detail, derr = _pinned_diff(repo, base_sha, head_sha)
             if not derr:
                 return text, f" via {detail}"
@@ -435,6 +439,8 @@ async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
     if not pr:
         return StepResult(False, FailureKind.BLOCKED, "no PR number in task spec")
     expected = str(spec.get("expected_head_sha") or "") if isinstance(spec, dict) else ""
+    if _snapshot_mode(ctx):
+        return _fetch_from_snapshot(ctx, int(pr), expected)
     repo = require_repo(ctx)
     if isinstance(repo, StepResult):
         return repo
@@ -470,7 +476,9 @@ async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
         outputs={"state_updates": {"diff_text": out, "pr_context": pr_context,
                                    "repo_path": wt_path,
                                    "checkout_note": note,
-                                   "pr_head_sha": head_sha}})
+                                   "pr_head_sha": head_sha,
+                                   "pr_base_sha": str(ctx.state.get("pr_base_sha") or ""),
+                                   "pr_base_ref": str(ctx.state.get("pr_base_ref") or "")}})
 
 
 @step("pr.gate_check", "deterministic", "read",
@@ -486,21 +494,47 @@ async def _pr_gate_check(ctx: StepContext) -> StepResult:
     pr = spec.get("pr") if isinstance(spec, dict) else None
     if not pr:
         return StepResult(False, FailureKind.BLOCKED, "no PR number in task spec")
+    if _snapshot_mode(ctx):
+        snap = _snapshot_for(ctx, int(pr))
+        if isinstance(snap, StepResult):
+            return snap
+        report = str(snap.get("gate_report") or "gate report absent from snapshot")
+        ctx.state["gate_report"] = report
+        ctx.state["pr_state"] = str(snap.get("pr_state") or "")
+        return StepResult(True, summary=f"[snapshot] {report.splitlines()[0][:100]}",
+                          outputs={"gate_report": report,
+                                   "state_updates": {"gate_report": report,
+                                                     "pr_state": ctx.state["pr_state"]}})
     repo = _repo_path(ctx)
+    report, pr_state, available = gate_report_for(repo, int(pr))
+    if not available:
+        ctx.state["gate_report"] = report
+        return StepResult(True, summary="gate check unavailable (gh failed) — "
+                                        "continuing without it",
+                          outputs={"state_updates": {"gate_report": report}})
+    # publish the PR state (OPEN|MERGED|CLOSED) — the renderer calibrates the
+    # verdict wording on merged PRs (W2); previously MERGED was discarded
+    # whenever no other gate fired
+    ctx.state["pr_state"] = pr_state
+    ctx.state["gate_report"] = report
+    return StepResult(True, summary=report.splitlines()[0][:120],
+                      outputs={"gate_report": report,
+                               "state_updates": {
+                                   "gate_report": report,
+                                   "pr_state": ctx.state.get("pr_state", "")}})
+
+
+def gate_report_for(repo: Path | None, pr: int) -> tuple[str, str, bool]:
+    """The deterministic gate report of a PR: `(report, pr_state, available)`
+    — shared by the live gate step and the shadow staging step, so a staged
+    snapshot carries exactly what the live step would have computed."""
     lines: list[str] = []
     code, out = _gh(["pr", "view", str(pr), "--json",
                      "state,isDraft,mergeable,mergeStateStatus"], cwd=repo)
     if code != 0:
-        ctx.state["gate_report"] = "gate check unavailable (gh failed)"
-        return StepResult(True, summary="gate check unavailable (gh failed) — "
-                                        "continuing without it",
-                          outputs={"state_updates":
-                                   {"gate_report": ctx.state["gate_report"]}})
+        return "gate check unavailable (gh failed)", "", False
     data = json.loads(out or "{}")
-    # publish the PR state (OPEN|MERGED|CLOSED) — the renderer calibrates the
-    # verdict wording on merged PRs (W2); previously MERGED was discarded
-    # whenever no other gate fired
-    ctx.state["pr_state"] = str(data.get("state") or "")
+    pr_state = str(data.get("state") or "")
     if data.get("isDraft"):
         lines.append("PR is a DRAFT — review findings are provisional.")
     if data.get("mergeable") == "CONFLICTING" or \
@@ -509,19 +543,86 @@ async def _pr_gate_check(ctx: StepContext) -> StepResult:
                      f"{data.get('mergeable')} — the branch conflicts with or "
                      "trails the base; files may have moved/renamed on main. "
                      "Flag this as a blocking issue.")
-    code, out = _gh(["pr", "checks", str(pr), "--json", "name,state,bucket"],
-                    cwd=repo)
-    if code == 0:
-        failing = [c.get("name", "?") for c in json.loads(out or "[]")
+    checks = ci_checks_for(repo, pr)
+    if checks is not None:
+        failing = [c.get("name", "?") for c in checks
                    if c.get("bucket") == "fail"
-                   or c.get("state", "").upper() in ("FAILURE", "ERROR")]
+                   or str(c.get("state", "")).upper() in ("FAILURE", "ERROR")]
         if failing:
             lines.append(f"FAILING CHECKS ({len(failing)}): {failing[:8]} — "
                          "do not re-argue what CI already reports; point at the gate.")
     report = "\n".join(lines) or "gates clean (mergeable, no failing checks)"
-    ctx.state["gate_report"] = report
-    return StepResult(True, summary=report.splitlines()[0][:120],
-                      outputs={"gate_report": report,
-                               "state_updates": {
-                                   "gate_report": report,
-                                   "pr_state": ctx.state.get("pr_state", "")}})
+    return report, pr_state, True
+
+
+def ci_checks_for(repo: Path | None, pr: int) -> list[dict] | None:
+    """`gh pr checks` as a list of `{name, state, link, bucket}`, or None when
+    the checks are UNAVAILABLE. `gh pr checks` exits non-zero when any check
+    is pending or failing while still printing the JSON, so the exit code is
+    not the signal: parseable list output is the data, whatever the code."""
+    code, out = _gh(["pr", "checks", str(pr), "--json", "name,state,link,bucket"], cwd=repo)
+    try:
+        checks = json.loads(out) if out and out.lstrip().startswith("[") else None
+    except json.JSONDecodeError:
+        checks = None
+    if isinstance(checks, list):
+        return checks
+    return None if code != 0 or not out else []
+
+
+# -- snapshot source (shadow experiments) ------------------------------------------
+
+def _snapshot_mode(ctx: StepContext) -> bool:
+    return str(getattr(ctx.settings, "pr_context_source", "live") or "live") == "snapshot"
+
+
+def _snapshot_for(ctx: StepContext, pr: int):
+    """The staged snapshot for this run's PR (`state['pr_snapshot']`, written
+    by `improve.stage_items`), or a BLOCKED StepResult: snapshot mode without
+    a snapshot, or one for another PR, is a configuration error, never a
+    fallback to the network."""
+    snap = ctx.state.get("pr_snapshot")
+    if not isinstance(snap, dict) or not snap:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "pr_context_source=snapshot but no staged snapshot in state "
+                          "(run improve.stage_items first)")
+    spec = ctx.state.get("task_spec") or {}
+    repo = str(spec.get("repo") or "") if isinstance(spec, dict) else ""
+    # PR numbers are repository-local: the snapshot must name THIS repository
+    if repo and str(snap.get("repo") or "") != repo:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"staged snapshot is for repository {snap.get('repo')!r}, not {repo!r}")
+    if int(snap.get("pr") or 0) != int(pr):
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"staged snapshot is for PR #{snap.get('pr')}, not #{pr}")
+    return snap
+
+
+def _fetch_from_snapshot(ctx: StepContext, pr: int, expected: str) -> StepResult:
+    """`pr.fetch_diff` under `pr_context_source=snapshot`: publish the staged
+    diff, context, shadow checkout and pinned shas — no gh, no git fetch."""
+    snap = _snapshot_for(ctx, pr)
+    if isinstance(snap, StepResult):
+        return snap
+    head_sha = str(snap.get("head_sha") or "")
+    if expected and head_sha != expected:
+        return _stale(ctx, pr, expected, head_sha)
+    shadow_dir = str(snap.get("shadow_dir") or "")
+    if not shadow_dir or not Path(shadow_dir).is_dir():
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"staged snapshot's shadow checkout is missing: {shadow_dir!r}")
+    diff_text = str(snap.get("diff") or "")
+    context = str(snap.get("context_text") or "")
+    note = (f"checkout: SHADOW CLONE (head {head_sha[:12]}, snapshot "
+            f"{str(snap.get('snapshot_sha256') or '')[:12]}) — staged before isolation; "
+            "repo-wide greps DO reflect PR-time state")
+    ctx.trace.record("pr_time_checkout", pr=pr, sha=head_sha, path=shadow_dir,
+                     detail="staged snapshot", snapshot_sha256=snap.get("snapshot_sha256", ""))
+    updates = {"diff_text": diff_text, "pr_context": context, "repo_path": shadow_dir,
+               "checkout_note": note, "pr_head_sha": head_sha,
+               "pr_base_sha": str(snap.get("base_sha") or ""),
+               "pr_base_ref": str(snap.get("base_ref") or "")}
+    ctx.state.update(updates)
+    return StepResult(True, summary=f"[snapshot] PR #{pr} diff ({len(diff_text)} chars, context "
+                                    f"{len(context)} chars); {note.split(' — ')[0]}",
+                      outputs={"state_updates": updates})

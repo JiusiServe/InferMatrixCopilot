@@ -192,7 +192,8 @@ def _knowledge_tools(store: "_ScopedKnowledge", ctx: StepContext) -> dict[str, T
             "Propose a new/updated skill (candidate only; curator-gated).",
             {"type": "object", "properties": {"name": s, "description": s,
                                               "body": s},
-             "required": ["name", "description", "body"]}, skill_update_candidate),
+             "required": ["name", "description", "body"]}, skill_update_candidate,
+            internal_write=True),
     }
 
 
@@ -206,7 +207,10 @@ def _repo_map_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
         return {}
     language = "python"
     cache_dir = ctx.run_dir / "repo_map"
-    if adapter is not None:
+    # a shadow run never writes the production knowledge tree: the cache
+    # (which RepoMap.index purges and rewrites) stays in the shadow run dir
+    shadow = bool(getattr(ctx.settings, "improve_shadow", False))
+    if adapter is not None and not shadow:
         from ...memory.paths import KnowledgePaths
 
         language = str(adapter.manifest.get("repo", {}).get("language")
@@ -215,7 +219,17 @@ def _repo_map_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
             ctx.settings, str((ctx.state.get("task_spec") or {})
                               .get("repo", "")),
             adapter_root=adapter.root).repo_map_cache_dir
-    rmap = RepoMap(repo, language, cache_dir=cache_dir)
+    if adapter is not None and shadow:
+        language = str(adapter.manifest.get("repo", {}).get("language") or "python")
+    accept = None
+    if shadow:
+        # the indexer follows symlinks: fence every indexed file to the shadow
+        # checkout after resolution, exactly as the read tools are fenced
+        from ...scopes import shadow_scope
+
+        fence = shadow_scope(repo)
+        accept = lambda resolved: fence.check_read(resolved).allowed  # noqa: E731
+    rmap = RepoMap(repo, language, cache_dir=cache_dir, accept=accept)
     if not rmap.supported:
         ctx.trace.record("capability_gap", capability=f"repo_map.{language}",
                          step="agent_runtime",

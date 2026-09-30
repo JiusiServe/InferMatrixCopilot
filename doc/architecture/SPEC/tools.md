@@ -51,3 +51,11 @@ step 专属工具作为 `extra` 传入，**不加在这里**。
 ## 重构备注
 dispatch choke point 是一条**硬安全不变量** —— 每条路径（内置和 extra）都必须保持
 被记 trace 且被 scope 检查。**不要新增绕过 `dispatch` 的"快路径"。** 当前体量没问题。
+
+## 影子边界与采集（元改进引擎 P0）
+- `ToolDef` 新增 `read_path_arg`（extra 工具读到的路径参数，在带 `read_roots` 的 scope 下与内建读同样围栏，
+  相对路径先按 `scope.root` 解析再交给 handler）与 `internal_write`（经内部 store 写入的工具，如
+  `skill_update_candidate`；严格 scope 拒绝）。
+- `tool_definitions_for`：严格 scope 下未在 `allowed_tools` 的 extra 与 `internal_write` 的 extra **不广告**。
+- `dispatch`：严格 scope 下 extra 先过白名单再过读围栏；内建读/exec 路径过 `scope.check_read`；所有拒绝经
+  `_refuse` 记 `tool_refused`。每次调用（允许、失败、拒绝）在绑定了 trace/1 store 时另写一条 `tool_call` 记录。

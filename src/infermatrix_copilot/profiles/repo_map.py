@@ -12,9 +12,11 @@ cached on disk keyed by the repo's HEAD commit — a new commit rebuilds it.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
+from typing import Callable
 
 from .languages import suffixes as _suffixes
 from .languages import symbol_re as _symbol_re
@@ -37,11 +39,16 @@ def _head_commit(repo: Path) -> str:
 
 def build_index(repo: Path, language: str, *, max_files: int = 4_000,
                 max_file_bytes: int = 200_000,
-                max_symbols_per_file: int = 40) -> dict[str, list[str]]:
+                max_symbols_per_file: int = 40,
+                accept: "Callable[[Path], bool] | None" = None) -> dict[str, list[str]]:
     """Build the symbol index: map each source file (relative path) to its list
     of regex-matched symbol definitions for `language`. Skips vcs/build/hidden
     dirs and non-source suffixes, and bounds the scan by file count, per-file
-    bytes, and symbols-per-file. Returns {} when the language is unsupported."""
+    bytes, and symbols-per-file. Returns {} when the language is unsupported.
+
+    `accept(path)` is an optional fence evaluated on the RESOLVED path (symlinks
+    followed): a shadow run passes the scope's read check so a symlink inside
+    the checkout cannot leak a host file's symbols into the map."""
     pattern = _symbol_re(language)
     suffixes = _suffixes(language)
     if pattern is None:
@@ -55,6 +62,8 @@ def build_index(repo: Path, language: str, *, max_files: int = 4_000,
             continue
         if any(part in _SKIP_DIRS or part.startswith(".")
                for part in path.relative_to(repo).parts[:-1]):
+            continue
+        if accept is not None and not accept(Path(os.path.realpath(path))):
             continue
         count += 1
         try:
@@ -73,13 +82,16 @@ class RepoMap:
     """Disk-cached symbol index + query-ranked rendering."""
 
     def __init__(self, repo: str | Path, language: str,
-                 cache_dir: str | Path | None = None):
+                 cache_dir: str | Path | None = None,
+                 accept: "Callable[[Path], bool] | None" = None):
         """Bind to `repo` (of `language`); `cache_dir`, when given, persists the
         HEAD-keyed index on disk. The index is built lazily and memoized in
-        `_index`."""
+        `_index`. `accept` fences indexed files (see `build_index`); a fenced
+        map is never served from an unfenced cache or written to one."""
         self.repo = Path(repo)
         self.language = language
         self.cache_dir = Path(cache_dir) if cache_dir else None
+        self.accept = accept
         self._index: dict[str, list[str]] | None = None
 
     @property
@@ -97,14 +109,15 @@ class RepoMap:
             return self._index
         cache_file = None
         if self.cache_dir is not None:
-            cache_file = self.cache_dir / f"index-{_head_commit(self.repo)}.json"
+            suffix = "-fenced" if self.accept is not None else ""
+            cache_file = self.cache_dir / f"index-{_head_commit(self.repo)}{suffix}.json"
             if cache_file.exists():
                 try:
                     self._index = json.loads(cache_file.read_text(encoding="utf-8"))
                     return self._index
                 except (OSError, json.JSONDecodeError):
                     pass
-        self._index = build_index(self.repo, self.language)
+        self._index = build_index(self.repo, self.language, accept=self.accept)
         if cache_file is not None:
             try:
                 self.cache_dir.mkdir(parents=True, exist_ok=True)

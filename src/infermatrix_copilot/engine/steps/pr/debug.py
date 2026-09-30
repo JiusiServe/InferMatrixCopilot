@@ -44,10 +44,21 @@ async def _pr_fetch_ci_failures(ctx: StepContext) -> StepResult:
     pr = spec.get("pr")
     if not pr:
         return StepResult(False, FailureKind.BLOCKED, "no PR number")
-    code, out = _gh(["pr", "checks", str(pr), "--json", "name,state,link,bucket"], cwd=repo)
-    if code != 0:
-        return StepResult(False, FailureKind.BLOCKED, f"gh pr checks failed: {out[:400]}")
-    checks = json.loads(out or "[]")
+    snapshot_mode = str(getattr(ctx.settings, "pr_context_source", "live") or "live") == "snapshot"
+    if snapshot_mode:
+        # shadow experiments: the checks were captured by improve.stage_items
+        # before isolation; no gh call, no log enrichment (which would fetch)
+        from .fetch import _snapshot_for
+
+        snap = _snapshot_for(ctx, int(pr))
+        if isinstance(snap, StepResult):
+            return snap
+        checks = list(snap.get("ci_checks") or [])
+    else:
+        code, out = _gh(["pr", "checks", str(pr), "--json", "name,state,link,bucket"], cwd=repo)
+        if code != 0:
+            return StepResult(False, FailureKind.BLOCKED, f"gh pr checks failed: {out[:400]}")
+        checks = json.loads(out or "[]")
     # full pre-fix snapshot (not just failures): the F2P/P2P metric needs the
     # before-state to compare a post-push snapshot against (METRICS_RESEARCH §2)
     snapshot = {c.get("name", "?"): (c.get("bucket") or c.get("state", ""))
@@ -59,7 +70,7 @@ async def _pr_fetch_ci_failures(ctx: StepContext) -> StepResult:
     ctx.state["ci_failures"] = [
         {"name": c.get("name", "?"), "log": "", "link": c.get("link", "")} for c in failing
     ]
-    enriched = _enrich_ci_logs(ctx, repo)
+    enriched = 0 if snapshot_mode else _enrich_ci_logs(ctx, repo)
     return StepResult(True, summary=f"{len(failing)}/{len(checks)} checks failing"
                                     + (f", {enriched} log(s) fetched"
                                        if enriched else ""),
