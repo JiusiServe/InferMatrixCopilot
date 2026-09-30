@@ -462,7 +462,8 @@ class DeepSeekHarnessTransport(HarnessTransport):
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
-                 role: str = "", effort: str = "") -> Reply:
+                 role: str = "", effort: str = "",
+                 max_budget_usd: float | None = None) -> Reply:
         """Tool-less one-shot in an EMPTY scratch cwd — the containment for
         calls that need no repo at all (intent, reducer, repair). No bridge
         spec, so no MCP layer is written; bash and the editor see an empty

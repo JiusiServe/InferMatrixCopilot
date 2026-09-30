@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-09-30 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -291,3 +291,11 @@ diff 时保留原摘录（证据不会因此变得更"好过"）。只扩展带 
 `merged_pr` 事件的证据新增 `merge_commit_sha`（旧事件经 `pull()` 查询）。`run_gate(evidence_for=...)` 由 `gate_and_stage`
 与事实证明共用同一个观测者（一次镜像同步）。首个线上运行中"所给 diff 在…之前截断"是 L2 判 unsure/fail 的主要原因，
 而整批 10 个 PR 的证据（约 105 KB）对每条规则都重复发送；按规则取证据后约 11 KB + 所引 PR 的完整 diff。
+
+## 2026-09-30 单次调用花费阈值（kb init 预算硬上限的一块积木）
+`ModelGateway.call_json(..., max_budget_usd=x)`：x 是**停止阈值**，不是硬上限 —— 花费达到 x 后不再发起新请求，但越过 x 的
+那个请求照样计费。硬上限由调用方负责：调用前预留 x + 单个请求的最坏情况。transport 的 `stops_at_spend` 为 False 时在发出调用
+**之前**抛 `ModelUnavailable("<provider> cannot stop a call at a spend threshold")`（fail-closed，绝不用 `max_tokens` 近似）；
+x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `ModelUnavailable`，并作为失败记录（不会成为训练样本）。
+`ModelReply.cost_usd` 取自 `usage["cost_usd"]`（未知为 None），trace 记录同时写入 `cost_usd` 与 `max_budget_usd`。
+不传上限的现有调用方行为不变：该参数根本不会发给 transport。

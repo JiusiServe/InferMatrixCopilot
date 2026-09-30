@@ -47,11 +47,16 @@ class ClaudeCodeTransport(HarnessTransport):
     """claude CLI (headless) as a Strict backend."""
 
     spec = PROVIDERS["claude-code"]
+    # `--max-budget-usd` (print mode, which _run uses) is checked after each
+    # API request completes: it stops the next one, it cannot cut the current
+    # one short. A threshold, never a hard cap.
+    stops_at_spend = True
 
     # -- process plumbing ----------------------------------------------------
     def _run(self, prompt_text: str, *, system: str, cwd: str,
              timeout_s: float, max_turns: int, model: str = "",
-             mcp_config: Path | None = None) -> tuple[dict, bool]:
+             mcp_config: Path | None = None,
+             max_budget_usd: float | None = None) -> tuple[dict, bool]:
         """One CLI invocation → (parsed result object, timed_out). Prompt on
         stdin (argv has a 128KiB per-arg limit; evidence packs exceed it)."""
         cmd = [self.require_cli(), "-p", "--output-format", "json",
@@ -63,6 +68,10 @@ class ClaudeCodeTransport(HarnessTransport):
         selected = model or self.settings.strict_backend_model
         if selected:
             cmd += ["--model", selected]
+        if max_budget_usd is not None:
+            if not max_budget_usd > 0:
+                raise ValueError(f"max_budget_usd must be positive, got {max_budget_usd!r}")
+            cmd += ["--max-budget-usd", f"{max_budget_usd:.4f}"]
         if mcp_config is not None:
             cmd += ["--mcp-config", str(mcp_config), "--strict-mcp-config",
                     "--allowedTools", f"mcp__{_BRIDGE_SERVER}"]
@@ -177,23 +186,35 @@ class ClaudeCodeTransport(HarnessTransport):
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
-                 role: str = "", effort: str = "") -> Reply:
+                 role: str = "", effort: str = "",
+                 max_budget_usd: float | None = None) -> Reply:
         """Tool-less one-shot: built-ins denied, no MCP config, two turns
         (one to think, the cap as a backstop). Runs in the run-less scratch
         of the process cwd — with every tool denied there is nothing to
-        contain."""
+        contain.
+
+        `max_budget_usd` is passed as `--max-budget-usd`: once the call's
+        spend reaches it the CLI starts no further API request (the request
+        that crossed it is already billed, so spend can exceed the threshold
+        by one request). A call the CLI ended on its budget (a `subtype`
+        naming the budget) comes back with `stop_reason "max_budget"` and no
+        text. The CLI's `total_cost_usd` is reported as
+        `usage["cost_usd"]` (absent when the CLI gave none)."""
         import tempfile
 
         with tempfile.TemporaryDirectory(prefix="imc-claude-oneshot-") as td:
             data, timed_out = self._run(
                 flatten_messages("", messages), system=system, cwd=td,
                 timeout_s=self.settings.strict_backend_timeout_s,
-                max_turns=2, model=model)
+                max_turns=2, model=model, max_budget_usd=max_budget_usd)
         usage = self._usage(data)
-        text = str(data.get("result") or "")
+        over_budget = "budget" in str(data.get("subtype") or "")
+        text = "" if over_budget else str(data.get("result") or "")
+        extra = {} if usage.cost_usd is None else {"cost_usd": usage.cost_usd}
         return Reply(
             blocks=[Block(type="text", text=text)] if text else [],
-            stop_reason="max_tokens" if timed_out else "end_turn",
+            stop_reason=("max_tokens" if timed_out
+                         else "max_budget" if over_budget else "end_turn"),
             usage={"input_tokens": usage.input_tokens,
                    "output_tokens": usage.output_tokens,
                    "cache_read_input_tokens": int(
@@ -201,5 +222,6 @@ class ClaudeCodeTransport(HarnessTransport):
                            "cache_read_input_tokens") or 0),
                    "cache_creation_input_tokens": int(
                        (data.get("usage") or {}).get(
-                           "cache_creation_input_tokens") or 0)},
+                           "cache_creation_input_tokens") or 0),
+                   **extra},
             model=usage.served_model)
