@@ -88,6 +88,7 @@ class InitRecord:
     files: list[str] = field(default_factory=list)        # repository-relative paths the stage writes
     pr: dict = field(default_factory=dict)                # {number, head_sha, branch} or {dry_run_dir}
     notes: list[str] = field(default_factory=list)
+    coverage: dict = field(default_factory=dict)          # the stage's coverage report (modules, deepen)
 
     @staticmethod
     def path(state_dir: Path, repo: str, stage: str) -> Path:
