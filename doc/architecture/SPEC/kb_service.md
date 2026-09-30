@@ -322,3 +322,14 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
 （(0, 1]，缺省 0.85）、`budget_usd`（>0，缺省 30）、`judge_call_usd`（≥0，缺省 0.50）。`validate_seeds(init,
 knowledge_root)` 是运行时检查：种子必须是知识树中已存在的文件或目录，解析后不得逃出知识根目录，逐条返回问题。
 解析只做静态校验，不读知识树。测试：`test_kb_init_config.py`。
+
+## 2026-09-30 kb init：覆盖率度量
+`init_coverage`（纯函数，stdlib + PyYAML，不调模型）：`load_owners(routes_yaml_text)` 读 `_routes.yaml` 的 `owners`
+（schema_version 1；`models` 按名称匹配，不参与覆盖率；格式错误抛 `ValueError`）；`routes_file(path, owners)` 按
+`scope_prefixes` 前缀匹配、保持路由顺序；`module_coverage(modules, owners)` —— 模块内**每个**源文件都被某个 owner 前缀
+覆盖才算覆盖；`make_include(source_roots, exclude, suffixes=())` 构造变更路径过滤器（测试/文档等一律由调用方的
+`exclude` glob 表达，不内置任何仓库字面量）；`pr_weighted_coverage(prs, owners, include=, rule_pages=)` —— 每个 PR
+改动的每个文件计一次，`routed` = 被某 owner 覆盖，`rule_bearing` = 覆盖它的 owner 页在 `rule_pages`（含有效规则的页）
+中，`uncovered_hot` 按次数降序、路径升序；`churn_by_module(prs, modules)` 按最长模块前缀归属（已折叠目录归到折入的
+祖先），降序。空集合的比例记为 1.0（没有可漏的路由）。`ROOT_MODULE` 与 `profiles.establish.ROOT_MODULE` 相同，
+由测试钉住（本包不依赖 `profiles`）。源根与变更路径按与 `profiles.establish.normalize_root` 相同的规则规范化（`.`、`./` 表示仓库根，接纳一切路径）。测试：`test_kb_init_coverage.py`。
