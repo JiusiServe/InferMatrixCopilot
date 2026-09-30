@@ -115,11 +115,23 @@ class Executor:
         store so the choke points (`tools.dispatch`, `LLM.create`) capture every
         tool and model call under the unit context of the running step."""
         root = str(getattr(self.settings, "trace_store_root", "") or "")
-        if not root:
+        governed_run = bool(getattr(self.settings, "improve_governed", False))
+        if not root and not governed_run:
             return await self._run_steps(playbook, state)
+        from contextlib import ExitStack
+
         from ..trace_store import TraceStore, bind_store
 
-        with bind_store(TraceStore(Path(root).expanduser())):
+        with ExitStack() as stack:
+            if root:
+                stack.enter_context(bind_store(TraceStore(Path(root).expanduser())))
+            if governed_run:
+                # a shadow child of an experiment: every model call of this
+                # process is reserved against the week's envelope (design §10)
+                from ..improve.budget import governed
+                from ..improve.cycle import governor_for, ledger_dir_for
+
+                stack.enter_context(governed(governor_for(self.settings, ledger_dir_for(self.settings))))
             return await self._run_steps(playbook, state)
 
     async def _run_steps(self, playbook: "Playbook", state: dict) -> RunOutcome:
@@ -330,6 +342,9 @@ class Executor:
         if item is not None:
             unit_id += f":{_item_key(item)}"
         context: dict = {"run_id": run_id, "playbook": playbook, "step": step, "unit_id": unit_id}
+        tag = os.environ.get("IMPROVE_UNIT_TAG", "")
+        if tag:
+            context["unit_tag"] = tag        # an experiment's per-run identity (never reused)
         decl = lookup(self._declarations(), playbook, step)
         if decl is None:
             return context

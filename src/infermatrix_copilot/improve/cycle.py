@@ -22,6 +22,7 @@ from typing import Any
 
 from ..trace_store import TraceStore, bind_store, file_lock, trace_context
 from .enroll import declarations_for
+from .budget import Governor, governed
 from .ledger import Ledger
 from .lints import Baseline, Finding, catalogue, run_lints, unit_usd
 from .reader import UNIT_LOOKBACK, Unit, collect_units, cursor_path, week_bounds
@@ -94,6 +95,15 @@ def is_due(now: float, last_run_at: float, *, weekday: int, hour: int, tz: dt.tz
     return last_run_at < slot.timestamp()
 
 
+def governor_for(settings: Any, ledger_dir: str | Path, *, now: float | None = None) -> Governor:
+    """The week's governor from settings (the dollar and judge-call
+    envelopes); every model and judge call of a cycle, an experiment or a
+    forensics pass is reserved against it."""
+    return Governor(ledger_dir, usd_week=float(getattr(settings, "improve_budget_usd_week", 20.0)),
+                    judge_calls_week=int(getattr(settings, "improve_budget_judge_calls_week", 300)),
+                    settings=settings, clock=(lambda: now) if now is not None else time.time)
+
+
 def preflight(settings: Any, ledger: Ledger) -> dict:
     """The kill switch and the per-workflow holds; refuses loudly."""
     if not bool(getattr(settings, "improve_enabled", False)):
@@ -138,7 +148,8 @@ def _run_cycle_locked(store: TraceStore, settings: Any, ledger_dir: Path, *, now
         until = now
     declarations = declarations_for(settings)
     started = time.time()
-    with bind_store(store), trace_context(playbook="workflow-improve", run_id=f"cycle-{int(now)}"):
+    governor = governor_for(settings, ledger_dir, now=now)
+    with bind_store(store), governed(governor), trace_context(playbook="workflow-improve", run_id=f"cycle-{int(now)}"):
         # the engine's own records are units too (self-enrolment, design §11.2):
         # the previous cycles' records fall in this window; this cycle's are
         # written after the read and belong to the next one
@@ -249,6 +260,7 @@ def _run_cycle_locked(store: TraceStore, settings: Any, ledger_dir: Path, *, now
             "cursor_migrated": cursor_migrated, "workflows": report_workflows,
             "proposals_opened": proposals_opened,
             "lint_catalogue": catalogue(), "seconds": round(time.time() - started, 3),
+            "budget": governor.remaining(),
         }
         try:
             store.append("decision", inputs={"report": json.dumps(report, ensure_ascii=False, default=str)},

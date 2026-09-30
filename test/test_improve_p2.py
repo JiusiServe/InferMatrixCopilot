@@ -79,9 +79,11 @@ def test_judge_runner_paths_and_verdict_parsing(tmp_path):
     class Gov:
         def reserve_judge_call(self):
             calls.append("reserve")
+            return "2027-W03|judge|abc"
 
-        def settle_judge_call(self):
+        def settle_judge_call(self, token=None):
             calls.append("settle")
+            assert token == "2027-W03|judge|abc"                 # settled against the week-pinned token
 
     def fake_run(argv, **kw):
         assert argv[0] == "cursor-agent" and "--mode" in argv and "ask" in argv

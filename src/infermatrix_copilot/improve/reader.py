@@ -85,7 +85,7 @@ def workflow_key(record: dict) -> tuple[str, bool]:
 def records_between(store: TraceStore, since: float, until: float) -> Iterator[dict]:
     """Records with ``since <= at < until`` from the JSONL files (the source of
     truth); files are named by UTC day, so only the days in range are read."""
-    first_day = dt.datetime.fromtimestamp(since, dt.timezone.utc).date() - dt.timedelta(days=1)
+    first_day = dt.datetime.fromtimestamp(max(since, 0.0), dt.timezone.utc).date() - dt.timedelta(days=1)
     for path in sorted((store.root / "records").glob("*.jsonl")):
         try:
             day = dt.date.fromisoformat(path.stem)

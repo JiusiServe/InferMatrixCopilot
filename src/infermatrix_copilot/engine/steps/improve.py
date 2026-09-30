@@ -171,6 +171,9 @@ async def _forensics(ctx: StepContext) -> StepResult:
     from ...improve.reader import collect_units
     from ...trace_store import bind_store, trace_context
 
+    from ...improve.budget import BudgetRefused, governed
+    from ...improve.cycle import governor_for
+
     store = _trace_store(ctx)
     if store is None:
         return StepResult(False, FailureKind.BLOCKED, "no trace store (set TRACE_STORE_ROOT)")
@@ -182,7 +185,9 @@ async def _forensics(ctx: StepContext) -> StepResult:
     decls = declarations_for(ctx.settings)
     agents = _forensics_agents(ctx)
     results: dict = {}
-    with bind_store(store), trace_context(playbook="workflow-improve", run_id=ctx.run_dir.name):
+    governor = governor_for(ctx.settings, _ledger_dir(ctx))
+    ctx.governor = governor
+    with bind_store(store), governed(governor), trace_context(playbook="workflow-improve", run_id=ctx.run_dir.name):
         units, _ = collect_units(store, float(since), float(until))
         for name, decl in decls.items():
             if not decl.tier2 or (only and name != only):
@@ -204,8 +209,12 @@ async def _forensics(ctx: StepContext) -> StepResult:
                            "descriptive_only": bool(getattr(adapter, "descriptive_only", False)),
                            "families": sorted(agents), "single_family": len(agents) < 2}
             if cells and agents:
-                attributions = attribute(store, {u.unit_id: u for u in wf_units}, golds, cells, agents=agents,
-                                         max_cells=int(ctx.params.get("max_cells") or 40))
+                try:
+                    attributions = attribute(store, {u.unit_id: u for u in wf_units}, golds, cells, agents=agents,
+                                             max_cells=int(ctx.params.get("max_cells") or 40))
+                except BudgetRefused as exc:
+                    entry["budget_exhausted"] = str(exc)[:200]
+                    attributions = []
                 entry["punch_list"] = punch_list(attributions, golds, {u.unit_id: u for u in wf_units})
                 entry["measurement"] = measurement_health(attributions)
             elif cells and not agents:
@@ -232,20 +241,11 @@ def _adapter_kwargs(ctx: StepContext, decl) -> dict:
 
 
 def _judge_spec(ctx: StepContext):
-    """The gold_match judge from settings.improve_judge: "api:<model>" or
-    "cli:<provider>:<model>"; None when unset (cells stay unlabeled and the
-    report says so)."""
-    from ...improve.judges import JudgeSpec
+    """The gold_match judge from settings.improve_judge (or params.judge);
+    None when unset (cells stay unlabeled and the report says so)."""
+    from ...improve.judges import judge_spec_from
 
-    raw = str(ctx.params.get("judge") or getattr(ctx.settings, "improve_judge", "") or "")
-    if not raw:
-        return None
-    parts = raw.split(":")
-    if parts[0] == "api" and len(parts) == 2:
-        return JudgeSpec("api", parts[1])
-    if parts[0] == "cli" and len(parts) == 3:
-        return JudgeSpec("cli", parts[2], provider=parts[1])
-    raise ValueError(f"improve_judge must be api:<model> or cli:<provider>:<model>, got {raw!r}")
+    return judge_spec_from(ctx.settings, str(ctx.params.get("judge") or ""))
 
 
 def _collect_outcomes(ctx: StepContext, adapter, units, store) -> dict:
@@ -280,3 +280,42 @@ def _collect_outcomes(ctx: StepContext, adapter, units, store) -> dict:
             summary["errors"].append(f"{unit.unit_id}: gold_match: {exc}"[:200])
     summary["inconclusive"] = len(getattr(adapter, "inconclusive", []) or [])
     return summary
+
+
+@step("improve.experiments", "deterministic", "read",
+      "Run every registered experiment (shadow arms, paired verdicts) before forensics; reserved budget first.")
+async def _experiments(ctx: StepContext) -> StepResult:
+    """Registered experiments run first in a cycle (design §10: their cost
+    was reserved at registration); each ends with a label. Params:
+    `experiment` (one id), `dry_run` (list only)."""
+    from ...improve import experiments as exps
+    from ...improve.budget import governed
+    from ...improve.cycle import governor_for
+    from ...trace_store import bind_store, trace_context
+
+    store = _trace_store(ctx)
+    if store is None:
+        return StepResult(False, FailureKind.BLOCKED, "no trace store (set TRACE_STORE_ROOT)")
+    ledger_dir = _ledger_dir(ctx)
+    pending = exps.list_experiments(ledger_dir, state="registered")
+    only = str(ctx.params.get("experiment") or "")
+    if only:
+        pending = [e for e in pending if e.experiment_id == only]
+    if ctx.params.get("dry_run"):
+        return StepResult(True, summary=f"{len(pending)} registered experiment(s) pending",
+                          outputs={"pending": [e.experiment_id for e in pending]})
+    governor = governor_for(ctx.settings, ledger_dir)
+    results: dict = {}
+    with bind_store(store), governed(governor), trace_context(playbook="workflow-improve", run_id=ctx.run_dir.name):
+        for exp in pending:
+            try:
+                done = exps.run(store, ctx.settings, ledger_dir, exp.experiment_id, governor=governor, judge_llm=ctx.llm)
+                results[exp.experiment_id] = {"state": done.state, **{k: done.result.get(k) for k in
+                                                                       ("mean", "lo", "hi", "n_retained", "n_required")}}
+            except Exception as exc:  # noqa: BLE001 - one experiment must not stop the others
+                results[exp.experiment_id] = {"state": "error", "error": str(exc)[:300]}
+    updates = {"improve_experiments": results}
+    ctx.state.update(updates)
+    return StepResult(True, summary=f"{len(results)} experiment(s) adjudicated: "
+                                    + ", ".join(f"{k}={v['state']}" for k, v in results.items()) if results else "no registered experiments",
+                      outputs={"experiments": results, "state_updates": updates})

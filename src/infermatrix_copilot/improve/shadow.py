@@ -107,8 +107,12 @@ def make_executables_dir(dest: str | Path, executables: Iterable[str] = DEFAULT_
 
 
 def shadow_env(*, shadow_dir: str | Path, run_dir: str | Path, trace_root: str | Path,
-               executables_dir: str | Path, repo_name: str, environ: dict | None = None) -> dict[str, str]:
-    """The allowlisted environment for a shadow subprocess (layer 3)."""
+               executables_dir: str | Path, repo_name: str, environ: dict | None = None,
+               ledger_dir: str | Path | None = None, usd_week: float = 20.0,
+               judge_calls_week: int = 300) -> dict[str, str]:
+    """The allowlisted environment for a shadow subprocess (layer 3). The
+    child binds its own budget governor from IMPROVE_GOVERNED=1 and the
+    ledger directory, against the same weekly files as the parent."""
     env = os.environ if environ is None else environ
     out: dict[str, str] = {}
     for key, value in env.items():
@@ -127,14 +131,23 @@ def shadow_env(*, shadow_dir: str | Path, run_dir: str | Path, trace_root: str |
     out["ALLOW_POST"] = "0"
     out["ALLOW_PUSH"] = "0"
     out["IMX_RUN_DIR"] = str(run_dir)
+    out["IMPROVE_GOVERNED"] = "1"
+    if ledger_dir is not None:
+        out["IMPROVE_LEDGER_DIR"] = str(ledger_dir)
+    out["IMPROVE_BUDGET_USD_WEEK"] = str(usd_week)
+    out["IMPROVE_BUDGET_JUDGE_CALLS_WEEK"] = str(judge_calls_week)
     return out
 
 
-def assert_boundaries(env: dict[str, str]) -> list[str]:
+def assert_boundaries(env: dict[str, str], expected: dict[str, str] | None = None) -> list[str]:
     """Violations of the credential/executable boundary in `env` (empty when
     the environment is safe to launch). Checked BEFORE dispatch; a
-    non-empty list aborts the experiment as invalid."""
+    non-empty list aborts the experiment as invalid. ``expected`` pins
+    values the child must carry exactly (the parent's budget configuration)."""
     problems: list[str] = []
+    for key, value in (expected or {}).items():
+        if env.get(key) != value:
+            problems.append(f"{key} is {env.get(key)!r}, expected {value!r}")
     for key in env:
         if key.startswith(_FORBIDDEN_PREFIXES):
             problems.append(f"forbidden variable {key}")
@@ -144,6 +157,8 @@ def assert_boundaries(env: dict[str, str]) -> list[str]:
         problems.append("outward writes enabled")
     if env.get("IMPROVE_SHADOW") != "1":
         problems.append("IMPROVE_SHADOW is not set")
+    if env.get("IMPROVE_GOVERNED") != "1" or not env.get("IMPROVE_LEDGER_DIR"):
+        problems.append("the child would run unmetered (IMPROVE_GOVERNED/IMPROVE_LEDGER_DIR missing)")
     path = env.get("PATH", "")
     if not path or os.pathsep in path:
         problems.append("PATH is not the single shadow executables directory")

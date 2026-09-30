@@ -2,7 +2,7 @@
 
 <!-- verified-against: 2026-09-30 -->
 
-`设计：/data/zhoutaichang/copilot/meta-improvement-engine-design.md v1（GPT-6 sol 批准 2026-09-29） · refactor-status: building (P0–P2 已落地)`
+`设计：/data/zhoutaichang/copilot/meta-improvement-engine-design.md v1（GPT-6 sol 批准 2026-09-29） · refactor-status: building (P0–P3 已落地)`
 
 ## 职责
 面向任意 trace/1 工作流的"取证—实验—提案"循环。**只提案**：引擎的写权限限于追加自己的 trace/1 记录、
@@ -27,13 +27,16 @@
 | `adapters/rb_review.py` | P2 | RB 生产适配器：PR 线程代理标签（accepted/disputed/silent）→ finding 级有效性，`descriptive_only`，无金标、不注册实验 |
 | `forensics.py` | P2 | 覆盖矩阵（确定性）、S0–S10 阶段分类法、取证 agent（只读 trace 工具、全部输出围栏为不可信数据、必须引用记录 id）、双家族交叉复核（不一致 = disputed）、整改清单、测量健康 |
 | `meta.py` | P2 | 冻结元基准：`eval/dataset/meta/cases`（trace + 人工阶段标签）与 `meta/lints`（注入缺陷样本）的导出与加载 |
-| `cli.py` | P0–P2 | `improve migrate-index|rebuild-index|rollback-index|compare-index|verify-index|cycle|ledger|lints|gold draft/check|meta lint-check` |
+| `budget.py` | P3 | 周包络（美元 + 判官次数，按 ISO 周持久化、跨进程加锁）：每次模型调用发出前按最坏情况预留（输入 = 请求字节数 ≥ token 数、输出 = `max_tokens`、无价格即拒绝）、返回后结算；`结算 > 预留` 记 `budget_breach` 并中止；`governed()`/`current_governor()` 供 `LLM.create` 与 `run_judge` 使用 |
+| `experiments.py` | P3 | 预注册（Tier 2 且非 descriptive-only、API 后端、指纹 diff 非空且不触及元基准、每个 item 有金标、按历史 sd 算 `n_required`、成本预留）→ 影子运行（stage → 每 item×replicate×臂 一个子进程、`PR_SNAPSHOT_FILE` 交接、指纹核对、L13/预算/崩溃隔离）→ 配对判定（`n_retained` 重算功效、五种标签、`experiment_verdict` 记录、提案状态推进） |
+| `cli.py` | P0–P3 | `improve migrate-index|rebuild-index|rollback-index|compare-index|verify-index|cycle|ledger|lints|gold draft/check|meta lint-check|budget|experiment register/run/list` |
 
 ## 接入点
 - 执行器：`settings.trace_store_root` 非空时绑定 store 并为每步绑定单元上下文；`settings.improve_shadow` 下拒绝非 read/report 步骤。
 - `tools.dispatch` / `LLM.create` / `HarnessLLM.create` / `run_harness_step` / MCP bridge：全保真采集。
 - `kb serve` 调度器：每 tick 调 `_improve_cycle()`，周度槽位到达即跑一次周期（与知识服务同一租约、异常隔离）。
-- 任务种类 `workflow_improve`（L2，READ_ONLY_KINDS）；playbook `workflow-improve`（preflight → lint → forensics → ledger → report）。
+- 任务种类 `workflow_improve`（L2，READ_ONLY_KINDS）；playbook `workflow-improve`（preflight → lint → experiments → forensics → ledger → report）。
+- `LLM.create`：绑定了 governor 时先预留再发请求，失败释放、成功结算；`improve.experiments` 与 `improve.forensics` 都在 `governed()` 内运行。
 - `improve.forensics` 步骤：对每个有结果适配器的工作流建覆盖矩阵、用两个模型家族归因每个 miss、产出整改清单；单元数低于 `tier2_min_items` 或无 LLM 时跳过并说明。
 
 ## 不变量
@@ -42,4 +45,4 @@
 - lint 只读 trace，不调模型；无证据形态的 lint 不猜。
 
 ## 测试
-`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`。
+`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`、`test_improve_p3.py`。

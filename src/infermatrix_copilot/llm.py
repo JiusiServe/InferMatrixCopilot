@@ -204,8 +204,20 @@ class LLM:
             max_tokens=max_tokens or self.settings.llm_max_tokens,
         )
         from . import tracing
+        from .improve.budget import current_governor
 
         started = time.monotonic()
+        # the weekly envelope (design §10): the worst case is reserved BEFORE
+        # the request leaves the process; a refusal never sends it
+        governor = current_governor()
+        reservation = None
+        if governor is not None:
+            from .improve.budget import request_bytes
+
+            reservation = governor.reserve_call(kwargs["model"], request_bytes(kwargs),
+                                                int(kwargs["max_tokens"] or 0), purpose=role or "")
+        sent = False          # once True, a failure may already have been billed
+        usage = None          # set as soon as the provider's usage is known
         try:
             with tracing.span("llm", model=kwargs["model"],
                               n_tools=len(kwargs["tools"]),
@@ -214,6 +226,7 @@ class LLM:
                               n_tools=len(kwargs["tools"]), role=role or "",
                               system=kwargs.get("system", ""),
                               payload=tracing.summarize_messages(kwargs["messages"]))
+                sent = True
                 if provider == "anthropic" and on_text is not None:
                     with self._client.messages.stream(**kwargs) as stream:
                         for delta in stream.text_stream:
@@ -238,6 +251,17 @@ class LLM:
                         self._normalize_anthropic(resp)
                 tracing.set_usage(_sp, usage, stop_reason=stop_reason)
         except Exception as exc:
+            if governor is not None and reservation is not None:
+                if usage is not None:
+                    # the provider answered (usage known) and something after
+                    # that failed, e.g. on_text: real spend, settled as such
+                    governor.settle_call(reservation, usage, kwargs["model"])
+                elif sent:
+                    # sent, no usage: billing may have happened — charge the
+                    # whole reservation rather than discard real spend
+                    governor.forfeit_call(reservation)
+                else:
+                    governor.release_call(reservation)
             # a failed provider call is still a model_call record (error set):
             # forensics must see the request that never got a reply
             capture_model_call(kwargs, role, provider, None,
@@ -255,6 +279,8 @@ class LLM:
                       usage=usage, model=served, request_id=request_id)
         capture_model_call(kwargs, role, provider, reply,
                            time.monotonic() - started)
+        if governor is not None and reservation is not None:
+            governor.settle_call(reservation, usage, kwargs["model"])  # a breach raises: fail closed
         self._guard_served_model(kwargs["model"], reply, _sp)
         return reply
 
