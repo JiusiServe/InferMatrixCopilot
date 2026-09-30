@@ -58,7 +58,7 @@ def test_unknown_backend_rejected_at_startup():
 
 
 def test_every_harness_id_resolves_a_transport():
-    for backend in ("cursor", "claude-code", "codex"):
+    for backend in ("cursor", "claude-code", "codex", "zcode"):
         transport = transport_for(_settings(strict_backend=backend))
         assert transport.spec.id == backend
         assert transport.spec.kind == "harness"

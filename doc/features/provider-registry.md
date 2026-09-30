@@ -1,11 +1,11 @@
-# Provider registry —— Strict 的五种后端
+# Provider registry —— Strict 的六种后端
 
 > **一览**
 > | | |
 > |---|---|
-> | **状态** | ✅ 已实现。`api` / `cursor` / `claude-code` / `deepseek` 已实测；`codex` 仅离线测试（开发机无 ChatGPT 登录，readiness 会报出登录缺口） |
+> | **状态** | ✅ 已实现。`api` / `cursor` / `claude-code` / `deepseek` / `zcode` 已实测；`codex` 仅离线测试（开发机无 ChatGPT 登录，readiness 会报出登录缺口） |
 > | **做什么** | 让只有编码 Agent 订阅、没有裸 API Key 的用户也能跑 Strict；顺带把原有 api 路径收编进同一张注册表 |
-> | **怎么开关** | `STRICT_BACKEND=api\|cursor\|claude-code\|codex\|deepseek`（另有 `STRICT_BACKEND_MODEL` / `_CONCURRENCY` / `_CLI` / `_TIMEOUT_S`） |
+> | **怎么开关** | `STRICT_BACKEND=api\|cursor\|claude-code\|codex\|deepseek\|zcode`（另有 `STRICT_BACKEND_MODEL` / `_CONCURRENCY` / `_CLI` / `_TIMEOUT_S`） |
 > | **怎么用** | 面向使用者的说明在 [`../guide/backends.md`](../guide/backends.md) |
 > | **实测** | 后端对比见 [`eval/dataset/results/model_comparison.md`](../../eval/dataset/results/model_comparison.md)；结论摘要在 [`../GUIDE.md §8`](../GUIDE.md#8-性能对比) |
 > | **硬边界** | 用 `api` 时行为**逐字节不变**（平价棘轮）；harness 会话的工具一律经 `tools.dispatch`；子进程环境是白名单 |

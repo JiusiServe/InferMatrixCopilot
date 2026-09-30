@@ -1,6 +1,6 @@
 # providers/registry.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-09-30 -->
 
 `LOC ~107 · 后端解析（唯一那张表） · refactor-status: ok`
 
@@ -8,8 +8,8 @@
 "够到一个模型"的所有方式的**唯一一张表**，以及从配置到 transport 的唯一解析路径。
 
 ## 功能
-声明 `PROVIDERS`（五条 `ProviderSpec`：`api`、`cursor`、`claude-code`、`codex`、
-`deepseek`），从 `Settings.strict_backend` 解析出被选中的那个，并为 harness 类型返回
+声明 `PROVIDERS`（六条 `ProviderSpec`：`api`、`cursor`、`claude-code`、`codex`、
+`deepseek`、`zcode`），从 `Settings.strict_backend` 解析出被选中的那个，并为 harness 类型返回
 一个 `HarnessTransport`。已声明但尚未发布的后端住在 `_UNSHIPPED` 里，抛出指向里程碑的
 错误，而不是返回一个根本跑不起来的 transport。
 
@@ -48,7 +48,7 @@ transport 还没就绪时，先登记进 `_UNSHIPPED`。
 
 ## 测试
 `test_providers.py`；逐后端的
-`test_provider_{cursor,claude_code,codex,deepseek}.py`。
+`test_provider_{cursor,claude_code,codex,deepseek,zcode}.py`。
 
 ## 重构备注
 `transport_for_id` 的 if 链是唯一会随后端数量增长的地方；用 id → import 路径的 dict

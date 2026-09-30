@@ -66,7 +66,7 @@
 | 安全原语 | `scopes` `push` |
 | Profile | `profiles/store` `profiles/establish` `profiles/repo_map` `profiles/consolidate` |
 | 跨切 | `review/{diff_summary,triggers,reviewer}` `memory/{debug_memory,skills}` `run_trace` `notify` `metrics` |
-| 后端 | `providers/{registry,base,claude_code,codex,cursor,deepseek,audit,harness_llm}` `tool_bridge` |
+| 后端 | `providers/{registry,base,claude_code,codex,cursor,deepseek,zcode,audit,harness_llm}` `tool_bridge` |
 | MCP 面 | `thin_mcp_server` `mcp_server` `mcp_policy` `run_status` `knowledge_docs` `__main__` |
 
 平凡的 `__init__.py` 再导出文件不单独出规范
