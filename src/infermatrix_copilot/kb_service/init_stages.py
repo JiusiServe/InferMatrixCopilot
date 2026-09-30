@@ -727,6 +727,7 @@ class _Stage:
         rt, lc, record = self.rt, self.lifecycle, self.record
         stage = self.STAGE
         title = f"kb init({lc.repo}): {stage}"
+        record.spent_usd = round(self.budget.spent_usd, 6)  # the body reports it
         body = render_pr_body(record, lc)
         publisher = InitPublisher(rt.knowledge.path, _knowledge_repository(), run=rt.gh_run)
         if self.dry_run:
@@ -857,18 +858,30 @@ class _Skeleton(_Stage):
         return self._to_candidates(data, rules_page[0], "docs")
 
     def _seed_pages(self) -> list[str]:
+        """Every content page a ``repos/<other>/`` seed names (a page, or the
+        pages under a directory), whatever its type: a guide adapts as well as
+        a rule page. Indexes are navigation, not content. A seed that yields
+        no page is reported, never skipped silently (design §4)."""
         pages = []
         for seed in self.lifecycle.init.seeds:
             if not seed.startswith("repos/"):
                 continue
             prefix = seed.rstrip("/")
+            found = []
             for path in sorted(self.base):
-                if (path == prefix or path.startswith(prefix + "/")) and path.endswith(".md"):
-                    try:
-                        if Page.parse(self.base[path]).frontmatter_data().get("type") == "rule":
-                            pages.append(path)
-                    except (LifecycleError, yaml.YAMLError):
-                        continue
+                if not ((path == prefix or path.startswith(prefix + "/")) and path.endswith(".md")):
+                    continue
+                if PurePosixPath(path).name == INDEX_NAME:
+                    continue
+                try:
+                    Page.parse(self.base[path]).frontmatter_data()
+                except (LifecycleError, yaml.YAMLError) as exc:
+                    self.record.checklist.append(f"seed {seed}: {path} is unreadable ({exc}); not adapted")
+                    continue
+                found.append(path)
+            if not found:
+                self.record.checklist.append(f"seed {seed}: names no content page; nothing was adapted")
+            pages += found
         return list(dict.fromkeys(pages))
 
     def _seed_rules(self) -> list[_Candidate]:
@@ -877,14 +890,15 @@ class _Skeleton(_Stage):
             self.record.unfinished += [f"seed {p}: over the {MAX_SEED_PAGES}-page cap" for p in pages[MAX_SEED_PAGES:]]
             pages = pages[:MAX_SEED_PAGES]
         out = []
-        for origin in pages:
+        for position, origin in enumerate(pages):
             payload = {"repository": self.lifecycle.full_name, "top_level": self.layout,
                        "docs": self._doc_payload(), "adapt_from": {"path": origin, "text": self.base[origin][:24_000]},
                        "language_sample": self._language_sample()}
             try:
                 data = self._rules_call(payload)
             except BudgetExhausted as exc:
-                self.record.unfinished.append(f"seed {origin}: {exc}")
+                # this seed and every one after it were never adapted
+                self.record.unfinished += [f"seed {p}: {exc}" for p in pages[position:]]
                 break
             slug = _slug(origin.removeprefix("repos/").removesuffix(".md"))
             page = f"{self.repo_dir}/rules-seed-{slug}.md"
@@ -893,6 +907,8 @@ class _Skeleton(_Stage):
                 self._titles[page] = _one_line(data.get("page_title")) or _title_of(self.base[origin], slug)
                 self.record.seeds.append({"origin": origin, "kb_sha": self.record.kb_base_sha,
                                           "new_page": page, "new_rule_ids": [c.rule_id for c in found]})
+            else:
+                self.record.notes.append(f"seed {origin}: no rule transfers to this repository")
             out += found
         return out
 

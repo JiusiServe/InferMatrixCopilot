@@ -78,7 +78,10 @@ KNOWLEDGE = {
     "knowledge/repos/_index.md": _index("Repositories", "other", (
         "## Current\n\n| repo | upstream | where |\n|---|---|---|\n"
         "| other | `o/other` | [other](other/_index.md) |\n")),
-    "knowledge/repos/other/_index.md": _index("Other", "other", "- [Other rules](rules.md)\n"),
+    "knowledge/repos/other/_index.md": _index("Other", "other", "- [Other rules](rules.md)\n- [Other guide](guide.md)\n"),
+    "knowledge/repos/other/guide.md": (
+        '---\ntitle: "Other guide"\ncreated: 2026-09-01\nupdated: 2026-09-01\ntype: guide\n'
+        "tags: [other]\nsources: []\n---\n\n# Other guide\n\nEngine helpers keep their tick contract documented.\n"),
     "knowledge/repos/other/rules.md": (
         '---\ntitle: "Other rules"\ncreated: 2026-09-01\nupdated: 2026-09-01\ntype: rule\n'
         "tags: [other]\nsources: []\n---\n\n# Other rules\n\n"
@@ -714,3 +717,57 @@ def test_pr_body_hides_failed_rules_from_the_table():
     body = render_pr_body(record, _lifecycle())
     table = body.split("<details>")[0]
     assert "| T-1 |" in table and "T-2" not in table and "- [ ] fix x" in body
+
+
+# -- seeds are adapted whatever their page type, and never skipped silently ----------
+
+class _SeedBudgetGateway(FakeGateway):
+    """Runs out of budget on the first seed adaptation."""
+
+    def call_json(self, role, *, system, prompt, validate=None, max_budget_usd=None):
+        if system == SYSTEM_RULES and "adapt_from" in prompt:
+            raise BudgetExhausted("budget spent")
+        return super().call_json(role, system=system, prompt=prompt, validate=validate,
+                                 max_budget_usd=max_budget_usd)
+
+
+def test_a_guide_page_seed_is_adapted_too(world):
+    record = run_stage(_runtime(world), _lifecycle(seeds=("repos/other/guide.md",)), "skeleton", dry_run=True)
+    assert [s["origin"] for s in record.seeds] == ["repos/other/guide.md"]
+    assert "knowledge/repos/toy/rules-seed-other-guide.md" in _tree(record)
+
+
+def test_a_seed_directory_adapts_its_pages_but_not_its_index(world):
+    gateway = FakeGateway()
+    run_stage(_runtime(world, gateway), _lifecycle(seeds=("repos/other",)), "skeleton", dry_run=True)
+    adapted = [json.loads(c["prompt"].split("\n", 1)[1].rsplit("</untrusted_data>", 1)[0])["adapt_from"]["path"]
+               for c in gateway.calls if c["system"] == SYSTEM_RULES and "adapt_from" in c["prompt"]]
+    assert adapted == ["repos/other/guide.md", "repos/other/rules.md"]
+
+
+def test_a_seed_that_names_only_an_index_is_reported(world):
+    record = run_stage(_runtime(world), _lifecycle(seeds=("repos/other/_index.md",)), "skeleton", dry_run=True)
+    assert record.seeds == []
+    assert any("seed repos/other/_index.md: names no content page" in c for c in record.checklist)
+
+
+def test_a_seed_that_transfers_nothing_is_reported(world):
+    record = run_stage(_runtime(world, FakeGateway(seed_rules=False)), _lifecycle(), "skeleton", dry_run=True)
+    assert record.seeds == []
+    assert "seed repos/other/rules.md: no rule transfers to this repository" in record.notes
+    body = (Path(record.pr["dry_run_dir"]) / "PR_BODY.md").read_text(encoding="utf-8")
+    assert "no rule transfers" in body
+
+
+def test_a_budget_stop_lists_every_seed_it_did_not_adapt(world):
+    lifecycle = _lifecycle(seeds=("repos/other/rules.md", "repos/other/guide.md"))
+    record = run_stage(_runtime(world, _SeedBudgetGateway()), lifecycle, "skeleton", dry_run=True)
+    assert sorted(u.split(":")[0] for u in record.unfinished) == [
+        "seed repos/other/guide.md", "seed repos/other/rules.md"]
+
+
+def test_the_pr_body_reports_the_spend_it_accounted(world):
+    record = run_stage(_runtime(world), _lifecycle(), "skeleton", dry_run=True)
+    assert record.spent_usd > 0
+    body = (Path(record.pr["dry_run_dir"]) / "PR_BODY.md").read_text(encoding="utf-8")
+    assert f"- Model spend (accounted): ${record.spent_usd:.2f}" in body
