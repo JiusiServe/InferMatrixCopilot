@@ -268,3 +268,19 @@ def test_a_record_without_judged_text_is_refused(world, monkeypatch):
     record.save(state)
     harvested = run_stage(_runtime(world, gateway), _modules_lifecycle(), "harvest-calibration", dry_run=True)
     assert harvested.status == "blocked" and any("predates the harvest" in p for p in harvested.problems)
+
+
+def test_explanatory_knowledge_verdicts_are_excluded_from_rule_calibration(world, monkeypatch):
+    from test_kb_init_knowledge import KnowledgeGateway
+
+    monkeypatch.setattr(init_harvest, "MIN_TRUSTED_BAD", 1)
+    gateway = _three_stages(world)
+    knowledge = run_stage(_runtime(world, KnowledgeGateway()), _modules_lifecycle(), "knowledge", dry_run=True)
+    assert knowledge.status == "dry_run", knowledge.problems
+    assert knowledge.verdicts and all(v["kind"] == "prose" for v in knowledge.verdicts.values())
+    deepen = run_stage(_runtime(world, gateway), _modules_lifecycle(), "deepen", dry_run=True)
+    assert deepen.status == "dry_run", deepen.problems
+    harvested = run_stage(_runtime(world, gateway), _modules_lifecycle(), "harvest-calibration", dry_run=True)
+    assert harvested.status == "dry_run", harvested.problems
+    cases = _cases(harvested)
+    assert cases and all("knowledge:" not in json.dumps(case) for case in cases.values())

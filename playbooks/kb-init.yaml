@@ -1,4 +1,4 @@
-# kb init for ONE repository: one stage per run (skeleton, then modules, then
+# kb init for ONE repository: one stage per run (skeleton, then modules, optional knowledge, then
 # deepen + lifecycle flip, then pr-history, then harvest-calibration), each opened as a
 # human-merged PR (design kb-init v3). Runs outside the knowledge service: it
 # never writes the service ledger. Candidate.
@@ -13,7 +13,7 @@ repos: []
 requires: []
 params:
   repo: "knowledge repository name"
-  stage: "skeleton | modules | deepen | pr-history | harvest-calibration"
+  stage: "skeleton | modules | knowledge | deepen | pr-history | harvest-calibration"
   dry_run: "true (default): write the tree and PR body locally; false needs ALLOW_PUSH=1 and ALLOW_POST=1"
   pin: "upstream commit to pin (default: the default branch head)"
   pr_count: "pr-history only: merged upstream PRs to replay (default: adapter pr_history_count or 1000)"

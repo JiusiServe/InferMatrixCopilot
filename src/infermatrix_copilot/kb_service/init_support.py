@@ -41,7 +41,7 @@ from .init_budget import Budget, Price, generator_reservation, load_prices, pric
 from .models import ModelGateway, ModelReply, ModelRole
 
 INIT_DIR = "init"
-STAGES = ("skeleton", "modules", "deepen", "pr-history", "harvest-calibration")
+STAGES = ("skeleton", "modules", "knowledge", "deepen", "pr-history", "harvest-calibration")
 KNOWLEDGE_PREFIX = "knowledge/"
 ALLOW_PUSH_ENV = "ALLOW_PUSH"
 ALLOW_POST_ENV = "ALLOW_POST"
