@@ -1,7 +1,7 @@
 ---
 title: "JiuwenSwarm 仓库经验入口"
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-01
 type: index
 tags: [jiuwenswarm]
 sources: []
@@ -9,10 +9,11 @@ sources: []
 
 # JiuwenSwarm 仓库经验入口
 
-本页是 `openJiuwen-ai/jiuwenswarm`（JiuwenSwarm，原名 JiuwenClaw，v0.2.0 起改为现名）的审查入口。它把 PR 标题或改动路径对应到负责的知识页，再指向仓库自己的文档。仓库文档和源码是事实来源，本知识库只负责指路。
+本页是 `openJiuwen-ai/jiuwenswarm`（JiuwenSwarm，原名 JiuwenClaw，v0.2.0 起改为现名）的知识入口。它按功能与代码 owner 连接架构、API、配置、设计取舍、关联功能、验证方法和审查规则。解释性知识引用固定版本的源码与文档；完整接口定义和当前行为仍以仓库自己的文档与源码为事实来源。
 
 **什么时候查这里**
 
+- 理解功能、API 配置、设计取舍或跨组件关系时，从下面的功能知识导航选择入口。
 - 审查 jiuwenswarm 的 PR 时，用来判断改动属于哪一块：Gateway 与频道、E2A/A2A/ACP 协议、A2UI、AgentServer 运行时、Agent Team/Harness/Skills、Auto Harness、Web 前端、默认配置、测试与 CI、打包部署，或文档。
 - 想知道某块代码该先读哪篇文档时查这里。中文文档在 `docs/zh/`，英文文档在 `docs/en/`，总导航是 `docs/README.md` 和 `docs/README_EN.md`。
 
@@ -24,6 +25,7 @@ sources: []
 
 **本仓库页面**
 
+- [功能、API、配置与设计取舍导航](feature-map.md) — 理解功能、配置与设计时查；连接九个组件的架构、契约、关联功能与验证入口。
 - [JiuwenSwarm 仓库经验入口 — architecture](architecture.md)
 - [JiuwenSwarm 仓库审查规则](rules.md)
 - [每次审查 jiuwenswarm 的 PR 都先读这份通用审查规则；本仓库自己的约束在 rules 页。](../../general/review/rules.md)

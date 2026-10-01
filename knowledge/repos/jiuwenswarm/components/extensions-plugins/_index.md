@@ -31,3 +31,17 @@ sources: []
 ## 专题入口
 
 - [应用插件绑定、前端贡献与资源挂载](jiuwenswarm-application-plugins.md) — 说明 ApplicationPlugin 的 manifest-only 构造、宿主绑定、禁用门、HTTP 资产与 WebSocket 路由；扩展发现和进程生命周期见扩展主页面。
+
+- [扩展与应用插件的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
+- [生命周期 Hooks 与扩展 功能知识](feature-hooks.md)
+- [Application Plugin 与前端贡献 功能知识](feature-applications.md)
+- [音视频双工扩展 功能知识](feature-video-duplex.md)
+- [extensions-plugins 源码接口与集成边界 01](source-contracts-01.md)
+- [agent-client](agent-client/_index.md)
+- [agentos](agentos/_index.md)
+- [agentos-agentos-router](agentos-agentos-router/_index.md)
+- [agentos-auth](agentos-auth/_index.md)
+- [sdk](sdk/_index.md)
+- [video-duplex-backend](video-duplex-backend/_index.md)
+- [video-duplex](video-duplex/_index.md)
+- [video-duplex-frontend](video-duplex-frontend/_index.md)

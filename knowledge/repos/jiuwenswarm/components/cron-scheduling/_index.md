@@ -36,3 +36,7 @@ sources: []
 ## 专题入口
 
 - [Cron 文件与 etcd 存储后端](jiuwenswarm-cron-store.md) — 说明 CronJob 持久化、后端选择、文件锁、变更修订与 etcd CAS/watch；任务 schema、表达式和执行路由见 Cron 主页面。
+
+- [Cron 后端与一致性的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
+- [定时任务与调度存储 功能知识](feature-cron.md)
+- [cron-scheduling 源码接口与集成边界 01](source-contracts-01.md)

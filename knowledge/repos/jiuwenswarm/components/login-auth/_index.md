@@ -26,3 +26,7 @@ sources: []
 ## 专题入口
 
 - [登录模型目录与跨进程凭据句柄](jiuwenswarm-login-models.md) — 说明登录模型在 Gateway 与 AgentServer 间的凭据传递、稳定句柄、请求钩子和目录缓存；OAuth 登录与加密会话持久化见登录主页面。
+
+- [登录凭据与续期的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
+- [账号登录与凭据续期 功能知识](feature-login.md)
+- [login-auth 源码接口与集成边界 01](source-contracts-01.md)

@@ -21,3 +21,14 @@ sources: []
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
 | start_services、jiuwenswarm-start、debug launcher、multi-instance、--dotenv、--name、… | 入口 | `jiuwenswarm/start_services.py`、`jiuwenswarm/dotenv_early.py`、`jiuwenswarm/init_workspace.py`、`jiuwenswarm/instance_manager/` |
+
+- [启动与实例隔离的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
+- [初始化与服务启动 功能知识](feature-bootstrap.md)
+- [单机多实例 功能知识](feature-instances.md)
+- [桌面宿主与自动更新 功能知识](feature-desktop.md)
+- [acp](acp/_index.md)
+- [channels-acp](channels-acp/_index.md)
+- [channels-desktop](channels-desktop/_index.md)
+- [cli](cli/_index.md)
+- [launch 源码接口与集成边界 01](source-contracts-01.md)
+- [instance-manager](instance-manager/_index.md)

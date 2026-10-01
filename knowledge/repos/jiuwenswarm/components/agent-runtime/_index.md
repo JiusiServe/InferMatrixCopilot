@@ -41,3 +41,7 @@ sources: []
 - [Runtime 交互输入、执行取代与取消](jiuwenswarm-runtime-control.md) — 协调等待交互的执行、补充输入、工作取代和子执行取消；会话注册、lane 调度与关闭由 Runtime Session 主页面说明。
 
 - [Runtime unary 与流式执行](jiuwenswarm-runtime-execution.md) — 提交去重、超时与取消、终态 owner 和流消费者提前退出。
+
+- [Runtime 生命周期与协调的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
+- [项目、会话与历史管理 功能知识](feature-projects-sessions.md)
+- [agent-runtime 源码接口与集成边界 01](source-contracts-01.md)

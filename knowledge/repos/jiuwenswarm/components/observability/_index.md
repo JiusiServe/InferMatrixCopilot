@@ -23,3 +23,8 @@ sources: []
 ## 专题入口
 
 - [轨迹保留、检查点与查看器投影边界](jiuwenswarm-trajectory-retention.md) — 说明已存轨迹的整页保留、检查点、OTLP 投影与持久化类型校验；记录准入、队列、writer 和会话删除见可观测性主页面。
+
+- [轨迹队列与存储的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
+- [执行轨迹与保留 功能知识](feature-observability.md)
+- [Debug Dump 与 OTel 功能知识](feature-debug-trace.md)
+- [observability 源码接口与集成边界 01](source-contracts-01.md)
