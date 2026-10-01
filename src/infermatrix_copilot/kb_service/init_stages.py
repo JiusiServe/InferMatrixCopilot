@@ -409,6 +409,10 @@ class _Stage:
             if chain.problems:
                 self.record = previous
                 return self._blocked(chain.problems)
+            problems = self._resume_input_problems(previous, digest)
+            if problems:
+                self.record = previous
+                return self._blocked(problems)
             return self._resume(previous)
         if previous is not None and previous.inputs_digest == digest and not adapter_missing_problem \
                 and not chain.problems and previous.status in ("dry_run", "published", "empty") \
@@ -531,6 +535,9 @@ class _Stage:
 
     def _base_for_run(self, latest: str) -> str:
         return latest
+
+    def _resume_input_problems(self, previous: InitRecord, digest: str) -> list[str]:
+        return []
 
     def _blocked(self, problems: list[str]) -> InitRecord:
         self.record.status = "blocked"

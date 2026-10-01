@@ -94,9 +94,12 @@ What each stage opens:
 - `pr-history`: reads the latest 1,000 merged upstream PRs as of the upstream
   pin, oldest first, with one extraction call per PR through `KB_GENERATOR`.
   `--pr-count N` overrides `init.pr_history_count` (default 1000). Executable
-  rules go to their nearest owner; PRs yielding no upgrade are recorded and
+  rules go to their nearest component or offered model owner; model-specific
+  contracts stay with that model. PRs yielding no upgrade are recorded and
   make no commit. One draft PR contains one commit per accepted upstream PR.
-  Codex reviews its complete base-to-head diff and pinned source evidence;
+  The PR body shows counts and the first 20 upgrades; all upstream references
+  remain in the commit trailers. Codex reviews its complete base-to-head diff,
+  prior owner rules, routes and pinned source evidence;
   only approval of that exact head makes it ready. `KB_INIT_REVIEWER` may
   pin a Codex model/effort (`codex:model[:effort]`, default
   `codex:gpt-6-sol:medium`); it never changes reviewer provider. A failed review leaves
@@ -116,8 +119,9 @@ For `pr-history`, a blocked record is a resumable checkpoint. When the user
 requests a retry, rerun the same stage with the same pin/window/backend;
 completed PRs and prepared commits are reused. The stage accounts cumulative
 spend on its frozen knowledge baseline; unrelated main merges do not restart
-the batch. Changing the baseline requires a new state directory. It accounts
-spend; `--budget-usd N` may raise its ceiling to continue after a budget stop.
+the batch. Changing the baseline requires a new state directory.
+`--budget-usd N` may raise the ceiling to continue after a budget stop.
+Prepared publication retries also require the original immutable inputs.
 It does not publish an incomplete window. Existing init runs with no history
 record remain harvestable, and may add this phase after their earlier stages
 have merged. Once a history record exists it must finish before harvest.

@@ -541,7 +541,10 @@ PR body、完整 diff、reviews、inline 回复关系与 issue 回复只在内�
 每 PR 一次 `ModelGateway` 生成调用，使用配置的 `KB_GENERATOR`，沿用价格/花费阈值检查；
 raw payload 不写 trace，保留模型身份、耗时、用量和成本。模型输出 trigger/must/forbid/acceptance、
 最近 owner 与当前源码行范围。只有当前源码支持的可执行规则可追加到 owner rule page；
-同义合并交给提炼与整 PR 审阅，完全相同的正文确定性去重；维护必要索引和快速入口。
+同义合并交给提炼与整 PR 审阅，完全相同的正文只在同一 owner 的规则页/拆分页内确定性去重；
+独立 owner 可保留相同合同。模型路由从 `_routes.yaml.models` 的现有 rule pages 读取，按名字和
+当前源码路径提供 `model:<name>` owner；单模型合同不得落到组件页，具体变体不继承短模型名。
+维护必要索引和快速入口。
 每个非空升级通过 pin claims、L1、知识树与 wiki 校验后形成一个 commit 计划；无升级的 PR 不造空 commit。
 本阶段不逐规则调用 advisory judge，现有阶段仍使用原 judge；最终整 PR 审阅单独记录，不冒充逐条评分。
 
@@ -549,7 +552,8 @@ raw payload 不写 trace，保留模型身份、耗时、用量和成本。模�
 每次预留费用在派发前写 checkpoint，进程中断把未知费用按整次 reservation 计入；
 重跑不重复已完成 PR，完整提炼结果可复用。`--budget-usd N` 提高累计预算继续同一窗口，
 不重置既有花费；首次启动时固定 knowledge base，后续 main 合并不改变同一批次的 baseline；
-pin/window/backend 变化阻塞并保留 checkpoint，换 baseline 需新的 state directory。旧阶段的 inputs digest
+pin/window/backend 或目标仓库变化阻塞并保留 checkpoint（包括已准备发布的重试），
+换 baseline 需新的 state directory。旧阶段的 inputs digest
 保持兼容，新增 history 配置不影响其缓存。旧三阶段 init 没有 history record 时仍可 harvest；
 一旦 history 开始，harvest 要等它完成并合并。已完成旧 init 也可单独添加此阶段。
 
@@ -561,7 +565,9 @@ history 的存在/状态加入后续 harvest 的 cache identity，chain 阻塞�
 不 checkout 主人的工作树。出版前 journal 固定整个串；push 后 create 失败可重建同一 head 并复用分支/PR。
 只开一个 draft PR。`KB_INIT_REVIEWER=codex:model[:effort]`（缺省 `DEFAULT_JUDGE`）经同一 gateway
 审阅完整 base..head diff、逐 PR 来源和当前 pin 的源码证据；provider 必须为 codex，无 fallback。
-完整 packet 还包含升级页所在 owner 的原有 rule pages，以检查与未改规则的重复、冲突。
+完整 packet 还包含升级页所在 owner 的原有 rule pages 和组件/模型路由，以检查与未改规则的重复、冲突。
+PR 描述只展示前 20 个升级及总数，完整来源留在 commit trailers/本地 checkpoint；描述限制 60KB，
+避免默认 1000 条历史超过 GitHub body 限制。旧 journal 仅重建超长描述，不改已推 head。
 完整审阅上下文超过 1MB 阻塞，禁止截断冒充全量；按 judge_call_usd 约定费用预留。
 `InitRecord.review` 钉住 base、head、diff SHA256、请求/实际模型、verdict、findings 与 summary。
 只有该身份的 approve 可复用；发布 review summary 后重新核对远程 OPEN/head，才 `gh pr ready`。

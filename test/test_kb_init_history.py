@@ -7,15 +7,15 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from infermatrix_copilot.kb_service.init_history import SYSTEM_HISTORY, SYSTEM_REVIEW, _body_key
+from infermatrix_copilot.kb_service.init_history import MAX_PR_BODY_BYTES, SYSTEM_HISTORY, SYSTEM_REVIEW, _PrHistory, _body_key
 from infermatrix_copilot.kb_service.init_stages import run_stage
 from infermatrix_copilot.kb_service.init_support import InitError, InitPublisher, InitRecord
-from infermatrix_copilot.kb_service.models import ModelReply, ModelUnavailable
+from infermatrix_copilot.kb_service.models import ModelReply, ModelRole, ModelUnavailable
 from infermatrix_copilot.kb_service.sources import GitHubReader, SourceError
 
 from test_kb_init_deepen import CodeGateway, _chain, _churn
 from test_kb_init_modules import _modules_lifecycle, _world_with_tools
-from test_kb_init_skeleton import FakeGh, _commit, _git, _runtime, _tree, world  # noqa: F401
+from test_kb_init_skeleton import FakeGh, _commit, _git, _index, _runtime, _tree, world  # noqa: F401
 
 
 def _payload(prompt):
@@ -118,6 +118,7 @@ def test_history_default_replays_one_call_per_pr_and_reviews_the_full_series(wor
     assert "doc invariants" not in review["complete_diff"]  # earlier dry runs form the preview baseline
     assert review["head_sha"] == head and review["base_sha"] == base
     assert any("return 1" in e["text"] for entries in review["rule_evidence"].values() for e in entries)
+    assert review["baseline_rule_pages"] and any(o["owner"] == "core" for o in review["owner_routes"])
     assert len(gateway.review_calls) == 1 and record.review["verdict"] == "approve"
     assert (Path(record.pr["dry_run_dir"]) / "COMMITS.json").is_file()
     assert all(p.startswith("knowledge/repos/toy/") for p in _tree(record))
@@ -268,12 +269,56 @@ def test_publish_recovers_create_failure_and_reviews_one_aggregate_pr(world):
     first = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=False)
     assert first.status == "blocked" and len(fake.pushed) == 1
     assert gateway.review_calls == [] and fake.ready_calls == []
+    # A checkpoint produced by an older writer may have a GitHub-sized body
+    # failure after pushing. Rebuild presentation without changing the series.
+    prepared = Path(first.pr["prepared"])
+    data = json.loads(prepared.read_text())
+    data["body"] = "x" * 70_000
+    prepared.write_text(json.dumps(data))
     resumed = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=False)
     assert resumed.status == "published", resumed.problems
     assert len(fake.pushed) == len(fake.created) == len(fake.ready_calls) == 1
     assert gateway.extract_calls == [101, 102, 103] and len(gateway.review_calls) == 1
     assert "Aggregate Codex review: approve" in fake.edited_bodies[0]
+    assert len(fake.edited_bodies[0].encode()) < MAX_PR_BODY_BYTES
     assert _git(world["clone"], "rev-list", "--count", f"{resumed.kb_base_sha}..{resumed.pr['head_sha']}") == "2"
+
+
+def test_default_thousand_upgrade_description_stays_publishable():
+    stage = _PrHistory(None, _modules_lifecycle(), True, None)
+    stage.reviewer = ModelRole("pr-reviewer", "codex", "review-model")
+    stage.record = InitRecord(stage="pr-history", repo="toy", pin="a" * 40, kb_base_sha="b" * 40)
+    stage.record.history = {"requested": 1000, "selected": list(range(1000)), "completed": list(range(1000)),
+                            "commits": [{"number": n, "rule_ids": [f"RULE-{n}-{i}" for i in range(12)]}
+                                        for n in range(1000)]}
+    stage.record.review = {"verdict": "approve", "head_sha": "c" * 40, "summary": "审阅" * 5000}
+    body = stage._body()
+    assert len(body.encode()) < MAX_PR_BODY_BYTES
+    assert "upgrade commits: 1000" in body and "980 more upgrades" in body
+    assert "o/toy#19" in body and "o/toy#999" not in body
+
+
+@pytest.mark.parametrize("changed", ["count", "pin", "backend"])
+def test_pending_publication_checks_immutable_inputs_before_remote_mutations(world, changed):
+    gateway, source = _setup(world)
+    fake = HistoryGh(fail_create=1)
+    rt = _live(world, gateway, source, fake)
+    first = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=False)
+    assert first.status == "blocked" and len(fake.pushed) == 1
+    kwargs = {"pr_count": 1} if changed == "count" else {}
+    if changed == "pin":
+        kwargs["pin"] = _commit(world["upstream"], {"pkg/new.py": "def new():\n    return 0\n"})
+    original_generator = rt.generator
+    if changed == "backend":
+        rt.generator = ModelRole("generator", "claude-code", "different-model")
+    blocked = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=False, **kwargs)
+    assert blocked.status == "blocked" and "inputs changed" in blocked.problems[0]
+    assert len(fake.pushed) == 1 and fake.created == [] and gateway.review_calls == []
+    assert blocked.history == first.history and blocked.spent_usd == first.spent_usd
+    rt.generator = original_generator
+    resumed = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=False, budget_usd=60)
+    assert resumed.status == "published", resumed.problems
+    assert len(fake.pushed) == len(fake.created) == len(fake.ready_calls) == 1
 
 
 def test_preview_of_merged_prerequisites_promotes_without_reextracting(world):
@@ -317,6 +362,87 @@ def test_case_distinct_upstream_paths_both_produce_upgrade_commits(world, monkey
     record = run_stage(_runtime(world, gateway, github=source), _modules_lifecycle(), "pr-history", dry_run=True)
     assert record.status == "dry_run", record.problems
     assert [c["number"] for c in record.history["commits"]] == [101, 102]
+
+
+def test_equal_rule_bodies_for_independent_owners_both_produce_commits(world, monkeypatch):
+    gateway, source = _setup(world)
+    original_rule = _rule
+    def rule_for(number):
+        rule = original_rule(101)
+        rule.update(title="Keep the constant result", trigger="a change edits this owner's result computation",
+                    must="retain its constant return value when adding instrumentation",
+                    acceptance="a focused test proves the result stays constant across repeated calls")
+        if number == 102:
+            rule.update(owner="tooling", evidence=[{"path": "tools/lint/y.py", "start": 1, "end": 5}])
+        return rule
+    monkeypatch.setitem(_rule.__globals__, "_rule", rule_for)
+    original_read = source.history_evidence
+    def read(full_name, number):
+        data = original_read(full_name, number)
+        data["files"] = [{"filename": "pkg/core.py" if number == 101 else "tools/lint/y.py"}]
+        return data
+    source.history_evidence = read
+    record = run_stage(_runtime(world, gateway, github=source), _modules_lifecycle(), "pr-history", dry_run=True)
+    assert record.status == "dry_run", record.problems
+    assert [c["number"] for c in record.history["commits"]] == [101, 102]
+    pages = {record.verdicts[rid]["page"] for c in record.history["commits"] for rid in c["rule_ids"]}
+    assert pages == {"repos/toy/rules.md", "repos/toy/components/tooling/rules.md"}
+
+
+def test_model_specific_learning_stays_with_the_model_owner(world, monkeypatch):
+    import yaml
+
+    model_source = "pkg/demo_model.py"
+    _commit(world["upstream"], {model_source: "def model_result():\n    return 1\n"})
+    gateway, source = _setup(world)
+    fake = HistoryGh()
+    rt = _live(world, gateway, source, fake)
+    model_root = "knowledge/repos/toy/models"
+    model_page = f"{model_root}/demo-model/rules.md"
+    routes_path = "knowledge/repos/toy/_routes.yaml"
+    routes = yaml.safe_load(_git(world["origin"], "show", f"HEAD:{routes_path}"))
+    routes["models"] = {"dir": "repos/toy/models", "page": "rules.md"}
+    root_path = "knowledge/repos/toy/_index.md"
+    _commit(world["origin"], {
+        routes_path: yaml.safe_dump(routes),
+        root_path: _git(world["origin"], "show", f"HEAD:{root_path}") + "\n- [Models](models/_index.md)\n",
+        f"{model_root}/_index.md": _index("Models", "toy", "- [DemoModel](demo-model/_index.md)\n"),
+        f"{model_root}/demo-model/_index.md": _index("DemoModel", "toy", "- [Rules](rules.md)\n"),
+        model_page: _index("DemoModel rules", "toy", "").replace("type: index", "type: rule"),
+    }, "existing model owner")
+    original_rule = _rule
+    def rule_for(number):
+        rule = original_rule(101)
+        rule.update(owner="model:demo-model" if number == 101 else "core",
+                    title="DemoModel keeps its result contract", trigger=f"a change edits `{model_source}`",
+                    must="retain DemoModel's constant return value when adding instrumentation",
+                    evidence=[{"path": model_source, "start": 1, "end": 2}])
+        return rule
+    monkeypatch.setitem(_rule.__globals__, "_rule", rule_for)
+    original_read = source.history_evidence
+    def read(full_name, number):
+        data = original_read(full_name, number)
+        data.update(title="DemoModel fix", files=[{"filename": model_source}])
+        return data
+    source.history_evidence = read
+    record = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=False)
+    assert record.status == "published", record.problems
+    assert [c["number"] for c in record.history["commits"]] == [101]
+    assert model_page in record.files
+    assert any(d["why"] == "wrong nearest model/component owner" for d in record.dropped)
+    assert gateway.review_calls[0]["model_routes"] == [{"owner": "model:demo-model",
+                                                       "model_name": "demo-model", "path": model_page.removeprefix("knowledge/")}]
+
+
+def test_model_variants_do_not_inherit_a_shorter_model_scope():
+    from infermatrix_copilot.kb_service.init_history_routes import model_scope_valid
+
+    models = [{"owner": f"model:{name}", "model_name": name}
+              for name in ("demo-model", "demo-model-next")]
+    assert model_scope_valid("model:demo-model-next", "keep the result", ["pkg/demo_model_next.py"], models)
+    assert not model_scope_valid("model:demo-model", "keep the result", ["pkg/demo_model_next.py"], models)
+    assert not model_scope_valid("core", "keep the result", ["pkg/demo_model_next.py"], models)
+    assert model_scope_valid("core", "DemoModel and DemoModelNext share this contract", ["pkg/common.py"], models)
 
 
 def test_started_history_invalidates_a_cached_legacy_harvest(world):
