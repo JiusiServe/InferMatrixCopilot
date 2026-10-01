@@ -1,7 +1,7 @@
 ---
 title: "登录鉴权与免费模型"
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-01
 type: index
 tags: [jiuwenswarm]
 sources: []
@@ -9,7 +9,7 @@ sources: []
 
 # 登录鉴权与免费模型
 
-- [华为账号登录与免费模型凭据（common/auth）](jiuwenswarm-common-auth.md)
+- [华为账号登录与免费模型凭据（common/auth）](jiuwenswarm-common-auth.md) — 覆盖 OAuth/PKCE 登录与待完成登录表、续期并发合并、AES-256-GCM 加密会话存档与跨进程共享、Gateway 凭据消毒、AgentServer 运行时句柄登记表与请求钩子、登录模型目录缓存
 
 ## 代码快速入口（Direct）
 <!-- kb-init:quick-map -->
@@ -18,4 +18,11 @@ sources: []
 
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
-| 登录、华为账号、Account Kit、OAuth、PKCE、id_token、refresh_token、免费模型、积分、APIG、远端配置、auth | 入口 | `jiuwenswarm/common/auth/` |
+| 登录、华为账号、Account Kit、OAuth、PKCE、id_token、refresh_token、免费模型、积分、APIG、远端配置、auth | 入口 | `jiuwenswarm/common/auth/service.py`、`jiuwenswarm/common/auth/account_kit.py` |
+| 登录会话落盘、加密存档、Gateway/AgentServer 共享登录态 | 入口 | `jiuwenswarm/common/auth/session_store.py` |
+| Gateway 转发前的凭据消毒与注入、`jiuwen-login:` 句柄、请求钩子、推送续期 | 入口 | `jiuwenswarm/common/auth/passthrough.py`、`jiuwenswarm/common/auth/login_credentials.py` |
+| 登录模型列表、目录缓存、`login_model_settings` | 入口 | `jiuwenswarm/common/auth/model_catalog.py` |
+
+## 专题入口
+
+- [登录模型目录与跨进程凭据句柄](jiuwenswarm-login-models.md) — 说明登录模型在 Gateway 与 AgentServer 间的凭据传递、稳定句柄、请求钩子和目录缓存；OAuth 登录与加密会话持久化见登录主页面。

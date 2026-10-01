@@ -1,7 +1,7 @@
 ---
 title: "启动与多实例管理"
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-01
 type: index
 tags: [jiuwenswarm]
 sources: []
@@ -9,9 +9,9 @@ sources: []
 
 # 启动与多实例管理
 
-- [jiuwenswarm 顶层包：启动入口、多实例与运行时补丁](jiuwenswarm.md)
+- [jiuwenswarm 顶层包：启动入口、多实例与运行时补丁](jiuwenswarm.md) — start_services/jiuwenswarm-init/dotenv_early 的启动分派、端口回退持久化、子进程环境注入与就绪横幅
 - [桌面端应用外壳（channels/desktop）](jiuwenswarm-channels-desktop.md)
-- [instance_manager：多实例配置、端口与进程管理](jiuwenswarm-instance-manager.md)
+- [instance_manager：多实例配置、端口与进程管理](jiuwenswarm-instance-manager.md) — 端口分配公式与探测语义、instances.yaml 校验、InstanceLock/GatewayLock 与安全停止阶梯
 
 ## 代码快速入口（Direct）
 <!-- kb-init:quick-map -->
@@ -20,4 +20,4 @@ sources: []
 
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
-| start_services、jiuwenswarm-start、debug launcher、multi-instance、--dotenv、--name、… | 入口 | `jiuwenswarm/acp/`、`jiuwenswarm/app.py`、`jiuwenswarm/channels/acp/` |
+| start_services、jiuwenswarm-start、debug launcher、multi-instance、--dotenv、--name、… | 入口 | `jiuwenswarm/start_services.py`、`jiuwenswarm/dotenv_early.py`、`jiuwenswarm/init_workspace.py`、`jiuwenswarm/instance_manager/` |
