@@ -397,7 +397,7 @@ class _Stage:
         upstream.sync()
         pin = upstream.resolve(self.pin or chain.pin or "HEAD")
         digest = inputs_digest(stage=stage, repo=lc.repo, pin=pin, kb=base_sha, init=self._init_identity(),
-                               generator=rt.generator.label(), judge=rt.judge.label(), dry_run=self.dry_run,
+                               generator=rt.generator.label(), judge=rt.judge.label(), dry_run=self._mode_identity(),
                                chain=chain.key, **self._input_options())
         record_path = InitRecord.path(rt.state_dir, lc.repo, stage)
         previous = InitRecord.load(rt.state_dir, lc.repo, stage)
@@ -406,9 +406,13 @@ class _Stage:
             if self.dry_run:
                 raise InitError("a publication of this stage is pending (pushed, PR not confirmed); re-run "
                                 f"without --dry-run to finish it, or remove {record_path} to start over")
+            if chain.problems:
+                self.record = previous
+                return self._blocked(chain.problems)
             return self._resume(previous)
         if previous is not None and previous.inputs_digest == digest and not adapter_missing_problem \
-                and previous.status in ("dry_run", "published", "empty"):
+                and not chain.problems and previous.status in ("dry_run", "published", "empty") \
+                and (previous.dry_run == self.dry_run or previous.status == "published"):
             return previous
         if previous is not None and previous.pr.get("number") and previous.inputs_digest != digest:
             raise InitError(f"a published {stage} record exists (PR #{previous.pr['number']}); remove "
@@ -459,6 +463,10 @@ class _Stage:
                 # Existing three-stage init runs remain harvestable. Once the
                 # history phase starts, it must finish and merge like any stage.
                 continue
+            if stage == "pr-history" and record is not None:
+                # Starting history invalidates a harvest cached before this
+                # prerequisite existed, including when history is blocked.
+                parts.append(f"pr-history:status:{record.status}:{record.inputs_digest}")
             if record is None:
                 chain.problems.append(f"run the {stage} stage first")
                 continue
@@ -517,6 +525,9 @@ class _Stage:
         # record digests across this additive configuration change.
         init = self.lifecycle.init
         return repr(init).replace(f", pr_history_count={init.pr_history_count}", "")
+
+    def _mode_identity(self) -> bool:
+        return self.dry_run
 
     def _blocked(self, problems: list[str]) -> InitRecord:
         self.record.status = "blocked"

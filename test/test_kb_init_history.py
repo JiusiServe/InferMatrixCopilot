@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from infermatrix_copilot.kb_service.init_history import SYSTEM_HISTORY, SYSTEM_REVIEW
+from infermatrix_copilot.kb_service.init_history import SYSTEM_HISTORY, SYSTEM_REVIEW, _body_key
 from infermatrix_copilot.kb_service.init_stages import run_stage
 from infermatrix_copilot.kb_service.init_support import InitError, InitPublisher, InitRecord
 from infermatrix_copilot.kb_service.models import ModelReply, ModelUnavailable
@@ -260,6 +260,62 @@ def test_publish_recovers_create_failure_and_reviews_one_aggregate_pr(world):
     assert gateway.extract_calls == [101, 102, 103] and len(gateway.review_calls) == 1
     assert "Aggregate Codex review: approve" in fake.edited_bodies[0]
     assert _git(world["clone"], "rev-list", "--count", f"{resumed.kb_base_sha}..{resumed.pr['head_sha']}") == "2"
+
+
+def test_preview_of_merged_prerequisites_promotes_without_reextracting(world):
+    gateway, source = _setup(world)
+    fake = HistoryGh()
+    rt = _live(world, gateway, source, fake)
+    preview = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=True)
+    assert preview.status == "dry_run", preview.problems
+    published = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=False)
+    assert published.status == "published", published.problems
+    assert gateway.extract_calls == [101, 102, 103] and len(gateway.review_calls) == 2
+    assert published.pr["head_sha"] != preview.review["head_sha"]
+    assert published.review["head_sha"] == published.pr["head_sha"]
+    assert published.spent_usd == pytest.approx(preview.spent_usd + 0.5)
+    assert len(fake.pushed) == len(fake.created) == len(fake.ready_calls) == 1
+
+
+def test_case_sensitive_code_and_literals_are_distinct_dedup_keys():
+    assert _body_key("- require `pkg/CORE.py::Run` and `Value`") != \
+        _body_key("- require `pkg/core.py::run` and `value`")
+    assert _body_key("- preserve `'a  b'`") != _body_key("- preserve `'a b'`")
+
+
+def test_case_distinct_upstream_paths_both_produce_upgrade_commits(world, monkeypatch):
+    _commit(world["upstream"], {"pkg/CORE.py": "class Engine:\n    def step(self):\n        return 1\n"})
+    gateway, source = _setup(world)
+    original_rule = _rule
+    def rule_for(number):
+        rule = original_rule(101)
+        path = "pkg/CORE.py" if number == 101 else "pkg/core.py"
+        rule["trigger"] = f"a change edits `{path}`"
+        rule["evidence"][0]["path"] = path
+        return rule
+    monkeypatch.setitem(_rule.__globals__, "_rule", rule_for)
+    original_read = source.history_evidence
+    def read(full_name, number):
+        data = original_read(full_name, number)
+        data["files"] = [{"filename": "pkg/CORE.py" if number == 101 else "pkg/core.py"}]
+        return data
+    source.history_evidence = read
+    record = run_stage(_runtime(world, gateway, github=source), _modules_lifecycle(), "pr-history", dry_run=True)
+    assert record.status == "dry_run", record.problems
+    assert [c["number"] for c in record.history["commits"]] == [101, 102]
+
+
+def test_started_history_invalidates_a_cached_legacy_harvest(world):
+    from test_kb_init_harvest import _three_stages
+
+    gateway = _three_stages(world)
+    rt = _runtime(world, gateway)
+    harvested = run_stage(rt, _modules_lifecycle(), "harvest-calibration", dry_run=True)
+    assert harvested.status == "dry_run", harvested.problems
+    InitRecord(stage="pr-history", repo="toy", pin=harvested.pin, status="blocked",
+               problems=["history still pending"]).save(rt.state_dir)
+    blocked = run_stage(rt, _modules_lifecycle(), "harvest-calibration", dry_run=True)
+    assert blocked.status == "blocked" and any("pr-history" in p for p in blocked.problems)
 
 
 @pytest.mark.parametrize("failure", ["unavailable", "findings", "changed_head"])

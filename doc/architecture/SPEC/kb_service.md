@@ -552,6 +552,10 @@ raw payload 不写 trace，保留模型身份、耗时、用量和成本。模�
 保持兼容，新增 history 配置不影响其缓存。旧三阶段 init 没有 history record 时仍可 harvest；
 一旦 history 开始，harvest 要等它完成并合并。已完成旧 init 也可单独添加此阶段。
 
+已合并依赖、base、pin 与 backend 均相同时，history dry run 可提升为实际发布而不重复提炼；
+提交作者变化会产生新 head，因此再次完整审阅该 head。去重保留源码 token 的大小写和内部空白。
+history 的存在/状态加入后续 harvest 的 cache identity，chain 阻塞时缓存不能越过依赖检查。
+
 `InitPublisher.build_series` 用 scratch index 在固定 base 上按顺序建非空 commit，作者/日期确定，
 不 checkout 主人的工作树。出版前 journal 固定整个串；push 后 create 失败可重建同一 head 并复用分支/PR。
 只开一个 draft PR。`KB_INIT_REVIEWER=codex:model[:effort]`（缺省 `DEFAULT_JUDGE`）经同一 gateway

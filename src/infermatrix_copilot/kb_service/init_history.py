@@ -69,7 +69,8 @@ rules. The deterministic validators already ran. Return one JSON object:
 {"verdict": "approve" | "request_changes", "findings": ["<actionable finding>"],
  "summary": "<what you checked>"}.
 Approve only if no actionable findings remain. Review the whole diff, not
-just the last commit. The caller binds this verdict to the exact base/head."""
+just the last commit. Use only the supplied complete packet; do not call tools
+or discover repositories. The caller binds this verdict to the exact base/head."""
 
 
 class _CheckpointBudget(Budget):
@@ -121,7 +122,8 @@ def _validate_review(data: dict) -> None:
 
 
 def _body_key(body: str) -> str:
-    return re.sub(r"\s+", " ", body).strip().casefold()
+    # Paths, symbols and literal strings preserve case and internal whitespace.
+    return body.strip()
 
 
 @dataclass
@@ -145,6 +147,11 @@ class _PrHistory(_Stage):
         # all prior spend. It never starts another 1,000-PR batch.
         return repr(replace(self.lifecycle.init, budget_usd=0.0))
 
+    def _mode_identity(self) -> bool:
+        # A preview of already merged prerequisites can be promoted without
+        # repeating extraction. Publication still rebuilds/reviews its head.
+        return False
+
     def _restore_progress(self, previous: InitRecord | None) -> list[str]:
         if previous is not None and previous.history:
             current_digest = self.record.inputs_digest
@@ -153,8 +160,11 @@ class _PrHistory(_Stage):
                 return ["PR-history inputs changed; preserve the checkpoint and start a new state directory "
                         "to change the window, base, pin or backend"]
             self.record.status = "started"
+            self.record.dry_run = self.dry_run
             self.record.problems = []
             self.record.unfinished = []
+            if not self.dry_run:
+                self.record.history.pop("series_base_sha", None)
         self.budget = _CheckpointBudget(self.lifecycle.init.budget_usd, self.record, self.rt.state_dir)
         return []
 
