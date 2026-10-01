@@ -186,23 +186,21 @@ def test_real_afd_setup_loads_only_its_repo_slice(monkeypatch, tmp_path):
     )
 
 
-def test_intra_knowledge_anchor_links_resolve():
-    """Heading renames silently break `file.md#anchor` links, and neither knowledge
-    linter checks fragments — renaming one quick-map heading broke a live link in
-    the same directory before this existed. 38 such links today, 0 broken."""
+def _broken_intra_knowledge_anchors(root: Path) -> list[str]:
     import re
-    from pathlib import Path
-
-    from infermatrix_copilot.thin_mcp_server import _KNOWLEDGE
+    from urllib.parse import urlsplit
 
     def slug(heading: str) -> str:
         s = re.sub(r"[^\w一-鿿\s-]", "", heading.strip().lower())
         return re.sub(r"\s+", "-", s).strip("-")
 
     broken = []
-    for md in Path(_KNOWLEDGE).rglob("*.md"):
+    for md in root.rglob("*.md"):
         text = md.read_text(encoding="utf-8", errors="replace")
         for target, frag in re.findall(r"\]\(([^)#\s]+\.md)#([^)\s]+)\)", text):
+            url = urlsplit(target)
+            if url.scheme or url.netloc:
+                continue  # remote source citations are not local knowledge links
             dest = (md.parent / target).resolve()
             if not dest.is_file():
                 broken.append(f"{md.name} -> {target} (missing file)")
@@ -214,4 +212,28 @@ def test_intra_knowledge_anchor_links_resolve():
             }
             if frag not in headings:
                 broken.append(f"{md.name} -> {target}#{frag} (no such heading)")
+    return broken
+
+
+def test_intra_knowledge_anchor_links_resolve():
+    """Heading renames silently break local `file.md#anchor` links; the two
+    knowledge linters check files but not their heading fragments."""
+    from infermatrix_copilot.thin_mcp_server import _KNOWLEDGE
+
+    broken = _broken_intra_knowledge_anchors(Path(_KNOWLEDGE))
     assert not broken, "dead anchor links:\n  " + "\n  ".join(broken)
+
+
+def test_anchor_check_skips_remote_citations_and_still_rejects_broken_local_links(tmp_path):
+    (tmp_path / "target.md").write_text("# Actual heading\n")
+    (tmp_path / "index.md").write_text(
+        "[source](https://example.com/guide.md#L1-L20)\n"
+        "[source](//example.com/guide.md#remote-heading)\n"
+        "[valid](target.md#actual-heading)\n"
+        "[bad anchor](target.md#missing-heading)\n"
+        "[bad file](missing.md#heading)\n"
+    )
+    assert _broken_intra_knowledge_anchors(tmp_path) == [
+        "index.md -> target.md#missing-heading (no such heading)",
+        "index.md -> missing.md (missing file)",
+    ]
