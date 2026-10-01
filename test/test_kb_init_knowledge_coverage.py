@@ -51,20 +51,21 @@ def test_owner_extraction_uses_all_production_roots_from_policy(world):
 
 def test_explicit_feature_ownership_fills_legacy_routes_without_guessing():
     from types import SimpleNamespace
-    from infermatrix_copilot.kb_service.init_coverage import Owner, most_specific
-    from infermatrix_copilot.kb_service.init_knowledge_inputs import source_owners
+    from infermatrix_copilot.kb_service.init_coverage import Owner
+    from infermatrix_copilot.kb_service.init_knowledge_inputs import source_owner, source_owners
 
     route = Owner("core", "repos/demo/architecture.md", ("src/",))
     feature = SimpleNamespace(owner="client", page="repos/demo/components/client/feature-client.md",
                               source_globs=("clients/*",))
     conflict = SimpleNamespace(owner="other", page="repos/demo/components/other/feature-other.md",
-                               source_globs=("clients/shared.ts", "src/already-routed.py"))
-    paths = ["clients/api.ts", "clients/shared.ts", "src/already-routed.py", "unowned/file.ts"]
+                               source_globs=("clients/api.tsx", "clients/shared.ts", "src/already-routed.py"))
+    paths = ["clients/api.ts", "clients/shared.ts", "src/already-routed.py", "unowned/file.ts", "clients/api.tsx"]
     owners = source_owners(paths, [route], SimpleNamespace(features=[feature, conflict]))
-    assert most_specific(paths[0], list(owners.values()))[0].owner == "client"
-    assert not most_specific(paths[1], list(owners.values()))
-    assert most_specific(paths[2], list(owners.values())) == [route]
-    assert not most_specific(paths[3], list(owners.values()))
+    assert source_owner(paths[0], [route], owners)[0].owner == "client"
+    assert not source_owner(paths[1], [route], owners)
+    assert source_owner(paths[2], [route], owners) == [route]
+    assert not source_owner(paths[3], [route], owners)
+    assert not source_owner(paths[4], [route], owners)
     assert owners["client"].path == feature.page
 
 

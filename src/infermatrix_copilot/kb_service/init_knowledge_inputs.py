@@ -90,3 +90,8 @@ def source_owners(paths: list[str], owners: list[Owner], policy) -> dict[str, Ow
         selected[name] = Owner(name, old.path if old else targets[name],
                                (old.prefixes if old else ()) + tuple(extra))
     return selected
+
+
+def source_owner(path: str, routes: list[Owner], selected: dict[str, Owner]) -> list[Owner]:
+    """Legacy prefixes retain precedence; fallback file paths match exactly."""
+    return most_specific(path, routes) or [owner for owner in selected.values() if path in owner.prefixes]

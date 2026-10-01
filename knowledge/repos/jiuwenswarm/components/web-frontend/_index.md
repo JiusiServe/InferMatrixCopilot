@@ -96,3 +96,4 @@ sources: []
 - [计划模式与多入口切换限制功能知识](feature-plan-mode.md)
 - [会话产物列表、预览与下载功能知识](feature-artifacts.md)
 - [语音输入、回复朗读与停止功能知识](feature-speech-interaction.md)
+- [Web 静态入口：产物、接口、配置与验证](knowledge-web-frontend.md) — 说明接口、配置与集成边界，关联源码和维护者文档。

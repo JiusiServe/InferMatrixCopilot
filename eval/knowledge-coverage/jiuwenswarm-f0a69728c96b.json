@@ -3026,7 +3026,7 @@
   },
   "provenance": {
     "policy_sha256": "c23eefb5057bfdff6a7be55cd663b5e9dc636cc2d76741b39d875088a8216661",
-    "knowledge_sha256": "ef0ec97246af483c8a7bb1584c40e85dbffaab6c7c33812f924ff3b0e9bf56d2",
+    "knowledge_sha256": "cb91abf226e28b831f885bfb160f82714824ea1b788f65f2e1e9abb19d30db15",
     "upstream_tracked_files_clean": true,
     "reproduce": "PYTHONPATH=src python tools/audit_knowledge_coverage.py --repo jiuwenswarm --upstream /path/to/pinned/jiuwenswarm --pin f0a69728c96b5961d993449f1a901cbd2f4dac5b"
   }

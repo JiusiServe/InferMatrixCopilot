@@ -60,6 +60,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from functools import cached_property
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
@@ -129,15 +130,18 @@ class ZCodeTransport(HarnessTransport):
 
     spec = PROVIDERS["zcode"]
 
+    @cached_property
+    def _selected_provider_id(self) -> str:
+        return (str(getattr(self.settings, "zcode_provider_id", "") or "")
+                or self._host_provider_id() or _DEFAULT_PROVIDER_ID)
+
     @property
     def subscription_billing(self) -> bool:
         """Known OAuth coding plan only; custom API providers still need caps.
 
         Billing mode is not a measured zero-dollar call cost.
         """
-        provider = (str(getattr(self.settings, "zcode_provider_id", "") or "")
-                    or self._host_provider_id() or _DEFAULT_PROVIDER_ID)
-        return provider == _DEFAULT_PROVIDER_ID
+        return self._selected_provider_id == _DEFAULT_PROVIDER_ID
 
     def auth_gap(self) -> str | None:
         """zcode has no login-status command; the OAuth login writes
@@ -233,12 +237,10 @@ class ZCodeTransport(HarnessTransport):
         level = str(getattr(self.settings, "zcode_reasoning_level", "") or "max")
         if level not in _REASONING_LEVELS:
             raise ValueError(f"zcode_reasoning_level must be one of {_REASONING_LEVELS}, got {level!r}")
-        provider = (str(getattr(self.settings, "zcode_provider_id", "") or "")
-                    or self._host_provider_id() or _DEFAULT_PROVIDER_ID)
         config = {
             "providerConfigRules": {"providerRules": []},
             "modelConfigRules": {"providerModelRules": [], "manualProviderModelRules": []},
-            "defaultModelSelection": {"providerId": provider, "modelId": self.canonical_model_id(model),
+            "defaultModelSelection": {"providerId": self._selected_provider_id, "modelId": self.canonical_model_id(model),
                                       "options": {"reasoningLevel": level}},
         }
         path = session / _PERSONAL_CONFIG_NAME

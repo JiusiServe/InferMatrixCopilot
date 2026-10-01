@@ -74,11 +74,21 @@ def test_subscription_billing_refuses_custom_api_provider(tmp_path, monkeypatch)
     transport = _transport(tmp_path)
     monkeypatch.setattr(transport, "_host_provider_id", lambda: "account:bigmodel-individual-coding-plan")
     assert transport.subscription_billing
+    transport = _transport(tmp_path)
     monkeypatch.setattr(transport, "_host_provider_id", lambda: "custom:metered-api")
     assert not transport.subscription_billing
-    transport.settings.zcode_provider_id = "custom:override-api"
+    transport = _transport(tmp_path, zcode_provider_id="custom:override-api")
     monkeypatch.setattr(transport, "_host_provider_id", lambda: "account:bigmodel-individual-coding-plan")
     assert not transport.subscription_billing
+
+
+def test_subscription_check_pins_provider_used_by_session_config(tmp_path, monkeypatch):
+    transport = _transport(tmp_path)
+    monkeypatch.setattr(transport, "_host_provider_id", lambda: "account:bigmodel-individual-coding-plan")
+    assert transport.subscription_billing
+    monkeypatch.setattr(transport, "_host_provider_id", lambda: "custom:metered-api")
+    config = json.loads(transport._write_model_config(tmp_path, "GLM-5.3").read_text())
+    assert config["config"]["defaultModelSelection"]["providerId"] == "account:bigmodel-individual-coding-plan"
 
 
 def _transport(tmp_path: Path, **settings) -> ZCodeTransport:

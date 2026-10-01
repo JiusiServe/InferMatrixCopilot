@@ -26,10 +26,10 @@ from ..knowledge_service.ops import page_over_capacity
 from ..knowledge_service.pinned_claims import check_rules, evidence_for
 from ..profiles.languages import suffixes
 from .init_budget import BudgetExhausted
-from .init_coverage import Owner, make_include, most_specific
+from .init_coverage import Owner, make_include
 from .init_stages import _Chain, _Stage, _numbered, _one_line, _page_frontmatter, neutral_headings
 from .init_support import InitRecord, classify_verdict, generate, judge
-from .init_knowledge_inputs import SYSTEM_KNOWLEDGE, knowledge_prompt, source_owners
+from .init_knowledge_inputs import SYSTEM_KNOWLEDGE, knowledge_prompt, source_owner, source_owners
 from .models import ModelUnavailable
 
 FACETS = ("architecture", "api", "configuration", "tradeoffs", "features", "validation")
@@ -141,10 +141,11 @@ class _Knowledge(_Stage):
         else:
             paths = [file.relative_to(tree).as_posix() for file in sorted(tree.rglob("*"))
                      if file.is_file() and include(file.relative_to(tree).as_posix())]
-        owners = source_owners(paths, self.owners, policy)
+        routes = self.owners
+        owners = source_owners(paths, routes, policy)
         self.owners = list(owners.values())
         for rel in paths:
-            hits = most_specific(rel, self.owners)
+            hits = source_owner(rel, routes, owners)
             if hits:
                 files.setdefault(hits[0].owner, []).append(rel)
             else:
@@ -207,6 +208,9 @@ class _Knowledge(_Stage):
                     if section["facet"] not in requested:
                         continue
                     result = self._section(owner, page, data, section, offered)
+                    verdict = self.record.verdicts.get(f"knowledge:{name}:{section['facet']}", {})
+                    if verdict.get("verdict") in ("unsure", "unjudged"):
+                        report[name]["facets"][section["facet"]] = "needs_review"
                     if result is not None:
                         key, text, entries, label = result
                         claims[key] = text
@@ -413,11 +417,11 @@ class _Knowledge(_Stage):
         label = classify_verdict(verdict)
         self.record.verdicts[key] = {"verdict": label, "reasons": verdict.reasons, "model": verdict.model,
                                      "page": page, "kind": "prose", "facet": facet}
-        if label == "fail":
-            self.record.dropped.append({"rule_id": key, "page": page, "why": f"advisory judge: {verdict.reasons}"})
-            return None
         if label != "pass":
-            text += f"\nAdvisory / 证据复核：{label}；本段仍需人工复核，不计入已覆盖维度。\n"
+            self.record.dropped.append({"rule_id": key, "page": page, "why": f"advisory judge: {verdict.reasons}"})
+            if label != "fail":
+                self.record.unfinished.append(f"{owner.owner}/{facet}: {label}; draft retained in model traces for review")
+            return None
         marker = f"<!-- kb:knowledge owner={owner.owner} facet={facet} pin={self.record.pin} verdict={label} -->"
         current = self.head.get(page, front)
         proposed = current.rstrip() + "\n\n" + marker + "\n\n" + text + "\n"

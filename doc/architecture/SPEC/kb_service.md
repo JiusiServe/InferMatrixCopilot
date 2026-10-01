@@ -468,7 +468,9 @@ owner 文档先在完整匹配清单中按源码邻接、路径引用与主题�
 每个段必须引用生成器实际看到的完整行区间；区间绑定 pin 和内容哈希，再经过路径/符号
 检查。提示中的源码、文档和既有知识采用 JSON 行数组，保留原行号；避免 CLI 附件读取器把
 100KB 的转义字符串作为一整行截断，实际提供的证据内容与字节额度不减少。
-每段随后经过 prose advisory judge。失败段不写入，推断明确标出。非规则知识写 owner 的
+每段随后经过 prose advisory judge。仅 pass 段写入知识页；fail 剔除，unsure/unjudged 的
+草稿保留在本地模型 trace，verdict 与待复核维度保留在阶段记录，不阻塞已通过段的发布。
+推断明确标出。非规则知识写 owner 的
 architecture 页并更新最近索引，已有正文保留。阶段不切换生命周期，不把 PR 原始材料
 存成架构或故事页。源文件/文档读取均有限额，报告缺少的维度、未读取文件与预算中断。
 聚合入口路由对应的 owner 会同时读取其 `components/<owner>/` 已有页面；语义页优先于大量源码接口目录。
@@ -491,6 +493,8 @@ architecture 页并更新最近索引，已有正文保留。阶段不切换生�
 
 `--subscription-generator` 显式允许已认证并声明 subscription billing 的生成器不请求 API 花费阈值；
 目前只接受 Zcode 已知的 OAuth coding-plan provider，自定义 API provider 仍被拒绝。
+检查通过的 transport 绑定下一次调用，Zcode 在同一 transport 内固定 provider ID，避免
+宿主设置在记账检查和派发之间变化后把无预留调用发到 API provider。
 此模式不需要模型单价表，生成器的 USD 留为 unreported，订阅费用不纳入阶段 USD accounting；
 token、served model 和调用结果照常记录，judge 的固定记账与预算门禁继续执行。
 默认模式仍要求支持 spend stop 的传输及完整价格预留，绝不自动切换订阅模式或模型。

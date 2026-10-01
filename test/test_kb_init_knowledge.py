@@ -74,6 +74,35 @@ def test_subscription_generator_requires_declared_billing_and_preserves_unknown_
     assert budget.spent_usd == 0  # stage accounting excludes subscription fees, not a measured price
 
 
+def test_subscription_check_binds_the_transport_that_receives_the_uncapped_call():
+    from infermatrix_copilot.kb_service.models import ModelGateway, ModelRole
+    from infermatrix_copilot.llm import Block, Reply
+
+    class SubscriptionTransport:
+        subscription_billing = True
+        called = False
+
+        def complete(self, **kwargs):
+            self.called = True
+            assert "max_budget_usd" not in kwargs
+            return Reply(blocks=[Block(type="text", text='{"ok":true}')], model="GLM-5.3")
+
+    class ApiTransport:
+        subscription_billing = False
+
+        def complete(self, **kwargs):
+            pytest.fail("the unreserved call reached a different billing provider")
+
+    subscription = SubscriptionTransport()
+    transports = iter([subscription, ApiTransport()])
+    gateway = ModelGateway(None, transport_factory=lambda provider: next(transports))
+    role = ModelRole("generator", "zcode", "GLM-5.3")
+    assert gateway.subscription_billing(role)
+    assert gateway.call_json(role, system="extract", prompt="source").data == {"ok": True}
+    assert subscription.called
+    assert not gateway.subscription_billing(role)
+
+
 def test_owner_overview_precedes_partial_symbol_cards(tmp_path):
     from types import SimpleNamespace
     from infermatrix_copilot.kb_service.init_coverage import Owner
@@ -375,7 +404,7 @@ def test_starting_knowledge_invalidates_a_cached_later_stage(world):
     assert any("knowledge stage is blocked" in p for p in after.problems)
 
 
-def test_uncertain_knowledge_is_labeled_and_does_not_count_as_covered(world):
+def test_uncertain_knowledge_stays_out_of_pages_and_does_not_count_as_covered(world):
     from infermatrix_copilot.kb_service.gate import JUDGE_SYSTEM
 
     class UnsureGateway(KnowledgeGateway):
@@ -390,11 +419,12 @@ def test_uncertain_knowledge_is_labeled_and_does_not_count_as_covered(world):
     gateway = UnsureGateway()
     _chain(world, gateway)
     record = run_stage(_runtime(world, gateway), _modules_lifecycle(), "knowledge", dry_run=True)
-    assert record.status == "dry_run", record.problems
+    assert record.status == "empty", record.problems
     assert record.coverage["knowledge"]["covered_by_facet"]["architecture"] == 0
     assert record.coverage["knowledge"]["owners"]["core"]["facets"]["architecture"] == "needs_review"
-    page = _tree(record)["knowledge/repos/toy/components/core/knowledge-core.md"]
-    assert "verdict=unsure" in page and "仍需人工复核" in page
+    assert not record.files and not record.pr
+    assert record.verdicts["knowledge:core:architecture"]["verdict"] == "unsure"
+    assert any("draft retained in model traces" in item for item in record.unfinished)
 
 
 @pytest.mark.parametrize("change", [
