@@ -70,6 +70,17 @@ class FakeTrace:
         self.events.append({"kind": kind, **fields})
 
 
+def test_subscription_billing_refuses_custom_api_provider(tmp_path, monkeypatch):
+    transport = _transport(tmp_path)
+    monkeypatch.setattr(transport, "_host_provider_id", lambda: "account:bigmodel-individual-coding-plan")
+    assert transport.subscription_billing
+    monkeypatch.setattr(transport, "_host_provider_id", lambda: "custom:metered-api")
+    assert not transport.subscription_billing
+    transport.settings.zcode_provider_id = "custom:override-api"
+    monkeypatch.setattr(transport, "_host_provider_id", lambda: "account:bigmodel-individual-coding-plan")
+    assert not transport.subscription_billing
+
+
 def _transport(tmp_path: Path, **settings) -> ZCodeTransport:
     cli = tmp_path / "bin" / "zcode"
     cli.parent.mkdir(exist_ok=True)
@@ -305,7 +316,11 @@ def test_complete_runs_in_scratch_without_bridge(tmp_path):
     assert reply.text == "REVIEW" and reply.model == "GLM-5.3-Flash"
     capture = _capture(tmp_path)
     assert "imc-zcode-oneshot-" in capture["cwd"]
-    assert capture["config"] == ""
+    config = json.loads(capture["config"])
+    assert config["features"] == {"memory": False, "skill": False, "subagent": False, "mcp": False}
+    assert config["memory"] == {"use": False} and config["plugins"] == {"enabled": False}
+    assert Path(config["storage"]["dir"]).parent == Path(capture["cwd"])
+    assert "mcp" not in config
     prompt = next(a for a in capture["argv"] if a.startswith("--prompt="))
     assert "CLASSIFY" in prompt and "[USER]\nhi" in prompt
 

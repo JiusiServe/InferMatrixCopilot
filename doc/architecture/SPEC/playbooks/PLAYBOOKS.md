@@ -63,3 +63,5 @@ success, steps[]`。
 pr-history → harvest-calibration），每阶段一个由人合并的 PR。只由 `kb init REPO --stage S` 运行，不经 `kb serve`，不写服务账本。
 `pr-history` 默认回溯 1000 个已合并上游 PR；可传 `pr_count` 和累计花费上限 `budget_usd`。
 每个非空知识升级一个 commit，汇成一个 draft PR，完整 Codex 审阅通过后才 ready。
+`knowledge` 可传 `from_existing` 从已合并索引与路由增补（保留已有阶段记录的门禁），
+可显式传 `subscription_generator` 使用声明订阅计费的生成器；未报告的订阅费用不伪造为 USD。

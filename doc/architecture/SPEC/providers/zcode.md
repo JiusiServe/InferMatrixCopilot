@@ -1,6 +1,6 @@
 # providers/zcode.py —— 规范
 
-<!-- verified-against: 2026-10-01 -->
+<!-- verified-against: 2026-10-02 -->
 
 `LOC ~400 · harness transport（Z.AI / GLM 订阅） · refactor-status: ok`
 
@@ -30,6 +30,8 @@ argv 单参数上限 128KiB）。
   按搜索目录解析，`../../etc/*` 这类穿越也会被抓到）。这是侦测型；预防型的读取走工具桥。
 - **`complete()` 连原生读工具也去掉**（输入可能是不可信文本）；只有 prompt 超长、必须靠
   `Read` 读附件时才保留 `Read`，且任何读到临时目录之外的调用都让这次调用失败。
+  one-shot 的局部配置关闭 memory/use、skills、plugins、subagent 和 MCP，并把 CLI storage
+  放入会话临时目录；避免保留下来的 Read 接触宿主自动记忆。工具桥会话同样关闭 memory/use。
 - **失败的运行不能读成空评审。** 非零退出或流里没有 `result` 事件（未超时时）直接抛
   `RuntimeError`，带上 zcode 自己的 stderr。
 - **模型按次钉死，再断言。** zcode 没有 `--model`；一个会话取其个人 provider 配置里的
@@ -59,3 +61,7 @@ stdlib + `.base` + `..agent_loop.AgentOutcome` + `..llm` 的类型与 `ModelMism
 一次端到端冒烟（工具桥 `read_file` 被调用，`bridge_trace.jsonl` 有记录）。
 
 `complete()` 接受并忽略 `max_budget_usd`；`stops_at_spend` 为 False（CLI 无花费阈值，`ModelGateway` 请求阈值时在派发前拒绝）。
+
+`subscription_billing` 仅在实际选中的 provider 为已知 OAuth coding plan 时为 True；自定义 provider
+或 settings 中的 API provider override 返回 False。它描述计费模式，不声称调用花费为零。
+`kb init --subscription-generator` 通过此声明显式使用订阅生成器，保留未报告的 USD 与 token 用量。

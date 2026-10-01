@@ -38,7 +38,7 @@ from typing import Any, Callable, Mapping
 from ..knowledge_service.facts import FactsError
 from ..knowledge_service.pinned_claims import Evidence, PinnedObserver, check_evidence, check_rules
 from .init_budget import Budget, Price, generator_reservation, load_prices, price_for
-from .models import ModelGateway, ModelReply, ModelRole
+from .models import ModelGateway, ModelReply, ModelRole, ModelUnavailable
 
 INIT_DIR = "init"
 STAGES = ("skeleton", "modules", "knowledge", "deepen", "pr-history", "harvest-calibration")
@@ -260,6 +260,7 @@ class InitRuntime:
     gh_run: Callable[..., subprocess.CompletedProcess] = subprocess.run
     upstream_remote: Callable[[str], str] | None = None   # full_name -> clone URL (tests)
     pull: Callable[[str, int], dict] | None = None        # PR lookup for pinned claims (tests)
+    subscription_generator: bool = False
 
     @property
     def init_dir(self) -> Path:
@@ -317,6 +318,14 @@ def generate(rt: InitRuntime, budget: Budget, init, *, system: str, prompt: str,
     """One generator call, reserved first: threshold + one worst-case request.
     Raises ``PriceError`` (no price: nothing is dispatched), ``BudgetExhausted``
     or ``ModelUnavailable``."""
+    if rt.subscription_generator:
+        if not rt.gateway.subscription_billing(rt.generator):
+            raise ModelUnavailable("subscription generator needs an authenticated subscription backend")
+        # No API spend threshold applies to this explicitly selected coding
+        # subscription. Preserve unreported USD and token usage; subscription
+        # fees are outside the stage's separate judge USD accounting.
+        return rt.gateway.call_json(rt.generator, system=system, prompt=prompt, validate=validate,
+                                    **({"record_payload": False} if not record_payload else {}))
     price = price_for(rt.prices, rt.generator.model)
     input_bytes = len(system.encode("utf-8")) + len(prompt.encode("utf-8")) + init.harness_overhead_bytes
     amount = generator_reservation(price, init.generator_call_usd, input_bytes)

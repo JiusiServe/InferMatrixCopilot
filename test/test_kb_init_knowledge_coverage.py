@@ -12,10 +12,60 @@ from infermatrix_copilot.kb_service.knowledge_coverage import (
 )
 from test_kb_init_knowledge import KnowledgeGateway, _chain
 from test_kb_init_modules import _modules_lifecycle
-from test_kb_init_skeleton import _commit, _runtime, world  # noqa: F401
+from test_kb_init_skeleton import _commit, _runtime, _tree, world  # noqa: F401
 
 PIN = "a" * 40
 PAGE = "repos/demo/components/core/feature-demo.md"
+
+
+def test_owner_extraction_uses_all_production_roots_from_policy(world):
+    import json
+    from infermatrix_copilot.kb_service.init_knowledge import SYSTEM_KNOWLEDGE
+
+    gateway = KnowledgeGateway()
+    _chain(world, gateway)
+    rt = _runtime(world, gateway)
+    skeleton = InitRecord.load(rt.state_dir, "toy", "skeleton")
+    modules = InitRecord.load(rt.state_dir, "toy", "modules")
+    baseline = {**_tree(skeleton), **_tree(modules)}
+    routes = yaml.safe_load(baseline["knowledge/repos/toy/_routes.yaml"])
+    tooling = next(owner for owner in routes["owners"] if owner["owner"] == "tooling")
+    tooling["scope_prefixes"].append("sdks/")
+    baseline["knowledge/repos/toy/_routes.yaml"] = yaml.safe_dump(routes)
+    data = _policy_data()
+    data["core"]["roots"] = ["pkg/", "tools/", "sdks/"]
+    data["features"][0].update(owner="tooling", source_globs=["sdks/client.ts"], docs=["docs/guide.md"],
+                               page="repos/toy/components/tooling/feature-demo.md")
+    baseline[policy_path("toy")] = yaml.safe_dump(data)
+    _commit(world["origin"], baseline, "merge initialized KB and production policy")
+    _commit(world["upstream"], {"sdks/client.ts": "export function connect() { return true; }\n"}, "add SDK")
+    gateway.calls.clear()
+    record = run_stage(_runtime(world, gateway, state_dir=world["tmp"] / "all-production"),
+                       _modules_lifecycle(), "knowledge", dry_run=True, from_existing=True)
+    assert record.status == "dry_run", record.problems
+    payloads = [json.loads(c["prompt"].split("\n", 1)[1].rsplit("</untrusted_data>", 1)[0])
+                for c in gateway.calls if c["system"] == SYSTEM_KNOWLEDGE]
+    owner = next(payload for payload in payloads if payload["owner"] == "tooling")
+    assert "sdks/client.ts" in [file["path"] for file in owner["files"]]
+
+
+def test_explicit_feature_ownership_fills_legacy_routes_without_guessing():
+    from types import SimpleNamespace
+    from infermatrix_copilot.kb_service.init_coverage import Owner, most_specific
+    from infermatrix_copilot.kb_service.init_knowledge_inputs import source_owners
+
+    route = Owner("core", "repos/demo/architecture.md", ("src/",))
+    feature = SimpleNamespace(owner="client", page="repos/demo/components/client/feature-client.md",
+                              source_globs=("clients/*",))
+    conflict = SimpleNamespace(owner="other", page="repos/demo/components/other/feature-other.md",
+                               source_globs=("clients/shared.ts", "src/already-routed.py"))
+    paths = ["clients/api.ts", "clients/shared.ts", "src/already-routed.py", "unowned/file.ts"]
+    owners = source_owners(paths, [route], SimpleNamespace(features=[feature, conflict]))
+    assert most_specific(paths[0], list(owners.values()))[0].owner == "client"
+    assert not most_specific(paths[1], list(owners.values()))
+    assert most_specific(paths[2], list(owners.values())) == [route]
+    assert not most_specific(paths[3], list(owners.values()))
+    assert owners["client"].path == feature.page
 
 
 def _policy_data():

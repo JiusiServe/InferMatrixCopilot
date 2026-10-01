@@ -3,7 +3,7 @@
 # (package `jiuwenswarm/` plus the `jiuwenbox` sandbox service under
 # `jiuwenbox/src/jiuwenbox/`), pytest under `tests/`, docs in `docs/zh` and
 # `docs/en` (the same set in two languages), no GitHub Actions workflows.
-# It has no knowledge pages yet: `kb init jiuwenswarm` creates repos/jiuwenswarm/.
+# Existing knowledge can be enriched with `kb init --stage knowledge --from-existing`.
 name: jiuwenswarm
 status: active
 created_by: human
@@ -26,8 +26,7 @@ push:
   protected_branches: [develop, main, master]
   allowed: false
 
-# Knowledge service: declared but disabled; kb init's third PR flips it to
-# shadow after human review (design kb-init §9).
+# Knowledge service runs in shadow after reviewed initialization.
 knowledge_lifecycle:
   enabled: true
   mode: shadow
@@ -57,6 +56,8 @@ knowledge_lifecycle:
       - "jiuwenswarm/**/DESIGN.md"
       - "sdks/**/README*.md"
       - "packages/**/README*.md"
+      # Owner notes are partial; verify their claims against pinned code.
+      - ".doc_project_maintainer/**/*.md"
     source_roots: [jiuwenswarm/, jiuwenbox/src/jiuwenbox/]
     exclude: ["*/tests/*", "*/__init__.py", "*/resources/*", "*/node_modules/*"]
   calibration_set: kb-calibration

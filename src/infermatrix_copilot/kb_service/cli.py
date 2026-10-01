@@ -134,6 +134,13 @@ def _init_command(args, state_dir: Path) -> int:
     from .runner import run_playbook
 
     params = {"stage": args.stage, "dry_run": "true" if args.dry_run else "false", "pin": args.pin or ""}
+    if args.from_existing:
+        if args.stage != "knowledge":
+            print("--from-existing is for --stage knowledge only", file=sys.stderr)
+            return 2
+        params["from_existing"] = "true"
+    if args.subscription_generator:
+        params["subscription_generator"] = "true"
     if args.pr_count is not None:
         if args.stage != "pr-history" or args.pr_count < 1:
             print("--pr-count is a positive integer for --stage pr-history only", file=sys.stderr)
@@ -201,6 +208,10 @@ def main(argv: list[str] | None = None) -> int:
                       help="write the tree and PR body under the state directory instead of opening a PR")
     init.add_argument("--pin", help="upstream commit to pin (default: the default branch head)")
     init.add_argument("--suggest-seeds", action="store_true")
+    init.add_argument("--from-existing", action="store_true",
+                      help="enrich a merged KB without local skeleton/modules records (knowledge only)")
+    init.add_argument("--subscription-generator", action="store_true",
+                      help="explicit subscription generator; unreported fees outside stage USD accounting")
     publish = sub.add_parser("publish")
     where = publish.add_mutually_exclusive_group(required=True)
     where.add_argument("--remote", help="host:/absolute/path of the service state directory (over ssh)")

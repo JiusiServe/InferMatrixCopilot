@@ -175,3 +175,7 @@ class ModelGateway:
         if failure is not None:
             raise failure
         return ModelReply(role, data, text, record["served_model"], usage, seconds, cost_usd)
+
+    def subscription_billing(self, role: ModelRole) -> bool:
+        """Whether this authenticated backend declares subscription billing."""
+        return getattr(self._transport(role.provider), "subscription_billing", False) is True

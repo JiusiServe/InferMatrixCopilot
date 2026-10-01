@@ -18,6 +18,8 @@ params:
   pin: "upstream commit to pin (default: the default branch head)"
   pr_count: "pr-history only: merged upstream PRs to replay (default: adapter pr_history_count or 1000)"
   budget_usd: "pr-history only: cumulative spend ceiling; increasing it resumes the same window"
+  from_existing: "knowledge only: explicitly enrich a merged index and owner routes without local earlier-stage records"
+  subscription_generator: "explicit subscription backend; generator USD unreported, fees outside stage USD accounting"
 steps:
   - {id: init, step: knowledge.init}
 success: the stage's PR is open (or its dry run is written), or the record says why it is blocked

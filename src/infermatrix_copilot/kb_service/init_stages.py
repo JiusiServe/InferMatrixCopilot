@@ -134,11 +134,15 @@ def validate_change(base: Mapping[str, str], head: Mapping[str, str], *, observe
 # -- stage entry -------------------------------------------------------------------
 
 def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str | None = None,
-              pr_count: int | None = None, budget_usd: float | None = None) -> InitRecord:
+              pr_count: int | None = None, budget_usd: float | None = None,
+              from_existing: bool = False, subscription_generator: bool = False) -> InitRecord:
     """Run one ``kb init`` stage for ``lifecycle``'s repository and return its
     record (also saved under ``<state_dir>/init/<repo>/<stage>.json``)."""
     if stage not in STAGES:
         raise InitError(f"unknown stage {stage!r}; one of {STAGES}")
+    if from_existing and stage != "knowledge":
+        raise InitError("--from-existing is for the knowledge stage only")
+    rt.subscription_generator = subscription_generator
     stage_class = _stage_class(stage)
     if lifecycle.init is None:
         raise InitError(f"{lifecycle.repo}: the adapter has no knowledge_lifecycle.init block")
@@ -166,7 +170,11 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
         if not publishing_allowed(rt.environ):
             raise InitError("publishing needs ALLOW_PUSH=1 and ALLOW_POST=1 (or pass --dry-run)")
         author = parse_author(rt.environ.get(AUTHOR_ENV, ""))   # refused before any model call
-    return stage_class(rt, lifecycle, dry_run=dry_run, pin=pin, notes=notes, author=author).run()
+    if subscription_generator:
+        notes.append(f"generator {rt.generator.label()}: subscription billing explicitly selected; "
+                     "generator USD is unreported and subscription fees are outside the stage USD accounting")
+    return stage_class(rt, lifecycle, dry_run=dry_run, pin=pin, notes=notes, author=author,
+                       from_existing=from_existing).run()
 
 
 def adapter_missing(path: str) -> str:
@@ -380,6 +388,7 @@ class _Stage:
     author: tuple[str, str] | None = None     # (name, email) of the PR commit; None in a dry run
     _titles: dict[str, str] = field(default_factory=dict)
     _judge_stopped: bool = False
+    from_existing: bool = False
 
     # the adapter's briefing docs, read from the manifest by run(); a stage built
     # bare (tests) has none
@@ -554,7 +563,10 @@ class _Stage:
         # The new window is irrelevant to old stages. Preserve their existing
         # record digests across this additive configuration change.
         init = self.lifecycle.init
-        return repr(init).replace(f", pr_history_count={init.pr_history_count}", "")
+        identity = repr(init).replace(f", pr_history_count={init.pr_history_count}", "")
+        if self.rt.subscription_generator:
+            identity += ":subscription-generator"
+        return identity
 
     def _mode_identity(self) -> bool:
         return self.dry_run
