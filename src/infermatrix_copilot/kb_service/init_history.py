@@ -152,6 +152,25 @@ class _PrHistory(_Stage):
         # repeating extraction. Publication still rebuilds/reviews its head.
         return False
 
+    def _base_for_run(self, latest: str) -> str:
+        # A 1,000-PR batch can span budget stops and unrelated main merges.
+        # Its knowledge baseline is part of the checkpoint, not a moving
+        # implicit CLI input. Continue the same immutable batch until reset.
+        previous = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, self.STAGE)
+        if previous is not None and previous.history:
+            base = previous.kb_base_sha
+            if not re.fullmatch(r"[0-9a-f]{40}", base):
+                raise InitError("the PR-history checkpoint has an invalid knowledge baseline")
+            try:
+                if self.rt.knowledge._git("cat-file", "-t", base).decode().strip() != "commit":
+                    raise InitError("the frozen PR-history baseline is not a commit")
+            except SourceError as exc:
+                raise InitError("the frozen PR-history baseline is unavailable") from exc
+            if base != latest:
+                self.notes.append(f"knowledge main advanced to {latest[:12]}; continuing this batch on {base[:12]}")
+            return base
+        return latest
+
     def _restore_progress(self, previous: InitRecord | None) -> list[str]:
         if previous is not None and previous.history:
             current_digest = self.record.inputs_digest
@@ -163,6 +182,9 @@ class _PrHistory(_Stage):
             self.record.dry_run = self.dry_run
             self.record.problems = []
             self.record.unfinished = []
+            for note in self.notes:
+                if note not in self.record.notes:
+                    self.record.notes.append(note)
             if not self.dry_run:
                 self.record.history.pop("series_base_sha", None)
         self.budget = _CheckpointBudget(self.lifecycle.init.budget_usd, self.record, self.rt.state_dir)
@@ -419,6 +441,13 @@ class _PrHistory(_Stage):
                    "commits": [{"upstream_pr": c["number"], "merge_commit_sha": c["merge_commit_sha"],
                                 "rule_ids": c["rule_ids"]} for c in record.history["commits"]],
                    "rule_evidence": supported}
+        # Include the unchanged rules beside upgraded pages: a full review
+        # needs the prior contracts to detect contradictions and duplicates.
+        directories = {str(Path(record.verdicts[rid]["page"]).parent)
+                       for c in record.history["commits"] for rid in c["rule_ids"]}
+        baseline = self.rt.knowledge.knowledge_files(record.kb_base_sha)
+        payload["baseline_rule_pages"] = {p: t for p, t in baseline.items()
+                                          if str(Path(p).parent) in directories and Page.parse(t).rules()}
         prompt = _fence(payload)
         if len(prompt.encode()) > MAX_REVIEW_BYTES:
             raise InitError("the complete aggregate diff exceeds the Codex review context bound; no truncated review")

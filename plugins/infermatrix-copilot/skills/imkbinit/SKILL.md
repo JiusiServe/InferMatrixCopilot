@@ -115,6 +115,8 @@ Never work around it by hand.
 For `pr-history`, a blocked record is a resumable checkpoint. When the user
 requests a retry, rerun the same stage with the same pin/window/backend;
 completed PRs and prepared commits are reused. The stage accounts cumulative
+spend on its frozen knowledge baseline; unrelated main merges do not restart
+the batch. Changing the baseline requires a new state directory. It accounts
 spend; `--budget-usd N` may raise its ceiling to continue after a budget stop.
 It does not publish an incomplete window. Existing init runs with no history
 record remain harvestable, and may add this phase after their earlier stages

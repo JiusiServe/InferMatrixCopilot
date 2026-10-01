@@ -384,7 +384,7 @@ class _Stage:
         rt, lc, stage = self.rt, self.lifecycle, self.STAGE
         init = lc.init
         self.repo_dir = lc.knowledge_dir
-        base_sha = rt.knowledge.fetch()
+        base_sha = self._base_for_run(rt.knowledge.fetch())
         self._base_sha = base_sha
         main = rt.knowledge.knowledge_files(base_sha)
         chain = self._chain()
@@ -528,6 +528,9 @@ class _Stage:
 
     def _mode_identity(self) -> bool:
         return self.dry_run
+
+    def _base_for_run(self, latest: str) -> str:
+        return latest
 
     def _blocked(self, problems: list[str]) -> InitRecord:
         self.record.status = "blocked"

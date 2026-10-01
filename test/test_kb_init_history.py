@@ -139,6 +139,20 @@ def test_extraction_resumes_without_replaying_completed_prs(world):
     assert resumed.spent_usd > spent
 
 
+def test_history_resumes_its_frozen_baseline_after_unrelated_main_merges(world):
+    gateway, source = _setup(world)
+    source.fail_number = 102
+    rt = _runtime(world, gateway, github=source)
+    first = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=True)
+    assert first.status == "blocked" and gateway.extract_calls == [101]
+    advanced = _commit(world["origin"], {"unrelated.md": "another merged change\n"})
+    resumed = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=True)
+    assert resumed.status == "dry_run", resumed.problems
+    assert resumed.kb_base_sha == first.kb_base_sha != advanced
+    assert gateway.extract_calls == [101, 102, 103] and len(source.windows) == 1
+    assert any("main advanced" in note for note in resumed.notes)
+
+
 def test_failed_codex_preview_resumes_review_without_reextracting(world):
     gateway, source = _setup(world, HistoryGateway(fail_review=1))
     rt = _runtime(world, gateway, github=source)

@@ -548,7 +548,8 @@ raw payload 不写 trace，保留模型身份、耗时、用量和成本。模�
 `InitRecord.history` 保存不可变窗口、已完成 PR、pending 提炼结果及逐 PR commit delta；
 每次预留费用在派发前写 checkpoint，进程中断把未知费用按整次 reservation 计入；
 重跑不重复已完成 PR，完整提炼结果可复用。`--budget-usd N` 提高累计预算继续同一窗口，
-不重置既有花费；base/pin/window/backend 变化阻塞并保留 checkpoint。旧阶段的 inputs digest
+不重置既有花费；首次启动时固定 knowledge base，后续 main 合并不改变同一批次的 baseline；
+pin/window/backend 变化阻塞并保留 checkpoint，换 baseline 需新的 state directory。旧阶段的 inputs digest
 保持兼容，新增 history 配置不影响其缓存。旧三阶段 init 没有 history record 时仍可 harvest；
 一旦 history 开始，harvest 要等它完成并合并。已完成旧 init 也可单独添加此阶段。
 
@@ -560,6 +561,7 @@ history 的存在/状态加入后续 harvest 的 cache identity，chain 阻塞�
 不 checkout 主人的工作树。出版前 journal 固定整个串；push 后 create 失败可重建同一 head 并复用分支/PR。
 只开一个 draft PR。`KB_INIT_REVIEWER=codex:model[:effort]`（缺省 `DEFAULT_JUDGE`）经同一 gateway
 审阅完整 base..head diff、逐 PR 来源和当前 pin 的源码证据；provider 必须为 codex，无 fallback。
+完整 packet 还包含升级页所在 owner 的原有 rule pages，以检查与未改规则的重复、冲突。
 完整审阅上下文超过 1MB 阻塞，禁止截断冒充全量；按 judge_call_usd 约定费用预留。
 `InitRecord.review` 钉住 base、head、diff SHA256、请求/实际模型、verdict、findings 与 summary。
 只有该身份的 approve 可复用；发布 review summary 后重新核对远程 OPEN/head，才 `gh pr ready`。
