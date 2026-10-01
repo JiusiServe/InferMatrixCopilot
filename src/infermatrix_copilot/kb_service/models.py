@@ -90,6 +90,7 @@ class ModelGateway:
         self._settings = settings
         self._factory = transport_factory
         self._recorder = recorder
+        self._subscription_transports: dict[str, Any] = {}
 
     def _transport(self, provider: str):
         if self._factory is not None:
@@ -114,7 +115,9 @@ class ModelGateway:
         request's worst case before calling. Requesting a threshold from a
         transport that cannot stop at one (``stops_at_spend`` False) is
         refused before dispatch; it is never approximated with ``max_tokens``."""
-        transport = self._transport(role.provider)
+        transport = self._subscription_transports.pop(role.label(), None)
+        if transport is None:
+            transport = self._transport(role.provider)
         cap: dict = {}
         if max_budget_usd is not None:
             if not max_budget_usd > 0:
@@ -175,3 +178,12 @@ class ModelGateway:
         if failure is not None:
             raise failure
         return ModelReply(role, data, text, record["served_model"], usage, seconds, cost_usd)
+
+    def subscription_billing(self, role: ModelRole) -> bool:
+        """Bind the authenticated subscription backend to the next dispatch."""
+        self._subscription_transports.pop(role.label(), None)
+        transport = self._transport(role.provider)
+        if getattr(transport, "subscription_billing", False) is not True:
+            return False
+        self._subscription_transports[role.label()] = transport
+        return True

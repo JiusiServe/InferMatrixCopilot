@@ -1,0 +1,527 @@
+{
+  "schema_version": 1,
+  "repository": "openJiuwen-ai/jiuwenswarm",
+  "upstream_pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "knowledge_base_sha": "65641cc96f66e532938b10428302c70b7eab606d",
+  "stage": "knowledge",
+  "from_existing": true,
+  "inputs": {
+    "owners_visited": 21,
+    "source_files_offered": 212,
+    "unique_docs_offered": 53,
+    "unique_maintainer_docs_offered": 24,
+    "owners_with_maintainer_docs": 16,
+    "owners": [
+      {
+        "owner": "web-frontend",
+        "shown_source_files": 1,
+        "docs": [
+          "jiuwenswarm/channels/web/frontend/README.md",
+          "docs/zh/A2UI.md",
+          "docs/zh/desktop-electron-packaging.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/architecture.md",
+          "repos/jiuwenswarm/components/web-frontend/_index.md",
+          "repos/jiuwenswarm/components/web-frontend/feature-agent-management.md",
+          "repos/jiuwenswarm/components/web-frontend/feature-artifacts.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "agents-team",
+        "shown_source_files": 10,
+        "docs": [
+          "jiuwenswarm/agents/swarm/DESIGN.md",
+          "docs/zh/分布式Team.md",
+          ".doc_project_maintainer/project/flows/agentserver-plan-mode-exit.md",
+          ".doc_project_maintainer/project/flows/agentserver-schedule-auto-harness.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/architecture.md",
+          "repos/jiuwenswarm/components/agents-team/_index.md",
+          "repos/jiuwenswarm/components/agents-team/feature-auto-memory.md",
+          "repos/jiuwenswarm/components/agents-team/feature-browser-tools.md",
+          "repos/jiuwenswarm/components/agents-team/feature-digital-avatar.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "agent-server-runtime",
+        "shown_source_files": 2,
+        "docs": [
+          ".doc_project_maintainer/modules/agentserver-runtime/README.md",
+          ".doc_project_maintainer/modules/runtime-session/README.md",
+          "jiuwenswarm/server/runtime/skill/skilldev/DESIGN.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/architecture.md",
+          "repos/jiuwenswarm/components/agent-server-runtime/_index.md",
+          "repos/jiuwenswarm/components/agent-server-runtime/feature-coding-memory.md",
+          "repos/jiuwenswarm/components/agent-server-runtime/feature-context.md",
+          "repos/jiuwenswarm/components/agent-server-runtime/feature-harness.md",
+          "repos/jiuwenswarm/components/agent-server-runtime/feature-heartbeat.md",
+          "repos/jiuwenswarm/components/agent-server-runtime/feature-lsp.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "config-resources",
+        "shown_source_files": 12,
+        "docs": [
+          "docs/zh/A2A.md",
+          "docs/zh/A2UI.md",
+          "docs/zh/TUI使用SwarmFlow指南.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/architecture.md",
+          "repos/jiuwenswarm/components/config-resources/_index.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "tui-client",
+        "shown_source_files": 1,
+        "docs": [
+          "docs/zh/TUI使用指南.md",
+          "docs/zh/工具权限与安全防护.md",
+          ".doc_project_maintainer/project/flows/agentserver-command-mcp.md",
+          ".doc_project_maintainer/project/flows/agentserver-sandbox-runtime.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/tui-client/_index.md",
+          "repos/jiuwenswarm/components/tui-client/feature-autofix.md",
+          "repos/jiuwenswarm/components/tui-client/feature-tui.md",
+          "repos/jiuwenswarm/components/tui-client/source-contracts-01.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "extensions-plugins",
+        "shown_source_files": 13,
+        "docs": [
+          ".doc_project_maintainer/project/architecture.md",
+          "docs/zh/application-plugins.md",
+          ".doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_extensions_delete.md",
+          ".doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_extensions_import.md",
+          ".doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_extensions_list.md",
+          ".doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_extensions_delete/risks.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/extensions-plugins/_index.md",
+          "repos/jiuwenswarm/components/extensions-plugins/design-tradeoffs.md",
+          "repos/jiuwenswarm/components/extensions-plugins/feature-applications.md",
+          "repos/jiuwenswarm/components/extensions-plugins/feature-hooks.md",
+          "repos/jiuwenswarm/components/extensions-plugins/feature-video-duplex.md",
+          "repos/jiuwenswarm/components/extensions-plugins/jiuwenswarm-application-plugins.md",
+          "repos/jiuwenswarm/components/extensions-plugins/jiuwenswarm-extensions-agentos.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "gateway-channels",
+        "shown_source_files": 2,
+        "docs": [
+          ".doc_project_maintainer/directories/jiuwenswarm__gateway__routing/README.md",
+          ".doc_project_maintainer/modules/gateway-and-channels/README.md",
+          ".doc_project_maintainer/project/flows/gateway-agentserver-e2a-chat.md",
+          "jiuwenswarm/channels/web/frontend/README.md",
+          ".doc_project_maintainer/INDEX.md",
+          ".doc_project_maintainer/project/build-plan.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/architecture.md",
+          "repos/jiuwenswarm/components/gateway-channels/_index.md",
+          "repos/jiuwenswarm/components/gateway-channels/design-tradeoffs.md",
+          "repos/jiuwenswarm/components/gateway-channels/feature-cli.md",
+          "repos/jiuwenswarm/components/gateway-channels/feature-im-dingtalk.md",
+          "repos/jiuwenswarm/components/gateway-channels/feature-im-discord.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "common-core",
+        "shown_source_files": 10,
+        "docs": [
+          "docs/zh/性能优化.md",
+          "docs/zh/日志.md",
+          "docs/zh/模式系统.md",
+          ".doc_project_maintainer/project/flows/agentserver-command-mcp.md",
+          "README_CN.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/common-core/_index.md",
+          "repos/jiuwenswarm/components/common-core/design-tradeoffs.md",
+          "repos/jiuwenswarm/components/common-core/feature-external-cli-agents.md",
+          "repos/jiuwenswarm/components/common-core/feature-mcp.md",
+          "repos/jiuwenswarm/components/common-core/feature-models.md",
+          "repos/jiuwenswarm/components/common-core/jiuwenswarm-common-acp.md",
+          "repos/jiuwenswarm/components/common-core/jiuwenswarm-common-config-panel.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "packaging-deploy",
+        "shown_source_files": 20,
+        "docs": [
+          ".doc_project_maintainer/modules/project-packaging/README.md",
+          "README_CN.md",
+          "sdks/README.md",
+          "docs/zh/desktop-electron-packaging.md",
+          "jiuwenswarm/channels/web/frontend/README.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/packaging-deploy/_index.md",
+          "repos/jiuwenswarm/components/packaging-deploy/feature-deployment.md",
+          "repos/jiuwenswarm/rules.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "browser-client",
+        "shown_source_files": 25,
+        "docs": [
+          "docs/README.md",
+          "sdks/README.md",
+          ".doc_project_maintainer/directories/jiuwenswarm__gateway__routing/README.md",
+          ".doc_project_maintainer/modules/agentserver-runtime/README.md",
+          ".doc_project_maintainer/modules/agentserver-runtime/design.md",
+          ".doc_project_maintainer/modules/gateway-and-channels/README.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/browser-client/_index.md",
+          "repos/jiuwenswarm/components/browser-client/feature-browser-client.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "subpackages",
+        "shown_source_files": 10,
+        "docs": [
+          "jiuwenbox/README_CN.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/architecture.md",
+          "repos/jiuwenswarm/components/subpackages/_index.md"
+        ],
+        "generator_reply_valid": false
+      },
+      {
+        "owner": "ide-clients",
+        "shown_source_files": 14,
+        "docs": [
+          "docs/README.md",
+          "sdks/README.md",
+          ".doc_project_maintainer/directories/jiuwenswarm__gateway__routing/README.md",
+          "docs/zh/ide/jetbrains/JetBrains插件.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/ide-clients/_index.md",
+          "repos/jiuwenswarm/components/ide-clients/feature-jetbrains.md",
+          "repos/jiuwenswarm/components/ide-clients/feature-vscode.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "a2ui",
+        "shown_source_files": 21,
+        "docs": [
+          "docs/zh/A2UI-web-only-pr-record.md",
+          "docs/zh/A2UI.md",
+          "docs/README.md",
+          "docs/zh/A2UI-IM-channel-analysis.md",
+          ".doc_project_maintainer/modules/runtime-session/README.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/architecture.md",
+          "repos/jiuwenswarm/components/a2ui/_index.md",
+          "repos/jiuwenswarm/components/a2ui/feature-a2ui.md"
+        ],
+        "generator_reply_valid": false
+      },
+      {
+        "owner": "gateway-channels-2",
+        "shown_source_files": 7,
+        "docs": [
+          ".doc_project_maintainer/modules/runtime-session/README.md",
+          ".doc_project_maintainer/directories/jiuwenswarm__gateway__routing/README.md",
+          ".doc_project_maintainer/modules/gateway-and-channels/README.md",
+          "jiuwenswarm/channels/web/frontend/README.md",
+          ".doc_project_maintainer/project/flows/runtime-session-reference-chain.md",
+          "README_CN.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/gateway-channels/_index.md",
+          "repos/jiuwenswarm/components/gateway-channels/design-tradeoffs.md",
+          "repos/jiuwenswarm/components/gateway-channels/feature-cli.md",
+          "repos/jiuwenswarm/components/gateway-channels/feature-im-dingtalk.md",
+          "repos/jiuwenswarm/components/gateway-channels/feature-im-discord.md",
+          "repos/jiuwenswarm/components/gateway-channels/feature-im-feishu.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "launch",
+        "shown_source_files": 7,
+        "docs": [
+          "docs/zh/desktop-electron-packaging.md",
+          "sdks/README.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/launch/_index.md",
+          "repos/jiuwenswarm/components/launch/design-tradeoffs.md",
+          "repos/jiuwenswarm/components/launch/feature-bootstrap.md",
+          "repos/jiuwenswarm/components/launch/feature-desktop.md",
+          "repos/jiuwenswarm/components/launch/feature-instances.md",
+          "repos/jiuwenswarm/components/launch/jiuwenswarm-channels-desktop.md",
+          "repos/jiuwenswarm/components/launch/jiuwenswarm-instance-manager.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "agent-runtime",
+        "shown_source_files": 12,
+        "docs": [
+          ".doc_project_maintainer/modules/runtime-session/README.md",
+          ".doc_project_maintainer/project/flows/runtime-session-reference-chain.md",
+          ".doc_project_maintainer/modules/agentserver-runtime/README.md",
+          ".doc_project_maintainer/modules/agentserver-runtime/design.md",
+          "jiuwenswarm/server/runtime/skill/skilldev/DESIGN.md",
+          ".doc_project_maintainer/README.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/agent-runtime/_index.md",
+          "repos/jiuwenswarm/components/agent-runtime/design-tradeoffs.md",
+          "repos/jiuwenswarm/components/agent-runtime/feature-projects-sessions.md",
+          "repos/jiuwenswarm/components/agent-runtime/jiuwenswarm-runtime-control.md",
+          "repos/jiuwenswarm/components/agent-runtime/jiuwenswarm-runtime-execution.md",
+          "repos/jiuwenswarm/components/agent-runtime/jiuwenswarm-runtime-session.md",
+          "repos/jiuwenswarm/components/agent-runtime/jiuwenswarm-runtime.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "symphony-orchestration",
+        "shown_source_files": 9,
+        "docs": [
+          ".doc_project_maintainer/README.md",
+          "docs/README.md",
+          "docs/zh/Symphony-技能编排与分发.md",
+          ".doc_project_maintainer/modules/agent-harness/README.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/symphony-orchestration/_index.md",
+          "repos/jiuwenswarm/components/symphony-orchestration/design-tradeoffs.md",
+          "repos/jiuwenswarm/components/symphony-orchestration/feature-symphony.md",
+          "repos/jiuwenswarm/components/symphony-orchestration/jiuwenswarm-symphony-evolution.md",
+          "repos/jiuwenswarm/components/symphony-orchestration/jiuwenswarm-symphony-service.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "protocols",
+        "shown_source_files": 11,
+        "docs": [
+          "docs/zh/A2A.md",
+          "docs/zh/ACP插件使用.md",
+          "docs/zh/E2A-protocol.md",
+          ".doc_project_maintainer/project/flows/runtime-session-reference-chain.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/architecture.md",
+          "repos/jiuwenswarm/components/protocols/_index.md",
+          "repos/jiuwenswarm/components/protocols/feature-a2a.md",
+          "repos/jiuwenswarm/components/protocols/feature-acp.md",
+          "repos/jiuwenswarm/components/protocols/feature-e2a.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "login-auth",
+        "shown_source_files": 9,
+        "docs": [
+          "docs/zh/华为账号登录.md",
+          "docs/zh/E2A-protocol.md",
+          "docs/zh/Slash命令表.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/login-auth/_index.md",
+          "repos/jiuwenswarm/components/login-auth/design-tradeoffs.md",
+          "repos/jiuwenswarm/components/login-auth/feature-login.md",
+          "repos/jiuwenswarm/components/login-auth/jiuwenswarm-common-auth.md",
+          "repos/jiuwenswarm/components/login-auth/jiuwenswarm-login-models.md",
+          "repos/jiuwenswarm/components/login-auth/source-contracts-01.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "observability",
+        "shown_source_files": 6,
+        "docs": [
+          "docs/zh/调试追踪.md",
+          ".doc_project_maintainer/project/flows/agentserver-command-mcp.md",
+          ".doc_project_maintainer/project/flows/agentserver-history-stream.md",
+          ".doc_project_maintainer/code/jiuwenswarm/server/app_agentserver.py/_run.md",
+          ".doc_project_maintainer/code/jiuwenswarm/server/app_agentserver.py/main.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/observability/_index.md",
+          "repos/jiuwenswarm/components/observability/design-tradeoffs.md",
+          "repos/jiuwenswarm/components/observability/feature-debug-trace.md",
+          "repos/jiuwenswarm/components/observability/feature-observability.md",
+          "repos/jiuwenswarm/components/observability/jiuwenswarm-observability.md"
+        ],
+        "generator_reply_valid": true
+      },
+      {
+        "owner": "cron-scheduling",
+        "shown_source_files": 10,
+        "docs": [
+          ".doc_project_maintainer/modules/gateway-and-channels/README.md",
+          ".doc_project_maintainer/modules/runtime-session/README.md",
+          ".doc_project_maintainer/INDEX.md",
+          ".doc_project_maintainer/project/build-plan.md",
+          "docs/zh/Harness.md",
+          "docs/zh/JiuwenMemory-SDK接入.md"
+        ],
+        "existing_pages": [
+          "repos/jiuwenswarm/components/cron-scheduling/_index.md",
+          "repos/jiuwenswarm/components/cron-scheduling/design-tradeoffs.md",
+          "repos/jiuwenswarm/components/cron-scheduling/feature-cron.md",
+          "repos/jiuwenswarm/components/cron-scheduling/jiuwenswarm-cron-store.md",
+          "repos/jiuwenswarm/components/cron-scheduling/jiuwenswarm-runtime-cron.md"
+        ],
+        "generator_reply_valid": true
+      }
+    ]
+  },
+  "models": {
+    "generator_requested": "zcode:GLM-5.3:low",
+    "generator_served_models": [
+      "GLM-5.3"
+    ],
+    "judge_requested": "codex:gpt-6-sol:medium",
+    "judge_served_model": "unreported by native transport",
+    "generator_calls": 21,
+    "judge_calls": 99,
+    "generator_invalid_replies": 2,
+    "claude_code_calls": 0
+  },
+  "advisory_verdicts": {
+    "fail": 38,
+    "unsure": 60,
+    "pass": 1
+  },
+  "revalidation": {
+    "status": "dry_run",
+    "problems": [],
+    "recorded_replies_reused": 120,
+    "matching": "Exact role, requested model/effort and SHA-256 of system/prompt; original replies and errors preserved.",
+    "additional_model_calls": 0,
+    "reason": "An uncertain draft contained a user-specific path. Only pass sections now enter generated pages; other drafts stay in ignored local traces."
+  },
+  "publication": {
+    "host_source_checked_sections": 29,
+    "owner_pages": [
+      {
+        "owner": "agent-server-runtime",
+        "page": "knowledge/repos/jiuwenswarm/components/agent-server-runtime/knowledge-agent-server-runtime.md",
+        "facets": [
+          "architecture",
+          "api",
+          "configuration",
+          "tradeoffs",
+          "features",
+          "validation"
+        ],
+        "review": "Codex host checked the pinned source and partial maintainer notes; trims unsupported GLM claims and historical run counts."
+      },
+      {
+        "owner": "agents-team",
+        "page": "knowledge/repos/jiuwenswarm/components/agents-team/knowledge-agents-team.md",
+        "facets": [
+          "architecture",
+          "api",
+          "configuration",
+          "tradeoffs",
+          "features",
+          "validation"
+        ],
+        "review": "Codex host checked pinned source and trimmed the GLM draft to supported claims."
+      },
+      {
+        "owner": "common-core",
+        "page": "knowledge/repos/jiuwenswarm/components/common-core/knowledge.md",
+        "facets": [
+          "architecture",
+          "api",
+          "configuration",
+          "tradeoffs",
+          "features",
+          "validation"
+        ],
+        "review": "Codex host checked pinned source and trimmed the GLM draft to supported claims."
+      },
+      {
+        "owner": "config-resources",
+        "page": "knowledge/repos/jiuwenswarm/components/config-resources/knowledge-config-resources.md",
+        "facets": [
+          "architecture",
+          "api",
+          "configuration",
+          "tradeoffs",
+          "features"
+        ],
+        "review": "Codex host checked pinned source; corrects lazy email initialization and precise model-config precedence."
+      },
+      {
+        "owner": "web-frontend",
+        "page": "knowledge/repos/jiuwenswarm/components/web-frontend/knowledge-web-frontend.md",
+        "facets": [
+          "architecture",
+          "api",
+          "configuration",
+          "tradeoffs",
+          "features",
+          "validation"
+        ],
+        "review": "Codex host checked the pinned source; repairs the GLM draft and adds test evidence."
+      }
+    ],
+    "automatic_pass_disposition": "The AgentServer validation draft was source-checked and rewritten within the 29 reviewed sections to remove historical passed-test counts.",
+    "uncertain_or_failed_model_drafts_published": 0,
+    "review_boundary": "Host-checked sections are identified separately from advisory model passes; no advisory verdicts were changed."
+  },
+  "budget": {
+    "configured_stage_usd": 60,
+    "stage_fixed_judge_accounting_usd": 49.5,
+    "all_attempts_fixed_judge_accounting_usd": 55.5,
+    "judge_accounting_per_call_usd": 0.5,
+    "generator_reported_usd": null,
+    "billing": "Explicit authenticated Zcode coding-plan subscription; fees are unreported and outside stage USD accounting. Native judge accounting is a fixed convention, not a measured invoice."
+  },
+  "coverage": {
+    "audit": "eval/knowledge-coverage/jiuwenswarm-f0a69728c96b.json",
+    "features_covered": 79,
+    "features_total": 79,
+    "production_files_covered": 2043,
+    "production_files_total": 2199,
+    "production_file_ratio": 0.9290586630286494,
+    "production_file_target": 0.85,
+    "static_contract_files": 1893,
+    "targets_met": true,
+    "provenance": {
+      "policy_sha256": "c23eefb5057bfdff6a7be55cd663b5e9dc636cc2d76741b39d875088a8216661",
+      "knowledge_sha256": "cb91abf226e28b831f885bfb160f82714824ea1b788f65f2e1e9abb19d30db15",
+      "upstream_tracked_files_clean": true,
+      "reproduce": "PYTHONPATH=src python tools/audit_knowledge_coverage.py --repo jiuwenswarm --upstream /path/to/pinned/jiuwenswarm --pin f0a69728c96b5961d993449f1a901cbd2f4dac5b"
+    },
+    "interpretation": "All declared features have pinned explanations. Production-file coverage includes verified static interface contracts; it does not prove exhaustive behavior review, runtime correctness, or upstream test execution. Existing feature pages/contracts provide the baseline; the 29 additions improve explanation depth without changing the file numerator."
+  },
+  "limitations": {
+    "owner_facets_still_unsupported_in_automatic_stage": 116,
+    "production_files_without_owner_route": 10,
+    "source_sampling": "Owner prompts offer at most 60 files and 100KB of source. Offered source files are not counted as covered by themselves.",
+    "maintainer_notes": "Partial/stale notes supply context and test entry points; audit labels and historical passed-test ledgers do not establish current behavior."
+  }
+}

@@ -182,6 +182,9 @@ async def init_stage(ctx: StepContext) -> StepResult:
         ceiling = ctx.params.get("budget_usd")
         if ceiling not in (None, ""):
             kwargs["budget_usd"] = float(ceiling)
+        for option in ("from_existing", "subscription_generator"):
+            if str(ctx.params.get(option, "false")).lower() in ("1", "true", "yes"):
+                kwargs[option] = True
         record = run_stage(rt, lifecycle, stage, dry_run=dry_run, pin=pin, **kwargs)
     except (InitError, NotImplementedError, ValueError) as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))

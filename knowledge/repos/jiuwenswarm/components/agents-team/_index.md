@@ -50,3 +50,4 @@ sources: []
 - [work-rails](work-rails/_index.md)
 - [swarm](swarm/_index.md)
 - [swarm-providers](swarm-providers/_index.md)
+- [Code harness：静态提示词、计划审批与观测开关](knowledge-agents-team.md) — 说明接口、配置与集成边界，关联源码和维护者文档。

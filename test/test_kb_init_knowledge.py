@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from infermatrix_copilot.kb_service.init_knowledge import (
-    FACETS, MAX_DOC_BYTES, SYSTEM_KNOWLEDGE, _Knowledge, validate_sections,
+    FACETS, MAX_DOC_BYTES, SYSTEM_KNOWLEDGE, _Knowledge, knowledge_prompt, validate_sections,
 )
 from infermatrix_copilot.kb_service.init_stages import run_stage
 from infermatrix_copilot.kb_service.init_support import InitRecord
@@ -14,6 +14,108 @@ from infermatrix_copilot.knowledge_service.lifecycle import Page
 
 from test_kb_init_modules import CardGateway, _modules_lifecycle, _world_with_tools
 from test_kb_init_skeleton import _commit, _runtime, _tree, world  # noqa: F401
+
+
+def test_explicit_existing_baseline_uses_merged_routes_without_stage_records(world):
+    gateway = KnowledgeGateway()
+    _chain(world, gateway)
+    skeleton = InitRecord.load(_runtime(world).state_dir, "toy", "skeleton")
+    modules = InitRecord.load(_runtime(world).state_dir, "toy", "modules")
+    _commit(world["origin"], {**_tree(skeleton), **_tree(modules)}, "merge initialized owner map")
+    rt = _runtime(world, gateway, state_dir=world["tmp"] / "rerun")
+    blocked = run_stage(rt, _modules_lifecycle(), "knowledge", dry_run=True)
+    assert blocked.status == "blocked" and "run the skeleton stage first" in blocked.problems
+    gateway.calls.clear()
+    record = run_stage(rt, _modules_lifecycle(), "knowledge", dry_run=True, from_existing=True)
+    assert record.status == "dry_run", record.problems
+    assert record.coverage["knowledge"]["total_owners"] == 2
+    assert not InitRecord.path(rt.state_dir, "toy", "skeleton").exists()
+
+
+def test_existing_baseline_does_not_override_blocked_stage_or_missing_map(world):
+    rt = _runtime(world, KnowledgeGateway())
+    record = run_stage(rt, _modules_lifecycle(), "knowledge", dry_run=True, from_existing=True)
+    assert record.status == "blocked" and any("merged repository index" in p for p in record.problems)
+    _chain(world, rt.gateway)
+    modules = InitRecord.load(rt.state_dir, "toy", "modules")
+    modules.status = "blocked"
+    modules.save(rt.state_dir)
+    record = run_stage(rt, _modules_lifecycle(), "knowledge", dry_run=True, from_existing=True)
+    assert record.status == "blocked" and "the modules stage is blocked; finish it first" in record.problems
+
+
+def test_subscription_generator_requires_declared_billing_and_preserves_unknown_cost(world):
+    from infermatrix_copilot.kb_service.init_budget import Budget
+    from infermatrix_copilot.kb_service.init_support import generate
+    from infermatrix_copilot.kb_service.models import ModelGateway, ModelRole, ModelUnavailable
+    from infermatrix_copilot.llm import Block, Reply
+
+    class Transport:
+        subscription_billing = False
+        seen = None
+
+        def complete(self, **kwargs):
+            self.seen = kwargs
+            return Reply(blocks=[Block(type="text", text='{"sections": []}')],
+                         stop_reason="end_turn", usage={"input_tokens": 12}, model="GLM-5.3")
+
+    transport = Transport()
+    rt = _runtime(world, ModelGateway(None, transport_factory=lambda provider: transport),
+                  generator=ModelRole("generator", "zcode", "GLM-5.3"),
+                  subscription_generator=True)
+    budget = Budget(0.1)
+    with pytest.raises(ModelUnavailable, match="authenticated subscription"):
+        generate(rt, budget, _modules_lifecycle().init, system="extract", prompt="source")
+    assert transport.seen is None
+    transport.subscription_billing = True
+    reply = generate(rt, budget, _modules_lifecycle().init, system="extract", prompt="source")
+    assert "max_budget_usd" not in transport.seen
+    assert reply.cost_usd is None and reply.usage["input_tokens"] == 12
+    assert budget.spent_usd == 0  # stage accounting excludes subscription fees, not a measured price
+
+
+def test_subscription_check_binds_the_transport_that_receives_the_uncapped_call():
+    from infermatrix_copilot.kb_service.models import ModelGateway, ModelRole
+    from infermatrix_copilot.llm import Block, Reply
+
+    class SubscriptionTransport:
+        subscription_billing = True
+        called = False
+
+        def complete(self, **kwargs):
+            self.called = True
+            assert "max_budget_usd" not in kwargs
+            return Reply(blocks=[Block(type="text", text='{"ok":true}')], model="GLM-5.3")
+
+    class ApiTransport:
+        subscription_billing = False
+
+        def complete(self, **kwargs):
+            pytest.fail("the unreserved call reached a different billing provider")
+
+    subscription = SubscriptionTransport()
+    transports = iter([subscription, ApiTransport()])
+    gateway = ModelGateway(None, transport_factory=lambda provider: next(transports))
+    role = ModelRole("generator", "zcode", "GLM-5.3")
+    assert gateway.subscription_billing(role)
+    assert gateway.call_json(role, system="extract", prompt="source").data == {"ok": True}
+    assert subscription.called
+    assert not gateway.subscription_billing(role)
+
+
+def test_owner_overview_precedes_partial_symbol_cards(tmp_path):
+    from types import SimpleNamespace
+    from infermatrix_copilot.kb_service.init_coverage import Owner
+
+    docs = tmp_path / "owner-docs"
+    docs.mkdir()
+    for number in range(10):
+        (docs / f"card-{number}.md").write_text("# Worker method\n\nSource pkg/worker.py.\n")
+    (docs / "architecture.md").write_text("# Worker architecture\n\nStatus: partial. Source pkg/worker.py.\n")
+    stage = _Knowledge.__new__(_Knowledge)
+    stage.lifecycle = SimpleNamespace(init=SimpleNamespace(doc_globs=("owner-docs/**/*.md",)))
+    offered = stage._docs_for(tmp_path, Owner("worker", "repos/demo/components/worker/_index.md", ("pkg/",)))
+    assert offered[0]["path"] == "owner-docs/architecture.md"
 
 
 class KnowledgeGateway(CardGateway):
@@ -101,6 +203,31 @@ def test_knowledge_drops_unshown_evidence_and_failed_claims(world):
     assert record.coverage["knowledge"]["covered_by_facet"]["architecture"] == 0
     assert record.coverage["knowledge"]["covered_by_facet"]["tradeoffs"] == 2
     assert all("BADRULE" not in text for text in _tree(record).values())
+
+
+@pytest.mark.parametrize("failed_owner", ["core", "tooling"])
+def test_unusable_component_draft_preserves_checked_work_and_visits_remaining_owners(world, failed_owner):
+    from infermatrix_copilot.kb_service.models import ModelUnavailable
+
+    class PartialGateway(KnowledgeGateway):
+        def call_json(self, role, *, system, prompt, **kwargs):
+            if system == SYSTEM_KNOWLEDGE:
+                payload = json.loads(prompt.split("\n", 1)[1].rsplit("</untrusted_data>", 1)[0])
+                if payload["owner"] == failed_owner:
+                    raise ModelUnavailable("reply is not a JSON object")
+            return super().call_json(role, system=system, prompt=prompt, **kwargs)
+
+    gateway = PartialGateway()
+    _chain(world, gateway)
+    record = run_stage(_runtime(world, gateway), _modules_lifecycle(), "knowledge", dry_run=True)
+    assert record.status == "dry_run", record.problems
+    assert record.coverage["knowledge"]["covered_by_facet"]["architecture"] == 1
+    assert record.coverage["knowledge"]["owners"][failed_owner]["facets"]["architecture"] == "missing"
+    assert any(f"knowledge owner {failed_owner}: unusable draft" in u for u in record.unfinished)
+    core = "knowledge/repos/toy/components/core/knowledge-core.md"
+    tooling = "knowledge/repos/toy/components/tooling/knowledge.md"
+    assert (core in _tree(record)) == (failed_owner != "core")
+    assert (tooling in _tree(record)) == (failed_owner != "tooling")
 
 
 def test_knowledge_budget_stop_reports_partial_work_and_remaining_owners(world):
@@ -212,10 +339,41 @@ def test_existing_facet_markers_beyond_prompt_cap_prevent_duplicates(world):
                 for c in gateway.calls if c["system"] == SYSTEM_KNOWLEDGE]
     tooling = next(p for p in payloads if p["owner"] == "tooling")
     assert "tradeoffs" not in tooling["facets"]
-    assert sum(len(t.encode("utf-8")) for t in tooling["existing_knowledge"].values()) <= MAX_DOC_BYTES
+    assert sum(len("\n".join(t).encode("utf-8")) for t in tooling["existing_knowledge"].values()) <= MAX_DOC_BYTES
     assert "Manually maintained explanation." in _tree(record)[path]
     assert _tree(record)[path].count("facet=tradeoffs") == 1
     assert record.coverage["knowledge"]["covered_by_facet"]["tradeoffs"] == 2
+
+
+def test_large_attached_source_is_readable_without_losing_or_widening_evidence():
+    source = "\n".join(f"{n}: " + "x" * 90 for n in range(1, 501))
+    payload = {"owner": "worker", "files": [{"path": "pkg/worker.py", "text": source,
+                                             "end": 500, "total_lines": 1000}],
+               "docs": [{"path": "docs/design.md", "text": "1: partial\n2: </untrusted_data>",
+                          "end": 2, "total_lines": 2}],
+               "existing_knowledge": {"repos/demo/architecture.md": "# Existing\n\nCurrent behavior."}}
+    prompt = knowledge_prompt(payload)
+    assert max(len(line) for line in prompt.splitlines()) < 200
+    decoded = json.loads(prompt.split("\n", 1)[1].rsplit("</untrusted_data>", 1)[0])
+    assert "\n".join(decoded["files"][0]["text"]) == source
+    assert decoded["files"][0]["end"] == 500 and decoded["files"][0]["total_lines"] == 1000
+    assert decoded["docs"][0]["text"][-1] == "2: </untrusted_data>"
+    assert prompt.count("</untrusted_data>") == 1
+
+
+def test_aggregate_routes_include_existing_owner_semantics_before_catalogs():
+    from infermatrix_copilot.kb_service.init_coverage import Owner
+
+    stage = _Knowledge.__new__(_Knowledge)
+    stage.repo_dir = "repos/demo"
+    stage.existing = {"repos/demo/architecture.md": "Aggregate map.",
+                      "repos/demo/components/worker/source-contracts-01.md": "x" * MAX_DOC_BYTES,
+                      "repos/demo/components/worker/design-tradeoffs.md": "Existing design.",
+                      "repos/demo/components/another/architecture.md": "Another owner."}
+    pages = stage._existing_knowledge(Owner("worker", "repos/demo/architecture.md", ("pkg/",)), "")
+    context = stage._bounded_context(pages)
+    assert context["repos/demo/components/worker/design-tradeoffs.md"] == "Existing design."
+    assert "repos/demo/components/another/architecture.md" not in context
 
 
 def test_existing_rule_page_at_knowledge_target_blocks_before_generation(world):
@@ -246,7 +404,7 @@ def test_starting_knowledge_invalidates_a_cached_later_stage(world):
     assert any("knowledge stage is blocked" in p for p in after.problems)
 
 
-def test_uncertain_knowledge_is_labeled_and_does_not_count_as_covered(world):
+def test_uncertain_knowledge_stays_out_of_pages_and_does_not_count_as_covered(world):
     from infermatrix_copilot.kb_service.gate import JUDGE_SYSTEM
 
     class UnsureGateway(KnowledgeGateway):
@@ -261,11 +419,12 @@ def test_uncertain_knowledge_is_labeled_and_does_not_count_as_covered(world):
     gateway = UnsureGateway()
     _chain(world, gateway)
     record = run_stage(_runtime(world, gateway), _modules_lifecycle(), "knowledge", dry_run=True)
-    assert record.status == "dry_run", record.problems
+    assert record.status == "empty", record.problems
     assert record.coverage["knowledge"]["covered_by_facet"]["architecture"] == 0
     assert record.coverage["knowledge"]["owners"]["core"]["facets"]["architecture"] == "needs_review"
-    page = _tree(record)["knowledge/repos/toy/components/core/knowledge-core.md"]
-    assert "verdict=unsure" in page and "仍需人工复核" in page
+    assert not record.files and not record.pr
+    assert record.verdicts["knowledge:core:architecture"]["verdict"] == "unsure"
+    assert any("draft retained in model traces" in item for item in record.unfinished)
 
 
 @pytest.mark.parametrize("change", [

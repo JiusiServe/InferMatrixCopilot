@@ -43,3 +43,4 @@ sources: []
 - [绑定会话的心跳续跑任务功能知识](feature-heartbeat.md)
 - [SkillDev 创建、评测与打包边界功能知识](feature-skill-development.md)
 - [主动推荐、频率限制与主 Agent 交付功能知识](feature-proactive-recommendation.md)
+- [AgentServer WebSocket 边界：Runtime、接口与配置](knowledge-agent-server-runtime.md) — 说明接口、配置与集成边界，关联源码和维护者文档。

@@ -71,6 +71,11 @@ The next stage is the first one that isn't done. If an earlier stage's PR is
 open, stop and say it's waiting for the owner's review. If a record says
 `blocked`, report its `problems` and stop.
 
+For an explicit knowledge rerun of an already merged KB with no local
+skeleton/modules records, use `--stage knowledge --from-existing`. The CLI
+checks the merged index and every owner route. Existing stage records still
+keep their review and merge gates; never manufacture records to skip them.
+
 ## 3. Run it
 
 Dry run is the default:
@@ -78,6 +83,13 @@ Dry run is the default:
 ```text
 <imc> kb init <repo> --stage <next> --dry-run
 ```
+
+When the user selects Zcode on its OAuth coding subscription, set
+`KB_GENERATOR=zcode:GLM-5.3` and pass `--subscription-generator` explicitly.
+The CLI pins and checks the served model. It rejects custom API providers in
+this mode; default API spend-cap checks remain in place. Report generator USD
+as unreported and subscription fees outside stage USD accounting, alongside
+token usage and the judge's accounted spend. Never claim a measured zero cost.
 
 Only publish when the user explicitly asks (`--publish`, "open the PR").
 Publishing needs `ALLOW_PUSH=1`, `ALLOW_POST=1` and

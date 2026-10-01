@@ -460,13 +460,20 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
 上游已有 README、架构/设计、API 与配置文档由 adapter 的 `init.doc_globs` 选入。
 owner 文档先在完整匹配清单中按源码邻接、路径引用与主题相关度排序，再应用六文件与
 字节上限，避免 skeleton 的全局文档截断漏掉后面的专题；没有专题匹配时使用仓库 README。
+相同相关度下优先 owner 的 README/architecture/design 概览与较浅路径；文档索引在本阶段内复用。
+维护者的 partial/inferred/stale 笔记也可由这些 globs 引入，其审计标签不能代替当前源码证据。
 功能页另使用覆盖清单显式声明的文档。生成器须交叉核对已展示源码，注明文档与实现差异，
 设计蓝图不能直接证明功能已可运行；文档是证据数据，不是执行指令。
 
 每个段必须引用生成器实际看到的完整行区间；区间绑定 pin 和内容哈希，再经过路径/符号
-检查及 prose advisory judge。失败段不写入，推断明确标出。非规则知识写 owner 的
+检查。提示中的源码、文档和既有知识采用 JSON 行数组，保留原行号；避免 CLI 附件读取器把
+100KB 的转义字符串作为一整行截断，实际提供的证据内容与字节额度不减少。
+每段随后经过 prose advisory judge。仅 pass 段写入知识页；fail 剔除，unsure/unjudged 的
+草稿保留在本地模型 trace，verdict 与待复核维度保留在阶段记录，不阻塞已通过段的发布。
+推断明确标出。非规则知识写 owner 的
 architecture 页并更新最近索引，已有正文保留。阶段不切换生命周期，不把 PR 原始材料
 存成架构或故事页。源文件/文档读取均有限额，报告缺少的维度、未读取文件与预算中断。
+聚合入口路由对应的 owner 会同时读取其 `components/<owner>/` 已有页面；语义页优先于大量源码接口目录。
 
 覆盖报告逐 owner、逐维度记录，有引证段只说明存在该维度知识，不证明所有行为或源码
 都已检查。无 required 覆盖清单的旧 init 链允许缺省 knowledge；一旦该阶段开始，后续阶段须等待它完成并合并。
@@ -476,6 +483,23 @@ architecture 页并更新最近索引，已有正文保留。阶段不切换生�
 文档，以及第一方生产文件的 roots/exclude/suffixes/filenames（包含 Dockerfile、Dockerfile.*、Makefile 与 gradlew 这类构建代码；第一方维护的类型声明也计入）。功能目标为清单的 100%，core 目标默认
 85%；两者都是独立的、不按 PR 热度加权的知识指标。清单需要随产品能力变化复核，不把
 “所有已路由 owner”当成完整功能目录。无此清单的旧仓库只报告 owner/facet，不能声称达标。
+存在清单时，owner 语义提炼也使用其完整生产文件 inventory，而非旧 init 的语言和源码根子集。
+旧路由未覆盖的文件可由清单的显式 feature owner 接管；只有唯一 owner 才补齐本次提炼输入，
+冲突或没有归属的文件继续单列为 unrouted，不改写持久路由。
+
+`--from-existing` 只适用于 knowledge：没有本地 skeleton/modules record 时，显式从已合并的仓库
+索引和 owner 路由开始增补；每个路由页须存在且属于本仓库。已有 record 的 review/merge 门禁保持生效。
+不创建或伪造前置阶段记录，输入摘要绑定该模式和 main 的固定 SHA。
+
+`--subscription-generator` 显式允许已认证并声明 subscription billing 的生成器不请求 API 花费阈值；
+目前只接受 Zcode 已知的 OAuth coding-plan provider，自定义 API provider 仍被拒绝。
+检查通过的 transport 绑定下一次调用，Zcode 在同一 transport 内固定 provider ID，避免
+宿主设置在记账检查和派发之间变化后把无预留调用发到 API provider。
+此模式不需要模型单价表，生成器的 USD 留为 unreported，订阅费用不纳入阶段 USD accounting；
+token、served model 和调用结果照常记录，judge 的固定记账与预算门禁继续执行。
+默认模式仍要求支持 spend stop 的传输及完整价格预留，绝不自动切换订阅模式或模型。
+单个 owner 或 feature 的生成器不可用、JSON/schema 失败仅将该项记为 unfinished，继续处理
+其余组件并保留已通过检查的草稿；未生成的维度保持 missing，不能增加覆盖。
 
 `knowledge_coverage.audit_coverage` 从固定版本的完整生产文件清单建立分母；解析失败的
 代码仍在分母中，测试、依赖、构建产物与无实现的包标记按显式规则排除。只计有相邻解释

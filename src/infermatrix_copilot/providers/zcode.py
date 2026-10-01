@@ -60,6 +60,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from functools import cached_property
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
@@ -129,6 +130,19 @@ class ZCodeTransport(HarnessTransport):
 
     spec = PROVIDERS["zcode"]
 
+    @cached_property
+    def _selected_provider_id(self) -> str:
+        return (str(getattr(self.settings, "zcode_provider_id", "") or "")
+                or self._host_provider_id() or _DEFAULT_PROVIDER_ID)
+
+    @property
+    def subscription_billing(self) -> bool:
+        """Known OAuth coding plan only; custom API providers still need caps.
+
+        Billing mode is not a measured zero-dollar call cost.
+        """
+        return self._selected_provider_id == _DEFAULT_PROVIDER_ID
+
     def auth_gap(self) -> str | None:
         """zcode has no login-status command; the OAuth login writes
         ``~/.zcode/v2/credentials.json``, so its absence is the cheap signal.
@@ -147,13 +161,30 @@ class ZCodeTransport(HarnessTransport):
         package_root = Path(__file__).resolve().parents[2]
         config = session / ".zcode" / "config.json"
         config.parent.mkdir()
-        config.write_text(json.dumps({"mcp": {"servers": {_BRIDGE_SERVER: {
+        config.write_text(json.dumps({"features": {"memory": False}, "memory": {"use": False},
+                                     "mcp": {"servers": {_BRIDGE_SERVER: {
             "type": "stdio",
             "command": sys.executable,
             "args": ["-m", "infermatrix_copilot.tool_bridge",
                      "--spec", str(spec_path)],
             "env": {"PYTHONPATH": str(package_root)},
         }}}}, indent=2), encoding="utf-8")
+
+    @staticmethod
+    def _write_oneshot_config(session: Path) -> None:
+        """Disable implicit memory, plugins and MCP in structured calls.
+
+        Oversized prompts need native Read for their attachment. That must
+        never also load personal memory outside the declared evidence roots.
+        """
+        config = session / ".zcode" / "config.json"
+        config.parent.mkdir()
+        storage = session / "storage"
+        config.write_text(json.dumps({
+            "features": {"memory": False, "skill": False, "subagent": False, "mcp": False},
+            "memory": {"use": False}, "plugins": {"enabled": False},
+            "storage": {"dir": str(storage), "sessionDbPath": str(storage / "db.sqlite")},
+        }), encoding="utf-8")
 
     @staticmethod
     def _zcode_home() -> Path:
@@ -206,12 +237,10 @@ class ZCodeTransport(HarnessTransport):
         level = str(getattr(self.settings, "zcode_reasoning_level", "") or "max")
         if level not in _REASONING_LEVELS:
             raise ValueError(f"zcode_reasoning_level must be one of {_REASONING_LEVELS}, got {level!r}")
-        provider = (str(getattr(self.settings, "zcode_provider_id", "") or "")
-                    or self._host_provider_id() or _DEFAULT_PROVIDER_ID)
         config = {
             "providerConfigRules": {"providerRules": []},
             "modelConfigRules": {"providerModelRules": [], "manualProviderModelRules": []},
-            "defaultModelSelection": {"providerId": provider, "modelId": self.canonical_model_id(model),
+            "defaultModelSelection": {"providerId": self._selected_provider_id, "modelId": self.canonical_model_id(model),
                                       "options": {"reasoningLevel": level}},
         }
         path = session / _PERSONAL_CONFIG_NAME
@@ -430,6 +459,7 @@ class ZCodeTransport(HarnessTransport):
         (the input here can be untrusted text) fails the call."""
         session = Path(tempfile.mkdtemp(prefix="imc-zcode-oneshot-"))
         try:
+            self._write_oneshot_config(session)
             events, timed_out = self._run(
                 flatten_messages(system, messages), session=session,
                 timeout_s=self.settings.strict_backend_timeout_s,

@@ -42,3 +42,4 @@ sources: []
 - [common-core 源码接口与集成边界 03](source-contracts-03.md)
 - [common-core 源码接口与集成边界 04](source-contracts-04.md)
 - [外部 Claude 与 Codex CLI 智能体功能知识](feature-external-cli-agents.md)
+- [公共契约：配置缓存、ACP 设置与最终消息](knowledge.md) — 说明接口、配置与集成边界，关联源码和维护者文档。

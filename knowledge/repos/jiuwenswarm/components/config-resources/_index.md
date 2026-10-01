@@ -42,3 +42,4 @@ sources: []
 - [skill-omni-creation-scripts](skill-omni-creation-scripts/_index.md)
 - [swarmskill-creator-scripts](swarmskill-creator-scripts/_index.md)
 - [xlsx-scripts](xlsx-scripts/_index.md)
+- [内置日报技能：采集、报告接口与模型配置](knowledge-config-resources.md) — 说明接口、配置与集成边界，关联源码和维护者文档。
