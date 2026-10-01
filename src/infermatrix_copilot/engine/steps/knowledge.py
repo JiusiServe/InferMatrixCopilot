@@ -177,8 +177,13 @@ async def init_stage(ctx: StepContext) -> StepResult:
         lifecycle = rt.registry.get(repo)
         if lifecycle is None:
             return StepResult(False, FailureKind.BLOCKED, f"no adapter declares knowledge repo {repo!r}")
-        record = run_stage(rt, lifecycle, stage, dry_run=dry_run, pin=pin)
-    except (InitError, NotImplementedError) as exc:
+        count = ctx.params.get("pr_count")
+        kwargs = {"pr_count": int(count)} if count not in (None, "") else {}
+        ceiling = ctx.params.get("budget_usd")
+        if ceiling not in (None, ""):
+            kwargs["budget_usd"] = float(ceiling)
+        record = run_stage(rt, lifecycle, stage, dry_run=dry_run, pin=pin, **kwargs)
+    except (InitError, NotImplementedError, ValueError) as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
     updates = {"kb_init_stage": stage, "kb_init_status": record.status, "kb_init_pr": dict(record.pr)}
     if record.status == "blocked":

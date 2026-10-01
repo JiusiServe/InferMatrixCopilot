@@ -106,7 +106,7 @@ class ModelGateway:
 
     def call_json(self, role: ModelRole, *, system: str, prompt: str,
                   validate: Callable[[dict], None] | None = None,
-                  max_budget_usd: float | None = None) -> ModelReply:
+                  max_budget_usd: float | None = None, record_payload: bool = True) -> ModelReply:
         """``max_budget_usd`` is a per-call STOP THRESHOLD, not a hard cap:
         the transport starts no further API request once the call's spend
         reaches it, but the request that crosses it is billed in full. A
@@ -133,8 +133,10 @@ class ModelGateway:
             if self._recorder is not None:
                 self._recorder({**identity, "served_model": "", "stop_reason": "", "usage": {},
                                 "cost_usd": None, "max_budget_usd": max_budget_usd,
-                                "seconds": round(time.time() - started, 3), "system": system,
-                                "prompt": prompt, "reply": "", "error": str(exc)[:2000]})
+                                "seconds": round(time.time() - started, 3),
+                                "system": system if record_payload else "",
+                                "prompt": prompt if record_payload else "", "reply": "",
+                                "error": str(exc)[:2000] if record_payload else "transport failed (payload omitted)"})
             raise ModelUnavailable(f"{role.label()} failed: {exc}") from exc
         seconds = time.time() - started
         text = "".join(getattr(block, "text", "") or "" for block in getattr(reply, "blocks", []))
@@ -146,7 +148,8 @@ class ModelGateway:
             "served_model": getattr(reply, "model", "") or "",
             "stop_reason": getattr(reply, "stop_reason", ""),
             "usage": usage, "cost_usd": cost_usd, "max_budget_usd": max_budget_usd,
-            "seconds": round(seconds, 3), "system": system, "prompt": prompt, "reply": text,
+            "seconds": round(seconds, 3), "system": system if record_payload else "",
+            "prompt": prompt if record_payload else "", "reply": text if record_payload else "",
         }
         # the record carries the call's FINAL verdict: a truncated, empty,
         # unparseable or schema-failing reply is recorded as a failure, so it

@@ -132,7 +132,8 @@ def validate_change(base: Mapping[str, str], head: Mapping[str, str], *, observe
 
 # -- stage entry -------------------------------------------------------------------
 
-def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str | None = None) -> InitRecord:
+def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str | None = None,
+              pr_count: int | None = None, budget_usd: float | None = None) -> InitRecord:
     """Run one ``kb init`` stage for ``lifecycle``'s repository and return its
     record (also saved under ``<state_dir>/init/<repo>/<stage>.json``)."""
     if stage not in STAGES:
@@ -142,6 +143,19 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
         raise InitError(f"{lifecycle.repo}: the adapter has no knowledge_lifecycle.init block")
     if not lifecycle.full_name:
         raise InitError(f"{lifecycle.repo}: the adapter names no upstream repository")
+    if pr_count is not None:
+        from dataclasses import replace
+
+        if stage != "pr-history" or isinstance(pr_count, bool) or not isinstance(pr_count, int) or pr_count < 1:
+            raise InitError("--pr-count is a positive integer for the pr-history stage only")
+        lifecycle = replace(lifecycle, init=replace(lifecycle.init, pr_history_count=pr_count))
+    if budget_usd is not None:
+        import math
+        from dataclasses import replace
+
+        if stage != "pr-history" or isinstance(budget_usd, bool) or not math.isfinite(budget_usd) or budget_usd <= 0:
+            raise InitError("--budget-usd is a finite positive ceiling for the pr-history stage only")
+        lifecycle = replace(lifecycle, init=replace(lifecycle.init, budget_usd=budget_usd))
     notes = []
     if lifecycle.upstream_visibility == "private" and not dry_run:
         dry_run = True
@@ -172,6 +186,10 @@ def _stage_class(stage: str) -> type:
         from .init_deepen import _Deepen
 
         return _Deepen
+    if stage == "pr-history":
+        from .init_history import _PrHistory
+
+        return _PrHistory
     if stage == "harvest-calibration":
         from .init_harvest import _Harvest
 
@@ -366,7 +384,7 @@ class _Stage:
         rt, lc, stage = self.rt, self.lifecycle, self.STAGE
         init = lc.init
         self.repo_dir = lc.knowledge_dir
-        base_sha = rt.knowledge.fetch()
+        base_sha = self._base_for_run(rt.knowledge.fetch())
         self._base_sha = base_sha
         main = rt.knowledge.knowledge_files(base_sha)
         chain = self._chain()
@@ -378,9 +396,9 @@ class _Stage:
         upstream = rt.upstream(lc.repo, lc.full_name)
         upstream.sync()
         pin = upstream.resolve(self.pin or chain.pin or "HEAD")
-        digest = inputs_digest(stage=stage, repo=lc.repo, pin=pin, kb=base_sha, init=repr(init),
-                               generator=rt.generator.label(), judge=rt.judge.label(), dry_run=self.dry_run,
-                               chain=chain.key)
+        digest = inputs_digest(stage=stage, repo=lc.repo, pin=pin, kb=base_sha, init=self._init_identity(),
+                               generator=rt.generator.label(), judge=rt.judge.label(), dry_run=self._mode_identity(),
+                               chain=chain.key, **self._input_options())
         record_path = InitRecord.path(rt.state_dir, lc.repo, stage)
         previous = InitRecord.load(rt.state_dir, lc.repo, stage)
         if previous is not None and previous.pr.get("prepared") and previous.status in ("publishing", "blocked"):
@@ -388,9 +406,17 @@ class _Stage:
             if self.dry_run:
                 raise InitError("a publication of this stage is pending (pushed, PR not confirmed); re-run "
                                 f"without --dry-run to finish it, or remove {record_path} to start over")
+            if chain.problems:
+                self.record = previous
+                return self._blocked(chain.problems)
+            problems = self._resume_input_problems(previous, digest)
+            if problems:
+                self.record = previous
+                return self._blocked(problems)
             return self._resume(previous)
         if previous is not None and previous.inputs_digest == digest and not adapter_missing_problem \
-                and previous.status in ("dry_run", "published", "empty"):
+                and not chain.problems and previous.status in ("dry_run", "published", "empty") \
+                and (previous.dry_run == self.dry_run or previous.status == "published"):
             return previous
         if previous is not None and previous.pr.get("number") and previous.inputs_digest != digest:
             raise InitError(f"a published {stage} record exists (PR #{previous.pr['number']}); remove "
@@ -402,7 +428,7 @@ class _Stage:
             self.record.notes.append(f"pinned at {pin[:12]}, not at the earlier stages' {chain.pin[:12]}")
         self.budget = Budget(init.budget_usd)
         self.base = {**main, **chain.knowledge}
-        problems = chain.problems + self._precheck()
+        problems = chain.problems + self._restore_progress(previous) + self._precheck()
         if adapter_missing_problem:
             problems.append(adapter_missing_problem)
         if problems:
@@ -437,6 +463,14 @@ class _Stage:
         publisher = None
         for stage in STAGES[:STAGES.index(self.STAGE)]:
             record = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, stage)
+            if stage == "pr-history" and record is None:
+                # Existing three-stage init runs remain harvestable. Once the
+                # history phase starts, it must finish and merge like any stage.
+                continue
+            if stage == "pr-history" and record is not None:
+                # Starting history invalidates a harvest cached before this
+                # prerequisite existed, including when history is blocked.
+                parts.append(f"pr-history:status:{record.status}:{record.inputs_digest}")
             if record is None:
                 chain.problems.append(f"run the {stage} stage first")
                 continue
@@ -481,6 +515,28 @@ class _Stage:
 
     def _precheck(self) -> list[str]:
         """Stage-specific problems found before any work (none by default)."""
+        return []
+
+    def _restore_progress(self, previous: InitRecord | None) -> list[str]:
+        """Stages with incremental work may restore their checkpoint here."""
+        return []
+
+    def _input_options(self) -> dict:
+        return {}
+
+    def _init_identity(self) -> str:
+        # The new window is irrelevant to old stages. Preserve their existing
+        # record digests across this additive configuration change.
+        init = self.lifecycle.init
+        return repr(init).replace(f", pr_history_count={init.pr_history_count}", "")
+
+    def _mode_identity(self) -> bool:
+        return self.dry_run
+
+    def _base_for_run(self, latest: str) -> str:
+        return latest
+
+    def _resume_input_problems(self, previous: InitRecord, digest: str) -> list[str]:
         return []
 
     def _blocked(self, problems: list[str]) -> InitRecord:
@@ -719,7 +775,8 @@ class _Stage:
                         prompt=_fence(payload), validate=validate).data
 
     def _id_source(self):
-        taken = set(all_rule_ids(self.base)) | all_tombstoned_ids(self.base)
+        taken = set(all_rule_ids(self.head)) | all_tombstoned_ids(self.head) | set(self.record.verdicts)
+        taken.update(d.get("rule_id", "") for d in self.record.dropped)
         prefixes = Counter(m.group(1) for rid in all_rule_ids(self.existing)
                            for m in [_ID_PREFIX.match(rid)] if m)
         if prefixes:
@@ -791,7 +848,7 @@ class _Stage:
                         "kind": "upstream_text", "text": excerpt})
         return out
 
-    def _screen(self, candidates: list[_Candidate]) -> list[_Candidate]:
+    def _screen(self, candidates: list[_Candidate], *, advisory: bool = True) -> list[_Candidate]:
         """D5, evidence, pinned claims and placement for each candidate, then
         the advisory judge. Placement runs before judging and against a
         running tree, so a page that fills up sends the next rules to a sibling
@@ -822,7 +879,9 @@ class _Stage:
             text_sha = hashlib.sha256(candidate.section.encode("utf-8")).hexdigest()
             block = Block("rule", candidate.page, candidate.rule_id, "add", text_sha)
             label, reasons, model = "unjudged", {"budget": "the judge budget ran out"}, ""
-            if not self._judge_stopped:
+            if not advisory:
+                reasons = {"review": "awaiting the aggregate PR review"}
+            if advisory and not self._judge_stopped:
                 try:
                     verdict = judge(self.rt, self.budget, self.lifecycle.init, block, base=self.base,
                                     head=running, evidence=self._judge_evidence(entries))
@@ -1565,8 +1624,11 @@ def render_pr_body(record: InitRecord, lifecycle) -> str:
         f"- Knowledge base: `{record.kb_base_sha}`",
         f"- Model spend (accounted): ${record.spent_usd:.2f}",
         "",
-        "Human-merged. Rules were screened by the docs redundancy filter, checked at the pin, "
-        "and given an advisory verdict; `fail` rules are already removed.",
+        ("Human-merged. Rules were screened by the docs redundancy filter and checked at the pin; "
+         "the complete PR receives one aggregate Codex review before leaving draft state."
+         if record.stage == "pr-history" else
+         "Human-merged. Rules were screened by the docs redundancy filter, checked at the pin, "
+         "and given an advisory verdict; `fail` rules are already removed."),
         "",
     ]
     if record.verdicts:
@@ -1593,4 +1655,3 @@ def render_pr_body(record: InitRecord, lifecycle) -> str:
     if record.notes:
         lines += ["Notes:", ""] + [f"- {note}" for note in record.notes] + [""]
     return "\n".join(lines)
-

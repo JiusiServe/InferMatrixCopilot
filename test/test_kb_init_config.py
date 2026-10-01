@@ -41,6 +41,7 @@ def test_empty_init_gets_defaults(tmp_path):
     assert init.doc_globs == DEFAULT_DOC_GLOBS
     assert (init.module_depth, init.min_module_loc) == (2, 300)
     assert (init.pr_window_count, init.pr_window_max_age_days) == (200, 180)
+    assert init.pr_history_count == 1000
     assert (init.coverage_target, init.budget_usd, init.judge_call_usd) == (0.85, 30.0, 0.50)
     assert (init.generator_call_usd, init.harness_overhead_bytes) == (2.0, 200_000)
     assert init.seeds == init.source_roots == init.exclude == ()
@@ -55,6 +56,7 @@ def test_full_init_parses(tmp_path):
         "module_depth": 3,
         "min_module_loc": 0,
         "pr_window": {"count": 50, "max_age_days": 30},
+        "pr_history_count": 1200,
         "coverage_target": 1,
         "budget_usd": 5,
         "judge_call_usd": 0,
@@ -67,6 +69,7 @@ def test_full_init_parses(tmp_path):
     assert init.exclude == ("*/tests/*",)
     assert (init.module_depth, init.min_module_loc) == (3, 0)
     assert (init.pr_window_count, init.pr_window_max_age_days) == (50, 30)
+    assert init.pr_history_count == 1200
     assert (init.coverage_target, init.budget_usd, init.judge_call_usd) == (1.0, 5.0, 0.0)
     assert (init.generator_call_usd, init.harness_overhead_bytes) == (0.25, 0)
 
@@ -101,6 +104,9 @@ def test_source_roots_default_to_ut_coverage(tmp_path):
     ({"min_module_loc": 1.5}, "min_module_loc must be an integer"),
     ({"pr_window": {"count": 0}}, "pr_window.count"),
     ({"pr_window": {"max_age_days": 0}}, "pr_window.max_age_days"),
+    ({"pr_history_count": 0}, "pr_history_count"),
+    ({"pr_history_count": True}, "pr_history_count"),
+    ({"pr_history_count": 1.5}, "pr_history_count"),
     ({"coverage_target": 0}, "coverage_target must be in"),
     ({"coverage_target": 1.01}, "coverage_target must be in"),
     ({"coverage_target": "high"}, "coverage_target must be a finite number"),

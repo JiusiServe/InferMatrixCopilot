@@ -527,3 +527,50 @@ Direct 的产品就是内嵌地图：知识侧 `_routes.yaml` 路由到的每个
   用生产提取器逐页检查，缺页或 `unavailable` 即 blocked 并点名页面；本次写入或改动的页面被服务端截断（`truncated`，CI 拒绝新增的截断）也 blocked。manifest 路由的仓库没有 routes 文件、
   不检查（Direct 的 manifest 回退对其页面报 `read_required`）。
 测试：`test_kb_init_quick_maps.py`。
+
+## 2026-10-01 历史 PR 学习阶段（pr-history）
+
+阶段顺序：skeleton → modules → deepen → pr-history → harvest-calibration。
+`InitConfig.pr_history_count` 为正整数，缺省 1000；CLI `--pr-count N` 可覆盖。
+历史模块按当前 pin 的提交时间选最近已合并上游 PR，按合并时间从旧到新重放。
+GitHub REST closed-pull 分页排除未合并与 pin 时间之后的 PR，以 update/merge 边界证明窗口完整；
+不受 Search 的 1000 条限制，扫描上限仍不足以证明完整则阻塞。非 pin 祖先的 merge 明确跳过。
+PR body、完整 diff、reviews、inline 回复关系与 issue 回复只在内存中暂存；文件和讨论分页，
+完整 diff 独立读取以避免文件 patch 截断；超出 500KB 或文件列表不完整即拒绝提炼。
+
+每 PR 一次 `ModelGateway` 生成调用，使用配置的 `KB_GENERATOR`，沿用价格/花费阈值检查；
+raw payload 不写 trace，保留模型身份、耗时、用量和成本。模型输出 trigger/must/forbid/acceptance、
+最近 owner 与当前源码行范围。只有当前源码支持的可执行规则可追加到 owner rule page；
+同义合并交给提炼与整 PR 审阅，完全相同的正文只在同一 owner 的规则页/拆分页内确定性去重；
+独立 owner 可保留相同合同。模型路由从 `_routes.yaml.models` 的现有 rule pages 读取，按名字和
+当前源码路径提供 `model:<name>` owner；单模型合同不得落到组件页，具体变体不继承短模型名。
+维护必要索引和快速入口。
+每个非空升级通过 pin claims、L1、知识树与 wiki 校验后形成一个 commit 计划；无升级的 PR 不造空 commit。
+本阶段不逐规则调用 advisory judge，现有阶段仍使用原 judge；最终整 PR 审阅单独记录，不冒充逐条评分。
+
+`InitRecord.history` 保存不可变窗口、已完成 PR、pending 提炼结果及逐 PR commit delta；
+每次预留费用在派发前写 checkpoint，进程中断把未知费用按整次 reservation 计入；
+重跑不重复已完成 PR，完整提炼结果可复用。`--budget-usd N` 提高累计预算继续同一窗口，
+不重置既有花费；首次启动时固定 knowledge base，后续 main 合并不改变同一批次的 baseline；
+pin/window/backend 或目标仓库变化阻塞并保留 checkpoint（包括已准备发布的重试），
+换 baseline 需新的 state directory。旧阶段的 inputs digest
+保持兼容，新增 history 配置不影响其缓存。旧三阶段 init 没有 history record 时仍可 harvest；
+一旦 history 开始，harvest 要等它完成并合并。已完成旧 init 也可单独添加此阶段。
+
+已合并依赖、base、pin 与 backend 均相同时，history dry run 可提升为实际发布而不重复提炼；
+提交作者变化会产生新 head，因此再次完整审阅该 head。去重保留源码 token 的大小写和内部空白。
+history 的存在/状态加入后续 harvest 的 cache identity，chain 阻塞时缓存不能越过依赖检查。
+
+`InitPublisher.build_series` 用 scratch index 在固定 base 上按顺序建非空 commit，作者/日期确定，
+不 checkout 主人的工作树。出版前 journal 固定整个串；push 后 create 失败可重建同一 head 并复用分支/PR。
+只开一个 draft PR。`KB_INIT_REVIEWER=codex:model[:effort]`（缺省 `DEFAULT_JUDGE`）经同一 gateway
+审阅完整 base..head diff、逐 PR 来源和当前 pin 的源码证据；provider 必须为 codex，无 fallback。
+完整 packet 还包含升级页所在 owner 的原有 rule pages 和组件/模型路由，以检查与未改规则的重复、冲突。
+PR 描述只展示前 20 个升级及总数，完整来源留在 commit trailers/本地 checkpoint；描述限制 60KB，
+避免默认 1000 条历史超过 GitHub body 限制。旧 journal 仅重建超长描述，不改已推 head。
+完整审阅上下文超过 1MB 阻塞，禁止截断冒充全量；按 judge_call_usd 约定费用预留。
+`InitRecord.review` 钉住 base、head、diff SHA256、请求/实际模型、verdict、findings 与 summary。
+只有该身份的 approve 可复用；发布 review summary 后重新核对远程 OPEN/head，才 `gh pr ready`。
+模型失败、findings 或远程 head 变化均保持阻塞；人仍负责合并。
+dry run 为旧快照建本地临时 baseline，再生成相同升级串与全量 Codex 审阅，落盘预览和 `COMMITS.json`，不写 GitHub。
+全程不打开服务账本。测试：`test_kb_init_history.py`、`test_kb_init_config.py`、`test_imkbinit_skill.py`。

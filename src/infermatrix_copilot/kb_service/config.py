@@ -29,7 +29,7 @@ _KEYS = {
 _INIT_KEYS = {
     "seeds", "doc_globs", "source_roots", "exclude", "module_depth", "min_module_loc",
     "pr_window", "coverage_target", "budget_usd", "judge_call_usd",
-    "generator_call_usd", "harness_overhead_bytes",
+    "generator_call_usd", "harness_overhead_bytes", "pr_history_count",
 }
 # README* + docs/**/*.md is what profiles/establish.build_doc_corpus reads;
 # the contribution and agent guides carry most cross-doc invariants.
@@ -66,6 +66,7 @@ class InitConfig:
     min_module_loc: int = 300
     pr_window_count: int = 200
     pr_window_max_age_days: int = 180
+    pr_history_count: int = 1000
     coverage_target: float = 0.85
     budget_usd: float = 30.0
     judge_call_usd: float = 0.50
@@ -195,6 +196,7 @@ def parse_init(section: object, where: str, *, repo: str, manifest: dict) -> Ini
         pr_window_count=_int(window.get("count", 200), f"{where}.pr_window.count", minimum=1),
         pr_window_max_age_days=_int(window.get("max_age_days", 180),
                                     f"{where}.pr_window.max_age_days", minimum=1),
+        pr_history_count=_int(data.get("pr_history_count", 1000), f"{where}.pr_history_count", minimum=1),
         coverage_target=coverage,
         budget_usd=budget,
         judge_call_usd=judge_call,
