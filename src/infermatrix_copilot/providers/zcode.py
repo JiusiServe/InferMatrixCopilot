@@ -30,12 +30,22 @@ Governance (disclosed, per doc/features/provider-registry.md):
   (measured live: ``mcp__infermatrix-tools__read_file`` called, bridge
   trace recorded), so scoped reads still pass ``tools.dispatch``.
 
-Model selection: zcode has NO per-run model flag (``--model`` does not
-exist; ``ZCODE_PERSONAL_PROVIDER_CONFIG_FILE`` was measured not to change the
-served model). It serves the host's configured default (``/model`` in the
-zcode TUI). ``STRICT_BACKEND_MODEL`` is therefore an ASSERTION here, checked
-against the served ``modelId`` under ``MODEL_MISMATCH_POLICY`` — a mislabeled
-arm is the failure this campaign has already paid for three times.
+Model selection: zcode has no ``--model`` flag; a session takes the
+*configured default* of its personal provider config, and only when that
+entry is *selectable* — the CLI (0.16.9, ``resolveInitialModelSelection``)
+requires ``options.reasoningLevel`` on the entry and otherwise falls back to
+the first catalog model without a word (which is why an entry written by
+hand without a level "did nothing"). The transport therefore pins the model
+PER RUN: it writes a minimal personal provider config into the session
+scratch dir — only ``defaultModelSelection`` (the host's provider id, the
+requested model in the catalog's casing, ``zcode_reasoning_level``) on empty
+rule sets, never the host's provider rules, which may carry API keys and
+would otherwise sit inside a read root of the session — and points the
+subprocess at it through ``ZCODE_PERSONAL_PROVIDER_CONFIG_FILE``; the host's
+file is never touched.
+``STRICT_BACKEND_MODEL`` / the request's model is still ASSERTED against the
+served ``modelId`` under ``MODEL_MISMATCH_POLICY`` — a mislabeled arm is the
+failure this campaign has already paid for three times.
 
 Env is the shared allowlist (`base.sanitized_env`); zcode keeps its Z.AI
 OAuth login under HOME (``~/.zcode/v2``)."""
@@ -88,6 +98,22 @@ _READ_TOOLS = frozenset({
 # Env the zcode subprocess keeps on top of `sanitized_env()`: the data dir
 # `auth_gap` checks must be the one the run logs in with.
 _ZCODE_ENV_KEEP = ("ZCODE_DATA_BASE_DIR",)
+# The personal provider config the CLI reads its configured default model
+# from (see the module docstring): written per run into the session dir.
+_PERSONAL_CONFIG_ENV = "ZCODE_PERSONAL_PROVIDER_CONFIG_FILE"
+_PERSONAL_CONFIG_NAME = "provider_config.json"
+# The Z.AI coding-plan provider the OAuth login provisions; the host's own
+# personal config names it when one exists, settings can override it.
+_DEFAULT_PROVIDER_ID = "account:bigmodel-individual-coding-plan"
+_REASONING_LEVELS = ("low", "high", "max")
+# Model ids as zcode 0.16.9 spells them (its own catalog list): the CLI
+# selects a configured model by case-sensitive equality.
+_KNOWN_MODEL_IDS = (
+    "GLM-5.3", "GLM-5.3-Flash", "GLM-5V-Turbo", "GLM-5.2", "GLM-5.1", "GLM-5.1-Highspeed",
+    "GLM-5", "GLM-5-Turbo", "GLM-4.7", "GLM-4.7-FlashX", "GLM-4.7-Flash", "GLM-4.6",
+    "GLM-4.5-Air", "GLM-4.5", "GLM-4.6V", "GLM-4.6V-Flash",
+)
+_KNOWN_ID = re.compile(r'"(GLM-[A-Za-z0-9.\-]+)"')
 
 # Input keys under which zcode's native tools name a filesystem path.
 _PATH_KEYS = ("file_path", "path", "notebook_path")
@@ -129,12 +155,76 @@ class ZCodeTransport(HarnessTransport):
             "env": {"PYTHONPATH": str(package_root)},
         }}}}, indent=2), encoding="utf-8")
 
+    @staticmethod
+    def _zcode_home() -> Path:
+        return Path(os.environ.get("ZCODE_DATA_BASE_DIR") or str(Path.home())) / ".zcode" / "v2"
+
+    def _host_provider_id(self) -> str:
+        """The provider the host's own configured default names — the one id
+        read from that file; its provider rules (which may carry API keys for
+        key-based providers) are never read into anything the session can see."""
+        host = self._zcode_home() / _PERSONAL_CONFIG_NAME
+        try:
+            data = json.loads(host.read_text(encoding="utf-8")) if host.is_file() else {}
+        except (OSError, ValueError):
+            return ""
+        current = (data.get("config") or {}).get("defaultModelSelection") if isinstance(data, dict) else None
+        return str(current.get("providerId") or "") if isinstance(current, dict) else ""
+
+    def _catalog_model_ids(self) -> list[str]:
+        """Model ids zcode knows, for canonical casing: the bundled catalog
+        under the zcode home when it is readable, plus the 0.16.9 list."""
+        ids: list[str] = []
+        root = self._zcode_home() / "runtime" / "provider"
+        try:
+            for path in sorted(root.rglob("zcode-builtin.json")):
+                ids.extend(_KNOWN_ID.findall(path.read_text(encoding="utf-8")))
+        except OSError:
+            pass
+        return [*ids, *_KNOWN_MODEL_IDS]
+
+    def canonical_model_id(self, model: str) -> str:
+        """zcode matches a configured model id case-SENSITIVELY, while our
+        model assertion is case-insensitive: a request such as
+        ``glm-5.3-flash`` must be written as the catalog spells it or the CLI
+        selects nothing and falls back. Unknown ids pass through unchanged
+        (the served-model assertion then reports the mismatch)."""
+        wanted = model.strip().casefold()
+        for known in self._catalog_model_ids():
+            if known.casefold() == wanted:
+                return known
+        return model.strip()
+
+    def _write_model_config(self, session: Path, model: str) -> Path:
+        """The session's personal provider config: ONLY a configured default
+        (provider id, canonical model id, ``zcode_reasoning_level``) on the
+        empty rule sets. Nothing from the host's file besides its provider id
+        is copied — the session dir is a read root of the zcode session, so
+        a provider rule carrying an API key must never land in it. Without
+        the level the CLI treats the entry as unselectable and falls back
+        silently — the mismatch assertion then catches it."""
+        level = str(getattr(self.settings, "zcode_reasoning_level", "") or "max")
+        if level not in _REASONING_LEVELS:
+            raise ValueError(f"zcode_reasoning_level must be one of {_REASONING_LEVELS}, got {level!r}")
+        provider = (str(getattr(self.settings, "zcode_provider_id", "") or "")
+                    or self._host_provider_id() or _DEFAULT_PROVIDER_ID)
+        config = {
+            "providerConfigRules": {"providerRules": []},
+            "modelConfigRules": {"providerModelRules": [], "manualProviderModelRules": []},
+            "defaultModelSelection": {"providerId": provider, "modelId": self.canonical_model_id(model),
+                                      "options": {"reasoningLevel": level}},
+        }
+        path = session / _PERSONAL_CONFIG_NAME
+        path.write_text(json.dumps({"schemaVersion": 1, "config": config}, indent=2), encoding="utf-8")
+        return path
+
     def _run(self, text: str, *, session: Path, timeout_s: float,
-             tool_less: bool = False) -> tuple[list[dict], bool]:
+             tool_less: bool = False, model: str = "") -> tuple[list[dict], bool]:
         """One CLI invocation → (parsed events, timed_out). A timeout kills
         the process but keeps the partial stream as salvage material.
         `tool_less` also removes the native reads unless an oversized prompt
-        needs `Read` to reach its attachment."""
+        needs `Read` to reach its attachment. `model` pins the served model
+        for this run (empty: the host's configured default)."""
         cmd = [self.require_cli()]
         disallowed = list(_DISALLOWED)
         oversized = len(text.encode("utf-8")) > _ARG_BUDGET
@@ -157,6 +247,8 @@ class ZCodeTransport(HarnessTransport):
         env = sanitized_env()
         env.update({k: os.environ[k] for k in _ZCODE_ENV_KEEP
                     if k in os.environ})
+        if model:
+            env[_PERSONAL_CONFIG_ENV] = str(self._write_model_config(session, model))
         timed_out = False
         returncode, stderr = 0, ""
         try:
@@ -297,7 +389,8 @@ class ZCodeTransport(HarnessTransport):
                           "that checkout.\n\n")
             events, timed_out = self._run(
                 f"{header}{req.system}\n\n{req.prompt}", session=session,
-                timeout_s=req.timeout_s)
+                timeout_s=req.timeout_s,
+                model=req.model or self.settings.strict_backend_model)
         finally:
             shutil.rmtree(session, ignore_errors=True)
         usage = self._usage(events)
@@ -340,7 +433,7 @@ class ZCodeTransport(HarnessTransport):
             events, timed_out = self._run(
                 flatten_messages(system, messages), session=session,
                 timeout_s=self.settings.strict_backend_timeout_s,
-                tool_less=True)
+                tool_less=True, model=model or self.settings.strict_backend_model)
         finally:
             shutil.rmtree(session, ignore_errors=True)
         violations = self._audit(self._tool_calls(events),

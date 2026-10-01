@@ -187,6 +187,12 @@ class Settings(BaseSettings):
     strict_backend_concurrency: int = 2  # concurrent harness sessions
     strict_backend_cli: str = ""         # binary path override (else PATH)
     strict_backend_timeout_s: float = 1800.0  # per-session wall-clock ceiling
+    # zcode pins the served model per run through a personal provider config
+    # written into the session dir (providers/zcode.py): the provider the
+    # entry names (empty: the host's own configured provider, else the Z.AI
+    # individual coding plan) and the reasoning level the entry must carry.
+    zcode_provider_id: str = ""
+    zcode_reasoning_level: Literal["low", "high", "max"] = "max"
 
     # Shared, human-curated knowledge base — vendored from the community docs
     # (see doc/architecture/KNOWLEDGE.md), organized as general/ (cross-repo experience) +
