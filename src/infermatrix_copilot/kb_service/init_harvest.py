@@ -57,7 +57,7 @@ from .init_support import STAGES, InitError, InitRecord
 
 CALIBRATION_DIR = "kb-calibration"
 MIN_TRUSTED_BAD = 5
-RULE_STAGES = tuple(s for s in STAGES if s != "harvest-calibration")
+RULE_STAGES = tuple(s for s in STAGES if s not in ("knowledge", "harvest-calibration"))
 MUTATIONS = ("broken_path", "shifted_range", "negated", "sibling_evidence")
 _HEADER = re.compile(r"^knowledge_lifecycle:\s*(?:#.*)?$")
 _CALIBRATION_LINE = re.compile(r"^(?P<indent>[ \t]+)calibration_set:(?P<space>[ \t]*)(?P<value>[^#\n]*?)"

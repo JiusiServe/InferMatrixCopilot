@@ -1,6 +1,6 @@
 ---
 name: imkbinit
-description: Bootstrap a repository's InferMatrixCopilot knowledge base with `kb init`, one reviewed stage at a time (skeleton, modules, deepen, pr-history, harvest-calibration). Use when the user invokes /imkbinit or $imkbinit, asks to initialise or onboard a repository's knowledge base, or wants the next kb init stage run.
+description: Bootstrap a repository's InferMatrixCopilot knowledge base with `kb init`, one reviewed stage at a time (skeleton, modules, knowledge, deepen, pr-history, harvest-calibration). Use when the user invokes /imkbinit or $imkbinit, asks to initialise or onboard a repository's knowledge base, or wants the next kb init stage run.
 ---
 
 # InferMatrix knowledge-base init
@@ -52,8 +52,8 @@ prints them, and makes no model call).
 
 ## 2. Find the next stage
 
-Stages run in this order: `skeleton` → `modules` → `deepen` → `pr-history` →
-`harvest-calibration`. The record of each stage is
+Stages run in this order: `skeleton` → `modules` → `knowledge` → `deepen` →
+`pr-history` → `harvest-calibration`. The record of each stage is
 `<state-dir>/init/<repo>/<stage>.json`, where the state dir is `--state-dir`,
 else `$KB_STATE_DIR`, else `~/.infermatrix-copilot/kb`.
 
@@ -89,6 +89,29 @@ What each stage opens:
 
 - `skeleton`: the map, the doc invariants and the seeds.
 - `modules`: one map card for every unrouted module.
+- `knowledge`: evidence-backed architecture, API contracts, configuration,
+  design tradeoffs, feature relationships and validation for each source owner.
+  It visits owners even when they already have rules, labels inferred rationale,
+  and reports missing facets and unread files. It does not change lifecycle flags.
+  Use the repository's existing README, architecture/design, API and configuration
+  docs via `init.doc_globs`, plus each feature's declared docs. Owner selection ranks
+  the complete matched document list before applying prompt limits, with repository
+  README fallback. Check documented behavior against pinned code and record mismatches
+  or unimplemented designs; link upstream detail rather than copying whole documents.
+  Older init chains without a required coverage policy may omit this stage; once started, its PR must merge
+  before later stages run. New onboarding includes it.
+  For full coverage, prepare the adapter's `knowledge-coverage.yaml`: enumerate
+  product features from source and docs, give each feature explicit production
+  entry points, and declare all first-party production roots, languages and
+  exclusions (including frontend, SDK and desktop clients when requested).
+  The targets are every inventoried feature and at least 85% of core files.
+  Verified source-contract records count as structural interface/dependency
+  knowledge; they do not prove complete behavior or test coverage. Bare links,
+  rules, routes and files offered to a model do not count. A required policy
+  blocks subsequent stages until both targets pass, including partial merged
+  drafts. It also prevents skipping knowledge and rejects results for an older
+  policy hash. Without a policy, report only owner/facet coverage and do not claim
+  feature/core completion. Save audit reports under eval or local state.
 - `deepen`: code rules for the hot modules, plus the adapter flip to
   `enabled: true, mode: shadow`.
 - `pr-history`: reads the latest 1,000 merged upstream PRs as of the upstream

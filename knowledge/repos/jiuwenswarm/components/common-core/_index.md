@@ -28,3 +28,17 @@ sources: []
 ## 专题入口
 
 - [模型目录、稳定选择与配置校验](jiuwenswarm-common-model-catalog.md) — 说明共享配置模型的稳定业务 ID、目录视图、选择 DTO、候选写入与校验；登录凭据的产生和续期由 login-auth 拥有。
+
+- [共享配置与模型目录的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
+- [模型平台与 API 配置 功能知识](feature-models.md)
+- [MCP 配置、凭据与资源 功能知识](feature-mcp.md)
+- [common-core 源码接口与集成边界 01](source-contracts-01.md)
+- [acp](acp/_index.md)
+- [client](client/_index.md)
+- [config-panel](config-panel/_index.md)
+- [common-core 源码接口与集成边界 02](source-contracts-02.md)
+- [schema](schema/_index.md)
+- [security](security/_index.md)
+- [common-core 源码接口与集成边界 03](source-contracts-03.md)
+- [common-core 源码接口与集成边界 04](source-contracts-04.md)
+- [外部 Claude 与 Codex CLI 智能体功能知识](feature-external-cli-agents.md)

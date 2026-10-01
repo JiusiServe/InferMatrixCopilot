@@ -5,7 +5,8 @@ Stages, each one human-merged PR (design §9):
 1. ``skeleton`` — the routing map (``_index.md``, ``_routes.yaml``,
    ``architecture.md``), rules for cross-doc invariants, adapted seed pages
    and links to ``general/`` seeds. (This module.)
-2. ``modules`` (``init_modules``) / 3. ``deepen`` (``init_deepen``) /
+2. ``modules`` (``init_modules``), explanatory ``knowledge`` (``init_knowledge``),
+   ``deepen`` (``init_deepen``) /
    ``harvest-calibration`` (``init_harvest``, after the deepen PR merged).
 
 This is the ONLY module that calls ``check_changeset(bootstrap=True)``
@@ -182,6 +183,10 @@ def _stage_class(stage: str) -> type:
         from .init_modules import _Modules
 
         return _Modules
+    if stage == "knowledge":
+        from .init_knowledge import _Knowledge
+
+        return _Knowledge
     if stage == "deepen":
         from .init_deepen import _Deepen
 
@@ -463,14 +468,35 @@ class _Stage:
         publisher = None
         for stage in STAGES[:STAGES.index(self.STAGE)]:
             record = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, stage)
-            if stage == "pr-history" and record is None:
-                # Existing three-stage init runs remain harvestable. Once the
-                # history phase starts, it must finish and merge like any stage.
+            if stage == "knowledge":
+                from .knowledge_coverage import load_policy, policy_path
+
+                policy_text = self.rt.knowledge.show(self._base_sha, policy_path(self.lifecycle.repo))
+                if policy_text:
+                    try:
+                        policy = load_policy(policy_text, self.repo_dir)
+                    except (ValueError, TypeError) as exc:
+                        chain.problems.append(f"knowledge coverage policy: {exc}")
+                        continue
+                    policy_digest = hashlib.sha256(policy_text.encode()).hexdigest()
+                    parts.append(f"knowledge:policy:{policy_digest}")
+                    targets = record.coverage.get("knowledge", {}).get("targets", {}) if record else {}
+                    if policy.required and (not targets.get("met") or targets.get("policy_sha256") != policy_digest):
+                        chain.problems.append("knowledge targets incomplete: run the knowledge stage first; required coverage needs a complete result for the current policy")
+                        continue
+            if stage in ("knowledge", "pr-history") and record is None:
+                # Old chains remain usable without additive stages. Once one
+                # starts, it must finish and merge like any stage.
                 continue
-            if stage == "pr-history" and record is not None:
-                # Starting history invalidates a harvest cached before this
+            if stage in ("knowledge", "pr-history") and record is not None:
+                # Starting an optional stage invalidates a result cached before this
                 # prerequisite existed, including when history is blocked.
-                parts.append(f"pr-history:status:{record.status}:{record.inputs_digest}")
+                parts.append(f"{stage}:status:{record.status}:{record.inputs_digest}")
+            if stage == "knowledge" and record is not None:
+                targets = record.coverage.get("knowledge", {}).get("targets", {})
+                if targets.get("required") and not targets.get("met"):
+                    chain.problems.append("knowledge targets incomplete: cover every feature and the required core-file percentage first")
+                    continue
             if record is None:
                 chain.problems.append(f"run the {stage} stage first")
                 continue
@@ -1594,6 +1620,27 @@ def _ratio(value) -> str:
 
 def _coverage_lines(coverage: dict) -> list[str]:
     """The coverage report of a stage (design §7) as PR-body lines."""
+    if "knowledge" in coverage:
+        knowledge = coverage["knowledge"]
+        lines = ["Knowledge coverage (evidence-backed facets; independent of routes and rules):", "",
+                 "| facet | source owners with knowledge |", "|---|---|"]
+        lines += [f"| {facet} | {count}/{knowledge['total_owners']} |"
+                  for facet, count in knowledge["covered_by_facet"].items()]
+        lines += ["", "Covered means the facet has a cited, screened section at this pin. "
+                  "It does not assert that every behavior or source file was inspected.", ""]
+        targets = knowledge.get("targets")
+        if targets:
+            core, features = targets["core"], targets["features"]
+            lines += [f"Feature coverage: {features['covered']}/{features['total']} (target 100%).",
+                      f"Core-file knowledge: {core['covered']}/{core['total']} ({core['ratio']:.1%}; target {core['target']:.0%}).",
+                      "Files count only from pinned explanatory citations or verified source-contract cards; "
+                      "rules, indexes, routing and files merely offered to a model do not count.",
+                      "Source-contract cards describe static interfaces and dependencies, not full behavioral or test coverage.",
+                      f"Targets met: {'yes' if targets['met'] else 'no'}.", ""]
+        if knowledge.get("unrouted_files"):
+            lines += ["Source files without an owner:", ""]
+            lines += [f"- `{path}`" for path in knowledge["unrouted_files"][:30]] + [""]
+        return lines
     lines = ["Coverage:", ""]
     if coverage.get("routes_source") == "manifest":
         lines += ["Routes come from the adapter manifest (`review_routes`); kb init writes no `_routes.yaml` "
@@ -1624,7 +1671,10 @@ def render_pr_body(record: InitRecord, lifecycle) -> str:
         f"- Knowledge base: `{record.kb_base_sha}`",
         f"- Model spend (accounted): ${record.spent_usd:.2f}",
         "",
-        ("Human-merged. Rules were screened by the docs redundancy filter and checked at the pin; "
+        ("Human-merged. Explanatory knowledge has pinned source references and per-facet advisory verdicts. "
+         "Design inferences are labeled; failed sections are removed and missing facets remain listed."
+         if record.stage == "knowledge" else
+         "Human-merged. Rules were screened by the docs redundancy filter and checked at the pin; "
          "the complete PR receives one aggregate Codex review before leaving draft state."
          if record.stage == "pr-history" else
          "Human-merged. Rules were screened by the docs redundancy filter, checked at the pin, "
@@ -1632,7 +1682,8 @@ def render_pr_body(record: InitRecord, lifecycle) -> str:
         "",
     ]
     if record.verdicts:
-        lines += ["| rule | page | verdict |", "|---|---|---|"]
+        lines += ["| knowledge facet | page | verdict |" if record.stage == "knowledge"
+                  else "| rule | page | verdict |", "|---|---|---|"]
         for rule_id, v in record.verdicts.items():
             if v["verdict"] != "fail":
                 lines.append(f"| {rule_id} | `{v.get('page', '')}` | {v['verdict']} |")
@@ -1643,7 +1694,8 @@ def render_pr_body(record: InitRecord, lifecycle) -> str:
                   for s in record.seeds]
         lines.append("")
     if record.dropped:
-        lines += ["<details><summary>Dropped rules</summary>", ""]
+        lines += ["<details><summary>Dropped knowledge sections</summary>" if record.stage == "knowledge"
+                  else "<details><summary>Dropped rules</summary>", ""]
         lines += [f"- {d['rule_id']}: {d['why']}" for d in record.dropped]
         lines += ["", "</details>", ""]
     if record.coverage:

@@ -47,7 +47,16 @@ knowledge_lifecycle:
       - general/ci/guides/inspect-existing-tests-first.md
     # one language only: docs/zh and docs/en carry the same pages, and reading
     # both would double the doc-corpus cost for no new facts
-    doc_globs: [README_CN.md, TESTING.md, "docs/zh/**/*.md", jiuwenbox/README_CN.md]
+    doc_globs:
+      - README_CN.md
+      - TESTING.md
+      - docs/README.md
+      - "docs/zh/**/*.md"
+      - jiuwenbox/README_CN.md
+      - jiuwenswarm/channels/web/frontend/README.md
+      - "jiuwenswarm/**/DESIGN.md"
+      - "sdks/**/README*.md"
+      - "packages/**/README*.md"
     source_roots: [jiuwenswarm/, jiuwenbox/src/jiuwenbox/]
     exclude: ["*/tests/*", "*/__init__.py", "*/resources/*", "*/node_modules/*"]
   calibration_set: kb-calibration

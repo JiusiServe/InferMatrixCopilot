@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-10-01 -->
+<!-- verified-against: 2026-10-02 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -450,6 +450,48 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   shadow），并在 head manifest 上跑 `config.parse_lifecycle`（开启、shadow、仍服务同一个知识目录）。已开启且为 shadow 时不改，
   记入 notes。测试：`test_kb_init_deepen.py`。
 
+## kb init：解释性知识（knowledge）
+
+`kb init REPO --stage knowledge --dry-run` 在 skeleton 和 modules 之后提炼解释性知识。
+`init_knowledge._Knowledge` 从固定源码与相关文档分别生成架构、API、配置、设计取舍、
+功能关系和验证六个维度。源码 owner 按最具体的路由边界确定，按改动频率排序；已有
+规则的 owner 仍参与。停止条件是 owner 用尽或预算用尽，不使用 rule-bearing 的 85% 阈值。
+
+上游已有 README、架构/设计、API 与配置文档由 adapter 的 `init.doc_globs` 选入。
+owner 文档先在完整匹配清单中按源码邻接、路径引用与主题相关度排序，再应用六文件与
+字节上限，避免 skeleton 的全局文档截断漏掉后面的专题；没有专题匹配时使用仓库 README。
+功能页另使用覆盖清单显式声明的文档。生成器须交叉核对已展示源码，注明文档与实现差异，
+设计蓝图不能直接证明功能已可运行；文档是证据数据，不是执行指令。
+
+每个段必须引用生成器实际看到的完整行区间；区间绑定 pin 和内容哈希，再经过路径/符号
+检查及 prose advisory judge。失败段不写入，推断明确标出。非规则知识写 owner 的
+architecture 页并更新最近索引，已有正文保留。阶段不切换生命周期，不把 PR 原始材料
+存成架构或故事页。源文件/文档读取均有限额，报告缺少的维度、未读取文件与预算中断。
+
+覆盖报告逐 owner、逐维度记录，有引证段只说明存在该维度知识，不证明所有行为或源码
+都已检查。无 required 覆盖清单的旧 init 链允许缺省 knowledge；一旦该阶段开始，后续阶段须等待它完成并合并。
+新接入流程包含该阶段；解释性 prose 判定不进入规则校准集，旧 rule 与 calibration 的契约保持适用。
+
+`adapters/<repo>/knowledge-coverage.yaml` 另行声明完整功能清单、每项功能的固定代码入口与
+文档，以及第一方生产文件的 roots/exclude/suffixes/filenames（包含 Dockerfile、Dockerfile.*、Makefile 与 gradlew 这类构建代码；第一方维护的类型声明也计入）。功能目标为清单的 100%，core 目标默认
+85%；两者都是独立的、不按 PR 热度加权的知识指标。清单需要随产品能力变化复核，不把
+“所有已路由 owner”当成完整功能目录。无此清单的旧仓库只报告 owner/facet，不能声称达标。
+
+`knowledge_coverage.audit_coverage` 从固定版本的完整生产文件清单建立分母；解析失败的
+代码仍在分母中，测试、依赖、构建产物与无实现的包标记按显式规则排除。只计有相邻解释
+的有效固定行引用，或源文件哈希与静态抽取正文均匹配的 `kb:file` 记录。列表、路由、规则、
+提供给生成器的文件与过期/被篡改的记录都不能增加覆盖。源码记录说明类型、入口参数与
+集成依赖，按稳定源码区域整理；它们是结构性知识，不代表全面行为分析或测试覆盖。
+
+功能条目须同时具备六维基本知识、当前 pin 的文档引用和明确的生产代码入口引证。
+预算或证据不足时可交付部分草稿，但 `targets.met` 为 false；required 清单下的后续阶段
+被 `_Stage._chain` 挡住，即使该部分草稿已合并也不能冒充完成。required 清单也不允许跳过 knowledge 阶段；阶段结果绑定清单内容哈希，清单改变后必须重新验证。source-contract 抽取不调用
+模型，不修改规则或生命周期开关；语义提炼仍使用原预算与 advisory judge。
+
+`PYTHONPATH=src python tools/audit_knowledge_coverage.py --repo REPO --upstream PATH --pin FULL_SHA`
+可独立复核；上游必须是干净的固定 HEAD。`--write-contracts` 只追加缺少的结构性记录，
+保留过期记录供人工刷新；`--report` 把逐功能/逐文件结果写入 eval 或本地临时文件。
+
 ## 2026-09-30 kb init：校准集收割（harvest-calibration）
 - 各阶段的 `InitRecord.verdicts[rule_id]` 除 verdict/reasons/model/text_sha/page 外还保存**判定时的规则全文**
   （`section`）与钉点证据（`evidence`），被判 fail 剥离或被 owner 删除的规则也能复原成用例；缺这两项的旧记录使收割
@@ -530,7 +572,7 @@ Direct 的产品就是内嵌地图：知识侧 `_routes.yaml` 路由到的每个
 
 ## 2026-10-01 历史 PR 学习阶段（pr-history）
 
-阶段顺序：skeleton → modules → deepen → pr-history → harvest-calibration。
+阶段顺序：skeleton → modules → knowledge → deepen → pr-history → harvest-calibration。
 `InitConfig.pr_history_count` 为正整数，缺省 1000；CLI `--pr-count N` 可覆盖。
 历史模块按当前 pin 的提交时间选最近已合并上游 PR，按合并时间从旧到新重放。
 GitHub REST closed-pull 分页排除未合并与 pin 时间之后的 PR，以 update/merge 边界证明窗口完整；

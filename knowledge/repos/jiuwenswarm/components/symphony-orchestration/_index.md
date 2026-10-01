@@ -44,3 +44,10 @@ sources: []
 ## 专题入口
 
 - [Symphony 服务、规划与经验候选安装](jiuwenswarm-symphony-service.md) — 说明进程内服务的构建互斥、规划 runtime、经验候选审批安装和 Skill taxonomy 适配；图谱构建与版本产物由 Symphony 主页面说明。
+
+- [Symphony 图谱与经验安装的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
+- [Symphony 检索与图谱编排 功能知识](feature-symphony.md)
+- [evolution](evolution/_index.md)
+- [symphony-orchestration 源码接口与集成边界 01](source-contracts-01.md)
+- [shared](shared/_index.md)
+- [skill-retrieval](skill-retrieval/_index.md)

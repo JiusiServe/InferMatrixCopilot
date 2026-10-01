@@ -28,3 +28,28 @@ sources: []
 ## 专题入口
 
 - [进程式 CLI 机器执行、会话租约与停机](jiuwenswarm-process-cli-machine.md) — 一次性执行的跨进程所有权、完成证据与清理边界。
+
+- [CLI 与会话结果交付的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
+- [机器执行与本地 CLI 功能知识](feature-process-cli.md)
+- [交互式命令行 功能知识](feature-cli.md)
+- [SSH 频道与远程终端 功能知识](feature-ssh.md)
+- [飞书 频道 功能知识](feature-im-feishu.md)
+- [微信 频道 功能知识](feature-im-wechat.md)
+- [企业微信 频道 功能知识](feature-im-wecom.md)
+- [钉钉 频道 功能知识](feature-im-dingtalk.md)
+- [小艺 频道 功能知识](feature-im-xiaoyi.md)
+- [Slack 频道 功能知识](feature-im-slack.md)
+- [Telegram 频道 功能知识](feature-im-telegram.md)
+- [Discord 频道 功能知识](feature-im-discord.md)
+- [WhatsApp 频道 功能知识](feature-im-whatsapp.md)
+- [channels-cli](channels-cli/_index.md)
+- [channels-process-cli](channels-process-cli/_index.md)
+- [gateway](gateway/_index.md)
+- [gateway-channel-manager](gateway-channel-manager/_index.md)
+- [gateway-cron](gateway-cron/_index.md)
+- [gateway-health-check](gateway-health-check/_index.md)
+- [gateway-heartbeat](gateway-heartbeat/_index.md)
+- [gateway-hooks](gateway-hooks/_index.md)
+- [gateway-im-pipeline](gateway-im-pipeline/_index.md)
+- [gateway-message-handler](gateway-message-handler/_index.md)
+- [gateway-routing](gateway-routing/_index.md)

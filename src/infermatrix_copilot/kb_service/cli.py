@@ -17,7 +17,8 @@
     kb init REPO --stage STAGE [--dry-run] [--pin SHA]
                                       bootstrap a repository's knowledge base, one
                                       human-merged stage at a time (skeleton, modules,
-                                      deepen, harvest-calibration); never touches kb.db
+                                      knowledge, deepen, pr-history, harvest-calibration);
+                                      never touches kb.db
     kb init REPO --suggest-seeds      rank existing knowledge pages worth seeding from (no model call)
     kb publish (--remote HOST:/STATE_DIR | --local DIR) [--once]
                                       the publisher (GPU box, owner's gh login): perform

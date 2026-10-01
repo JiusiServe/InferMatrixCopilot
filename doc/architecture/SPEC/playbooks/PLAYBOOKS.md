@@ -1,6 +1,6 @@
 # playbooks/*.yaml —— 规范
 
-<!-- verified-against: 2026-10-01 -->
+<!-- verified-against: 2026-10-02 -->
 
 `9 个文件 · 声明式编排数据 · refactor-status: ok`
 
@@ -59,7 +59,7 @@ success, steps[]`。
 知识服务的合并推进、发版巡检与快照激活；candidate 状态，由 `kb serve` 调度或 `kb run` 手动运行。
 
 ## kb-init（candidate）
-为一个仓库建知识库：单步 `knowledge.init`，每次运行一个阶段（skeleton → modules → deepen + 生命周期开关 →
+为一个仓库建知识库：单步 `knowledge.init`，每次运行一个阶段（skeleton → modules → knowledge（解释性知识）→ deepen + 生命周期开关 →
 pr-history → harvest-calibration），每阶段一个由人合并的 PR。只由 `kb init REPO --stage S` 运行，不经 `kb serve`，不写服务账本。
 `pr-history` 默认回溯 1000 个已合并上游 PR；可传 `pr_count` 和累计花费上限 `budget_usd`。
 每个非空知识升级一个 commit，汇成一个 draft PR，完整 Codex 审阅通过后才 ready。

@@ -1,7 +1,7 @@
 ---
 title: "jiuwenswarm components"
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-01
 type: index
 tags: [jiuwenswarm]
 sources: []
@@ -18,3 +18,17 @@ sources: []
 - [Agent 运行时与会话](agent-runtime/_index.md)
 - [定时任务与调度](cron-scheduling/_index.md)
 - [Symphony 编排与能力图谱](symphony-orchestration/_index.md)
+- [packaging-deploy](packaging-deploy/_index.md)
+- [tui-client](tui-client/_index.md)
+- [web-frontend](web-frontend/_index.md)
+- [agent-server-runtime](agent-server-runtime/_index.md)
+- [agents-team](agents-team/_index.md)
+- [auto-harness](auto-harness/_index.md)
+- [protocols](protocols/_index.md)
+- [a2ui](a2ui/_index.md)
+- [browser-client](browser-client/_index.md)
+- [ide-clients](ide-clients/_index.md)
+- [sdk-clients](sdk-clients/_index.md)
+- [sandbox-runtime](sandbox-runtime/_index.md)
+- [subpackages](subpackages/_index.md)
+- [config-resources](config-resources/_index.md)
