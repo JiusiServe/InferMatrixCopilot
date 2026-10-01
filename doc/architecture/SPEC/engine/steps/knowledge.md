@@ -1,6 +1,6 @@
 # engine/steps/knowledge.py —— 规范
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-01 -->
 
 `知识服务的 knowledge.* 步骤 · refactor-status: new`
 
@@ -26,3 +26,6 @@ auto_merge 仓库写 outbox 的 `open_pr` 项，shadow 只记录）。逻辑全�
 调 `init_stages.run_stage`；`InitError`/`NotImplementedError` 与状态 `blocked` 的记录都返回 BLOCKED。`state_updates`：
 `kb_init_stage`、`kb_init_status`、`kb_init_pr`。它是本模块里唯一直接写 GitHub 的步骤：经仓库主人的 `gh` 开一个由人合并的
 PR，且只在 `ALLOW_PUSH=1` 与 `ALLOW_POST=1` 同时成立、非 dry run、上游非私有时。测试：`test_kb_init_skeleton.py`。
+
+`pr-history` 阶段另接收可选 `pr_count` 与 `budget_usd`，转成整数/浮点后传入 `run_stage`；非法值返回 BLOCKED。
+历史 PR 的完整选择、逐 PR checkpoint、commit 串和 Codex 审阅均由 `kb_service.init_history` 负责。

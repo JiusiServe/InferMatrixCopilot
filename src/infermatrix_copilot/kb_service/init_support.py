@@ -41,7 +41,7 @@ from .init_budget import Budget, Price, generator_reservation, load_prices, pric
 from .models import ModelGateway, ModelReply, ModelRole
 
 INIT_DIR = "init"
-STAGES = ("skeleton", "modules", "deepen", "harvest-calibration")
+STAGES = ("skeleton", "modules", "deepen", "pr-history", "harvest-calibration")
 KNOWLEDGE_PREFIX = "knowledge/"
 ALLOW_PUSH_ENV = "ALLOW_PUSH"
 ALLOW_POST_ENV = "ALLOW_POST"
@@ -89,6 +89,8 @@ class InitRecord:
     pr: dict = field(default_factory=dict)                # {number, head_sha, branch} or {dry_run_dir}
     notes: list[str] = field(default_factory=list)
     coverage: dict = field(default_factory=dict)          # the stage's coverage report (modules, deepen)
+    history: dict = field(default_factory=dict)           # pr-history selection, checkpoints and commit plan
+    review: dict = field(default_factory=dict)            # aggregate review, bound to the exact base/head
 
     @staticmethod
     def path(state_dir: Path, repo: str, stage: str) -> Path:
@@ -311,7 +313,7 @@ def ensure_knowledge_clone(path: Path, *, repository: str | None = None) -> None
 # -- model calls ------------------------------------------------------------------
 
 def generate(rt: InitRuntime, budget: Budget, init, *, system: str, prompt: str,
-             validate: Callable[[dict], None] | None = None) -> ModelReply:
+             validate: Callable[[dict], None] | None = None, record_payload: bool = True) -> ModelReply:
     """One generator call, reserved first: threshold + one worst-case request.
     Raises ``PriceError`` (no price: nothing is dispatched), ``BudgetExhausted``
     or ``ModelUnavailable``."""
@@ -320,7 +322,8 @@ def generate(rt: InitRuntime, budget: Budget, init, *, system: str, prompt: str,
     amount = generator_reservation(price, init.generator_call_usd, input_bytes)
     with budget.reserve(amount) as reservation:
         reply = rt.gateway.call_json(rt.generator, system=system, prompt=prompt, validate=validate,
-                                     max_budget_usd=init.generator_call_usd)
+                                     max_budget_usd=init.generator_call_usd,
+                                     **({"record_payload": False} if not record_payload else {}))
         reservation.charge(reply.cost_usd)
     return reply
 
@@ -515,10 +518,12 @@ class InitPublisher:
             "GIT_COMMITTER_NAME": name, "GIT_COMMITTER_EMAIL": email, "GIT_COMMITTER_DATE": date})
 
     def open_pr(self, *, base_sha: str, branch: str, files: Mapping[str, str | None], title: str,
-                body: str, author: tuple[str, str], when: float) -> dict:
+                body: str, author: tuple[str, str], when: float,
+                commits: list[dict] | None = None, draft: bool = False) -> dict:
         """Push ``branch`` (which must be absent, or already carry exactly
         this commit) and open the PR, or reuse the open PR that has it."""
-        commit = self.build_commit(base_sha, files, title=title, author=author, when=when)
+        commit = self.build_series(base_sha, commits, author=author, when=when) if commits is not None else \
+            self.build_commit(base_sha, files, title=title, author=author, when=when)
         existing = json.loads(self._gh("pr", "list", "--repo", self.repository, "--head", branch,
                                        "--state", "open", "--json", "number,headRefOid") or "[]")
         if existing:
@@ -533,12 +538,40 @@ class InitPublisher:
         elif listed[0] != commit:
             raise InitError(f"branch {branch} already exists with other content")
         self._gh("pr", "create", "--repo", self.repository, "--base", "main", "--head", branch,
-                 "--title", title, "--body-file", "-", input=body)
+                 "--title", title, "--body-file", "-", *(["--draft"] if draft else []), input=body)
         opened = json.loads(self._gh("pr", "list", "--repo", self.repository, "--head", branch,
                                      "--state", "open", "--json", "number,headRefOid") or "[]")
         if len(opened) != 1 or opened[0].get("headRefOid") != commit:
             raise InitError(f"the PR for {branch} could not be confirmed after creation")
         return {"number": int(opened[0]["number"]), "head_sha": commit, "branch": branch}
+
+    def build_series(self, base_sha: str, commits: list[dict], *, author: tuple[str, str], when: float) -> str:
+        """One nonempty upgrade per upstream PR, in the supplied order.
+
+        Plumbing uses a scratch index and deterministic dates; it neither
+        checks out nor rewrites the owner's working tree or branch.
+        """
+        if not commits:
+            raise InitError("an upgrade series needs at least one commit")
+        head = base_sha
+        for index, item in enumerate(commits):
+            new = self.build_commit(head, item["files"], title=item["title"], author=author, when=when + index)
+            if self._git("rev-parse", f"{head}^{{tree}}") == self._git("rev-parse", f"{new}^{{tree}}"):
+                raise InitError("an upstream PR upgrade must change knowledge (empty commit refused)")
+            head = new
+        return head
+
+    def ready(self, number: int, *, head_sha: str) -> None:
+        """Only the aggregate head actually reviewed may leave draft state."""
+        data = self.pr_metadata(number)
+        if data.get("headRefOid") != head_sha or data.get("state") != "OPEN":
+            raise InitError("the PR head or state changed after the aggregate review")
+        if data.get("isDraft"):
+            self._gh("pr", "ready", str(number), "--repo", self.repository)
+
+    def pr_metadata(self, number: int) -> dict:
+        return json.loads(self._gh("pr", "view", str(number), "--repo", self.repository,
+                                   "--json", "headRefOid,state,isDraft"))
 
     def pr_state(self, number: int) -> str:
         data = json.loads(self._gh("pr", "view", str(number), "--repo", self.repository,
@@ -547,13 +580,14 @@ class InitPublisher:
 
 
 PREPARED_KEYS = ("base_sha", "branch", "files", "title", "body", "author", "when")
+PREPARED_OPTIONAL = {"commits", "draft"}
 
 
 def save_prepared(path: Path, **publication: Any) -> Path:
     """Persist a publication BEFORE it is pushed, so a retry after a partial
     failure (pushed, but the PR was not opened) rebuilds the very same commit
     instead of re-running the stage."""
-    if set(publication) != set(PREPARED_KEYS):
+    if not set(PREPARED_KEYS).issubset(publication) or set(publication) - set(PREPARED_KEYS) - PREPARED_OPTIONAL:
         raise ValueError(f"a prepared publication needs exactly {PREPARED_KEYS}")
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -569,7 +603,8 @@ def load_prepared(path: Path) -> dict:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise InitError(f"the prepared publication {path} is unreadable: {exc}") from exc
-    if not isinstance(data, dict) or set(data) != set(PREPARED_KEYS):
+    if not isinstance(data, dict) or not set(PREPARED_KEYS).issubset(data) \
+            or set(data) - set(PREPARED_KEYS) - PREPARED_OPTIONAL:
         raise InitError(f"the prepared publication {path} is malformed")
     data["author"] = tuple(data["author"])
     return data

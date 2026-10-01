@@ -133,6 +133,18 @@ def _init_command(args, state_dir: Path) -> int:
     from .runner import run_playbook
 
     params = {"stage": args.stage, "dry_run": "true" if args.dry_run else "false", "pin": args.pin or ""}
+    if args.pr_count is not None:
+        if args.stage != "pr-history" or args.pr_count < 1:
+            print("--pr-count is a positive integer for --stage pr-history only", file=sys.stderr)
+            return 2
+        params["pr_count"] = str(args.pr_count)
+    if args.budget_usd is not None:
+        import math
+
+        if args.stage != "pr-history" or not math.isfinite(args.budget_usd) or args.budget_usd <= 0:
+            print("--budget-usd is a finite positive ceiling for --stage pr-history only", file=sys.stderr)
+            return 2
+        params["budget_usd"] = str(args.budget_usd)
     outcome, run_dir = run_playbook(Settings(), "kb-init", args.repo, state_dir=state_dir, params=params)
     print(f"kb init {args.repo} {args.stage}: {outcome.status} ({run_dir})")
     return 0 if outcome.status == "done" else 1
@@ -179,7 +191,11 @@ def main(argv: list[str] | None = None) -> int:
     export.add_argument("--role", default="judge", choices=("judge", "generator"))
     init = sub.add_parser("init")
     init.add_argument("repo")
-    init.add_argument("--stage", choices=("skeleton", "modules", "deepen", "harvest-calibration"))
+    from .init_support import STAGES
+
+    init.add_argument("--stage", choices=STAGES)
+    init.add_argument("--pr-count", type=int, help="PR-history window (default: adapter pr_history_count or 1000)")
+    init.add_argument("--budget-usd", type=float, help="PR-history cumulative spend ceiling; may be raised to resume")
     init.add_argument("--dry-run", action="store_true",
                       help="write the tree and PR body under the state directory instead of opening a PR")
     init.add_argument("--pin", help="upstream commit to pin (default: the default branch head)")

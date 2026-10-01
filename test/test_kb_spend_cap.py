@@ -141,6 +141,17 @@ def test_gateway_without_a_cap_is_unchanged():
     assert reply.data == {"ok": True}
 
 
+def test_raw_intake_payload_is_omitted_but_identity_and_spend_are_recorded():
+    transport = _Transport(capped=True, text='{"lesson": "private PR evidence"}')
+    records = []
+    reply = _gateway(transport, records).call_json(
+        ROLE, system="intake policy", prompt="private PR evidence", record_payload=False, max_budget_usd=1)
+    assert reply.data == {"lesson": "private PR evidence"}
+    assert transport.calls[0]["messages"][0]["content"] == "private PR evidence"
+    assert records[-1]["requested"] == ROLE.label() and records[-1]["cost_usd"] == 0.12
+    assert records[-1]["prompt"] == records[-1]["reply"] == records[-1]["system"] == ""
+
+
 def test_gateway_treats_a_call_stopped_at_its_cap_as_unavailable():
     transport = _Transport(capped=True, text="", stop="max_budget")
     records: list = []

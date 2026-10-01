@@ -13,7 +13,9 @@
 - `imupdate`：上游变化后更新模型清单、registry、deploy、路径路由和
   source pin，避免继续按旧知识工作。
 - `imkbinit`：为新接入的仓库分阶段初始化知识库（`kb init`：骨架 → 模块 →
-  深化 → 校准集），每阶段一个 PR，由人审阅合并后再进入下一阶段。
+  深化 → 历史 PR 学习 → 校准集），每阶段一个 PR，由人审阅合并后再进入下一阶段。
+  历史 PR 学习默认回溯 1,000 个已合并上游 PR，逐 PR 提炼；每次知识升级一个 commit，
+  汇成一个 PR，再由 Codex 审阅完整改动。
 
 copilot 本身与具体仓库无关：每个仓库的知识住在自己的 adapter
 （`adapters/<repo>/`）和知识切片（`knowledge/repos/<repo>/`）里，playbook

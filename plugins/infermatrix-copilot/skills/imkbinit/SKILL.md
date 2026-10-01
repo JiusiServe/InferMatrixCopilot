@@ -1,6 +1,6 @@
 ---
 name: imkbinit
-description: Bootstrap a repository's InferMatrixCopilot knowledge base with `kb init`, one reviewed stage at a time (skeleton, modules, deepen, harvest-calibration). Use when the user invokes /imkbinit or $imkbinit, asks to initialise or onboard a repository's knowledge base, or wants the next kb init stage run.
+description: Bootstrap a repository's InferMatrixCopilot knowledge base with `kb init`, one reviewed stage at a time (skeleton, modules, deepen, pr-history, harvest-calibration). Use when the user invokes /imkbinit or $imkbinit, asks to initialise or onboard a repository's knowledge base, or wants the next kb init stage run.
 ---
 
 # InferMatrix knowledge-base init
@@ -52,7 +52,7 @@ prints them, and makes no model call).
 
 ## 2. Find the next stage
 
-Stages run in this order: `skeleton` → `modules` → `deepen` →
+Stages run in this order: `skeleton` → `modules` → `deepen` → `pr-history` →
 `harvest-calibration`. The record of each stage is
 `<state-dir>/init/<repo>/<stage>.json`, where the state dir is `--state-dir`,
 else `$KB_STATE_DIR`, else `~/.infermatrix-copilot/kb`.
@@ -91,6 +91,17 @@ What each stage opens:
 - `modules`: one map card for every unrouted module.
 - `deepen`: code rules for the hot modules, plus the adapter flip to
   `enabled: true, mode: shadow`.
+- `pr-history`: reads the latest 1,000 merged upstream PRs as of the upstream
+  pin, oldest first, with one extraction call per PR through `KB_GENERATOR`.
+  `--pr-count N` overrides `init.pr_history_count` (default 1000). Executable
+  rules go to their nearest owner; PRs yielding no upgrade are recorded and
+  make no commit. One draft PR contains one commit per accepted upstream PR.
+  Codex reviews its complete base-to-head diff and pinned source evidence;
+  only approval of that exact head makes it ready. `KB_INIT_REVIEWER` may
+  pin a Codex model/effort (`codex:model[:effort]`, default
+  `codex:gpt-6-sol:medium`); it never changes reviewer provider. A failed review leaves
+  the PR draft. Dry runs also perform the complete Codex review and write a
+  `COMMITS.json` beside the preview. Raw PR evidence is transient.
 - `harvest-calibration`: turns the merged review into
   `adapters/<adapter>/kb-calibration/cases/*.json`. It refuses to open a PR
   with fewer than five bad cases from the owner or from mutations.
@@ -100,6 +111,14 @@ flips it.
 
 If the CLI or its run report blocks the stage, report the reason and stop.
 Never work around it by hand.
+
+For `pr-history`, a blocked record is a resumable checkpoint. When the user
+requests a retry, rerun the same stage with the same pin/window/backend;
+completed PRs and prepared commits are reused. The stage accounts cumulative
+spend; `--budget-usd N` may raise its ceiling to continue after a budget stop.
+It does not publish an incomplete window. Existing init runs with no history
+record remain harvestable, and may add this phase after their earlier stages
+have merged. Once a history record exists it must finish before harvest.
 
 ## 4. Report
 
