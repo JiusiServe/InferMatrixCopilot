@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>InferMatrix · RFC 工作台</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div id="notice" class="notice" role="status" hidden></div>
+  <section id="login" class="login-page">
+    <div class="login-story">
+      <div class="wordmark"><span class="brand-mark">IM</span> InferMatrix Copilot</div>
+      <span class="eyebrow">从一个想法，到可验证的进展</span>
+      <h1>让共识成为计划。<br>让进展有据可查。</h1>
+      <p>在同一个工作台创建 RFC、连接实现工作、追踪依赖，并用证据确认验收。</p>
+      <div class="journey"><span>提出问题</span><i>→</i><span>评审方案</span><i>→</i><span>推进实现</span><i>→</i><span>验证结果</span></div>
+    </div>
+    <div class="login-card">
+      <span class="eyebrow">授权团队工作空间</span>
+      <h2>进入 RFC 工作台</h2>
+      <p class="muted">使用管理员签发给你的个人令牌登录。</p>
+      <form id="login-form">
+        <label for="login-token">个人访问令牌</label>
+        <input id="login-token" name="token" type="password" autocomplete="off" spellcheck="false" required placeholder="粘贴个人令牌">
+        <button type="submit" class="primary wide">登录工作空间 <span>→</span></button>
+        <p id="login-error" class="form-error" role="alert" hidden></p>
+      </form>
+      <p class="small muted">令牌仅用于创建会话。页面不会把令牌保存到浏览器存储。</p>
+    </div>
+  </section>
+  <div id="app" class="app-shell" hidden>
+    <aside class="sidebar">
+      <a href="#dashboard" class="wordmark"><span class="brand-mark">IM</span><span>InferMatrix<small>RFC 工作台</small></span></a>
+      <p class="sidebar-label">工作空间</p>
+      <nav aria-label="主导航">
+        <a href="#dashboard" data-nav="dashboard"><span>◫</span>进展总览</a>
+        <a href="#draft" data-nav="draft"><span>＋</span>创建 RFC</a>
+        <a href="#operations" data-nav="operations"><span>↻</span>操作记录</a>
+        <a href="#account" data-nav="account"><span>⌁</span>个人令牌</a>
+        <a href="#admin" id="admin-nav" data-nav="admin" hidden><span>◇</span>团队与权限</a>
+      </nav>
+      <div class="sidebar-bottom"><span class="live-dot"></span><span>授权访问 · 范围内协作</span></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><span id="breadcrumb">工作空间 / 进展总览</span><div class="identity"><span id="identity-name"></span><button id="logout" class="quiet" type="button">退出</button></div></header>
+      <main id="content" tabindex="-1"></main>
+      <footer>InferMatrix Copilot <span>实现状态与验收结论分别记录</span></footer>
+    </div>
+  </div>
+  <dialog id="secret-dialog">
+    <h2>保存个人令牌</h2>
+    <p>这个令牌只显示一次。请通过私密方式交给对应用户。</p>
+    <textarea id="issued-secret" readonly aria-label="新创建的个人令牌" spellcheck="false"></textarea>
+    <div class="actions"><button id="copy-secret" type="button">复制令牌</button><button id="close-secret" class="primary" type="button">已保存，关闭</button></div>
+  </dialog>
+</body>
+</html>

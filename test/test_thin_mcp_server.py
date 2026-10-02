@@ -110,6 +110,9 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "update_knowledge",
         "doc_search",
         "doc_read",
+        "rfc_request",
+        "rfc_capabilities",
+        "rfc_status",
     }
 
     review = mcp.tools["review"](
