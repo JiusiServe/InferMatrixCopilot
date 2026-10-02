@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/tui/frontend/src/index.ts:L17-L29, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/tui/frontend/src/index.ts:L86-L92]
+feature: "tui"
+entry_points: ["jiuwenswarm/channels/tui/frontend/src/index.ts"]
+source_globs: ["jiuwenswarm/channels/tui/frontend/src/index.ts", "jiuwenswarm/channels/tui/*"]
 ---
 
 # TUI 对话与命令：实现深读

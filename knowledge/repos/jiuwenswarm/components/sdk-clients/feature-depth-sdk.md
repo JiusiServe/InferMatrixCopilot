@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:sdks/python/src/jiuwenswarm_sdk/client.py:L38-L61, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:sdks/python/src/jiuwenswarm_sdk/client.py:L240-L249, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:sdks/python/src/jiuwenswarm_sdk/client.py:L299-L325, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:sdks/python/src/jiuwenswarm_sdk/client.py:L327-L356]
+feature: "sdk"
+entry_points: ["sdks/python/src/jiuwenswarm_sdk/client.py"]
+source_globs: ["sdks/python/src/jiuwenswarm_sdk/client.py", "sdks/*"]
 ---
 
 # Python 与 TypeScript SDK：实现深读

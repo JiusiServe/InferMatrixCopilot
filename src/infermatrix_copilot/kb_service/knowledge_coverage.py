@@ -10,10 +10,11 @@ from __future__ import annotations
 import ast
 import fnmatch
 import hashlib
+import json
 import os
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote, unquote
 
@@ -29,6 +30,26 @@ SUFFIXES = (".py", ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs",
             ".rs", ".go", ".swift", ".ets", ".vue", ".svelte", ".html", ".css", ".scss", ".less",
             ".c", ".cc", ".cpp", ".h", ".hpp", ".sh", ".ps1", ".psm1", ".cmd", ".bat", ".iss", ".spec")
 FILENAMES = ("Dockerfile", "Dockerfile.*", "Makefile", "gradlew")
+
+
+def feature_metadata(text: str, feature) -> str:
+    """Bind retrieval hints to the reviewed feature policy, preserving the body."""
+    page = Page.parse(text)
+    data = page.frontmatter_data()
+    if data.get("type") not in ("architecture", "guide") or page.rules():
+        raise ValueError("feature retrieval metadata needs explanatory knowledge")
+    hints = {"feature": feature.id, "entry_points": list(feature.entry_points),
+             "source_globs": list(feature.source_globs)}
+    # Replace whole YAML fields, including an existing block-list form.
+    for key, value in hints.items():
+        pattern = re.compile(rf"(?m)^{key}:[^\n]*\n(?:[ \t]+[^\n]*\n|-[ \t]+[^\n]*\n)*")
+        line = f"{key}: {json.dumps(value, ensure_ascii=False)}\n"
+        front = pattern.sub(lambda _: line, page.frontmatter, count=1) if pattern.search(page.frontmatter) \
+            else page.frontmatter.rsplit("---", 1)[0] + line + "---\n"
+        page = replace(page, frontmatter=front)
+    return page.render()
+
+
 _FILE = re.compile(r"<!-- kb:file path=(\S+) pin=([a-f0-9]{40}) sha256=([a-f0-9]{64}) -->\n(.*?)\n<!-- /kb:file -->", re.S)
 _FACET = re.compile(r"<!-- kb:knowledge owner=feature-([a-z0-9-]+) facet=([a-z]+) pin=([a-f0-9]{40})"
                     r"(?: verdict=(pass|unsure|unjudged))? -->")

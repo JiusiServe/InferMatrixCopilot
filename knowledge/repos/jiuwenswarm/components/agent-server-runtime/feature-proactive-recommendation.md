@@ -9,6 +9,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/recommendation/proactive_engine.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/proactive_adapter.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/设置与频道升级迁移指南.md
+feature: "proactive-recommendation"
+entry_points: ["jiuwenswarm/agents/harness/common/recommendation/proactive_engine.py", "jiuwenswarm/server/runtime/proactive_adapter.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/recommendation/proactive_engine.py", "jiuwenswarm/server/runtime/proactive_adapter.py"]
 ---
 
 # 主动推荐、频率限制与主 Agent 交付的职责、接口与配置

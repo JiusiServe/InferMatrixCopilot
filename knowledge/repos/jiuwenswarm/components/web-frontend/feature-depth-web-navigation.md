@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L397-L397, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L858-L870, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L466-L482, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L872-L876, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L484-L501]
+feature: "web-navigation"
+entry_points: ["jiuwenswarm/channels/web/frontend/src/App.tsx"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/App.tsx", "jiuwenswarm/channels/web/frontend/src/*"]
 ---
 
 # Web 页面与功能入口：实现深读

@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/slack/slack_connect.py:L79-L112, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/slack/slack_connect.py:L40-L50, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/slack/slack_connect.py:L166-L251]
+feature: "im-slack"
+entry_points: ["jiuwenswarm/gateway/channel_manager/im_platforms/slack/slack_connect.py"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/slack/slack_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/slack/*"]
 ---
 
 # Slack 频道：实现深读

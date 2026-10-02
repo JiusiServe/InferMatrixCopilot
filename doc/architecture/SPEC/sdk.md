@@ -1,11 +1,15 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-02 -->
 
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
 
 ## 职责
+
+`DirectReviewPlan.related_knowledge` 是有默认空字典的增量字段，与 MCP 提供同一有界背景。
+每个相关文档另带内容寻址的 `document` 引用，路径保持知识相对 ID；后续读取使用原
+`review_context_id`，不混入激活切换后的另一快照。正文 pin 与 PR head 分别记录。
 
 给 ReviewBot 等嵌入式宿主提供一个版本化、可序列化、wheel-safe 的公开 API：
 `infermatrix_copilot.sdk.v1`。宿主不得再 import `mcp_server`、`config`、

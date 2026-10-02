@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skill_manager.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/技能.md
+feature: "skills"
+entry_points: ["jiuwenswarm/server/runtime/skill/skill_manager.py"]
+source_globs: ["jiuwenswarm/server/runtime/skill/skill_manager.py", "jiuwenswarm/server/runtime/skill/*"]
 ---
 
 # 技能安装、挂载与发现 的职责、接口与配置

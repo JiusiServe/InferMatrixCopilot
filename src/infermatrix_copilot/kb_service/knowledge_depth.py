@@ -9,13 +9,12 @@ import re
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 
-from ..knowledge_service.lifecycle import Page
+from ..knowledge_service.lifecycle import (
+    DEPTH_BLOCK as _BLOCK, DEPTH_FACETS as FACETS, Page, safe_source_path as safe_path,
+)
 from .init_stages import neutral_headings
 from .knowledge_coverage import _LEXICAL_NO_CODE, inventory
 
-FACETS = ("flow", "api", "configuration", "dependencies", "failure_modes", "tradeoffs", "validation")
-_BLOCK = re.compile(r"<!-- kb:depth feature=([a-z0-9-]+) facet=([a-z_]+) pin=([0-9a-f]{40}) "
-                    r"sha256=([0-9a-f]{64}) -->\n(.*?)\n<!-- /kb:depth -->", re.S)
 _PROOF = re.compile(r"\n<!-- kb:depth-proof (.*?) -->\s*$", re.S)
 _PRIVATE_PATH = re.compile(r"/(?:home/(?!models(?:/|\b)|<)|data/(?!models?(?:/|\b)|<))[A-Za-z0-9_-]+")
 _IP = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
@@ -23,11 +22,6 @@ _IP = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
 
 def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def safe_path(path: object) -> bool:
-    return isinstance(path, str) and bool(path) and not path.startswith("/") and "\\" not in path \
-        and all(part not in ("", ".", "..") for part in path.split("/"))
 
 
 def validate_draft(data: dict) -> None:

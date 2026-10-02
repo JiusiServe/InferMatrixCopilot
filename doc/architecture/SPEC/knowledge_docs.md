@@ -1,15 +1,15 @@
 # knowledge_docs.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-10-02 -->
 
-`LOC ~122 · 供 MCP 面使用的只读知识检索 · refactor-status: ok`
+`LOC ~280 · 供 Direct 与 Agent 共用的只读知识检索 · refactor-status: ok`
 
 ## 职责
 对那棵精选 Markdown 知识库的跨平台、按仓库限定的**只读访问** ——
-`doc_search`/`doc_read` 的底座。
+`doc_search`/`doc_read`/`doc_related` 的底座。
 
 ## 公开契约
-`KnowledgeDocs`（search、read）、`KnowledgeDocsError`。
+`KnowledgeDocs`（search、read、related）、`KnowledgeDocsError`。
 
 ## 不变量（**C1**、**D1**）
 - **限定在切片内**：general 切片加上**单个**仓库的切片。知识根之外的路径一律拒绝
@@ -22,10 +22,20 @@
 不撰写知识、不提 candidate、不在代码里放仓库专属规则（那棵树是数据面）。
 
 ## 依赖（允许）
-仅 stdlib。
+stdlib 与 `knowledge_service.lifecycle` 的页面/完整深读正文解析；不依赖模型、配置或 server。
 
 ## 测试
-`test_knowledge_source.py`、`test_thin_mcp_server.py`。
+`test_knowledge_source.py`、`test_knowledge_retrieval.py`、`test_thin_mcp_server.py`。
+
+## 有界审查背景
+
+`related(changed_files, query=...)` 只选当前 repo 的 architecture/guide；规则页、索引与
+结构化接口卡不进入背景。确定性优先级为固定来源路径、生产入口、源码 glob，再结合
+功能 ID/标题和正文词命中；相同 feature 去重，完整深读优先于基础功能页。
+最多返回两页、每页 3,000 字符、总计 6,000 字符；优先完整 facet，超长单 facet 仍提供
+截断片段并标 `more_available`。返回来源 pin、命中路径、已有/缺失 facet，不验证 PR head。
+深读正文哈希、证明形状或重复 facet 有问题时不提供该块；上游证据验证仍属于 init/audit。
+所有读取前调用同一 `verify`，包括最终被排除的接口卡；激活快照校验失败直接阻断。
 
 ## 重构备注
 **保持它不含模型**：这是 Direct MCP 路径与工具桥共用的**唯一**知识读取器，

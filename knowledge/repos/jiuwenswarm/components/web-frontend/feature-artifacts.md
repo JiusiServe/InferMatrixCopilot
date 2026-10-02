@@ -10,6 +10,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/filePreviewModel.ts
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/AGENTS.md
+feature: "artifacts"
+entry_points: ["jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx", "jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts", "jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/filePreviewModel.ts"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx", "jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts", "jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/filePreviewModel.ts"]
 ---
 
 # 会话产物列表、预览与下载的职责、接口与配置

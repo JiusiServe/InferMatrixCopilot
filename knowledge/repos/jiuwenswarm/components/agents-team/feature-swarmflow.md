@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/handlers/workflow_state.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/TUI使用SwarmFlow指南.md
+feature: "swarmflow"
+entry_points: ["jiuwenswarm/agents/harness/team/handlers/workflow_state.py"]
+source_globs: ["jiuwenswarm/agents/harness/team/handlers/workflow_state.py", "jiuwenswarm/agents/harness/team/handlers/*"]
 ---
 
 # SwarmFlow 工作流与 HITL 的职责、接口与配置

@@ -10,6 +10,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/MCP配置.md
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/AGENTS.md
+feature: "connectors"
+entry_points: ["jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts", "jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts", "jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx"]
 ---
 
 # 连接器市场与 MCP 授权流程的职责、接口与配置

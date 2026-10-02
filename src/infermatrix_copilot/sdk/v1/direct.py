@@ -355,6 +355,9 @@ class DirectClient:
         completion_gate["operation"] = str(
             completion_gate.pop("tool", "") or "validate_direct_review"
         )
+        related = dict(raw.get("related_knowledge") or {})
+        related["documents"] = [{**item, "document": self._document_ref(view.path(item["path"]), view).to_dict()}
+                                for item in related.get("documents") or []]
         plan = DirectReviewPlan(
             protocol_version=DIRECT_API_VERSION,
             review_context_id=review_context_id,
@@ -382,6 +385,7 @@ class DirectClient:
             knowledge_snapshot=view.public_snapshot,
             knowledge_tree_sha256=view.tree_sha256,
             untested_public_api=dict(raw.get("untested_public_api") or {}),
+            related_knowledge=related,
         )
         self._remember_context(review_context_id, expected_head, carried, view)
         return plan

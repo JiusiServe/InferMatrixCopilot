@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/tui/frontend/src/index.ts
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/TUI使用指南.md
+feature: "tui"
+entry_points: ["jiuwenswarm/channels/tui/frontend/src/index.ts"]
+source_globs: ["jiuwenswarm/channels/tui/frontend/src/index.ts", "jiuwenswarm/channels/tui/*"]
 ---
 
 # TUI 对话与命令 的职责、接口与配置

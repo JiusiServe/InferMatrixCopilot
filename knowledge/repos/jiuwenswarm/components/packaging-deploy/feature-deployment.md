@@ -12,6 +12,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docker/Dockerfile.claw
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docker/Dockerfile.claw.base
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docker/Dockerfile.yr.rt.mgr
+feature: "deployment"
+entry_points: ["scripts/build-electron-exe.sh", "Dockerfile.claw", "docker/Dockerfile.claw", "docker/Dockerfile.claw.base", "docker/Dockerfile.yr.rt.mgr"]
+source_globs: ["scripts/build-electron-exe.sh", "scripts/*", "Dockerfile.claw", "docker/Dockerfile.claw", "docker/Dockerfile.claw.base", "docker/Dockerfile.yr.rt.mgr"]
 ---
 
 # 打包与部署 的职责、接口与配置

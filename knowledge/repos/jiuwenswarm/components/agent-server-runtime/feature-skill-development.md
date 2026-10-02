@@ -11,6 +11,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skilldev/deps.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skilldev/context.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skilldev/DESIGN.md
+feature: "skill-development"
+entry_points: ["jiuwenswarm/server/runtime/skill/skilldev/service.py", "jiuwenswarm/server/runtime/skill/skilldev/pipeline.py", "jiuwenswarm/server/runtime/skill/skilldev/deps.py", "jiuwenswarm/server/runtime/skill/skilldev/context.py"]
+source_globs: ["jiuwenswarm/server/runtime/skill/skilldev/service.py", "jiuwenswarm/server/runtime/skill/skilldev/pipeline.py", "jiuwenswarm/server/runtime/skill/skilldev/deps.py", "jiuwenswarm/server/runtime/skill/skilldev/context.py"]
 ---
 
 # SkillDev 创建、评测与打包边界的职责、接口与配置

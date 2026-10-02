@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_agentserver_modes.py:L48-L138, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_agentserver_modes.py:L141-L170]
+feature: "context"
+entry_points: ["jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py", "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py"]
+source_globs: ["jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py", "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py", "jiuwenswarm/agents/harness/common/*"]
 ---
 
 # 上下文压缩与卸载：实现深读

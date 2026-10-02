@@ -20,7 +20,7 @@ from .init_history import _CheckpointBudget
 from .init_knowledge import MAX_DOC_BYTES, _Knowledge
 from .init_stages import _one_line, _page_frontmatter
 from .init_support import InitError, InitRecord, generate
-from .knowledge_coverage import audit_coverage, inventory
+from .knowledge_coverage import audit_coverage, feature_metadata, inventory
 from .knowledge_depth import FACETS, audit_depth, depth_page, digest, render_block, validate_draft, verified_blocks
 from .models import ModelUnavailable
 
@@ -160,6 +160,11 @@ class _KnowledgeDepth(_Knowledge):
             if stopped:
                 break
         state["done"] = not stopped
+        if accepted:
+            for feature in policy.features:
+                for page in (feature.page, depth_page(feature)):
+                    if page in self.head:
+                        self.head[page] = feature_metadata(self.head[page], feature)
         depth = audit_depth(self.head, tree, policy, self.record.pin)
         breadth = audit_coverage(self.head, tree, policy, full_name=self.lifecycle.full_name, pin=self.record.pin)
         self.record.coverage = {"semantic_depth": depth, "breadth": breadth}

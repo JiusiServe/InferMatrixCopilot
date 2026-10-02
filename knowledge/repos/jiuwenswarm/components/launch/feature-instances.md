@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/bootstrap.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/单机多实例运行.md
+feature: "instances"
+entry_points: ["jiuwenswarm/instance_manager/bootstrap.py"]
+source_globs: ["jiuwenswarm/instance_manager/bootstrap.py", "jiuwenswarm/instance_manager/*.py"]
 ---
 
 # 单机多实例 的职责、接口与配置

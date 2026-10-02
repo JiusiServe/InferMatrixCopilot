@@ -40,6 +40,13 @@ validation 六个维度。它生成的非规则段使用 `kb:knowledge` HTML 注
 实现知识；旧标记、静态接口卡、规则和索引不计入此深度。正文或证据改变、pin 不符或重复
 facet 均失效。页面仍使用既有 architecture/guide 类型，设计推断与未验证测试明确标出。
 
+功能解释页可声明 `feature`（功能 ID）、`entry_points`（生产入口路径列表）和
+`source_globs`（所属源码 glob 列表）。`knowledge`/`knowledge-deepen` 从同一份已审阅
+coverage policy 生成这些匹配提示，刷新时保留正文、来源和深读证明。提示只选择审查背景，
+不增加文件或行为覆盖率；旧页仍可通过 `sources` 中的固定源码路径匹配。
+Direct 的 `related_knowledge` 与 Agent 的 `doc_related` 共用确定性检索，最多提供两页、
+共 6,000 字符，附来源 pin、已有/缺失 facet 和截断状态；它不把推断变成硬规则。
+
 `check_wiki_lint.py` 强制的只有前五项（`title`、`created`、`updated`、`type`、
 非空 `tags`）；其余为约定字段，写了就必须合法（`confidence` 只能取三值）。
 

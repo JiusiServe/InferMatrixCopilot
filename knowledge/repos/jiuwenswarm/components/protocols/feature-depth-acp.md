@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/acp/cli.py:L36-L60, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/acp/cli.py:L75-L82, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L2432-L2433]
+feature: "acp"
+entry_points: ["jiuwenswarm/acp/stdio_client.py"]
+source_globs: ["jiuwenswarm/acp/stdio_client.py", "jiuwenswarm/acp/*.py"]
 ---
 
 # ACP 与 stdio 桥接：实现深读

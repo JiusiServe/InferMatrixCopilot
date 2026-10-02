@@ -27,6 +27,7 @@ import yaml
 
 from .adapters import AdapterError, AdapterRegistry, RepoAdapter
 from .knowledge_view import KnowledgeView
+from .knowledge_docs import KnowledgeDocs
 from .sdk._resources import adapters_root
 from .ut_coverage import UTCoverageRules, analyze as _ut_analyze
 from .ut_coverage import REVIEWER_INSTRUCTIONS as _UT_INSTRUCTIONS
@@ -140,7 +141,8 @@ DIRECT_REVIEW_CHECKLIST = (
     "Freeze one base/head snapshot and collect PR intent, diff, mergeability, and CI once.",
     "Read every source file cited as evidence at the frozen head SHA; when the local checkout does not contain that commit, fetch the PR head ref or read files by ref instead of trusting the working tree.",
     "Immediately after snapshot metadata returns, report head SHA, CI, mergeability, and preliminary findings in the host conversation; do this before reading knowledge, searching source, or running tests.",
-    "Call Direct once with the collected title, body, and changed_files; read only the returned knowledge_routes and stop knowledge navigation.",
+    "Call Direct once with title, body, and changed_files; use embedded knowledge_routes and related_knowledge content, then stop index navigation.",
+    "Treat related knowledge as background at its source pins; verify against the frozen PR head. Read only returned related documents with more_available when needed, within the explicit budget.",
     "After the progress update, run independent knowledge/source and validation tracks concurrently.",
     "Reuse one in-review evidence packet for files, bounded rg searches, callers, tests, repo-map, routing, and findings.",
     "Treat CI as status only; open logs only when the first failure overlaps the frozen diff or blocks the verdict.",
@@ -628,11 +630,18 @@ def direct_review_plan(
         if route.get("quick_map_status") != "ok"
     ]
     mandatory_review_guides = _direct_mandatory_review_guides(view)
+    related_started = time.perf_counter()
+    normalized = _normalize_repo(repo)
+    subdir = f"repos/{normalized}" if _REPO_NAME.fullmatch(normalized) and routing.get("status") != "unsupported_exact_router" else None
+    related = KnowledgeDocs(view.root, subdir, verify=view.path).related(
+        changed_files, query="\n".join((title, body, diff)))
+    related_ms = int((time.perf_counter() - related_started) * 1000)
+    followups = [d["path"] for d in related["documents"] if d["more_available"]]
     budget_started = time.perf_counter()
     execution_budget = _direct_execution_budget(
         changed_files,
         knowledge_file_reads=(
-            len(unavailable) + len(mandatory_review_guides)
+            len(unavailable) + len(mandatory_review_guides) + len(followups)
         ),
     )
     budget_ms = int((time.perf_counter() - budget_started) * 1000)
@@ -646,6 +655,7 @@ def direct_review_plan(
         ),
         "knowledge_routes": knowledge_routes,
         "mandatory_review_guides": mandatory_review_guides,
+        "related_knowledge": related,
         "routing": {
             key: value for key, value in routing.items() if key != "routes"
         },
@@ -653,6 +663,8 @@ def direct_review_plan(
             "progress_before_knowledge": True,
             "use_embedded_quick_maps": True,
             "read_mandatory_review_guides": True,
+            "use_embedded_related_knowledge": True,
+            "related_document_read_paths": followups,
             "open_route_file_only_for_concrete_ambiguity": True,
             "open_route_file_when": (
                 'quick_map_status != "ok" — that route carries no embedded '
@@ -708,6 +720,7 @@ def direct_review_plan(
             "knowledge_snapshot": view.public_snapshot,
             "timing_ms": {
                 "routing": route_ms,
+                "related_knowledge": related_ms,
                 "execution_budget": budget_ms,
                 "total": int((time.perf_counter() - started) * 1000),
             }

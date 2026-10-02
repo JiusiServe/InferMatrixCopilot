@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenbox/src/jiuwenbox/server/app.py:L405-L528, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenbox/src/jiuwenbox/cli/jiuwenbox.py:L302-L319, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenbox/src/jiuwenbox/server/app.py:L153-L204, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenbox/src/jiuwenbox/server/app.py:L44-L59]
+feature: "sandbox"
+entry_points: ["jiuwenbox/src/jiuwenbox/server/app.py"]
+source_globs: ["jiuwenbox/src/jiuwenbox/server/app.py", "jiuwenbox/src/jiuwenbox/*"]
 ---
 
 # JiuwenBox 隔离执行：实现深读

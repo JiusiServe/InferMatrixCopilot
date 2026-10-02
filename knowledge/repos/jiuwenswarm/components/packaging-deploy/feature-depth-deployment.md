@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L144-L159, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:Dockerfile.claw:L78-L85, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L55-L68, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L301-L307]
+feature: "deployment"
+entry_points: ["scripts/build-electron-exe.sh", "Dockerfile.claw", "docker/Dockerfile.claw", "docker/Dockerfile.claw.base", "docker/Dockerfile.yr.rt.mgr"]
+source_globs: ["scripts/build-electron-exe.sh", "scripts/*", "Dockerfile.claw", "docker/Dockerfile.claw", "docker/Dockerfile.claw.base", "docker/Dockerfile.yr.rt.mgr"]
 ---
 
 # 打包与部署：实现深读

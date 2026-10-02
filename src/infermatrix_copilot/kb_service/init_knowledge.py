@@ -290,6 +290,11 @@ class _Knowledge(_Stage):
                                           for id_, f in targets["features"]["items"].items() if not f["covered"])
             if not targets["met"]:
                 self.record.notes.append("knowledge targets incomplete: all features and core-file threshold are required")
+        if policy_text:
+            from .knowledge_coverage import feature_metadata
+            for feature in policy.features:
+                if feature.page in self.head:
+                    self.head[feature.page] = feature_metadata(self.head[feature.page], feature)
         return self._conclude(claims, evidence)
 
     def _page_for(self, owner: Owner) -> str:

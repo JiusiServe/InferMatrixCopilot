@@ -11,8 +11,12 @@ source, or running tests. Within 60 seconds, do this. Then call
 InferMatrixCopilot `review` once
 with `mode="direct"` plus the
 collected `title`, `body`, and `changed_files`. Use the embedded `quick_map` in
-each returned `knowledge_routes` item. Do not open the full route file unless a
-concrete ambiguity blocks source review, and do not reopen `AGENTS.md`,
+each returned `knowledge_routes` item and the bounded prose in `related_knowledge`.
+That prose includes source pins and explicit missing facets; verify claims at the
+PR head, and treat inferred tradeoffs as background. Do not open the full route file
+unless a concrete ambiguity blocks source review. For incomplete related excerpts,
+use the budgeted `navigation_policy.related_document_read_paths` with `doc_read`
+(or SDK `read_document` bound to this review context). Do not reopen `AGENTS.md`,
 `CLAUDE.md`, repo indexes, or model catalogs. Inspect the code at the pinned
 head SHA and return only evidence-backed findings with file/line references.
 Read every file cited as evidence at that commit; when the local checkout does

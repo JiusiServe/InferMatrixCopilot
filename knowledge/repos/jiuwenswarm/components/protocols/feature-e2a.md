@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/e2a/models.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/E2A-protocol.md
+feature: "e2a"
+entry_points: ["jiuwenswarm/common/e2a/models.py"]
+source_globs: ["jiuwenswarm/common/e2a/models.py", "jiuwenswarm/common/e2a/*.py"]
 ---
 
 # E2A 统一请求响应协议 的职责、接口与配置

@@ -1,6 +1,6 @@
 # knowledge_service/lifecycle.py —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-10-02 -->
 
 `LOC ~330 · 规则页数据模型与生命周期尾注 · refactor-status: stable`
 
@@ -10,6 +10,10 @@
 reason、evidence、supersedes、superseded_by、protected）；无尾注即 active。
 
 ## 公开契约
+
+`DEPTH_FACETS`、`DEPTH_BLOCK` 和 `depth_sections` 是 init/audit 与检索共享的深读数据格式。
+后者只返回正文哈希完整、facet 唯一且 proof evidence 形状合法的段落，隐藏 proof 注释，
+不重新读取上游证据。固定源码验证仍由 `kb_service.knowledge_depth` 负责。
 `Page.parse/render`、`Page.rules/rule/replace_section/append_section`、
 `Page.sources/with_sources`（按页面原风格写 flow 或 block 列表）、`Section.footer/
 with_footer/body_without_footer/content_sha256/citations`、`Footer.parse/render/check`、

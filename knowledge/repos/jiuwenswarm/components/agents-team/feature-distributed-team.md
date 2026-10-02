@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/distributed_runtime.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/分布式Team.md
+feature: "distributed-team"
+entry_points: ["jiuwenswarm/agents/harness/team/distributed_runtime.py"]
+source_globs: ["jiuwenswarm/agents/harness/team/distributed_runtime.py"]
 ---
 
 # 跨进程分布式 Team 的职责、接口与配置

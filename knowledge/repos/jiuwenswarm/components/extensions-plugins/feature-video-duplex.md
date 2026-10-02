@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/tasks/rail.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/application-plugins.md
+feature: "video-duplex"
+entry_points: ["jiuwenswarm/extensions/video_duplex/backend/tasks/rail.py"]
+source_globs: ["jiuwenswarm/extensions/video_duplex/backend/tasks/rail.py", "jiuwenswarm/extensions/video_duplex/*"]
 ---
 
 # 音视频双工扩展 的职责、接口与配置

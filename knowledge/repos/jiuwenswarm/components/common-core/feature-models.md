@@ -9,6 +9,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_catalog.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_config_validation.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/配置信息.md
+feature: "models"
+entry_points: ["jiuwenswarm/common/model_catalog.py", "jiuwenswarm/common/model_config_validation.py"]
+source_globs: ["jiuwenswarm/common/model_catalog.py", "jiuwenswarm/common/model_config_validation.py", "jiuwenswarm/common/model*.py"]
 ---
 
 # 模型平台与 API 配置 的职责、接口与配置

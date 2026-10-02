@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/mcp_config.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/MCP配置.md
+feature: "mcp"
+entry_points: ["jiuwenswarm/common/mcp_config.py"]
+source_globs: ["jiuwenswarm/common/mcp_config.py"]
 ---
 
 # MCP 配置、凭据与资源 的职责、接口与配置

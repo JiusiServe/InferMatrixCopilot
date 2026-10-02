@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/ide/vscode/VSCode插件.md
+feature: "vscode"
+entry_points: ["jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts"]
+source_globs: ["jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts", "jiuwenswarm/channels/ide/packages/vscode-extension/*"]
 ---
 
 # VS Code 客户端 的职责、接口与配置

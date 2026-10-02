@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/xiaoyi_utils/push.py:L55-L132, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/xiaoyi_connect.py:L386-L412, "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/国内频道.md:L67-L103"]
+feature: "im-xiaoyi"
+entry_points: ["jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/xiaoyi_connect.py"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/xiaoyi_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/*"]
 ---
 
 # 小艺 频道：实现深读

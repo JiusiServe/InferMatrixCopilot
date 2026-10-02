@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/a2ui/runtime/finalizer.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/A2UI.md
+feature: "a2ui"
+entry_points: ["jiuwenswarm/server/runtime/a2ui/runtime/finalizer.py"]
+source_globs: ["jiuwenswarm/server/runtime/a2ui/runtime/finalizer.py", "jiuwenswarm/server/runtime/a2ui/*"]
 ---
 
 # A2UI 生成式界面 的职责、接口与配置

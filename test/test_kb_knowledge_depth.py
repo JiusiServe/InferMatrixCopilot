@@ -128,6 +128,11 @@ def test_depth_visits_rule_bearing_owner_and_tracks_separate_metrics(world):
     assert record.coverage["breadth"]["core"]["contract_files"] == 0
     page = _tree(record)["knowledge/" + depth_page(policy.features[0])]
     assert "Engine.step" in page and "kb:depth-proof" in page
+    from infermatrix_copilot.knowledge_service.lifecycle import Page
+    hints = Page.parse(page).frontmatter_data()
+    assert hints["feature"] == policy.features[0].id
+    assert hints["entry_points"] == list(policy.features[0].entry_points)
+    assert hints["source_globs"] == list(policy.features[0].source_globs)
     _run(world, gateway)
     assert len(gateway.depth_calls) == 1
 

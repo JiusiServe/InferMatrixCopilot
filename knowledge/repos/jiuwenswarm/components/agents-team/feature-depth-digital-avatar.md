@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/rails/avatar_rail.py:L43-L119, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/rails/permissions/owner_scopes.py:L104-L114, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/rails/avatar_rail.py:L121-L161, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/rails/avatar_rail.py:L164-L170]
+feature: "digital-avatar"
+entry_points: ["jiuwenswarm/agents/harness/common/rails/avatar_rail.py", "jiuwenswarm/agents/harness/common/rails/permissions/owner_scopes.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/rails/avatar_rail.py", "jiuwenswarm/agents/harness/common/rails/permissions/owner_scopes.py"]
 ---
 
 # 群聊数字分身与 owner 权限：实现深读

@@ -9,6 +9,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/multimodal_config.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/image_tools.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Harness.md
+feature: "multimodal"
+entry_points: ["jiuwenswarm/agents/harness/common/tools/multimodal_config.py", "jiuwenswarm/agents/harness/common/tools/image_tools.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/tools/multimodal_config.py", "jiuwenswarm/agents/harness/common/tools/image_tools.py", "jiuwenswarm/agents/harness/common/tools/*"]
 ---
 
 # 多模态理解与媒体配置 的职责、接口与配置

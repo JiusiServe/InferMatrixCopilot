@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L304-L316, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L556-L568, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/config.py:L71-L79, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L293-L302, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/config.py:L21-L28]
+feature: "debug-trace"
+entry_points: ["jiuwenswarm/server/runtime/debug_trace/config.py", "jiuwenswarm/server/runtime/debug_trace/stream_logger.py"]
+source_globs: ["jiuwenswarm/server/runtime/debug_trace/config.py", "jiuwenswarm/server/runtime/debug_trace/stream_logger.py", "jiuwenswarm/server/runtime/debug_trace/*.py"]
 ---
 
 # Debug Dump 与 OTel：实现深读

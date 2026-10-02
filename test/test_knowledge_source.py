@@ -110,7 +110,7 @@ def test_doc_tools_reach_general_and_repo_specific(tmp_path):
     (k / "general" / "g.md").write_text("SEMANTIC PARITY in general", encoding="utf-8")
     adapter = _adapter(tmp_path, {"knowledge": {"repo_subdir": "repos/r"}})
     tools = _repo_docs_tool(_ctx(k), adapter)
-    assert set(tools) == {"doc_search", "doc_read"}
+    assert set(tools) == {"doc_search", "doc_read", "doc_related"}
     assert "SEMANTIC PARITY" in tools["doc_read"].handler(path="general/g.md")
     assert "HARD GATES" in tools["doc_read"].handler(path="repos/r/rules.md")
     assert "general/g.md" in tools["doc_search"].handler(query="SEMANTIC PARITY")

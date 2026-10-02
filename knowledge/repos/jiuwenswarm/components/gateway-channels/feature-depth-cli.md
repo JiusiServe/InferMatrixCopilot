@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/cli/_terminal.py:L5-L8, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/cli/chat.py:L5-L8, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/cli/main.py:L5-L7]
+feature: "cli"
+entry_points: ["jiuwenswarm/cli/main.py"]
+source_globs: ["jiuwenswarm/cli/main.py", "jiuwenswarm/cli/*.py"]
 ---
 
 # 交互式命令行：实现深读

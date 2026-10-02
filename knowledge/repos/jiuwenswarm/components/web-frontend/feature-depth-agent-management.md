@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/index.tsx:L984-L1004]
+feature: "agent-management"
+entry_points: ["jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/index.tsx", "jiuwenswarm/channels/web/frontend/src/features/agentManagement/client.ts", "jiuwenswarm/channels/web/frontend/src/components/AgentPanel/index.tsx"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/index.tsx", "jiuwenswarm/channels/web/frontend/src/features/agentManagement/client.ts", "jiuwenswarm/channels/web/frontend/src/components/AgentPanel/index.tsx"]
 ---
 
 # 智能体资产管理与工作区浏览：实现深读

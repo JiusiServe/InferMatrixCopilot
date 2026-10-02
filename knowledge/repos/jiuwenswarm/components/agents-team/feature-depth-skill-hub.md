@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/marketplace/hub_client.py:L220-L245, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/marketplace/hub_client.py:L45-L54, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/marketplace/hub_models.py:L163-L177]
+feature: "skill-hub"
+entry_points: ["jiuwenswarm/server/runtime/marketplace/hub_client.py"]
+source_globs: ["jiuwenswarm/server/runtime/marketplace/hub_client.py", "jiuwenswarm/server/runtime/marketplace/*"]
 ---
 
 # Skill Hub 与市场流通：实现深读

@@ -122,6 +122,7 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "mode",
         "knowledge_entry",
         "knowledge_routes",
+        "related_knowledge",
         "mandatory_review_guides",
         "routing",
         "navigation_policy",
@@ -249,6 +250,7 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     }
     assert set(review["diagnostics"]["timing_ms"]) == {
         "routing",
+        "related_knowledge",
         "execution_budget",
         "total",
     }
@@ -300,7 +302,7 @@ def test_direct_routes_title_body_before_changed_files(monkeypatch):
         assert route["read_required"] is (route["quick_map_status"] != "ok")
     assert review["execution_budget"]["knowledge_file_reads"] == len(
         [r for r in review["knowledge_routes"] if r["read_required"]]
-    ) + len(review["mandatory_review_guides"])
+    ) + len(review["mandatory_review_guides"]) + len(review["navigation_policy"]["related_document_read_paths"])
     scope = {
         item["owner"]: item
         for item in review["routing"]["scope_validation"]
@@ -309,7 +311,7 @@ def test_direct_routes_title_body_before_changed_files(monkeypatch):
     assert review["execution_budget"]["profile"] == "code"
     # was 0 unconditionally; the budget now grants exactly one read per route whose
     # map is not fully deliverable, so it cannot contradict read_required
-    assert review["execution_budget"]["knowledge_file_reads"] == 2
+    assert review["execution_budget"]["knowledge_file_reads"] == 2 + len(review["navigation_policy"]["related_document_read_paths"])
 
 
 def test_direct_ranks_diffusion_owner_for_scheduler_managed_kv_pr(monkeypatch):
@@ -971,7 +973,7 @@ def test_unavailable_quick_map_wires_through_review_end_to_end(monkeypatch, tmp_
     n = len([r for r in review["knowledge_routes"] if r["read_required"]])
     assert n >= 1
     assert review["execution_budget"]["knowledge_file_reads"] == (
-        n + len(review["mandatory_review_guides"])
+        n + len(review["mandatory_review_guides"]) + len(review["navigation_policy"]["related_document_read_paths"])
     )
     assert "unavailable" in review["navigation_policy"]["open_route_file_when"]
 

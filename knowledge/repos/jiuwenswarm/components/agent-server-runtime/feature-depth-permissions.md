@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/rails/permissions/send_file_path_guard.py:L112-L123, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/rails/permissions/permission_interrupt_rail.py:L71-L82]
+feature: "permissions"
+entry_points: ["jiuwenswarm/agents/harness/common/rails/permissions/permission_interrupt_rail.py", "jiuwenswarm/agents/harness/common/rails/permissions/policy_eval.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/rails/permissions/permission_interrupt_rail.py", "jiuwenswarm/agents/harness/common/rails/permissions/policy_eval.py", "jiuwenswarm/server/*"]
 ---
 
 # 工具权限与安全治理：实现深读

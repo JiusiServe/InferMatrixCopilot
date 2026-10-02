@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/joyai_provider.py:L65-L79, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/joyai_provider.py:L82-L89]
+feature: "video-duplex"
+entry_points: ["jiuwenswarm/extensions/video_duplex/backend/tasks/rail.py"]
+source_globs: ["jiuwenswarm/extensions/video_duplex/backend/tasks/rail.py", "jiuwenswarm/extensions/video_duplex/*"]
 ---
 
 # 音视频双工扩展：实现深读

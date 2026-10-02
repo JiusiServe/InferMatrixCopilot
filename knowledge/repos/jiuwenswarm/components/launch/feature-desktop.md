@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/windows自动更新设计.md
+feature: "desktop"
+entry_points: ["jiuwenswarm/channels/desktop/desktop_app.py"]
+source_globs: ["jiuwenswarm/channels/desktop/desktop_app.py", "jiuwenswarm/channels/desktop/*"]
 ---
 
 # 桌面宿主与自动更新 的职责、接口与配置

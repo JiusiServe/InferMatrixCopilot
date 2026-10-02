@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/telegram/telegram_connect.py:L39-L47, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/telegram/telegram_connect.py:L92-L98, "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/海外频道.md:L55-L61"]
+feature: "im-telegram"
+entry_points: ["jiuwenswarm/gateway/channel_manager/im_platforms/telegram/telegram_connect.py"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/telegram/telegram_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/telegram/*"]
 ---
 
 # Telegram 频道：实现深读

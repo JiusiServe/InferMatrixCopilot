@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/control/a2ui_config.py:L39-L69, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/system_tests/test_a2ui_system_flow.py:L42-L100, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/a2ui/test_integration_bridge.py:L26-L32, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/a2ui/test_integration_bridge.py:L93-L109]
+feature: "a2ui"
+entry_points: ["jiuwenswarm/server/runtime/a2ui/runtime/finalizer.py"]
+source_globs: ["jiuwenswarm/server/runtime/a2ui/runtime/finalizer.py", "jiuwenswarm/server/runtime/a2ui/*"]
 ---
 
 # A2UI 生成式界面：实现深读

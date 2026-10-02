@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/code/rails/code_task_planning_rail.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/任务规划.md
+feature: "planning"
+entry_points: ["jiuwenswarm/agents/harness/code/rails/code_task_planning_rail.py"]
+source_globs: ["jiuwenswarm/agents/harness/code/rails/code_task_planning_rail.py", "jiuwenswarm/agents/harness/common/*"]
 ---
 
 # 任务规划与 Todo 的职责、接口与配置
