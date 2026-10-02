@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/index.ts:L211-L249, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/index.ts:L236-L248, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/ContextCache.ts:L1-L12]
+feature: "browser-client"
+entry_points: ["jiuwenswarm/channels/browser/frontend/src/background/index.ts", "jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts"]
+source_globs: ["jiuwenswarm/channels/browser/frontend/src/background/index.ts", "jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts", "jiuwenswarm/channels/browser/frontend/src/*"]
 ---
 
 # Chromium 浏览器扩展：实现深读

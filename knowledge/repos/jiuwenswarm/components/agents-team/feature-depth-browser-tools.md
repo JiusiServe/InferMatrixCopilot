@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/swarm/browser_runtime.py:L26-L57, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/browser_config.py:L12-L32, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/config.py:L62-L99, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/browser_config.py:L19-L32, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L416-L433, "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/浏览器.md:L99-L119", openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/playwright_mcp_runtime.py:L333-L381]
+feature: "browser-tools"
+entry_points: ["jiuwenswarm/agents/swarm/browser_runtime.py", "jiuwenswarm/agents/harness/common/browser_config.py"]
+source_globs: ["jiuwenswarm/agents/swarm/browser_runtime.py", "jiuwenswarm/agents/harness/common/browser_config.py", "jiuwenswarm/agents/harness/common/*"]
 ---
 
 # 浏览器服务与网页工具：实现深读

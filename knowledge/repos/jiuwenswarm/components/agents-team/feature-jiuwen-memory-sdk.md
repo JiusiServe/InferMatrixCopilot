@@ -9,6 +9,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/memory/external_memory_builder.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/memory/external_memory_config.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/JiuwenMemory-SDK接入.md
+feature: "jiuwen-memory-sdk"
+entry_points: ["jiuwenswarm/agents/harness/common/memory/external_memory_builder.py", "jiuwenswarm/agents/harness/common/memory/external_memory_config.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/memory/external_memory_builder.py", "jiuwenswarm/agents/harness/common/memory/external_memory_config.py"]
 ---
 
 # JiuwenMemory 进程内 SDK 接入的职责、接口与配置

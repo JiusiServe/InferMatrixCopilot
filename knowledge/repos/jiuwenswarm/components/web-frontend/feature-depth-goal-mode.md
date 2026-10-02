@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/features/goalMode/goalModeGate.ts:L201-L220, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/features/goalMode/goalModeGate.ts:L162-L182, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/features/goalMode/goalModeGate.ts:L126-L132, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/features/goalMode/goalModeGate.ts:L99-L102, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/services/webClient.ts:L747-L763, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/services/webClient.ts:L773-L792, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/services/webClient.ts:L340-L365]
+feature: "goal-mode"
+entry_points: ["jiuwenswarm/channels/web/frontend/src/features/goalMode/goalModeGate.ts", "jiuwenswarm/channels/web/frontend/src/stores/goalStore.ts", "jiuwenswarm/channels/web/frontend/src/services/webClient.ts", "jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/features/goalMode/goalModeGate.ts", "jiuwenswarm/channels/web/frontend/src/stores/goalStore.ts", "jiuwenswarm/channels/web/frontend/src/services/webClient.ts", "jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts"]
 ---
 
 # 持续目标与会话控制：实现深读

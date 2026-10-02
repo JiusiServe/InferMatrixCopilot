@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts:L115-L137, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts:L81-L99, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts:L54-L63, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts:L54-L70]
+feature: "plan-mode"
+entry_points: ["jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts", "jiuwenswarm/channels/web/frontend/src/stores/planStore.ts"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts", "jiuwenswarm/channels/web/frontend/src/stores/planStore.ts"]
 ---
 
 # 计划模式与多入口切换限制：实现深读

@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts:L21-L39, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/vscode-extension/src/client/WsClient.ts:L145-L152]
+feature: "vscode"
+entry_points: ["jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts"]
+source_globs: ["jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts", "jiuwenswarm/channels/ide/packages/vscode-extension/*"]
 ---
 
 # VS Code 客户端：实现深读

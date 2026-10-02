@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py:L67-L83, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py:L153-L179, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py:L201-L209, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py:L57-L58, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py:L24-L33, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py:L162-L168]
+feature: "im-whatsapp"
+entry_points: ["jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/*"]
 ---
 
 # WhatsApp 频道：实现深读

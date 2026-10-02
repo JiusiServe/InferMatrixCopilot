@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/auto_harness/service.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/AutoHarness.md
+feature: "auto-harness"
+entry_points: ["jiuwenswarm/agents/harness/common/auto_harness/service.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/auto_harness/service.py", "jiuwenswarm/agents/harness/common/auto_harness/*"]
 ---
 
 # Auto Harness 评测优化 的职责、接口与配置

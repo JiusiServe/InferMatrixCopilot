@@ -9,6 +9,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/rails/permissions/permission_interrupt_rail.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/rails/permissions/policy_eval.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/工具权限与安全防护.md
+feature: "permissions"
+entry_points: ["jiuwenswarm/agents/harness/common/rails/permissions/permission_interrupt_rail.py", "jiuwenswarm/agents/harness/common/rails/permissions/policy_eval.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/rails/permissions/permission_interrupt_rail.py", "jiuwenswarm/agents/harness/common/rails/permissions/policy_eval.py", "jiuwenswarm/server/*"]
 ---
 
 # 工具权限与安全治理 的职责、接口与配置

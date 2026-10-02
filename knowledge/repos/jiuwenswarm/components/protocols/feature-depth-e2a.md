@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/e2a/acp/acp_tool_updates.py:L119-L148, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/e2a/acp/acp_tool_updates.py:L301-L310]
+feature: "e2a"
+entry_points: ["jiuwenswarm/common/e2a/models.py"]
+source_globs: ["jiuwenswarm/common/e2a/models.py", "jiuwenswarm/common/e2a/*.py"]
 ---
 
 # E2A 统一请求响应协议：实现深读

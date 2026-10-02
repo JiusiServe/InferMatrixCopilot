@@ -9,6 +9,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/index.ts
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/browser-extension/浏览器扩展.md
+feature: "browser-client"
+entry_points: ["jiuwenswarm/channels/browser/frontend/src/background/index.ts", "jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts"]
+source_globs: ["jiuwenswarm/channels/browser/frontend/src/background/index.ts", "jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts", "jiuwenswarm/channels/browser/frontend/src/*"]
 ---
 
 # Chromium 浏览器扩展 的职责、接口与配置

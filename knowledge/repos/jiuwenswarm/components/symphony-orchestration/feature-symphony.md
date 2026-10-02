@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/symphony/service.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Symphony-技能编排与分发.md
+feature: "symphony"
+entry_points: ["jiuwenswarm/symphony/service.py"]
+source_globs: ["jiuwenswarm/symphony/service.py", "jiuwenswarm/symphony/*.py"]
 ---
 
 # Symphony 检索与图谱编排 的职责、接口与配置

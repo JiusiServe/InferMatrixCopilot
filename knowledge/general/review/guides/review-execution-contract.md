@@ -1,7 +1,7 @@
 ---
 title: "独立审查执行合同"
 created: 2026-07-13
-updated: 2026-09-02
+updated: 2026-10-02
 type: guide
 tags: [general, review]
 sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "vllm-project/vllm-omni PR #5871", "zuiho-kai/claude-workflow-starter@c217fc6"]
@@ -13,7 +13,7 @@ sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "vllm-
 
 ## 单次输入与简明检查单
 
-主审查只采集一次 `{base_sha, head_sha, PR title/body, changed files, diff, mergeability, CI}`。元数据返回后先发宿主进度，再把 title/body/changed files 一次传给 Direct；使用返回的至多 3 个精确 owner/model `knowledge_routes` 内嵌 `quick_map`，只有具体歧义阻塞源码审查时才打开完整规则文件，不得从总入口和索引重新导航。changed files 只验证和补全范围；PR 描述只负责导航，不能作为 finding 证据。
+主审查只采集一次 `{base_sha, head_sha, PR title/body, changed files, diff, mergeability, CI}`。元数据返回后先发宿主进度，再把 title/body/changed files 一次传给 Direct；使用返回的至多 3 个精确 owner/model `knowledge_routes` 内嵌 `quick_map`，同时消费 `related_knowledge` 中有界的解释性正文，核对来源 pin 与 PR head，缺失维度保留为未知。截断背景只沿预算内的 `related_document_read_paths` 读取。只有具体歧义阻塞源码审查时才打开完整规则文件，不得从总入口和索引重新导航。changed files 只验证和补全范围；PR 描述只负责导航，不能作为 finding 证据。
 
 同一份证据包持续追加已读文件、caller 搜索、测试结果和 findings，后续步骤必须复用，不能重新抓取或重复调查。第一次 Codex review 使用这份简明检查单：
 

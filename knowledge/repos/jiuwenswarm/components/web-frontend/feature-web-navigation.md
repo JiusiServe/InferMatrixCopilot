@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/页面概览.md
+feature: "web-navigation"
+entry_points: ["jiuwenswarm/channels/web/frontend/src/App.tsx"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/App.tsx", "jiuwenswarm/channels/web/frontend/src/*"]
 ---
 
 # Web 页面与功能入口 的职责、接口与配置

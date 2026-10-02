@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/安装指南.md
+feature: "bootstrap"
+entry_points: ["jiuwenswarm/init_workspace.py"]
+source_globs: ["jiuwenswarm/init_workspace.py"]
 ---
 
 # 初始化与服务启动 的职责、接口与配置

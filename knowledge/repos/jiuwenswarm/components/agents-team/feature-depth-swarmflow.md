@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/handlers/workflow_state.py:L832-L847]
+feature: "swarmflow"
+entry_points: ["jiuwenswarm/agents/harness/team/handlers/workflow_state.py"]
+source_globs: ["jiuwenswarm/agents/harness/team/handlers/workflow_state.py", "jiuwenswarm/agents/harness/team/handlers/*"]
 ---
 
 # SwarmFlow 工作流与 HITL：实现深读

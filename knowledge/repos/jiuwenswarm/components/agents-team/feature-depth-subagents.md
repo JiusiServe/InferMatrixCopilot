@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/swarm/providers/code_subagents.py:L111-L126, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/swarm/providers/code_subagents.py:L137-L154, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/statusline_setup_agent.py:L89-L119]
+feature: "subagents"
+entry_points: ["jiuwenswarm/agents/swarm/providers/code_subagents.py", "jiuwenswarm/agents/harness/common/tools/subagent_compat.py"]
+source_globs: ["jiuwenswarm/agents/swarm/providers/code_subagents.py", "jiuwenswarm/agents/harness/common/tools/subagent_compat.py", "jiuwenswarm/agents/harness/common/rails/*"]
 ---
 
 # 子代理派发与验证：实现深读

@@ -10,6 +10,7 @@ tool (design §V2.3.4 channel 3: structure is pulled, never injected wholesale).
 from __future__ import annotations
 
 from pathlib import Path
+import json
 from typing import Any
 
 from ...memory.debug_memory import DebugMemory
@@ -236,13 +237,12 @@ def _repo_map_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
 
 
 def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
-    """`doc_search` / `doc_read` over the SHARED curated knowledge base (the
-    vendored community docs: general/ cross-repo + repos/<repo>/ specific). The
-    always-on briefing injects only the hard-gate rules + navigation; the deep
-    guides/incidents those pages link to (general or repo-specific) are pulled on
-    demand here (design §V2.3.4 channel 3: pulled, not injected) — so nothing in
-    the knowledge base is lost, just not dumped wholesale. Read-only and contained
-    under the knowledge dir (traversal is refused)."""
+    """Shared read/search tools plus bounded implementation context.
+
+    General docs are readable; related prose is selected only from the active
+    repository. Review dispatch injects it before the first model call, and
+    agents can retrieve additional context on demand without writing the KB.
+    """
     kdir = Path(ctx.settings.knowledge_dir)  # shared base (general/ + repos/)
     if not kdir.exists():
         return {}
@@ -277,8 +277,20 @@ def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
                        f"offset={page['next_offset']}]")
         return window
 
+    def doc_related(changed_files: list[str], query: str = "", **_: Any) -> str:
+        """The same bounded implementation context used by Direct plans."""
+        try:
+            return json.dumps(docs.related(changed_files, query=query), ensure_ascii=False)
+        except KnowledgeDocsError as exc:
+            return json.dumps({"status": "refused", "reason": str(exc), "documents": []})
+
     s = {"type": "string"}
     return {
+        "doc_related": ToolDef(
+            "doc_related", "Retrieve at most two relevant implementation explanations for changed files. "
+                           "Includes pinned sources and missing facets; verify against the PR head.",
+            {"type": "object", "properties": {"changed_files": {"type": "array", "items": s}, "query": s},
+             "required": ["changed_files"]}, doc_related),
         "doc_search": ToolDef(
             "doc_search",
             "Search the repo's curated knowledge base (community docs) for a "

@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/auth/service.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/华为账号登录.md
+feature: "login"
+entry_points: ["jiuwenswarm/common/auth/service.py"]
+source_globs: ["jiuwenswarm/common/auth/service.py", "jiuwenswarm/common/auth/*.py"]
 ---
 
 # 账号登录与凭据续期 的职责、接口与配置

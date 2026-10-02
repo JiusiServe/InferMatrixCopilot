@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenbox/src/jiuwenbox/server/app.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenbox/README_CN.md
+feature: "sandbox"
+entry_points: ["jiuwenbox/src/jiuwenbox/server/app.py"]
+source_globs: ["jiuwenbox/src/jiuwenbox/server/app.py", "jiuwenbox/src/jiuwenbox/*"]
 ---
 
 # JiuwenBox 隔离执行 的职责、接口与配置

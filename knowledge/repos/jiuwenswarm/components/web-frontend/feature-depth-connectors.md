@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts:L14-L30, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts:L146-L169]
+feature: "connectors"
+entry_points: ["jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts", "jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts", "jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx"]
 ---
 
 # 连接器市场与 MCP 授权流程：实现深读

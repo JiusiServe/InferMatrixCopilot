@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/auto_harness/service.py:L961-L980, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/auto_harness/service.py:L880-L958]
+feature: "auto-harness"
+entry_points: ["jiuwenswarm/agents/harness/common/auto_harness/service.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/auto_harness/service.py", "jiuwenswarm/agents/harness/common/auto_harness/*"]
 ---
 
 # Auto Harness 评测优化：实现深读

@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/cron/factory.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/定时任务.md
+feature: "cron"
+entry_points: ["jiuwenswarm/runtime/cron/factory.py"]
+source_globs: ["jiuwenswarm/runtime/cron/factory.py", "jiuwenswarm/runtime/cron/*.py"]
 ---
 
 # 定时任务与调度存储 的职责、接口与配置

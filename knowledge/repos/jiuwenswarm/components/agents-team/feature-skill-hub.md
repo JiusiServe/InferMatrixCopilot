@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/marketplace/hub_client.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/技能.md
+feature: "skill-hub"
+entry_points: ["jiuwenswarm/server/runtime/marketplace/hub_client.py"]
+source_globs: ["jiuwenswarm/server/runtime/marketplace/hub_client.py", "jiuwenswarm/server/runtime/marketplace/*"]
 ---
 
 # Skill Hub 与市场流通 的职责、接口与配置

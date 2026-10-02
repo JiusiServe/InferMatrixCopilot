@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/multimodal_config.py:L233-L282, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/multimodal_config.py:L185-L230, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/image_tools.py:L89-L93]
+feature: "multimodal"
+entry_points: ["jiuwenswarm/agents/harness/common/tools/multimodal_config.py", "jiuwenswarm/agents/harness/common/tools/image_tools.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/tools/multimodal_config.py", "jiuwenswarm/agents/harness/common/tools/image_tools.py", "jiuwenswarm/agents/harness/common/tools/*"]
 ---
 
 # 多模态理解与媒体配置：实现深读

@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/dingtalk/dingtalk_connect.py:L28-L42, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/dingtalk/dingtalk_connect.py:L374-L412]
+feature: "im-dingtalk"
+entry_points: ["jiuwenswarm/gateway/channel_manager/im_platforms/dingtalk/dingtalk_connect.py"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/dingtalk/dingtalk_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/dingtalk/*"]
 ---
 
 # 钉钉 频道：实现深读

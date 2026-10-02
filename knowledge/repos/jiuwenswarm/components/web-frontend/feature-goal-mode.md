@@ -12,6 +12,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Harness.md
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/AGENTS.md
+feature: "goal-mode"
+entry_points: ["jiuwenswarm/channels/web/frontend/src/features/goalMode/goalModeGate.ts", "jiuwenswarm/channels/web/frontend/src/stores/goalStore.ts", "jiuwenswarm/channels/web/frontend/src/services/webClient.ts", "jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/features/goalMode/goalModeGate.ts", "jiuwenswarm/channels/web/frontend/src/stores/goalStore.ts", "jiuwenswarm/channels/web/frontend/src/services/webClient.ts", "jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts"]
 ---
 
 # 持续目标与会话控制的职责、接口与配置

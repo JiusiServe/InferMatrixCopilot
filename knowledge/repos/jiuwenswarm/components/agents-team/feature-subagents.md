@@ -9,6 +9,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/swarm/providers/code_subagents.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/subagent_compat.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Harness.md
+feature: "subagents"
+entry_points: ["jiuwenswarm/agents/swarm/providers/code_subagents.py", "jiuwenswarm/agents/harness/common/tools/subagent_compat.py"]
+source_globs: ["jiuwenswarm/agents/swarm/providers/code_subagents.py", "jiuwenswarm/agents/harness/common/tools/subagent_compat.py", "jiuwenswarm/agents/harness/common/rails/*"]
 ---
 
 # 子代理派发与验证 的职责、接口与配置

@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skilldev/service.py:L44-L52, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skilldev/service.py:L65-L83, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skilldev/service.py:L328-L336, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skilldev/service.py:L92-L101, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skilldev/schema.py:L113-L122]
+feature: "skill-development"
+entry_points: ["jiuwenswarm/server/runtime/skill/skilldev/service.py", "jiuwenswarm/server/runtime/skill/skilldev/pipeline.py", "jiuwenswarm/server/runtime/skill/skilldev/deps.py", "jiuwenswarm/server/runtime/skill/skilldev/context.py"]
+source_globs: ["jiuwenswarm/server/runtime/skill/skilldev/service.py", "jiuwenswarm/server/runtime/skill/skilldev/pipeline.py", "jiuwenswarm/server/runtime/skill/skilldev/deps.py", "jiuwenswarm/server/runtime/skill/skilldev/context.py"]
 ---
 
 # SkillDev 创建、评测与打包边界：实现深读

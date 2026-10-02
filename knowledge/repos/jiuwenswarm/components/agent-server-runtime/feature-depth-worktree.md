@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_code.py:L1860-L1870]
+feature: "worktree"
+entry_points: ["jiuwenswarm/server/runtime/agent_adapter/interface_code.py"]
+source_globs: ["jiuwenswarm/server/runtime/agent_adapter/interface_code.py", "jiuwenswarm/agents/harness/common/rails/*"]
 ---
 
 # Worktree 隔离工作：实现深读

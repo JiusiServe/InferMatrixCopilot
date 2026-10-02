@@ -677,3 +677,13 @@ PR 描述只展示前 20 个升级及总数，完整来源留在 commit trailers
 模型失败、findings 或远程 head 变化均保持阻塞；人仍负责合并。
 dry run 为旧快照建本地临时 baseline，再生成相同升级串与全量 Codex 审阅，落盘预览和 `COMMITS.json`，不写 GitHub。
 全程不打开服务账本。测试：`test_kb_init_history.py`、`test_kb_init_config.py`、`test_imkbinit_skill.py`。
+
+
+## 2026-10-02 初始化与检索验收
+
+`knowledge` 与有 accepted depth 的 `knowledge-deepen` 从 coverage policy 更新现存功能解释页
+的 `feature`、`entry_points`、`source_globs`；同一 writer 保留正文和来源。深读 checkpoint
+仍绑定 accepted 原文哈希，恢复后再生成提示，不改已接受证明。全部被拒绝时不写 metadata-only
+变更，保持 empty 阶段语义。提示不会增加 coverage、创建规则或改 owner 路由。
+完成合并后的完整 checkout 用 `tools/audit_review_retrieval.py` 验收 Direct 上下文交付，
+同时报告描述+路径与仅路径结果。报告在 eval/本地状态，与 breadth/depth 审计分开；不是 RQS 或缺陷召回率。

@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_code.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/编码记忆.md
+feature: "coding-memory"
+entry_points: ["jiuwenswarm/server/runtime/agent_adapter/interface_code.py"]
+source_globs: ["jiuwenswarm/server/runtime/agent_adapter/interface_code.py", "jiuwenswarm/agents/harness/code/*"]
 ---
 
 # Code 模式编码记忆 的职责、接口与配置

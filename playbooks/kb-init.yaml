@@ -24,3 +24,8 @@ params:
 steps:
   - {id: init, step: knowledge.init}
 success: the stage's PR is open (or its dry run is written), or the record says why it is blocked
+retrieval_acceptance:
+  after: "knowledge / knowledge-deepen, in the complete merged checkout"
+  command: "PYTHONPATH=src python tools/audit_review_retrieval.py --repo <repo> --report <eval-report.json>"
+  checks: "catalog description+path probes receive bounded feature prose; paths-only ambiguity is reported separately"
+  meaning: "context delivery only; report breadth, checked depth, missing facets and real PR quality separately"

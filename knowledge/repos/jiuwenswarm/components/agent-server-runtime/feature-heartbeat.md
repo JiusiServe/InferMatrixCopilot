@@ -11,6 +11,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/heartbeat/proxy.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/项目与会话管理.md
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/AGENTS.md
+feature: "heartbeat"
+entry_points: ["jiuwenswarm/agents/harness/code/rails/heartbeat/models.py", "jiuwenswarm/agents/harness/code/rails/heartbeat/controller.py", "jiuwenswarm/gateway/heartbeat/proxy.py"]
+source_globs: ["jiuwenswarm/agents/harness/code/rails/heartbeat/models.py", "jiuwenswarm/agents/harness/code/rails/heartbeat/controller.py", "jiuwenswarm/gateway/heartbeat/proxy.py"]
 ---
 
 # 绑定会话的心跳续跑任务的职责、接口与配置

@@ -1,0 +1,485 @@
+{
+  "baseline_commit": "2b669678bd5bf43a77edf5b296c5d59dc4497591",
+  "same_kb_input": "current metadata; repository page bodies unchanged from baseline",
+  "cases": [
+    {
+      "feature": "bootstrap",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "instances",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "desktop",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "deployment",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "process-cli",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "cli",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "tui",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "web-chat",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "web-navigation",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "projects-sessions",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "modes",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "team",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "distributed-team",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "human-team",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "swarmflow",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "harness",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "planning",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "subagents",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "skills",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "swarm-skills",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "skill-hub",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "skill-evolution",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "symphony",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "auto-harness",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "rsi-packages",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "ttse",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "memory",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "auto-memory",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "coding-memory",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "task-memory",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "context",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "permissions",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "hooks",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "applications",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "video-duplex",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "e2a",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "a2a",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "acp",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "ssh",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "a2ui",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "browser-tools",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "browser-client",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "vscode",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "jetbrains",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "sdk",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "sandbox",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "models",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "mcp",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "login",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "cron",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "observability",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "debug-trace",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "multimodal",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "lsp",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "worktree",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "autofix",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "im-feishu",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "im-wechat",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "im-wecom",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "im-dingtalk",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "im-xiaoyi",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "im-slack",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "im-telegram",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "im-discord",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "im-whatsapp",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "agent-management",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "jiuwen-memory-sdk",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "image-generation",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "sandbox-privacy-proxy",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "digital-avatar",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "connectors",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "external-cli-agents",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "goal-mode",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "plan-mode",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "heartbeat",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "artifacts",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "speech-interaction",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "skill-development",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    },
+    {
+      "feature": "proactive-recommendation",
+      "routes_unchanged": true,
+      "old_embedded_related_documents": 0,
+      "old_file_reads": 1
+    }
+  ],
+  "summary": {
+    "cases": 79,
+    "routes_unchanged": 79,
+    "old_embedded_related_documents": 0
+  }
+}

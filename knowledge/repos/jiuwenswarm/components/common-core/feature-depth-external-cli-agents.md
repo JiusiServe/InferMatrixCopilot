@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/external_cli_runtime.py:L215-L239, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/external_cli_catalog.py:L24-L27]
+feature: "external-cli-agents"
+entry_points: ["jiuwenswarm/common/external_cli_runtime.py", "jiuwenswarm/common/external_cli_catalog.py"]
+source_globs: ["jiuwenswarm/common/external_cli_runtime.py", "jiuwenswarm/common/external_cli_catalog.py"]
 ---
 
 # 外部 Claude 与 Codex CLI 智能体：实现深读

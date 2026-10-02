@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/manager.py:L90-L100]
+feature: "hooks"
+entry_points: ["jiuwenswarm/extensions/manager.py"]
+source_globs: ["jiuwenswarm/extensions/manager.py", "jiuwenswarm/extensions/*.py"]
 ---
 
 # 生命周期 Hooks 与扩展：实现深读

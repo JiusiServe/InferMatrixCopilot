@@ -9,6 +9,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/swarm/browser_runtime.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/browser_config.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/浏览器.md
+feature: "browser-tools"
+entry_points: ["jiuwenswarm/agents/swarm/browser_runtime.py", "jiuwenswarm/agents/harness/common/browser_config.py"]
+source_globs: ["jiuwenswarm/agents/swarm/browser_runtime.py", "jiuwenswarm/agents/harness/common/browser_config.py", "jiuwenswarm/agents/harness/common/*"]
 ---
 
 # 浏览器服务与网页工具 的职责、接口与配置

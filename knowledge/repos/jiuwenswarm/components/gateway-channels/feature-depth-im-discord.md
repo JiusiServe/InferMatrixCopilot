@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/discord/discord_connect.py:L190-L217]
+feature: "im-discord"
+entry_points: ["jiuwenswarm/gateway/channel_manager/im_platforms/discord/discord_connect.py"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/discord/discord_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/discord/*"]
 ---
 
 # Discord 频道：实现深读

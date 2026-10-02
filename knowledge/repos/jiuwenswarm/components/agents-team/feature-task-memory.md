@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/经验记忆.md
+feature: "task-memory"
+entry_points: ["jiuwenswarm/agents/harness/common/tools/task_tools.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/tools/task_tools.py", "jiuwenswarm/agents/harness/common/memory/*"]
 ---
 
 # 任务经验检索与沉淀 的职责、接口与配置

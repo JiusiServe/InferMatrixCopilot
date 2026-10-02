@@ -9,6 +9,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/config.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/调试追踪.md
+feature: "debug-trace"
+entry_points: ["jiuwenswarm/server/runtime/debug_trace/config.py", "jiuwenswarm/server/runtime/debug_trace/stream_logger.py"]
+source_globs: ["jiuwenswarm/server/runtime/debug_trace/config.py", "jiuwenswarm/server/runtime/debug_trace/stream_logger.py", "jiuwenswarm/server/runtime/debug_trace/*.py"]
 ---
 
 # Debug Dump 与 OTel 的职责、接口与配置

@@ -10,6 +10,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/rails/permissions/owner_scopes.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/频道.md
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/国内频道.md
+feature: "digital-avatar"
+entry_points: ["jiuwenswarm/agents/harness/common/rails/avatar_rail.py", "jiuwenswarm/agents/harness/common/rails/permissions/owner_scopes.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/rails/avatar_rail.py", "jiuwenswarm/agents/harness/common/rails/permissions/owner_scopes.py"]
 ---
 
 # 群聊数字分身与 owner 权限的职责、接口与配置

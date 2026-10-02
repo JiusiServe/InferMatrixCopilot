@@ -9,6 +9,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/external_cli_runtime.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/external_cli_catalog.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/设置与频道升级迁移指南.md
+feature: "external-cli-agents"
+entry_points: ["jiuwenswarm/common/external_cli_runtime.py", "jiuwenswarm/common/external_cli_catalog.py"]
+source_globs: ["jiuwenswarm/common/external_cli_runtime.py", "jiuwenswarm/common/external_cli_catalog.py"]
 ---
 
 # 外部 Claude 与 Codex CLI 智能体的职责、接口与配置

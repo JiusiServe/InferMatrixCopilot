@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/auth/account_kit.py:L92-L99, "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/华为账号登录.md:L15-L27"]
+feature: "login"
+entry_points: ["jiuwenswarm/common/auth/service.py"]
+source_globs: ["jiuwenswarm/common/auth/service.py", "jiuwenswarm/common/auth/*.py"]
 ---
 
 # 账号登录与凭据续期：实现深读

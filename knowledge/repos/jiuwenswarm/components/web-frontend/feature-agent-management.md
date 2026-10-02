@@ -10,6 +10,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/features/agentManagement/client.ts
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/components/AgentPanel/index.tsx
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/智能体.md
+feature: "agent-management"
+entry_points: ["jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/index.tsx", "jiuwenswarm/channels/web/frontend/src/features/agentManagement/client.ts", "jiuwenswarm/channels/web/frontend/src/components/AgentPanel/index.tsx"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/index.tsx", "jiuwenswarm/channels/web/frontend/src/features/agentManagement/client.ts", "jiuwenswarm/channels/web/frontend/src/components/AgentPanel/index.tsx"]
 ---
 
 # 智能体资产管理与工作区浏览的职责、接口与配置

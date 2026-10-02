@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/gateway/test_feishu_im_adapter.py:L12-L26]
+feature: "im-feishu"
+entry_points: ["jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_connect.py"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/feishu/*"]
 ---
 
 # 飞书 频道：实现深读

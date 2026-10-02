@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/memory/config.py:L250-L281, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/memory/config.py:L207-L247, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/memory/dreaming/sweeper.py:L51-L71]
+feature: "memory"
+entry_points: ["jiuwenswarm/agents/harness/common/memory/manager.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/memory/manager.py", "jiuwenswarm/agents/harness/common/memory/*"]
 ---
 
 # 长期记忆：实现深读

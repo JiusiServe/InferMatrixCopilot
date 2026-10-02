@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_connect.py:L46-L66, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_connect.py:L1374-L1418, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_connect.py:L1426-L1446]
+feature: "im-wecom"
+entry_points: ["jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_connect.py"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/wecom/*"]
 ---
 
 # 企业微信 频道：实现深读

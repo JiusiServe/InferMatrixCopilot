@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/ssh/server.py:L144-L149, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/ssh/server.py:L273-L290]
+feature: "ssh"
+entry_points: ["jiuwenswarm/gateway/channel_manager/protocol/ssh/ssh_connect.py"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/protocol/ssh/ssh_connect.py", "jiuwenswarm/gateway/channel_manager/protocol/ssh/*.py"]
 ---
 
 # SSH 频道与远程终端：实现深读

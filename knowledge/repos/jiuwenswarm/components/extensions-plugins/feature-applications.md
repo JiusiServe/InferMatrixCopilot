@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/application_host.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/application-plugins.md
+feature: "applications"
+entry_points: ["jiuwenswarm/extensions/application_host.py"]
+source_globs: ["jiuwenswarm/extensions/application_host.py"]
 ---
 
 # Application Plugin 与前端贡献 的职责、接口与配置

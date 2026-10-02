@@ -124,6 +124,10 @@ What each stage opens:
   drafts. It also prevents skipping knowledge and rejects results for an older
   policy hash. Without a policy, report only owner/facet coverage and do not claim
   feature/core completion. Save audit reports under eval or local state.
+  The stage emits `feature`, `entry_points` and `source_globs` from the reviewed
+  policy on explanatory feature pages, preserving prose and source proofs.
+  These hints let Direct and Agent review retrieve relevant knowledge automatically;
+  they do not count toward structural or behavioral coverage.
 - `deepen`: code rules for the hot modules, plus the adapter flip to
   `enabled: true, mode: shadow`.
 - `pr-history`: reads the latest 1,000 merged upstream PRs as of the upstream
@@ -162,6 +166,20 @@ record remain harvestable, and may add this phase after their earlier stages
 have merged. Once a history record exists it must finish before harvest.
 
 ## 4. Report
+
+After `knowledge` or `knowledge-deepen` has merged, verify retrieval in the complete
+InferMatrixCopilot checkout (not a partial dry-run delta):
+
+```text
+PYTHONPATH=src python tools/audit_review_retrieval.py --repo <repo> --report <eval-report.json>
+```
+
+The offline audit checks every catalog feature using description plus entry points,
+and separately measures paths-only ambiguity. It must return bounded prose, including
+approved depth where available; explicit missing facets remain gaps. Save reports
+outside `knowledge/`. Report delivery results separately from breadth/depth and real
+PR quality; this audit does not establish bug recall or revalidate the PR head.
+If no complete merged checkout is available yet, report retrieval as unverified.
 
 Read the stage record and the PR body (`PR_BODY.md` under `pr.dry_run_dir` for
 a dry run, otherwise the opened PR). Summarise:

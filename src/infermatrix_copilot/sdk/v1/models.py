@@ -260,6 +260,7 @@ class DirectReviewPlan(_Serializable):
     # new public functions no test in the request's diff names (#164);
     # {"status": "no_diff"} when the request carried no diff
     untested_public_api: dict[str, Any] = field(default_factory=dict)
+    related_knowledge: dict[str, Any] = field(default_factory=dict)
 
 FeedbackStatus = Literal[
     "checked", "disabled", "unavailable", "not_applicable"

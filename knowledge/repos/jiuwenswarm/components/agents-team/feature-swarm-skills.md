@@ -9,6 +9,9 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/swarm/assembly.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/swarm/providers/skills.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/SwarmSkills.md
+feature: "swarm-skills"
+entry_points: ["jiuwenswarm/agents/swarm/assembly.py", "jiuwenswarm/agents/swarm/providers/skills.py"]
+source_globs: ["jiuwenswarm/agents/swarm/assembly.py", "jiuwenswarm/agents/swarm/providers/skills.py", "jiuwenswarm/agents/swarm/*"]
 ---
 
 # 团队技能与能力复用 的职责、接口与配置

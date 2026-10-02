@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L261-L289, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L62-L70]
+feature: "observability"
+entry_points: ["jiuwenswarm/observability/sink.py"]
+source_globs: ["jiuwenswarm/observability/sink.py", "jiuwenswarm/observability/*.py"]
 ---
 
 # 执行轨迹与保留：实现深读

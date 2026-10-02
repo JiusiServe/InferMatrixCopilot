@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/日志.md
+feature: "observability"
+entry_points: ["jiuwenswarm/observability/sink.py"]
+source_globs: ["jiuwenswarm/observability/sink.py", "jiuwenswarm/observability/*.py"]
 ---
 
 # 执行轨迹与保留 的职责、接口与配置

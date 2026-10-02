@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/cli/main.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/命令行指令.md
+feature: "cli"
+entry_points: ["jiuwenswarm/cli/main.py"]
+source_globs: ["jiuwenswarm/cli/main.py", "jiuwenswarm/cli/*.py"]
 ---
 
 # 交互式命令行 的职责、接口与配置

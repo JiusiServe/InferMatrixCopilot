@@ -5,6 +5,9 @@ updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
 sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/heartbeat/proxy.py:L25-L66, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/code/rails/heartbeat/controller.py:L71-L80, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/code/rails/heartbeat/controller.py:L278-L380]
+feature: "heartbeat"
+entry_points: ["jiuwenswarm/agents/harness/code/rails/heartbeat/models.py", "jiuwenswarm/agents/harness/code/rails/heartbeat/controller.py", "jiuwenswarm/gateway/heartbeat/proxy.py"]
+source_globs: ["jiuwenswarm/agents/harness/code/rails/heartbeat/models.py", "jiuwenswarm/agents/harness/code/rails/heartbeat/controller.py", "jiuwenswarm/gateway/heartbeat/proxy.py"]
 ---
 
 # 绑定会话的心跳续跑任务：实现深读

@@ -8,6 +8,9 @@ tags:
 sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/process_cli/app.py
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/命令行指令.md
+feature: "process-cli"
+entry_points: ["jiuwenswarm/channels/process_cli/app.py"]
+source_globs: ["jiuwenswarm/channels/process_cli/app.py", "jiuwenswarm/channels/process_cli/*.py"]
 ---
 
 # 机器执行与本地 CLI 的职责、接口与配置
