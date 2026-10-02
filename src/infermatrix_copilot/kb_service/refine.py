@@ -136,7 +136,8 @@ def refine(rt, lifecycle, changeset: dict) -> str | None:
                                 external=external, operations=draft.operations, result=draft.result,
                                 evidence=[*evidence, mark], event_ids=[], release=release,
                                 draft_keys=[accepted_key(key, holder)] if accepted_key(key, holder) else [],
-                                extra_detail={"refine_round": round_, "refine_history": history})
+                                extra_detail={"refine_round": round_, "refine_history": history,
+                                              "generator": draft.generator})
     open_pr = changeset.get("pr_number") is not None
     rt.ledger.update_changeset(changeset["id"], status="superseding" if open_pr else "refined",
                                detail={**detail, "refined_as": new_id, "refine_history": history,

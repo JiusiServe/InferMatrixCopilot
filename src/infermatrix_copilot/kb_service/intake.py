@@ -65,6 +65,7 @@ class Draft:
     rationale: str = ""
     attempts: list[dict] = field(default_factory=list)
     rejected: bool = False  # repairs exhausted, as opposed to "nothing to learn"
+    generator: str = ""  # the successful model, including an explicit fallback
 
     @property
     def empty(self) -> bool:
@@ -189,7 +190,8 @@ def draft_changes(*, repo: str, repo_dir: str, event_id: int, evidence: dict,
                 break
         else:
             if not operations:
-                return Draft([event_id], [], None, str(reply.data.get("rationale") or ""), attempts)
+                return Draft([event_id], [], None, str(reply.data.get("rationale") or ""), attempts,
+                             generator=reply.role.label())
             try:
                 result = apply_operations(files, operations, release=release, today=today)
             except LifecycleError as exc:
@@ -198,7 +200,8 @@ def draft_changes(*, repo: str, repo_dir: str, event_id: int, evidence: dict,
                 attempts.append({"attempt": attempt, "error": str(exc)})
                 continue
             accept_attempt(attempt)  # only this call's reply became the change
-            return Draft([event_id], operations, result, str(reply.data.get("rationale") or ""), attempts)
+            return Draft([event_id], operations, result, str(reply.data.get("rationale") or ""), attempts,
+                         generator=reply.role.label())
         attempts.append({"attempt": attempt, "error": feedback.strip()})
     return Draft([event_id], [], None, "rejected after repairs", attempts, rejected=True)
 

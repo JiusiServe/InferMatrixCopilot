@@ -49,7 +49,18 @@ infermatrix-copilot kb calibrate --repo vllm-omni                  # 评审模�
 ```
 
 模型：`KB_GENERATOR`（默认 `claude-code:claude-opus-5-5`）、`KB_JUDGE`（默认
-`codex:gpt-6-sol:medium`）。每次模型调用写入 `$KB_STATE_DIR/traces/model_calls.jsonl`。
+`codex:gpt-6-sol:medium`）。生成器可显式配置一个备用模型：
+
+```bash
+export KB_GENERATOR_FALLBACK=zcode:GLM-5.3
+```
+
+主生成器缺少 CLI、未登录、调用失败、超时或回复无法解析时，同一次请求尝试备用生成器一次；
+两者都不可用则事件继续排队。评审模型不切换，备用生成器也必须与评审来自不同家族。
+每次尝试记录实际 provider/model，备用调用还记录 `fallback_from`；变更集注明实际生成器。
+未设置此变量时只调用主模型。schema 错误仍由原有修复流程处理；带花费阈值的调用不切换，
+因为预算只为主模型预留且 Zcode 无法执行阈值。
+调用记录位于 `$KB_STATE_DIR/traces/records/`。
 
 运行经验（来源②）：`pr_debug` 的已验证修复记录经 `KB_BUGFIX_DIR`（同机，与运行侧 `KNOWLEDGE_INTAKE_DIR`
 配为同一目录）与 `KB_BUGFIX_MAILBOX`（异机，`owner/repo#N`，只接受 `KB_BUGFIX_AUTHORS` 列出的作者）进入 intake。
