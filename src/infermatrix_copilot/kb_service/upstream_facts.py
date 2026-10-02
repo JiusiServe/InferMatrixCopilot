@@ -8,6 +8,7 @@ publisher's re-check is independent of what the service saw.
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 from typing import Callable
@@ -18,12 +19,20 @@ from ..knowledge_service.lifecycle import LifecycleError, Page
 
 class MirrorObserver:
     def __init__(self, git_dir: Path, repository: str, pull: Callable[[int], dict], *,
-                 url: str | None = None):
+                 url: str | None = None, branch: str | None = None):
         self.git_dir = Path(git_dir)
         self.repository = repository
         self._pull = pull
         self._url = url or f"https://github.com/{repository}.git"
         self._synced = False
+        self.branch = branch
+        if branch is not None:
+            if not isinstance(branch, str) or not branch or "\0" in branch:
+                raise FactsError(f"invalid upstream branch: {branch!r}")
+            proc = subprocess.run(["git", "check-ref-format", "--branch", branch],
+                                  capture_output=True, text=True, check=False)
+            if proc.returncode or proc.stdout.strip() != branch:
+                raise FactsError(f"invalid upstream branch: {branch!r}")
 
     def _git(self, *args: str, ok: tuple[int, ...] = (0,)) -> subprocess.CompletedProcess:
         try:
@@ -48,17 +57,24 @@ class MirrorObserver:
                 raise FactsError(f"cannot clone {self.repository}: {exc}") from exc
             if proc.returncode != 0:
                 raise FactsError(f"cannot clone {self.repository}: {proc.stderr.strip()[:300]}")
-        self._git("fetch", "--quiet", "origin", "+refs/heads/*:refs/heads/*")
+        self._git("fetch", "--quiet", "--prune", "origin", "+refs/heads/*:refs/heads/*")
         self._synced = True
 
     def head(self) -> str:
         self.sync()
-        return self._git("rev-parse", "HEAD^{commit}").stdout.strip()
+        ref = f"refs/heads/{self.branch}" if self.branch is not None else "HEAD"
+        return self._git("rev-parse", "--verify", f"{ref}^{{commit}}").stdout.strip()
 
     def _commit(self, sha: str) -> None:
+        if not re.fullmatch(r"[0-9a-fA-F]{40}", sha):
+            raise FactsError(f"invalid upstream commit: {sha!r}")
         self.sync()
         if self._git("cat-file", "-e", f"{sha}^{{commit}}", ok=(0, 1, 128)).returncode != 0:
-            raise FactsError(f"{self.repository} has no commit {sha[:12]}")
+            # A merged PR can be absent from current branches after a force
+            # push. Fetch only the exact pinned object, never substitute HEAD.
+            self._git("fetch", "--quiet", "origin", sha)
+            if self._git("cat-file", "-e", f"{sha}^{{commit}}", ok=(0, 1, 128)).returncode != 0:
+                raise FactsError(f"{self.repository} has no commit {sha[:12]}")
 
     def top_level(self, sha: str) -> set[str]:
         self._commit(sha)

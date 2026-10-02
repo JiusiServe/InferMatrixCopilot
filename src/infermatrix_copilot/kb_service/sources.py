@@ -343,15 +343,26 @@ class GitHubReader:
         """
         root = f"/repos/{full_name}/pulls/{int(number)}"
         pr = self.get(root)
-        payload = {"number": int(pr["number"]), "title": str(pr.get("title") or ""),
+        base, head = pr.get("base") or {}, pr.get("head") or {}
+        base_repo = str((base.get("repo") or {}).get("full_name") or "")
+        if base_repo and base_repo.casefold() != full_name.casefold():
+            raise SourceError(f"PR #{number} base repository differs from {full_name}")
+        payload = {"number": int(pr["number"]), "source_reference": f"PR #{number}",
+                   "repository": full_name,
+                   "base": {"ref": str(base.get("ref") or ""), "sha": str(base.get("sha") or ""),
+                            "repo": {"full_name": base_repo}},
+                   "head": {"ref": str(head.get("ref") or ""), "sha": str(head.get("sha") or "")},
+                   "title": str(pr.get("title") or ""),
                    "body": str(pr.get("body") or ""), "merged_at": str(pr.get("merged_at") or ""),
                    "merge_commit_sha": str(pr.get("merge_commit_sha") or "")}
         fields = {
             "files": (root + "/files", ("filename", "status")),
+            "commits": (root + "/commits", ("sha", "commit")),
             "reviews": (root + "/reviews", ("id", "body", "state", "submitted_at", "commit_id")),
             "threads": (root + "/comments", ("id", "in_reply_to_id", "body", "path", "line",
-                                              "original_line", "created_at", "commit_id")),
-            "replies": (f"/repos/{full_name}/issues/{int(number)}/comments", ("id", "body", "created_at")),
+                                              "original_line", "created_at", "updated_at", "commit_id")),
+            "replies": (f"/repos/{full_name}/issues/{int(number)}/comments",
+                        ("id", "body", "created_at", "updated_at")),
         }
         def check_size() -> None:
             if len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) > max_bytes:
@@ -373,6 +384,10 @@ class GitHubReader:
         # GitHub's files endpoint has a documented 3,000-file ceiling.
         if len(payload["files"]) != int(pr.get("changed_files") or 0):
             raise SourceError(f"PR #{number} changed-file evidence is incomplete")
+        # GitHub also caps the PR commits endpoint. A declared count prevents
+        # a short terminal page from being mistaken for a complete chronology.
+        if "commits" in pr and len(payload["commits"]) != int(pr["commits"] or 0):
+            raise SourceError(f"PR #{number} commit evidence is incomplete")
         # Per-file REST patches can be omitted/truncated. Read the complete
         # diff representation separately, refusing oversized evidence.
         payload["diff"] = self._fetch_diff(self.API + root, max_bytes)

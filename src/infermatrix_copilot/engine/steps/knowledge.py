@@ -69,6 +69,74 @@ async def intake(ctx: StepContext) -> StepResult:
                                                  "kb_changeset_status": status}})
 
 
+async def _intake_phase(ctx: StepContext, phase: str) -> StepResult:
+    rt, lifecycle = _lifecycle(ctx)
+    if lifecycle is None:
+        return StepResult(False, FailureKind.BLOCKED, "repository is unknown or disabled")
+    from ...kb_service import intake_workflow as workflow
+    from ...kb_service.ledger import LeaseError
+    from ...kb_service.models import ModelUnavailable
+    from ...kb_service.sources import SourceError
+
+    batch_id = str(ctx.state.get("kb_intake_batch") or "")
+    try:
+        if phase == "prepare":
+            maximum = int(ctx.params.get("max_events", 10))
+            if maximum < 1:
+                return StepResult(False, FailureKind.BLOCKED, "max_events must be positive")
+            batch_id = _with_lease(rt, lambda owner: workflow.prepare_intake(rt, lifecycle, owner, maximum))
+            if batch_id is None and rt.ledger.events(lifecycle.repo, "pending", limit=1):
+                return StepResult(False, FailureKind.BLOCKED, "pending evidence could not be prepared; see event detail")
+            return StepResult(True, summary=f"prepared intake batch {batch_id or '-'}",
+                              outputs={"state_updates": {"kb_intake_batch": batch_id or "",
+                                                         "kb_changeset": "", "kb_changeset_status": "none"}})
+        if not batch_id:
+            return StepResult(True, summary="no intake batch")
+        batch = workflow.load_batch(rt, batch_id)
+        if batch["repo"] != lifecycle.repo:
+            return StepResult(False, FailureKind.BLOCKED, "intake batch belongs to another repository")
+        if phase == "draft":
+            _with_lease(rt, lambda owner: workflow.draft_intake(rt, lifecycle, owner, batch_id))
+            batch = workflow.load_batch(rt, batch_id)
+            if batch["phase"] not in ("drafted", "complete"):
+                return StepResult(False, FailureKind.BLOCKED, batch.get("error") or "intake drafting awaits review")
+            return StepResult(True, summary=f"drafted intake batch {batch_id}")
+        changeset_id = _with_lease(rt, lambda owner: workflow.gate_intake(rt, lifecycle, owner, batch_id))
+        batch = workflow.load_batch(rt, batch_id)
+        if batch["phase"] != "complete":
+            return StepResult(False, FailureKind.RETRYABLE, batch.get("error") or "intake gate could not complete")
+        status = rt.ledger.changeset(changeset_id)["status"] if changeset_id else "none"
+        outputs = {"state_updates": {"kb_changeset": changeset_id or "", "kb_changeset_status": status}}
+        held = sum(e.get("status") in ("rejected_packet", "source_unavailable", "conflicting")
+                   for e in batch["events"])
+        summary = f"change set {changeset_id or '-'}: {status}; {held} event(s) pending"
+        if status in ("failed", "human") or not changeset_id and held:
+            return StepResult(False, FailureKind.BLOCKED, summary, outputs=outputs)
+        return StepResult(True, summary=summary, outputs=outputs)
+    except (SourceError, LeaseError) as exc:
+        return StepResult(False, FailureKind.RETRYABLE, str(exc))
+    except (ModelUnavailable, ValueError, OSError) as exc:
+        return StepResult(False, FailureKind.BLOCKED, str(exc))
+
+
+@step("knowledge.prepare_intake", kind="deterministic", risk="knowledge",
+      description="Capture complete PR evidence and checkpoint one branch's owner packets")
+async def prepare_intake(ctx: StepContext) -> StepResult:
+    return await _intake_phase(ctx, "prepare")
+
+
+@step("knowledge.draft_intake", kind="agent", risk="knowledge",
+      description="Draft and checkpoint typed operations with explicit discussion coverage")
+async def draft_intake(ctx: StepContext) -> StepResult:
+    return await _intake_phase(ctx, "draft")
+
+
+@step("knowledge.gate_intake", kind="validation", risk="knowledge",
+      description="Reapply cached operations to current main, gate and stage under the writer lease")
+async def gate_intake(ctx: StepContext) -> StepResult:
+    return await _intake_phase(ctx, "gate")
+
+
 @step("knowledge.publish", kind="deterministic", risk="knowledge",
       description="Hand a gated change set to the publisher (auto_merge) or record it (shadow)")
 async def publish(ctx: StepContext) -> StepResult:

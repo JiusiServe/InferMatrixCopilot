@@ -19,9 +19,9 @@ from typing import Callable
 
 from .config import RepoLifecycle, general_lifecycle, load_registry
 from .gate import changes_between, run_gate
-from .intake import draft_changes, merge_drafts, operations_json
+from .intake import operations_json
 from .ledger import Ledger
-from .models import ModelGateway, ModelRole, ModelUnavailable, roles_from_env
+from .models import ModelGateway, ModelRole, roles_from_env
 from .sources import (
     GitHubReader, KnowledgeRepo, SourceError, bugfix_lesson, load_bugfix_drops, load_lessons, mailbox_records,
     resolve_repository,
@@ -222,65 +222,13 @@ def run_intake(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: int = 10)
 
 
 def _run_intake_locked(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: int, owner: str) -> str | None:
-    events = rt.ledger.events(lifecycle.repo, "pending", limit=max_events)
-    if not events:
-        return None
-    try:
-        base_sha = rt.knowledge.fetch()
-        base = rt.knowledge.knowledge_files(base_sha)
-        external = rt.knowledge.external_texts(base_sha)
-    except SourceError:
-        return None  # retried next tick; events stay pending
-    release, today = rt.release_for(lifecycle.repo), rt.today()
-    drafts = []
-    from ..trace_store import accepted_key, trace_context
+    from .intake_workflow import draft_intake, gate_intake, prepare_intake
 
-    accepted: dict[int, str] = {}  # event -> the accepted generator call's key
-    for event in events:
-        rt.ledger.heartbeat(owner)  # model calls are slow; keep the lease live
-        try:
-            # the change set does not exist yet: the draft key and the accepted
-            # attempt link exactly the call whose reply became the change to
-            # the decision that later stages it
-            key, holder = draft_key_for_event(lifecycle.repo, event["id"]), {}
-            with trace_context(draft_key=key, _accepted=holder, step="draft"):
-                drafts.append(draft_changes(
-                    repo=lifecycle.repo, repo_dir=lifecycle.knowledge_dir, event_id=event["id"],
-                    evidence=event["payload"], files=base, gateway=rt.gateway,
-                    generator=rt.generator, release=release, today=today))
-            if accepted_key(key, holder):
-                accepted[event["id"]] = accepted_key(key, holder)
-        except ModelUnavailable as exc:
-            # fenced: if this worker lost its lease meanwhile, the new holder may
-            # already have staged the event; an unfenced reset would undo that
-            rt.ledger.set_event_statuses(owner, [(event["id"], "pending", f"generator unavailable: {exc}")])
-            return None  # no weaker fallback; wait for the pinned model
-    operations, result, kept, conflicting = merge_drafts(base, drafts, release=release, today=today)
-    kept_ids = {i for d in kept for i in d.event_ids}
-    updates = []
-    for draft in drafts:
-        for event_id in draft.event_ids:
-            if event_id in kept_ids or draft in conflicting:
-                continue  # kept: staged below; conflicting: stays pending, redrafted later
-            if draft.rejected:
-                updates.append((event_id, "rejected", json.dumps(draft.attempts, ensure_ascii=False)[:2000]))
-            else:
-                updates.append((event_id, "done", "no rules"))
-    rt.ledger.set_event_statuses(owner, updates)
-    if not operations or result is None:
+    batch_id = prepare_intake(rt, lifecycle, owner, max_events=max_events)
+    if batch_id is None:
         return None
-    outside = sorted(p for p in result.files if not p.startswith(lifecycle.knowledge_dir + "/"))
-    if outside:  # defence in depth: drafting already refuses these
-        rt.ledger.set_event_statuses(owner, [
-            (event_id, "rejected", f"writes outside {lifecycle.knowledge_dir}: {outside}")
-            for event_id in kept_ids])
-        return None
-    evidence = [e["payload"] for e in events if e["id"] in kept_ids]
-    return gate_and_stage(rt, lifecycle, owner, kind="intake", base=base, base_sha=base_sha,
-                          external=external, operations=operations, result=result,
-                          evidence=evidence, event_ids=sorted(kept_ids), release=release,
-                          draft_keys=[accepted[i] for i in sorted(kept_ids) if i in accepted],
-                          extra_detail={"generator": ", ".join(dict.fromkeys(d.generator for d in kept))})
+    draft_intake(rt, lifecycle, owner, batch_id)
+    return gate_intake(rt, lifecycle, owner, batch_id)
 
 
 def draft_key_for_event(repo: str, event_id) -> str:
@@ -302,7 +250,9 @@ def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind:
     rt.ledger.heartbeat(owner)
     changeset_id = rt.ledger.new_changeset_id(lifecycle.repo, kind)
     rule_ids = sorted({op.new_rule_id or op.rule_id for op in operations if (op.new_rule_id or op.rule_id)})
-    observer = rt.upstream_facts(lifecycle)  # one mirror sync for facts and evidence
+    from .packets import observer_for
+
+    observer = observer_for(rt, lifecycle, evidence)  # one branch scope for facts and evidence
     with trace_context(changeset_id=changeset_id, rule_ids=rule_ids, step="gate"):
         decision = run_gate(
             base=base, head=head, changes=changes_between(base, head), external_texts=external,
@@ -408,8 +358,6 @@ def _pr_body(changeset_id: str, detail: dict) -> str:
 
 def _evidence_for(observer):
     """Per-rule evidence with full upstream diffs (the judge's view; see kb_service.evidence)."""
-    if observer is None:
-        return None
     from .evidence import for_rule
 
     return lambda text, evidence: for_rule(text, evidence, observer)

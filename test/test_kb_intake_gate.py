@@ -219,16 +219,21 @@ def _knowledge_remote(tmp_path: Path) -> Path:
 
 class FakeGitHub(GitHubReader):
     def __init__(self):
-        super().__init__(fetch=self._answer, token="")
+        super().__init__(fetch=self._answer, token="", fetch_diff=lambda _url, _limit:
+                         "diff --git a/demo/core/q.py b/demo/core/q.py\n+if full: raise QueueFull()\n")
 
     def _answer(self, url):
         if "/search/issues" in url:
             return {"items": [{"number": 11, "pull_request": {"merged_at": "2026-09-28T01:00:00Z"}}]}
         if url.endswith("/pulls/11"):
             return {"number": 11, "title": "Bound the queue", "body": "adds backpressure",
-                    "merged_at": "2026-09-28T01:00:00Z", "merge_commit_sha": "c" * 40, "user": {"login": "dev"}}
+                    "merged_at": "2026-09-28T01:00:00Z", "merge_commit_sha": "c" * 40, "user": {"login": "dev"},
+                    "changed_files": 1, "commits": 0,
+                    "base": {"ref": "main", "repo": {"full_name": "org/demo"}}, "head": {"ref": "fix"}}
         if "/pulls/11/files" in url:
             return [{"filename": "demo/core/q.py", "patch": "+if full: raise QueueFull()"}]
+        if any(endpoint in url for endpoint in ("/pulls/11/commits", "/pulls/11/reviews", "/pulls/11/comments", "/issues/11/comments")):
+            return []
         raise AssertionError(url)
 
 
@@ -373,7 +378,8 @@ def test_kb_intake_playbook_is_registered_and_candidate():
     store = PlaybookStore(ROOT / "playbooks", registry)
     playbook = store.get("kb-intake")
     assert playbook.status == "candidate"
-    assert [s.step for s in playbook.steps] == ["knowledge.collect_events", "knowledge.intake", "knowledge.publish"]
+    assert [s.step for s in playbook.steps] == ["knowledge.collect_events", "knowledge.prepare_intake",
+                                               "knowledge.draft_intake", "knowledge.gate_intake", "knowledge.publish"]
     assert store.find("knowledge_maintenance") is None  # never planner-visible
 
 
@@ -391,7 +397,7 @@ def test_drafts_may_not_write_to_another_repository():
 def test_conflicting_drafts_stay_pending_and_rejections_are_not_no_rules(tmp_path):
     rt, lifecycle = _runtime(tmp_path, None)
     for n in (1, 2, 3):
-        rt.ledger.record_event("demo", "merged_pr", str(n), {"title": f"t{n}", "changed_files": []})
+        rt.ledger.record_event("demo", "copilot_run", str(n), {"title": f"t{n}", "changed_files": []})
 
     def answer(role, prompt):
         if role.name == "generator":
@@ -407,7 +413,8 @@ def test_conflicting_drafts_stay_pending_and_rejections_are_not_no_rules(tmp_pat
     status = {e["external_id"]: e["status"] for e in
               rt.ledger.events("demo", "pending") + rt.ledger.events("demo", "drafted")
               + rt.ledger.events("demo", "rejected") + rt.ledger.events("demo", "done")}
-    assert status == {"1": "drafted", "2": "pending", "3": "rejected"}
+    assert status == {"1": "drafted", "2": "pending", "3": "pending"}
+    assert rt.ledger.human_queue("demo")  # rejected learning remains visible and retryable
 
 
 def test_merged_pr_discovery_paginates_in_merge_order(tmp_path):
