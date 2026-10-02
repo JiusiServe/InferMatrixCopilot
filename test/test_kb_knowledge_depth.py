@@ -7,7 +7,7 @@ import pytest
 import yaml
 
 from infermatrix_copilot.kb_service.depth_inputs import DepthContext, SYSTEM_DEPTH
-from infermatrix_copilot.kb_service.gate import JUDGE_SYSTEM
+from infermatrix_copilot.kb_service.depth_judge import SYSTEM_DEPTH_REVIEW
 from infermatrix_copilot.kb_service.init_stages import _page_frontmatter, run_stage
 from infermatrix_copilot.kb_service.init_support import InitRecord
 from infermatrix_copilot.kb_service.knowledge_depth import (
@@ -65,13 +65,17 @@ class DepthGateway(KnowledgeGateway):
             if kwargs.get("validate"):
                 kwargs["validate"](data)
             return ModelReply(role, data, json.dumps(data), role.model, {}, 0.01)
-        if kwargs["system"] == JUDGE_SYSTEM:
+        if kwargs["system"] == SYSTEM_DEPTH_REVIEW:
             if self.interrupt:
                 self.interrupt = False
                 raise KeyboardInterrupt()
-            data = {"dimensions": {k: "no" if self.reject and k == "faithful" else "yes"
-                                   for k in ("faithful", "non_contradictory", "does_not_weaken")},
-                    "reasons": {"faithful": "Pinned source checked"}}
+            payload = json.JSONDecoder().raw_decode(kwargs["prompt"][kwargs["prompt"].index("{"):])[0]
+            data = {"facets": {facet: {"dimensions": {
+                    k: "no" if (self.reject is True or self.reject == facet) and k == "faithful" else "yes"
+                    for k in ("faithful", "non_contradictory", "does_not_weaken")}, "reason": "Pinned source checked"}
+                    for facet in payload["sections"]}}
+            if kwargs.get("validate"):
+                kwargs["validate"](data)
             return ModelReply(role, data, json.dumps(data), role.model, {}, 0.01)
         return super().call_json(role, **kwargs)
 
@@ -115,6 +119,8 @@ def test_depth_visits_rule_bearing_owner_and_tracks_separate_metrics(world):
     gateway = DepthGateway()
     record = _run(world, gateway)
     assert record.status == "dry_run", record.problems
+    body = (world["tmp"] / "depth/init/toy/knowledge-deepen-dryrun/PR_BODY.md").read_text()
+    assert "Feature implementation depth" in body and "| rule |" not in body
     assert len(gateway.depth_calls) == 1
     report = record.coverage["semantic_depth"]
     assert report["complete_features"] == 1 and report["covered_facets"] == 7
@@ -293,6 +299,17 @@ def test_bad_flow_does_not_discard_checked_other_facets(world):
     assert record.depth["features"]["step0"]["skipped_facets"]
 
 
+def test_one_unfaithful_facet_does_not_discard_other_approved_facets(world):
+    _baseline(world)
+    record = _run(world, DepthGateway(reject="api"))
+    assert record.status == "dry_run", record.problems
+    assert record.coverage["semantic_depth"]["covered_facets"] == 6
+    assert record.coverage["semantic_depth"]["features"]["step0"]["missing_facets"] == ["api"]
+    checks = record.verdicts["depth:step0"]["facets"]
+    assert checks["api"]["verdict"] == "fail" and checks["flow"]["verdict"] == "pass"
+    assert record.spent_usd == 1
+
+
 def test_client_trace_uses_its_own_checker_and_ignores_comment_calls(tmp_path):
     from types import SimpleNamespace
     from infermatrix_copilot.knowledge_service.facts import claims_in
@@ -308,6 +325,27 @@ def test_client_trace_uses_its_own_checker_and_ignores_comment_calls(tmp_path):
     (tmp_path / "client.ts").write_text("function run() { /* helper() */ return 1; }\nfunction helper() { return 1; }\n")
     with pytest.raises(ValueError, match="does not show"):
         verify_trace(tmp_path, section["trace"])
+
+
+def test_incomplete_facet_review_fails_closed():
+    from types import SimpleNamespace
+    from infermatrix_copilot.kb_service.depth_judge import review_facets
+    from infermatrix_copilot.kb_service.init_budget import Budget
+    from infermatrix_copilot.kb_service.models import ModelRole, ModelUnavailable
+
+    class Incomplete:
+        def call_json(self, *args, **kwargs):
+            try:
+                kwargs["validate"]({"facets": {}})
+            except ValueError as exc:
+                raise ModelUnavailable(str(exc)) from exc
+            pytest.fail("missing facets must be rejected")
+
+    budget = Budget(1)
+    rt = SimpleNamespace(gateway=Incomplete(), judge=ModelRole.parse("judge", "codex:fixture"))
+    result = review_facets(rt, budget, SimpleNamespace(judge_call_usd=0.5), feature="step", pin="a" * 40,
+                          blocks={"api": "source-backed API"}, existing={}, evidence=[])
+    assert result["facets"]["api"]["verdict"] == "unjudged" and budget.spent_usd == 0.5
 
 
 @pytest.mark.parametrize("command, stage", [("widen", "knowledge"), ("deepen", "knowledge-deepen")])

@@ -531,9 +531,10 @@ flow 至少包含两个不同定义的直接调用；Python 校验限定符号�
 
 每维用 `kb:depth` 绑定 feature、facet、完整 pin 与正文哈希，`kb:depth-proof` 绑定精确证据
 区间及其哈希、flow trace。区间必须完整展示给生成器，不允许跨缺口。页面必须是无规则的
-architecture/guide；整页 advisory pass 后才写入，拒绝或证据不足的草稿保留在本地 checkpoint/trace。
+architecture/guide；同一调用独立判定各新增维度的 faithful/non_contradictory/does_not_weaken，
+三项均 yes 的维度才写入。每项 verdict 绑定原段哈希，拒绝或证据不足的草稿保留在本地 checkpoint/trace。
 机器枚举始终用固定英文标识，正文遵循知识语言。单个无证据或无效维度被剔除并记录原因，
-其它有效维度仍须整页通过裁判才保存；flow 不允许用测试调用链替代生产实现。
+其它有效维度仍须分别通过裁判才保存；flow 不允许用测试调用链替代生产实现。
 来源引用、符号、L1 与知识树校验仍需通过。
 
 `coverage.semantic_depth` 单列完整功能数、七维槽位数和有语义证据的生产文件；

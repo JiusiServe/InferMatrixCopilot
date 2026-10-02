@@ -9,17 +9,17 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from ..knowledge_service.l1 import Block
 from ..knowledge_service.lifecycle import Page
 from ..knowledge_service.ops import page_over_capacity
 from ..knowledge_service.pinned_claims import Evidence, check_rules, evidence_for
 from .depth_inputs import DepthContext, SYSTEM_DEPTH, prompt
+from .depth_judge import review_facets
 from .init_budget import BudgetExhausted
 from .init_coverage import Owner
 from .init_history import _CheckpointBudget
 from .init_knowledge import MAX_DOC_BYTES, _Knowledge
 from .init_stages import _one_line, _page_frontmatter
-from .init_support import InitError, InitRecord, classify_verdict, generate, judge
+from .init_support import InitError, InitRecord, generate
 from .knowledge_coverage import audit_coverage, inventory
 from .knowledge_depth import FACETS, audit_depth, depth_page, digest, render_block, validate_draft, verified_blocks
 from .models import ModelUnavailable
@@ -49,7 +49,7 @@ class _KnowledgeDepth(_Knowledge):
             ":subscription-generator" if self.rt.subscription_generator else "")
 
     def _input_options(self) -> dict:
-        return {**super()._input_options(), "depth_version": 2}
+        return {**super()._input_options(), "depth_version": 3}
 
     def _base_for_run(self, latest: str) -> str:
         previous = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, self.STAGE)
@@ -265,26 +265,39 @@ class _KnowledgeDepth(_Knowledge):
             raise ValueError("; ".join(issues) or "depth page exceeds capacity")
         hashed = digest(proposed)
         cached = entry.get("checked")
-        if cached and cached.get("text_sha256") == hashed:
-            label, reasons, model = cached["verdict"], cached["reasons"], cached["model"]
-        else:
-            result = judge(self.rt, self.budget, self.lifecycle.init,
-                           Block("prose", page, "", "prose", hashed), base={page: old} if old else {},
-                           head={**self.head, page: proposed}, evidence=self._judge_evidence(evidence))
-            label, reasons, model = classify_verdict(result), result.reasons, result.model
-            entry["checked"] = {"verdict": label, "reasons": reasons, "model": model, "text_sha256": hashed}
+        if not cached or cached.get("text_sha256") != hashed:
+            new = {f: block for f, block in blocks.items() if f not in old_blocks}
+            entry["checked"] = {**review_facets(self.rt, self.budget, self.lifecycle.init,
+                                  feature=feature.id, pin=self.record.pin, blocks=new,
+                                  existing={**existing, page: old}, evidence=self._judge_evidence(evidence)),
+                                "text_sha256": hashed}
             self.record.save(self.rt.state_dir)
+        checked = entry["checked"]
+        passed = {f for f, result in checked["facets"].items() if result["verdict"] == "pass"}
+        labels = {result["verdict"] for result in checked["facets"].values()}
+        label = "pass" if passed else "fail" if "fail" in labels else "unsure" if "unsure" in labels else "unjudged"
         key = "depth:" + feature.id
-        self.record.verdicts[key] = entry["checked"]
+        prior = self.record.verdicts.setdefault(key, {"facets": {}, "calls": []})
+        for f, result in checked["facets"].items():
+            prior["facets"][f] = {**result, "block_sha256": digest(blocks[f]), "model": checked["model"]}
+        prior["calls"].append(checked)
         entry["shown_source_files"] = sorted({f["path"] for f in files})
         entry["status"] = label
-        entry["reason"] = json.dumps({"review": reasons, "unsupported_facets": skipped}, ensure_ascii=False)
+        entry["reason"] = json.dumps({"review": checked["facets"], "unsupported_facets": skipped}, ensure_ascii=False)
         entry.pop("draft", None)
         entry.pop("checked", None)
         if label != "pass":
             return
+        blocks = {f: block for f, block in blocks.items() if f in old_blocks or f in passed}
+        proposed = front + related + "\n\n".join(blocks[f] for f in FACETS if f in blocks) + "\n"
+        kept_evidence = []
+        for block in blocks.values():
+            proof = json.loads(re.search(r"<!-- kb:depth-proof (.*?) -->", block, re.S).group(1))
+            kept_evidence += [evidence_for(self.observer, e["path"], e["start"], e["end"]) for e in proof["evidence"]]
+        sources = [f"{self.lifecycle.full_name}@{self.record.pin}:{e.path}:L{e.start}-L{e.end}" for e in kept_evidence]
+        proposed = Page.parse(proposed).with_sources(list(dict.fromkeys(sources))).render()
         self.head[page] = proposed
         self.record.depth["accepted"][page] = proposed
         entry["accepted_sha256"] = digest(proposed)
-        self.record.evidence[key] = [e.to_dict() for e in evidence]
+        self.record.evidence[key] = [e.to_dict() for e in kept_evidence]
         self._link_page(page, _one_line(feature.title) + "：实现深读")
