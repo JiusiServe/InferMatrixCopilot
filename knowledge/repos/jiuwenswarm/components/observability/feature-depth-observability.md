@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L261-L289, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L62-L70, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L472-L511, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/config.py:L98-L109, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/store.py:L2336-L2357, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/observability/test_trajectory_session_usage.py:L107-L118, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/observability/test_trace_store.py:L506-L518, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L302-L326]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L261-L289, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L62-L70, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L472-L511, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/config.py:L98-L109, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/store.py:L2336-L2357, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/observability/test_trajectory_session_usage.py:L107-L118, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/observability/test_trace_store.py:L506-L518, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L302-L326, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L73-L122, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/sink.py:L161-L207]
 feature: "observability"
 entry_points: ["jiuwenswarm/observability/sink.py"]
 source_globs: ["jiuwenswarm/observability/sink.py", "jiuwenswarm/observability/*.py"]
@@ -66,4 +66,15 @@ _connect 依赖 aiosqlite 与 _SCHEMA_VERSION 常量：session_scoped 时先经 
 来源：[tests/unit_tests/observability/test_trajectory_session_usage.py:L107–L118](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/observability/test_trajectory_session_usage.py#L107-L118), [tests/unit_tests/observability/test_trace_store.py:L506–L518](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/observability/test_trace_store.py#L506-L518)
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":118,"path":"tests/unit_tests/observability/test_trajectory_session_usage.py","sha256":"7b6feb4ef78f5742c751554c1e139113cbbe6884cc49b73c71951f4a241ef04b","start":107},{"end":518,"path":"tests/unit_tests/observability/test_trace_store.py","sha256":"68b1ac9d8a22a01ff6212a16c295c1347d860921e398aed8677cf2e3dc24334c","start":506}],"trace":[],"validation_kind":"automated_runtime"} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=observability facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=8de5ec76e7b7f0673723bc0ae9ed9dff45a4515b76e9b583c590dd4e888b86c6 -->
+**consume 在 owner 一致且接受态用 put_nowait：满队列丢该记录换不等待**
+设计推断（非作者历史意图）：
+
+在 _record_owner_is_consistent 通过且 _accepting 为真的本地分支里，consume 对 maxsize=settings.queue_size 的有界记录队列调用 put_nowait；queue.Full 时仅把 dropped 与 dropped_final 各加一并记 warning 后返回，该记录不会到达 writer 线程。推断：收益是满队列时入队不等待腾位；代价是丢失这条进入该 sink 队列的记录；此路径仍在 _state_lock 内，不能等同完全无阻塞。
+
+来源：[jiuwenswarm/observability/sink.py:L73–L122](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/observability/sink.py#L73-L122), [jiuwenswarm/observability/sink.py:L161–L207](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/observability/sink.py#L161-L207)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":122,"path":"jiuwenswarm/observability/sink.py","sha256":"0669d997540e8f4d2df176cb8f3202e3823276dd1e878398036cb461a0df8095","start":73},{"end":207,"path":"jiuwenswarm/observability/sink.py","sha256":"6e6fc801de0214d05fae4b5430456e1a64eb7b7f4b8e22abedeb8238ca32342d","start":161}],"trace":[]} -->
 <!-- /kb:depth -->

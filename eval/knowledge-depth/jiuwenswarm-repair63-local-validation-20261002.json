@@ -1,0 +1,57 @@
+{
+  "schema": "jiuwenswarm-repair63-local-validation/1",
+  "runtime_sha": "182851e9b4e08f5632983204e6d42e93dd462287",
+  "source_pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "knowledge_frozen_during_tests": true,
+  "full_pytest": {
+    "exit_code": 0,
+    "progress_marks": {
+      ".": 2898,
+      "s": 17
+    },
+    "log_sha256": "3c9a19ed7cb4ef61f5ebbce67ab0cbbeb44b3c18595336272cdfb8da0ca8e188",
+    "passed": 2898,
+    "skipped": 17,
+    "failed": 0,
+    "total": 2915
+  },
+  "knowledge_validator_regressions": {
+    "exit_code": 0,
+    "progress_marks": {
+      ".": 69
+    },
+    "log_sha256": "2d7fc38427e2c574ec9abadf23ff1d9fc392f0d2e75e882df8f67c00172c1004",
+    "passed": 69,
+    "failed": 0
+  },
+  "knowledge_tree": {
+    "errors": 0,
+    "reminders": 44
+  },
+  "wiki_lint": {
+    "errors": 0,
+    "pages": 1162
+  },
+  "doc_links": {
+    "passed": true,
+    "files": 337
+  },
+  "doc_citations": {
+    "passed": true,
+    "citations": 56
+  },
+  "SPEC": {
+    "passed": true,
+    "declared": 93,
+    "stale": 0,
+    "uncovered": 0
+  },
+  "native_source_retrieval": {
+    "passed": true,
+    "bound_approvals": 552,
+    "retrieval_cases": 237
+  },
+  "actual_upstream_tests_executed": false,
+  "CI_results": "Recorded externally on the final PR290 commit",
+  "captured_at_utc": "2026-10-02T16:34:27.191073+00:00"
+}

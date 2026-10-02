@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_agentserver_modes.py:L48-L138, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_agentserver_modes.py:L141-L170, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py:L108-L123, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py:L132-L153, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L18326-L18329, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L18358-L18360, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py:L2-L22, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py:L32-L58, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L8898-L8930, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L3095-L3115]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_agentserver_modes.py:L48-L138, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_agentserver_modes.py:L141-L170, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py:L108-L123, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py:L132-L153, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L18326-L18329, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L18358-L18360, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py:L2-L22, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py:L32-L58, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L8898-L8930, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L3095-L3115, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L19103-L19197, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L19200-L19227, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L18415-L18507]
 feature: "context"
 entry_points: ["jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py", "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py"]
 source_globs: ["jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py", "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py", "jiuwenswarm/agents/harness/common/*"]
@@ -48,4 +48,33 @@ config_base 缺省时用 get_config()，读取 execution_guard.model_anomaly_det
 来源：[jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L8898–L8930](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/agent_adapter/interface_deep.py#L8898-L8930)
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":8930,"path":"jiuwenswarm/server/runtime/agent_adapter/interface_deep.py","sha256":"ab76cd9453bb062d5e1d5f1f408995667f57de86964dba58c6e1c87610ae36e7","start":8898}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=context facet=dependencies pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=ea2a12ce13f484d4c20b5b1681866a832f7dbb81eff8135b3fdeeac0912359c5 -->
+**会话作用域 compress_context 依赖 react_agent.context_engine；stats 中仅 total_messages 取自 context.statistic()**
+非会话作用域时经 _get_or_create_session_adapter 委派同名调用并在 finally 调 _evict_idle_session_adapters；会话作用域要求 _instance.react_agent 存在（否则 ValueError "Agent instance not available"），压缩经其 context_engine 的 get_context/compress_context（return_state=True、可选 processor_types）完成。result 为 compressed 且重取 context 非空时才写 stats：total_messages 取 context.statistic()，total_tokens 与 raw_total_tokens 由 _count_full_context_tokens 计算。
+
+来源：[jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L18415–L18507](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/agent_adapter/interface_deep.py#L18415-L18507)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":18507,"path":"jiuwenswarm/server/runtime/agent_adapter/interface_deep.py","sha256":"ec688defcf3ab10c3492b573e627fb60443e4dedf066443725c854018dd187ea","start":18415}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=context facet=failure_modes pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=5c13c889caed95be1f86cbeda57eb709a50bafbd0994c1c06530986e67dd5100 -->
+**compact_partial 缺轮或空输入返回 no_turn；模型 Exception 与回退后仍空白的 summary 分别返回 failed**
+history 为空、无用户轮、turn_index 超过总轮数、待摘要区间或转换后 recap 消息为空时返回 status=no_turn；direction 非 from/up_to 时返回 failed 与 unknown direction 错误。try 仅包围模型 invoke 与 raw 读取：Exception 记日志后返回 Model call failed；raw 经 getattr(result,"content",None) 或 str(result) 回退后仍为空白时，才返回 Model returned empty response。
+
+来源：[jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L19103–L19197](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/agent_adapter/interface_deep.py#L19103-L19197)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":19197,"path":"jiuwenswarm/server/runtime/agent_adapter/interface_deep.py","sha256":"402f843218a5c6e3a889e9772bddd1f37ceafa65222f76e97e45d1204c1dd58c","start":19103}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=context facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=6300b6f9b70fe563a8da28fe651068c235a3e53d6b33375929519f12e1e0c1ee -->
+**局部摘要过滤原文以缩减输入，代价是丢失被滤细节**
+设计推断（非作者历史意图）：
+
+_build_messages_for_model 剥离用户消息中的 file-content 块，跳过工具记录与目标完成消息，仅保留满足角色与 event_type 条件的 user/assistant 文本；推断收益是 recap 输入更省 token，成本是该摘要请求不含这些被过滤的原文内容。
+
+来源：[jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L19103–L19197](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/agent_adapter/interface_deep.py#L19103-L19197), [jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L19200–L19227](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/agent_adapter/interface_deep.py#L19200-L19227)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":19197,"path":"jiuwenswarm/server/runtime/agent_adapter/interface_deep.py","sha256":"402f843218a5c6e3a889e9772bddd1f37ceafa65222f76e97e45d1204c1dd58c","start":19103},{"end":19227,"path":"jiuwenswarm/server/runtime/agent_adapter/interface_deep.py","sha256":"a9c63f4dfa60f7fae932cf8e0e6282e9afbcd26b2d5c43de98010ce7c73c0975","start":19200}],"trace":[]} -->
 <!-- /kb:depth -->

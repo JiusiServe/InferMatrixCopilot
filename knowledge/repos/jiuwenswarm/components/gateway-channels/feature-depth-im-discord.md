@@ -69,3 +69,14 @@ docs/zh/海外频道.md §8「验证」为手动流程：在已配置频道或�
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":289,"path":"docs/zh/海外频道.md","sha256":"75ac1f0b5011237aecc9069121aa7f7c7d196214ddce35db979be7bf2c33eea7","start":285}],"trace":[],"validation_kind":"documented_manual"} -->
 <!-- /kb:depth -->
+
+<!-- kb:depth feature=im-discord facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=2d0a981ad99e38c6134de9653134856167d9d2804f7480ba604fbb213c2c4b83 -->
+**send 捕获普通 Exception 仅告警不重抛且返回 None 的取舍**
+设计推断（非作者历史意图）：
+
+客户端/内容/目标守卫通过后 await channel.send；fetch_channel 与 send 抛 Exception 时仅记 warning 后返回，不向调用方重抛，且 send 返回类型为 None。推断：收益是这些普通异常不沿此入口传播，代价是调用方不能凭正常返回确认投递成功；send 抛错也不证明消息未送达。
+
+来源：[jiuwenswarm/gateway/channel_manager/im_platforms/discord/discord_connect.py:L116–L140](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/channel_manager/im_platforms/discord/discord_connect.py#L116-L140)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":140,"path":"jiuwenswarm/gateway/channel_manager/im_platforms/discord/discord_connect.py","sha256":"0997e2b2c3ab253a68a75cec9c5bac1089af69bafb3f4311ea007580de4896e5","start":116}],"trace":[]} -->
+<!-- /kb:depth -->

@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: ["openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L26-L41", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L43-L43", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L92-L110", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L112-L125", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L174-L185", openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py:L274-L309, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py:L519-L541, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_evolution_helpers.py:L128-L138]
+sources: ["openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L26-L41", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L43-L43", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L92-L110", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L112-L125", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L174-L185", openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py:L274-L309, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py:L519-L541, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_evolution_helpers.py:L128-L138, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L19328-L19377]
 feature: "skill-evolution"
 entry_points: ["jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py"]
 source_globs: ["jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py", "jiuwenswarm/agents/harness/common/rails/*"]
@@ -66,4 +66,15 @@ evolve_result.status 去除空白后等于 "no_evolution_no_records" 时取 no_r
 来源：[tests/unit_tests/agentserver/test_evolution_helpers.py:L128–L138](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/agentserver/test_evolution_helpers.py#L128-L138)
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":138,"path":"tests/unit_tests/agentserver/test_evolution_helpers.py","sha256":"9c9e8918344a0377ed989501b0436b8265dadd0c26c69db03748a8e23db2de82","start":128}],"trace":[],"validation_kind":"helper_unit"} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=skill-evolution facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=b620ae9dc1a7eb7474384e866f7b1f6a64b3ded5eaa478d2f24d4ccae9f0cfcb -->
+**演进 watcher 空闲阈值随有效 SDK 超时伸缩，无效值回退 Host 默认**
+设计推断（非作者历史意图）：
+
+rail 存在、signal_trigger 开启且 auto_save 关闭时，watcher 调 resolve_evolution_event_timeout_sec：SDK 超时可转为正有限浮点则加 max(grace,0.0)，读属性抛异常、float 失败或值非有限/≤0 则回退 TEAM_EVOLUTION_EVENT_TIMEOUT_SEC（仅读属性异常分支记 debug 日志）。推断：收益是空闲等待窗口与 SDK 超时对齐；代价是 float 失败与无效值两类回退无日志，且阈值只约束事件间空闲（每批事件重置计时），不是 watcher 总时长上限。
+
+来源：[jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py:L519–L541](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py#L519-L541), [jiuwenswarm/server/runtime/agent_adapter/interface_deep.py:L19328–L19377](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/agent_adapter/interface_deep.py#L19328-L19377)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":541,"path":"jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py","sha256":"2e632099e2f41b9f3ae81746e442b916ab544ddb22a1674a6ff7bb51cc313c52","start":519},{"end":19377,"path":"jiuwenswarm/server/runtime/agent_adapter/interface_deep.py","sha256":"b7f2c584102e19fb8065b4928cefd78e7b5dc179fa1c1915ebf9860c0cdf1edc","start":19328}],"trace":[]} -->
 <!-- /kb:depth -->

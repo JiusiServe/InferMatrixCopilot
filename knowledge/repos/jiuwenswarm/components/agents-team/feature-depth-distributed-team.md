@@ -69,3 +69,12 @@ missing_distributed_dependencies 仅在 is_distributed_mode（runtime.mode 为 d
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":291,"path":"jiuwenswarm/agents/harness/team/distributed_runtime.py","sha256":"4369e8477b245bb73a7352c2eb4a63f0c79a7f30cca8536815aae3d80ac2224a","start":282},{"end":412,"path":"jiuwenswarm/agents/harness/team/distributed_runtime.py","sha256":"0f2e226d5960faa6e060d249cee6a9ffb934180e2551454078a2b59b854a9e60","start":319}],"trace":[]} -->
 <!-- /kb:depth -->
+
+<!-- kb:depth feature=distributed-team facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=dacbd4f794ee45bad913d12ada59295a01af4b7e5d1c52892c0c729af592107d -->
+**leader 且 PostgreSQL storage 下不可达端点的条件启动与按退避就绪轮询**
+仅当 runtime_role(config_base) 为 "leader" 且 team 配置判定为 PostgreSQL storage 时继续，否则返回；端点探测已可用也直接返回。不可达时先尝试集群启动，未成功再依次尝试 systemctl/service，首个 rc==0 即生效；全部启动命令失败则记录 warning 并返回，不进入轮询。仅启动命令成功后才在默认 30 秒期限内带退避轮询就绪，就绪即返回，到期仍不可用记录 warning 后返回。
+
+来源：[jiuwenswarm/agents/harness/team/distributed_runtime.py:L319–L412](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/team/distributed_runtime.py#L319-L412)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":412,"path":"jiuwenswarm/agents/harness/team/distributed_runtime.py","sha256":"0f2e226d5960faa6e060d249cee6a9ffb934180e2551454078a2b59b854a9e60","start":319}],"trace":[]} -->
+<!-- /kb:depth -->

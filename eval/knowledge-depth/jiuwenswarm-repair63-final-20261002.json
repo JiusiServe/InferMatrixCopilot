@@ -1,0 +1,234 @@
+{
+  "schema": "jiuwenswarm-repair63-final/1",
+  "source_pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "repair_baseline": "5a4580e735de76d7377c02b392aaedf4e813a9d5",
+  "frozen_runtime_sha": "182851e9b4e08f5632983204e6d42e93dd462287",
+  "native_source_retrieval_audits_passed": true,
+  "gates": {
+    "campaign_workers_completed_normally": true,
+    "assembly_proofs": true,
+    "all_490_baseline_blocks_exact": true,
+    "all_490_baseline_native_bindings_exact": true,
+    "protected_strict207_exact": true,
+    "native_raw_approvals": true,
+    "guided_native_generation_bindings": true,
+    "source_and_approval_bindings": true,
+    "source_and_policy_target": true,
+    "usage_ledger_integrity": true,
+    "retrieval_exact237_and_budget": true,
+    "all_current_bound": true,
+    "current_exact_assembled_union_minus_canonical_review_rejections": true,
+    "original_172_exact": true,
+    "retired_1_raw_archive": true,
+    "retired_1_historical_native": true,
+    "fixed_denominator": true,
+    "independent_new_repair_content_review": true,
+    "campaign_and_original_checkpoints_unchanged": true
+  },
+  "recognized_facets": 552,
+  "newly_recognized_facets": 62,
+  "unknown_facets": 1,
+  "requested_all_63_supported": false,
+  "strict_recognized_facets": 207,
+  "lightweight_recognized_facets": 345,
+  "facet_counts": {
+    "flow": {
+      "supported": 79,
+      "verified_absent": 0,
+      "unknown": 0,
+      "recognized": 79,
+      "ratio": 1.0,
+      "strict_recognized": 22,
+      "lightweight_recognized": 57,
+      "eligible_recognized": 79,
+      "eligible_ratio": 1.0,
+      "target_met": true
+    },
+    "api": {
+      "supported": 79,
+      "verified_absent": 0,
+      "unknown": 0,
+      "recognized": 79,
+      "ratio": 1.0,
+      "strict_recognized": 35,
+      "lightweight_recognized": 44,
+      "eligible_recognized": 79,
+      "eligible_ratio": 1.0,
+      "target_met": true
+    },
+    "configuration": {
+      "supported": 79,
+      "verified_absent": 0,
+      "unknown": 0,
+      "recognized": 79,
+      "ratio": 1.0,
+      "strict_recognized": 51,
+      "lightweight_recognized": 28,
+      "eligible_recognized": 79,
+      "eligible_ratio": 1.0,
+      "target_met": true
+    },
+    "dependencies": {
+      "supported": 79,
+      "verified_absent": 0,
+      "unknown": 0,
+      "recognized": 79,
+      "ratio": 1.0,
+      "strict_recognized": 23,
+      "lightweight_recognized": 56,
+      "eligible_recognized": 79,
+      "eligible_ratio": 1.0,
+      "target_met": true
+    },
+    "failure_modes": {
+      "supported": 79,
+      "verified_absent": 0,
+      "unknown": 0,
+      "recognized": 79,
+      "ratio": 1.0,
+      "strict_recognized": 24,
+      "lightweight_recognized": 55,
+      "eligible_recognized": 79,
+      "eligible_ratio": 1.0,
+      "target_met": true
+    },
+    "tradeoffs": {
+      "supported": 78,
+      "verified_absent": 0,
+      "unknown": 1,
+      "recognized": 78,
+      "ratio": 0.9873417721518988,
+      "strict_recognized": 24,
+      "lightweight_recognized": 54,
+      "eligible_recognized": 78,
+      "eligible_ratio": 0.9873417721518988,
+      "target_met": true
+    },
+    "validation": {
+      "supported": 79,
+      "verified_absent": 0,
+      "unknown": 0,
+      "recognized": 79,
+      "ratio": 1.0,
+      "strict_recognized": 28,
+      "lightweight_recognized": 51,
+      "eligible_recognized": 79,
+      "eligible_ratio": 1.0,
+      "target_met": true
+    }
+  },
+  "reports": {
+    "source-depth": {
+      "name": "jiuwenswarm-repair63-source-depth-20261002.json",
+      "sha256": "616fec02458281dd074d9fb13dccb75df24994eaeed686cf7fdc25088bcc2138"
+    },
+    "native-approvals": {
+      "name": "jiuwenswarm-repair63-native-approvals-20261002.json",
+      "sha256": "a544c1609739c12471d68d4fd8de1f2dd4b7c67479be5c8d9b38b7fd2a283eb3"
+    },
+    "retrieval": {
+      "name": "jiuwenswarm-repair63-retrieval-after-20261002.json",
+      "sha256": "16a1e7d9227005f991fe911061a9f0874339a8e11bd95dba31bd6d03065ea62b"
+    },
+    "comparison.md": {
+      "name": "jiuwenswarm-repair63-comparison-cn-20261002.md",
+      "sha256": "0a9c640797b97d73f618f5c0387124c53ad2dedb1a591fbadb677b0d33288102"
+    },
+    "comparison.json": {
+      "name": "jiuwenswarm-repair63-comparison-cn-20261002.json",
+      "sha256": "ae8185123894ffa4ed731e7afc00d8cda35e1431e72904fa47ed6287a3fd81f3"
+    },
+    "independent-review": {
+      "name": "jiuwenswarm-repair63-independent-review-20261002.json",
+      "sha256": "1d617293a3baf1a09ba1c86b70bdf48ca2644414b997932045ec8641aa407d49"
+    },
+    "local-validation": {
+      "name": "jiuwenswarm-repair63-local-validation-20261002.json",
+      "sha256": "4ef78c5d2476e4f57504a822dc37361d54de84f04a146d0fdc69749b0ef0d221"
+    }
+  },
+  "private_audit_summary_sha256": "271ced632878f5fc54c8b9b5e52dc3ee3b4bd406af215553c69d4bd023caf102",
+  "guidance_sha256": "4b4c8224c94d2f38e518b783b07da512f0f827ad7e6881a2faad278c05fdcd2f",
+  "shared_index_sha256": "f306d7002ef5e9f35e4679e80bc10e390f29d2b8dd083b5cfc01aa875aedb046",
+  "trace_archive": ".kb-jiuwenswarm-repair63-20261002",
+  "workers": 13,
+  "trace_retention": "Persistent native requests, streams, replies, journals, failures and reported usage outside Git",
+  "new_batch_usage": {
+    "unique_model_call_records": 126,
+    "total_observed_attempts": 126,
+    "reported_usage_by_role": {
+      "generator": {
+        "model_call_records": 63,
+        "successful_model_records": 63,
+        "failed_model_records": 0,
+        "reported_input_tokens": 676242,
+        "input_usage_reported_calls": 63,
+        "reported_output_tokens": 303861,
+        "output_usage_reported_calls": 63,
+        "reported_cost_subtotal_usd": null,
+        "cost_reported_calls": 0,
+        "ambiguous_model_records": 0,
+        "usage_status": "reported_fields_only"
+      },
+      "judge": {
+        "model_call_records": 63,
+        "successful_model_records": 63,
+        "failed_model_records": 0,
+        "reported_input_tokens": 1376152,
+        "input_usage_reported_calls": 63,
+        "reported_output_tokens": 27683,
+        "output_usage_reported_calls": 63,
+        "reported_cost_subtotal_usd": null,
+        "cost_reported_calls": 0,
+        "ambiguous_model_records": 0,
+        "usage_status": "reported_fields_only"
+      }
+    },
+    "invoice_cost": "unknown",
+    "accounting_integrity": true,
+    "unfinished_without_model_record_count": 0
+  },
+  "actual_invoice_cost": "unknown",
+  "remaining_unknown": [
+    {
+      "feature": "im-feishu",
+      "facet": "tradeoffs",
+      "prior_reason": "单个 debounce 路径不能证明所有卡片写入都受相同条件约束、一次突发恰好写入一次或无更早写入。",
+      "attempts": 4,
+      "status": "unknown",
+      "blocked": "initial attempt and three corrections exhausted; evidence remains unknown",
+      "current_reason": "L206–L209 和 L230–L249 支持活动会话的 replace 更新文本、共用待执行的 flush 任务，以及写入期间文本再变化时重新排期。L167–L176 支持 150 ms 的构造默认值。但“变更至少等待该延时才写入”不成立：一次 replace 可以发生在已有 flush 的等待期末尾，随后很快被写入，无须从该次变更起再等 debounce_ms。现有知识中没有相冲突或被弱化的要求。",
+      "checkpoint_sha256": "33431ae08f353d02a4b447cc81d86a67d8560a3ac573f3cfed673a4ce9930410",
+      "native_rejected_calls": [
+        {
+          "model": "codex:gpt-6-sol:medium",
+          "native_trace_id": "1790957100274-9c8573e4d518",
+          "native_reply_sha256": "6f4c05fdfeec19fe8033b1155c9c8a641588a564df42aae444b2655e7a1fa1c5"
+        },
+        {
+          "model": "codex:gpt-6-sol:medium",
+          "native_trace_id": "1790957345071-ed9092da2439",
+          "native_reply_sha256": "95a7289a6dd428a4c90846826fd2ea5ca11e95d7d3aa1acedb669a23b44434ba"
+        },
+        {
+          "model": "codex:gpt-6-sol:medium",
+          "native_trace_id": "1790957599787-06afd9d534f3",
+          "native_reply_sha256": "c9f54dde69783f24ef590b8ba0492cf2fbf9b66d0459363dc1c9688146d6b41b"
+        },
+        {
+          "model": "codex:gpt-6-sol:medium",
+          "native_trace_id": "1790957831865-5530a544aa9f",
+          "native_reply_sha256": "a4510877e7f0cbd5fefb256848098758145d5044d319e6d8fdafab1374253a6d"
+        }
+      ]
+    }
+  ],
+  "CI": "Final pushed-commit results are recorded externally on PR290; not assumed by this audit.",
+  "merge": "Only after independent delivery review and CI pass",
+  "limitations": [
+    "Lightweight knowledge recognition is not runtime test coverage or execution.",
+    "The remaining unknown is not a verified-absence claim.",
+    "Policy thresholds are met; all63 requested gaps are not filled."
+  ],
+  "captured_at_utc": "2026-10-02T16:34:27.191073+00:00"
+}

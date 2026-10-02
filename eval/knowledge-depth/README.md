@@ -1,20 +1,22 @@
 # JiuwenSwarm implementation-knowledge depth
 
-## Current completion result: partial delivery
+## Current result: recognition target met, one explicit unknown
 
-The completion campaign at `f0a69728c96b5961d993449f1a901cbd2f4dac5b` retains **490 recognized facets: 207 strict and 283 lightweight**, counted once per feature/facet. This is **490/553 (88.61%)**. The fixed denominator remains 79 features × seven dimensions. **63 facets remain unknown**: 53 were unsupported after their bounded extraction/correction rounds, and 10 initially accepted lightweight facets were withdrawn after the final independent content review found wrong feature attribution or claims beyond the evidence. Withdrawal preserves the review record; it does not prove that the project lacks the capability or tests.
+The user-authorized targeted repair batch at source pin `f0a69728c96b5961d993449f1a901cbd2f4dac5b` adds **62 of the previous 63 unknown facets**. The current union is **552/553 (99.82%): 207 strict and 345 lightweight**. Six dimensions have 79/79 recognized facets; design tradeoffs has 78/79 (98.73%). Every dimension exceeds the required 90%, all 79 features have recognized depth, and production-file breadth remains **2043/2199 (92.91%)**.
 
-The target requires each dimension to exceed 90% (at least 72/79), recognized depth for every feature, and production-file breadth of at least 85%. This delivery **does not meet the target**. Its partial result is reviewable in a draft PR; it is not eligible for merge. The campaign's initial attempt plus at most three corrections is a persisted lifetime limit, including across resumes; late withdrawals do not reset it.
+**One gap remains: `im-feishu/tradeoffs`.** Its initial attempt and three corrections did not produce an independently approved explanation: a claim that each text update waits a full debounce delay was inconsistent with an already pending shared flush task. It remains unknown, without an absence claim or reduced denominator. Meeting the recognition target does not mean all requested gaps are filled.
+
+All 490 previously active blocks retain exact bytes and native approval bindings. The original 172 active historical blocks and the separately archived retired artifacts-flow block are also preserved. Validation knowledge describes 27 runtime-test entries, one source-text test, 14 helper tests, nine documented manual checks and 28 historical uncategorized entries. These counts do not establish that upstream tests were executed or passed.
 
 Current delivery reports:
 
-- [Chinese comparison and PR-review impact](jiuwenswarm-lightweight-comparison-cn-20261002.md), with [machine-readable comparison](jiuwenswarm-lightweight-comparison-cn-20261002.json).
-- [Final source/native audit summary](jiuwenswarm-lightweight-final-20261002.json), with [source bindings](jiuwenswarm-lightweight-source-depth-20261002.json) and [native approval bindings](jiuwenswarm-lightweight-native-approvals-20261002.json).
-- [Final retrieval acceptance](jiuwenswarm-lightweight-retrieval-after-20261002.json).
-- [Independent content review](jiuwenswarm-independent-content-review-20261002.json) and [withdrawn-content quarantine](jiuwenswarm-content-quarantine-20261002.json).
-- [Local validation record](jiuwenswarm-local-validation-20261002.json); final CI results are recorded on the draft PR.
+- [Chinese comparison and PR-review impact](jiuwenswarm-repair63-comparison-cn-20261002.md), with [compact data](jiuwenswarm-repair63-comparison-cn-20261002.json).
+- [Final audit summary](jiuwenswarm-repair63-final-20261002.json), [source bindings](jiuwenswarm-repair63-source-depth-20261002.json), and [actual native approval bindings](jiuwenswarm-repair63-native-approvals-20261002.json).
+- [237-case retrieval acceptance](jiuwenswarm-repair63-retrieval-after-20261002.json), [independent review](jiuwenswarm-repair63-independent-review-20261002.json), and [local validation](jiuwenswarm-repair63-local-validation-20261002.json).
 
-The campaign used 13 isolated feature workers, a shared immutable evidence index and a persistent Zcode start/cooldown schedule. Native Zcode/Codex attempt journals, prompts, streamed events and replies remain in ignored local campaign state outside Git and the knowledge tree. Git reports contain bounded findings, hashes and provenance rather than raw native trajectories. Unreported usage and invoiced cost remain unknown. The historical 173-facet report and the separate original artifacts-flow retirement archive below remain preserved as historical evidence, without adding retired blocks back to current recognition.
+The repair batch reused the immutable source/test/document index and 13 isolated workers. Pinned per-gap localization guidance is bound to the source SHA, policy, knowledge baseline and parent-to-child guidance hash. Its proposed wording is untrusted input; actual GLM extraction and independent Codex review still determine recognition. Prior campaign counters/checkpoints remain unchanged; the newly authorized batch has its own persisted four-round limit. Native Zcode/Codex inputs, streamed events, replies, errors and usage remain in persistent ignored state outside Git. Actual invoiced cost remains unknown.
+
+The [previous 490-facet comparison](jiuwenswarm-lightweight-comparison-cn-20261002.md), [previous audit](jiuwenswarm-lightweight-final-20261002.json), [previous retrieval](jiuwenswarm-lightweight-retrieval-after-20261002.json), and [previous content quarantine](jiuwenswarm-content-quarantine-20261002.json) are immutable historical records of the partial checkpoint. Their unmet target and 63 unknowns describe that checkpoint.
 
 ## Historical 173-facet baseline
 
