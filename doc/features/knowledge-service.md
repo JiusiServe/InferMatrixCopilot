@@ -48,6 +48,17 @@ infermatrix-copilot kb run --playbook kb-intake --repo vllm-omni   # 一次 inta
 infermatrix-copilot kb calibrate --repo vllm-omni                  # 评审模型校准；不达标不得切 auto_merge
 ```
 
+`kb-intake` v2 拆为 collect → prepare → draft → gate → publish；夜间调度复用同一流程。
+prepare 重新读取完整 PR 文件、提交、review 和回复，按真实 base 分支分批，再按最近 owner／模型页拆分。
+来源读取不完整或超出预算时保留 pending 并记录原因，不把摘录当成完整证据。
+draft 为每条讨论记录 keep／merge／drop 及理由，保留撤回建议的后续回复；每个 packet 最多六个操作。
+阶段和每个 packet 的结果存入 `$KB_STATE_DIR/intake-batches/`，恢复时复用已完成起草；gate 在最新 main
+上重新应用操作并完整复检。结束后清理临时原始输入，保留 hash、操作／讨论处置摘要和变更集关联。
+精炼继承未被拒绝的操作；修改或删除被拒绝的结论必须显式记录，原 source event 归属沿精炼链保留。
+验收条目描述未来必须执行的检查，不能把源码中的测试定义写成已运行的测试结果。
+未路由的测试／recipe／文档作为已确定 owner 的共用证据；整个来源没有 owner 时保留待处理并报告路由缺口。
+来源不可读仅延迟该事件五分钟，完整事件可继续处理；相关讨论超过 L2 总证据预算时转人工复核。
+
 模型：`KB_GENERATOR`（默认 `claude-code:claude-opus-5-5`）、`KB_JUDGE`（默认
 `codex:gpt-6-sol:medium`）。生成器可显式配置一个备用模型：
 

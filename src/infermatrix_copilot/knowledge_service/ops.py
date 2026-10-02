@@ -35,6 +35,7 @@ import yaml
 
 from .lifecycle import (
     ANY_RULE_HEADING, RETIRE_REASONS, Footer, LifecycleError, Page, Section, expected_sources,
+    render_flow_list,
 )
 
 KNOWLEDGE_OPS_API_VERSION = "2.0.0"
@@ -185,7 +186,10 @@ def _check_section(section_markdown: str, rule_id: str, level: int = 2) -> Secti
 def _new_page_text(page: str, title: str, today: str, template: Page | None) -> str:
     tags = "[]"
     if template is not None and template.frontmatter_field("tags") is not None:
-        tags = template.frontmatter_field("tags")
+        inherited = template.frontmatter_data().get("tags")
+        if not isinstance(inherited, list) or any(not isinstance(tag, str) for tag in inherited):
+            raise LifecycleError("inherited page tags must be a list of strings")
+        tags = render_flow_list(inherited)
     if not title or '"' in title:
         raise LifecycleError("a new page needs a title without quotes")
     return (
@@ -238,11 +242,14 @@ def apply_operations(
         if text is None:
             if not create_title:
                 raise LifecycleError(f"page does not exist: {path}")
-            sibling = str(PurePosixPath(path).with_name("rules.md"))
-            template = Page.parse(work[sibling]) if sibling in work else None
             index = str(PurePosixPath(path).with_name(INDEX_NAME))
             if index not in work:
                 raise LifecycleError(f"a new page's directory needs an {INDEX_NAME}: {index}")
+            # Split owner pages inherit the owner's taxonomy, even without rules.md.
+            template = Page.parse(work[index])
+            if not template.frontmatter_data().get("tags"):
+                sibling = str(PurePosixPath(path).with_name("rules.md"))
+                template = Page.parse(work[sibling]) if sibling in work else None
             text = _new_page_text(path, create_title, today, template)
             work[path] = text
             created.append(path)

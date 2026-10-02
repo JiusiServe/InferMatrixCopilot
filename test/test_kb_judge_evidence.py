@@ -49,12 +49,14 @@ def test_full_diffs_replace_the_excerpt_named_files_first():
 
 def test_the_byte_limits_hold_and_say_so(monkeypatch):
     monkeypatch.setattr(ev, "PER_FILE", 10)
-    monkeypatch.setattr(ev, "PER_RULE", 15)
+    monkeypatch.setattr(ev, "PER_RULE", 4096)
     mirror = Mirror({"docs/a.md": "x" * 50, "pkg/serving_speech.py": "y" * 5, "tests/test_x.py": "z" * 50})
     (item,) = ev.for_rule("`pkg/serving_speech.py` ^[PR #10]", EVIDENCE, mirror)
     assert item["diffs"]["pkg/serving_speech.py"] == "y" * 5
     assert item["diffs"]["tests/test_x.py"].startswith("z" * 10) and "cut at 10 bytes of 50" in item["diffs"]["tests/test_x.py"]
-    assert item["diffs_omitted"] == ["docs/a.md"]
+    assert "cut at 10 bytes of 50" in item["diffs"]["docs/a.md"]
+    assert item["diffs_omitted"] == []
+    assert len(ev._encoded([item])) <= ev.PER_RULE
 
 
 def test_source_comes_before_tests_and_docs_when_the_rule_names_no_file():

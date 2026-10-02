@@ -1,6 +1,6 @@
 # knowledge_service/ops.py —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-10-02 -->
 
 `LOC ~360 · Knowledge Ops API 2.0（类型化知识变更） · refactor-status: stable`
 
@@ -9,6 +9,8 @@
 类型化操作（`add`、`edit_same_meaning`、`replace`、`retire`、`purge`），输出变更后的文件。
 随后写入机械结果：`updated:`、只追加的 `sources:`、新页面在同目录 `_index.md` 的一行、
 purge 的 `_tombstones.yaml` 条目。
+新规则页的 tags 继承同目录 owner `_index.md`，缺少时再使用同目录 canonical `rules.md`；
+已有页保留原 tags。继承数据非法则拒绝，不发明分类；服务与发布器使用同一纯函数重建。
 
 ## 不变量
 - 新 ID（含嵌套 `###`）在全树唯一，且不在 tombstones 中。

@@ -40,9 +40,23 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   `apply_operations` 必须接受，最多两轮带精确错误的修复；多事件合并为一个变更集。
 - `gate`：L1 → 逐块 L2（每类块只问适用维度）→ 按 owner 目录的一致性检查；
   外部引用、protected、熔断（按仓库计算）、任何不确定 → human；L1 失败不调用模型。
-- `runtime`：collect → intake → gate → publish；shadow 只记录；变更集文件存 `changesets/<id>.json`。
+- `runtime`：collect → prepare → draft → gate → publish；shadow 只记录；变更集文件存 `changesets/<id>.json`。
 - `calibration`：按仓库的校准集评分（坏样例须全部拦下、好样例误拒 ≤ 20%）。
 - `runner`：经标准 executor 运行 `kb-*` playbook。CLI 新增 `kb run`、`kb calibrate`。
+
+## 2026-10-02 基于提取 trace 的输入、检查点与精炼约束
+
+- `packets` 在发现事件后重新读取完整 PR，核对合并 SHA、repository、base 分支；5 MB 输入上限按拒绝执行。
+  最近路径 owner 优先于宽泛组件，模型专属路径优先落模型 owner；单个 owner packet 上限 300 KB，按文件拆分。
+  全部讨论项都有显式处置；共用 review／回复对所有受影响 owner 可见，引用数据始终 fenced。
+- `intake_workflow` 持有租约并把准备／起草／gate 检查点写入 `intake-batches/<id>.json`；playbook 仅交接字符串 ID。
+  模型不可用保留事件并复用已有 packet；同一事件所有 packet 成功才可暂存。gate 前重读 main；冲突不消费事件。
+  已暂存关联防止崩溃恢复重复创建变更集；结束后删除临时原始证据，只留摘要与 canonical changeset／trace。
+- 完整 ID 清单包含 retired 与嵌套规则，避免跨 owner 重用。replace 的 predecessor／successor 全文独立于邻居上限；
+  历史 evidence 不等于当前 active 状态。新页由标准 Ops API 继承 owner index 的 tags，使服务与发布器重建一致。
+- L2 复用准备好的 patch，并按规则命名的函数／常量／测试从精确合并 SHA 补充有界源码片段；缺失、截断和不可读显式记录。
+  源码测试定义不能证明测试已运行。精炼保留无关操作，失败结论的 keep／revise／drop 必须有原因和输出映射。
+  `source_event_ids` 与新 gate 的 `event_ids` 分离，避免重消费和来源丢失。质量标准、保护与精炼次数上限保持不变。
 
 ## 2026-09-28 合并流程、激活、巡检与调度
 - `merge`：publisher 回执推进状态（pr_requested → pr_open → merge_requested → merged，v8 见下文）；

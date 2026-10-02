@@ -52,7 +52,7 @@ class OutboxError(RuntimeError):
     """An item is invalid, stale, or must not be executed."""
 
 
-def atomic_write_json(path: Path, data: Any) -> None:
+def atomic_write_json(path: Path, data: Any, *, mode: int = 0o644) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
@@ -60,7 +60,7 @@ def atomic_write_json(path: Path, data: Any) -> None:
             handle.write(canonical_json(data))
             handle.flush()
             os.fsync(handle.fileno())
-        os.chmod(tmp, 0o644)
+        os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:
         try:

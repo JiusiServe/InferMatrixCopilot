@@ -17,6 +17,14 @@ auto_merge 仓库写 outbox 的 `open_pr` 项，shadow 只记录）。逻辑全�
 ## 测试
 `test_kb_intake_gate.py`。
 
+## 2026-10-02 分阶段 intake
+`kb-intake` v2 用 `knowledge.prepare_intake` → `knowledge.draft_intake` → `knowledge.gate_intake`。
+准备完整 source／owner packet，逐 packet checkpoint，gate 在最新 main 上复检；夜间调度复用相同实现。
+经 `state_updates.kb_intake_batch` 传递字符串 ID；恢复不重复已完成的模型调用。
+未读完整证据、模型不可用、failed／human gate 返回失败并保留明确原因与已记录判定；有意无规则仍可成功。
+步骤处理跨仓库 batch ID 时拒绝；旧 `knowledge.intake` 入口仍兼容并调用同一流程。
+测试：`test_kb_intake_steps.py`、`test_kb_intake_workflow.py`。
+
 ## 2026-09-28 合并、巡检、激活步骤
 新增 `knowledge.advance_merges`、`knowledge.sweep`、`knowledge.activate`；`kb run` 路径自行持有租约，调度器路径复用其租约。
 

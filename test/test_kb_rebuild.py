@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from infermatrix_copilot.kb_service import merge
 from test_kb_flow import KnowledgeGitHub, _ack, _flow_runtime, _items, _open_pr
 
@@ -110,7 +112,18 @@ def test_a_rebuild_that_fails_its_own_gate_leaves_the_pr_to_people(tmp_path):
     from test_kb_intake_gate import ScriptedGateway, _generator_then_judge
 
     rt, lifecycle, changeset_id, _ = _posted(tmp_path)
-    rt.gateway = ScriptedGateway(_generator_then_judge("no"))
+    original_answer = _generator_then_judge("no")
+
+    def answer(role, prompt):
+        if role.name == "generator":
+            evidence = json.loads(prompt.split("<untrusted_data>\n", 1)[1].split("\n</untrusted_data>", 1)[0])
+            if "previous_operations" in evidence:
+                return {"operations": [], "operation_dispositions": [
+                    {"operation": key, "action": "keep", "reason": "retain the original claim for full recheck"}
+                    for key in evidence["rejected_operations"]]}
+        return original_answer(role, prompt)
+
+    rt.gateway = ScriptedGateway(answer)
     _fail(rt, "context changed since the verdict was judged: repos/demo/core/_index.md")
     rt.lease_owner = rt.ledger.acquire_lease("scheduler")
     events = merge.advance(rt, lifecycle)

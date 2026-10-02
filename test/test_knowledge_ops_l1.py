@@ -94,6 +94,54 @@ def test_add_to_new_page_appends_index_line():
     assert {b.op for b in result.blocks} == {"add"}
 
 
+@pytest.mark.parametrize("kind", ["add", "replace"])
+@pytest.mark.parametrize("index_tags,canonical,expected", [
+    ("tags: [general, review]\n", True, ["general", "review"]),
+    ("tags:\n  - general\n  - review\n", False, ["general", "review"]),
+    (None, True, ["demo"]),
+    ("tags: []\n", True, ["demo"]),
+    (None, False, []),
+])
+def test_new_rule_pages_inherit_owner_index_tags_then_canonical_sibling(kind, index_tags, canonical, expected):
+    base = _tree()
+    index = "repos/demo/core/_index.md"
+    source = PAGE
+    if not canonical:
+        source = "repos/demo/core/rules-source.md"
+        base[source] = base.pop(PAGE)
+        base[index] = base[index].replace("rules.md", "rules-source.md")
+    if index_tags is not None:
+        base[index] = ("---\ntitle: Core\ncreated: 2026-09-01\nupdated: 2026-09-01\n"
+                       "type: index\n" + index_tags + "---\n\n" + base[index])
+    target = "repos/demo/core/rules-backpressure.md"
+    if kind == "add":
+        operation = Op("add", target, "DEMO-3a", _rule("DEMO-3a"), page_title="Backpressure")
+    else:
+        operation = Op("replace", source, "DEMO-1a", _rule("DEMO-3a"), new_rule_id="DEMO-3a",
+                       new_page=target, evidence="PR #10", page_title="Backpressure")
+    head = _apply(base, operation)
+    assert Page.parse(head[target]).frontmatter_data()["tags"] == expected
+    assert Page.parse(head[source]).frontmatter_data()["tags"] == ["demo"]
+    assert head[index].startswith(base[index].rstrip("\n"))
+    result = check_changeset(base, head, _changes(base, head))
+    assert result.ok, result.issues
+
+
+def test_adding_to_an_existing_page_preserves_its_tags_when_owner_index_differs():
+    base = _tree()
+    base["repos/demo/core/_index.md"] = "---\ntags: [general, review]\n---\n\n# core\n"
+    head = _apply(base, Op("add", PAGE, "DEMO-3a", _rule("DEMO-3a")))
+    assert Page.parse(head[PAGE]).frontmatter_data()["tags"] == ["demo"]
+
+
+def test_invalid_inherited_tags_are_rejected_instead_of_coerced():
+    base = _tree()
+    base["repos/demo/core/_index.md"] = "---\ntags: general\n---\n\n# core\n"
+    with pytest.raises(LifecycleError, match="tags must be a list of strings"):
+        _apply(base, Op("add", "repos/demo/core/rules-new.md", "DEMO-3a", _rule("DEMO-3a"),
+                       page_title="New rules"))
+
+
 def test_replace_supersedes_atomically_and_flags_dangling_guide():
     base = _tree()
     head = _apply(base, Op("replace", PAGE, "DEMO-1b", _rule("DEMO-1c"),

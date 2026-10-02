@@ -3,11 +3,11 @@
 # uses the pinned generator, the gate the pinned judge (kb_service/models.py).
 # In shadow mode `publish` only records what it would have opened.
 name: kb-intake
-version: 1
+version: 2
 status: candidate
 provenance:
   created_by: human
-  source: knowledge-base redesign (Copilot owns the knowledge base), v7
+  source: nightly extraction trace audit; complete evidence and checkpointed owner drafting
 task_kinds: [knowledge_maintenance]
 repos: []
 requires: []
@@ -16,7 +16,10 @@ params:
   max_events: "events drafted per run (default 10)"
 steps:
   - {id: collect, step: knowledge.collect_events}
-  - {id: intake, step: knowledge.intake}
+  - {id: prepare, step: knowledge.prepare_intake}
+  - {id: draft, step: knowledge.draft_intake}
+  - {id: gate, step: knowledge.gate_intake}
   - {id: publish, step: knowledge.publish}
-success: new events recorded; at most one gated change set staged and either
+success: complete source evidence prepared for one upstream branch; every discussion
+  item accounted for; cached drafts reapplied to current main; at most one gated change set staged and either
   handed to the publisher (auto_merge) or recorded (shadow); nothing pushed here

@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from infermatrix_copilot.kb_service import merge
-from infermatrix_copilot.kb_service.refine import MAX_REFINES
+from infermatrix_copilot.kb_service.refine import (
+    MAX_REFINES, operation_key, refinement_validator, rejected_operations,
+)
 from infermatrix_copilot.kb_service.runtime import collect_events, run_intake
 from test_kb_flow import _ack, _flow_runtime, _items, _open_pr
 from test_kb_intake_gate import PAGE, ScriptedGateway, _judge_all, _rule
@@ -23,8 +27,16 @@ class Judges:
     def __call__(self, role, prompt):
         if role.name == "generator":
             self.prompts.append(prompt)
-            return {"operations": [{"kind": "add", "page": PAGE, "rule_id": "DEMO-2a",
-                                    "section_markdown": _rule("DEMO-2a", "PR #11")}], "rationale": "r"}
+            op = {"kind": "add", "page": PAGE, "rule_id": "DEMO-2a",
+                  "section_markdown": _rule("DEMO-2a", "PR #11")}
+            data = {"operations": [op], "rationale": "r"}
+            if "gate_feedback" in prompt:
+                payload = json.loads(prompt.split("<untrusted_data>\n", 1)[1].split("\n</untrusted_data>", 1)[0])
+                if operation_key(op) in payload.get("rejected_operations", []):
+                    data["operation_dispositions"] = [
+                        {"operation": operation_key(op), "action": "revise", "reason": "correct cited claim",
+                         "replacements": [operation_key(op)]}]
+            return data
         if '"directory"' in prompt:
             return {"verdict": "consistent", "conflicts": []}
         value = self.verdicts[0] if self.verdicts else "yes"
@@ -206,7 +218,9 @@ def test_a_refinement_may_carry_as_many_operations_as_the_change_set(tmp_path):
         def __call__(self, role, prompt):
             if role.name == "generator" and "gate_feedback" in prompt:
                 self.prompts.append(prompt)
-                return {"operations": many, "rationale": "r"}
+                return {"operations": many, "rationale": "r", "operation_dispositions": [
+                    {"operation": PAGE + "::DEMO-2a", "action": "revise", "reason": "split corrected conclusions",
+                     "replacements": [operation_key(op) for op in many]}]}
             return super().__call__(role, prompt)
     judges = Many(["yes"])
     rt.gateway = ScriptedGateway(judges)
@@ -214,3 +228,235 @@ def test_a_refinement_may_carry_as_many_operations_as_the_change_set(tmp_path):
     (event,) = [e for e in events if e.startswith(f"refined {first} as ")]
     refined = rt.ledger.changeset(event.rsplit(" ", 1)[1])
     assert len(refined["detail"]["operations"]) == 7
+
+
+def _operation(rule_id):
+    return {"kind": "add", "page": PAGE, "rule_id": rule_id,
+            "section_markdown": _rule(rule_id, "PR #11")}
+
+
+def test_refinement_preserves_process_and_jev_learning_and_source_trace(tmp_path):
+    """The live four-PR batch lost process/Jev rules while repairing browser rules."""
+    from infermatrix_copilot.trace_store import TraceStore
+
+    rt, lifecycle, judges, first = _failed_intake(tmp_path, ["no"])
+    original = rt.ledger.changeset(first)["detail"]
+    operations = [_operation(r) for r in ("DEMO-2a", "PROCESS-LEASE", "JEV-CONFIG")]
+    rt.ledger.update_changeset(first, detail={**original, "operations": operations,
+                                           "event_ids": [71, 72, 73], "source_event_ids": [71, 72, 73]})
+    rt.traces = TraceStore(tmp_path / "trace")
+    judges.next_round()
+    merge.advance(rt, lifecycle)
+    refined = rt.ledger.changeset(rt.ledger.changeset(first)["detail"]["refined_as"])
+    assert {op["rule_id"] for op in refined["detail"]["operations"]} == {
+        "DEMO-2a", "PROCESS-LEASE", "JEV-CONFIG"}
+    assert refined["detail"]["event_ids"] == []
+    assert refined["detail"]["source_event_ids"] == [71, 72, 73]
+    dispositions = refined["detail"]["operation_dispositions"]
+    assert {d["operation"] for d in dispositions if d["action"] == "keep"} == {
+        PAGE + "::PROCESS-LEASE", PAGE + "::JEV-CONFIG"}
+    # Full gate judges inherited operations too; no previous pass is reused.
+    assert {b["rule_id"] for b in refined["detail"]["decision"]["blocks"]} == {
+        "DEMO-2a", "PROCESS-LEASE", "JEV-CONFIG"}
+    (trace,) = [r for r in rt.traces.query(kind="outcome") if r["result"].get("action") == "refinement"]
+    assert trace["context"]["source_event_ids"] == [71, 72, 73]
+    assert trace["result"]["operation_dispositions"] == dispositions
+
+
+def test_refinement_requires_explicit_dispositions_and_allows_justified_failed_drop():
+    previous = [_operation("BAD-CLAIM"), _operation("PROCESS-LEASE"), _operation("JEV-CONFIG")]
+    bad = operation_key(previous[0])
+    audit = {}
+    validate = refinement_validator(previous, {bad}, audit)
+    with pytest.raises(ValueError, match="missing explicit disposition"):
+        validate({"operations": []})
+    with pytest.raises(ValueError, match="missing explicit disposition"):
+        validate({"operations": previous[1:]})
+    data = {"operations": [], "operation_dispositions": [
+        {"operation": bad, "action": "drop", "reason": "PR #11 shows the assertion was not implemented"}]}
+    validate(data)
+    assert data["operations"] == previous[1:]
+    assert audit["operation_dispositions"][0]["action"] == "drop"
+    with pytest.raises(ValueError, match="unrejected operation"):
+        validate({"operations": [], "operation_dispositions": [
+            data["operation_dispositions"][0],
+            {"operation": operation_key(previous[1]), "action": "drop", "reason": "shorten the answer"}]})
+
+
+def test_refinement_collision_rename_and_semantic_replacement_have_explicit_mapping():
+    previous = [_operation("DUPLICATE-ID")]
+    replacement = {"kind": "replace", "page": PAGE, "rule_id": "SERV-5j", "new_rule_id": "SPEECH-CAPABILITIES",
+                   "section_markdown": _rule("SPEECH-CAPABILITIES"), "evidence": "PR #11"}
+    renamed = _operation("FRESH-ID")
+    data = {"operations": [renamed, replacement], "operation_dispositions": [
+        {"operation": operation_key(previous[0]), "action": "revise", "reason": "fresh ID and supersede old meaning",
+         "replacements": [operation_key(renamed), operation_key(replacement)]}]}
+    refinement_validator(previous, {operation_key(previous[0])}, {})(data)
+    assert data["operations"] == [renamed, replacement]
+
+
+def test_refinement_gate_failure_scope_preserves_other_owners():
+    process, browser, generation = [_operation(r) for r in ("PROCESS-LEASE", "JEV-CONFIG", "GEN-NATIVE")]
+    browser["page"] = "repos/demo/browser/rules.md"
+    generation["page"] = "repos/demo/generation/rules.md"
+    detail = {"decision": {"blocks": [{"rule_id": "GEN-NATIVE", "verdict": "fail"}],
+                           "consistency": [{"owner_dir": "repos/demo/browser", "verdict": "conflict"}],
+                           "l1_issues": []}}
+    assert rejected_operations([process, browser, generation], detail) == {
+        operation_key(browser), operation_key(generation)}
+
+
+@pytest.mark.parametrize("claim,citation", [
+    ("`pkg/removed.py`", "PR #10"),
+    ("`pkg/queue.py::Queue.removed`", "PR #10"),
+    ("`pkg/queue.py::Queue.put`", "PR #99"),
+])
+def test_false_required_facts_can_be_refined_without_changing_valid_learning(claim, citation):
+    from infermatrix_copilot.kb_service.gate import changes_between, run_gate
+    from infermatrix_copilot.kb_service.intake import draft_changes
+    from infermatrix_copilot.knowledge_service.ops import KnowledgeOperation, apply_operations
+    from test_kb_intake_gate import GEN, JUDGE, _tree
+    from test_kb_upstream_facts import FakeUpstream
+
+    base, observer = _tree(), FakeUpstream()
+    valid = "`pkg/queue.py::Queue.put`"
+    bad, good = _operation("BAD-CLAIM"), _operation("GOOD-CLAIM")
+    bad["section_markdown"] = _rule("BAD-CLAIM", citation, claim=claim)
+    good["section_markdown"] = _rule("GOOD-CLAIM", "PR #10", claim=valid)
+    previous = [bad, good]
+
+    def gate(operations):
+        result = apply_operations(base, [KnowledgeOperation.from_dict(op) for op in operations],
+                                  release="v1", today="2026-10-02")
+        head = {**base, **result.files}
+        return run_gate(base=base, head=head, changes=changes_between(base, head), external_texts={},
+                        evidence=[], gateway=ScriptedGateway(_judge_all("yes")), judge=JUDGE,
+                        release="v1", repo_dir="repos/demo", facts=observer)
+
+    failed = gate(previous)
+    assert failed.status == "fail" and failed.blocks == []
+    rejected = rejected_operations(previous, {"decision": failed.to_dict()})
+    assert rejected == {operation_key(bad)}
+    revised = {**bad, "section_markdown": _rule("BAD-CLAIM", "PR #10", claim=valid)}
+    answer = {"operations": [revised], "operation_dispositions": [
+        {"operation": operation_key(bad), "action": "revise", "reason": "correct the observed false fact",
+         "replacements": [operation_key(revised)]}]}
+    draft = draft_changes(repo="demo", repo_dir="repos/demo", event_id=0, evidence={}, files=base,
+                          gateway=ScriptedGateway(lambda role, prompt: answer), generator=GEN,
+                          release="v1", today="2026-10-02",
+                          reply_validator=refinement_validator(previous, rejected, {}))
+    normalized = [op.to_dict() for op in draft.operations]
+    assert not draft.rejected and normalized == [revised, good]
+    assert gate(normalized).status == "pass"
+
+
+def test_only_false_required_retirement_evidence_implicates_the_retirement():
+    retirement = {"kind": "retire", "page": PAGE, "rule_id": "DEMO-1a",
+                  "reason": "incorrect", "evidence": "PR #99"}
+    untouched = _operation("GOOD-CLAIM")
+    untouched["section_markdown"] = _rule("GOOD-CLAIM", "PR #10", claim="`pkg/removed.py`")
+    facts = [{"kind": "pr", "pr": 99, "merged": False, "must_hold": True},
+             {"kind": "path", "path": "pkg/removed.py", "exists": False, "must_hold": False}]
+    assert rejected_operations([retirement, untouched], {"decision": {"facts": facts}}) == {
+        operation_key(retirement)}
+
+
+@pytest.mark.parametrize("collision", ["BAD-CLAIM", "BAD-CLAIM-NESTED"])
+def test_pathless_l1_collisions_implicate_exact_rule_ids_including_nested_rules(collision):
+    bad, good = _operation("BAD-CLAIM"), _operation("BAD-CLAIM-X")
+    bad["section_markdown"] += "\n### BAD-CLAIM-NESTED — nested contract\n\n- preserve this contract.\n"
+    decision = {"l1_issues": [{"code": "duplicate_rule_id", "path": "", "detail": collision}]}
+    assert rejected_operations([bad, good], {"decision": decision}) == {operation_key(bad)}
+
+
+def test_source_events_and_inherited_operations_survive_both_refinement_rounds(tmp_path):
+    rt, lifecycle, judges, first = _failed_intake(tmp_path, ["no"])
+    detail = rt.ledger.changeset(first)["detail"]
+    rt.ledger.update_changeset(first, detail={**detail, "event_ids": [71, 72], "source_event_ids": [71, 72],
+                                           "operations": [_operation("DEMO-2a"), _operation("PROCESS-LEASE")]})
+
+    class Selective(Judges):
+        def __call__(self, role, prompt):
+            if role.name == "judge" and '"directory"' not in prompt:
+                payload = json.loads(prompt.split("<untrusted_data>\n", 1)[1].split("\n</untrusted_data>", 1)[0])
+                if payload["change"]["rule_id"] == "PROCESS-LEASE":
+                    return _judge_all("yes")(role, prompt)
+            return super().__call__(role, prompt)
+
+    judges = Selective(["no", "yes"])
+    rt.gateway = ScriptedGateway(judges)
+    merge.advance(rt, lifecycle)
+    middle = rt.ledger.changeset(rt.ledger.changeset(first)["detail"]["refined_as"])
+    assert middle["status"] == "failed"
+    judges.next_round()
+    merge.advance(rt, lifecycle)
+    final = rt.ledger.changeset(rt.ledger.changeset(middle["id"])["detail"]["refined_as"])
+    assert final["detail"]["refine_round"] == MAX_REFINES
+    assert final["detail"]["source_event_ids"] == [71, 72]
+    assert {op["rule_id"] for op in final["detail"]["operations"]} == {"DEMO-2a", "PROCESS-LEASE"}
+
+
+def test_large_multi_pr_refinement_uses_bounded_failed_context_and_preserves_canonical_audit(tmp_path):
+    from infermatrix_copilot.kb_service.packets import MAX_PACKET_BYTES
+
+    rt, lifecycle, judges, first = _failed_intake(tmp_path, ["no"])
+    original = rt.ledger.changeset(first)["detail"]
+    operations = [_operation(r) for r in ("DEMO-2a", "PROCESS-LEASE", "JEV-CONFIG")]
+    rt.ledger.update_changeset(first, detail={**original, "operations": operations})
+    data = rt.load_changeset_files(first)
+    canonical = [{"source_reference": f"PR #{n}", "title": f"Source title {n}",
+                  "body": "UNRELATED-RAW-CONTENT " * 10_000, "changed_files": [f"pkg/{n}.py"],
+                  "merged_at": "2026-10-01T00:00:00Z", "merge_commit_sha": "c" * 40,
+                  "diffs": {f"pkg/{n}.py": "+long patch\n" * 5_000}}
+                 for n in range(11, 21)]
+    data["evidence"] = canonical
+    rt.save_changeset_files(first, data)
+    judges.next_round()
+    merge.advance(rt, lifecycle)
+    prompt = judges.prompts[-1]
+    assert len(prompt.encode()) <= MAX_PACKET_BYTES
+    assert "UNRELATED-RAW-CONTENT" not in prompt
+    payload = json.loads(prompt.split("<untrusted_data>\n", 1)[1].split("\n</untrusted_data>", 1)[0])
+    assert "body" not in payload and len(payload["evidence"]) == 1
+    assert payload["source_catalog"][-1]["title"] == "Source title 20"
+    refined = rt.ledger.changeset(rt.ledger.changeset(first)["detail"]["refined_as"])
+    assert {op["rule_id"] for op in refined["detail"]["operations"]} == {"DEMO-2a", "PROCESS-LEASE", "JEV-CONFIG"}
+    assert rt.load_changeset_files(refined["id"])["evidence"][:-1] == canonical
+
+
+@pytest.mark.parametrize("problem", ["oversized-discussion", "oversized-prompt", "unavailable-observer"])
+def test_unbounded_or_unavailable_refinement_context_escalates_before_generator(tmp_path, monkeypatch, problem):
+    from infermatrix_copilot.kb_service import packets
+    from infermatrix_copilot.knowledge_service.facts import FactsError
+
+    rt, lifecycle, judges, first = _failed_intake(tmp_path, ["no"])
+    before_calls = len(judges.prompts)
+    if problem == "oversized-discussion":
+        data = rt.load_changeset_files(first)
+        data["evidence"][0]["threads"] = [{"id": 1, "body": "queue " * 10_000}]
+        rt.save_changeset_files(first, data)
+    elif problem == "oversized-prompt":
+        detail = rt.ledger.changeset(first)["detail"]
+        op = {**detail["operations"][0], "section_markdown": "massive rule " * 30_000}
+        rt.ledger.update_changeset(first, detail={**detail, "operations": [op]})
+    else:
+        def unavailable(*args):
+            raise FactsError("branch mirror unavailable")
+        monkeypatch.setattr(packets, "observer_for", unavailable)
+    merge.advance(rt, lifecycle)
+    assert len(judges.prompts) == before_calls
+    assert rt.ledger.changeset(first)["status"] == "refine_exhausted"
+    assert not [cs for cs in rt.ledger.changesets_of_kind("demo", "refine")]
+    (queue,) = rt.ledger.human_queue("demo")
+    assert "refinement" in queue["reason"]
+    assert "no truncated refinement" in queue["reason"] if problem == "oversized-prompt" else "context unavailable" in queue["reason"]
+
+
+def test_duplicate_original_operation_identity_is_explicitly_refused():
+    from infermatrix_copilot.knowledge_service.lifecycle import LifecycleError
+
+    first = {"kind": "edit_same_meaning", "page": PAGE, "rule_id": "DEMO-1a",
+             "section_markdown": _rule("DEMO-1a")}
+    second = {**first, "section_markdown": _rule("DEMO-1a", claim="different rewording")}
+    with pytest.raises(LifecycleError, match="not unique; explicit consolidation"):
+        refinement_validator([first, second], set(), {})
