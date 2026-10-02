@@ -197,7 +197,7 @@ def render_block(feature, section: dict, tree: Path, full_name: str, pin: str) -
         body += "设计推断（非作者历史意图）：\n\n"
     body += section["body"].strip() + "\n\n"
     if proof["trace"]:
-        body += "调用路径：" + " → ".join(chr(96) + s["path"] + "::" + s["symbol"] + chr(96)
+        body += "调用路径：" + " → ".join(chr(96) + s["path"] + chr(96) + "（" + chr(96) + s["symbol"] + chr(96) + "）"
                                     for s in proof["trace"]) + "\n\n"
     body += "来源：" + ", ".join(
         f"[{e['path']}:L{e['start']}–L{e['end']}](https://github.com/{full_name}/blob/{pin}/"
@@ -256,6 +256,11 @@ def audit_depth(head: dict[str, str], tree: Path, policy, pin: str) -> dict:
     for feature in policy.features:
         page = depth_page(feature)
         blocks, problems = verified_blocks(head[page], feature, tree, pin) if page in head else ({}, [])
+        if "flow" in blocks:
+            proof = json.loads(_PROOF.search(_BLOCK.search(blocks["flow"]).group(5)).group(1))
+            if any(s["path"] not in production for s in proof["trace"]):
+                blocks.pop("flow")
+                problems.append(f"{feature.id}/flow: trace must use production implementation")
         errors.extend(problems)
         for block in blocks.values():
             proof = json.loads(_PROOF.search(_BLOCK.search(block).group(5)).group(1))

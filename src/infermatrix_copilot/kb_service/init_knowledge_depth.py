@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections import Counter
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -22,6 +23,11 @@ from .init_support import InitError, InitRecord, classify_verdict, generate, jud
 from .knowledge_coverage import audit_coverage, inventory
 from .knowledge_depth import FACETS, audit_depth, depth_page, digest, render_block, validate_draft, verified_blocks
 from .models import ModelUnavailable
+
+
+def validate_container(data: dict) -> None:
+    if not isinstance(data, dict) or not isinstance(data.get("sections"), list) or len(data["sections"]) > len(FACETS):
+        raise ValueError("sections must list at most seven depth facets")
 
 
 @dataclass
@@ -43,7 +49,7 @@ class _KnowledgeDepth(_Knowledge):
             ":subscription-generator" if self.rt.subscription_generator else "")
 
     def _input_options(self) -> dict:
-        return {**super()._input_options(), "depth_version": 1}
+        return {**super()._input_options(), "depth_version": 2}
 
     def _base_for_run(self, latest: str) -> str:
         previous = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, self.STAGE)
@@ -100,6 +106,9 @@ class _KnowledgeDepth(_Knowledge):
                 _, problems = verified_blocks(self.head[page], feature, tree, self.record.pin)
                 if problems:
                     return self._blocked(problems + ["refresh stale/edited depth explicitly before extending it"])
+        initial = audit_depth(self.head, tree, policy, self.record.pin)
+        if initial["problems"]:
+            return self._blocked(initial["problems"])
         context = DepthContext(tree, inventory(tree, policy))
         # A completed first pass takes priority over repairs, so one difficult
         # feature cannot consume the budget before the others get visited.
@@ -211,26 +220,35 @@ class _KnowledgeDepth(_Knowledge):
             entry["status"] = "extracting"
             self.record.save(self.rt.state_dir)
             entry["draft"] = generate(self.rt, self.budget, self.lifecycle.init, system=SYSTEM_DEPTH,
-                                      prompt=prompt(payload), validate=validate_draft).data
+                                      prompt=prompt(payload), validate=validate_container).data
             entry["context_sha256"] = digest(prompt(payload))
             entry["status"] = "extracted"
             self.record.save(self.rt.state_dir)
         elif entry.get("context_sha256") != digest(prompt(payload)):
             raise ValueError("checkpoint draft context changed")
         data = entry["draft"]
-        validate_draft(data)
+        validate_container(data)
         offered = files + docs
         blocks = dict(old_blocks)
+        duplicates = Counter(s.get("facet") for s in data["sections"] if isinstance(s, dict) and isinstance(s.get("facet"), str))
+        skipped = []
         for section in data["sections"]:
-            if section["facet"] in old_blocks or section["facet"] not in payload["facets"]:
-                raise ValueError("draft attempts to rewrite an existing depth facet")
-            for evidence in section["evidence"]:
-                if not any(item["path"] == evidence["path"] and item["start"] <= evidence["start"]
-                           <= evidence["end"] <= item["end"] for item in offered):
-                    raise ValueError("depth evidence crosses an unshown source gap")
-            blocks[section["facet"]] = render_block(feature, section, tree, self.lifecycle.full_name, self.record.pin)
+            try:
+                validate_draft({"sections": [section]})
+                if duplicates[section["facet"]] > 1 or section["facet"] not in payload["facets"]:
+                    raise ValueError("duplicate or unrequested depth facet")
+                for evidence in section["evidence"]:
+                    if not any(item["path"] == evidence["path"] and item["start"] <= evidence["start"]
+                               <= evidence["end"] <= item["end"] for item in offered):
+                        raise ValueError("depth evidence crosses an unshown source gap")
+                if section["facet"] == "flow" and any(s["path"] not in context.production for s in section["trace"]):
+                    raise ValueError("flow must trace production implementation")
+                blocks[section["facet"]] = render_block(feature, section, tree, self.lifecycle.full_name, self.record.pin)
+            except (ValueError, TypeError, KeyError, SyntaxError) as exc:
+                skipped.append(str(section.get("facet", "invalid")) + ": " + str(exc) if isinstance(section, dict) else str(exc))
+        entry["skipped_facets"] = skipped
         if blocks == old_blocks:
-            raise ModelUnavailable("no supported new depth facets")
+            raise ModelUnavailable("no supported new depth facets; " + "; ".join(skipped))
         front = _page_frontmatter(_one_line(feature.title) + "：实现深读", kind="architecture",
                                   today=self.today, tags=self.tags)
         related = f"[功能概览]({Path(feature.page).name}) · [owner 入口](_index.md)\n\n"
@@ -260,7 +278,7 @@ class _KnowledgeDepth(_Knowledge):
         self.record.verdicts[key] = entry["checked"]
         entry["shown_source_files"] = sorted({f["path"] for f in files})
         entry["status"] = label
-        entry["reason"] = json.dumps(reasons, ensure_ascii=False)
+        entry["reason"] = json.dumps({"review": reasons, "unsupported_facets": skipped}, ensure_ascii=False)
         entry.pop("draft", None)
         entry.pop("checked", None)
         if label != "pass":

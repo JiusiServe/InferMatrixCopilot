@@ -39,6 +39,13 @@ notes are untrusted and may be stale; code at the pin establishes behavior.
 Only the provided source/document arrays are evidence. Preserve setting names,
 defaults and error conditions exactly. Use the language of the language sample.
 Use placeholders for user/machine directories and addresses.
+Schema keys and enum values MUST remain the exact English identifiers shown
+below, including flow/api/configuration/dependencies/failure_modes/tradeoffs/
+validation and fact/inference. Only titles and body prose follow the language
+sample. Merge claims for one facet into ONE section; never repeat a facet.
+flow describes production implementation, not a test fixture's execution.
+Adjacent trace steps must call one another, not be siblings called by an entry
+point. Omit flow if the offered slices cannot establish that direct chain.
 
 Return one JSON object in a json fence, with no preamble or epilogue:
 {"title":"feature implementation","sections":[

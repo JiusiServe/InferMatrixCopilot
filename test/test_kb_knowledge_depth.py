@@ -274,6 +274,42 @@ def test_repeated_explicit_retry_can_retry_missing_facets(world):
     assert accepted.spent_usd == 2.5 and accepted.coverage["semantic_depth"]["complete_features"] == 1
 
 
+def test_bad_flow_does_not_discard_checked_other_facets(world):
+    _baseline(world)
+
+    class BadFlow(DepthGateway):
+        def call_json(self, role, **kwargs):
+            result = super().call_json(role, **kwargs)
+            if kwargs["system"] == SYSTEM_DEPTH:
+                for section in result.data["sections"]:
+                    if section["facet"] == "flow":
+                        section["trace"][0]["symbol"] = "OtherEngine.step"
+            return result
+
+    record = _run(world, BadFlow())
+    assert record.status == "dry_run", record.problems
+    assert record.coverage["semantic_depth"]["covered_facets"] == 6
+    assert record.coverage["semantic_depth"]["features"]["step0"]["missing_facets"] == ["flow"]
+    assert record.depth["features"]["step0"]["skipped_facets"]
+
+
+def test_client_trace_uses_its_own_checker_and_ignores_comment_calls(tmp_path):
+    from types import SimpleNamespace
+    from infermatrix_copilot.knowledge_service.facts import claims_in
+    from infermatrix_copilot.kb_service.knowledge_depth import verify_trace
+
+    (tmp_path / "client.ts").write_text("function run() { return helper(); }\nfunction helper() { return 1; }\n")
+    section = {"facet": "flow", "title": "Client flow", "body": "run returns helper's result.",
+               "interpretation": "fact", "evidence": [{"path": "client.ts", "start": 1, "end": 2}],
+               "trace": [{"path": "client.ts", "symbol": "run", "start": 1, "end": 1},
+                         {"path": "client.ts", "symbol": "helper", "start": 2, "end": 2}]}
+    block = render_block(SimpleNamespace(id="client"), section, tmp_path, "o/demo", "a" * 40)
+    assert not any(c.kind == "symbol" for c in claims_in(block, {"client.ts"}, active=True))
+    (tmp_path / "client.ts").write_text("function run() { /* helper() */ return 1; }\nfunction helper() { return 1; }\n")
+    with pytest.raises(ValueError, match="does not show"):
+        verify_trace(tmp_path, section["trace"])
+
+
 @pytest.mark.parametrize("command, stage", [("widen", "knowledge"), ("deepen", "knowledge-deepen")])
 def test_aliases_use_init_before_opening_a_ledger(monkeypatch, command, stage):
     from infermatrix_copilot.kb_service import cli
