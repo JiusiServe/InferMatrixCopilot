@@ -438,6 +438,82 @@ def test_coverage_promotion_converts_findings_to_comments(settings, trace,
     assert len(kept) == 2
     assert "remains unfixed" in kept[1]["comment"]
     assert next(trace.events("review_coverage_promoted"))["added"] == 1
+    assert "2 actionable finding(s)." in result.outputs["review_summary"]
+    assert "merged" not in result.outputs["review_summary"]
+    assert not llm._replies
+
+
+def test_rejected_facts_stay_available_and_non_actionable_additions_drop(
+        settings, trace, tmp_path, git_repo):
+    """A true unused-key observation must not become a published defect
+    merely because coverage revisits it after the reducer rejected it."""
+    settings.review_ensemble = True
+    settings.review_depth = "full"
+    settings.review_second_round = True
+    settings.review_verify_comments = True
+    settings.review_verify_concurrency = 1
+    harmless = {"file": "config.py", "line": 10, "severity": "minor",
+                "comment": "optional key also reaches an unused consumer",
+                "evidence": "config.py:10 `allowed |= {'model_config'}`"}
+    future = {"file": "config.py", "line": 40, "severity": "minor",
+              "comment": "validator may reject this if its fields change later",
+              "evidence": "config.py:40 `fields = current_fields()`"}
+    reason = "No current affected consumer; forwarding is harmless"
+    llm = ScriptedLLM([
+        contract(review_comments=[harmless],
+                 findings=["[validated] optional key is forwarded"]),
+        *[contract(review_comments=[])] * (len(_REVIEW_LENSES) - 1),
+        verdicts_reply({"i": 0, "action": "drop", "why": reason},
+                       summary="No actionable findings."),
+        Reply(blocks=[Block(type="text", text=json.dumps(
+            {"additions": [harmless]}))]),
+        contract(review_comments=[future]),
+        contract(verdict="not_actionable", evidence=reason),
+        contract(verdict="not_actionable",
+                 evidence="current_fields excludes the key on this head"),
+    ])
+    state = {"diff_text": "diff --git a/config.py b/config.py\n"
+                          "+++ b/config.py\n@@ -1,0 +1,1 @@\n+allowed = set()",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    result = asyncio.run(register_builtin_steps(StepRegistry()).get(
+        "agent.review_diff").handler(
+            _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok
+    assert result.outputs["review_comments"] == []
+    assert result.outputs["review_summary"].endswith("**Verdict:** APPROVE")
+    assert "optional key also reaches" not in result.outputs["review_text"]
+    assert next(trace.events("review_comments_verified"))["dropped"] == 2
+    # The decision survives every boundary, including the second round and
+    # independent verifiers, instead of only living in a reducer archive.
+    for call in llm.calls[-4:]:
+        assert reason in json.dumps(call["messages"])
+    assert not llm._replies
+
+
+def test_verification_removal_clears_stale_reducer_summary(
+        settings, trace, tmp_path, git_repo):
+    settings.review_ensemble = True
+    settings.review_depth = "full"
+    settings.review_verify_comments = True
+    llm = ScriptedLLM([
+        contract(review_comments=[{"file": "config.py", "line": 1,
+                                   "severity": "major", "comment": "broken",
+                                   "evidence": "config.py:1"}]),
+        *[contract(review_comments=[])] * (len(_REVIEW_LENSES) - 1),
+        verdicts_reply({"i": 0, "action": "keep"},
+                       summary="One blocking defect remains."),
+        contract(verdict="refuted"),
+    ])
+    state = {"diff_text": "diff --git a/config.py b/config.py\n+x = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    result = asyncio.run(register_builtin_steps(StepRegistry()).get(
+        "agent.review_diff").handler(
+            _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok
+    assert result.outputs["review_comments"] == []
+    for field in ("review_text", "review_summary"):
+        assert "blocking defect remains" not in result.outputs[field]
+        assert "No actionable findings." in result.outputs[field]
     assert not llm._replies
 
 

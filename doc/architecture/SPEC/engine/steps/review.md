@@ -1,6 +1,6 @@
 # engine/steps/review/ —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-10-02 -->
 
 `patch gate + PR review + quality（9 个源文件） · step 库（评审） · refactor-status: ok`
 
@@ -49,6 +49,15 @@ agent、评审结果的有界精炼、评测调优过的 prompt 数据和确定�
   「Checked, no defect found」注记：保留证据，去掉诉求，不带优先级。
   在此之前取舍只活在模型的 `summary` 散文里，而发布读的是列表，于是
   summary 说要丢弃的请求照样行内发出（#141）。
+- **终局摘要不能复用过期取舍**：覆盖补充、第二轮、核验、disposition 或评论预算
+  改变评论的成员、主张、位置或严重度后，清除 reducer 的 draft summary，
+  由最终可发布集合生成摘要；无发现时正文明确写 `No actionable findings.`。
+- **事实成立不等于需要改动**：覆盖补充、第二轮和逐评论核验都携带 ensemble
+  reducer 的拒绝候选及原因（`_rejected_review_comments`）；重新提出同一关切
+  必须有推翻原原因的新证据。核验须指出当前 head 的具体触发条件及坏结果，
+  或明确未满足的要求。无影响的未使用可选值、依赖未来假设代码变更的问题
+  属于 `not_actionable`，与 `refuted` 一样丢弃；无法核验仍保留并降级，
+  调用失败仍保留原评论。
 - **`[resolved]` 是记录，不是诉求**：findings 里的 `[resolved]` 行从不变成评论。
   残留问题若需要贡献者处理，由评审者自己另发一条 `publish` 评论（file:line、
   要做的改动、`evidence` 引用该 `[resolved]` 行）；覆盖补充（coverage editor）

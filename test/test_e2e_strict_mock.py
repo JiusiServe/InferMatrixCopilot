@@ -108,6 +108,8 @@ def _fake_gh(head: str):
             data: dict = {}
             if "baseRefName" in fields:
                 data["baseRefName"] = "main"
+            if "headRefOid" in fields:
+                data["headRefOid"] = head
             if "commits" in fields:
                 data["commits"] = [{"oid": head, "messageHeadline": "add feature"}]
             if "title" in fields:

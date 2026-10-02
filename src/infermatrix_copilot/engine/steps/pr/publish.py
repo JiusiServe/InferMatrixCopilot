@@ -290,14 +290,13 @@ def _review_payload(state: dict, *, current_head: str = "") -> tuple[dict, int]:
 
 def _current_pr_head(repo, pr: int) -> tuple[str, str]:
     """Resolve the current PR head SHA immediately before the write."""
-    code, out = _gh(["pr", "view", str(int(pr)), "--json", "commits"], cwd=repo)
+    code, out = _gh(["pr", "view", str(int(pr)), "--json", "headRefOid"], cwd=repo)
     if code != 0:
         return "", out[:400]
     try:
-        commits = json.loads(out or "{}").get("commits") or []
+        sha = str(json.loads(out or "{}").get("headRefOid") or "")
     except (AttributeError, json.JSONDecodeError):
-        commits = []
-    sha = str(commits[-1].get("oid") or "") if commits else ""
+        sha = ""
     return sha, "" if sha else "PR head SHA missing from gh response"
 
 
