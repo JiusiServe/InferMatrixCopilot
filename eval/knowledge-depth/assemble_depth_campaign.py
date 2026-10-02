@@ -1,7 +1,7 @@
 """Assemble durable source-verified campaign pages; native archive audit is separate.
 
-The default is read-only. --apply writes only accepted depth additions and their
-missing owner index links, after every checkpoint has passed the same checks.
+The default is read-only. --apply writes accepted depth additions, explicitly
+archived invalid retirements and missing owner links after all checks pass.
 """
 
 from __future__ import annotations
@@ -97,7 +97,70 @@ def _receipt(record, feature, facet, block):
             "native_trace_id": result["native_trace_id"], "native_reply_sha256": result["native_reply_sha256"]}
 
 
-def assemble(root: Path, state: Path, source: Path):
+def _retirements(paths, root, baseline, pin, repo, features, source, policy):
+    """Bind explicit historical archives; never waive a current proof check."""
+    retired, reports = {}, []
+    for path in paths:
+        path = Path(path)
+        if path.resolve().is_relative_to((root / "knowledge").resolve()):
+            raise ValueError("retirement archives belong outside product knowledge")
+        raw = path.read_bytes()
+        archive = json.loads(raw)
+        if not isinstance(archive, dict) or type(archive.get("schema_version")) is not int \
+                or archive["schema_version"] != 1 or archive.get("repo") != repo \
+                or archive.get("pin") != pin or archive.get("historical_knowledge_base_sha") != baseline:
+            raise ValueError("retirement archive differs from the campaign identity")
+        feature = features.get(archive.get("feature"))
+        facet = archive.get("facet")
+        page = archive.get("page")
+        block = archive.get("raw_block")
+        if feature is None or facet not in DEPTH_FACETS or page != depth_page(feature) \
+                or not isinstance(block, str) or archive.get("current_status") != "unknown_pending_replacement":
+            raise ValueError("retirement archive has an invalid feature, facet or page")
+        original = _baseline(root, baseline, "knowledge/" + page)
+        match = DEPTH_BLOCK.fullmatch(block)
+        if original is None or archive.get("original_page_sha256") != digest(original) \
+                or match is None or match.groups()[:3] != (feature.id, facet, pin) \
+                or match[4] != digest(match[5]) or archive.get("body_sha256") != match[4] \
+                or archive.get("raw_block_sha256") != digest(block) \
+                or sum(item.group() == block for item in DEPTH_BLOCK.finditer(original)) != 1:
+            raise ValueError("retirement archive does not bind the exact baseline page and block hashes")
+        receipt = archive.get("native_approval")
+        if not isinstance(receipt, dict) or any(receipt.get(key) != value for key, value in (
+                ("feature", feature.id), ("facet", facet), ("page", page), ("pin", pin),
+                ("block_sha256", digest(block)), ("dimensions", {d: "yes" for d in DIMENSIONS["prose"]}))) \
+                or not isinstance(receipt.get("native_trace_id"), str) or not receipt["native_trace_id"] \
+                or not re.fullmatch(r"[0-9a-f]{64}", str(receipt.get("native_reply_sha256", ""))):
+            raise ValueError("retirement archive lacks an exact historical native approval receipt")
+        if (page, facet) in retired:
+            raise ValueError("duplicate retired facet")
+        # Isolate this block so another invalid facet cannot authorize retiring
+        # a valid one. The remaining baseline still passes the full proof gate.
+        probe = Page.parse(original).frontmatter + block + "\n"
+        blocks, problems = verified_blocks(probe, feature, source, pin, policy=policy)
+        if facet in blocks or not problems or any(not p.startswith(feature.id + "/" + facet + ":") for p in problems):
+            raise ValueError("retirement requires this exact block to fail current pinned proof replay")
+        retired[(page, facet)] = {"feature": feature.id, "facet": facet, "page": page, "raw_block": block,
+                                "block_sha256": digest(block), "native_trace_id": receipt["native_trace_id"],
+                                "native_reply_sha256": receipt["native_reply_sha256"],
+                                "status": "unknown_pending_replacement", "proof_problems": problems,
+                                "archive_sha256": hashlib.sha256(raw).hexdigest()}
+        reports.append({"name": path.name, "sha256": hashlib.sha256(raw).hexdigest()})
+    return retired, reports
+
+
+def _filtered(text, page, retired):
+    for (target, _), row in retired.items():
+        if target == page:
+            # Remove only the archived exact bytes. A distinct replacement
+            # must prove itself and bind a new successful receipt as usual.
+            if text.count(row["raw_block"]) > 1:
+                raise ValueError("duplicate archived block in a retirement page")
+            text = text.replace(row["raw_block"], "")
+    return text
+
+
+def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
     """Return metadata and validated writes without modifying any input."""
     root, state, source = root.resolve(), state.resolve(), source.resolve()
     metadata_raw = (state / "campaign.json").read_bytes()
@@ -131,13 +194,18 @@ def assemble(root: Path, state: Path, source: Path):
             or campaign.get("features") != len(features) or campaign.get("denominator") != len(features) * len(DEPTH_FACETS):
         raise ValueError("partitions must own every policy feature exactly once without reducing the denominator")
     by_page = {depth_page(feature): feature for feature in features.values()}
-    pinned_files, baseline_pages, old_blocks = set(), {}, {}
+    retired, retirement_provenance = _retirements(retirement_reports, root, baseline, pin, repo,
+                                                features, source, policy)
+    pinned_files, baseline_pages, old_blocks, original_baseline_pages = set(), {}, {}, {}
     for page, feature in by_page.items():
         text = _baseline(root, baseline, "knowledge/" + page)
         if text is not None:
+            original_baseline_pages[page] = text
+            text = _filtered(text, page, retired)
             baseline_pages[page] = text
             old_blocks[page] = _blocks(text, feature, source, pin, policy, pinned_files)
-    proposals, changes, receipts, checkpoints = {}, [], [], []
+    proposals = {page: baseline_pages[page] for page, _ in retired}
+    changes, receipts, checkpoints, accepted_pages = [], [], [], set()
     counts = {facet: sum(facet in blocks for blocks in old_blocks.values()) for facet in DEPTH_FACETS}
     recognized_features = {by_page[page].id for page, blocks in old_blocks.items() if blocks}
     for worker, owned in partitions.items():
@@ -158,17 +226,21 @@ def assemble(root: Path, state: Path, source: Path):
                             "status": record.get("status"), "accepted_pages": len(accepted)})
         for page, candidate in accepted.items():
             feature = by_page.get(page)
-            if feature is None or feature.id not in owned or page in proposals or not isinstance(candidate, str):
+            if feature is None or feature.id not in owned or page in accepted_pages or not isinstance(candidate, str):
                 raise ValueError("accepted page is outside unique worker ownership: " + str(page))
+            accepted_pages.add(page)
             entry = entries.get(feature.id, {})
             accepted_sha = digest(candidate)
             if entry.get("accepted_sha256") != accepted_sha:
                 raise ValueError("durable accepted page hash differs: " + feature.id)
+            candidate = _filtered(candidate, page, retired)
             blocks = _blocks(candidate, feature, source, pin, policy, pinned_files)
             prior = old_blocks.get(page, {})
-            if not blocks or any(blocks.get(facet) != block for facet, block in prior.items()):
+            if (not blocks and not any(target == page for target, _ in retired)) \
+                    or any(blocks.get(facet) != block for facet, block in prior.items()):
                 raise ValueError("accepted page edits or omits an existing depth block: " + feature.id)
-            recognized_features.add(feature.id)
+            if blocks:
+                recognized_features.add(feature.id)
             old = baseline_pages.get(page)
             related = f"[功能概览]({PurePosixPath(feature.page).name}) · [owner 入口](_index.md)"
             expected_body = _outside_blocks(old) if old is not None else ["# " + _one_line(feature.title) + "：实现深读", related]
@@ -218,7 +290,7 @@ def assemble(root: Path, state: Path, source: Path):
             raise ValueError("target knowledge path contains a symlink")
         prior = _baseline(root, baseline, "knowledge/" + page)
         current = target.read_text(encoding="utf-8") if target.is_file() else None
-        if current not in (prior, text):
+        if current not in (prior, baseline_pages.get(page, prior), text):
             raise ValueError("target page has unrelated changes: " + page)
         if current != text:
             writes[page] = text
@@ -227,6 +299,9 @@ def assemble(root: Path, state: Path, source: Path):
               "features": len(features), "denominator": len(features) * len(DEPTH_FACETS),
               "campaign_sha256": hashlib.sha256(metadata_raw).hexdigest(), "policy_sha256": digest(policy_text),
               "checkpoints": checkpoints, "baseline_facets": sum(map(len, old_blocks.values())),
+              "original_baseline_facets": sum(len(DEPTH_BLOCK.findall(text)) for text in original_baseline_pages.values()),
+              "retired_facets": [{key: value for key, value in row.items() if key != "raw_block"}
+                                  for row in retired.values()], "retirement_reports": retirement_provenance,
               "new_receipt_bound_facets": len(receipts), "source_verified_facets": sum(counts.values()),
               "recognized_feature_count": len(recognized_features),
               "all_features_recognized": len(recognized_features) == len(features),
@@ -242,6 +317,7 @@ def main():
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--source-tree", type=Path, required=True)
+    parser.add_argument("--retirement-report", type=Path, action="append", default=[])
     parser.add_argument("--report", type=Path)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
@@ -255,7 +331,7 @@ def main():
                              for n in range(campaign["workers"]))]:
                     handle = stack.enter_context(lock.open("r"))
                     fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            report, writes = assemble(args.root, args.state, args.source_tree)
+            report, writes = assemble(args.root, args.state, args.source_tree, retirement_reports=args.retirement_report)
             report["applied"] = args.apply
             if args.apply:
                 for page, text in writes.items():
@@ -276,7 +352,7 @@ def main():
         args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({key: report[key] for key in ("repo", "baseline_facets", "new_receipt_bound_facets",
           "source_verified_facets", "recognized_feature_count", "source_target_met", "facet_counts",
-          "planned_files", "applied", "native_archive_audit_required")}, ensure_ascii=False))
+          "retired_facets", "planned_files", "applied", "native_archive_audit_required")}, ensure_ascii=False))
     return 0
 
 

@@ -52,8 +52,9 @@ Cursor 用 slash 形式：
 表示已核验缺失并保留真实缺口，`unknown` 表示尚未认可；不存在测试不等于测试通过。
 达到门槛与填完所有缺口分别报告，遍历结束不能代替完成。
 
-用户明确要求不限次数订阅提取时，使用 `--unlimited-subscription`；提取器与独立
-Codex 评审都须通过订阅身份检查，该参数与 `--budget-usd` 冲突。不可自动转为 API
+用户明确要求不限次数订阅提取时，使用 `--unlimited-subscription`，设置
+`KB_GENERATOR=zcode:GLM-5.3:low` 和 `KB_JUDGE=codex:gpt-6-sol:medium`；两个通道
+都须通过订阅身份检查，该参数与 `--budget-usd` 冲突。不可自动转为 API
 计费或替换模型，未报告的真实费用保持未知。已有用户授权适用于后续发布与合并。
 
 交付前在包含全部候选变更的完整 checkout 中校验源码及原生认可记录，再检查检索、

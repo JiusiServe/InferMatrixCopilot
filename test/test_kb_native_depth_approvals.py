@@ -8,7 +8,8 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from infermatrix_copilot.kb_service.knowledge_depth import render_block
+from infermatrix_copilot.kb_service.knowledge_coverage import load_policy
+from infermatrix_copilot.kb_service.knowledge_depth import build_absence_certificate, render_block
 from infermatrix_copilot.trace_store import TraceStore
 from tools.audit_native_depth_approvals import audit_native_approvals, main
 
@@ -30,7 +31,8 @@ def native(tmp_path):
     root = tmp_path / "checkout"
     adapter = root / "adapters/toy"
     adapter.mkdir(parents=True)
-    (adapter / "manifest.yaml").write_text(yaml.safe_dump({"knowledge": {"repo_subdir": "repos/toy"}}))
+    (adapter / "manifest.yaml").write_text(yaml.safe_dump({
+        "repo": {"full_name": "o/toy"}, "knowledge": {"repo_subdir": "repos/toy"}}))
     feature = {"id": "settings", "title": "Settings", "owner": "core", "source_globs": ["pkg/core.py"],
                "docs": ["docs.md"], "entry_points": ["pkg/core.py"],
                "page": "repos/toy/components/core/feature-settings.md"}
@@ -51,7 +53,9 @@ def native(tmp_path):
                              inputs={"prompt": _fence({"feature": {"id": "settings"}, "pin": PIN})},
                              outputs={"reply": json.dumps({"sections": [section]})})
     prose = "\n".join(block.splitlines()[1:-1]).split("<!-- kb:depth-proof", 1)[0].strip()
-    prompt = {"feature": "settings", "pin": PIN, "sections": {"configuration": prose}}
+    prompt = {"feature": "settings", "pin": PIN, "sections": {"configuration": prose},
+              "evidence": [{"source_reference": f"o/toy@{PIN}:pkg/core.py:L1-L1", "kind": "upstream_text",
+                            "text": ["1: DEFAULT_RETRIES = 3"]}]}
     reply = {"facets": {"configuration": {"dimensions": dict(YES), "reason": "Source lines checked"}}}
     judge = store.append("model_call", model={"role": "judge", "provider": "codex", "model": "gpt-6-sol",
                          "served_model": ""}, inputs={"prompt": _fence(prompt)}, outputs={"reply": json.dumps(reply)})
@@ -83,6 +87,11 @@ def _replace_reply(native, reply):
     _replace_record(native, native["judge"], outputs={"reply": ref})
     native["row"]["native_reply_sha256"] = ref.removeprefix("sha256:")
     native["baseline"].write_text(json.dumps({"approvals": [native["row"]]}))
+
+
+def _replace_prompt(native, prompt):
+    ref = native["store"].put_blob(_fence(prompt))
+    _replace_record(native, native["judge"], inputs={"prompt": ref})
 
 
 def test_legacy_dimensions_are_read_from_native_blobs_and_archives_are_read_only(native):
@@ -137,6 +146,82 @@ def test_editing_prose_and_updating_receipt_hash_still_needs_a_new_native_judgme
     assert any("exact current facet prose" in issue for issue in _audit(native)["problems"])
 
 
+@pytest.mark.parametrize("change", ["missing", "empty", "wrong_text", "wrong_reference", "wrong_pin",
+                                    "wrong_repository", "wrong_number", "missing_line", "conflicting_line"])
+def test_actual_judged_evidence_must_bind_the_current_source_proof(native, change):
+    prompt = json.loads(json.dumps(native["prompt"]))
+    item = prompt["evidence"][0]
+    if change == "missing":
+        prompt.pop("evidence")
+    elif change == "empty":
+        prompt["evidence"] = []
+    elif change == "wrong_text":
+        item["text"] = ["1: DEFAULT_RETRIES = 9"]
+    elif change == "wrong_reference":
+        item["source_reference"] = f"o/toy@{PIN}:pkg/other.py:L1-L1"
+    elif change == "wrong_pin":
+        item["source_reference"] = "o/toy@" + "b" * 40 + ":pkg/core.py:L1-L1"
+    elif change == "wrong_repository":
+        item["source_reference"] = f"another/repo@{PIN}:pkg/core.py:L1-L1"
+    elif change == "wrong_number":
+        item["text"] = ["2: DEFAULT_RETRIES = 3"]
+    elif change == "missing_line":
+        item["source_reference"] = f"o/toy@{PIN}:pkg/core.py:L1-L2"
+    else:
+        prompt["evidence"].append({**item, "text": ["1: DEFAULT_RETRIES = 9"]})
+    _replace_prompt(native, prompt)
+    report = _audit(native)
+    assert not report["approvals"] and report["problems"]
+
+
+@pytest.mark.parametrize("context", ["merged", "unterminated"])
+def test_merged_judged_source_spans_and_no_final_newline_keep_exact_bindings(native, context):
+    source = native["upstream"] / "pkg/core.py"
+    source.write_text("DEFAULT_RETRIES = 3\n\ndef configure(): return DEFAULT_RETRIES\n" if context == "merged"
+                      else "DEFAULT_RETRIES = 3")
+    block = render_block(SimpleNamespace(id="settings"), native["section"], native["upstream"], "o/toy", PIN)
+    native["page"].write_text(block + "\n")
+    native["row"]["block_sha256"] = _hash(block)
+    native["baseline"].write_text(json.dumps({"approvals": [native["row"]]}))
+    prompt = json.loads(json.dumps(native["prompt"]))
+    if context == "merged":
+        prompt["evidence"][0].update(source_reference=f"o/toy@{PIN}:pkg/core.py:L1-L3",
+                                    text=["1: DEFAULT_RETRIES = 3", "2: ", "3: def configure(): return DEFAULT_RETRIES"])
+    _replace_prompt(native, prompt)
+    assert _audit(native)["problems"] == []
+
+
+@pytest.mark.parametrize("change", ["none", "missing", "changed", "duplicate"])
+def test_verified_absence_needs_the_exact_certificate_in_the_native_judged_packet(native, change):
+    (native["upstream"] / "docs.md").write_text("Settings documentation.\n")
+    policy = load_policy((native["root"] / "adapters/toy/knowledge-coverage.yaml").read_text(), "repos/toy")
+    feature = policy.features[0]
+    certificate = build_absence_certificate(native["upstream"], policy, feature, PIN)
+    assert certificate is not None
+    section = {**native["section"], "facet": "validation", "basis": "verified_absent",
+               "absence_certificate": certificate, "title": "Static test gap",
+               "body": "No statically associated test entry; external or dynamic tests remain unknown."}
+    block = render_block(feature, section, native["upstream"], "o/toy", PIN, policy=policy)
+    native["page"].write_text(block + "\n")
+    native["row"].update(facet="validation", block_sha256=_hash(block))
+    prose = "\n".join(block.splitlines()[1:-1]).split("<!-- kb:depth-proof", 1)[0].strip()
+    packet = {"kind": "replayed_absence_certificate", "certificate": dict(certificate)}
+    evidence = json.loads(json.dumps(native["prompt"]["evidence"]))
+    if change != "missing":
+        evidence.append(packet)
+    if change == "changed":
+        packet["certificate"]["test_inventory_sha256"] = "0" * 64
+    elif change == "duplicate":
+        evidence.append(packet)
+    _replace_prompt(native, {**native["prompt"], "sections": {"validation": prose}, "evidence": evidence})
+    _replace_reply(native, {"facets": {"validation": {"dimensions": dict(YES), "reason": "Bounded gap checked"}}})
+    report = _audit(native)
+    if change == "none":
+        assert not report["problems"] and len(report["approvals"]) == 1
+    else:
+        assert not report["approvals"] and any("absence certificate" in issue for issue in report["problems"])
+
+
 @pytest.mark.parametrize("change", ["wrong_hash", "missing_trace", "generator_trace", "judge_error", "judge_api"])
 def test_missing_or_misidentified_native_receipts_fail_closed(native, change):
     if change == "wrong_hash":
@@ -167,6 +252,20 @@ def test_judge_requires_an_independent_successful_generator_context(native):
                                                      "model": "gpt-6-mini", "served_model": "gpt-6-mini"})
     report = _audit(native)
     assert not report["approvals"] and any("independently identified" in issue for issue in report["problems"])
+
+
+@pytest.mark.parametrize("served", ["claude-opus-5", "GLM-5.3", "gemini-3-pro", {"model": "gpt-6-sol"}, {}, []])
+def test_explicit_incompatible_judge_served_identity_is_not_a_codex_approval(native, served):
+    _replace_record(native, native["judge"], model={**native["judge"]["model"], "served_model": served})
+    report = _audit(native)
+    assert not report["approvals"] and any("incompatible Codex" in issue for issue in report["problems"])
+
+
+@pytest.mark.parametrize("served", ["gpt-6.1-sol", "codex-mini-latest", "o3"])
+def test_compatible_explicit_codex_served_identity_is_retained(native, served):
+    _replace_record(native, native["judge"], model={**native["judge"]["model"], "served_model": served})
+    report = _audit(native)
+    assert not report["problems"] and report["approvals"][0]["model"]["served_model"] == served
 
 
 def test_judge_without_successful_prior_generator_is_not_an_independent_approval(native):

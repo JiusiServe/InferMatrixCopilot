@@ -34,3 +34,13 @@ PYTHONPATH=src python tools/audit_knowledge_depth.py \
 ```
 
 `kb widen jiuwenswarm` expands explanatory knowledge. `kb deepen jiuwenswarm` adds implementation facets; `--retry-unfinished` retries gaps with cumulative accounting and priority for features without accepted depth. Use a fresh state directory after publishing and merging a batch. Existing rule-focused `kb init --stage deepen` keeps its original behavior.
+
+## Completion campaign at the same source pin
+
+The new policy fixes the denominator at 79 features × seven facets and requires **each facet above 90%** (at least 72/79), every feature to have recognized depth, and production-file breadth at least 85%. An incomplete checkpoint remains partial and cannot publish or merge. `--unlimited-subscription` requires authenticated Zcode GLM-5.3 extraction and an independent Codex subscription judge; no configured fallback or invoiced zero is inferred.
+
+The workflow is structural coverage review → targeted deepening → pinned source and actual native-record audits → retrieval acceptance → independent review → CI → merge. Positive knowledge, rigorously verified absences and unknowns are reported separately. A verified test-entry absence is a test gap, not a passing test or demonstrated capability.
+
+[The frozen retrieval baseline](jiuwenswarm-completion-retrieval-before-20261002.json) contains 237 probes and their actual context. Its `storage.format` is `depth-retrieval-deduplicated-v1`: cases reference hash-bound document metadata and execution budgets; `content_blobs` stores repeated text once. `audit_depth_retrieval.expand_report()` verifies every reference and reconstructs the original report against `expanded_report_sha256`. Large collections use one record per line. Baseline page hits do not mean all facets were injected: description plus paths delivers 162 of the 173 available facets within the unchanged two-page/6,000-character budget.
+
+[The archived artifacts flow block](jiuwenswarm-artifacts-flow-legacy-20261002.json) retains its exact original bytes, proof and native approval. The stricter caller-scope check cannot prove the flattened callback edges; with the user's confirmed repair choice it is excluded from current recognition pending a newly extracted and independently approved replacement. The other 172 original blocks stay unchanged; this retirement does not remove a feature or facet from the denominator.

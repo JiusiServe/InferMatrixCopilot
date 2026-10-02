@@ -189,6 +189,9 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
     if unlimited_subscription:
         if any(role.fallback is not None for role in (rt.generator, rt.judge)):
             raise InitError("--unlimited-subscription requires pinned generator and judge without fallback")
+        if rt.generator.provider != "zcode" or rt.generator.model.casefold() != "glm-5.3" \
+                or rt.judge.provider != "codex":
+            raise InitError("--unlimited-subscription requires Zcode GLM-5.3 extraction and an independent Codex judge")
         for role in (rt.generator, rt.judge):
             try:
                 available = rt.gateway.subscription_billing(role)

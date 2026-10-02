@@ -563,11 +563,16 @@ architecture/guide；同一调用独立判定各新增维度的 faithful/non_con
 测试索引包含嵌套第一方 SDK/前端套件，优先直接入口引用与实际调用；无关包标记不作为
 验证入口。固定前四文件、两个测试及前 180 行不再构成检索上限。动态关联只作为未知。
 保存生成前的完整 payload 与规范化 prompt 摘要，中断裁判复用完成的草稿；每个缺口
-保留明确原因。同一证据三次未成功修复时保留阻塞原因，不盲重试；显式 retry 可补证继续。
+保留明确原因及按调用事件去重的历史，绑定证据和上下文摘要，恢复不覆盖旧拒绝原因。
+同一证据三次未成功修复时保留阻塞原因，不盲重试；显式 retry 可补证继续。
+非 Python 调用见证绑定模块级声明、目标完整定义与调用方自己的执行范围；同名方法、
+未执行的嵌套函数和回调中的调用不能直接归属外层函数，无法证明的关系保持未知。
 
 proof `basis` 缺省 supported，旧区块不改写。verified_absent 当前只允许完整、可重放
 检查证明的验证入口缺失，绑定固定 pin、政策推导范围、版本化检测器及内容摘要；读取、
 解析和动态映射不完整均不能发证。正文明确保留测试缺口，不声称执行或通过测试。
+已关联到功能、但测试入口或断言因别名等原因未被识别的候选也保持未知；不能仅凭
+字面 test/assert 匹配为空签发缺失证明。
 两种 basis 都须独立三个维度全 yes。covered_facets/facet_ratio/complete_features 保留
 正向语义；recognized_facets/recognized_facet_ratio/recognized_complete_features 另计
 认可知识，各维分列 supported/verified_absent/unknown。
@@ -581,9 +586,12 @@ proof `basis` 缺省 supported，旧区块不改写。verified_absent 当前只�
 并行批次各自保留检查点，合并认可页面后须重新通过全量验收，不能发布分组的部分结果。
 独立 source audit 使用相同门槛。原生认可审计读取实际 archived model_call 输入输出，
 核对最终区块与源码 pin、三个 yes 和不同模型家族；不能信任只有 receipt 字段的报告。
+判定时的编号源码正文须完整覆盖每个区块证明并匹配内容哈希，缺失区块还须绑定相同的
+重放证书；显式报告非 Codex 裁判身份则拒绝，未报告身份仍保留未知。
 
 `--unlimited-subscription` 仅用于 knowledge-deepen/deepen，显式要求生成和裁判两角色
-均使用已认证订阅，拒绝 budget_usd 冲突及 configured fallback。预算上限 None 表示
+分别使用 Zcode GLM-5.3 与独立 Codex 的已认证订阅，拒绝其他模型协议、budget_usd 冲突
+及 configured fallback。预算上限 None 表示
 该模式，不使用无穷或零价格伪装；累计固定记账和原生调用用量仍记录，实际费用未报告
 保持未知。每次调用重新绑定已经检查的订阅传输，不启用 API 付费回退。
 

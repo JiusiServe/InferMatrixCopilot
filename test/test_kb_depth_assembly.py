@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -12,7 +13,7 @@ import yaml
 from infermatrix_copilot.kb_service.init_stages import _page_frontmatter
 from infermatrix_copilot.kb_service.knowledge_coverage import feature_metadata, load_policy
 from infermatrix_copilot.kb_service.knowledge_depth import depth_page, digest, render_block
-from infermatrix_copilot.knowledge_service.lifecycle import Page
+from infermatrix_copilot.knowledge_service.lifecycle import DEPTH_BLOCK, Page
 
 
 @pytest.fixture
@@ -250,4 +251,226 @@ def test_cli_dry_run_does_not_write_pages(assembler, world, monkeypatch, capsys)
     assert assembler.main() == 0
     assert {p: p.read_bytes() for p in (world.root / "knowledge").rglob("*.md")} == before
     assert not json.loads(report.read_text())["applied"]
+    assert '"applied": false' in capsys.readouterr().out
+
+
+def _replace_block_body(block, change, *, pin=None, facet=None):
+    match = DEPTH_BLOCK.fullmatch(block)
+    body = change(match[5])
+    return (f"<!-- kb:depth feature={match[1]} facet={facet or match[2]} pin={pin or match[3]} "
+            f"sha256={digest(body)} -->\n" + body + "\n<!-- /kb:depth -->")
+
+
+def _archive(world, block):
+    match = DEPTH_BLOCK.fullmatch(block)
+    feature = world.policy.features[0]
+    page = depth_page(feature)
+    approval = {"feature": feature.id, "facet": match[2], "page": page, "pin": world.campaign["pin"],
+                "block_sha256": digest(block), "native_trace_id": "historical-fixture-call",
+                "native_reply_sha256": "a" * 64,
+                "dimensions": {d: "yes" for d in ("faithful", "non_contradictory", "does_not_weaken")},
+                "model": {"role": "judge", "provider": "codex", "model": "gpt-5.4", "served_model": ""}}
+    return {"schema_version": 1, "repo": "demo", "pin": world.campaign["pin"], "feature": feature.id,
+            "facet": match[2], "page": page, "historical_knowledge_base_sha": world.campaign["baseline"],
+            "original_page_sha256": digest(world.old), "raw_block_sha256": digest(block),
+            "body_sha256": match[4], "raw_block": block, "native_approval": approval,
+            "current_status": "unknown_pending_replacement"}
+
+
+@pytest.fixture
+def retired_world(world):
+    # The old lexical checker confused the homonymous class method on line 3
+    # with the module helper actually called by run. The stronger proof gate
+    # rejects this exact historical trace; the source and prose stay intact.
+    source = "function helper() { return 1; }\nclass Wrong {\n  helper() { return 2; }\n}\nfunction run() { return helper(); }\n"
+    _write(world.source, "pkg/client.ts", source)
+    old_pin, pin = world.campaign["pin"], _commit(world.source)
+
+    def repin(text):
+        return DEPTH_BLOCK.sub(lambda m: _replace_block_body(m.group(), lambda body: body.replace(old_pin, pin), pin=pin), text)
+
+    world.blocks = {key: repin(block) for key, block in world.blocks.items()}
+    world.old = repin(world.old)
+    flow = {"facet": "flow", "title": "Module helper path", "body": "run returns the module helper result.",
+            "interpretation": "fact", "evidence": [{"path": "pkg/client.ts", "start": 1, "end": 5}],
+            "trace": [{"path": "pkg/client.ts", "symbol": "run", "start": 5, "end": 5},
+                      {"path": "pkg/client.ts", "symbol": "helper", "start": 1, "end": 1}]}
+    valid = render_block(world.policy.features[0], flow, world.source, "owner/demo", pin)
+
+    def wrong_ownership(body):
+        proof = re.search(r"<!-- kb:depth-proof (.*?) -->", body, re.S)
+        data = json.loads(proof[1])
+        data["trace"][1].update(start=3, end=3)
+        return body.replace(proof[1], json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+
+    legacy = _replace_block_body(valid, wrong_ownership)
+    world.old += "\n" + legacy + "\n"
+    _write(world.root, "knowledge/" + depth_page(world.policy.features[0]), world.old)
+    world.campaign.update(pin=pin, baseline=_commit(world.root))
+    (world.state / "campaign.json").write_text(json.dumps(world.campaign))
+    for worker, record in enumerate(world.records):
+        record.update(pin=pin, kb_base_sha=world.campaign["baseline"])
+        feature = world.policy.features[worker]
+        page = depth_page(feature)
+        candidate = repin(record["depth"]["accepted"][page])
+        if worker == 0:
+            candidate += "\n" + legacy + "\n"
+        record["depth"]["accepted"][page] = candidate
+        record["depth"]["features"][feature.id]["accepted_sha256"] = digest(candidate)
+        for facet, row in record["verdicts"]["depth:" + feature.id]["facets"].items():
+            row["block_sha256"] = digest(world.blocks[(feature.id, facet)])
+        _save(world, worker)
+    archive = _archive(world, legacy)
+    report = world.state / "retirement.json"
+    report.write_text(json.dumps(archive))
+    return SimpleNamespace(world=world, archive=archive, report=report, block=legacy, valid_replacement=valid)
+
+
+def test_archived_invalid_retirement_preserves_other_blocks_and_raw_checkpoint_hash(assembler, retired_world):
+    w, archive = retired_world.world, retired_world.archive
+    page = depth_page(w.policy.features[0])
+    accepted = w.records[0]["depth"]["accepted"][page]
+    with pytest.raises(ValueError, match="source proof"):
+        assembler.assemble(w.root, w.state, w.source)
+    report, writes = assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])
+    assert retired_world.block not in writes[page]
+    assert w.blocks[("f0", "api")] in writes[page] and w.blocks[("f0", "configuration")] in writes[page]
+    assert assembler._body(writes[page]).startswith(assembler._body(w.old.replace(retired_world.block, "")))
+    assert report["pages"][0]["checkpoint_accepted_sha256"] == digest(accepted)
+    assert report["original_baseline_facets"] == 2 and report["baseline_facets"] == 1
+    assert report["new_receipt_bound_facets"] == 2 and report["source_verified_facets"] == 3
+    assert report["denominator"] == 14 and report["facet_counts"]["flow"] == 0
+    assert report["retired_facets"][0]["status"] == "unknown_pending_replacement"
+    assert report["retired_facets"][0]["block_sha256"] == archive["raw_block_sha256"]
+    assert report["native_archive_audit_required"] and "raw_block" not in report["retired_facets"][0]
+    for target, text in writes.items():
+        _write(w.root, "knowledge/" + target, text)
+    assert not assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])[1]
+
+
+def test_retirement_proposes_filtered_baseline_without_an_accepted_worker_page(assembler, retired_world):
+    w = retired_world.world
+    w.records[0]["depth"]["accepted"] = {}
+    w.records[0]["verdicts"] = {}
+    _save(w)
+    page = depth_page(w.policy.features[0])
+    report, writes = assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])
+    assert writes[page] == w.old.replace(retired_world.block, "")
+    assert report["source_verified_facets"] == 2 and report["facet_counts"]["flow"] == 0
+    # Root may have already retired the exact archived bytes before salvage.
+    _write(w.root, "knowledge/" + page, writes[page])
+    assert page not in assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])[1]
+
+
+def test_retiring_a_features_only_block_leaves_it_unknown_in_full_denominator(assembler, retired_world):
+    w = retired_world.world
+    page = depth_page(w.policy.features[0])
+    w.old = w.old.replace(w.blocks[("f0", "api")], "")
+    _write(w.root, "knowledge/" + page, w.old)
+    w.campaign["baseline"] = _commit(w.root)
+    (w.state / "campaign.json").write_text(json.dumps(w.campaign))
+    for worker, record in enumerate(w.records):
+        record["kb_base_sha"] = w.campaign["baseline"]
+        if worker == 0:
+            record["depth"]["accepted"] = {}
+            record["verdicts"] = {}
+        _save(w, worker)
+    retired_world.report.write_text(json.dumps(_archive(w, retired_world.block)))
+    report, writes = assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])
+    assert retired_world.block not in writes[page]
+    assert report["baseline_facets"] == 0 and report["source_verified_facets"] == 1
+    assert report["recognized_feature_count"] == 1 and not report["all_features_recognized"]
+    assert report["denominator"] == 14 and not report["source_target_met"]
+
+
+@pytest.mark.parametrize("field", ["pin", "historical_knowledge_base_sha", "original_page_sha256", "raw_block_sha256", "body_sha256", "page", "feature", "facet"])
+def test_retirement_rejects_wrong_identity_or_hashes(assembler, retired_world, field):
+    retired_world.archive[field] = "wrong"
+    retired_world.report.write_text(json.dumps(retired_world.archive))
+    w = retired_world.world
+    with pytest.raises(ValueError, match="retirement archive"):
+        assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])
+
+
+def test_retirement_rejects_foreign_raw_bytes_even_with_recomputed_receipt_hash(assembler, retired_world):
+    w = retired_world.world
+    foreign = retired_world.block.replace("module helper result", "changed module helper result")
+    foreign = _replace_block_body(foreign, lambda body: body)
+    retired_world.archive = _archive(w, foreign)
+    retired_world.report.write_text(json.dumps(retired_world.archive))
+    with pytest.raises(ValueError, match="exact baseline"):
+        assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])
+
+
+@pytest.mark.parametrize("field,value", [
+    ("block_sha256", "0" * 64), ("pin", "0" * 40), ("native_trace_id", ""),
+    ("native_reply_sha256", "invalid"), ("dimensions", {"faithful": "unsure"}),
+])
+def test_retirement_requires_exact_historical_native_receipt(assembler, retired_world, field, value):
+    retired_world.archive["native_approval"][field] = value
+    retired_world.report.write_text(json.dumps(retired_world.archive))
+    w = retired_world.world
+    with pytest.raises(ValueError, match="historical native approval"):
+        assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])
+
+
+@pytest.mark.parametrize("approved", [False, True])
+def test_retired_facet_replacement_needs_its_own_current_successful_receipt(assembler, retired_world, approved):
+    w = retired_world.world
+    block = retired_world.valid_replacement
+    _candidate(w, lambda text: text.replace(retired_world.block, block))
+    if approved:
+        result = {"verdict": "pass", "reason": "The module helper is bound to its own definition.",
+                  "dimensions": {d: "yes" for d in ("faithful", "non_contradictory", "does_not_weaken")}}
+        call = {"facets": {"flow": result}, "model": "codex:gpt-5.4", "native_trace_id": "replacement-flow-call",
+                "native_reply_sha256": "b" * 64}
+        prior = w.records[0]["verdicts"]["depth:f0"]
+        prior["facets"]["flow"] = {**result, **{k: call[k] for k in ("model", "native_trace_id", "native_reply_sha256")},
+                                     "block_sha256": digest(block)}
+        prior["calls"].append(call)
+        _save(w)
+        report, writes = assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])
+        page = depth_page(w.policy.features[0])
+        assert block in writes[page] and retired_world.block not in writes[page]
+        assert report["new_receipt_bound_facets"] == 3 and report["source_verified_facets"] == 4
+        assert report["facet_counts"]["flow"] == 1 and report["denominator"] == 14
+        assert any(row["facet"] == "flow" and row["native_trace_id"] == "replacement-flow-call"
+                   for row in report["receipts"])
+    else:
+        with pytest.raises(ValueError, match="exact successful receipt"):
+            assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])
+
+
+def test_currently_valid_block_cannot_be_retired(assembler, world):
+    archive = world.state / "valid-retirement.json"
+    archive.write_text(json.dumps(_archive(world, world.blocks[("f0", "api")])))
+    with pytest.raises(ValueError, match="fail current pinned proof"):
+        assembler.assemble(world.root, world.state, world.source, retirement_reports=[archive])
+
+
+def test_retirement_does_not_allow_editing_another_baseline_block(assembler, retired_world):
+    w = retired_world.world
+    _candidate(w, lambda text: text.replace(w.blocks[("f0", "api")], ""))
+    with pytest.raises(ValueError, match="existing depth block"):
+        assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])
+
+
+def test_duplicate_archive_or_duplicate_retired_candidate_is_rejected(assembler, retired_world):
+    w = retired_world.world
+    with pytest.raises(ValueError, match="duplicate retired"):
+        assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report] * 2)
+    _candidate(w, lambda text: text + retired_world.block + "\n")
+    with pytest.raises(ValueError, match="duplicate archived"):
+        assembler.assemble(w.root, w.state, w.source, retirement_reports=[retired_world.report])
+
+
+def test_retirement_cli_default_remains_read_only(assembler, retired_world, monkeypatch, capsys):
+    w = retired_world.world
+    before = {p: p.read_bytes() for p in (w.root / "knowledge").rglob("*.md")}
+    report = w.state / "assembly-retirement-report.json"
+    monkeypatch.setattr(sys, "argv", ["assemble", "--root", str(w.root), "--state", str(w.state),
+        "--source-tree", str(w.source), "--retirement-report", str(retired_world.report), "--report", str(report)])
+    assert assembler.main() == 0
+    assert {p: p.read_bytes() for p in (w.root / "knowledge").rglob("*.md")} == before
+    assert json.loads(report.read_text())["retired_facets"][0]["facet"] == "flow"
     assert '"applied": false' in capsys.readouterr().out

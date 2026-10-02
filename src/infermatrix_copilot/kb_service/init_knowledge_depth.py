@@ -246,6 +246,12 @@ class _KnowledgeDepth(_Knowledge):
         event = [entry.get("attempts", 0), entry.get("review_attempts", 0)]
         if slot.get("last_attempt") == event and status != "pass":
             return
+        history = slot.setdefault("history", [])
+        outcome = {"attempt": event[0], "review_attempt": event[1], "status": status,
+                   "reason": reason, "evidence_sha256": entry.get("evidence_sha256"),
+                   "context_sha256": entry.get("context_sha256")}
+        if not history or history[-1] != outcome:
+            history.append(outcome)
         slot["last_attempt"] = event
         slot.update(status=status, reason=reason)
         if status == "pass":

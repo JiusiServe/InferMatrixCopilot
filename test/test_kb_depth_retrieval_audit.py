@@ -1,6 +1,8 @@
 """Retrieval acceptance checks actual content rather than merely declared facets."""
 
+import copy
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -206,3 +208,36 @@ def test_declared_facet_with_empty_content_is_not_counted_as_depth(auditor, worl
     report = auditor.audit_retrieval(root, "retrievaldemo", PIN)
     assert report["summary"]["probes"]["query_only"]["depth_hits"] == 0
     assert any("declared injected facet" in problem for problem in report["problems"])
+
+
+def test_deduplicated_report_replays_exact_actual_context_and_budgets(auditor, world):
+    root, _ = world(1)
+    report = auditor.audit_retrieval(root, "retrievaldemo", PIN)
+    original = copy.deepcopy(report)
+    packed = json.loads(auditor.serialize_report(report))
+    assert report == original  # Writing evidence must not mutate the audit result.
+    assert len(packed["cases"]) == 3
+    assert len(packed["content_blobs"]) == 1
+    assert len(packed["documents"]) == 2  # Description and path matches retain their distinct metadata.
+    assert len(packed["execution_budgets"]) == 1
+    assert auditor.expand_report(packed) == original
+    assert all("documents" not in case and "execution_budget" not in case for case in packed["cases"])
+
+
+@pytest.mark.parametrize("corruption", ["body", "metadata", "budget", "reference", "summary"])
+def test_deduplicated_report_rejects_changed_or_missing_evidence(auditor, world, corruption):
+    root, _ = world(1)
+    packed = auditor.pack_report(auditor.audit_retrieval(root, "retrievaldemo", PIN))
+    if corruption == "body":
+        reference = next(iter(packed["content_blobs"]))
+        packed["content_blobs"][reference] += "Changed actual returned text."
+    elif corruption == "metadata":
+        next(iter(packed["documents"].values()))["included_facets"] = []
+    elif corruption == "budget":
+        next(iter(packed["execution_budgets"].values()))["knowledge_file_reads"] = 999
+    elif corruption == "reference":
+        packed["cases"][0]["document_refs"] = ["0" * 64]
+    else:
+        packed["summary"]["probes"]["query_only"]["depth_hits"] = 999
+    with pytest.raises(ValueError, match="hash mismatch|evidence reference|differs from the original audit"):
+        auditor.expand_report(packed)

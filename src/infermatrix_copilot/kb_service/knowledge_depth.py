@@ -10,7 +10,8 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 
 from ..knowledge_service.lifecycle import (
-    DEPTH_BLOCK as _BLOCK, DEPTH_FACETS as FACETS, Page, depth_proof_basis, safe_source_path as safe_path,
+    DEPTH_ABSENCE_DETECTOR, DEPTH_BLOCK as _BLOCK, DEPTH_FACETS as FACETS, Page,
+    depth_proof_basis, safe_source_path as safe_path,
 )
 from .init_stages import neutral_headings
 from .knowledge_coverage import _LEXICAL_NO_CODE, inventory, matches
@@ -111,30 +112,97 @@ def _scope_nodes(node):
             yield from _scope_nodes(child)
 
 
-def _module_matches(path: str, caller: str, node: ast.ImportFrom | ast.Import, name: str) -> bool:
+def _scope_bindings(node) -> tuple[set[str], set[str], set[str]]:
+    """Bindings created in this scope, excluding nested callable bodies."""
+    definitions, assigned, imports = set(), set(), set()
+
+    def walk(parent):
+        for child in ast.iter_child_nodes(parent):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                definitions.add(child.name)
+                # Definition headers run in the enclosing scope. Their named
+                # expressions may rebind a callee without entering its body.
+                headers = list(child.decorator_list)
+                if isinstance(child, ast.ClassDef):
+                    headers += list(child.bases) + list(child.keywords)
+                else:
+                    headers += [child.args] + ([child.returns] if child.returns else [])
+                for header in headers:
+                    walk(header)
+                continue
+            if isinstance(child, ast.Lambda):
+                walk(child.args)
+                continue
+            if isinstance(child, ast.Name) and isinstance(child.ctx, (ast.Store, ast.Del)):
+                assigned.add(child.id)
+            elif isinstance(child, ast.ExceptHandler) and child.name:
+                assigned.add(child.name)
+            elif isinstance(child, (ast.MatchAs, ast.MatchStar)) and child.name:
+                assigned.add(child.name)
+            elif isinstance(child, ast.MatchMapping) and child.rest:
+                assigned.add(child.rest)
+            elif isinstance(child, (ast.Import, ast.ImportFrom)):
+                imports.update(alias.asname or (alias.name.split(".")[0] if isinstance(child, ast.Import)
+                                               else alias.name) for alias in child.names)
+            walk(child)
+
+    walk(node)
+    return definitions, assigned, imports
+
+
+def python_module_index(paths) -> dict[str, list[str]]:
+    """Index tracked Python modules without assuming a configured sys.path."""
+    index = {}
+    for path in sorted(set(paths)):
+        if not safe_path(path) or not path.endswith(".py"):
+            continue
+        parts = path.removesuffix(".py").removesuffix("/__init__").split("/")
+        for offset in range(len(parts)):
+            index.setdefault("/".join(parts[offset:]), []).append(path)
+    return index
+
+
+def resolve_python_module(name: str, index: dict[str, list[str]], *, exact: bool = False) -> str | None:
+    """Prefer an exact root module; otherwise require one tracked suffix."""
+    base = name.replace(".", "/")
+    candidates = index.get(base, [])
+    direct = [path for path in (base + ".py", base + "/__init__.py") if path in candidates]
+    if direct:
+        return direct[0] if len(direct) == 1 else None
+    return candidates[0] if not exact and len(candidates) == 1 else None
+
+
+def _module_matches(path: str, caller: str, node: ast.ImportFrom | ast.Import, name: str, *, resolver=None) -> bool:
+    if resolver is None:
+        return False  # a target suffix alone cannot establish import ownership
     if isinstance(node, ast.ImportFrom) and node.level:
         package = caller.split("/")[:-1]
         if node.level > len(package):
             return False
         prefix = package[:len(package) - node.level + 1]
-        base = "/".join(prefix + name.split("."))
-        return path in (base + ".py", base + "/__init__.py")
-    base = name.replace(".", "/")
-    return any(path == suffix or path.endswith("/" + suffix)
-               for suffix in (base + ".py", base + "/__init__.py"))
+        return path == resolver(".".join(prefix + (name.split(".") if name else [])), exact=True)
+    return path == resolver(name)
 
 
-def _calls_next(module, definition, step, target):
+def _calls_next(module, definition, step, target, *, resolver=None):
     aliases = {}
+
+    def bind(local, resolved):
+        # Conflicting imports do not establish a single pinned binding, even
+        # if one branch imports the target. No import-order guess is made.
+        aliases[local] = resolved if local not in aliases or aliases[local] == resolved else None
+
     for node in list(_scope_nodes(module)) + list(_scope_nodes(definition)):
         if isinstance(node, ast.ImportFrom):
             for alias in node.names:
-                if _module_matches(target["path"], step["path"], node, node.module or ""):
-                    aliases[alias.asname or alias.name] = alias.name
+                bind(alias.asname or alias.name,
+                     alias.name if _module_matches(target["path"], step["path"], node, node.module or "",
+                                                    resolver=resolver) else None)
         elif isinstance(node, ast.Import):
             for alias in node.names:
-                if _module_matches(target["path"], step["path"], node, alias.name):
-                    aliases[alias.asname or alias.name] = ""
+                bind(alias.asname or alias.name.split(".")[0],
+                     "" if _module_matches(target["path"], step["path"], node, alias.name,
+                                            resolver=resolver) else None)
     owner = step["symbol"].rsplit(".", 1)[0] if "." in step["symbol"] else ""
     parameters = {argument.arg for argument in definition.args.posonlyargs + definition.args.args
                   + definition.args.kwonlyargs}
@@ -145,25 +213,46 @@ def _calls_next(module, definition, step, target):
     for statement in definition.body:
         if not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             runtime_nodes.extend([statement, *_scope_nodes(statement)])
-    assigned = {node.id for node in runtime_nodes if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)}
+    local_definitions, assigned, local_imports = _scope_bindings(definition)
+    assigned.update(local_definitions)
+    module_definitions, module_assigned, module_imports = _scope_bindings(module)
+    if "*" in local_imports | module_imports:
+        return False
+
+    def reference(node, *, qualified=False):
+        names = []
+        while isinstance(node, ast.Attribute):
+            names.insert(0, node.attr)
+            node = node.value
+        if not isinstance(node, ast.Name):
+            return None
+        names.insert(0, node.id)
+        if qualified and owner and names[0] in ("self", "cls"):
+            names = owner.split(".") + names[1:]
+        return tuple(names)
+
+    mutated_attributes = {reference(node, qualified=True) for node in runtime_nodes
+                          if isinstance(node, ast.Attribute) and isinstance(node.ctx, (ast.Store, ast.Del))}
     for call in runtime_nodes:
         if not isinstance(call, ast.Call) or not step["start"] <= call.lineno <= step["end"]:
             continue
-        names, function = [], call.func
-        while isinstance(function, ast.Attribute):
-            names.insert(0, function.attr)
-            function = function.value
-        if not isinstance(function, ast.Name):
+        names = reference(call.func)
+        if names is None:
             continue  # object dispatch needs a runtime/type witness, not a name guess
-        names.insert(0, function.id)
+        if reference(call.func, qualified=True) in mutated_attributes:
+            continue  # an explicit write invalidates this exact method binding
         root = names[0]
         if root in assigned or root in parameters and not (root in ("self", "cls") and owner):
             continue
         if root in aliases:
-            resolved = ".".join(([aliases[root]] if aliases[root] else []) + names[1:])
+            if aliases[root] is None or root in module_assigned or root in module_definitions:
+                continue
+            resolved = ".".join(((aliases[root],) if aliases[root] else ()) + names[1:])
             if resolved == target["symbol"]:
                 return True
         elif step["path"] == target["path"]:
+            if root in module_assigned:
+                continue
             resolved = ".".join(names)
             if root in ("self", "cls") and owner:
                 resolved = owner + "." + ".".join(names[1:])
@@ -172,7 +261,159 @@ def _calls_next(module, definition, step, target):
     return False
 
 
-def _lexical_calls_next(tree: Path, raw: str, span: str, step: dict, target: dict) -> bool:
+def _lexical_code(raw: str) -> str:
+    # Preserve offsets and line boundaries when removing comments/literals.
+    return _LEXICAL_NO_CODE.sub(lambda m: re.sub(r"[^\n]", " ", m.group()), raw)
+
+
+def _closing(code: str, opening: int) -> int:
+    pairs = {"(": ")", "{": "}", "[": "]"}
+    stack = []
+    for index in range(opening, len(code)):
+        char = code[index]
+        if char in pairs:
+            stack.append(pairs[char])
+        elif char in pairs.values():
+            if not stack or stack.pop() != char:
+                break
+            if not stack:
+                return index
+    raise ValueError("flow lexical delimiters are incomplete or ambiguous")
+
+
+def _function_body(code: str, start: int) -> tuple[int, int]:
+    opening = code.find("(", start)
+    if opening < 0:
+        raise ValueError("flow lexical parameters are unresolved")
+    params_end = _closing(code, opening)
+    body = code.find("{", params_end + 1)
+    between = code[params_end + 1:body].strip() if body >= 0 else ";"
+    if body < 0 or ";" in between or "=" in between or between == ":" \
+            or between and not between.startswith(":"):
+        raise ValueError("flow lexical function body is unresolved")
+    return body, _closing(code, body)
+
+
+def _expression_end(code: str, start: int) -> int:
+    end = start
+    while end < len(code) and code[end] not in ",;\n)}]":
+        end = _closing(code, end) + 1 if code[end] in "({[" else end + 1
+    return end
+
+
+def _lexical_name_writes(code: str, symbol: str) -> list[int]:
+    """Conservative direct writes, including compound and destructured forms."""
+    name = re.escape(symbol)
+    writes = [match.start() for pattern in (
+        r"(?<![\w$.])" + name + r"\s*(?:=(?!=|>)|(?:&&|\|\||\?\?|[+*/%&|^\-])=|\+\+|--)",
+        r"(?:\+\+|--)\s*" + name + r"\b",
+        r"\bdelete\s+" + name + r"\b",
+        r"\bfor\s*\(\s*" + name + r"\s+(?:of|in)\b",
+    ) for match in re.finditer(pattern, code)]
+    for match in re.finditer(r"(?:\[[^\]\n]*\]|\{[^}\n]*\})\s*=(?!=|>)", code):
+        if re.search(r"\b" + name + r"\b", match.group()):
+            writes.append(match.start())
+    return writes
+
+
+def _lexical_definition(raw: str, step: dict) -> tuple[str, int, int]:
+    """Bind a span to one actual module function, never a homonymous method."""
+    if "." in step["symbol"]:
+        raise ValueError("flow lexical object/type ownership is unresolved")
+    code = _lexical_code(raw)
+    name = re.escape(step["symbol"])
+    declarations = list(re.finditer(r"\b(?:function|fun)\s+" + name + r"\s*\(|\bconst\s+" + name
+                                   + r"\s*(?::[^=;\n]+)?=\s*(?:async\s+)?", code))
+    matches = []
+    for declaration in declarations:
+        prefix = code[:declaration.start()]
+        boundary = max(prefix.rfind("\n"), prefix.rfind(";"), prefix.rfind("}"))
+        if any(prefix.count(a) != prefix.count(b) for a, b in (("{", "}"), ("(", ")"), ("[", "]"))) \
+                or prefix[boundary + 1:].strip() not in ("", "export", "async", "export async", "export default", "suspend"):
+            continue
+        try:
+            if declaration.group().lstrip().startswith("const"):
+                initializer = declaration.end()
+                if code.startswith("function", initializer):
+                    body, end = _function_body(code, initializer)
+                elif initializer < len(code) and code[initializer] == "(":
+                    params_end = _closing(code, initializer)
+                    # Parse the initializer's own parameter list. A regex that
+                    # searches ahead for an arrow can bind a later declaration
+                    # to a non-callable value such as `(1)\nconst other = ...`.
+                    arrow = re.match(r"\s*(?::\s*[\w$.[\]<>|?, ]+)?\s*=>", code[params_end + 1:])
+                    if not arrow:
+                        continue
+                    body = params_end + 1 + arrow.end()
+                    while body < len(code) and code[body].isspace():
+                        body += 1
+                    if body >= len(code):
+                        continue
+                    end = _closing(code, body) if code[body] == "{" else _expression_end(code, body) - 1
+                    if end < body:
+                        continue
+                else:
+                    continue
+            else:
+                body, end = _function_body(code, declaration.start())
+        except ValueError:
+            continue
+        matches.append((declaration.start(), body, end))
+    if len(matches) != 1:
+        raise ValueError("flow symbol is not declared as one pinned module-level definition")
+    start, body, end = matches[0]
+    module_scope = _execution_scope(code, -1)
+    if any(not start <= write < body for write in _lexical_name_writes(module_scope, step["symbol"])):
+        raise ValueError("flow module-level definition binding is overwritten or ambiguous")
+    if not step["start"] <= code[:start].count("\n") + 1 <= code[:body].count("\n") + 1 <= step["end"] \
+            or step["end"] > code[:end].count("\n") + 1:
+        raise ValueError("flow symbol/span is not a pinned module-level definition")
+    if "/" in code[body:end + 1]:
+        raise ValueError("flow lexical syntax has an unresolved regex, division or JSX boundary")
+    lines = code.splitlines(keepends=True)
+    offset = sum(map(len, lines[:step["start"] - 1]))
+    return "".join(lines[step["start"] - 1:step["end"]]), body - offset - (code[body] != "{"), end - offset
+
+
+def _execution_scope(span: str, body: int) -> str:
+    """Remove nested callable bodies; their creation does not prove execution."""
+    scope = list(span)
+    ranges = []
+    for match in re.finditer(r"\b(?:function|fun)\b|\bclass\b|=>|\b([\w$]+)\s*\(", span[body + 1:]):
+        start = body + 1 + match.start()
+        token = match.group()
+        if token == "class":
+            opening = span.find("{", start)
+            if opening < 0:
+                raise ValueError("flow nested class is unresolved")
+            ranges.append((start, _closing(span, opening) + 1))
+        elif token in ("function", "fun"):
+            _, end = _function_body(span, start)
+            ranges.append((start, end + 1))
+        elif token == "=>":
+            opening = start + 2
+            while opening < len(span) and span[opening].isspace():
+                opening += 1
+            if opening < len(span) and span[opening] == "{":
+                end = _closing(span, opening) + 1
+            else:
+                end = _expression_end(span, opening)
+            ranges.append((start, end))
+        elif match[1] not in ("if", "for", "while", "switch", "catch", "with"):
+            opening = body + 1 + match.end() - 1
+            closing = _closing(span, opening)
+            after = closing + 1
+            while after < len(span) and span[after].isspace():
+                after += 1
+            if after < len(span) and span[after] in "{:":
+                _, end = _function_body(span, start)
+                ranges.append((start, end + 1))
+    for start, end in ranges:
+        scope[start:end] = ["\n" if c == "\n" else " " for c in scope[start:end]]
+    return "".join(scope)
+
+
+def _lexical_calls_next(tree: Path, raw: str, span: str, step: dict, target: dict, *, execution: str) -> bool:
     """Admit only an unshadowed local name or a bound relative ES import."""
     symbol = target["symbol"]
     if "." in symbol:
@@ -228,10 +469,11 @@ def _lexical_calls_next(tree: Path, raw: str, span: str, step: dict, target: dic
     for local, pattern in candidates:
         if re.search(r"\b" + re.escape(local) + r"\b", header) \
                 or re.search(r"\b(?:const|let|var)\s+" + re.escape(local) + r"\b", span) \
-                or re.search(r"(?<![\w$.])" + re.escape(local) + r"\s*=(?!=|>)", span):
+                or re.search(r"\b(?:function|fun|class)\s+" + re.escape(local) + r"\b", span) \
+                or _lexical_name_writes(span, local):
             continue
-        for call in re.finditer(pattern, span):
-            if not re.search(r"\b(?:function|fun)\s*$", span[:call.start()]):
+        for call in re.finditer(pattern, execution):
+            if not re.search(r"\b(?:function|fun)\s*$", execution[:call.start()]):
                 return True
     return False
 
@@ -241,30 +483,33 @@ def verify_trace(tree: Path, trace: list[dict]) -> None:
     identities = [(s["path"], s["symbol"], s["start"], s["end"]) for s in trace]
     if len(set(identities)) != len(identities) or len(trace) < 2:
         raise ValueError("flow steps must be distinct")
+    resolver = None
     for i, step in enumerate(trace):
         raw = (tree / step["path"]).read_text(encoding="utf-8")
         span = source_span(tree, step)
         name = step["symbol"].rsplit(".", 1)[-1]
         if step["path"].endswith(".py"):
+            if resolver is None:
+                # DepthContext owns the complete tracked-path inventory used
+                # by both extraction and pinned proof replay.
+                from .depth_inputs import DepthContext
+                index = python_module_index(DepthContext(tree, [])._tracked())
+                resolver = lambda name, *, exact=False: resolve_python_module(name, index, exact=exact)
             module = ast.parse(raw)
             definition = python_definitions(module).get(step["symbol"])
+            _, module_assigned, module_imports = _scope_bindings(module)
             if (not isinstance(definition, (ast.FunctionDef, ast.AsyncFunctionDef))
-                    or not definition.lineno <= step["start"] <= step["end"] <= definition.end_lineno):
+                    or not definition.lineno <= step["start"] <= step["end"] <= definition.end_lineno
+                    or step["symbol"].split(".")[0] in module_assigned | module_imports
+                    or "*" in module_imports):
                 raise ValueError("flow symbol/span is not a pinned definition")
             if i + 1 < len(trace):
-                if not _calls_next(module, definition, step, trace[i + 1]):
+                if not _calls_next(module, definition, step, trace[i + 1], resolver=resolver):
                     raise ValueError("flow span does not call the next named step")
         else:
-            # Conservative lexical witnesses for clients/build languages.
-            span = _LEXICAL_NO_CODE.sub("", span)
-            callable_name = re.escape(name)
-            declared = re.search(
-                r"(?:function|def|fun)\s+" + callable_name + r"\b|\b" + callable_name
-                + r"\s*(?:\([^\n]*\)\s*\{|(?:\s*:[^=;\n]+)?=\s*(?:async\s+)?"
-                  r"(?:function\b|(?:\([^;\n]*?\)|[\w$]+)\s*(?::[^=;\n]+)?=>))", span)
-            if not declared:
-                raise ValueError("flow symbol is not declared in the supplied span")
-            if i + 1 < len(trace) and not _lexical_calls_next(tree, raw, span, step, trace[i + 1]):
+            span, body, _ = _lexical_definition(raw, step)
+            execution = _execution_scope(span, body)
+            if i + 1 < len(trace) and not _lexical_calls_next(tree, raw, span, step, trace[i + 1], execution=execution):
                 raise ValueError("flow span does not show the next call")
 
 
@@ -301,7 +546,7 @@ def build_absence_certificate(tree: Path, policy, feature, pin: str, facet: str 
         return None
     if association.get("complete") is not True or association.get("matched_files") \
             or association.get("unresolved_files") or sorted(association.get("source_scope", [])) != scope \
-            or association.get("checker_version") != "static-test-association-v1":
+            or association.get("checker_version") != DEPTH_ABSENCE_DETECTOR:
         return None
     source_hashes = []
     for path in scope:
@@ -315,7 +560,7 @@ def build_absence_certificate(tree: Path, policy, feature, pin: str, facet: str 
     policy_scope = {"roots": policy.roots, "exclude": policy.exclude, "suffixes": policy.suffixes,
                     "filenames": policy.filenames, "feature": feature.id,
                     "source_globs": feature.source_globs, "entry_points": feature.entry_points, "docs": feature.docs}
-    certificate = {"version": 1, "detector": "static-test-association-v1", "feature": feature.id,
+    certificate = {"version": 1, "detector": DEPTH_ABSENCE_DETECTOR, "feature": feature.id,
                    "facet": facet, "pin": pin, "policy_sha256": digest(json.dumps(policy_scope, sort_keys=True)),
                    "source_scope_sha256": digest(json.dumps(source_hashes)), "source_files": len(scope),
                    "docs_scope_sha256": digest(json.dumps(doc_hashes)),

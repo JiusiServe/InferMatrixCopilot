@@ -7,6 +7,8 @@ import json
 import stat
 from pathlib import Path
 
+import pytest
+
 from infermatrix_copilot.config import Settings
 from infermatrix_copilot.providers.base import AgentSessionRequest
 from infermatrix_copilot.providers.codex import CodexTransport
@@ -57,14 +59,14 @@ def _transport(tmp_path: Path) -> CodexTransport:
 
 
 def test_subscription_requires_chatgpt_login_and_default_provider(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
     transport = _transport(tmp_path)
     assert not transport.subscription_billing
     (tmp_path / "bin" / "logged-in").touch()
     assert transport.subscription_billing
-    config = tmp_path / "codex-home" / "config.toml"
-    config.parent.mkdir()
+    config = tmp_path / "home" / ".codex" / "config.toml"
+    config.parent.mkdir(parents=True)
     config.write_text('model_provider = "custom"\n')
     assert not transport.subscription_billing
     config.write_text('profile = "custom"\n[profiles.custom]\nmodel_provider = "api-provider"\n')
@@ -76,7 +78,7 @@ def test_subscription_requires_chatgpt_login_and_default_provider(tmp_path, monk
 
 
 def test_api_login_and_base_url_do_not_establish_subscription(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
     transport = _transport(tmp_path)
     cli = tmp_path / "bin" / "codex"
@@ -86,6 +88,72 @@ def test_api_login_and_base_url_do_not_establish_subscription(tmp_path, monkeypa
     assert transport.subscription_billing
     monkeypatch.setenv("OPENAI_BASE_URL", "https://example.invalid")
     assert not transport.subscription_billing
+
+
+@pytest.mark.parametrize("default_mode,custom_mode,approved", [
+    ("apikey", "chatgpt", False),
+    ("chatgpt", "apikey", True),
+])
+def test_subscription_probe_and_exec_use_same_sanitized_home(
+        tmp_path, monkeypatch, default_mode, custom_mode, approved):
+    """An inherited CODEX_HOME cannot approve a different execution login."""
+    home = tmp_path / "home"
+    default = home / ".codex"
+    custom = tmp_path / "custom-codex"
+    for directory, mode in ((default, default_mode), (custom, custom_mode)):
+        directory.mkdir(parents=True)
+        (directory / "auth-mode").write_text(mode)
+        (directory / "config.toml").write_text('model_provider = "openai"\n')
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("CODEX_HOME", str(custom))
+    monkeypatch.setenv("OPENAI_API_KEY", "must-be-dropped")
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    transport = _transport(tmp_path)
+    cli = tmp_path / "bin" / "codex"
+    cli.write_text('''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+here = Path(__file__).parent
+kind = "login" if sys.argv[1:3] == ["login", "status"] else "exec"
+(here / (kind + "-context.json")).write_text(json.dumps({
+    "home": str(home), "custom_home": os.environ.get("CODEX_HOME"),
+    "api_key_present": bool(os.environ.get("OPENAI_API_KEY"))}))
+if kind == "login":
+    mode = (home / "auth-mode").read_text()
+    print("Logged in using ChatGPT" if mode == "chatgpt" else "Logged in using an API key")
+else:
+    sys.stdin.read()
+    print(json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": "fixture"}}))
+''')
+    assert transport.subscription_billing is approved
+    assert transport.auth_gap() is None  # either login is authenticated
+    transport._run("offline fixture", cwd=str(tmp_path), timeout_s=5)
+    login = json.loads((tmp_path / "bin/login-context.json").read_text())
+    execution = json.loads((tmp_path / "bin/exec-context.json").read_text())
+    assert login == execution == {"home": str(default), "custom_home": None, "api_key_present": False}
+
+
+@pytest.mark.parametrize("config", [
+    'model_provider = "custom"\n',
+    'profile = "api"\n[profiles.api]\nmodel_provider = "custom"\n',
+    '[model_providers.openai]\nbase_url = "https://example.invalid"\n',
+])
+def test_custom_subscription_home_cannot_hide_api_execution_config(tmp_path, monkeypatch, config):
+    home = tmp_path / "home"
+    default = home / ".codex"
+    custom = tmp_path / "custom-codex"
+    default.mkdir(parents=True)
+    custom.mkdir()
+    (default / "config.toml").write_text(config)
+    (custom / "config.toml").write_text('model_provider = "openai"\n')
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("CODEX_HOME", str(custom))
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    transport = _transport(tmp_path)
+    (tmp_path / "bin/logged-in").touch()
+    assert not transport.subscription_billing
+    assert not (tmp_path / "bin/capture.json").exists()
 
 
 def _request(tmp_path: Path, with_bridge: bool = True) -> AgentSessionRequest:

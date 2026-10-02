@@ -14,16 +14,7 @@ source_globs: ["jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/
 
 [功能概览](feature-artifacts.md) · [owner 入口](_index.md)
 
-<!-- kb:depth feature=artifacts facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=060c20b4e44e8a30e011492104f5504a1eb22556ea53c89dc8458e43a98fe856 -->
-**从会话消息构建产物列表**
-useSessionArtifacts 从 useChatStore 读取 activeSessionId 对应会话的 messages，经 useMemo 交给 buildArtifacts；buildArtifacts 遍历每条 message.fileItems，过滤无名或无资源的项后逐个调用 fileItemToArtifact 生成 ArtifactItem，再按 getFileIdentityKey 去重（冲突用 preferArtifact 合并），最后按 timestamp 降序返回数组供列表渲染。
 
-调用路径：`jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx`（`useSessionArtifacts`） → `jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts`（`buildArtifacts`） → `jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts`（`fileItemToArtifact`）
-
-来源：[jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx:L23–L28](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx#L23-L28), [jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts:L95–L119](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts#L95-L119), [jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts:L75–L93](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts#L75-L93)
-
-<!-- kb:depth-proof {"evidence":[{"path":"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx","start":23,"end":28,"sha256":"4062ef2d150be5e8b4ac2669b3a0b2d2b79127bd94a0e6c8fcd2ac99b5fda19c"},{"path":"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts","start":95,"end":119,"sha256":"999efec876d5cf0e6c2603c13dcae555ed14e423bf1d099ec7e70dfdc77b9bd9"},{"path":"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts","start":75,"end":93,"sha256":"da33d82df3f0799eff14877545259837cf62940ef0e8347b4525705491b60c92"}],"trace":[{"path":"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx","symbol":"useSessionArtifacts","start":23,"end":28},{"path":"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts","symbol":"buildArtifacts","start":95,"end":103},{"path":"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts","symbol":"fileItemToArtifact","start":75,"end":93}]} -->
-<!-- /kb:depth -->
 
 <!-- kb:depth feature=artifacts facet=api pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=0691d0c3ee9d7d920ef1ba99957ad9f6069e7929ce7a2c604e9272e296c48d57 -->
 **handleDownload 的调用契约**

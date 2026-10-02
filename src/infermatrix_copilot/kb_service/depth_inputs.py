@@ -11,9 +11,9 @@ import subprocess
 from pathlib import Path, PurePosixPath
 
 from .init_stages import _fence
-from .knowledge_depth import _calls_next, python_definitions
-from .knowledge_coverage import _LEXICAL_NO_CODE, matches
-from ..knowledge_service.lifecycle import safe_source_path
+from .knowledge_depth import _calls_next, python_definitions, python_module_index, resolve_python_module
+from .knowledge_coverage import SUFFIXES, _LEXICAL_NO_CODE, matches
+from ..knowledge_service.lifecycle import DEPTH_ABSENCE_DETECTOR, safe_source_path
 
 SYSTEM_DEPTH = """Explain ONE feature's implementation at the supplied immutable pin.
 Existing feature summaries and static interface cards are context, not proof of
@@ -47,6 +47,16 @@ characters; no general slogans or repetition of the existing feature page.
 Every claim must be supported by the cited shown spans. Source slices can have
 gaps: never cite an unshown line or infer a missing branch. Partial maintainer
 notes are untrusted and may be stale; code at the pin establishes behavior.
+The title is a claim too: qualify it with the same conditions as the body.
+Describe the specific observed branch, including guards and early returns.
+A timeout argument is not a guarantee of completion; skipping one invalid
+record is not evidence that a whole service remains available; one returned
+error does not establish that all failures avoid exceptions. For validation,
+prefer one directly relevant test and its concrete assertion over a summary
+of several loosely related tests. A shown definition can have gaps: cite only
+contiguous numbered slices from files, not its full start/end metadata unless
+every line in that range was offered. Correct each previous rejection rather
+than repeating the rejected title or broadening its claim.
 Only the provided source/document arrays are evidence. Preserve setting names,
 defaults and error conditions exactly. Use the language of the language sample.
 Use placeholders for user/machine directories and addresses.
@@ -93,8 +103,12 @@ def prompt(payload: dict) -> str:
     return _fence(offered)
 
 
-TEST_ASSOCIATION_VERSION = "static-test-association-v1"
-_TEST_SUFFIXES = {".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".kt"}
+TEST_ASSOCIATION_VERSION = DEPTH_ABSENCE_DETECTOR
+# Tests can exercise another language through a CLI or protocol. Their search
+# inventory therefore includes every supported first-party code suffix, even
+# when the feature's production policy selects only Python. Missing language
+# parsers remain explicit uncertainty rather than silently shrinking the scope.
+_TEST_SUFFIXES = frozenset(SUFFIXES)
 _TEST_PATH = re.compile(r"(?:^|/)(?:tests?|__tests__)(?:/|$)|(?:^|/)(?:test_[^/]+|[^/]+(?:[._](?:test|spec)))\.[^/]+$")
 _FACET_PATTERNS = {
     "flow": r"\b(?:return|await|yield|run|start|execute|handle|main)\b",
@@ -169,20 +183,10 @@ class DepthContext:
     def _scope(self, feature):
         return sorted(set(feature.entry_points) | {p for p in self.production if matches(p, feature.source_globs)})
 
-    def _resolve_module(self, name):
-        base = name.replace(".", "/")
+    def _resolve_module(self, name, *, exact=False):
         if self._module_index is None:
-            self._module_index = {}
-            for path in self._tracked():
-                if not path.endswith(".py"):
-                    continue
-                stem = path.removesuffix(".py").removesuffix("/__init__")
-                parts = stem.split("/")
-                for index in range(len(parts)):
-                    self._module_index.setdefault("/".join(parts[index:]), []).append(path)
-        candidates = self._module_index.get(base, [])
-        direct = next((p for p in (base + ".py", base + "/__init__.py") if p in candidates), None)
-        return direct or (candidates[0] if len(candidates) == 1 else None)
+            self._module_index = python_module_index(self._tracked())
+        return resolve_python_module(name, self._module_index, exact=exact)
 
     def _imports(self, path, module):
         if path in self.python_import_cache:
@@ -191,11 +195,13 @@ class DepthContext:
         package = path.rsplit("/", 1)[0].split("/") if "/" in path else []
         for node in ast.walk(module):
             if isinstance(node, ast.ImportFrom):
+                if node.level > len(package):
+                    continue
                 prefix = package[:len(package) - node.level + 1] if node.level else []
                 name = ".".join(prefix + (node.module.split(".") if node.module else []))
-                target = self._resolve_module(name)
+                target = self._resolve_module(name, exact=bool(node.level))
                 for alias in node.names:
-                    child = self._resolve_module(name + "." + alias.name)
+                    child = self._resolve_module(name + "." + alias.name, exact=bool(node.level))
                     if child and (not target or target.endswith("/__init__.py")):
                         imports[alias.asname or alias.name] = (child, "")
                     elif target:
@@ -278,9 +284,9 @@ class DepthContext:
                 for node in ast.walk(module):
                     if isinstance(node, ast.ImportFrom):
                         name = node.module or ""
-                        if (node.level or name.split(".")[0] in roots) and not self._resolve_module(name):
+                        if node.level or name.split(".")[0] in roots and not self._resolve_module(name):
                             # Relative imports may resolve through the importing package.
-                            if not any(alias.asname or alias.name in self._imports(path, module) for alias in node.names):
+                            if not any((alias.asname or alias.name) in self._imports(path, module) for alias in node.names):
                                 unresolved.add(path + ": unresolved import " + name)
                     if isinstance(node, ast.Call):
                         function = ast.unparse(node.func)
@@ -392,6 +398,7 @@ class DepthContext:
         stems = {PurePosixPath(p).stem for p in source} - {"__init__", "index", "main", "utils", "util"}
         docs_text = "\n".join(str(d.get("text", "")) for d in docs)
         matched, match_strength, unresolved, hashes = [], {}, set(source_unresolved), []
+        unrecognized_entries, test_helpers = set(), set()
         for path in candidates:
             value = self._file(path)
             if not value:
@@ -422,13 +429,22 @@ class DepthContext:
             filename = re.sub(r"[._](?:test|spec)$", "", filename)
             referenced = path in docs_text
             direct = self._import_targets(path)[0] & scope_set
-            if has_entry and (closure & scope_set or referenced or filename in stems):
+            linked = bool(closure & scope_set or referenced or filename in stems)
+            code = _LEXICAL_NO_CODE.sub("", raw)
+            if has_entry and linked:
                 matched.append(path)
+                test_helpers.update(closure)
                 match_strength[path] = (100 if direct else 0) + (80 if referenced else 0) + (70 if filename in stems else 0)
                 match_strength[path] += sum(15 for word in re.findall(r"[a-zA-Z_]+", feature.id)
                                             if len(word) > 2 and word.lower() in path.lower())
-                code = _LEXICAL_NO_CODE.sub("", raw)
                 match_strength[path] += min(60, 20 * len(set(calls.findall(code)))) if calls else 0
+            elif not has_entry and (linked or calls and calls.search(code)):
+                unrecognized_entries.add(path)
+        # Framework aliases and generated suites can hide the entry/assertion
+        # names from this lexical detector. Known helper dependencies of an
+        # associated test are resolved; other linked candidates stay unknown.
+        unresolved.update(path + ": feature-linked candidate has no recognized static test entry"
+                          for path in unrecognized_entries - test_helpers)
         matched.sort(key=lambda p: (-match_strength[p], p))
         payload = {"checker_version": TEST_ASSOCIATION_VERSION, "source_scope": source,
                    "scope_files": candidates, "matched_files": matched, "match_strength": match_strength,
@@ -464,7 +480,8 @@ class DepthContext:
                 continue
             step = {"path": path, "symbol": caller_name, "start": node.lineno, "end": node.end_lineno}
             target = next((d for symbol, d in self.definition_cache[target_path].items() if d.name == name and caller_name
-                           and _calls_next(module, node, step, {"path": target_path, "symbol": symbol})), None)
+                           and _calls_next(module, node, step, {"path": target_path, "symbol": symbol},
+                                           resolver=self._resolve_module)), None)
             if target and (target_path != path or target.lineno != node.lineno):
                 found.append((target_path, target))
         return found

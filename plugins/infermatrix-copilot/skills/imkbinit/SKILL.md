@@ -108,11 +108,12 @@ When the user explicitly selects uncapped subscription extraction, the independe
 `knowledge-deepen` stage and `kb deepen` accept `--unlimited-subscription`:
 
 ```text
-KB_GENERATOR=zcode:GLM-5.3 <imc> kb deepen <repo> --pin <source-sha> --subscription-generator --unlimited-subscription --dry-run
+KB_GENERATOR=zcode:GLM-5.3:low KB_JUDGE=codex:gpt-6-sol:medium <imc> kb deepen <repo> --pin <source-sha> --subscription-generator --unlimited-subscription --dry-run
 ```
 
-Both generator and independent Codex judge must be authenticated subscription
-roles. This mode conflicts with `--budget-usd`, removes the stage's fixed
+The generator must be Zcode GLM-5.3 and the independent judge must be Codex;
+both must be authenticated subscription roles. Other model protocols fail
+before authentication or dispatch. This mode conflicts with `--budget-usd`, removes the stage's fixed
 accounting ceiling, and preserves call, served-model and token receipts. It does
 not authorize API spending or fallback to another provider; unavailable
 subscription roles stop with their reason. Actual USD remains unknown when the
@@ -174,6 +175,10 @@ What each stage opens:
   claims tests passed or that an implementation is verified. A partial search,
   parse/read error or unresolved association remains `unknown`; never shrink
   the denominator or manufacture absence. Report all three categories separately.
+  The tracked test inventory includes every policy-supported first-party code
+  suffix, even when a feature uses only one source language. Unsupported syntax
+  or association checkers remain unknown; cross-language tests cannot be omitted
+  to certify absence (`static-test-association-v2`).
   The target gate and processing the full gap worklist are distinct: retain
   `target_met`, `all_resolved` and each slot's reason. An unmet required target
   leaves a resumable partial preview and blocks publication. Reaching the

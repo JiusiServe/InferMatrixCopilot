@@ -16,7 +16,9 @@ from infermatrix_copilot.kb_service.gate import DIMENSIONS
 from infermatrix_copilot.kb_service.knowledge_coverage import load_policy, policy_path
 from infermatrix_copilot.kb_service.knowledge_depth import depth_page
 from infermatrix_copilot.kb_service.models import ModelUnavailable, parse_json_object
-from infermatrix_copilot.knowledge_service.lifecycle import DEPTH_BLOCK, DEPTH_FACETS, depth_sections
+from infermatrix_copilot.knowledge_service.lifecycle import (
+    DEPTH_BLOCK, DEPTH_FACETS, depth_proof_basis, depth_sections, safe_source_path,
+)
 from infermatrix_copilot.trace_store import TraceStore
 
 MODEL_FIELDS = ("role", "provider", "model", "effort", "served_model")
@@ -41,6 +43,61 @@ def _prose(block: str) -> str:
 
 def _family(model: str) -> str:
     return model.casefold().split("-")[0]
+
+
+def _judged_evidence(data: dict, block: str, repository: str, pin: str, facet: str) -> None:
+    """Bind the actual judge context to each persisted source witness.
+
+    Historical packets merge adjoining evidence spans and omit line endings.
+    Source-span hashes normalize CRLF through read_text, so replay their UTF-8
+    text with either a final LF or no terminator for a source's final line.
+    """
+    match = re.search(r"\n<!-- kb:depth-proof (.*?) -->\s*\n<!-- /kb:depth -->$", block, re.S)
+    if match is None:
+        raise ValueError("current facet has no evidence proof")
+    proof = json.loads(match[1])
+    basis = depth_proof_basis(proof, facet=facet, pin=pin)
+    evidence = data.get("evidence")
+    if not isinstance(evidence, list) or not evidence:
+        raise ValueError("native judgment has no source evidence packet")
+    lines, certificates = {}, []
+    for item in evidence:
+        if not isinstance(item, dict):
+            raise ValueError("native judgment has malformed evidence")
+        if item.get("kind") == "replayed_absence_certificate":
+            certificates.append(item.get("certificate"))
+            continue
+        if item.get("kind") != "upstream_text":
+            raise ValueError("native judgment has an unknown evidence kind")
+        reference = item.get("source_reference")
+        prefix = repository + "@" + pin + ":"
+        if not isinstance(reference, str) or not reference.startswith(prefix):
+            raise ValueError("native evidence reference differs from the repository or pin")
+        span = re.fullmatch(r"(.+):L([1-9][0-9]*)-L([1-9][0-9]*)", reference[len(prefix):])
+        if span is None or not safe_source_path(span[1]):
+            raise ValueError("native evidence has an invalid source reference")
+        path, start, end = span[1], int(span[2]), int(span[3])
+        text = item.get("text")
+        if end < start or not isinstance(text, list) or len(text) != end - start + 1:
+            raise ValueError("native numbered evidence does not cover its declared span")
+        for number, row in enumerate(text, start):
+            marker = f"{number}: "
+            if not isinstance(row, str) or not row.startswith(marker) or "\n" in row or "\r" in row:
+                raise ValueError("native numbered evidence is malformed or noncontiguous")
+            value = row[len(marker):]
+            key = (path, number)
+            if key in lines and lines[key] != value:
+                raise ValueError("native evidence contains conflicting source lines")
+            lines[key] = value
+    for span in proof["evidence"]:
+        try:
+            shown = "\n".join(lines[(span["path"], number)] for number in range(span["start"], span["end"] + 1))
+        except KeyError as exc:
+            raise ValueError("native judgment omitted a current proof span") from exc
+        if span["sha256"] not in {_sha(shown.encode()), _sha((shown + "\n").encode())}:
+            raise ValueError("native source text differs from its current proof hash")
+    if basis == "verified_absent" and certificates != [proof["absence_certificate"]]:
+        raise ValueError("native judgment omitted or changed the replayed absence certificate")
 
 
 def _archives(paths: list[Path]) -> tuple[dict, dict, list[dict], list[str]]:
@@ -137,6 +194,9 @@ def audit_native_approvals(root: Path, repo: str, *, baseline_reports: list[Path
     if not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", repo):
         raise ValueError("repo must be a canonical adapter slug")
     manifest = yaml.safe_load((root / f"adapters/{repo}/manifest.yaml").read_text())
+    repository = manifest.get("repo", {}).get("full_name")
+    if not isinstance(repository, str) or not re.fullmatch(r"[^/@:]+/[^/@:]+", repository):
+        raise ValueError("adapter must declare its source repository full_name")
     policy_file = root / policy_path(repo)
     policy = load_policy(policy_file.read_text(), manifest["knowledge"]["repo_subdir"])
     pages = {feature.id: depth_page(feature) for feature in policy.features}
@@ -181,6 +241,10 @@ def audit_native_approvals(root: Path, repo: str, *, baseline_reports: list[Path
                         or model.get("role") != "judge" or model.get("provider") != "codex" \
                         or not isinstance(model.get("model"), str) or not model["model"]:
                     raise ValueError("native record is not a successful Codex judge call")
+                served = model.get("served_model")
+                if served not in (None, "") and (not isinstance(served, str)
+                        or not re.match(r"^(?:gpt-|codex(?:-|$)|o[0-9]+(?:-|$))", served, re.I)):
+                    raise ValueError("native record reports an incompatible Codex judge served identity")
                 reply_ref = record.get("outputs", {}).get("reply")
                 expected_ref = "sha256:" + str(receipt.get("native_reply_sha256", ""))
                 if reply_ref != expected_ref:
@@ -194,6 +258,7 @@ def audit_native_approvals(root: Path, repo: str, *, baseline_reports: list[Path
                 if data.get("feature") != fid or data.get("pin") != pin \
                         or data.get("sections", {}).get(facet) != _prose(match[0]):
                     raise ValueError("native judgment prompt does not bind the exact current facet prose and pin")
+                _judged_evidence(data, match[0], repository, pin, facet)
                 sections, results = data["sections"], response["facets"]
                 if set(sections) != set(results) or any(
                         name not in DEPTH_FACETS or not isinstance(item, dict)

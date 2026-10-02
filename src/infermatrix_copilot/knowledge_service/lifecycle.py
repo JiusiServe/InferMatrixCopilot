@@ -29,6 +29,7 @@ from typing import Iterable
 import yaml
 
 DEPTH_FACETS = ("flow", "api", "configuration", "dependencies", "failure_modes", "tradeoffs", "validation")
+DEPTH_ABSENCE_DETECTOR = "static-test-association-v2"
 DEPTH_BLOCK = re.compile(r"<!-- kb:depth feature=([a-z0-9-]+) facet=([a-z_]+) pin=([0-9a-f]{40}) "
                          r"sha256=([0-9a-f]{64}) -->\n(.*?)\n<!-- /kb:depth -->", re.S)
 
@@ -57,7 +58,7 @@ def depth_proof_basis(proof: dict, *, facet: str, pin: str) -> str:
     if facet != "validation" or not isinstance(certificate, dict) or set(certificate) != required \
             or certificate.get("version") != 1 or isinstance(certificate.get("version"), bool) \
             or certificate.get("facet") != facet or certificate.get("pin") != pin \
-            or certificate.get("detector") != "static-test-association-v1" \
+            or certificate.get("detector") != DEPTH_ABSENCE_DETECTOR \
             or not isinstance(certificate.get("feature"), str) \
             or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", certificate["feature"]):
         raise ValueError("invalid validation absence certificate")

@@ -117,6 +117,27 @@ def test_legacy_supported_proof_is_default_and_preserved_byte_for_byte(tmp_path)
     assert report["features"][feature.id]["facets"] == ["api"]
 
 
+def test_repair_ledger_preserves_specific_failures_across_resume_without_duplicate_events():
+    from infermatrix_copilot.kb_service.init_knowledge_depth import _KnowledgeDepth
+
+    entry = {"attempts": 1, "context_sha256": "context-1", "evidence_sha256": "same-source"}
+    _KnowledgeDepth._slot_result(entry, "validation", "invalid", "assertion crosses an unshown source gap")
+    _KnowledgeDepth._slot_result(entry, "validation", "unjudged", "outer extraction failed")
+    entry = json.loads(json.dumps(entry))
+    entry.update(attempts=2, context_sha256="context-2")
+    _KnowledgeDepth._slot_result(entry, "validation", "omitted", "generator omitted the requested test facet")
+    entry.update(attempts=3, review_attempts=1, context_sha256="context-3")
+    _KnowledgeDepth._slot_result(entry, "validation", "fail", "the test asserts another feature's behavior")
+    slot = entry["facets"]["validation"]
+    assert [event["status"] for event in slot["history"]] == ["invalid", "omitted", "fail"]
+    assert slot["history"][0]["reason"] == "assertion crosses an unshown source gap"
+    assert len(slot["history"]) == 3 and slot.get("blocked")
+    entry.update(attempts=4, review_attempts=2, evidence_sha256="new-direct-test", context_sha256="context-4")
+    _KnowledgeDepth._slot_result(entry, "validation", "pass", "the new assertion supports the corrected claim")
+    assert "blocked" not in slot
+    assert len(slot["history"]) == 4 and slot["history"][-1]["evidence_sha256"] == "new-direct-test"
+
+
 def _absence(tmp_path, policy):
     feature = policy.features[0]
     certificate = build_absence_certificate(tmp_path, policy, feature, PIN)

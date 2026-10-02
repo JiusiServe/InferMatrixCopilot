@@ -91,7 +91,7 @@ def test_unlimited_stage_rejects_either_paid_transport_before_calls(world, unava
     transports = {"zcode": Transport(subscription=unavailable_role != "generator"),
                   "codex": Transport(subscription=unavailable_role != "judge")}
     rt = _runtime(world, ModelGateway(None, transport_factory=transports.__getitem__),
-                  generator=ModelRole("generator", "zcode", "subscription-model"))
+                  generator=ModelRole("generator", "zcode", "GLM-5.3"))
     with pytest.raises(InitError, match=unavailable_role + ":.*authenticated subscription"):
         run_stage(rt, _modules_lifecycle(), "knowledge-deepen", dry_run=True,
                   from_existing=True, unlimited_subscription=True)
@@ -102,7 +102,8 @@ def test_unlimited_stage_refuses_unauthenticated_transport_before_calls(world):
     def unavailable(provider):
         raise ModelUnavailable("CLI is not logged in")
 
-    rt = _runtime(world, ModelGateway(None, transport_factory=unavailable))
+    rt = _runtime(world, ModelGateway(None, transport_factory=unavailable),
+                  generator=ModelRole("generator", "zcode", "GLM-5.3"))
     with pytest.raises(InitError, match="authenticated subscription backend is unavailable"):
         run_stage(rt, _modules_lifecycle(), "knowledge-deepen", dry_run=True,
                   from_existing=True, unlimited_subscription=True)
@@ -110,13 +111,26 @@ def test_unlimited_stage_refuses_unauthenticated_transport_before_calls(world):
 
 def test_unlimited_stage_refuses_configured_fallback_before_dispatch(world):
     transport = Transport()
-    generator = ModelRole("generator", "zcode", "subscription-model",
+    generator = ModelRole("generator", "zcode", "GLM-5.3",
                           fallback=ModelRole("generator", "other", "paid-model"))
     rt = _runtime(world, ModelGateway(None, transport_factory=lambda _: transport), generator=generator)
     with pytest.raises(InitError, match="without fallback"):
         run_stage(rt, _modules_lifecycle(), "knowledge-deepen", dry_run=True,
                   from_existing=True, unlimited_subscription=True)
     assert transport.calls == []
+
+
+@pytest.mark.parametrize("generator,judge", [
+    (ModelRole("generator", "claude-code", "claude-opus-5-5"), ModelRole("judge", "codex", "gpt-6-sol")),
+    (ModelRole("generator", "zcode", "GLM-5.4"), ModelRole("judge", "codex", "gpt-6-sol")),
+    (ModelRole("generator", "zcode", "GLM-5.3"), ModelRole("judge", "other", "gpt-6-sol")),
+])
+def test_unlimited_stage_rejects_a_different_model_protocol_before_auth_or_calls(world, generator, judge):
+    gateway = ModelGateway(None, transport_factory=lambda _: pytest.fail("wrong protocol reached auth or dispatch"))
+    rt = _runtime(world, gateway, generator=generator, judge=judge)
+    with pytest.raises(InitError, match="Zcode GLM-5.3.*independent Codex"):
+        run_stage(rt, _modules_lifecycle(), "knowledge-deepen", dry_run=True,
+                  from_existing=True, unlimited_subscription=True)
 
 
 @pytest.mark.parametrize("stage, options", [
@@ -136,7 +150,7 @@ def test_unlimited_generate_rechecks_billing_and_preserves_unknown_cost(world):
     subscription, paid = Transport(), Transport(subscription=False)
     transports = iter([subscription, paid])
     rt = _runtime(world, ModelGateway(None, transport_factory=lambda _: next(transports)),
-                  generator=ModelRole("generator", "zcode", "subscription-model"), unlimited_subscription=True)
+                  generator=ModelRole("generator", "zcode", "GLM-5.3"), unlimited_subscription=True)
     budget = Budget(None)
     reply = generate(rt, budget, _modules_lifecycle().init, system="extract", prompt="source")
     assert reply.cost_usd is None and reply.usage == {"input_tokens": 12}
@@ -151,7 +165,7 @@ def test_unlimited_depth_runs_past_adapter_ceiling_and_accounts_judges(world):
     gateway = DepthGateway()
     lifecycle = _modules_lifecycle()
     lifecycle = replace(lifecycle, init=replace(lifecycle.init, budget_usd=0.5))
-    rt = _runtime(world, gateway, generator=ModelRole("generator", "zcode", "subscription-model"),
+    rt = _runtime(world, gateway, generator=ModelRole("generator", "zcode", "GLM-5.3"),
                   state_dir=world["tmp"] / "unlimited-depth")
     record = run_stage(rt, lifecycle, "knowledge-deepen", dry_run=True, from_existing=True,
                        unlimited_subscription=True)
@@ -174,7 +188,7 @@ def test_execution_partition_keeps_global_denominator_and_publication_gate(world
     policy["semantic_depth"] = {"per_facet_gt": 0.90}
     _commit(world["origin"], {path: yaml.safe_dump(policy)}, "require full semantic target")
     gateway = DepthGateway()
-    rt = _runtime(world, gateway, generator=ModelRole("generator", "zcode", "subscription-model"),
+    rt = _runtime(world, gateway, generator=ModelRole("generator", "zcode", "GLM-5.3"),
                   state_dir=world["tmp"] / "partition")
     record = run_stage(rt, _modules_lifecycle(), "knowledge-deepen", dry_run=True,
                        from_existing=True, unlimited_subscription=True, feature_ids=("step0",))
@@ -196,7 +210,7 @@ def test_structural_gap_blocks_strict_campaign_before_model_calls(world):
     data["semantic_depth"] = {"per_facet_gt": 0.90}
     _commit(world["origin"], {path: yaml.safe_dump(data)}, "strict policy without structural baseline")
     gateway = DepthGateway()
-    rt = _runtime(world, gateway, generator=ModelRole("generator", "zcode", "subscription-model"),
+    rt = _runtime(world, gateway, generator=ModelRole("generator", "zcode", "GLM-5.3"),
                   state_dir=world["tmp"] / "missing-breadth")
     record = run_stage(rt, _modules_lifecycle(), "knowledge-deepen", dry_run=True,
                        from_existing=True, unlimited_subscription=True)
@@ -209,7 +223,7 @@ def test_structural_gap_blocks_strict_campaign_before_model_calls(world):
 def test_explicit_feature_order_only_changes_execution_not_global_audit(world):
     _baseline(world, features=2)
     gateway = DepthGateway()
-    rt = _runtime(world, gateway, generator=ModelRole("generator", "zcode", "subscription-model"),
+    rt = _runtime(world, gateway, generator=ModelRole("generator", "zcode", "GLM-5.3"),
                   state_dir=world["tmp"] / "ordered-partition")
     record = run_stage(rt, _modules_lifecycle(), "knowledge-deepen", dry_run=True,
                        from_existing=True, unlimited_subscription=True, feature_ids=("step1", "step0"))

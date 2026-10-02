@@ -16,6 +16,8 @@
 subscription_billing 只认可当前 CLI 明确报告 ChatGPT 登录、默认 openai provider 且无
 活动 profile 或 provider/base-url 覆盖的环境。API-key 登录、配置或检查失败均不能用于订阅无限模式；
 布尔状态不代表已测得零费用。
+配置读取、登录探测和实际执行使用同一 `sanitized_env()` 与有效 HOME；被过滤的
+`CODEX_HOME` 不得使检查与执行落在不同认证目录。
 
 ## 不变量（**C1**、**C2**）
 - **控制手段是沙箱，不是工具列表。** Codex 无法关闭自己的原生 shell，所以容纳靠 OS 级的

@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L154-L173, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/system_tests/test_init_workspace.py:L54-L177, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L44-L151, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L1674-L1677, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L378-L394, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L63-L71]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L154-L173, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/system_tests/test_init_workspace.py:L54-L177, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L44-L151, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L1674-L1677, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L378-L394, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L63-L71, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L26-L41, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L100-L144]
 feature: "bootstrap"
 entry_points: ["jiuwenswarm/init_workspace.py"]
 source_globs: ["jiuwenswarm/init_workspace.py"]
@@ -50,4 +50,13 @@ tests/system_tests/test_init_workspace.py 的 TestPromptPreferredLanguage 通过
 来源：[tests/system_tests/test_init_workspace.py:L54–L177](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/system_tests/test_init_workspace.py#L54-L177)
 
 <!-- kb:depth-proof {"evidence":[{"path":"tests/system_tests/test_init_workspace.py","start":54,"end":177,"sha256":"4eff8ab35147a389b2a4139d1a2a142afa2fdf9465af10e63fcd3076b13f894b"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=bootstrap facet=dependencies pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=c1b7c311b07b519aa12e39b4492ce8ae2dd565f518f4e3a519d4c44ba3823cc7 -->
+**命名实例初始化对 instance_manager 端口预留的依赖**
+run_init 的命名实例分支直接复用 jiuwenswarm.instance_manager（27-41 行导入）：get_instance_index/calculate_instance_ports 算出本组端口后逐一 is_port_available("127.0.0.1", p) 检测（110-113 行），有冲突时先 collect_all_ports(exclude_name=name) 排除兄弟实例，再 find_available_ports(base_index=index, scan_range=20, exclude_ports=...) 向上扫描（117-123 行），最后 update_instances_yaml + create_bootstrap_env 落盘（138、141 行）。源码注释（106-109 行）说明目的：让实例创建后立即可启动，否则首次 jiuwenswarm-start --name 会撞端口并退回启动时兜底。
+
+来源：[jiuwenswarm/init_workspace.py:L26–L41](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/init_workspace.py#L26-L41), [jiuwenswarm/init_workspace.py:L100–L144](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/init_workspace.py#L100-L144)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":41,"path":"jiuwenswarm/init_workspace.py","sha256":"8d1f57776977744471c0ce09c29c2c180743c7c42068ce1fd37a877d87f76910","start":26},{"end":144,"path":"jiuwenswarm/init_workspace.py","sha256":"f04b26b2735fdbcd3d3ceef7a869846cdb201e1c0fd249d51095a63a88830c2b","start":100}],"trace":[]} -->
 <!-- /kb:depth -->

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from infermatrix_copilot.kb_service.depth_inputs import DepthContext
+from infermatrix_copilot.kb_service.knowledge_coverage import SUFFIXES
 
 
 def _write(root, path, text):
@@ -19,6 +20,45 @@ def _feature(paths, *, entry=None):
 
 def _shown(data):
     return "\n".join(line for file in data["files"] for line in file["text"])
+
+
+def test_test_inventory_detector_version_is_shared_with_absence_validation():
+    from infermatrix_copilot.kb_service.depth_inputs import TEST_ASSOCIATION_VERSION
+    from infermatrix_copilot.knowledge_service.lifecycle import DEPTH_ABSENCE_DETECTOR
+
+    assert TEST_ASSOCIATION_VERSION == DEPTH_ABSENCE_DETECTOR == "static-test-association-v2"
+
+
+@pytest.mark.parametrize("suffix", SUFFIXES)
+def test_global_test_inventory_includes_every_policy_supported_code_suffix(tmp_path, suffix):
+    source, test = "pkg/core.py", "sdk/nested/tests/contract" + suffix
+    _write(tmp_path, source, "def send(value):\n    return value\n")
+    _write(tmp_path, test, "language specific test fixture\n")
+    report = DepthContext(tmp_path, [source]).test_association(_feature([source]))
+    assert report["scope_files"] == [test]
+    assert not report["complete"]
+    assert any(test in problem for problem in report["unresolved_files"])
+
+
+def test_go_cli_test_cannot_be_silently_excluded_from_python_feature_absence(tmp_path):
+    from infermatrix_copilot.kb_service.knowledge_depth import build_absence_certificate
+
+    source, test = "pkg/cli.py", "tests/cli_test.go"
+    _write(tmp_path, source, "def main():\n    print('ok')\nif __name__ == '__main__':\n    main()\n")
+    _write(tmp_path, test, 'package tests\nimport ("os/exec"; "strings"; "testing")\n'
+           'func TestCLI(t *testing.T) {\n'
+           ' out, err := exec.Command("python3", "-m", "pkg.cli").Output()\n'
+           ' if err != nil || strings.TrimSpace(string(out)) != "ok" {\n'
+           '  t.Fatalf("bad CLI output: %s, %v", out, err)\n }\n}\n')
+    _write(tmp_path, "docs.md", "CLI documentation.\n")
+    feature = _feature([source])
+    feature.docs = ("docs.md",)
+    report = DepthContext(tmp_path, [source]).test_association(feature)
+    assert report["scope_files"] == [test]
+    assert not report["complete"]
+    assert any(test in problem and "checker" in problem for problem in report["unresolved_files"])
+    policy = SimpleNamespace(roots=("pkg/",), exclude=(), suffixes=(".py",), filenames=())
+    assert build_absence_certificate(tmp_path, policy, feature, "a" * 40) is None
 
 
 def test_configuration_search_covers_all_reviewed_files_and_actual_use(tmp_path):
@@ -43,6 +83,92 @@ def test_validation_finds_nested_sdk_mjs_and_late_assertions(tmp_path):
     assert data["test_search"]["matched_files"] == [test]
     assert "assert.equal(send(7), 7)" in _shown(data)
     assert any(f["path"] == test and f["end"] > 250 for f in data["files"])
+
+
+def test_aliased_javascript_test_and_assertion_entries_cannot_certify_absence(tmp_path):
+    from infermatrix_copilot.kb_service.knowledge_depth import build_absence_certificate
+
+    source, test = "pkg/core.mjs", "tests/roundtrip.test.mjs"
+    _write(tmp_path, source, "export function send(value) { return value; }\n")
+    _write(tmp_path, test, "import {test as scenario} from 'node:test';\n"
+                         "import {strictEqual as equal} from 'node:assert';\n"
+                         "import {send} from '../pkg/core.mjs';\n"
+                         "scenario('roundtrip', () => equal(send(3), 3));\n")
+    _write(tmp_path, "docs.md", "Core API documentation.\n")
+    feature = _feature([source])
+    feature.docs = ("docs.md",)
+    report = DepthContext(tmp_path, [source]).test_association(feature)
+    assert not report["complete"]
+    assert any(test in problem and "static test entry" in problem for problem in report["unresolved_files"])
+    policy = SimpleNamespace(roots=("pkg/",), exclude=(), suffixes=(".mjs",), filenames=())
+    assert build_absence_certificate(tmp_path, policy, feature, "a" * 40) is None
+
+
+@pytest.mark.parametrize("link", ["symbol", "docs"])
+def test_unrecognized_test_entry_with_symbol_or_doc_link_remains_unknown(tmp_path, link):
+    source, test = "pkg/core.py", "tests/check_behavior.py"
+    _write(tmp_path, source, "def send(value):\n    return value\n")
+    _write(tmp_path, test, "def check_behavior():\n    send(3)\n" if link == "symbol" else "def check_behavior():\n    pass\n")
+    docs = [{"text": "External runner invokes " + test}] if link == "docs" else []
+    report = DepthContext(tmp_path, [source]).test_association(_feature([source]), docs)
+    assert not report["complete"] and any(test in problem for problem in report["unresolved_files"])
+
+
+def test_python_call_neighbours_use_the_same_exact_root_module_as_source_audit(tmp_path):
+    from infermatrix_copilot.kb_service.knowledge_depth import verify_trace
+
+    caller, actual, copy = "pkg/caller.py", "pkg/helpers.py", "sdks/client/pkg/helpers.py"
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(tmp_path, caller, "from pkg.helpers import finish\ndef run(value):\n    return finish(value)\n")
+    _write(tmp_path, actual, "def finish(value):\n    return value + 1\n")
+    _write(tmp_path, copy, "def finish(value):\n    return value + 2\n")
+    context = DepthContext(tmp_path, [caller, actual, copy])
+    assert context._resolve_module("pkg.helpers") == actual
+    assert context._import_targets(caller)[0] == {actual}
+    node = context._file(caller)[2][0]
+    assert [path for path, _ in context._neighbours(caller, node)] == [actual]
+    trace = [{"path": caller, "symbol": "run", "start": 2, "end": 3},
+             {"path": actual, "symbol": "finish", "start": 1, "end": 2}]
+    verify_trace(tmp_path, trace)
+    with pytest.raises(ValueError):
+        verify_trace(tmp_path, [trace[0], {**trace[1], "path": copy}])
+
+
+def test_python_module_and_package_ambiguity_remains_unknown(tmp_path):
+    caller = "pkg/caller.py"
+    _write(tmp_path, caller, "from pkg.helpers import finish as invoke\ndef run():\n    return invoke()\n")
+    _write(tmp_path, "pkg/helpers.py", "def finish():\n    return 1\n")
+    _write(tmp_path, "pkg/helpers/__init__.py", "def finish():\n    return 2\n")
+    context = DepthContext(tmp_path, [caller, "pkg/helpers.py", "pkg/helpers/__init__.py"])
+    assert context._resolve_module("pkg.helpers") is None
+    targets, unresolved = context._import_targets(caller)
+    assert not targets and unresolved
+
+
+def test_unique_nested_sdk_python_module_retains_a_proven_call_pair(tmp_path):
+    from infermatrix_copilot.kb_service.knowledge_depth import verify_trace
+
+    caller, helper = "caller.py", "sdks/client/src/pkg/helpers.py"
+    _write(tmp_path, caller, "from pkg.helpers import finish\ndef run():\n    return finish()\n")
+    _write(tmp_path, helper, "def finish():\n    return 1\n")
+    context = DepthContext(tmp_path, [caller, helper])
+    assert context._resolve_module("pkg.helpers") == helper
+    assert context._import_targets(caller)[0] == {helper}
+    assert context._neighbours(caller, context._file(caller)[2][0])[0][0] == helper
+    verify_trace(tmp_path, [{"path": caller, "symbol": "run", "start": 2, "end": 3},
+                            {"path": helper, "symbol": "finish", "start": 1, "end": 2}])
+
+
+def test_relative_python_import_cannot_fall_back_to_a_different_source_root(tmp_path):
+    caller, copy = "pkg/caller.py", "sdks/client/pkg/helpers.py"
+    _write(tmp_path, caller, "from .helpers import finish as invoke\ndef run():\n    return invoke()\n")
+    _write(tmp_path, copy, "def finish():\n    return 1\n")
+    context = DepthContext(tmp_path, [caller, copy])
+    assert context._resolve_module("pkg.helpers") == copy
+    assert context._resolve_module("pkg.helpers", exact=True) is None
+    targets, unresolved = context._import_targets(caller)
+    assert not targets and unresolved
+    assert not context._neighbours(caller, context._file(caller)[2][0])
 
 
 def test_association_propagates_python_test_helper_imports_and_excludes_init(tmp_path):

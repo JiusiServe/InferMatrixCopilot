@@ -21,7 +21,7 @@ params:
   from_existing: "explanatory knowledge: enrich a merged index and owner routes without local earlier-stage records"
   retry_unfinished: "knowledge-deepen only: retry unsupported facets while retaining accepted work and cumulative spend"
   subscription_generator: "explicit subscription backend; generator USD unreported, fees outside stage USD accounting"
-  unlimited_subscription: "knowledge-deepen only: authenticated subscription generator and judge without fixed accounting ceiling; incompatible with budget_usd"
+  unlimited_subscription: "knowledge-deepen only: authenticated Zcode GLM-5.3 generator and independent Codex subscription judge without fixed accounting ceiling; incompatible with budget_usd"
 steps:
   - {id: init, step: knowledge.init}
 success: the stage's PR is open or its complete dry run is written; an unmet required semantic target returns partial or blocked

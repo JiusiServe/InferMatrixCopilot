@@ -22,10 +22,91 @@ from infermatrix_copilot.knowledge_service.lifecycle import depth_sections
 from infermatrix_copilot.knowledge_view import KnowledgeView, build_manifest
 
 PROBES = ("description_and_paths", "query_only", "paths_only")
+REPORT_FORMAT = "depth-retrieval-deduplicated-v1"
 
 
 def _hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _object_hash(value) -> str:
+    return _hash(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+
+
+def pack_report(report: dict) -> dict:
+    """Store repeated actual context and budgets once, without losing evidence."""
+    if "storage" in report:
+        raise ValueError("retrieval report is already packed")
+    packed = {**report, "cases": [], "documents": {}, "content_blobs": {}, "execution_budgets": {}}
+    for case in report["cases"]:
+        row = {k: v for k, v in case.items() if k not in ("documents", "execution_budget")}
+        row["document_refs"] = []
+        for document in case["documents"]:
+            content = document["content"]
+            content_hash = _hash(content)
+            if document.get("content_sha256") != content_hash:
+                raise ValueError("actual retrieval content hash differs from the document")
+            packed["content_blobs"][content_hash] = content
+            metadata = {k: v for k, v in document.items() if k != "content"}
+            reference = _object_hash(metadata)
+            packed["documents"][reference] = metadata
+            row["document_refs"].append(reference)
+        budget_hash = _object_hash(case["execution_budget"])
+        packed["execution_budgets"][budget_hash] = case["execution_budget"]
+        row["execution_budget_ref"] = budget_hash
+        packed["cases"].append(row)
+    packed["storage"] = {"format": REPORT_FORMAT, "expanded_report_sha256": _object_hash(report)}
+    return packed
+
+
+def expand_report(report: dict) -> dict:
+    """Replay hash-bound records into the exact original audit result."""
+    storage = report.get("storage", {})
+    if storage.get("format") != REPORT_FORMAT:
+        raise ValueError("unsupported retrieval evidence storage format")
+    expanded = {k: v for k, v in report.items()
+                if k not in ("storage", "documents", "content_blobs", "execution_budgets", "cases")}
+    expanded["cases"] = []
+    try:
+        for reference, content in report["content_blobs"].items():
+            if _hash(content) != reference:
+                raise ValueError("retrieval content blob hash mismatch")
+        for reference, document in report["documents"].items():
+            if _object_hash(document) != reference:
+                raise ValueError("retrieval document metadata hash mismatch")
+        for reference, budget in report["execution_budgets"].items():
+            if _object_hash(budget) != reference:
+                raise ValueError("retrieval execution budget hash mismatch")
+        for case in report["cases"]:
+            row = {k: v for k, v in case.items() if k not in ("document_refs", "execution_budget_ref")}
+            row["documents"] = []
+            for reference in case["document_refs"]:
+                metadata = report["documents"][reference]
+                row["documents"].append({**metadata, "content": report["content_blobs"][metadata["content_sha256"]]})
+            row["execution_budget"] = report["execution_budgets"][case["execution_budget_ref"]]
+            expanded["cases"].append(row)
+    except (KeyError, TypeError) as exc:
+        raise ValueError("missing or malformed retrieval evidence reference") from exc
+    if _object_hash(expanded) != storage.get("expanded_report_sha256"):
+        raise ValueError("expanded retrieval evidence differs from the original audit")
+    return expanded
+
+
+def serialize_report(report: dict) -> str:
+    """Readable summaries and one record per line for large evidence tables."""
+    packed = pack_report(report)
+    compact = lambda value: json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    fields = []
+    for key, value in packed.items():
+        if key == "cases":
+            rendered = "[\n" + ",\n".join("    " + compact(row) for row in value) + "\n  ]"
+        elif key in ("features", "documents", "content_blobs", "execution_budgets"):
+            rendered = "{\n" + ",\n".join("    " + compact(k) + ": " + compact(v)
+                                          for k, v in value.items()) + "\n  }"
+        else:
+            rendered = json.dumps(value, ensure_ascii=False, indent=2).replace("\n", "\n  ")
+        fields.append("  " + compact(key) + ": " + rendered)
+    return "{\n" + ",\n".join(fields) + "\n}\n"
 
 
 def _document(document: dict, view: KnowledgeView, pin: str, problems: list[str], label: str) -> dict:
@@ -164,7 +245,7 @@ def main() -> int:
                            "the audit independently binds its actual files with knowledge_tree_sha256."]
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+        args.report.write_text(serialize_report(report))
     print(json.dumps({"summary": report["summary"], "problems": report["problems"]}, ensure_ascii=False, indent=2))
     return int(bool(report["problems"]))
 

@@ -40,6 +40,9 @@ stdlib 与 `knowledge_service.lifecycle` 的页面/完整深读正文解析；�
 旧证明默认 `supported`；`verified_absent` 通过确定性缺失证明准入并在 `verified_gaps`
 保留缺口标签；没有认可区块的维度仍是 unknown。核验缺失不代表能力已实现、测试已运行
 或测试通过，不得把这类背景升级为约束性规则或从覆盖分母删去。
+`static-test-association-v2` 的测试清单扫描全部政策支持的第一方代码后缀，
+不随功能的源码语言缩小范围；例如 Go 测试可以调用 Python CLI。
+尚无完整语法检查器或无法可靠关联的语言保留为 unknown，不能签发缺失证明。
 深读正文哈希、证明形状或重复 facet 有问题时不提供该块；上游证据验证仍属于 init/audit。
 所有读取前调用同一 `verify`，包括最终被排除的接口卡；激活快照校验失败直接阻断。
 是否超过 `semantic_depth.per_facet_gt`、每个功能是否具有认可知识和原生审批绑定，

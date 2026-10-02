@@ -56,7 +56,11 @@ class CodexTransport(HarnessTransport):
         cli = self.cli_path()
         if not cli or os.environ.get("OPENAI_BASE_URL"):
             return False
-        config = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "config.toml"
+        # Exec uses the sanitized environment, which intentionally drops
+        # CODEX_HOME. Probe that same home and authentication context rather
+        # than approving a different login selected by the parent environment.
+        env = sanitized_env()
+        config = Path(env.get("HOME") or Path.home()) / ".codex" / "config.toml"
         try:
             data = tomllib.loads(config.read_text(encoding="utf-8")) if config.exists() else {}
             provider = data.get("model_provider", "openai")
@@ -64,7 +68,7 @@ class CodexTransport(HarnessTransport):
             if data.get("profile") or provider != "openai" or not isinstance(providers, dict) or providers.get(provider):
                 return False
             result = subprocess.run([cli, "login", "status"], capture_output=True, text=True,
-                                    encoding="utf-8", errors="replace", timeout=15, check=False)
+                                    encoding="utf-8", errors="replace", timeout=15, check=False, env=env)
         except (OSError, ValueError, subprocess.SubprocessError):
             return False
         return result.returncode == 0 and "Logged in using ChatGPT" in result.stdout + result.stderr
@@ -76,7 +80,7 @@ class CodexTransport(HarnessTransport):
         try:
             out = subprocess.run([cli, "login", "status"], capture_output=True,
                                  text=True, encoding="utf-8", errors="replace",
-                                 timeout=15, check=False)
+                                 timeout=15, check=False, env=sanitized_env())
         except (OSError, subprocess.SubprocessError):
             return None  # status probe itself broken — let the run surface it
         blob = f"{out.stdout}\n{out.stderr}"
