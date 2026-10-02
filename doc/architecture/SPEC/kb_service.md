@@ -528,6 +528,7 @@ token、served model 和调用结果照常记录，judge 的固定记账与预�
 knowledge-deepen 需要显式 feature/production coverage policy，逐项访问全部功能，包含已有规则的 owner。
 每项提炼 flow、api、configuration、dependencies、failure_modes、tradeoffs、validation 七维，
 只保存有证据的内容到最近 owner 的 `feature-depth-<id>.md`，链接功能概览与 owner 索引。
+只追加索引链接，保留已有 Direct quick map；最终仍检查地图存在且未被截断。
 源码按定义切片，可检索文件前缀之外的实现，并补充可静态解析的第一方被调函数与相关测试。
 flow 至少包含两个不同定义的直接调用；Python 校验限定符号、词法 owner 和导入目标，其它
 语言检查去除注释/字符串后的声明和调用。动态对象分派不能靠同名猜测，语义仍由模型裁判复核。

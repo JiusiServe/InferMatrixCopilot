@@ -528,3 +528,21 @@ def test_explicit_retry_prioritizes_features_without_accepted_depth(world):
     assert retried.spent_usd == 1.5
     assert gateway.reviews == {"step0": 1, "step1": 2}
     assert retried.coverage["semantic_depth"]["features"]["step1"]["complete"]
+
+
+def test_depth_preserves_existing_quick_map_when_linking_pages(world):
+    from infermatrix_copilot.kb_service.init_quick_maps import with_quick_map
+
+    _baseline(world)
+    index = "knowledge/repos/toy/components/core/_index.md"
+    original = (world["origin"] / index).read_text()
+    mapping = ("## 代码快速入口（Direct）\n<!-- kb-init:quick-map -->\n\n"
+               "触发词：special coordination\n\n"
+               "| PR 描述在做什么 | 精确规则 | 第一批 live 源码 |\n|---|---|---|\n"
+               "| special coordination | Owner contract | `pkg/core.py` |\n")
+    _commit(world["origin"], {index: with_quick_map(original, mapping)}, "extend quick map manually")
+    record = _run(world, DepthGateway())
+    assert record.status == "dry_run", record.problems
+    updated = _tree(record)[index]
+    assert mapping.strip() in updated
+    assert "feature-depth-step0.md" in updated

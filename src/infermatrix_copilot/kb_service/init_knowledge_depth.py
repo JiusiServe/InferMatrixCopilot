@@ -84,6 +84,12 @@ class _KnowledgeDepth(_Knowledge):
             problems.append("knowledge-deepen requires an explicit feature/production coverage policy")
         return problems
 
+    def _refresh_quick_maps(self) -> list[str]:
+        # Depth adds explanatory pages and index links, without changing routes
+        # or review rules. Keep existing quick maps, including manual additions
+        # inside generated sections; _conclude still checks presence/capacity.
+        return []
+
     def _build(self, tree: Path) -> InitRecord:
         policy = self.coverage_policy
         self.today = time.strftime("%Y-%m-%d", time.gmtime(self.record.started_at))
