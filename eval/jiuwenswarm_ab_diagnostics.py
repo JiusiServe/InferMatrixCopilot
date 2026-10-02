@@ -18,6 +18,14 @@ import statistics
 SCHEMA = "jiuwenswarm-pr-ab-diagnostics-v1"
 TOOLS = {"read_prompt", "source_read", "source_grep", "source_list", "file_at_base", "calc", "doc_search", "doc_read"}
 PREFIX = "mcp__jiuwenswarm-ab__"
+OUTPUT_CONTRACT_ERRORS = {
+    "model output does not satisfy successful review contract",
+    "review comment has missing required fields",
+    "review comment line is invalid",
+    "review comment severity/disposition is invalid",
+    "review comment text must be a string",
+    "this read-only harness cannot execute tests",
+}
 
 
 def _sha(data):
@@ -135,10 +143,13 @@ def _canonical_relative(path):
     return isinstance(path, str) and bool(path) and not path.startswith("/") and "\\" not in path and all(part not in {"", ".", "..", ".git"} for part in path.split("/"))
 
 
-def _invalid_reasons(result, attempts):
+def _invalid_reasons(result, attempts, *, result_bound=False):
     if result.get("status") != "invalid_run":
         return []
     reasons = set()
+    error = result.get("error", "")
+    if result_bound and attempts and attempts[-1]["integrity"] == "verified" and isinstance(error, str) and any(error == known or error.startswith(known + ": ") for known in OUTPUT_CONTRACT_ERRORS):
+        reasons.add("output_schema_or_contract_rejected")
     for attempt in attempts:
         if attempt["integrity"] == "mismatch":
             continue
@@ -284,6 +295,22 @@ def diagnose_run(run_root):
     """Return compact diagnostics without creating files or invoking models."""
     root = Path(run_root).resolve()
     identity = _json(root / "identity.json")
+    bindings, duplicate_slots = {}, set()
+    try:
+        manifest = _json(root / "reviews-manifest.json")
+        if manifest.get("schema") == "jiuwenswarm-pr-reviews-v1" and all(manifest.get(key) == identity.get(key) for key in ("identity_sha256", "campaign_sha256")):
+            for row in manifest.get("reviews", []):
+                if not isinstance(row, dict):
+                    continue
+                key = row.get("pr"), row.get("arm"), row.get("repeat")
+                if type(key[0]) is not int or key[1] not in ("A", "B") or type(key[2]) is not int or key[2] not in (0, 1, 2):
+                    continue
+                if key in bindings:
+                    duplicate_slots.add(key)
+                bindings[key] = row
+    except (OSError, ValueError, KeyError, TypeError):
+        # A missing/partial collector manifest is expected during live diagnosis.
+        bindings = {}
     reviews, incomplete, read_errors, all_attempts = [], [], [], []
     for item in sorted((root / "items").glob("review-*")):
         path = item / "result.json"
@@ -291,7 +318,8 @@ def diagnose_run(run_root):
             incomplete.append(item.name)
             continue
         try:
-            result = _json(path)
+            result_data = path.read_bytes()
+            result = json.loads(result_data)
             slot = re.fullmatch(r"review-pr(\d+)-([AB])-r([123])", item.name)
             if not slot or result.get("preflight") or result.get("number") != int(slot[1]) or result.get("arm") != slot[2] or result.get("repetition") != int(slot[3]):
                 raise ValueError("result_slot_mismatch")
@@ -304,11 +332,18 @@ def diagnose_run(run_root):
                 attempts.append(_attempt_diagnostics(native))
             all_attempts += attempts
             final = attempts[-1] if attempts else {}
+            key = result["number"], result["arm"], result["repetition"] - 1
+            binding = bindings.get(key, {})
+            result_bound = key not in duplicate_slots and binding.get("run_result_sha256") == _sha(result_data) and \
+                binding.get("run_result_path") == str(path) and binding.get("native_status") == result.get("status") and \
+                binding.get("status") == ("complete" if result.get("status") == "valid" else "failed") and \
+                all(binding.get(field) == identity.get(field) for field in ("identity_sha256", "campaign_sha256"))
             row = {"pr": result["number"], "arm": result["arm"], "repeat": result["repetition"] - 1,
                    "status": result["status"], "native_cli_attempts": len(attempts),
                    "source_calls_cumulative": final.get("source_calls_cumulative"),
                    "knowledge_chars_cumulative": final.get("knowledge_chars_cumulative"),
-                   "invalid_run_reasons": _invalid_reasons(result, attempts), "attempts": attempts}
+                   "result_manifest_binding_verified": result_bound,
+                   "invalid_run_reasons": _invalid_reasons(result, attempts, result_bound=result_bound), "attempts": attempts}
             reviews.append(row)
         except (OSError, ValueError, KeyError, TypeError) as exc:
             read_errors.append({"item": item.name, "error": type(exc).__name__ + ":" + str(exc)[:160]})

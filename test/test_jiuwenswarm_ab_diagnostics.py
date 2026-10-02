@@ -28,7 +28,7 @@ def _root(tmp_path):
     return root
 
 
-def _review(root, pr=1, arm="A", repeat=1, intervals=((10, 30),), events=(), violation=None, covered=True, status="valid"):
+def _review(root, pr=1, arm="A", repeat=1, intervals=((10, 30),), events=(), violation=None, covered=True, status="valid", error=""):
     item = root / f"items/review-pr{pr}-{arm}-r{repeat}"
     attempts = []
     for ordinal, (started, finished) in enumerate(intervals, 1):
@@ -52,8 +52,18 @@ def _review(root, pr=1, arm="A", repeat=1, intervals=((10, 30),), events=(), vio
         attempts.append({"ordinal": ordinal, "attempt_root": str(a), "status": status,
                          "native_trace_id": f"receipt{ordinal}", "artifacts": files})
     _write(item / "result.json", {"number": pr, "arm": arm, "repetition": repeat, "status": status,
-        "preflight": False, "identity_sha256": "identity", "campaign_sha256": "campaign", "attempts": attempts})
+        "preflight": False, "identity_sha256": "identity", "campaign_sha256": "campaign", "attempts": attempts, "error": error})
     return item
+
+
+def _bind(root, item):
+    path = item / "result.json"
+    result = json.loads(path.read_text())
+    _write(root / "reviews-manifest.json", {"schema": "jiuwenswarm-pr-reviews-v1", "identity_sha256": "identity", "campaign_sha256": "campaign",
+        "reviews": [{"pr": result["number"], "arm": result["arm"], "repeat": result["repetition"] - 1,
+            "run_result_path": str(path), "run_result_sha256": diag._sha(path.read_bytes()),
+            "native_status": result["status"], "status": "complete" if result["status"] == "valid" else "failed",
+            "identity_sha256": "identity", "campaign_sha256": "campaign"}]})
 
 
 def _rate(request="r1", delay=3000):
@@ -207,4 +217,38 @@ def test_unavailable_receipt_digest_stays_unknown_even_with_artifact_hash(tmp_pa
 def test_unknown_invalid_run_is_not_claimed_to_be_scope_escape(tmp_path):
     root = _root(tmp_path)
     _review(root, status="invalid_run")
+    assert diag.diagnose_run(root)["reviews"][0]["invalid_run_reasons"] == ["unknown"]
+
+
+@pytest.mark.parametrize("error,expected", [
+    ("model output does not satisfy successful review contract", "output_schema_or_contract_rejected"),
+    ("review comment has missing required fields", "output_schema_or_contract_rejected"),
+    ("review comment line is invalid", "output_schema_or_contract_rejected"),
+    ("review comment severity/disposition is invalid", "output_schema_or_contract_rejected"),
+    ("review comment text must be a string", "output_schema_or_contract_rejected"),
+    ("this read-only harness cannot execute tests", "output_schema_or_contract_rejected"),
+    ("review comment has missing required fields: file", "output_schema_or_contract_rejected"),
+    ("review comment has missing required fields possibly", "unknown"),
+    ("unrecognized failure", "unknown")])
+def test_canonical_output_contract_failures_require_bound_verified_evidence(tmp_path, error, expected):
+    root = _root(tmp_path)
+    item = _review(root, status="invalid_run", error=error)
+    _bind(root, item)
+    row = diag.diagnose_run(root)["reviews"][0]
+    assert row["result_manifest_binding_verified"] is True
+    assert row["invalid_run_reasons"] == [expected]
+
+
+@pytest.mark.parametrize("fault", ["missing_binding", "wrong_result_hash", "missing_trace"])
+def test_canonical_error_without_verified_binding_or_trace_remains_unknown(tmp_path, fault):
+    root = _root(tmp_path)
+    item = _review(root, status="invalid_run", error="review comment has missing required fields")
+    if fault != "missing_binding":
+        _bind(root, item)
+    if fault == "wrong_result_hash":
+        manifest = json.loads((root / "reviews-manifest.json").read_text())
+        manifest["reviews"][0]["run_result_sha256"] = "0" * 64
+        _write(root / "reviews-manifest.json", manifest)
+    elif fault == "missing_trace":
+        (item / "attempt-1/traces/attempts/native/native-events.jsonl").unlink()
     assert diag.diagnose_run(root)["reviews"][0]["invalid_run_reasons"] == ["unknown"]

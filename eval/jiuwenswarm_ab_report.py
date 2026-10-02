@@ -392,6 +392,7 @@ def build(state: Path, output: Path, study: Path | None = None):
              "当前知识库在功能组织、源码关联和可审计性方面更完整；原资料保留了作者的设计意图、被拒绝方案、完整使用手册和维护风险，两者都能为评审提供有价值的上下文。",
              f"当前认可 **552/553（99.82%）**；原作者正文在本次有界映射中提供 **{mapping_total['supported']}/553（{100*mapping_total['supported']/553:.2f}%）** 项说明。两项统计的依据不同，不能将其差额直接解释为新增正确知识。", "",
              f"实测状态：**{value['status']}**；72 个计划评审中已有 {completed} 个终态结果、{collection.get('valid_reviews',0)} 个有效评审、{scored} 个完成独立评分。", "",
+             f"全体有效完成率：A {collection.get('by_arm',{}).get('A',{}).get('valid',0)}/36、B {collection.get('by_arm',{}).get('B',{}).get('valid',0)}/36。判断质量以已评分有效评审为条件，须同时考虑失败和未交付；本轮不会修正失败回复后重新评分。", "",
              conclusion, "",
              "## 内容与覆盖", "",
              "| 指标 | 原项目作者资料 | 当前知识库 | 统计含义 |", "| --- | ---: | ---: | --- |",
@@ -525,7 +526,7 @@ def build(state: Path, output: Path, study: Path | None = None):
     b = exposure["B"]
     lines += ["",
               f"当前知识组初始每次完整注入的功能×维度区块均值为 {num(b['initial_intact_facets']['mean'])}，片段区块均值为 {num(b['initial_partial_facets']['mean'])}；所选页面可用区块均值为 {num(b['available_facets_on_selected_pages']['mean'])}（跨页面累计，同一维度可涉及多个功能）。只按实际正文匹配计算完整注入，库存 552 项并非全部进入模型。原作者页没有 kb:depth 标记，不能把其标记数为零解释为没有知识。",
-              "速度表列出有效评审；失败、超时和额外尝试保留在完成率及配套 JSON 中，不删除较慢或失败样本。排期等待从 worker 开始计算，不包含尚未获得 worker 的排队。P90 使用线性插值。知识库存、初始实际注入及后续工具读取分别记录。",
+              "速度表列出有效评审；失败、超时和额外尝试保留在完成率及配套 JSON 中，不删除较慢或失败样本。排期等待从 worker 开始计算，不包含尚未获得 worker 的排队；表中端到端也从 worker 进入评审函数计到终态。逐任务的提交到退出总耗时及完整池内排队未记录，保持未知。P90 使用线性插值。知识库存、初始实际注入及后续工具读取分别记录。",
               "6000 字符按知识正文和后续搜索片段累计；导航元数据、PR diff、源码工具输出及协议提示词另记输入 token。原生耗时是 CLI 执行时间，包含工具读写和服务内部退避，不等同于纯推理时间。",
               "订阅服务的 HTTP429 可触发 Zcode 内部请求退避，观测 maxAttempts 为 11；这是原生请求重试，与最多一次外层 CLI 传输重试分开。共享排期初始间隔 15 秒、限流冷却 90 秒，可放缓到 60 秒。请求的退避延迟不是测得的等待时间，排队延迟不能归因于检索质量。",
               f"实际 CLI 并发峰值为 {diagnostics.get('native_timing',{}).get('native_active_peak_completed_intervals','未知')}，完整区间数为 {diagnostics.get('native_timing',{}).get('completed_native_intervals','未知')}；缺失区间时仅为下界。全批次从首次原生启动到最后退出的时间为 {num(diagnostics.get('native_timing',{}).get('batch_native_span_seconds'))} 秒，不含准备与独立评分。",
