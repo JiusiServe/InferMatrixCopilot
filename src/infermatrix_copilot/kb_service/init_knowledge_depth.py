@@ -117,12 +117,10 @@ class _KnowledgeDepth(_Knowledge):
                     for f in policy.features}
         stopped = False
         for repair in (False, True):
-            order = policy.features
-            if repair:
-                progress = audit_depth(self.head, tree, policy, self.record.pin)
-                # Cover features with no accepted explanation before extending
-                # partial pages; stable sorting keeps policy order within groups.
-                order = sorted(order, key=lambda f: bool(progress["features"][f.id]["facets"]))
+            progress = audit_depth(self.head, tree, policy, self.record.pin)
+            # Include resumed and explicit retry passes in coverage priority.
+            # Stable sorting keeps policy order within each coverage group.
+            order = sorted(policy.features, key=lambda f: bool(progress["features"][f.id]["facets"]))
             for feature in order:
                 entry = states.setdefault(feature.id, {})
                 current = audit_depth({depth_page(feature): self.head[depth_page(feature)]}, tree,
@@ -135,6 +133,9 @@ class _KnowledgeDepth(_Knowledge):
                 pending_draft = "draft" in entry
                 if not pending_draft and ((not repair and attempts >= ceilings[feature.id] - 1)
                                           or attempts >= ceilings[feature.id]):
+                    if entry.get("status") == "extracting":
+                        entry["status"] = "interrupted"
+                        entry["reason"] = "extraction interrupted before a durable draft"
                     continue
                 if self.budget.spent_usd + self.lifecycle.init.judge_call_usd > self.budget.limit_usd:
                     stopped = True

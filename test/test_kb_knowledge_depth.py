@@ -473,3 +473,58 @@ def test_interrupted_repair_judge_reuses_its_completed_draft(world):
     assert record.status == "dry_run", record.problems
     assert record.coverage["semantic_depth"]["complete_features"] == 1
     assert len(gateway.depth_calls) == 2
+
+
+def test_interrupted_last_extraction_stays_explicit_until_retry(world):
+    _baseline(world)
+
+    class InterruptedExtraction(DepthGateway):
+        def __init__(self):
+            super().__init__(reject="api")
+            self.generations = 0
+
+        def call_json(self, role, **kwargs):
+            if kwargs["system"] == SYSTEM_DEPTH:
+                self.generations += 1
+                if self.generations == 2:
+                    raise KeyboardInterrupt()
+            return super().call_json(role, **kwargs)
+
+    gateway = InterruptedExtraction()
+    with pytest.raises(KeyboardInterrupt):
+        _run(world, gateway)
+    record = _run(world, gateway)
+    assert record.status == "dry_run", record.problems
+    entry = record.depth["features"]["step0"]
+    assert entry["status"] == "interrupted" and entry["attempts"] == 2
+    assert record.coverage["semantic_depth"]["covered_facets"] == 6
+    assert gateway.generations == 2 and record.spent_usd == 0.5
+    gateway.reject = False
+    retried = _run(world, gateway, retry=True)
+    assert retried.coverage["semantic_depth"]["complete_features"] == 1
+    assert gateway.generations == 3 and retried.spent_usd == 1
+
+
+def test_explicit_retry_prioritizes_features_without_accepted_depth(world):
+    _baseline(world, features=2)
+
+    class CoverageFirst(DepthGateway):
+        def __init__(self):
+            super().__init__()
+            self.reviews = {}
+
+        def call_json(self, role, **kwargs):
+            if kwargs["system"] == SYSTEM_DEPTH_REVIEW:
+                payload = json.JSONDecoder().raw_decode(kwargs["prompt"][kwargs["prompt"].index("{"):])[0]
+                feature = payload["feature"]
+                self.reviews[feature] = self.reviews.get(feature, 0) + 1
+                self.reject = "api" if feature == "step0" else self.reviews[feature] == 1
+            return super().call_json(role, **kwargs)
+
+    gateway = CoverageFirst()
+    before = _run(world, gateway, budget=1)
+    assert before.coverage["semantic_depth"]["covered_facets"] == 6
+    retried = _run(world, gateway, budget=1.5, retry=True)
+    assert retried.spent_usd == 1.5
+    assert gateway.reviews == {"step0": 1, "step1": 2}
+    assert retried.coverage["semantic_depth"]["features"]["step1"]["complete"]
