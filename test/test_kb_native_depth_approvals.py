@@ -307,3 +307,160 @@ def test_cli_exports_only_normalized_receipts_and_refuses_knowledge_destination(
     with pytest.raises(SystemExit) as exc:
         main(args + ["--report", str(native["root"] / "knowledge" / "report.json")])
     assert exc.value.code == 2
+
+
+def _lightweight(native, section=None):
+    section = section or native["section"]
+    block = render_block(SimpleNamespace(id="settings"), section, native["upstream"], "o/toy", PIN,
+                         acceptance_mode="lightweight")
+    native["page"].write_text(block + "\n")
+    native["row"].update(facet=section["facet"], block_sha256=_hash(block), acceptance_mode="lightweight")
+    if "validation_kind" in section:
+        native["row"]["validation_kind"] = section["validation_kind"]
+    data = {"repository": "o/toy", "pin": PIN, "feature": {"id": "settings"},
+            "acceptance_mode": "lightweight", "facets": [section["facet"]], "files": [], "docs": []}
+    judged = []
+    for e in section["evidence"]:
+        lines = (native["upstream"] / e["path"]).read_text().splitlines()[e["start"] - 1:e["end"]]
+        numbered = [f"{n}: {line}" for n, line in enumerate(lines, e["start"])]
+        kind = "docs" if e["path"].endswith(".md") else "files"
+        data[kind].append({**e, "text": lines if kind == "docs" else numbered})
+        judged.append({"source_reference": f"o/toy@{PIN}:{e['path']}:L{e['start']}-L{e['end']}",
+                       "kind": "upstream_text", "text": numbered})
+    _replace_record(native, native["generator"], inputs={"prompt": native["store"].put_blob(_fence(data))},
+                    outputs={"reply": native["store"].put_blob(json.dumps({"sections": [section]}))})
+    packet = {**native["prompt"], "sections": {section["facet"]:
+        "\n".join(block.splitlines()[1:-1]).split("<!-- kb:depth-proof", 1)[0].strip()},
+        "acceptance_modes": {section["facet"]: "lightweight"}, "evidence": judged,
+        "validation_kinds": {section["facet"]: section["validation_kind"]} if "validation_kind" in section else {}}
+    _replace_prompt(native, packet)
+    _replace_reply(native, {"facets": {section["facet"]: {"dimensions": dict(YES), "reason": "Shown evidence checked"}}})
+    return section, data
+
+
+def _replace_generation(native, *, data=None, sections=None, raw_reply=None):
+    fields = {}
+    if data is not None:
+        fields["inputs"] = {"prompt": native["store"].put_blob(_fence(data))}
+    if sections is not None or raw_reply is not None:
+        fields["outputs"] = {"reply": native["store"].put_blob(raw_reply if raw_reply is not None else json.dumps({"sections": sections}))}
+    _replace_record(native, native["generator"], **fields)
+
+
+@pytest.mark.parametrize("interpretation", ["fact", "inference"])
+def test_lightweight_native_draft_binds_host_title_body_and_inference_transform(native, interpretation):
+    section, _ = _lightweight(native, {**native["section"], "title": " # Retry   default # ",
+                                    "interpretation": interpretation})
+    _replace_generation(native, raw_reply="```json\n" + json.dumps({"sections": [section]}) + "\n```")
+    report = _audit(native)
+    assert not report["problems"] and len(report["approvals"]) == 1
+    assert report["approvals"][0]["native_generator_trace_id"] == native["generator"]["id"]
+
+
+@pytest.mark.parametrize("change", ["unrelated_facet", "title", "body", "interpretation", "evidence", "duplicate"])
+def test_lightweight_three_yes_cannot_override_a_different_actual_generator_draft(native, change):
+    section, _ = _lightweight(native)
+    changed = {**section, "evidence": [dict(item) for item in section["evidence"]]}
+    if change == "unrelated_facet":
+        changed["facet"] = "api"
+    elif change in ("title", "body"):
+        changed[change] = "An unrelated generated claim"
+    elif change == "interpretation":
+        changed["interpretation"] = "inference"
+    elif change == "evidence":
+        changed["evidence"][0]["path"] = "pkg/another.py"
+    _replace_generation(native, sections=[changed, changed] if change == "duplicate" else [changed])
+    report = _audit(native)
+    assert not report["approvals"] and any("exact successful Zcode" in p for p in report["problems"])
+
+
+@pytest.mark.parametrize("change", ["repository", "feature", "pin", "acceptance_mode", "facets", "missing",
+                                     "wrong_number", "wrong_text", "unshown"])
+def test_lightweight_draft_binds_actual_extraction_context_and_shown_source(native, change):
+    _, data = _lightweight(native)
+    if change == "repository":
+        data["repository"] = "other/toy"
+    elif change == "feature":
+        data["feature"] = {"id": "other"}
+    elif change == "pin":
+        data["pin"] = "b" * 40
+    elif change == "acceptance_mode":
+        data["acceptance_mode"] = "strict"
+    elif change == "facets":
+        data["facets"] = ["api"]
+    elif change == "missing":
+        data["files"] = []
+    elif change == "wrong_number":
+        data["files"][0]["text"] = ["2: DEFAULT_RETRIES = 3"]
+    elif change == "wrong_text":
+        data["files"][0]["text"] = ["1: DEFAULT_RETRIES = 9"]
+    else:
+        data["files"][0].update(start=2, end=2, text=["2: DEFAULT_RETRIES = 3"])
+    _replace_generation(native, data=data)
+    report = _audit(native)
+    assert not report["approvals"] and report["problems"]
+
+
+@pytest.mark.parametrize("change", ["provider", "requested_model", "served_model", "model_fallback", "result_fallback"])
+def test_lightweight_generator_requires_native_zcode_glm53_without_fallback(native, change):
+    _lightweight(native)
+    model = dict(native["generator"]["model"])
+    fields = {"model": model}
+    if change == "provider":
+        model.update(provider="claude", model="claude-opus-5", served_model="claude-opus-5")
+    elif change == "requested_model":
+        model["model"] = "GLM-5.3-Flash"
+    elif change == "served_model":
+        model["served_model"] = "GLM-5.3-Flash"
+    elif change == "model_fallback":
+        model["fallback_from"] = "zcode:glm-5.3"
+    else:
+        fields["result"] = {"fallback_from": "zcode:glm-5.3"}
+    _replace_record(native, native["generator"], **fields)
+    report = _audit(native)
+    assert not report["approvals"] and any("exact successful Zcode" in p for p in report["problems"])
+
+
+def test_lightweight_unreported_generator_served_model_stays_unknown(native):
+    _lightweight(native)
+    _replace_record(native, native["generator"], model={**native["generator"]["model"], "served_model": ""})
+    report = _audit(native)
+    assert not report["problems"] and report["approvals"][0]["generator_model"]["served_model"] == ""
+
+
+@pytest.mark.parametrize("kind", ["documented_manual", "helper_unit"])
+def test_lightweight_validation_kind_and_manual_prefix_bind_actual_raw_draft(native, kind):
+    section = {**native["section"], "facet": "validation", "validation_kind": kind}
+    if kind == "documented_manual":
+        (native["upstream"] / "docs.md").write_text("Inspect DEFAULT_RETRIES.\nExpected: 3.\n")
+        section.update(title="Documented retry inspection", body="Inspect the retry setting and expect three; this check was not executed.",
+                       evidence=[{"path": "docs.md", "start": 1, "end": 2}])
+    else:
+        (native["upstream"] / "tests").mkdir()
+        (native["upstream"] / "tests/test_helper.py").write_text("def test_retry_default():\n    assert get_retry_default() == 3\n")
+        section.update(title="Helper default assertion", body="test_retry_default asserts only the helper's value is three; tests were not run.",
+                       evidence=[{"path": "tests/test_helper.py", "start": 1, "end": 2}])
+    section, _ = _lightweight(native, section)
+    assert not _audit(native)["problems"]
+    changed = {**section, "validation_kind": "automated_runtime"}
+    _replace_generation(native, sections=[changed])
+    report = _audit(native)
+    assert not report["approvals"] and any("exact successful Zcode" in p for p in report["problems"])
+
+
+def test_retained_lightweight_draft_is_bound_instead_of_a_later_unrelated_generation(native):
+    _, data = _lightweight(native)
+    later = native["store"].append("model_call", model=dict(native["generator"]["model"]),
+        inputs={"prompt": _fence({**data, "facets": ["api"]})},
+        outputs={"reply": json.dumps({"sections": [{**native["section"], "facet": "api"}]})})
+    _replace_record(native, native["judge"], at=later["at"] + 1)
+    report = _audit(native)
+    assert not report["problems"] and report["approvals"][0]["native_generator_trace_id"] == native["generator"]["id"]
+
+
+def test_strict_legacy_generator_context_is_not_reinterpreted_as_lightweight(native):
+    _replace_record(native, native["generator"], model={**native["generator"]["model"],
+        "provider": "claude", "model": "claude-opus-5", "served_model": "claude-opus-5"},
+        outputs={"reply": native["store"].put_blob(json.dumps({"sections": []}))})
+    report = _audit(native)
+    assert not report["problems"] and len(report["approvals"]) == 1

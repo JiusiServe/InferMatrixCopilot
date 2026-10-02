@@ -9,12 +9,14 @@ import json
 import re
 from bisect import bisect_right
 from pathlib import Path
+from urllib.parse import quote
 
 import yaml
 
 from infermatrix_copilot.kb_service.gate import DIMENSIONS
+from infermatrix_copilot.kb_service.init_stages import neutral_headings
 from infermatrix_copilot.kb_service.knowledge_coverage import load_policy, policy_path
-from infermatrix_copilot.kb_service.knowledge_depth import depth_page, depth_acceptance_mode
+from infermatrix_copilot.kb_service.knowledge_depth import depth_page, depth_acceptance_mode, validate_draft
 from infermatrix_copilot.kb_service.models import ModelUnavailable, parse_json_object
 from infermatrix_copilot.knowledge_service.lifecycle import (
     DEPTH_BLOCK, DEPTH_FACETS, depth_proof_basis, depth_sections, safe_source_path,
@@ -43,6 +45,85 @@ def _prose(block: str) -> str:
 
 def _family(model: str) -> str:
     return model.casefold().split("-")[0]
+
+
+def _generated_prose(section: dict, repository: str, pin: str) -> str:
+    """Replay only render_block's deterministic lightweight prose transforms."""
+    validate_draft({"sections": [section]}, acceptance_mode="lightweight")
+    title = " ".join(str(section.get("title") or section["facet"]).replace("#", "").split())
+    body = neutral_headings(f"## {title}\n\n")
+    if section.get("validation_kind") == "documented_manual":
+        body += "文档中的人工验收步骤（本轮未执行）：\n\n"
+    if section["interpretation"] == "inference":
+        body += "设计推断（非作者历史意图）：\n\n"
+    body += section["body"].strip() + "\n\n"
+    body += "来源：" + ", ".join(
+        f"[{e['path']}:L{e['start']}–L{e['end']}](https://github.com/{repository}/blob/{pin}/"
+        f"{quote(e['path'], safe='/')}#L{e['start']}-L{e['end']})" for e in section["evidence"]) + "\n"
+    return _prose(body)
+
+
+def _generator_evidence(data: dict, repository: str, pin: str) -> dict:
+    """Convert the actual offered files/docs to the existing exact-span verifier."""
+    packet = []
+    for kind in ("files", "docs"):
+        items = data.get(kind, [])
+        if not isinstance(items, list):
+            raise ValueError("native generator offered spans are malformed")
+        for item in items:
+            if not isinstance(item, dict) or not safe_source_path(item.get("path")) \
+                    or type(item.get("start")) is not int or type(item.get("end")) is not int \
+                    or not 1 <= item["start"] <= item["end"] \
+                    or not isinstance(item.get("text"), list) \
+                    or len(item["text"]) != item["end"] - item["start"] + 1:
+                raise ValueError("native generator offered spans are malformed")
+            rows = item["text"] if kind == "files" else [f"{n}: {line}" for n, line in enumerate(item["text"], item["start"])]
+            if any(not isinstance(line, str) for line in item["text"]):
+                raise ValueError("native generator offered lines are malformed")
+            packet.append({"kind": "upstream_text", "text": rows,
+                           "source_reference": f"{repository}@{pin}:{item['path']}:L{item['start']}-L{item['end']}"})
+    return {"evidence": packet}
+
+
+def _lightweight_generator(candidates, records, *, before: float, feature: str, facet: str,
+                           block: str, proof: dict, repository: str, pin: str) -> dict:
+    """Find the actual retained draft, which may precede a later unrelated retry."""
+    expected = [{key: e[key] for key in ("path", "start", "end")} for e in proof["evidence"]]
+    for candidate in reversed(candidates):
+        native = records.get(candidate["id"])
+        if candidate["at"] > before or native is None:
+            continue
+        record, store = native
+        model = record.get("model", {})
+        requested, served = model.get("model"), model.get("served_model")
+        if model.get("provider") != "zcode" or not isinstance(requested, str) or requested.casefold() != "glm-5.3" \
+                or model.get("fallback_from") or record.get("result", {}).get("fallback_from") \
+                or served not in (None, "") and (not isinstance(served, str) or served.casefold() != "glm-5.3"):
+            continue
+        try:
+            data = _payload(store.blob(record["inputs"]["prompt"]))
+            requested_facets = data.get("facets")
+            if data.get("repository") != repository or data.get("feature", {}).get("id") != feature \
+                    or data.get("pin") != pin or data.get("acceptance_mode") != "lightweight" \
+                    or not isinstance(requested_facets, list) or requested_facets.count(facet) != 1:
+                continue
+            draft = parse_json_object(store.blob(record["outputs"]["reply"]))
+            sections = draft.get("sections")
+            if not isinstance(sections, list):
+                continue
+            matching = [section for section in sections if isinstance(section, dict) and section.get("facet") == facet]
+            if len(matching) != 1:
+                continue
+            section = matching[0]
+            spans = [{key: e[key] for key in ("path", "start", "end")} for e in section["evidence"]]
+            if spans != expected or section.get("validation_kind") != proof.get("validation_kind") \
+                    or _generated_prose(section, repository, pin) != _prose(block):
+                continue
+            _judged_evidence(_generator_evidence(data, repository, pin), block, repository, pin, facet)
+            return record
+        except (OSError, ValueError, TypeError, KeyError, AttributeError, ModelUnavailable):
+            continue
+    raise ValueError("no exact successful Zcode GLM-5.3 lightweight draft and offered evidence before this judgment")
 
 
 def _judged_evidence(data: dict, block: str, repository: str, pin: str, facet: str) -> None:
@@ -282,7 +363,9 @@ def audit_native_approvals(root: Path, repo: str, *, baseline_reports: list[Path
                 index = bisect_right([row["at"] for row in candidates], record["at"]) - 1
                 if index < 0:
                     raise ValueError("no successful native generator context before this judgment")
-                generator = candidates[index]
+                generator = _lightweight_generator(candidates, records, before=record["at"], feature=fid,
+                    facet=facet, block=match[0], proof=proof, repository=repository, pin=pin) \
+                    if mode == "lightweight" else candidates[index]
                 if records.get(generator["id"]) is None:
                     raise ValueError("generator trace ID is duplicated")
                 generator_model = generator.get("model", {})
@@ -313,7 +396,10 @@ def audit_native_approvals(root: Path, repo: str, *, baseline_reports: list[Path
                            "approval_set_sha256": _sha(json.dumps(approvals, ensure_ascii=False, sort_keys=True).encode())},
             "interpretation": "Three yes dimensions were read from native reply blobs bound to current prose. "
                               "Unreported served-model identities remain unreported; requested identity and provider "
-                              "come from the native record. Source and absence proofs require the pinned depth audit."}
+                              "come from the native record. Lightweight generator provenance also binds an exact "
+                              "Zcode GLM-5.3 draft and its actually offered source/document spans without fallback; "
+                              "strict historical provenance retains its existing model-family check. "
+                              "Source and absence proofs require the pinned depth audit."}
 
 
 def main(argv: list[str] | None = None) -> int:
