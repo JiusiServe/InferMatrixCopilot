@@ -132,7 +132,8 @@ def trace_recorder(traces):
                 # (None when unset/unknown), on failures too
                 result={"stop_reason": entry.get("stop_reason", ""),
                         "max_budget_usd": entry.get("max_budget_usd"),
-                        "cost_usd": entry.get("cost_usd")},
+                        "cost_usd": entry.get("cost_usd"),
+                        **({"fallback_from": entry["fallback_from"]} if entry.get("fallback_from") else {})},
                 error=entry.get("error", ""))
         except Exception:  # noqa: BLE001 - tracing never breaks a model call
             pass
@@ -278,7 +279,8 @@ def _run_intake_locked(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: i
     return gate_and_stage(rt, lifecycle, owner, kind="intake", base=base, base_sha=base_sha,
                           external=external, operations=operations, result=result,
                           evidence=evidence, event_ids=sorted(kept_ids), release=release,
-                          draft_keys=[accepted[i] for i in sorted(kept_ids) if i in accepted])
+                          draft_keys=[accepted[i] for i in sorted(kept_ids) if i in accepted],
+                          extra_detail={"generator": ", ".join(dict.fromkeys(d.generator for d in kept))})
 
 
 def draft_key_for_event(repo: str, event_id) -> str:
@@ -328,7 +330,8 @@ def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind:
                 "operations": operations_json(operations), "event_ids": event_ids,
                 **(extra_detail or {}),
                 "base_sha": base_sha, "release": release, "decision": decision.to_dict(),
-                "generator": rt.generator.label(), "judge": rt.judge.label(),
+                "generator": (extra_detail or {}).get("generator") or rt.generator.label(),
+                "judge": rt.judge.label(),
             })
     except Exception:
         rt.changeset_path(changeset_id).unlink(missing_ok=True)
