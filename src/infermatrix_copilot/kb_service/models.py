@@ -1,30 +1,38 @@
-"""Pinned model roles for the knowledge service, with no silent fallback.
+"""Pinned model roles with an explicitly configured generator fallback.
 
 The generator drafts knowledge changes; the judge (a different model family)
 grades them. Both are pinned by (provider, model, reasoning effort) and
-recorded on every call. An unavailable backend, a timeout, a call stopped
-at its spend cap or an unparseable reply raises ``ModelUnavailable``; the caller leaves the work queued. It never
-switches to a weaker model: a verdict must always say which model made it.
+recorded on every call. ``KB_GENERATOR_FALLBACK`` may name one pinned model
+to try when generation is unavailable. Judges never fall back, and schema
+repair and spend limits retain their existing behavior. If both generators
+are unavailable, the caller leaves the work queued.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable
 
 GENERATOR_ENV = "KB_GENERATOR"   # "provider:model[:effort]"
+GENERATOR_FALLBACK_ENV = "KB_GENERATOR_FALLBACK"
 JUDGE_ENV = "KB_JUDGE"
 DEFAULT_GENERATOR = "claude-code:claude-opus-5-5"
 DEFAULT_JUDGE = "codex:gpt-6-sol:medium"
 _JSON_FENCE = re.compile(r"```(?:json)?\s*(\{.*\})\s*```", re.DOTALL)
+logger = logging.getLogger(__name__)
 
 
 class ModelUnavailable(RuntimeError):
     """The pinned backend could not produce a usable reply; work stays queued."""
+
+    def __init__(self, message: str, *, allow_fallback: bool = True):
+        super().__init__(message)
+        self.allow_fallback = allow_fallback
 
 
 @dataclass(frozen=True)
@@ -33,6 +41,7 @@ class ModelRole:
     provider: str
     model: str
     effort: str = ""
+    fallback: ModelRole | None = None
 
     @classmethod
     def parse(cls, name: str, spec: str) -> "ModelRole":
@@ -48,8 +57,16 @@ class ModelRole:
 def roles_from_env() -> tuple[ModelRole, ModelRole]:
     generator = ModelRole.parse("generator", os.environ.get(GENERATOR_ENV, DEFAULT_GENERATOR))
     judge = ModelRole.parse("judge", os.environ.get(JUDGE_ENV, DEFAULT_JUDGE))
-    if generator.provider == judge.provider and generator.model.split("-")[0] == judge.model.split("-")[0]:
-        raise ValueError("the judge must come from a different model family than the generator")
+    fallback_spec = os.environ.get(GENERATOR_FALLBACK_ENV, "").strip()
+    if fallback_spec:
+        fallback = ModelRole.parse("generator", fallback_spec)
+        if fallback.label().casefold() == generator.label().casefold():
+            raise ValueError("the generator fallback must differ from the primary generator")
+        generator = replace(generator, fallback=fallback)
+    for candidate in (generator, generator.fallback):
+        if candidate is not None and candidate.provider == judge.provider \
+                and candidate.model.casefold().split("-")[0] == judge.model.casefold().split("-")[0]:
+            raise ValueError("the judge must come from a different model family than every generator")
     return generator, judge
 
 
@@ -108,6 +125,34 @@ class ModelGateway:
     def call_json(self, role: ModelRole, *, system: str, prompt: str,
                   validate: Callable[[dict], None] | None = None,
                   max_budget_usd: float | None = None, record_payload: bool = True) -> ModelReply:
+        """Try the primary, then one configured generator on unavailability.
+
+        Both attempts use the same validation and payload policy. Calls with
+        a spend threshold and schema errors never trigger a second model call:
+        the caller has reserved for one model, and Zcode cannot enforce a cap.
+        """
+        kwargs = dict(system=system, prompt=prompt, validate=validate,
+                      max_budget_usd=max_budget_usd, record_payload=record_payload)
+        try:
+            return self._call_json(role, **kwargs)
+        except ModelUnavailable as primary_error:
+            if role.name != "generator" or role.fallback is None \
+                    or max_budget_usd is not None or not primary_error.allow_fallback:
+                raise
+            logger.warning("Knowledge generator %s unavailable; trying configured fallback %s",
+                           role.label(), role.fallback.label())
+            try:
+                return self._call_json(role.fallback, fallback_from=role.label(), **kwargs)
+            except ModelUnavailable as fallback_error:
+                raise ModelUnavailable(
+                    f"{role.label()} unavailable: {primary_error}; "
+                    f"fallback {role.fallback.label()} unavailable: {fallback_error}",
+                    allow_fallback=False) from fallback_error
+
+    def _call_json(self, role: ModelRole, *, system: str, prompt: str,
+                   validate: Callable[[dict], None] | None = None,
+                   max_budget_usd: float | None = None, record_payload: bool = True,
+                   fallback_from: str = "") -> ModelReply:
         """``max_budget_usd`` is a per-call STOP THRESHOLD, not a hard cap:
         the transport starts no further API request once the call's spend
         reaches it, but the request that crosses it is billed in full. A
@@ -115,20 +160,21 @@ class ModelGateway:
         request's worst case before calling. Requesting a threshold from a
         transport that cannot stop at one (``stops_at_spend`` False) is
         refused before dispatch; it is never approximated with ``max_tokens``."""
-        transport = self._subscription_transports.pop(role.label(), None)
-        if transport is None:
-            transport = self._transport(role.provider)
-        cap: dict = {}
-        if max_budget_usd is not None:
-            if not max_budget_usd > 0:
-                raise ModelUnavailable(f"{role.label()}: max_budget_usd must be positive")
-            if not getattr(transport, "stops_at_spend", False):
-                raise ModelUnavailable(f"{role.provider} cannot stop a call at a spend threshold")
-            cap = {"max_budget_usd": max_budget_usd}
         started = time.time()
         identity = {"role": role.name, "requested": role.label(), "provider": role.provider,
-                    "model": role.model, "effort": role.effort}
+                    "model": role.model, "effort": role.effort, "fallback_from": fallback_from}
         try:
+            transport = self._subscription_transports.pop(role.label(), None)
+            if transport is None:
+                transport = self._transport(role.provider)
+            cap: dict = {}
+            if max_budget_usd is not None:
+                if not max_budget_usd > 0:
+                    raise ModelUnavailable(f"{role.label()}: max_budget_usd must be positive", allow_fallback=False)
+                if not getattr(transport, "stops_at_spend", False):
+                    raise ModelUnavailable(f"{role.provider} cannot stop a call at a spend threshold",
+                                           allow_fallback=False)
+                cap = {"max_budget_usd": max_budget_usd}
             reply = transport.complete(
                 system=system, messages=[{"role": "user", "content": prompt}],
                 model=role.model, effort=role.effort, role=role.name, **cap)
@@ -140,6 +186,8 @@ class ModelGateway:
                                 "system": system if record_payload else "",
                                 "prompt": prompt if record_payload else "", "reply": "",
                                 "error": str(exc)[:2000] if record_payload else "transport failed (payload omitted)"})
+            if isinstance(exc, ModelUnavailable):
+                raise
             raise ModelUnavailable(f"{role.label()} failed: {exc}") from exc
         seconds = time.time() - started
         text = "".join(getattr(block, "text", "") or "" for block in getattr(reply, "blocks", []))
@@ -160,7 +208,8 @@ class ModelGateway:
         failure: ModelUnavailable | None = None
         data: dict = {}
         if getattr(reply, "stop_reason", "") == "max_budget":
-            failure = ModelUnavailable(f"{role.label()} stopped at its spend threshold ${max_budget_usd}")
+            failure = ModelUnavailable(f"{role.label()} stopped at its spend threshold ${max_budget_usd}",
+                                       allow_fallback=False)
         elif getattr(reply, "stop_reason", "") == "max_tokens" or not text.strip():
             failure = ModelUnavailable(f"{role.label()} timed out or returned nothing")
         else:
@@ -170,7 +219,8 @@ class ModelGateway:
                     try:
                         validate(data)
                     except Exception as exc:  # any malformed shape is a controlled refusal
-                        raise ModelUnavailable(f"{role.label()} reply failed its schema: {exc!r}") from exc
+                        raise ModelUnavailable(f"{role.label()} reply failed its schema: {exc!r}",
+                                               allow_fallback=False) from exc
             except ModelUnavailable as exc:
                 failure = exc
         if self._recorder is not None:
