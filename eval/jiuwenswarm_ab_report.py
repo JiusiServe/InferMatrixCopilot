@@ -300,6 +300,7 @@ def build(state: Path, output: Path, study: Path | None = None):
     freshness = load(state / "upstream-freshness.json", {})
     baseline_pr = load(state / "baseline-pr290.json", {})
     runtime = load(study / "identity.json", {})
+    native_scores = [load(p, {}) for p in sorted((study / "private-codex/scores").glob("pr-*.json"))]
     validation = public_paths(load(state / "final-validation.json", {}), state, project)
     groups = campaign.get("analysis_groups", {})
     subgroup = {}
@@ -354,6 +355,10 @@ def build(state: Path, output: Path, study: Path | None = None):
                                               "served_models_observed": sorted({a.get("served_model", "unknown") or "unknown"
                                                                                 for r in formal_rows for a in r.get("attempts", [])}),
                                               "effective_reasoning": "unknown unless provider-reported"},
+                            "codex_scoring_model_identity": {
+                                "requested_models": sorted({r["requested_model"] for r in native_scores if r.get("requested_model")}),
+                                "served_models_reported": sorted({r["served_model"] for r in native_scores if r.get("served_model")}),
+                                "served_model_unknown_calls": sum(not r.get("served_model") for r in native_scores)},
                             "scored_reviews": scored, "by_arm": {arm: {k: v for k, v in row.items() if k != "injected_dimensions"}
                                                                   for arm, row in collection.get("by_arm", {}).items()},
                             "groups": groups, "subgroups": subgroup, "overall_macro": scores.get("macro", {}), "knowledge_exposure": exposure,
@@ -384,7 +389,11 @@ def build(state: Path, output: Path, study: Path | None = None):
             delta = f"，B−A 为 {100*(b-a):+.2f} 个百分点" if a is not None and b is not None else "，分母不足时不可计算"
             metrics.append(f"{label} A {pct(a)}、B {pct(b)}{delta}（共同适用 {metric.get('applicable_prs',0)} PR）")
         latencies = [primary.get("operational", {}).get(a, {}).get("timings_valid", {}).get("native_seconds", {}).get("p50") for a in ("A", "B")]
-        conclusion = "主样本实测：" + "；".join(metrics) + f"。有效评审的原生耗时 P50 为 A {num(latencies[0])} 秒、B {num(latencies[1])} 秒；两组有效样本可能不同，仅作描述性统计，包含限流和工具等待。结果来自 8 个所选 PR，不能推广为全项目准确率。"
+        operations = primary.get("operational", {})
+        completion = [operations.get(a, {}).get("valid", 0) / operations.get(a, {}).get("expected", 24) for a in ("A", "B")]
+        speed = primary.get("paired_speed", {}).get("native_seconds", {})
+        conclusion = f"主样本有效完成率 A {pct(completion[0])}、B {pct(completion[1])}。已评分有效评审中：" + "；".join(metrics) + \
+            f"。成对原生耗时均值 A {num(speed.get('A'))} 秒、B {num(speed.get('B'))} 秒（{speed.get('paired_repeats',0)} 对重复，{speed.get('applicable_prs',0)} PR）。有效评审的原生耗时 P50 为 A {num(latencies[0])} 秒、B {num(latencies[1])} 秒，两组有效样本可能不同。耗时包含限流和工具等待，本轮不能认定整体评审收益或因果加速。结果来自 8 个所选 PR，不能推广为全项目准确率。"
     value["conclusion_cn"] = conclusion
     lines = ["# JiuwenSwarm 原项目文档与当前知识库对比报告", "",
              f"生成时间：{value['generated_at_cn']}（北京时间）。源码知识基线：`{PIN}`；当前知识内容为 PR #290 已合并版本。", "",
@@ -441,6 +450,7 @@ def build(state: Path, output: Path, study: Path | None = None):
               "## GLM‑5.3 PR 评审实测", "",
               "A 组只检索原作者资料；B 组只检索当前 JiuwenSwarm 知识库。两组使用相同冻结源码、提示词、检索算法、两页初始检索和 6000 字符累计知识预算。后续搜索和读取扣除余量。并发 13，共享排期；每评审最多 60 次源码调用，每次结果最多 24,000 字符，原生超时 30 分钟。",
               "模型配置冻结为 Zcode 订阅 GLM‑5.3、请求 reasoning=max；有效 reasoning 档位未由服务报告时保持未知。逐调用核查 served model 和订阅 provider，身份不符属于失败，不切换模型。",
+              "独立评分请求 Codex gpt-6-sol/medium；原生记录未报告实际 served model，该字段保持未知。GLM 的实际 served model 与订阅 provider 已逐调用验证，两个通道的身份信息分别归档。",
               "12 PR × 两组 × 三重复，共 72 个评审。GitHub 的目标分支 SHA 与 PR 实际 diff 基线分开记录；diff 使用真实 merge-base→head，不将目标分支的历史变化当作 PR 修改。",
               "8 个直接基于 f0a69728 的 PR 为主样本；#7639、#7654、#7655、#7656 从较旧提交分叉，且头部提交早于知识基线，只作探索性对照。其知识可能描述较新的目标分支实现，不能混同为无时间泄漏的前瞻准确率。",
               "主样本均为 2–4 文件的后端修复，涉及 cron、MCP、权限、hooks、gateway、agent-mode、runtime 和输出截断。52 文件的大型研究工作台（含前端改动）在旧分叉 #7639；主样本不足以代表大型功能或前端评审。",
@@ -453,7 +463,7 @@ def build(state: Path, output: Path, study: Path | None = None):
     lines += [f"源码基准审计成功 {value['experiment']['truth_complete_prs']}/12，未知 PR 为 {value['experiment']['truth_unknown_prs'] or '无'}。#7656 的原答复缺少现有源码的基线证据，未重抽样；它的确认问题数和召回率保持未知。主样本只在 #7647、#7649 确认各一个问题，主样本召回率最多有 2 个适用 PR，应谨慎解读。", ""]
     for group_name, label in (("primary_prospective", "主样本：8 PR / 48 次"), ("older_fork_exploratory", "旧分叉探索：4 PR / 24 次")):
         result = subgroup.get(group_name, {})
-        lines += [f"### {label}", "", "| 指标（先每 PR 三重复均值，再按 PR 平均） | A 原资料 | B 当前知识 |", "| --- | ---: | ---: |"]
+        lines += [f"### {label}", "", "| 指标（先 PR 内有效重复均值，再按 PR 平均） | A 原资料 | B 当前知识 |", "| --- | ---: | ---: |"]
         for field, title in (("defect_precision", "缺陷评论精确率"), ("confirmed_recall", "已确认问题召回率"), ("advice_validity", "非缺陷建议有效率")):
             cells = []
             for arm in ("A", "B"):

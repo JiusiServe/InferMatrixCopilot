@@ -2,6 +2,8 @@
 
 本评估比较原项目作者资料（A）与当前 JiuwenSwarm 知识库（B）为 GLM‑5.3 PR 评审提供的上下文。脚本、精简报告在 `eval/`；源码检出、原始文档、提示词、模型回复和完整调用日志保存在仓库外。
 
+本次结果：[中文对比报告](knowledge-depth/jiuwenswarm-original-docs-comparison-cn-20261003.md)、[紧凑 JSON](knowledge-depth/jiuwenswarm-original-docs-comparison-cn-20261003.json)。72 次终态、55 次有效评审、12 次独立评分；报告保留失败及条件统计的限制。
+
 ## 固定输入与统计边界
 
 - 知识源码 SHA：`f0a69728c96b5961d993449f1a901cbd2f4dac5b`。
