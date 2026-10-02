@@ -19,3 +19,4 @@ sources: []
 - [shared](shared/_index.md)
 - [sidepanel](sidepanel/_index.md)
 - [webview](webview/_index.md)
+- [Chromium 浏览器扩展：实现深读](feature-depth-browser-client.md)

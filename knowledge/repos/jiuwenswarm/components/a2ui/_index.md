@@ -13,3 +13,4 @@ sources: []
 - [A2UI 生成式界面 功能知识](feature-a2ui.md)
 - [channels-web](channels-web/_index.md)
 - [server-runtime](server-runtime/_index.md)
+- [A2UI 生成式界面：实现深读](feature-depth-a2ui.md)

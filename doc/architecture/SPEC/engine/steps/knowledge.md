@@ -29,3 +29,7 @@ PR，且只在 `ALLOW_PUSH=1` 与 `ALLOW_POST=1` 同时成立、非 dry run、�
 
 `pr-history` 阶段另接收可选 `pr_count` 与 `budget_usd`，转成整数/浮点后传入 `run_stage`；非法值返回 BLOCKED。
 历史 PR 的完整选择、逐 PR checkpoint、commit 串和 Codex 审阅均由 `kb_service.init_history` 负责。
+
+`knowledge-deepen` 另接收 `budget_usd` 与 `retry_unfinished`，逐功能保存七维实现知识、
+累计预算与草稿。`from_existing` 允许 knowledge/knowledge-deepen 从已合并 KB 开始。
+`kb widen` / `kb deepen` 经同一 playbook/step 指定这两个知识阶段，旧规则 deepen 保持原契约。

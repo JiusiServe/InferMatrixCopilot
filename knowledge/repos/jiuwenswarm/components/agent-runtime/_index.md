@@ -45,3 +45,4 @@ sources: []
 - [Runtime 生命周期与协调的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
 - [项目、会话与历史管理 功能知识](feature-projects-sessions.md)
 - [agent-runtime 源码接口与集成边界 01](source-contracts-01.md)
+- [项目、会话与历史管理：实现深读](feature-depth-projects-sessions.md)

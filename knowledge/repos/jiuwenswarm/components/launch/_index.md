@@ -32,3 +32,6 @@ sources: []
 - [cli](cli/_index.md)
 - [launch 源码接口与集成边界 01](source-contracts-01.md)
 - [instance-manager](instance-manager/_index.md)
+- [初始化与服务启动：实现深读](feature-depth-bootstrap.md)
+- [单机多实例：实现深读](feature-depth-instances.md)
+- [桌面宿主与自动更新：实现深读](feature-depth-desktop.md)

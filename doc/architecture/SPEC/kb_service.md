@@ -490,7 +490,7 @@ architecture 页并更新最近索引，已有正文保留。阶段不切换生�
 旧路由未覆盖的文件可由清单的显式 feature owner 接管；只有唯一 owner 才补齐本次提炼输入，
 冲突或没有归属的文件继续单列为 unrouted，不改写持久路由。
 
-`--from-existing` 只适用于 knowledge：没有本地 skeleton/modules record 时，显式从已合并的仓库
+`--from-existing` 适用于 knowledge 与 knowledge-deepen：没有本地 skeleton/modules record 时，显式从已合并的仓库
 索引和 owner 路由开始增补；每个路由页须存在且属于本仓库。已有 record 的 review/merge 门禁保持生效。
 不创建或伪造前置阶段记录，输入摘要绑定该模式和 main 的固定 SHA。
 
@@ -518,6 +518,40 @@ token、served model 和调用结果照常记录，judge 的固定记账与预�
 `PYTHONPATH=src python tools/audit_knowledge_coverage.py --repo REPO --upstream PATH --pin FULL_SHA`
 可独立复核；上游必须是干净的固定 HEAD。`--write-contracts` 只追加缺少的结构性记录，
 保留过期记录供人工刷新；`--report` 把逐功能/逐文件结果写入 eval 或本地临时文件。
+
+## kb widen / kb deepen：功能广度与实现深度
+
+`kb widen REPO` 经同一 playbook 指定 `knowledge --from-existing`；`kb deepen REPO`
+指定 `knowledge-deepen --from-existing`。支持 `--dry-run`、`--pin`、`--subscription-generator`。
+旧 `--stage deepen` 继续提炼规则和处理 shadow 开关；新知识深读不生成规则、不修改生命周期或旧阶段链。
+
+knowledge-deepen 需要显式 feature/production coverage policy，逐项访问全部功能，包含已有规则的 owner。
+每项提炼 flow、api、configuration、dependencies、failure_modes、tradeoffs、validation 七维，
+只保存有证据的内容到最近 owner 的 `feature-depth-<id>.md`，链接功能概览与 owner 索引。
+只追加索引链接，保留已有 Direct quick map；最终仍检查地图存在且未被截断。
+源码按定义切片，可检索文件前缀之外的实现，并补充可静态解析的第一方被调函数与相关测试。
+flow 至少包含两个不同定义的直接调用；Python 校验限定符号、词法 owner 和导入目标，其它
+语言检查去除注释/字符串后的声明和调用。动态对象分派不能靠同名猜测，语义仍由模型裁判复核。
+
+每维用 `kb:depth` 绑定 feature、facet、完整 pin 与正文哈希，`kb:depth-proof` 绑定精确证据
+区间及其哈希、flow trace。区间必须完整展示给生成器，不允许跨缺口。页面必须是无规则的
+architecture/guide；同一调用独立判定各新增维度的 faithful/non_contradictory/does_not_weaken，
+三项均 yes 的维度才写入。每项 verdict 绑定原段哈希，拒绝或证据不足的草稿保留在本地 checkpoint/trace。
+机器枚举始终用固定英文标识，正文遵循知识语言。单个无证据或无效维度被剔除并记录原因，
+其它有效维度仍须分别通过裁判才保存；flow 不允许用测试调用链替代生产实现。
+来源引用、符号、L1 与知识树校验仍需通过。
+
+`coverage.semantic_depth` 单列完整功能数、七维槽位数和有语义证据的生产文件；
+`coverage.breadth` 保留原功能/文件指标。静态接口卡、旧 owner/facet 标记、规则和路由不能
+增加新深度。七维齐全只说明各有代表性实现知识，不声称全行为或执行测试覆盖。
+`tools/audit_knowledge_depth.py` 在干净的固定上游 HEAD 上独立重算两组指标。
+
+先遍历全部功能，再修复缺口；恢复与显式重试同样优先处理尚无已接受维度的功能，每项每批最多两次尝试。
+重复维度整项剔除，其它有界候选维度继续独立核验。逐项保存预算预留、生成草稿、裁判
+结果与已接受正文；包括第二次尝试在内，中断裁判均可复用完成的生成。恢复固定 KB baseline 与 upstream pin，
+输入变化则拒绝串用。`--budget-usd N` 可提高同批累计 ceiling；`--retry-unfinished` 显式
+重试缺口并保留花费。已发布批次不再修改，合并后用新 state directory。missing facets
+保持明确；订阅生成器 USD 为 unreported，judge 固定记账不等于账单实付。
 
 ## 2026-09-30 kb init：校准集收割（harvest-calibration）
 - 各阶段的 `InitRecord.verdicts[rule_id]` 除 verdict/reasons/model/text_sha/page 外还保存**判定时的规则全文**

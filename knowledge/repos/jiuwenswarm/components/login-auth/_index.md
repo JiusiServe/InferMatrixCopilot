@@ -30,3 +30,4 @@ sources: []
 - [登录凭据与续期的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
 - [账号登录与凭据续期 功能知识](feature-login.md)
 - [login-auth 源码接口与集成边界 01](source-contracts-01.md)
+- [账号登录与凭据续期：实现深读](feature-depth-login.md)

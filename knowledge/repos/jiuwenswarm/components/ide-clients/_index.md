@@ -16,3 +16,5 @@ sources: []
 - [jetbrains-plugin-src](jetbrains-plugin-src/_index.md)
 - [vscode-extension](vscode-extension/_index.md)
 - [vscode-extension-src](vscode-extension-src/_index.md)
+- [VS Code 客户端：实现深读](feature-depth-vscode.md)
+- [JetBrains 客户端：实现深读](feature-depth-jetbrains.md)

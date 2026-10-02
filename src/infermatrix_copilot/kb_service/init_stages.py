@@ -45,7 +45,7 @@ from ..knowledge_service.pinned_claims import Evidence, check_rules, evidence_fo
 from .init_budget import Budget, BudgetExhausted, PriceError
 from .init_coverage import Owner, most_specific, owner_table, routes_file
 from .init_support import (
-    AUTHOR_ENV, KNOWLEDGE_PREFIX, STAGES, InitError, InitPublisher, InitRecord, InitRuntime, claim_problems, classify_verdict,
+    AUTHOR_ENV, INDEPENDENT_STAGES, KNOWLEDGE_PREFIX, STAGES, InitError, InitPublisher, InitRecord, InitRuntime, claim_problems, classify_verdict,
     collect_docs, generate, inputs_digest, judge, knowledge_changes, load_prepared, other_path_problems,
     parse_author, publishing_allowed, run_knowledge_validators, save_prepared,
 )
@@ -135,13 +135,16 @@ def validate_change(base: Mapping[str, str], head: Mapping[str, str], *, observe
 
 def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str | None = None,
               pr_count: int | None = None, budget_usd: float | None = None,
-              from_existing: bool = False, subscription_generator: bool = False) -> InitRecord:
+              from_existing: bool = False, subscription_generator: bool = False,
+              retry_unfinished: bool = False) -> InitRecord:
     """Run one ``kb init`` stage for ``lifecycle``'s repository and return its
     record (also saved under ``<state_dir>/init/<repo>/<stage>.json``)."""
-    if stage not in STAGES:
-        raise InitError(f"unknown stage {stage!r}; one of {STAGES}")
-    if from_existing and stage != "knowledge":
-        raise InitError("--from-existing is for the knowledge stage only")
+    if stage not in STAGES + INDEPENDENT_STAGES:
+        raise InitError(f"unknown stage {stage!r}; one of {STAGES + INDEPENDENT_STAGES}")
+    if from_existing and stage not in ("knowledge", "knowledge-deepen"):
+        raise InitError("--from-existing is for explanatory knowledge stages only")
+    if retry_unfinished and stage != "knowledge-deepen":
+        raise InitError("--retry-unfinished is for knowledge-deepen only")
     rt.subscription_generator = subscription_generator
     stage_class = _stage_class(stage)
     if lifecycle.init is None:
@@ -158,8 +161,9 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
         import math
         from dataclasses import replace
 
-        if stage != "pr-history" or isinstance(budget_usd, bool) or not math.isfinite(budget_usd) or budget_usd <= 0:
-            raise InitError("--budget-usd is a finite positive ceiling for the pr-history stage only")
+        if stage not in ("pr-history", "knowledge-deepen") or isinstance(budget_usd, bool) \
+                or not math.isfinite(budget_usd) or budget_usd <= 0:
+            raise InitError("--budget-usd is a finite positive ceiling for pr-history or knowledge-deepen only")
         lifecycle = replace(lifecycle, init=replace(lifecycle.init, budget_usd=budget_usd))
     notes = []
     if lifecycle.upstream_visibility == "private" and not dry_run:
@@ -173,8 +177,9 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
     if subscription_generator:
         notes.append(f"generator {rt.generator.label()}: subscription billing explicitly selected; "
                      "generator USD is unreported and subscription fees are outside the stage USD accounting")
+    options = {"retry_unfinished": retry_unfinished} if stage == "knowledge-deepen" else {}
     return stage_class(rt, lifecycle, dry_run=dry_run, pin=pin, notes=notes, author=author,
-                       from_existing=from_existing).run()
+                       from_existing=from_existing, **options).run()
 
 
 def adapter_missing(path: str) -> str:
@@ -195,6 +200,10 @@ def _stage_class(stage: str) -> type:
         from .init_knowledge import _Knowledge
 
         return _Knowledge
+    if stage == "knowledge-deepen":
+        from .init_knowledge_depth import _KnowledgeDepth
+
+        return _KnowledgeDepth
     if stage == "deepen":
         from .init_deepen import _Deepen
 
@@ -430,7 +439,8 @@ class _Stage:
             return self._resume(previous)
         if previous is not None and previous.inputs_digest == digest and not adapter_missing_problem \
                 and not chain.problems and previous.status in ("dry_run", "published", "empty") \
-                and (previous.dry_run == self.dry_run or previous.status == "published"):
+                and (previous.dry_run == self.dry_run or previous.status == "published") \
+                and self._cache_reusable(previous):
             return previous
         if previous is not None and previous.pr.get("number") and previous.inputs_digest != digest:
             raise InitError(f"a published {stage} record exists (PR #{previous.pr['number']}); remove "
@@ -475,7 +485,7 @@ class _Stage:
         chain = _Chain()
         parts: list[str] = []
         publisher = None
-        for stage in STAGES[:STAGES.index(self.STAGE)]:
+        for stage in STAGES[:STAGES.index(self._chain_boundary())]:
             record = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, stage)
             if stage == "knowledge":
                 from .knowledge_coverage import load_policy, policy_path
@@ -547,6 +557,12 @@ class _Stage:
                 chain.problems.append(f"the {stage} stage is {record.status}; finish it first")
         chain.key = ";".join(parts)
         return chain
+
+    def _chain_boundary(self) -> str:
+        return self.STAGE
+
+    def _cache_reusable(self, previous: InitRecord) -> bool:
+        return True
 
     def _precheck(self) -> list[str]:
         """Stage-specific problems found before any work (none by default)."""
@@ -1632,6 +1648,17 @@ def _ratio(value) -> str:
 
 def _coverage_lines(coverage: dict) -> list[str]:
     """The coverage report of a stage (design §7) as PR-body lines."""
+    if "semantic_depth" in coverage:
+        depth, breadth = coverage["semantic_depth"], coverage["breadth"]
+        features, core = breadth["features"], breadth["core"]
+        return ["Feature implementation depth (representative pinned evidence):", "",
+                f"- Complete features: {depth['complete_features']}/{depth['total_features']}.",
+                f"- Accepted facet slots: {depth['covered_facets']}/{depth['total_facets']}.",
+                f"- Production files with semantic evidence: {len(depth['production_files_with_semantic_evidence'])}/{depth['production_files_total']}.",
+                f"- Separate breadth: {features['covered']}/{features['total']} features; "
+                f"{core['covered']}/{core['total']} files ({core['ratio']:.1%}).", "",
+                "Static interface records do not count as semantic depth. These witnesses do not prove "
+                "exhaustive behavior or executed-test coverage.", ""]
     if "knowledge" in coverage:
         knowledge = coverage["knowledge"]
         lines = ["Knowledge coverage (evidence-backed facets; independent of routes and rules):", "",
@@ -1685,7 +1712,7 @@ def render_pr_body(record: InitRecord, lifecycle) -> str:
         "",
         ("Human-merged. Explanatory knowledge has pinned source references and per-facet advisory verdicts. "
          "Design inferences are labeled; failed sections are removed and missing facets remain listed."
-         if record.stage == "knowledge" else
+         if record.stage in ("knowledge", "knowledge-deepen") else
          "Human-merged. Rules were screened by the docs redundancy filter and checked at the pin; "
          "the complete PR receives one aggregate Codex review before leaving draft state."
          if record.stage == "pr-history" else
@@ -1694,11 +1721,16 @@ def render_pr_body(record: InitRecord, lifecycle) -> str:
         "",
     ]
     if record.verdicts:
-        lines += ["| knowledge facet | page | verdict |" if record.stage == "knowledge"
-                  else "| rule | page | verdict |", "|---|---|---|"]
-        for rule_id, v in record.verdicts.items():
-            if v["verdict"] != "fail":
-                lines.append(f"| {rule_id} | `{v.get('page', '')}` | {v['verdict']} |")
+        if record.stage == "knowledge-deepen":
+            lines += ["| feature | accepted facets | missing facets |", "|---|---|---|"]
+            for feature, item in record.coverage.get("semantic_depth", {}).get("features", {}).items():
+                lines.append(f"| {feature} | {', '.join(item['facets']) or 'none'} | {', '.join(item['missing_facets']) or 'none'} |")
+        else:
+            lines += ["| knowledge facet | page | verdict |" if record.stage == "knowledge"
+                      else "| rule | page | verdict |", "|---|---|---|"]
+            for rule_id, v in record.verdicts.items():
+                if v["verdict"] != "fail":
+                    lines.append(f"| {rule_id} | `{v.get('page', '')}` | {v['verdict']} |")
         lines.append("")
     if record.seeds:
         lines += ["Seeds (adapted, provenance only here):", ""]
@@ -1715,7 +1747,10 @@ def render_pr_body(record: InitRecord, lifecycle) -> str:
     if record.checklist:
         lines += ["Needs human edit:", ""] + [f"- [ ] {item}" for item in record.checklist] + [""]
     if record.unfinished:
-        lines += ["Not done (budget or caps):", ""] + [f"- {item}" for item in record.unfinished] + [""]
+        items = record.unfinished[:100] if record.stage == "knowledge-deepen" else record.unfinished
+        lines += ["Not done (budget or caps):", ""] + [f"- {item}" for item in items] + [""]
+        if len(items) < len(record.unfinished):
+            lines += [f"{len(record.unfinished) - len(items)} additional gaps are retained in the stage record.", ""]
     if record.notes:
         lines += ["Notes:", ""] + [f"- {note}" for note in record.notes] + [""]
     return "\n".join(lines)

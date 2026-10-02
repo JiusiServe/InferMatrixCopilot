@@ -21,3 +21,5 @@ sources: []
 - [ui](ui/_index.md)
 - [ui-components](ui-components/_index.md)
 - [ui-rendering](ui-rendering/_index.md)
+- [TUI 对话与命令：实现深读](feature-depth-tui.md)
+- [已有 PR 自动修复：实现深读](feature-depth-autofix.md)
