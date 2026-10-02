@@ -126,6 +126,16 @@ def _document(document: dict, view: KnowledgeView, pin: str, problems: list[str]
         problems.append(f"{label}: delivered injected basis differs from the actual included facets")
     if document.get("verified_gaps") != {facet: row["gap_label"] for facet, row in sections.items() if row["gap_label"]}:
         problems.append(f"{label}: delivered gap labels differ from the intact page")
+    modes = {facet: row["acceptance_mode"] for facet, row in sections.items()}
+    kinds = {facet: row["validation_kind"] for facet, row in sections.items() if row["validation_kind"]}
+    if "facet_acceptance_modes" in document or "lightweight" in modes.values():
+        if document.get("facet_acceptance_modes") != modes or document.get("included_facet_acceptance_modes") != {
+                facet: modes[facet] for facet in included if facet in modes}:
+            problems.append(f"{label}: acceptance modes differ from available or injected facets")
+    if "validation_kinds" in document or kinds:
+        if document.get("validation_kinds") != kinds or document.get("included_validation_kinds") != {
+                facet: kinds[facet] for facet in included if facet in kinds}:
+            problems.append(f"{label}: validation types differ from available or injected facets")
     if document.get("not_injected_facets") != [facet for facet in available if facet not in included]:
         problems.append(f"{label}: uninjected facet metadata differs from selection")
     missing = [facet for facet in FACETS if facet not in expected] if document["feature"] else []

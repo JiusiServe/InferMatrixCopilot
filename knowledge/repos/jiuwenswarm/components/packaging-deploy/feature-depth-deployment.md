@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L144-L159, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:Dockerfile.claw:L78-L85, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L55-L68, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L301-L307]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L144-L159, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:Dockerfile.claw:L78-L85, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L55-L68, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L301-L307, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build_config.py:L264-L299, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build_config.py:L164-L166, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build_config.py:L149-L150, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L143-L176, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/test_build_config.py:L80-L98, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/test_build_config.py:L308-L331]
 feature: "deployment"
 entry_points: ["scripts/build-electron-exe.sh", "Dockerfile.claw", "docker/Dockerfile.claw", "docker/Dockerfile.claw.base", "docker/Dockerfile.yr.rt.mgr"]
 source_globs: ["scripts/build-electron-exe.sh", "scripts/*", "Dockerfile.claw", "docker/Dockerfile.claw", "docker/Dockerfile.claw.base", "docker/Dockerfile.yr.rt.mgr"]
@@ -30,4 +30,24 @@ dist 目录名、exe 名、版本号和 bundle 标识全部来自 scripts/build_
 来源：[scripts/build-electron-exe.sh:L144–L159](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/scripts/build-electron-exe.sh#L144-L159), [Dockerfile.claw:L78–L85](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/Dockerfile.claw#L78-L85)
 
 <!-- kb:depth-proof {"evidence":[{"path":"scripts/build-electron-exe.sh","start":144,"end":159,"sha256":"a8965329140844b3c4458fde0b578328c78cf1ff092198999ad5416d14b028e8"},{"path":"Dockerfile.claw","start":78,"end":85,"sha256":"c2a25bb51a598248682a2a5d5de9ef264f7f0292091d1700b1764459e3d7c30a"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=deployment facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=b8cfd495d341c24eb8cba049c2de5efe877062233a77751d9f2ca8f9f9225e60 -->
+**main 在 --sync --emit-shell 下经 render_shell 到 _constant_values 输出 BUILD_* 赋值**
+输入是 scripts/build-electron-exe.sh:149 的 --sync --emit-shell 调用：main 先在 268-270 行经 write_expected 同步受管文件并把 updated … 状态写 stderr，280 行 load_build_config 取值；因请求了输出，跳过 285-288 行的提前 return，294 行 _emit(render_shell(config), sys.stdout)；render_shell 165 行调 _constant_values（键转大写），经 shlex.quote 生成 BUILD_*=值 写入 stdout，由脚本 150-154 行 sed 提取 BUILD_DIST_DIR_NAME / BUILD_EXECUTABLE_NAME / BUILD_VERSION 等。
+
+调用路径：`scripts/build_config.py`（`main`） → `scripts/build_config.py`（`render_shell`） → `scripts/build_config.py`（`_constant_values`）
+
+来源：[scripts/build_config.py:L264–L299](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/scripts/build_config.py#L264-L299), [scripts/build_config.py:L164–L166](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/scripts/build_config.py#L164-L166), [scripts/build_config.py:L149–L150](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/scripts/build_config.py#L149-L150), [scripts/build-electron-exe.sh:L143–L176](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/scripts/build-electron-exe.sh#L143-L176)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":299,"path":"scripts/build_config.py","sha256":"7876066bc1ef84c9799ac3b96fc3056956f038b4887ceb308793aa60cfc20215","start":264},{"end":166,"path":"scripts/build_config.py","sha256":"aef5a1ae5acc6f0cf4b9a0fd9d7d56e1b7f91a968e3d7c00409e6e532e3dbb4b","start":164},{"end":150,"path":"scripts/build_config.py","sha256":"7adc65eb97b273ccf3559c6fe2d7e08e26464b9ed8bd6986c5bcb1a1ab536dd9","start":149},{"end":176,"path":"scripts/build-electron-exe.sh","sha256":"1b50141a676ac36cc1061877ca7796b50e83391c42927ee0107305f3f65ff4f9","start":143}],"trace":[{"end":299,"path":"scripts/build_config.py","start":264,"symbol":"main"},{"end":166,"path":"scripts/build_config.py","start":164,"symbol":"render_shell"},{"end":150,"path":"scripts/build_config.py","start":149,"symbol":"_constant_values"}]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=deployment facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=fd55584b57d9c29c5e650c33b0336d49257dca2575b05032a688c7c7d5c7e8cd -->
+**test_build_config.py 以临时 fixture 和真实子进程 CLI 钉住漂移检测与输出流分离**
+test_check_detects_version_drift_before_write（80-98 行）在同步后的临时 fixture 中把根 pyproject 版本改为 9.8.7.beta6，断言 find_drift 报出 packages/jiuwenswarm-tui/pyproject.toml 与 jiuwenswarm/common/_build_config.py，且 write_expected 之后漂移清零；test_cli_sync_status_uses_stderr_without_log_prefix（308-331 行）以子进程运行真实 CLI，断言 --sync --version 时 stdout 恰为版本行、stderr 恰为三条 updated 行。
+
+来源：[tests/unit_tests/test_build_config.py:L80–L98](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/test_build_config.py#L80-L98), [tests/unit_tests/test_build_config.py:L308–L331](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/test_build_config.py#L308-L331)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":98,"path":"tests/unit_tests/test_build_config.py","sha256":"a4e6bbcda0e3cccd65a7cd433d1afac3cb0a52a0b4e746739dfaf5f872fd6145","start":80},{"end":331,"path":"tests/unit_tests/test_build_config.py","sha256":"2492b6ef892d9630afbf3faa910113a773672a358174b8ada50ee9b32099d88b","start":308}],"trace":[]} -->
 <!-- /kb:depth -->

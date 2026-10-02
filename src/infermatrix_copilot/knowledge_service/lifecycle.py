@@ -84,6 +84,14 @@ def depth_sections(text: str) -> list[dict]:
             data = json.loads(proof.group(1)) if proof else {}
             evidence = data["evidence"]
             basis = depth_proof_basis(data, facet=facet, pin=pin)
+            acceptance_mode = data.get("acceptance_mode", "strict")
+            if acceptance_mode not in ("strict", "lightweight") or (
+                    acceptance_mode == "lightweight" and basis != "supported"):
+                continue
+            validation_kind = data.get("validation_kind")
+            if validation_kind is not None and (facet != "validation" or validation_kind not in (
+                    "automated_runtime", "automated_source_text", "helper_unit", "documented_manual")):
+                continue
             if basis == "verified_absent" and data["absence_certificate"]["feature"] != feature:
                 continue
             if not isinstance(evidence, list) or not 1 <= len(evidence) <= 4:
@@ -99,6 +107,7 @@ def depth_sections(text: str) -> list[dict]:
         rows.append({"feature": feature, "facet": facet, "pin": pin,
                      "content": visible_text(body[:proof.start()]), "evidence": evidence,
                      "basis": basis,
+                     "acceptance_mode": acceptance_mode, "validation_kind": validation_kind,
                      "gap_label": "no_statically_associated_test_entry" if basis == "verified_absent" else None})
     return [row for row in rows if counts[(row["feature"], row["facet"])] == 1]
 

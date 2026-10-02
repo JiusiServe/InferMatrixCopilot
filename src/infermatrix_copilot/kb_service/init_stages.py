@@ -137,7 +137,8 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
               pr_count: int | None = None, budget_usd: float | None = None,
               from_existing: bool = False, subscription_generator: bool = False,
               retry_unfinished: bool = False, unlimited_subscription: bool = False,
-              feature_ids: tuple[str, ...] = ()) -> InitRecord:
+              feature_ids: tuple[str, ...] = (), acceptance_mode: str = "strict",
+              depth_index_path: Path | None = None, stop_file: Path | None = None) -> InitRecord:
     """Run one ``kb init`` stage for ``lifecycle``'s repository and return its
     record (also saved under ``<state_dir>/init/<repo>/<stage>.json``)."""
     if stage not in STAGES + INDEPENDENT_STAGES:
@@ -146,6 +147,9 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
         raise InitError("--from-existing is for explanatory knowledge stages only")
     if retry_unfinished and stage != "knowledge-deepen":
         raise InitError("--retry-unfinished is for knowledge-deepen only")
+    if acceptance_mode not in ("strict", "lightweight") or (
+        stage != "knowledge-deepen" and (acceptance_mode != "strict" or depth_index_path or stop_file)):
+        raise InitError("acceptance_mode must be strict or lightweight and depth options require knowledge-deepen")
     if feature_ids and (stage != "knowledge-deepen" or not isinstance(feature_ids, tuple)
                         or any(not isinstance(f, str) or not f for f in feature_ids)):
         raise InitError("feature_ids must be a depth-only tuple of policy feature identifiers")
@@ -202,7 +206,9 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
         notes.append("unlimited subscription generation and independent judgment explicitly selected; "
                      "no stage USD ceiling applies; fixed USD accounting is observability only, "
                      "and unreported invoiced costs remain unknown")
-    options = {"retry_unfinished": retry_unfinished, "feature_ids": feature_ids} if stage == "knowledge-deepen" else {}
+    options = {"retry_unfinished": retry_unfinished, "feature_ids": feature_ids,
+               "acceptance_mode": acceptance_mode, "depth_index_path": depth_index_path,
+               "stop_file": stop_file} if stage == "knowledge-deepen" else {}
     return stage_class(rt, lifecycle, dry_run=dry_run, pin=pin, notes=notes, author=author,
                        from_existing=from_existing, **options).run()
 

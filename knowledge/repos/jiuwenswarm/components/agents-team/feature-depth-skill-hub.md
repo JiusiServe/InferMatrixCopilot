@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/marketplace/hub_client.py:L220-L245, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/marketplace/hub_client.py:L45-L54, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/marketplace/hub_models.py:L163-L177]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/marketplace/hub_client.py:L220-L245, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/marketplace/hub_client.py:L45-L54, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/marketplace/hub_models.py:L163-L177, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/test_hub_catalog_cache.py:L76-L84, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/test_hub_catalog_cache.py:L275-L281]
 feature: "skill-hub"
 entry_points: ["jiuwenswarm/server/runtime/marketplace/hub_client.py"]
 source_globs: ["jiuwenswarm/server/runtime/marketplace/hub_client.py", "jiuwenswarm/server/runtime/marketplace/*"]
@@ -41,4 +41,15 @@ HubClient.get_plugin 以 asset_id 为输入：清洗参数后通过 HubTransport
 来源：[jiuwenswarm/server/runtime/marketplace/hub_client.py:L45–L54](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/marketplace/hub_client.py#L45-L54)
 
 <!-- kb:depth-proof {"evidence":[{"path":"jiuwenswarm/server/runtime/marketplace/hub_client.py","start":45,"end":54,"sha256":"b5712e504fdf8ddacaffdbb6fe95c4d6d750505b8f8ed71208ab1515259d923a"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=skill-hub facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=6df7528a41910e2325738b424e4cfc662fceceb2220c7106a749570649ee9086 -->
+**读路径不阻塞换来的代价是冷启动与分页期间数据不完整**
+设计推断（非作者历史意图）：
+
+选择：读取不等刷新完成，loader 在后台任务中分页拉取，read 立即返回旧快照或 miss。收益：测试中上游 post 被 gate 阻塞时，handle_skills_swarm_skills_hub_recommend 仍在 asyncio.wait_for 的 0.05 秒内返回 state='miss'，调用方不被慢 Hub 请求卡住。代价：冷启动首个请求拿到空列表（not items 且 state['refreshing']），分页全部完成前只能看到部分条目（len(items)==2 且 has_more 为真）。该取舍为基于所引测试行为的推断，非文档记载的历史意图。
+
+来源：[tests/test_hub_catalog_cache.py:L76–L84](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/test_hub_catalog_cache.py#L76-L84), [tests/test_hub_catalog_cache.py:L275–L281](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/test_hub_catalog_cache.py#L275-L281)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":84,"path":"tests/test_hub_catalog_cache.py","sha256":"027d479aa81734177c337287f6aa3cea8df78176411848cfb812eb54b687124a","start":76},{"end":281,"path":"tests/test_hub_catalog_cache.py","sha256":"6cd988e274dcaeedeab3d333d20f401b80016c9351754e6eb8e9114e097046a6","start":275}],"trace":[]} -->
 <!-- /kb:depth -->

@@ -19,13 +19,39 @@ from .knowledge_coverage import _LEXICAL_NO_CODE, inventory, matches
 _PROOF = re.compile(r"\n<!-- kb:depth-proof (.*?) -->\s*$", re.S)
 _PRIVATE_PATH = re.compile(r"/(?:home/(?!models(?:/|\b)|<)|data/(?!models?(?:/|\b)|<))[A-Za-z0-9_-]+")
 _IP = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
+VALIDATION_KINDS = ("automated_runtime", "automated_source_text", "helper_unit", "documented_manual")
 
 
 def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def validate_draft(data: dict) -> None:
+def depth_acceptance_mode(proof: dict) -> str:
+    """Read acceptance separately from evidence basis; legacy proofs are strict."""
+    if not isinstance(proof, dict):
+        raise ValueError("depth proof must be an object")
+    mode = proof.get("acceptance_mode", "strict")
+    if mode not in ("strict", "lightweight"):
+        raise ValueError("depth acceptance_mode must be strict or lightweight")
+    if mode == "lightweight" and (proof.get("basis", "supported") != "supported"
+                                   or proof.get("absence_certificate") is not None):
+        raise ValueError("lightweight knowledge cannot establish verified absence")
+    return mode
+
+
+def _validation_kind(proof: dict, facet: str, mode: str) -> str | None:
+    if "validation_kind" not in proof:
+        if mode == "lightweight" and facet == "validation":
+            raise ValueError("lightweight validation needs validation_kind")
+        return None
+    kind = proof.get("validation_kind")
+    if mode != "lightweight" or facet != "validation" or kind not in VALIDATION_KINDS:
+        raise ValueError("validation_kind needs a known lightweight validation category")
+    return kind
+
+
+def validate_draft(data: dict, *, acceptance_mode: str = "strict") -> None:
+    mode = depth_acceptance_mode({"acceptance_mode": acceptance_mode})
     sections = data.get("sections")
     if not isinstance(sections, list) or len(sections) > len(FACETS):
         raise ValueError("sections must list at most seven depth facets")
@@ -44,6 +70,8 @@ def validate_draft(data: dict) -> None:
         if section.get("interpretation") not in ("fact", "inference"):
             raise ValueError("depth interpretation must be fact or inference")
         basis = section.get("basis", "supported")
+        depth_acceptance_mode({**section, "acceptance_mode": mode})
+        _validation_kind(section, section["facet"], mode)
         if basis not in ("supported", "verified_absent"):
             raise ValueError("unknown depth basis")
         if basis == "verified_absent":
@@ -60,7 +88,7 @@ def validate_draft(data: dict) -> None:
                     or type(item.get("start")) is not int or type(item.get("end")) is not int \
                     or not 1 <= item["start"] <= item["end"]:
                 raise ValueError("depth evidence needs safe paths and inclusive integer line spans")
-        if section["facet"] == "flow":
+        if section["facet"] == "flow" and mode == "strict":
             trace = section.get("trace")
             if not isinstance(trace, list) or not 2 <= len(trace) <= 6:
                 raise ValueError("flow needs two to six named, ordered call steps")
@@ -570,9 +598,17 @@ def build_absence_certificate(tree: Path, policy, feature, pin: str, facet: str 
     return certificate
 
 
-def render_block(feature, section: dict, tree: Path, full_name: str, pin: str, *, policy=None) -> str:
+def render_block(feature, section: dict, tree: Path, full_name: str, pin: str, *, policy=None,
+                 acceptance_mode: str = "strict") -> str:
+    mode = depth_acceptance_mode({**section, "acceptance_mode": acceptance_mode})
+    validation_kind = _validation_kind(section, section["facet"], mode)
     proof = {"evidence": [{**e, "sha256": digest(source_span(tree, e))} for e in section["evidence"]],
-             "trace": section.get("trace", []), "basis": section.get("basis", "supported")}
+             "trace": section.get("trace", []) if mode == "strict" else [],
+             "basis": section.get("basis", "supported")}
+    if mode == "lightweight":
+        proof["acceptance_mode"] = mode
+        if validation_kind is not None:
+            proof["validation_kind"] = validation_kind
     if proof["basis"] == "verified_absent":
         if policy is None:
             raise ValueError("absence proof needs the reviewed coverage policy")
@@ -581,12 +617,14 @@ def render_block(feature, section: dict, tree: Path, full_name: str, pin: str, *
             raise ValueError("absence scope is unresolved or differs from the deterministic detector")
         proof["absence_certificate"] = certificate
     depth_proof_basis(proof, facet=section["facet"], pin=pin)
-    if section["facet"] == "flow":
+    if section["facet"] == "flow" and mode == "strict":
         verify_trace(tree, proof["trace"])
     title = " ".join(str(section.get("title") or section["facet"]).replace("#", "").split())
     body = neutral_headings(f"## {title}\n\n")
     if proof["basis"] == "verified_absent":
         body += "已核验缺口（非测试通过证明）：\n\n"
+    if validation_kind == "documented_manual":
+        body += "文档中的人工验收步骤（本轮未执行）：\n\n"
     if section["interpretation"] == "inference":
         body += "设计推断（非作者历史意图）：\n\n"
     body += section["body"].strip() + "\n\n"
@@ -619,6 +657,10 @@ def verified_blocks(text: str, feature, tree: Path, pin: str, *, policy=None) ->
             if not match:
                 raise ValueError("depth block has no bound evidence proof")
             proof = json.loads(match.group(1))
+            mode = depth_acceptance_mode(proof)
+            validation_kind = _validation_kind(proof, facet, mode)
+            if validation_kind == "documented_manual" and "文档中的人工验收步骤（本轮未执行）" not in body:
+                raise ValueError("documented manual validation must disclose it was not executed")
             basis = depth_proof_basis(proof, facet=facet, pin=pin)
             if basis == "verified_absent":
                 if policy is None or proof["absence_certificate"]["feature"] != feature.id \
@@ -630,7 +672,7 @@ def verified_blocks(text: str, feature, tree: Path, pin: str, *, policy=None) ->
             for e in proof["evidence"]:
                 if e.get("sha256") != digest(source_span(tree, e)):
                     raise ValueError("depth evidence changed at the pin")
-            if facet == "flow":
+            if facet == "flow" and mode == "strict":
                 trace = proof.get("trace", [])
                 if not 2 <= len(trace) <= 6 or any(not any(
                         e["path"] == s["path"] and e["start"] <= s["start"] <= s["end"] <= e["end"]
@@ -652,8 +694,10 @@ def depth_page(feature) -> str:
 
 def audit_depth(head: dict[str, str], tree: Path, policy, pin: str, *, approvals: list[dict] | None = None) -> dict:
     """Recompute positive and recognized coverage without changing the denominator."""
+    policy_mode = depth_acceptance_mode({"acceptance_mode": getattr(policy, "semantic_depth_acceptance_mode", "strict")})
     production = set(inventory(tree, policy))
     witnessed, features, errors, binding_errors = set(), {}, [], []
+    witnessed_by_mode = {"strict": set(), "lightweight": set()}
     approval_index = {}
     if approvals is not None:
         for row in approvals:
@@ -671,40 +715,80 @@ def audit_depth(head: dict[str, str], tree: Path, policy, pin: str, *, approvals
         blocks, problems = verified_blocks(head[page], feature, tree, pin, policy=policy) if page in head else ({}, [])
         if "flow" in blocks:
             proof = json.loads(_PROOF.search(_BLOCK.search(blocks["flow"]).group(5)).group(1))
-            if any(s["path"] not in production for s in proof["trace"]):
+            if depth_acceptance_mode(proof) == "strict" and any(s["path"] not in production for s in proof["trace"]):
                 blocks.pop("flow")
                 problems.append(f"{feature.id}/flow: trace must use production implementation")
         errors.extend(problems)
-        basis = {}
+        basis, modes, validation_kinds = {}, {}, {}
         for facet, block in list(blocks.items()):
+            proof = json.loads(_PROOF.search(_BLOCK.search(block).group(5)).group(1))
+            mode = depth_acceptance_mode(proof)
+            kind = _validation_kind(proof, facet, mode)
             if approvals is not None:
                 row = approval_index.get((feature.id, facet))
+                receipt_mode, mode_matches = "strict", True
+                if row:
+                    receipt_mode = row.get("acceptance_mode", "strict")
+                    receipt_modes = row.get("acceptance_modes")
+                    if receipt_modes is not None:
+                        if not isinstance(receipt_modes, dict) or facet not in receipt_modes:
+                            mode_matches = False
+                        elif "acceptance_mode" in row and receipt_modes[facet] != receipt_mode:
+                            mode_matches = False
+                        else:
+                            receipt_mode = receipt_modes[facet]
+                mode_matches = mode_matches and receipt_mode == mode
+                kind_matches = True
+                if kind is not None:
+                    receipt_kind = row.get("validation_kind") if row else None
+                    receipt_kinds = row.get("validation_kinds") if row else None
+                    if receipt_kinds is not None:
+                        if not isinstance(receipt_kinds, dict) or facet not in receipt_kinds:
+                            kind_matches = False
+                        elif "validation_kind" in row and receipt_kinds[facet] != receipt_kind:
+                            kind_matches = False
+                        else:
+                            receipt_kind = receipt_kinds[facet]
+                    kind_matches = kind_matches and receipt_kind == kind
                 expected_dimensions = {"faithful": "yes", "non_contradictory": "yes", "does_not_weaken": "yes"}
                 if not row or row.get("page") != page or row.get("block_sha256") != digest(block) \
                         or row.get("dimensions") != expected_dimensions \
                         or not isinstance(row.get("native_trace_id"), str) or not row["native_trace_id"] \
                         or not isinstance(row.get("native_reply_sha256"), str) \
                         or not re.fullmatch(r"[0-9a-f]{64}", row["native_reply_sha256"]) \
-                        or row.get("pin", pin) != pin:
+                        or row.get("pin", pin) != pin or not mode_matches or not kind_matches:
                     binding_errors.append(f"{feature.id}/{facet}: missing or mismatched all-yes native approval")
                     blocks.pop(facet)
                     continue
-            proof = json.loads(_PROOF.search(_BLOCK.search(block).group(5)).group(1))
             basis[facet] = depth_proof_basis(proof, facet=facet, pin=pin)
+            modes[facet] = mode
+            if kind is not None:
+                validation_kinds[facet] = kind
             if basis[facet] == "supported":
-                witnessed.update(e["path"] for e in proof["evidence"] if e["path"] in production)
+                files = {e["path"] for e in proof["evidence"] if e["path"] in production}
+                witnessed.update(files)
+                witnessed_by_mode[mode].update(files)
         supported = [f for f in FACETS if basis.get(f) == "supported"]
         absent = [f for f in FACETS if basis.get(f) == "verified_absent"]
         recognized = [f for f in FACETS if f in basis]
         unknown = [f for f in FACETS if f not in basis]
+        strict = [f for f in recognized if modes[f] == "strict"]
+        light = [f for f in recognized if modes[f] == "lightweight"]
+        eligible = recognized if policy_mode == "lightweight" else strict
         features[feature.id] = {"owner": feature.owner, "page": page, "facets": supported,
                                "missing_facets": [f for f in FACETS if f not in supported],
                                "complete": len(supported) == len(FACETS), "basis": basis,
                                "verified_absent_facets": absent, "recognized_facets": recognized,
-                               "unknown_facets": unknown, "recognized_complete": not unknown}
+                               "unknown_facets": unknown, "recognized_complete": not unknown,
+                               "acceptance_modes": modes, "strict_facets": strict, "lightweight_facets": light,
+                               "eligible_facets": eligible, "ineligible_facets": [f for f in recognized if f not in eligible],
+                               "validation_kinds": validation_kinds}
     slots = len(policy.features) * len(FACETS)
     covered = sum(len(x["facets"]) for x in features.values())
     recognized = sum(len(x["recognized_facets"]) for x in features.values())
+    strict_recognized = sum(len(x["strict_facets"]) for x in features.values())
+    light_recognized = sum(len(x["lightweight_facets"]) for x in features.values())
+    eligible_recognized = sum(len(x["eligible_facets"]) for x in features.values())
     threshold = policy.semantic_depth_per_facet_gt
     facet_counts = {}
     for facet in FACETS:
@@ -712,22 +796,39 @@ def audit_depth(head: dict[str, str], tree: Path, policy, pin: str, *, approvals
         absent = sum(x["basis"].get(facet) == "verified_absent" for x in features.values())
         count = supported + absent
         ratio = count / len(features) if features else 0.0
+        strict = sum(facet in x["strict_facets"] for x in features.values())
+        light = sum(facet in x["lightweight_facets"] for x in features.values())
+        eligible = count if policy_mode == "lightweight" else strict
+        eligible_ratio = eligible / len(features) if features else 0.0
         facet_counts[facet] = {"supported": supported, "verified_absent": absent,
                                "unknown": len(features) - count, "recognized": count, "ratio": ratio,
-                               "target_met": threshold is None or ratio > threshold}
-    all_features_recognized = bool(features) and all(x["recognized_facets"] for x in features.values())
+                               "strict_recognized": strict, "lightweight_recognized": light,
+                               "eligible_recognized": eligible, "eligible_ratio": eligible_ratio,
+                               "target_met": threshold is None or eligible_ratio > threshold}
+    all_features_recognized = bool(features) and all(x["eligible_facets"] for x in features.values())
     target_met = not errors and not binding_errors and (threshold is None or
                  all_features_recognized and all(x["target_met"] for x in facet_counts.values()))
     return {"pin": pin, "features": features, "complete_features": sum(x["complete"] for x in features.values()),
             "total_features": len(features), "covered_facets": covered, "total_facets": slots,
             "facet_ratio": covered / slots if slots else 0.0, "recognized_facets": recognized,
             "recognized_facet_ratio": recognized / slots if slots else 0.0,
+            "strict_recognized_facets": strict_recognized, "lightweight_recognized_facets": light_recognized,
+            "eligible_recognized_facets": eligible_recognized, "acceptance_mode": policy_mode,
             "recognized_complete_features": sum(x["recognized_complete"] for x in features.values()),
             "recognized_feature_count": sum(bool(x["recognized_facets"]) for x in features.values()),
+            "eligible_recognized_feature_count": sum(bool(x["eligible_facets"]) for x in features.values()),
+            "validation_kind_counts": {**{kind: sum(x["validation_kinds"].get("validation") == kind for x in features.values())
+                                          for kind in VALIDATION_KINDS},
+                                       "unclassified": sum("validation" in x["recognized_facets"]
+                                                           and "validation" not in x["validation_kinds"] for x in features.values())},
             "facet_counts": facet_counts, "per_facet_gt": threshold, "target_met": target_met,
             "approval_bindings_checked": approvals is not None, "approval_binding_problems": binding_errors,
             "production_files_with_semantic_evidence": sorted(witnessed), "production_files_total": len(production),
+            "production_files_with_strict_evidence": sorted(witnessed_by_mode["strict"]),
+            "production_files_with_lightweight_evidence": sorted(witnessed_by_mode["lightweight"]),
             "problems": errors, "complete": covered == slots and not errors and not binding_errors,
             "recognized_complete": recognized == slots and not errors and not binding_errors,
-            "interpretation": "Positive supported witnesses remain separate from verified gaps. Recognized coverage "
-                              "includes both, without claiming capabilities, exhaustive behavior, or tests passed."}
+            "interpretation": "Recognized slots count strict and lightweight knowledge once and keep verified gaps "
+                              "separate from supported knowledge. The target uses the declared acceptance policy; "
+                              "lightweight prose has pinned citations and independent review, without deterministic "
+                              "call-chain certification or claims that tests ran."}

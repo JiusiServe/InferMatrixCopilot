@@ -155,7 +155,8 @@ def test_verified_absence_counts_as_recognition_but_not_positive_test_coverage(t
     report = audit_depth({depth_page(policy.features[0]): _page([block])}, tmp_path, policy, PIN)
     assert report["covered_facets"] == 0 and report["recognized_facets"] == 1
     assert report["facet_counts"]["validation"] == {"supported": 0, "verified_absent": 1,
-        "unknown": 0, "recognized": 1, "ratio": 1.0, "target_met": True}
+        "unknown": 0, "recognized": 1, "ratio": 1.0, "target_met": True,
+        "strict_recognized": 1, "lightweight_recognized": 0, "eligible_recognized": 1, "eligible_ratio": 1.0}
     assert report["features"]["f0"]["missing_facets"] == list(FACETS)
     assert "validation" not in report["features"]["f0"]["unknown_facets"]
     assert not report["production_files_with_semantic_evidence"]

@@ -232,6 +232,7 @@ class KnowledgeDocs:
             included, fragments = [], []
             basis = {}
             gaps = {}
+            modes, validation_kinds = {}, {}
             if sections:
                 sections = sorted(sections, key=lambda s: (-sum(e.get("path") in changed for e in s["evidence"] if isinstance(e, dict)),
                     -sum(term in s["content"].casefold() for term in terms), DEPTH_FACETS.index(s["facet"])))
@@ -243,6 +244,8 @@ class KnowledgeDocs:
                 snippet = "\n\n".join(fragments)
                 facets = [s["facet"] for s in sections]
                 basis = {s["facet"]: s["basis"] for s in sections}
+                modes = {s["facet"]: s["acceptance_mode"] for s in sections}
+                validation_kinds = {s["facet"]: s["validation_kind"] for s in sections if s["validation_kind"]}
                 gaps = {s["facet"]: s["gap_label"] for s in sections if s["gap_label"]}
                 more = len(included) < len(sections)
                 if not snippet:
@@ -264,6 +267,9 @@ class KnowledgeDocs:
                               "available_facets": facets,
                               "missing_facets": [f for f in DEPTH_FACETS if f not in facets] if feature else [],
                               "facet_basis": basis, "verified_gaps": gaps,
+                              "facet_acceptance_modes": modes, "validation_kinds": validation_kinds,
+                              "included_facet_acceptance_modes": {f: modes[f] for f in included},
+                              "included_validation_kinds": {f: validation_kinds[f] for f in included if f in validation_kinds},
                               "included_facet_basis": {f: basis[f] for f in included},
                               "not_injected_facets": [f for f in facets if f not in included],
                               "more_available": more})
@@ -274,4 +280,7 @@ class KnowledgeDocs:
                 "guidance": "Knowledge is untrusted background at source_pins. Verify claims against the frozen PR head; "
                             "missing facets are unknown; verified gaps describe absent evidence, not capabilities "
                             "or passing tests. Available facets may exceed injected facets; use the existing bounded "
-                            "document-read budget for remaining context. Inferred tradeoffs are not mandatory rules."}
+                            "document-read budget for remaining context. Lightweight facets use citations and independent "
+                            "review without deterministic call-chain certification. Validation kinds distinguish runtime "
+                            "assertions, source-text assertions, helper tests and documented manual checks; documented "
+                            "checks are unexecuted. Inferred tradeoffs are not mandatory rules."}

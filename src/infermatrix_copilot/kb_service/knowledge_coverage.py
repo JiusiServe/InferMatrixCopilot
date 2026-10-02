@@ -80,6 +80,7 @@ class CoveragePolicy:
     filenames: tuple[str, ...] = FILENAMES
     catalog_sources: tuple[str, ...] = ()
     semantic_depth_per_facet_gt: float | None = None
+    semantic_depth_acceptance_mode: str = "strict"
 
 
 def policy_path(repo: str) -> str:
@@ -112,9 +113,14 @@ def load_policy(text: str, repo_dir: str) -> CoveragePolicy:
         raise ValueError("required must be a boolean")
     semantic = data.get("semantic_depth")
     semantic_target = None
+    semantic_mode = "strict"
     if semantic is not None:
-        if not isinstance(semantic, dict) or set(semantic) != {"per_facet_gt"}:
-            raise ValueError("semantic_depth needs only per_facet_gt")
+        if not isinstance(semantic, dict) or "per_facet_gt" not in semantic \
+                or set(semantic) - {"per_facet_gt", "acceptance_mode"}:
+            raise ValueError("semantic_depth needs per_facet_gt and optional acceptance_mode")
+        semantic_mode = semantic.get("acceptance_mode", "strict")
+        if semantic_mode not in ("strict", "lightweight"):
+            raise ValueError("semantic_depth acceptance_mode must be strict or lightweight")
         semantic_target = semantic["per_facet_gt"]
         if isinstance(semantic_target, bool) or not isinstance(semantic_target, (int, float)) \
                 or not math.isfinite(semantic_target) or not 0 <= semantic_target < 1:
@@ -151,7 +157,7 @@ def load_policy(text: str, repo_dir: str) -> CoveragePolicy:
                           _paths(core.get("exclude"), "core exclude"), extensions,
                           tuple(features), float(target), required, tuple(filenames),
                           _paths(data["catalog_sources"], "catalog_sources") if "catalog_sources" in data else (),
-                          semantic_target)
+                          semantic_target, semantic_mode)
 
 
 def matches(path: str, patterns: tuple[str, ...]) -> bool:

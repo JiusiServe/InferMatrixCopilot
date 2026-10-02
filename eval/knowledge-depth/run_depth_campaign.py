@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 import re
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -49,7 +51,10 @@ def run_worker(args, state):
     runtime.upstream_remote = lambda _: str(args.upstream_mirror)
     record = run_stage(runtime, runtime.registry[args.repo], "knowledge-deepen", dry_run=True,
                        from_existing=True, pin=args.pin, unlimited_subscription=True,
-                       feature_ids=tuple(args.feature_ids.split(",")), retry_unfinished=args.retry)
+                       feature_ids=tuple(args.feature_ids.split(",")), retry_unfinished=args.retry,
+                       acceptance_mode=getattr(args, "acceptance_mode", "strict"),
+                       depth_index_path=getattr(args, "depth_index_path", None),
+                       stop_file=getattr(args, "stop_file", None))
     if record.kb_base_sha != args.baseline or record.pin != args.pin:
         raise RuntimeError("worker completed against a different source or knowledge baseline")
     print(json.dumps({"worker": args.worker, "status": record.status, "problems": record.problems,
@@ -66,17 +71,25 @@ def main():
     parser.add_argument("--pin", required=True)
     parser.add_argument("--upstream-mirror", type=Path, required=True)
     parser.add_argument("--baseline", required=True)
-    parser.add_argument("--workers", type=int, default=3)
+    parser.add_argument("--workers", type=int, default=13)
+    parser.add_argument("--acceptance-mode", choices=("strict", "lightweight"), default="lightweight")
+    parser.add_argument("--depth-index-path", type=Path)
+    parser.add_argument("--stop-file", type=Path, help="Create this file to stop new dispatch and drain active calls")
     parser.add_argument("--priority-features", default="", help="Visit these policy features first without changing audit scope")
     parser.add_argument("--retry", action="store_true")
     parser.add_argument("--worker", type=int)
     parser.add_argument("--feature-ids")
     args = parser.parse_args()
-    if args.worker is not None:
-        return worker(args)
-    if not 1 <= args.workers <= 4:
-        parser.error("workers must be between one and four")
+    if not 1 <= args.workers <= 13:
+        parser.error("workers must be between one and thirteen")
     args.root, args.state, args.upstream_mirror = args.root.resolve(), args.state.resolve(), args.upstream_mirror.resolve()
+    args.stop_file = (args.stop_file or args.state / "STOP").resolve()
+    if args.depth_index_path:
+        args.depth_index_path = args.depth_index_path.resolve()
+    if args.worker is not None:
+        if not 0 <= args.worker < args.workers or not args.feature_ids:
+            parser.error("worker must belong to the campaign and have feature IDs")
+        return worker(args)
     args.baseline = subprocess.check_output(["git", "-C", str(args.root), "rev-parse", args.baseline + "^{commit}"], text=True).strip()
     args.state.mkdir(parents=True, exist_ok=True)
     with (args.state / ".campaign.lock").open("a") as lock:
@@ -91,6 +104,7 @@ def campaign(args, parser):
     from infermatrix_copilot.kb_service.knowledge_coverage import load_policy, policy_path
     from infermatrix_copilot.kb_service.sources import KnowledgeRepo
     import yaml
+    from infermatrix_copilot.kb_service.outbox import atomic_write_json
 
     manifest = yaml.safe_load((args.root / f"adapters/{args.repo}/manifest.yaml").read_text())
     text = subprocess.check_output(["git", "-C", str(args.root), "show", args.baseline + ":" + policy_path(args.repo)], text=True)
@@ -111,12 +125,33 @@ def campaign(args, parser):
         partitions[worker] = [fid for fid in priority if fid in group] + [fid for fid in group if fid not in priority]
     summary = {"baseline": args.baseline, "pin": args.pin, "repo": args.repo,
                "features": len(policy.features), "denominator": len(policy.features) * 7,
-               "workers": args.workers, "partitions": partitions}
+               "workers": args.workers, "partitions": partitions,
+               "acceptance_mode": getattr(args, "acceptance_mode", "strict")}
     metadata = args.state / "campaign.json"
     if metadata.exists():
         prior = json.loads(metadata.read_text())
         if any(prior.get(key) != value for key, value in summary.items()):
             parser.error("campaign identity changed; use a fresh state directory")
+    stop_file = getattr(args, "stop_file", None) or args.state / "STOP"
+    index_path = getattr(args, "depth_index_path", None)
+    if summary["acceptance_mode"] == "lightweight":
+        from infermatrix_copilot.kb_service.depth_index import build_depth_index, load_depth_index
+        from infermatrix_copilot.kb_service.knowledge_coverage import inventory
+
+        index_path = index_path or args.state / "depth-index.json"
+        policy_sha = hashlib.sha256(text.encode()).hexdigest()
+        if index_path.exists():
+            index = load_depth_index(index_path, pin=args.pin, policy_sha256=policy_sha)
+        else:
+            # A fresh export cannot inherit files from a previously interrupted
+            # archive build. Only the complete immutable index is retained.
+            with tempfile.TemporaryDirectory(prefix="source-index-", dir=args.state) as scratch:
+                tree = KnowledgeRepo(args.upstream_mirror).export(args.pin, Path(scratch))
+                index = build_depth_index(tree, inventory(tree, policy), pin=args.pin,
+                                          policy_sha256=policy_sha, cache_path=index_path)
+        summary["depth_index_sha256"] = index.sha256
+        if metadata.exists() and prior.get("depth_index_sha256") != index.sha256:
+            parser.error("campaign index changed; use a fresh state directory")
     origin = args.state / "knowledge-origin.git"
     if not origin.exists():
         git("init", "--bare", origin)
@@ -137,15 +172,49 @@ def campaign(args, parser):
         features = partitions[str(number)]
         argv = [sys.executable, __file__, "--root", str(args.root), "--state", str(args.state),
                 "--repo", args.repo, "--pin", args.pin, "--upstream-mirror", str(args.upstream_mirror),
-                "--baseline", args.baseline, "--worker", str(number), "--feature-ids", ",".join(features)]
+                "--baseline", args.baseline, "--workers", str(args.workers),
+                "--worker", str(number), "--feature-ids", ",".join(features),
+                "--acceptance-mode", summary["acceptance_mode"], "--stop-file", str(stop_file)]
+        if index_path:
+            argv += ["--depth-index-path", str(index_path)]
         if args.retry:
             argv.append("--retry")
         jobs.append((number, argv))
         checkpoints.append(state / f"init/{args.repo}/knowledge-deepen.json")
-    metadata.write_text(json.dumps(summary, indent=2) + "\n")
+    atomic_write_json(metadata, summary)
     processes = []
+
+    def snapshots():
+        result = []
+        for number, path in enumerate(checkpoints):
+            if path.exists():
+                record = json.loads(path.read_text())
+                entries = record.get("depth", {}).get("features", {})
+                result.append({"worker": number, "visited": sum(e.get("attempts", 0) > 0 for e in entries.values()),
+                               "pages": len(record.get("depth", {}).get("accepted", {})),
+                               "active": [f for f, e in entries.items() if e.get("status") in ("extracting", "extracted")],
+                               "accounted_usd": record.get("spent_usd"), "status": record["status"]})
+        return result
+
+    def save_drain():
+        inflight = []
+        for path in args.state.glob("worker-*/init/traces/attempts/*/attempt.json"):
+            attempt = json.loads(path.read_text())
+            if attempt.get("status") == "inflight":
+                inflight.append({"path": str(path), "id": attempt["id"], "model": attempt.get("model", {})})
+        atomic_write_json(args.state / "drain.json", {"requested_at": stop_file.stat().st_mtime,
+                          "observed_at": time.time(), "progress": snapshots(), "inflight": inflight,
+                          "running_workers": [n for n, p, _ in processes if p.poll() is None]})
+
+    def request_drain(signum, _frame):
+        if not stop_file.exists():
+            atomic_write_json(stop_file, {"signal": signal.Signals(signum).name, "at": time.time()})
+
+    previous_handlers = {sig: signal.signal(sig, request_drain) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
         for number, argv in jobs:
+            if stop_file.exists():
+                break
             log = (args.state / f"worker-{number}.log").open("a")
             try:
                 process = subprocess.Popen(argv, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
@@ -154,18 +223,13 @@ def campaign(args, parser):
                 raise
             processes.append((number, process, log))
         while any(process.poll() is None for _, process, _ in processes):
-            snapshots = []
-            for number, path in enumerate(checkpoints):
-                if path.exists():
-                    record = json.loads(path.read_text())
-                    entries = record.get("depth", {}).get("features", {})
-                    snapshots.append({"worker": number, "visited": sum(e.get("attempts", 0) > 0 for e in entries.values()),
-                                      "pages": len(record.get("depth", {}).get("accepted", {})),
-                                      "active": [f for f, e in entries.items() if e.get("status") in ("extracting", "extracted")],
-                                      "accounted_usd": record.get("spent_usd"), "status": record["status"]})
-            print(json.dumps({"progress": snapshots}, ensure_ascii=False), flush=True)
-            time.sleep(20)
+            if stop_file.exists():
+                save_drain()
+            print(json.dumps({"progress": snapshots(), "draining": stop_file.exists()}, ensure_ascii=False), flush=True)
+            time.sleep(2 if stop_file.exists() else 20)
     finally:
+        for sig, handler in previous_handlers.items():
+            signal.signal(sig, handler)
         cleanup_errors = []
         for _, process, log in processes:
             try:
@@ -190,7 +254,10 @@ def campaign(args, parser):
         if cleanup_errors:
             raise cleanup_errors[0]
     summary["exit_codes"] = {number: process.returncode for number, process, _ in processes}
-    metadata.write_text(json.dumps(summary, indent=2) + "\n")
+    summary["drained"] = stop_file.exists()
+    if summary["drained"]:
+        save_drain()
+    atomic_write_json(metadata, summary)
     return int(any(process.returncode != 0 for _, process, _ in processes))
 
 

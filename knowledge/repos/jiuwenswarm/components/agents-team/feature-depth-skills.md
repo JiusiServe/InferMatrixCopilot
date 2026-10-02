@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skill_manager.py:L811-L877, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/archive_store.py:L1-L35, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skill_manager.py:L6331-L6343, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/archive_store.py:L87-L100, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skill_manager.py:L995-L1014, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skill_manager.py:L903-L915, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skill_manager.py:L786-L809, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L1816-L1824]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skill_manager.py:L811-L877, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/archive_store.py:L1-L35, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skill_manager.py:L6331-L6343, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/archive_store.py:L87-L100, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skill_manager.py:L995-L1014, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skill_manager.py:L903-L915, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/skill/skill_manager.py:L786-L809, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L1816-L1824, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_skill_content_images.py:L43-L88, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_skill_content_images.py:L92-L125]
 feature: "skills"
 entry_points: ["jiuwenswarm/server/runtime/skill/skill_manager.py"]
 source_globs: ["jiuwenswarm/server/runtime/skill/skill_manager.py", "jiuwenswarm/server/runtime/skill/*"]
@@ -50,4 +50,13 @@ handle_skills_installed 不再信任 installed_plugins[].version，而是对每�
 来源：[jiuwenswarm/server/runtime/skill/skill_manager.py:L786–L809](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/skill/skill_manager.py#L786-L809)
 
 <!-- kb:depth-proof {"evidence":[{"path":"jiuwenswarm/server/runtime/skill/skill_manager.py","start":786,"end":809,"sha256":"b32f6f369ac7b684bdeb9c010f7fb43a60f15ad887d3a227a34e5a03d5c6aec7"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=skills facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=d42c43e36b7769164bece2c969bacfa0711822562c884d6130103862877d22d7 -->
+**图片改写行为的单测断言**
+tests/unit_tests/agentserver/test_skill_content_images.py::test_skills_get_rewrites_relative_image_keeps_external：manager fixture monkeypatch 技能目录后写入含本地 PNG、外链 https://example.com/a.png 与缺失文件的 SKILL.md，调用 handle_skills_get（name=visual-doc、_session_id=sess-1），断言返回 content 含 /file-api/download?token= 与 session_id=sess-1、外链与缺失路径保持原文，且磁盘 SKILL.md 仍含 assets/flow.png、不含 /file-api/download。
+
+来源：[tests/unit_tests/agentserver/test_skill_content_images.py:L43–L88](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/agentserver/test_skill_content_images.py#L43-L88), [tests/unit_tests/agentserver/test_skill_content_images.py:L92–L125](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/agentserver/test_skill_content_images.py#L92-L125)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":88,"path":"tests/unit_tests/agentserver/test_skill_content_images.py","sha256":"5af9d2abd24719995e333874e9242076368e763d6bd4757d4f65f9694069e515","start":43},{"end":125,"path":"tests/unit_tests/agentserver/test_skill_content_images.py","sha256":"d21207d8263afdea19294bd2bf7955d7ca3809bf33c977af0c995facf0c0b6cc","start":92}],"trace":[]} -->
 <!-- /kb:depth -->

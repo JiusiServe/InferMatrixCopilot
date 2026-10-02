@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/manager.py:L90-L100]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/manager.py:L90-L100, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/manager.py:L89-L109]
 feature: "hooks"
 entry_points: ["jiuwenswarm/extensions/manager.py"]
 source_globs: ["jiuwenswarm/extensions/manager.py", "jiuwenswarm/extensions/*.py"]
@@ -23,4 +23,13 @@ Runtime 直连（include_transport_extensions=False）时依据 manifest 的 req
 来源：[jiuwenswarm/extensions/manager.py:L90–L100](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/extensions/manager.py#L90-L100)
 
 <!-- kb:depth-proof {"evidence":[{"path":"jiuwenswarm/extensions/manager.py","start":90,"end":100,"sha256":"29ecdb708aaa4663754417b9db05a2c16ec0303367f87ac01dace1d547c23b5f"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=hooks facet=failure_modes pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=10164c78dc93cc1226b1399f4ef62ed50d89fc30ef156d3ea8140b61769af54e -->
+**单根路径加载失败的隔离**
+load_all_extensions 对每个扩展根路径各自 try/except：当 load_manifest 或 load_extension 抛出任意 Exception 时，108-109 行捕获并 logger.error 记录路径与异常，for 循环继续处理下一个 root，异常不向外重抛。该分支只证明单个失败根路径被跳过且循环继续推进，不构成对其余扩展必然加载成功的保证。
+
+来源：[jiuwenswarm/extensions/manager.py:L89–L109](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/extensions/manager.py#L89-L109)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":109,"path":"jiuwenswarm/extensions/manager.py","sha256":"0a2cb91d16a87efa1e1f199f995898cdeac50188604baa608f89bf36394feb54","start":89}],"trace":[]} -->
 <!-- /kb:depth -->

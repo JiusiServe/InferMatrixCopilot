@@ -22,7 +22,7 @@ import yaml
 from infermatrix_copilot.kb_service.gate import DIMENSIONS
 from infermatrix_copilot.kb_service.init_stages import _one_line
 from infermatrix_copilot.kb_service.knowledge_coverage import feature_metadata, load_policy, policy_path
-from infermatrix_copilot.kb_service.knowledge_depth import depth_page, digest, verified_blocks
+from infermatrix_copilot.kb_service.knowledge_depth import depth_page, digest, verified_blocks, depth_acceptance_mode
 from infermatrix_copilot.knowledge_service.lifecycle import DEPTH_BLOCK, DEPTH_FACETS, Page, safe_source_path
 
 
@@ -78,6 +78,13 @@ def _receipt(record, feature, facet, block):
     prior = record.get("verdicts", {}).get("depth:" + feature, {})
     result = prior.get("facets", {}).get(facet, {})
     dimensions = result.get("dimensions")
+    proof = json.loads(re.search(r"<!-- kb:depth-proof (.*?) -->", block, re.S)[1])
+    mode = depth_acceptance_mode(proof)
+    kind = proof.get("validation_kind")
+    if result.get("acceptance_mode", "strict") != mode:
+        raise ValueError("new facet receipt has a mismatched recognition mode")
+    if kind is not None and result.get("validation_kind") != kind:
+        raise ValueError("new facet receipt has a mismatched validation category")
     if result.get("verdict") != "pass" or not isinstance(dimensions, dict) \
             or set(dimensions) != set(DIMENSIONS["prose"]) or any(v != "yes" for v in dimensions.values()) \
             or result.get("block_sha256") != digest(block) \
@@ -88,11 +95,16 @@ def _receipt(record, feature, facet, block):
         raise ValueError("new facet lacks an exact successful receipt: " + feature + "/" + facet)
     if not any(isinstance(call, dict) and all(call.get(key) == result.get(key)
                for key in ("model", "native_trace_id", "native_reply_sha256"))
-               and call.get("facets", {}).get(facet) == {k: v for k, v in result.items()
-                    if k not in {"model", "native_trace_id", "native_reply_sha256", "block_sha256"}}
+               and {k: v for k, v in call.get("facets", {}).get(facet, {}).items()
+                    if k != "acceptance_mode"} == {k: v for k, v in result.items()
+                    if k not in {"model", "native_trace_id", "native_reply_sha256", "block_sha256", "acceptance_mode"}}
+               and call.get("acceptance_modes", {}).get(facet, "strict") == mode
+               and (kind is None or call.get("validation_kinds", {}).get(facet) == kind)
                for call in prior.get("calls", [])):
         raise ValueError("facet receipt does not bind a durable successful review call: " + feature + "/" + facet)
     return {"feature": feature, "facet": facet, "block_sha256": result["block_sha256"],
+            "acceptance_mode": mode,
+            **({"validation_kind": kind} if kind is not None else {}),
             "dimensions": dimensions, "model": result["model"],
             "native_trace_id": result["native_trace_id"], "native_reply_sha256": result["native_reply_sha256"]}
 
@@ -207,6 +219,14 @@ def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
     proposals = {page: baseline_pages[page] for page, _ in retired}
     changes, receipts, checkpoints, accepted_pages = [], [], [], set()
     counts = {facet: sum(facet in blocks for blocks in old_blocks.values()) for facet in DEPTH_FACETS}
+    strict_counts = {facet: sum(facet in blocks and depth_acceptance_mode(json.loads(
+        re.search(r"<!-- kb:depth-proof (.*?) -->", blocks[facet], re.S)[1])) == "strict"
+        for blocks in old_blocks.values()) for facet in DEPTH_FACETS}
+    policy_mode = policy.semantic_depth_acceptance_mode
+    eligible_features = {by_page[page].id for page, blocks in old_blocks.items() if any(
+        policy_mode == "lightweight" or depth_acceptance_mode(json.loads(
+            re.search(r"<!-- kb:depth-proof (.*?) -->", block, re.S)[1])) == "strict"
+        for block in blocks.values())}
     recognized_features = {by_page[page].id for page, blocks in old_blocks.items() if blocks}
     for worker, owned in partitions.items():
         path = state / f"worker-{worker}/init/{repo}/knowledge-deepen.json"
@@ -241,6 +261,10 @@ def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
                 raise ValueError("accepted page edits or omits an existing depth block: " + feature.id)
             if blocks:
                 recognized_features.add(feature.id)
+            if any(policy_mode == "lightweight" or depth_acceptance_mode(json.loads(
+                    re.search(r"<!-- kb:depth-proof (.*?) -->", block, re.S)[1])) == "strict"
+                   for block in blocks.values()):
+                eligible_features.add(feature.id)
             old = baseline_pages.get(page)
             related = f"[功能概览]({PurePosixPath(feature.page).name}) · [owner 入口](_index.md)"
             expected_body = _outside_blocks(old) if old is not None else ["# " + _one_line(feature.title) + "：实现深读", related]
@@ -250,6 +274,9 @@ def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
             for facet in added:
                 receipts.append({**_receipt(record, feature.id, facet, blocks[facet]), "page": page, "worker": worker})
                 counts[facet] += 1
+                if depth_acceptance_mode(json.loads(re.search(
+                        r"<!-- kb:depth-proof (.*?) -->", blocks[facet], re.S)[1])) == "strict":
+                    strict_counts[facet] += 1
             if old is None:
                 proposed = feature_metadata(candidate, feature)
             elif added:
@@ -295,6 +322,8 @@ def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
         if current != text:
             writes[page] = text
     threshold = policy.semantic_depth_per_facet_gt
+    mode = policy.semantic_depth_acceptance_mode
+    eligible_counts = counts if mode == "lightweight" else strict_counts
     report = {"repo": repo, "baseline": baseline, "pin": pin, "workers": workers,
               "features": len(features), "denominator": len(features) * len(DEPTH_FACETS),
               "campaign_sha256": hashlib.sha256(metadata_raw).hexdigest(), "policy_sha256": digest(policy_text),
@@ -305,8 +334,12 @@ def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
               "new_receipt_bound_facets": len(receipts), "source_verified_facets": sum(counts.values()),
               "recognized_feature_count": len(recognized_features),
               "all_features_recognized": len(recognized_features) == len(features),
-              "facet_counts": counts, "source_target_met": len(recognized_features) == len(features) and threshold is not None
-                  and all(count / len(features) > threshold for count in counts.values()),
+              "facet_counts": counts, "source_target_met": len(eligible_features) == len(features) and threshold is not None
+                  and all(count / len(features) > threshold for count in eligible_counts.values()),
+              "acceptance_mode": mode, "strict_facet_counts": strict_counts,
+              "lightweight_facet_counts": {facet: counts[facet] - strict_counts[facet] for facet in DEPTH_FACETS},
+              "eligible_facet_counts": eligible_counts,
+              "eligible_feature_count": len(eligible_features),
               "pages": changes, "index_links": new_links, "planned_files": sorted(writes),
               "receipts": receipts, "native_archive_audit_required": True, "problems": []}
     return report, writes

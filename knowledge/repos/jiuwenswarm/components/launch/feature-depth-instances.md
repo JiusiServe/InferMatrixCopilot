@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/config.py:L141-L159, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/config.py:L183-L188, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/bootstrap.py:L139-L202, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/status.py:L261-L294, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/bootstrap.py:L172-L202, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/bootstrap.py:L93-L120]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/config.py:L141-L159, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/config.py:L183-L188, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/bootstrap.py:L139-L202, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/status.py:L261-L294, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/bootstrap.py:L172-L202, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/bootstrap.py:L93-L120, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/test_desktop_port_resolve.py:L223-L252]
 feature: "instances"
 entry_points: ["jiuwenswarm/instance_manager/bootstrap.py"]
 source_globs: ["jiuwenswarm/instance_manager/bootstrap.py", "jiuwenswarm/instance_manager/*.py"]
@@ -50,4 +50,13 @@ load_instance_bootstrap_by_name 通过 get_instance_config(name) 从 instances.y
 来源：[jiuwenswarm/instance_manager/bootstrap.py:L93–L120](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/instance_manager/bootstrap.py#L93-L120), [jiuwenswarm/instance_manager/config.py:L183–L188](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/instance_manager/config.py#L183-L188)
 
 <!-- kb:depth-proof {"evidence":[{"path":"jiuwenswarm/instance_manager/bootstrap.py","start":93,"end":120,"sha256":"52da6f6a5c18f4b75b54d3397c1e519e8d598d6cfe527420cd2dcca5704de83e"},{"path":"jiuwenswarm/instance_manager/config.py","start":183,"end":188,"sha256":"1ee582140d85e2d82eb1ef421a01e0ecb4fd6aa2166ee1bca225aeae146b3502"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=instances facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=1fb650e43d2424a76c5b49021ed4a94b497b4e08dc0f97ac653d19d325042554 -->
+**桌面端口组测试对 instance_manager 端口公式的断言**
+tests/unit_tests/test_desktop_port_resolve.py:223-252 三个用例均 monkeypatch desktop_app.find_available_ports 后断言 resolve_desktop_ports：默认组等于 calculate_instance_ports(0) 且 frontend/web 端口与 instance_manager 的 BASE_PORTS 一致；回退组为 calculate_instance_ports(1)，即 BASE_PORTS 各 +1000；扫描返回 None 时抛 RuntimeError 匹配 'No available desktop port group'。这是对端口组公式消费端映射的断言记录，不证明当前已运行通过。
+
+来源：[tests/unit_tests/test_desktop_port_resolve.py:L223–L252](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/test_desktop_port_resolve.py#L223-L252)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":252,"path":"tests/unit_tests/test_desktop_port_resolve.py","sha256":"6219d27bbefa463eaa1223addefbdf678627f7f7613122075da9f3a7690ff2d3","start":223}],"trace":[]} -->
 <!-- /kb:depth -->

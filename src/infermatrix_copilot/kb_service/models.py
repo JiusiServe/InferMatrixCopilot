@@ -165,6 +165,25 @@ class ModelGateway:
         started = time.time()
         identity = {"role": role.name, "requested": role.label(), "provider": role.provider,
                     "model": role.model, "effort": role.effort, "fallback_from": fallback_from}
+        payload = {"system": system if record_payload else "", "prompt": prompt if record_payload else ""}
+        begin = getattr(self._recorder, "begin_call", None)
+        archive = begin({**identity, **payload}) if callable(begin) else None
+        native_events: list[dict] = []
+        transport = None
+
+        def event_sink(event):
+            native_events.append(event)
+            if archive is not None and record_payload:
+                archive.event(event)
+
+        def record_call(entry, status):
+            if archive is not None:
+                entry.update(archive.payload())
+            receipt = self._recorder(entry) if self._recorder else None
+            if archive is not None:
+                archive.finish(receipt if isinstance(receipt, dict) else None, entry, status=status)
+            return receipt
+
         try:
             transport = self._subscription_transports.pop(role.label(), None)
             if transport is None:
@@ -177,17 +196,25 @@ class ModelGateway:
                     raise ModelUnavailable(f"{role.provider} cannot stop a call at a spend threshold",
                                            allow_fallback=False)
                 cap = {"max_budget_usd": max_budget_usd}
+            if archive is not None and getattr(transport, "supports_native_events", False):
+                cap["native_event_sink"] = event_sink
             reply = transport.complete(
                 system=system, messages=[{"role": "user", "content": prompt}],
                 model=role.model, effort=role.effort, role=role.name, **cap)
-        except Exception as exc:  # the transport's own failure modes
-            if self._recorder is not None:
-                self._recorder({**identity, "served_model": "", "stop_reason": "", "usage": {},
-                                "cost_usd": None, "max_budget_usd": max_budget_usd,
+        except BaseException as exc:  # preserve partial native events on interruption too
+            snapshot = getattr(transport, "native_snapshot", None)
+            partial = snapshot(native_events) if callable(snapshot) else {}
+            reported_cost = (partial.get("usage") or {}).get("cost_usd")
+            partial_cost = float(reported_cost) if isinstance(reported_cost, (int, float)) and not isinstance(reported_cost, bool) else None
+            record_call({**identity, "served_model": partial.get("served_model", ""),
+                                "stop_reason": "", "usage": partial.get("usage") or {},
+                                "cost_usd": partial_cost, "max_budget_usd": max_budget_usd,
                                 "seconds": round(time.time() - started, 3),
-                                "system": system if record_payload else "",
-                                "prompt": prompt if record_payload else "", "reply": "",
-                                "error": str(exc)[:2000] if record_payload else "transport failed (payload omitted)"})
+                                **payload, "reply": partial.get("text", "") if record_payload else "",
+                                "error": (str(exc) or type(exc).__name__)[:2000] if record_payload else "transport failed (payload omitted)"},
+                        "failed" if isinstance(exc, Exception) else "interrupted")
+            if not isinstance(exc, Exception):
+                raise
             if isinstance(exc, ModelUnavailable):
                 raise
             raise ModelUnavailable(f"{role.label()} failed: {exc}") from exc
@@ -225,7 +252,14 @@ class ModelGateway:
                                                allow_fallback=False) from exc
             except ModelUnavailable as exc:
                 failure = exc
-        receipt = self._recorder({**record, "error": str(failure) if failure else ""}) if self._recorder else None
+            except BaseException as exc:
+                # A native response may already have returned when the caller
+                # interrupts validation. Preserve that response and its usage.
+                record_call({**record, "error": (str(exc) or type(exc).__name__)[:2000]},
+                            "failed" if isinstance(exc, Exception) else "interrupted")
+                raise
+        receipt = record_call({**record, "error": str(failure) if failure else ""},
+                              "failed" if failure else "complete")
         if failure is not None:
             raise failure
         receipt = receipt if isinstance(receipt, dict) else {}

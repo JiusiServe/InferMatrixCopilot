@@ -139,6 +139,11 @@ def _init_command(args, state_dir: Path) -> int:
     from .runner import run_playbook
 
     params = {"stage": args.stage, "dry_run": "true" if args.dry_run else "false", "pin": args.pin or ""}
+    if getattr(args, "acceptance_mode", "strict") != "strict":
+        if args.stage != "knowledge-deepen":
+            print("--acceptance-mode is for knowledge-deepen only", file=sys.stderr)
+            return 2
+        params["acceptance_mode"] = args.acceptance_mode
     if args.from_existing:
         if args.stage not in ("knowledge", "knowledge-deepen"):
             print("--from-existing is for --stage knowledge or knowledge-deepen only", file=sys.stderr)
@@ -227,6 +232,8 @@ def main(argv: list[str] | None = None) -> int:
     init.add_argument("--unlimited-subscription", action="store_true",
                       help="uncapped knowledge-deepen with authenticated subscription generator and judge; no fallback")
     init.add_argument("--retry-unfinished", action="store_true", help="retry missing depth facets, preserving prior spend")
+    init.add_argument("--acceptance-mode", choices=("strict", "lightweight"), default="strict",
+                      help="depth recognition standard; lightweight uses pinned citations and one independent feature review")
     for name, stage in (("widen", "knowledge"), ("deepen", "knowledge-deepen")):
         cmd = sub.add_parser(name, help="feature breadth" if name == "widen" else "feature implementation depth")
         cmd.add_argument("repo")
@@ -237,6 +244,7 @@ def main(argv: list[str] | None = None) -> int:
             cmd.add_argument("--budget-usd", type=float)
             cmd.add_argument("--retry-unfinished", action="store_true")
             cmd.add_argument("--unlimited-subscription", action="store_true")
+            cmd.add_argument("--acceptance-mode", choices=("strict", "lightweight"), default="strict")
         cmd.set_defaults(stage=stage, from_existing=True, suggest_seeds=False, pr_count=None,
                          **({"budget_usd": None, "retry_unfinished": False, "unlimited_subscription": False}
                             if name == "widen" else {}))

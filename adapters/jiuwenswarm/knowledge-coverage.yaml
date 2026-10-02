@@ -2,6 +2,7 @@ schema_version: 1
 required: true
 semantic_depth:
   per_facet_gt: 0.90
+  acceptance_mode: lightweight
 catalog_sources:
 - README_CN.md
 - docs/README.md

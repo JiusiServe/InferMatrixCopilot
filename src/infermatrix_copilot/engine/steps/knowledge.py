@@ -185,6 +185,8 @@ async def init_stage(ctx: StepContext) -> StepResult:
         for option in ("from_existing", "subscription_generator", "retry_unfinished", "unlimited_subscription"):
             if str(ctx.params.get(option, "false")).lower() in ("1", "true", "yes"):
                 kwargs[option] = True
+        if ctx.params.get("acceptance_mode"):
+            kwargs["acceptance_mode"] = str(ctx.params["acceptance_mode"])
         record = run_stage(rt, lifecycle, stage, dry_run=dry_run, pin=pin, **kwargs)
     except (InitError, NotImplementedError, ValueError) as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))

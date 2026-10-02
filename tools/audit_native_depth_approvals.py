@@ -14,7 +14,7 @@ import yaml
 
 from infermatrix_copilot.kb_service.gate import DIMENSIONS
 from infermatrix_copilot.kb_service.knowledge_coverage import load_policy, policy_path
-from infermatrix_copilot.kb_service.knowledge_depth import depth_page
+from infermatrix_copilot.kb_service.knowledge_depth import depth_page, depth_acceptance_mode
 from infermatrix_copilot.kb_service.models import ModelUnavailable, parse_json_object
 from infermatrix_copilot.knowledge_service.lifecycle import (
     DEPTH_BLOCK, DEPTH_FACETS, depth_proof_basis, depth_sections, safe_source_path,
@@ -228,10 +228,14 @@ def audit_native_approvals(root: Path, repo: str, *, baseline_reports: list[Path
                 if fid != feature.id or key not in valid or _sha(body.encode()) != body_hash:
                     raise ValueError("invalid, edited, or misplaced current depth block")
                 block_hash = _sha(match[0].encode())
+                proof = json.loads(re.search(r"<!-- kb:depth-proof (.*?) -->", match[0], re.S)[1])
+                mode = depth_acceptance_mode(proof)
                 receipt = receipts.get(key)
                 if not receipt or receipt.get("page") != page or receipt.get("block_sha256") != block_hash \
                         or receipt.get("pin", pin) != pin:
                     raise ValueError("missing or mismatched current-block approval receipt")
+                if receipt.get("acceptance_mode", "strict") != mode:
+                    raise ValueError("approval receipt acceptance mode differs from current block")
                 native = records.get(receipt.get("native_trace_id"))
                 if not native:
                     raise ValueError("missing or duplicate native judgment trace")
@@ -258,14 +262,21 @@ def audit_native_approvals(root: Path, repo: str, *, baseline_reports: list[Path
                 if data.get("feature") != fid or data.get("pin") != pin \
                         or data.get("sections", {}).get(facet) != _prose(match[0]):
                     raise ValueError("native judgment prompt does not bind the exact current facet prose and pin")
+                modes = data.get("acceptance_modes", {})
+                if not isinstance(modes, dict) or modes.get(facet, "strict") != mode:
+                    raise ValueError("native judgment prompt does not bind the current acceptance mode")
+                validation_kind = proof.get("validation_kind")
+                if validation_kind is not None and (receipt.get("validation_kind") != validation_kind or
+                        data.get("validation_kinds", {}).get(facet) != validation_kind):
+                    raise ValueError("native judgment and receipt do not bind the validation category")
                 _judged_evidence(data, match[0], repository, pin, facet)
                 sections, results = data["sections"], response["facets"]
-                if set(sections) != set(results) or any(
+                if mode == "strict" and (set(sections) != set(results) or any(
                         name not in DEPTH_FACETS or not isinstance(item, dict)
                         or not isinstance(item.get("reason"), str) or not isinstance(item.get("dimensions"), dict)
                         or set(item["dimensions"]) != set(dimensions)
                         or any(value not in ("yes", "no", "unsure") for value in item["dimensions"].values())
-                        for name, item in results.items()):
+                        for name, item in results.items())):
                     raise ValueError("native response does not answer the complete judged packet")
                 candidates = generators.get((fid, pin), [])
                 index = bisect_right([row["at"] for row in candidates], record["at"]) - 1
@@ -282,6 +293,8 @@ def audit_native_approvals(root: Path, repo: str, *, baseline_reports: list[Path
                         or _family(gen_name) == _family(judge_name):
                     raise ValueError("native generator and judge are not independently identified model families")
                 approvals.append({"feature": fid, "facet": facet, "page": page, "pin": pin,
+                                  "acceptance_mode": mode,
+                                  **({"validation_kind": validation_kind} if validation_kind is not None else {}),
                                   "block_sha256": block_hash, "dimensions": result["dimensions"],
                                   "native_trace_id": record["id"], "native_reply_sha256": reply_ref.removeprefix("sha256:"),
                                   "model": {key: model.get(key, "") for key in MODEL_FIELDS},
