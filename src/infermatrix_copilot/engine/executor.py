@@ -109,7 +109,20 @@ class Executor:
         checkpoint (its published `state_updates` are replayed so resume is
         faithful), otherwise fanned out over `foreach` items, merged, traced, and
         checkpointed on success. A BLOCKED/ESCALATE/FORBIDDEN failure notifies and
-        halts as "blocked"; any other failure halts as "failed"."""
+        halts as "blocked"; any other failure halts as "failed".
+
+        With `settings.trace_store_root` set, the whole run binds that trace/1
+        store so the choke points (`tools.dispatch`, `LLM.create`) capture every
+        tool and model call under the unit context of the running step."""
+        root = str(getattr(self.settings, "trace_store_root", "") or "")
+        if not root:
+            return await self._run_steps(playbook, state)
+        from ..trace_store import TraceStore, bind_store
+
+        with bind_store(TraceStore(Path(root).expanduser())):
+            return await self._run_steps(playbook, state)
+
+    async def _run_steps(self, playbook: "Playbook", state: dict) -> RunOutcome:
         progress = self._load_progress()
         outcome = RunOutcome(status="done")
         state.setdefault("playbook", playbook.name)
@@ -215,6 +228,7 @@ class Executor:
         exception is caught and converted to a BLOCKED StepResult so a handler bug
         never escapes as a raw exception. Returns the last StepResult produced."""
         from .. import tracing
+        from ..trace_store import trace_context
 
         ctx = StepContext(
             settings=self.settings, state=state, params=params or {},
@@ -228,9 +242,11 @@ class Executor:
         ident = {"step_id": step_id} if step_id else {}
         if item is not None:
             ident["item"] = _item_key(item)
+        unit = self._unit_context(spec.name, step_id, state, item)
         for attempt in range(1, attempts + 1):
             try:
-                with tracing.span("step", step=spec.name, attempt=attempt, **ident):
+                with tracing.span("step", step=spec.name, attempt=attempt, **ident), \
+                        trace_context(attempt=attempt, **unit):
                     last = await spec.handler(ctx)
             except Exception as exc:  # handler bug != typed failure
                 last = StepResult(False, FailureKind.BLOCKED,
@@ -239,6 +255,48 @@ class Executor:
                 return last
             self.trace.record("step_retry", spec=spec.name, attempt=attempt)
         return last  # exhausted retries
+
+
+    # -- trace/1 unit context ---------------------------------------------------
+    def _declarations(self) -> dict:
+        """Workflow declarations, loaded once per executor (a malformed file is a
+        loud configuration error, never a silent Tier 1 downgrade)."""
+        cached = getattr(self, "_decls", None)
+        if cached is None:
+            from ..improve.enroll import load_declarations
+
+            extra = [d for d in (getattr(self.settings, "improve_workflows_dirs", "") or "")
+                     .split(os.pathsep) if d.strip()]
+            cached = load_declarations(extra)
+            self._decls = cached
+        return cached
+
+    def _unit_context(self, step: str, step_id: str, state: dict, item) -> dict:
+        """The trace/1 context of one unit of work (design §3.1): run, playbook,
+        step, ``unit_id``; plus ``workflow``, ``item`` and the declared
+        ``fingerprint`` when the step is enrolled. An incomplete fingerprint is
+        recorded as ``fingerprint_missing`` (the unit stays Tier 1)."""
+        from ..improve.enroll import item_for, lookup
+
+        run_id = self.run_dir.name
+        playbook = str(state.get("playbook") or "")
+        unit_id = f"{run_id}:{step_id or step}"
+        if item is not None:
+            unit_id += f":{_item_key(item)}"
+        context: dict = {"run_id": run_id, "playbook": playbook, "step": step, "unit_id": unit_id}
+        decl = lookup(self._declarations(), playbook, step)
+        if decl is None:
+            return context
+        from ..improve.fingerprint import compute
+
+        context["workflow"] = decl.workflow
+        context["item"] = item_for(decl, state)
+        digest, manifest = compute(decl, self.settings, state=state)
+        if digest:
+            context["fingerprint"] = digest
+        else:
+            context["fingerprint_missing"] = list(manifest.get("missing") or [])
+        return context
 
 
 def _item_key(item) -> str:

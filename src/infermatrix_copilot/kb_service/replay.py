@@ -42,6 +42,11 @@ def replay(store, record_id: str, gateway, role: ModelRole) -> dict:
     record = store.get(record_id)
     if record["kind"] != "model_call":
         raise ValueError(f"{record_id} is a {record['kind']} record, not a model call")
+    if "prompt" not in record["inputs"]:
+        raise ValueError(
+            f"{record_id} is a structured conversation record "
+            f"(result.format={record.get('result', {}).get('format', '?')}, inputs.messages/tools); "
+            "kb replay re-asks single-prompt records only")
     system, prompt = store.blob(record["inputs"]["system"]), store.blob(record["inputs"]["prompt"])
     try:
         recorded = None if record.get("error") else \
@@ -98,7 +103,8 @@ def export_dataset(store, out_path: str | Path, *, role: str = "judge",
             rule_outcomes.setdefault(str(result.get("rule_id")), []).append("rule_retired")
         else:
             outcomes.setdefault(record["context"].get("changeset_id") or "", []).append(result["outcome"])
-    counts = {"written": 0, "leak_dropped": 0, "calibration_dropped": 0, "failed_dropped": 0}
+    counts = {"written": 0, "leak_dropped": 0, "calibration_dropped": 0, "failed_dropped": 0,
+              "structured_skipped": 0}
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as handle:
@@ -109,6 +115,9 @@ def export_dataset(store, out_path: str | Path, *, role: str = "judge",
                 continue
             if record.get("error"):
                 counts["failed_dropped"] += 1
+                continue
+            if "prompt" not in record["inputs"]:
+                counts["structured_skipped"] += 1   # agent conversations (messages/1) are not dataset rows
                 continue
             system, prompt = store.blob(record["inputs"]["system"]), store.blob(record["inputs"]["prompt"])
             if any(mark.search(prompt) or mark.search(system) for mark in marks):

@@ -142,6 +142,10 @@ def main(argv: list[str] | None = None) -> int:
         from ..kb_service.cli import main as kb_main
 
         return kb_main(raw[1:])
+    if raw and raw[0] == "improve":  # the meta-improvement engine's commands
+        from ..improve.cli import main as improve_main
+
+        return improve_main(raw[1:])
     args = parser.parse_args(argv)
 
     if args.command == "doctor":  # diagnostics only — no Copilot/LLM spin-up

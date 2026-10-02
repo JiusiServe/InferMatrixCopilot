@@ -74,9 +74,43 @@ def run_harness_step(ctx, target, *, step_name: str, system: str, prompt: str,
     bridge_spec = write_bridge_spec(
         run_dir=ctx.run_dir, step_name=step_name, scope=scope,
         repo=str(spec.get("repo") or ctx.settings.default_repo))
-    return transport.run_session(AgentSessionRequest(
-        system=system, prompt=prompt, scope=scope,
-        model=model or target.model,
-        max_iters=max_iters, timeout_s=ctx.settings.strict_backend_timeout_s,
-        run_dir=ctx.run_dir, step_name=step_name,
-        bridge_spec_path=bridge_spec, trace=ctx.trace))
+    import time
+
+    from ..llm import capture_model_call
+
+    # the session is one model_call record (a harness runs the whole loop
+    # inside its CLI: the reply is the final answer, the usage the session's);
+    # the bridge subprocess records the tool calls under the same unit context
+    kwargs = {"system": system, "messages": [{"role": "user", "content": prompt}],
+              "model": model or target.model, "max_tokens": None, "tools": []}
+    provider = f"harness:{getattr(getattr(transport, 'spec', None), 'id', provider_id or '')}"
+    started = time.monotonic()
+    try:
+        outcome = transport.run_session(AgentSessionRequest(
+            system=system, prompt=prompt, scope=scope,
+            model=model or target.model,
+            max_iters=max_iters, timeout_s=ctx.settings.strict_backend_timeout_s,
+            run_dir=ctx.run_dir, step_name=step_name,
+            bridge_spec_path=bridge_spec, trace=ctx.trace))
+    except Exception as exc:
+        capture_model_call(kwargs, step_name, provider, None, time.monotonic() - started,
+                           error=str(exc), extra_result={"session": True})
+        raise
+    capture_model_call(kwargs, step_name, provider, _SessionReply(outcome), time.monotonic() - started,
+                       extra_result={"session": True, "iterations": outcome.iterations,
+                                     "tool_calls": outcome.tool_calls, "truncated": outcome.truncated,
+                                     "refusals": list(outcome.refusals),
+                                     "tools_used": list(outcome.tools_used)})
+    return outcome
+
+
+class _SessionReply:
+    """An AgentOutcome viewed as a reply for capture: final text, usage."""
+
+    def __init__(self, outcome):
+        from ..llm import Block
+
+        self.blocks = [Block(type="text", text=outcome.text or "")]
+        self.model = ""
+        self.stop_reason = "truncated" if outcome.truncated else "end_turn"
+        self.usage = {"input_tokens": outcome.input_tokens, "output_tokens": outcome.output_tokens}

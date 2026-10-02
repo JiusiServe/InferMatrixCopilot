@@ -9,10 +9,12 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
+from . import trace_store
 from .config import Settings
 
 logger = logging.getLogger("infermatrix_copilot")
@@ -203,36 +205,44 @@ class LLM:
         )
         from . import tracing
 
-        with tracing.span("llm", model=kwargs["model"],
-                          n_tools=len(kwargs["tools"]),
-                          **({"role": role} if role else {})) as _sp:
-            tracing.event("llm.request", span=_sp, model=kwargs["model"],
-                          n_tools=len(kwargs["tools"]), role=role or "",
-                          system=kwargs.get("system", ""),
-                          payload=tracing.summarize_messages(kwargs["messages"]))
-            if provider == "anthropic" and on_text is not None:
-                with self._client.messages.stream(**kwargs) as stream:
-                    for delta in stream.text_stream:
-                        _sp.mark_ttft()  # first streamed token = prefill done
-                        on_text(delta)
-                    resp = stream.get_final_message()
-                blocks, stop_reason, usage, served, request_id = \
-                    self._normalize_anthropic(resp)
-            elif provider == "openai":
-                resp = self._create_openai(**kwargs)
-                blocks, stop_reason, usage, served, request_id = \
-                    self._normalize_openai(resp)
-                if on_text is not None:
-                    _sp.mark_ttft()
-                    text = "".join(
-                        b.text for b in blocks if b.type == "text")
-                    if text:
-                        on_text(text)
-            else:
-                resp = self._client.messages.create(**kwargs)
-                blocks, stop_reason, usage, served, request_id = \
-                    self._normalize_anthropic(resp)
-            tracing.set_usage(_sp, usage, stop_reason=stop_reason)
+        started = time.monotonic()
+        try:
+            with tracing.span("llm", model=kwargs["model"],
+                              n_tools=len(kwargs["tools"]),
+                              **({"role": role} if role else {})) as _sp:
+                tracing.event("llm.request", span=_sp, model=kwargs["model"],
+                              n_tools=len(kwargs["tools"]), role=role or "",
+                              system=kwargs.get("system", ""),
+                              payload=tracing.summarize_messages(kwargs["messages"]))
+                if provider == "anthropic" and on_text is not None:
+                    with self._client.messages.stream(**kwargs) as stream:
+                        for delta in stream.text_stream:
+                            _sp.mark_ttft()  # first streamed token = prefill done
+                            on_text(delta)
+                        resp = stream.get_final_message()
+                    blocks, stop_reason, usage, served, request_id = \
+                        self._normalize_anthropic(resp)
+                elif provider == "openai":
+                    resp = self._create_openai(**kwargs)
+                    blocks, stop_reason, usage, served, request_id = \
+                        self._normalize_openai(resp)
+                    if on_text is not None:
+                        _sp.mark_ttft()
+                        text = "".join(
+                            b.text for b in blocks if b.type == "text")
+                        if text:
+                            on_text(text)
+                else:
+                    resp = self._client.messages.create(**kwargs)
+                    blocks, stop_reason, usage, served, request_id = \
+                        self._normalize_anthropic(resp)
+                tracing.set_usage(_sp, usage, stop_reason=stop_reason)
+        except Exception as exc:
+            # a failed provider call is still a model_call record (error set):
+            # forensics must see the request that never got a reply
+            capture_model_call(kwargs, role, provider, None,
+                               time.monotonic() - started, error=str(exc))
+            raise
         tracing.event("llm.response", span=_sp,
                       stop_reason=stop_reason,
                       text="".join(b.text for b in blocks if b.type == "text"),
@@ -243,8 +253,11 @@ class LLM:
                       **tracing.usage_counts(usage))
         reply = Reply(blocks=blocks, stop_reason=stop_reason,
                       usage=usage, model=served, request_id=request_id)
+        capture_model_call(kwargs, role, provider, reply,
+                           time.monotonic() - started)
         self._guard_served_model(kwargs["model"], reply, _sp)
         return reply
+
 
     @staticmethod
     def _normalize_anthropic(resp: Any) -> tuple[
@@ -450,3 +463,54 @@ def parse_json_reply(text: str) -> dict | None:
         except json.JSONDecodeError:
             continue
     return None
+
+
+MESSAGES_FORMAT = "messages/1"
+
+
+def capture_model_call(kwargs: dict, role: str, provider: str,
+                       reply: "Reply | None", seconds: float,
+                       error: str = "", extra_result: dict | None = None) -> None:
+    """trace/1 ``model_call`` capture for every provider path (the API loop,
+    the harness one-shot, a harness session) when a store is bound; never
+    raises. Full fidelity so the request can be reconstructed: ``inputs.system``,
+    ``inputs.messages`` (the structured conversation, JSON) and
+    ``inputs.tools`` (the tool definitions offered, JSON); ``result.format``
+    names the shape so readers never confuse it with the knowledge service's
+    single-string ``inputs.prompt`` records. A failed call has no outputs at
+    all: forensics reads "no reply blob and a non-empty error" as the
+    dropped-call shape."""
+    store = trace_store.current_store()
+    if store is None:
+        return
+    try:
+        blocks = list(getattr(reply, "blocks", None) or []) if reply is not None else []
+        text = "".join(getattr(b, "text", "") for b in blocks if getattr(b, "type", "") == "text")
+        tool_calls = [{"name": b.name, "id": b.id, "input": b.input}
+                      for b in blocks if getattr(b, "type", "") == "tool_use"]
+        inputs = {"system": str(kwargs.get("system") or ""),
+                  "messages": json.dumps(kwargs.get("messages") or [],
+                                         ensure_ascii=False, default=str)}
+        if kwargs.get("tools"):
+            inputs["tools"] = json.dumps(kwargs["tools"], ensure_ascii=False, default=str)
+        store.append(
+            "model_call",
+            inputs=inputs,
+            outputs=({"reply": text,
+                      "tool_calls": json.dumps(tool_calls, ensure_ascii=False,
+                                               default=str)}
+                     if reply is not None else {}),
+            model={"role": role or "", "provider": provider,
+                   "model": kwargs.get("model", "") or "",
+                   "served_model": (getattr(reply, "model", "") if reply is not None else "") or ""},
+            usage=dict((getattr(reply, "usage", None) if reply is not None else None) or {}),
+            seconds=round(seconds, 6),
+            result={"format": MESSAGES_FORMAT,
+                    "stop_reason": (getattr(reply, "stop_reason", "") if reply is not None else "") or "",
+                    "max_tokens": kwargs.get("max_tokens"),
+                    "n_tools": len(kwargs.get("tools") or []),
+                    "n_tool_calls": len(tool_calls),
+                    **(extra_result or {})},
+            error=error)
+    except Exception:  # noqa: BLE001 - capture never breaks a model call
+        pass

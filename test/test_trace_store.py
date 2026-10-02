@@ -159,7 +159,8 @@ def test_export_joins_decisions_and_outcomes_and_drops_calibration_leaks(tmp_pat
     store.append("outcome", context={"changeset_id": "cs9", "rule_ids": ["DEMO-2a"]},
                  result={"outcome": "rule_retired", "rule_id": "DEMO-2a"})
     counts = export_dataset(store, tmp_path / "out.jsonl", calibration_dirs=[calib])
-    assert counts == {"written": 2, "leak_dropped": 2, "calibration_dropped": 2, "failed_dropped": 0}
+    assert counts == {"written": 2, "leak_dropped": 2, "calibration_dropped": 2, "failed_dropped": 0,
+                      "structured_skipped": 0}
     row, other = [json.loads(line) for line in (tmp_path / "out.jsonl").read_text().splitlines()]
     assert other["changeset_id"] == "cs4"
     assert row["changeset_id"] == "cs1" and row["decision"] == {"status": "pass"}

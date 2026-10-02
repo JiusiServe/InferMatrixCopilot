@@ -1,0 +1,25 @@
+# PR review, the diff-review agent loop (dynamic): the copilot's eval arms and
+# any production pr-review run. Tier 2 comparative (design §6.1) once the
+# outcome adapter lands (P2); until then the adapter line is absent and the
+# workflow is Tier 1 with a fingerprint.
+workflow: pr-review.agent.review_diff
+kind: dynamic
+unit: agent_loop
+item_key: "{repo}#{pr}@{head_sha}"
+fingerprint:
+  covers:
+    - playbook_yaml_sha
+    - settings: [review_second_round, review_second_round_max_iters, llm_max_tokens,
+                 review_lens_backends, strict_backend, strict_backend_model, agent_model,
+                 eco_model, performance_model, profile_briefing_enabled]
+    - prompts: ["engine/steps/review/prompts.py", "engine/agent_runtime/*.py"]
+    - routing: [ECO_MODEL, PERFORMANCE_MODEL, STRICT_BACKEND]
+    - resolved_models
+    - tools
+    - knowledge_snapshot
+    - copilot_sha
+capture: full
+tier2_min_items: 8
+shadow_tools: [doc_read, doc_search, repo_map, repo_docs, diff_stat, file_at_base,
+               show_commit, search_history, calc]
+shadow_executables: [python3, git, grep]

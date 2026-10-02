@@ -167,6 +167,18 @@ class Ledger:
             )
         return owner
 
+    def live_lease(self) -> str:
+        """The owner of a lease whose heartbeat is still within its TTL, else
+        ``""``: a running service instance (``kb serve``) renews it; a stopped
+        one has released it or let it expire."""
+        row = self._conn.execute("SELECT value FROM meta WHERE key='lease'").fetchone()
+        if row is None:
+            return ""
+        held = json.loads(row["value"])
+        if self._clock() - float(held["heartbeat"]) < float(held["ttl"]):
+            return str(held["owner"])
+        return ""
+
     def heartbeat(self, owner: str) -> None:
         with self.tx() as cur:
             row = cur.execute("SELECT value FROM meta WHERE key='lease'").fetchone()

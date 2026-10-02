@@ -7,12 +7,15 @@ recorded — never silent.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from . import trace_store
 from .run_trace import RunTrace
 from .scopes import ToolScope
 
@@ -324,7 +327,46 @@ def dispatch(
     trace: RunTrace | None = None,
     extra: dict[str, ToolDef] | None = None,
 ) -> dict:
-    """Returns {"ok": bool, "result"|"error": str, "out_of_scope": bool}."""
+    """Returns {"ok": bool, "result"|"error": str, "out_of_scope": bool}.
+
+    The single choke point for every agent tool call (invariant 5). When a
+    trace/1 store is bound (``trace_store.bind_store``), every call — allowed,
+    failed or refused — is also captured as a ``tool_call`` record with its
+    arguments and result as blobs; capture never changes the payload."""
+    started = time.monotonic()
+    payload = _dispatch(name, args, scope=scope, trace=trace, extra=extra)
+    _capture_tool_call(name, args, payload, time.monotonic() - started)
+    return payload
+
+
+def _capture_tool_call(name: str, args: dict, payload: dict, seconds: float) -> None:
+    store = trace_store.current_store()
+    if store is None:
+        return
+    try:
+        error = str(payload.get("error") or "")
+        result_text = payload.get("result") if payload.get("ok") else error
+        store.append(
+            "tool_call",
+            inputs={"args": json.dumps(args, ensure_ascii=False, sort_keys=True, default=str)},
+            outputs={"result": str(result_text if result_text is not None else "")},
+            result={"tool": name, "ok": bool(payload.get("ok")),
+                    "refused": error.startswith("refused:"),
+                    "out_of_scope": bool(payload.get("out_of_scope")),
+                    "bytes": len(str(result_text or ""))},
+            seconds=round(seconds, 6), error="" if payload.get("ok") else error)
+    except Exception:  # noqa: BLE001 - capture never breaks a tool call
+        pass
+
+
+def _dispatch(
+    name: str,
+    args: dict,
+    *,
+    scope: ToolScope | None = None,
+    trace: RunTrace | None = None,
+    extra: dict[str, ToolDef] | None = None,
+) -> dict:
     tool = (extra or {}).get(name) or TOOLS.get(name)
     if tool is None:
         return {"ok": False, "error": f"unknown tool: {name}", "out_of_scope": False}

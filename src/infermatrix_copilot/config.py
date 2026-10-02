@@ -565,6 +565,15 @@ class Settings(BaseSettings):
     # (2026-08-01 audit); the adapter manifest declares them.
     high_risk_modules: list[str] = []
 
+    # trace/1 full-fidelity capture (meta-improvement engine, design §7):
+    # TRACE_STORE_ROOT names the store every run binds; every model call and
+    # tool call then lands as a record with blobs. Empty = no capture (the
+    # legacy span/event files are unaffected either way).
+    trace_store_root: str = ""
+    # Extra directories of workflow declarations (os.pathsep separated),
+    # consulted after the package's builtin improve/workflows/.
+    improve_workflows_dirs: str = ""
+
     # Metrics (eval/METRICS_RESEARCH.md) — per-run metrics.json: CATQ = Q·S/C.
     # Reference budgets are EXPLICIT deployment assumptions (RQS3e precedent):
     # at the ref cost the log discount is ~23%; raise a ref where that
