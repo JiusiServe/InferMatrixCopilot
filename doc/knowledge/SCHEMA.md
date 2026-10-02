@@ -35,6 +35,11 @@ validation 六个维度。它生成的非规则段使用 `kb:knowledge` HTML 注
 不产生规则，也不承诺整文件行为或测试覆盖。功能页和源码记录按最近代码 owner 组织；
 达标报告属于 `eval/`，不能作为产品知识正文保存或通过新增索引增加覆盖率。
 
+`kb deepen`（`knowledge-deepen`）的 `kb:depth` 标记另绑定 feature、七维 facet、完整 pin
+与正文哈希，`kb:depth-proof` 保存精确证据区间及其内容哈希、调用 trace。只用于复核代表性
+实现知识；旧标记、静态接口卡、规则和索引不计入此深度。正文或证据改变、pin 不符或重复
+facet 均失效。页面仍使用既有 architecture/guide 类型，设计推断与未验证测试明确标出。
+
 `check_wiki_lint.py` 强制的只有前五项（`title`、`created`、`updated`、`type`、
 非空 `tags`）；其余为约定字段，写了就必须合法（`confidence` 只能取三值）。
 

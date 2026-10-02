@@ -42,6 +42,7 @@ from .models import ModelGateway, ModelReply, ModelRole, ModelUnavailable
 
 INIT_DIR = "init"
 STAGES = ("skeleton", "modules", "knowledge", "deepen", "pr-history", "harvest-calibration")
+INDEPENDENT_STAGES = ("knowledge-deepen",)
 KNOWLEDGE_PREFIX = "knowledge/"
 ALLOW_PUSH_ENV = "ALLOW_PUSH"
 ALLOW_POST_ENV = "ALLOW_POST"
@@ -91,6 +92,7 @@ class InitRecord:
     coverage: dict = field(default_factory=dict)          # the stage's coverage report (modules, deepen)
     history: dict = field(default_factory=dict)           # pr-history selection, checkpoints and commit plan
     review: dict = field(default_factory=dict)            # aggregate review, bound to the exact base/head
+    depth: dict = field(default_factory=dict)             # independent semantic-depth checkpoints
 
     @staticmethod
     def path(state_dir: Path, repo: str, stage: str) -> Path:

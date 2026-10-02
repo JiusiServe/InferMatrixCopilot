@@ -13,12 +13,13 @@ repos: []
 requires: []
 params:
   repo: "knowledge repository name"
-  stage: "skeleton | modules | knowledge | deepen | pr-history | harvest-calibration"
+  stage: "skeleton | modules | knowledge | deepen | pr-history | harvest-calibration | knowledge-deepen (independent)"
   dry_run: "true (default): write the tree and PR body locally; false needs ALLOW_PUSH=1 and ALLOW_POST=1"
   pin: "upstream commit to pin (default: the default branch head)"
   pr_count: "pr-history only: merged upstream PRs to replay (default: adapter pr_history_count or 1000)"
-  budget_usd: "pr-history only: cumulative spend ceiling; increasing it resumes the same window"
-  from_existing: "knowledge only: explicitly enrich a merged index and owner routes without local earlier-stage records"
+  budget_usd: "pr-history/depth: cumulative spend ceiling; increasing it resumes the same pinned batch"
+  from_existing: "explanatory knowledge: enrich a merged index and owner routes without local earlier-stage records"
+  retry_unfinished: "knowledge-deepen only: retry unsupported facets while retaining accepted work and cumulative spend"
   subscription_generator: "explicit subscription backend; generator USD unreported, fees outside stage USD accounting"
 steps:
   - {id: init, step: knowledge.init}
