@@ -40,3 +40,5 @@ sources: []
 - [Cron 后端与一致性的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
 - [定时任务与调度存储 功能知识](feature-cron.md)
 - [cron-scheduling 源码接口与集成边界 01](source-contracts-01.md)
+
+- [定时任务与调度存储：实现深读](feature-depth-cron.md)

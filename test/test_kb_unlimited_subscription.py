@@ -204,3 +204,15 @@ def test_structural_gap_blocks_strict_campaign_before_model_calls(world):
     assert not record.coverage["breadth"]["met"]
     assert "structural coverage" in record.problems[0]
     assert gateway.depth_calls == []
+
+
+def test_explicit_feature_order_only_changes_execution_not_global_audit(world):
+    _baseline(world, features=2)
+    gateway = DepthGateway()
+    rt = _runtime(world, gateway, generator=ModelRole("generator", "zcode", "subscription-model"),
+                  state_dir=world["tmp"] / "ordered-partition")
+    record = run_stage(rt, _modules_lifecycle(), "knowledge-deepen", dry_run=True,
+                       from_existing=True, unlimited_subscription=True, feature_ids=("step1", "step0"))
+    assert [payload["feature"]["id"] for payload in gateway.depth_calls] == ["step1", "step0"]
+    assert record.coverage["semantic_depth"]["total_features"] == 2
+    assert record.coverage["semantic_depth"]["total_facets"] == 14

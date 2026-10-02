@@ -509,20 +509,23 @@ class DepthContext:
         words = {w.lower() for w in re.findall(r"[A-Za-z_][\w]*", feature.id + " " + existing + " " + str(previous_review or "")) if len(w) > 3}
         source = self._scope(feature)
         tests = self.test_association(feature, docs)
-        relevant = list(source)
-        for path in source:
-            relevant.extend(sorted(self._import_targets(path)[0] & set(self.production)))
+        dependencies = set().union(*(self._import_targets(path)[0] for path in source)) & set(self.production)
+        relevant = list(source) + sorted(dependencies)
         # Callers expose API obligations and failure propagation outside the owner.
         if any(f in facets for f in ("api", "flow", "dependencies", "failure_modes")):
             relevant.extend(p for p in self.production if self._import_targets(p)[0] & set(source))
         relevant = list(dict.fromkeys(relevant))
-        ranges, edges = [], []
+        tiers = {path: 3 if path in feature.entry_points else 2 if path in source
+                 else 1 if path in dependencies else 0
+                 for path in relevant}
+        ranges, edges, flow_pairs, headers = [], [], [], {}
         for path in relevant + tests["matched_files"]:
             value = self._file(path)
             if not value:
                 continue
             lines, module, nodes = value
             definitions = self._definitions(path)
+            headers[path] = {d["start"] for d in definitions}
             is_test = path in tests["matched_files"]
             base = ((50 + tests["match_strength"][path]) if is_test and "validation" in facets
                     else 15 if path in feature.entry_points else 0)
@@ -554,16 +557,20 @@ class DepthContext:
                 offset = evidence_round * 6 % len(ranked_nodes) if ranked_nodes else 0
                 for node in (ranked_nodes[offset:] + ranked_nodes[:offset])[:6]:
                     for target_path, target in self._neighbours(path, node):
+                        if target_path not in self.production or not isinstance(target, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            continue
                         symbol = next(name for name, d in self.definition_cache[path].items() if d is node)
                         target_symbol = next(name for name, d in self.definition_cache[target_path].items() if d is target)
                         edges.append({"caller": path + "::" + symbol, "callee": target_path + "::" + target_symbol})
-                        ranges.extend([(base + 35, path, node.lineno, node.end_lineno),
-                                       (base + 35, target_path, target.lineno, target.end_lineno)])
+                        pair = [(path, node.lineno, node.end_lineno),
+                                (target_path, target.lineno, target.end_lineno)]
+                        flow_pairs.append((tiers[path], base + 35, pair))
+                        ranges.extend((base + 35, p, start, end) for p, start, end in pair)
         # Sorting before rotation preserves priority; only ties rotate between rounds.
-        ordered = sorted(set(ranges), key=lambda r: (-r[0], r[1], r[2], r[3]))
+        ordered = sorted(set(ranges), key=lambda r: (-tiers.get(r[1], 4), -r[0], r[1], r[2], r[3]))
         if evidence_round and ordered:
             rotated = []
-            for _, group in groupby(ordered, key=lambda item: item[0]):
+            for _, group in groupby(ordered, key=lambda item: (tiers.get(item[1], 4), item[0])):
                 tied = list(group)
                 shift = (evidence_round * 11) % len(tied)
                 rotated.extend(tied[shift:] + tied[:shift])
@@ -572,21 +579,56 @@ class DepthContext:
         test_paths = set(tests["matched_files"])
         test_fraction = 0.75 if facets == ("validation",) else 0.40
         quotas = {True: int(limit * test_fraction), False: limit - int(limit * test_fraction)} if test_paths else {True: 0, False: limit}
-        kind_used = {True: 0, False: 0}
-        for _, path, start, end in ordered:
-            lines = self._file(path)[0]
-            for number in range(start, end + 1):
-                if (path, number) in seen:
-                    continue
-                text = f"{number}: {lines[number - 1]}"
+        kind_used, file_used = {True: 0, False: 0}, {}
+        support = set(relevant) - set(source)
+        source_quota = int(quotas[False] * 0.80) if support else quotas[False]
+        support_quota = quotas[False] - source_quota
+        scope_used = {True: 0, False: 0}
+        caps = {True: int(quotas[True] * 0.80) if len(test_paths) > 1 else quotas[True],
+                False: quotas[False] // max(1, min(4, len(source)))}
+
+        def offer(spans, *, atomic=False):
+            nonlocal used
+            pending = {(path, number): f"{number}: {self._file(path)[0][number - 1]}"
+                       for path, start, end in spans for number in range(start, end + 1)
+                       if (path, number) not in seen}
+            size = sum(len(text.encode("utf-8")) for text in pending.values())
+            if atomic and (size > quotas[False] // 3 or kind_used[False] + size > quotas[False]):
+                return
+            items = list(pending.items())
+            if not atomic:
+                def rank(item):
+                    (path, number), text = item
+                    hits = sum(bool(pattern.search(text)) for pattern in patterns)
+                    declaration = number in headers.get(path, set())
+                    named = sum(word in text.lower() for word in words)
+                    return (-bool(hits or declaration), -named, -declaration, -hits, number)
+                items.sort(key=rank)
+            for (path, number), text in items:
                 size = len(text.encode("utf-8"))
-                kind = path in test_paths
+                kind, own = path in test_paths, path in source
                 if used + size > limit or kind_used[kind] + size > quotas[kind]:
+                    continue
+                if not atomic and (file_used.get(path, 0) + size > caps[kind]
+                                   or not kind and scope_used[own] + size > (source_quota if own else support_quota)):
                     continue
                 selected.setdefault(path, {})[number] = text
                 used += size
                 kind_used[kind] += size
+                file_used[path] = file_used.get(path, 0) + size
+                if not kind:
+                    scope_used[own] += size
                 seen.add((path, number))
+
+        # One small complete, statically proved pair is more useful than a
+        # truncated giant caller. Reserve it, then diversify by owner/file.
+        for _, _, pair in sorted(flow_pairs, key=lambda item: (-item[0], -item[1], item[2])):
+            before = used
+            offer(pair, atomic=True)
+            if used > before:
+                break
+        for _, path, start, end in ordered:
+            offer([(path, start, end)])
         files = []
         for path, numbered in selected.items():
             span = []

@@ -61,7 +61,7 @@ class _KnowledgeDepth(_Knowledge):
             ":unlimited-subscription" if getattr(self.rt, "unlimited_subscription", False) else "")
 
     def _input_options(self) -> dict:
-        return {**super()._input_options(), "depth_version": 4, "depth_feature_ids": sorted(self.feature_ids)}
+        return {**super()._input_options(), "depth_version": 4, "depth_feature_ids": list(self.feature_ids)}
 
     def _base_for_run(self, latest: str) -> str:
         previous = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, self.STAGE)
@@ -136,7 +136,8 @@ class _KnowledgeDepth(_Knowledge):
             state["done"] = False
             return self._blocked(["structural coverage target is unmet; restore feature and production-file coverage before depth extraction"])
         context = DepthContext(tree, inventory(tree, policy))
-        selected_features = tuple(f for f in policy.features if not self.feature_ids or f.id in self.feature_ids)
+        by_id = {f.id: f for f in policy.features}
+        selected_features = tuple(by_id[fid] for fid in dict.fromkeys(self.feature_ids)) if self.feature_ids else policy.features
         # Finish a fair first pass before targeted repairs. Subscription mode
         # stops on converged evidence rather than on an artificial USD ceiling.
         unlimited = getattr(self.rt, "unlimited_subscription", False)

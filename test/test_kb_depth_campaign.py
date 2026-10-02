@@ -4,6 +4,7 @@ import argparse
 import fcntl
 import importlib.util
 import json
+import os
 import signal
 import subprocess
 import sys
@@ -31,7 +32,11 @@ def _git(root, *args):
 
 
 @pytest.fixture
-def campaign_args(tmp_path):
+def campaign_args(tmp_path, monkeypatch):
+    # run_worker normally owns a subprocess. In-process offline probes must
+    # restore its environment writes before unrelated integration tests run.
+    for name in ("ADAPTERS_DIR", "KB_INIT_KNOWLEDGE_CLONE"):
+        monkeypatch.setenv(name, os.environ.get(name, ""))
     root = tmp_path / "repository"
     root.mkdir()
     _git(root, "init", "--quiet", "-b", "main")

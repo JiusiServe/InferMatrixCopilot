@@ -129,7 +129,7 @@ def test_direct_exercised_feature_tests_rank_before_transitive_shared_imports(tm
     assert report["matched_files"] == [direct, "tests/a_test_video.py"]
     data = context.build(_feature([source]), "", [], facets=["validation"], limit=180, evidence_round=evidence_round)
     assert "assert schedule(1) == 2" in _shown(data)
-    assert "assert other(1) == 1" not in _shown(data)
+    assert data["files"][0]["path"] == direct
 
 
 @pytest.mark.parametrize("exports", ["./src/api.mjs", {".": {"import": "./src/api.mjs", "require": "./src/api.cjs"}}])
@@ -217,3 +217,58 @@ def test_external_python_execution_cannot_certify_no_feature_test(tmp_path, exec
     assert report["unresolved_files"]
     policy = SimpleNamespace(roots=("pkg/",), exclude=(), suffixes=(".py",), filenames=())
     assert build_absence_certificate(tmp_path, policy, feature, "a" * 40) is None
+
+
+@pytest.mark.parametrize("evidence_round", [0, 1, 4])
+def test_large_generic_caller_cannot_crowd_out_feature_scope_or_flow_pair(tmp_path, evidence_round):
+    from infermatrix_copilot.kb_service.knowledge_depth import verify_trace
+
+    entry, helper, scoped = "pkg/cron.py", "pkg/cron_util.py", "pkg/cron_config.py"
+    _write(tmp_path, entry, "from pkg.cron_util import finish\ndef schedule(value):\n    return finish(value)\n")
+    _write(tmp_path, helper, "def finish(value):\n    return value + 1\n")
+    _write(tmp_path, scoped, "TIMEOUT = 17\ndef configure(timeout=TIMEOUT):\n    return timeout\n")
+    caller = "pkg/interface_deep.py"
+    _write(tmp_path, caller, "from pkg.cron import schedule\ndef generic_stream():\n" + "".join(
+        f"    config_{i} = 'default retry await request session cache return timeout'\n" for i in range(1000))
+        + "    return schedule(1)\n")
+    feature = _feature([entry, scoped])
+    feature.id = "cron"
+    data = DepthContext(tmp_path, [entry, helper, scoped, caller]).build(feature, "", [], limit=900,
+                                                                     evidence_round=evidence_round)
+    paths = {f["path"] for f in data["files"]}
+    assert {entry, helper, scoped} <= paths
+    assert "return finish(value)" in _shown(data) and "return value + 1" in _shown(data)
+    assert "TIMEOUT = 17" in _shown(data)
+    assert data["source_bytes"] <= 900
+    trace = [{"path": entry, "symbol": "schedule", "start": 2, "end": 3},
+             {"path": helper, "symbol": "finish", "start": 1, "end": 2}]
+    assert all(any(f["path"] == s["path"] and f["start"] <= s["start"] <= s["end"] <= f["end"]
+                   for f in data["files"]) for s in trace)
+    verify_trace(tmp_path, trace)
+
+
+@pytest.mark.parametrize("evidence_round", [0, 1, 4])
+def test_padding_cannot_spend_file_quota_before_the_setting_signature(tmp_path, evidence_round):
+    entry, settings = "pkg/entry.py", "pkg/settings.py"
+    _write(tmp_path, entry, "def entry(value):\n    return value\n")
+    _write(tmp_path, settings, "#\n" * 195 + ("# " + "0" * 100 + "\n") * 5
+           + "def configure(timeout=17):\n    return timeout\n")
+    data = DepthContext(tmp_path, [entry, settings]).build(_feature([entry, settings]), "", [],
+             facets=["configuration"], limit=900, evidence_round=evidence_round)
+    assert "def configure(timeout=17)" in _shown(data)
+    assert "return timeout" in _shown(data)
+    assert data["source_bytes"] <= 900
+
+
+def test_long_owned_function_offers_late_default_assertion_before_padding(tmp_path):
+    source = "pkg/transport.py"
+    _write(tmp_path, source, "def configure_transport():\n" + "    value = 1\n" * 1000
+           + "    timeout = 17\n    assert timeout > 0\n    return timeout\n")
+    data = DepthContext(tmp_path, [source]).build(_feature([source]), "", [],
+             facets=["configuration", "validation"], limit=600)
+    shown = _shown(data)
+    assert "def configure_transport()" in shown
+    assert "timeout = 17" in shown
+    assert "assert timeout > 0" in shown
+    assert "return timeout" in shown
+    assert data["source_bytes"] <= 600

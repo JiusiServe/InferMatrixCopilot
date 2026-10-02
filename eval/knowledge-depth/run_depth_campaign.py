@@ -67,6 +67,7 @@ def main():
     parser.add_argument("--upstream-mirror", type=Path, required=True)
     parser.add_argument("--baseline", required=True)
     parser.add_argument("--workers", type=int, default=3)
+    parser.add_argument("--priority-features", default="", help="Visit these policy features first without changing audit scope")
     parser.add_argument("--retry", action="store_true")
     parser.add_argument("--worker", type=int)
     parser.add_argument("--feature-ids")
@@ -103,6 +104,11 @@ def campaign(args, parser):
         parser.error("source pin is not a commit in the upstream mirror")
     partitions = {str(n): [f.id for i, f in enumerate(policy.features) if i % args.workers == n]
                   for n in range(args.workers)}
+    priority = list(dict.fromkeys(filter(None, getattr(args, "priority_features", "").split(","))))
+    if set(priority) - {f.id for f in policy.features}:
+        parser.error("priority features must belong to the unchanged coverage policy")
+    for worker, group in partitions.items():
+        partitions[worker] = [fid for fid in priority if fid in group] + [fid for fid in group if fid not in priority]
     summary = {"baseline": args.baseline, "pin": args.pin, "repo": args.repo,
                "features": len(policy.features), "denominator": len(policy.features) * 7,
                "workers": args.workers, "partitions": partitions}
