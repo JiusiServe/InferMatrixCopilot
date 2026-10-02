@@ -44,6 +44,10 @@ def public_paths(value, state, project):
 def validate_evaluation(study, campaign, collection, truth, scores):
     """Never turn equal counters from different experiments into A/B results."""
     campaign_sha = binding(study / "campaign.json")["sha256"]
+    for case in campaign.get("cases", []):
+        for kind in ("context", "diff"):
+            if case.get(kind + "_path") and binding(case[kind + "_path"])["sha256"] != case.get(kind + "_sha256"):
+                raise ValueError("frozen PR input bytes changed")
     identity = load(study / "identity.json", {})
     if identity and identity.get("campaign_sha256") != campaign_sha:
         raise ValueError("runtime belongs to a different campaign")
@@ -134,6 +138,8 @@ def subgroup_operational(reviews, samples, prs):
         if any(r.get("novel_valid_defects") is None for r in scored):
             counts["novel_valid_defects"] = None
         defects = counts["TP"] + counts["FP"] + counts["unknown"]
+        if not scored:
+            counts = {key: None for key in counts}
         result[arm] = {"expected": len(prs) * 3, "valid": len(valid), "terminal": len(rows), "scored": len(scored), "counts": counts,
                        "unknown_share": counts["unknown"] / defects if defects else None,
                        "classification_unit": "root causes deduplicated within review; repeat findings remain separate samples",
@@ -188,6 +194,38 @@ def paired_quality(per_pr):
         value[field] = {"A": a, "B": b, "B_minus_A": b-a if pairs else None,
                         "applicable_prs": len(pairs), "prs": [p["pr"] for p in pairs]}
     return value
+
+
+def paired_speed(reviews, prs):
+    """Compare the same successful PR/repetition slots, then average by PR."""
+    slots = {(r["number"], r["repetition"], r["arm"]): r for r in reviews
+             if not r.get("preflight") and r["number"] in prs and r["status"] == "valid"}
+    result = {}
+    for field in ("native_seconds", "queue_seconds", "end_to_end_seconds"):
+        per_pr = []
+        for pr in prs:
+            pairs = [(slots.get((pr, rep, "A")), slots.get((pr, rep, "B"))) for rep in (1, 2, 3)]
+            pairs = [(a, b) for a, b in pairs if a and b and all(isinstance(r.get(field), (int, float)) for r in (a, b))]
+            if pairs:
+                per_pr.append({"pr": pr, "paired_repeats": len(pairs),
+                               "A": statistics.mean(a[field] for a, _ in pairs),
+                               "B": statistics.mean(b[field] for _, b in pairs)})
+        a = statistics.mean(r["A"] for r in per_pr) if per_pr else None
+        b = statistics.mean(r["B"] for r in per_pr) if per_pr else None
+        result[field] = {"A": a, "B": b, "B_minus_A_seconds": b - a if per_pr else None,
+                         "applicable_prs": len(per_pr), "paired_repeats": sum(r["paired_repeats"] for r in per_pr),
+                         "per_pr": per_pr, "interpretation": "descriptive paired valid trials; includes rate limits and tool time"}
+    return result
+
+
+def matching_diagnostics(diagnostics, collection, identity):
+    rows = [r for r in collection.get("results", []) if not r.get("preflight")]
+    expected = {(r["number"], r["arm"], r["repetition"] - 1): r["status"] for r in rows}
+    observed = {(r["pr"], r["arm"], r["repeat"]): r["status"] for r in diagnostics.get("reviews", [])}
+    matches = diagnostics.get("identity_sha256") == identity.get("identity_sha256") and expected == observed
+    if not matches and collection.get("completed_results") == 72:
+        raise ValueError("final diagnostics must match frozen collection identity, slots and statuses")
+    return matches
 
 
 def refresh_upstream(state):
@@ -250,8 +288,18 @@ def build(state: Path, output: Path, study: Path | None = None):
     diagnostics = diagnose_run(study) if collection else {}
     if diagnostics.get("campaign_sha256") not in (None, binding(study / "campaign.json")["sha256"]):
         raise ValueError("diagnostics belong to another campaign")
+    formal_rows = [r for r in collection.get("results", []) if not r.get("preflight")]
+    if collection and not matching_diagnostics(diagnostics, collection, load(study / "identity.json", {})):
+        diagnostics = {"status": "pending_matching_collection_snapshot"}
+    if diagnostics.get("by_arm"):
+        derived = state / "report-derived"
+        derived.mkdir(exist_ok=True)
+        (derived / "native-diagnostics.json").write_text(json.dumps(diagnostics, ensure_ascii=False, indent=2) + "\n")
+        diagnostics = {key: val for key, val in diagnostics.items() if key != "reviews"}
     timing = load(state / "extraction-timing.json", {})
     freshness = load(state / "upstream-freshness.json", {})
+    baseline_pr = load(state / "baseline-pr290.json", {})
+    runtime = load(study / "identity.json", {})
     validation = public_paths(load(state / "final-validation.json", {}), state, project)
     groups = campaign.get("analysis_groups", {})
     subgroup = {}
@@ -262,6 +310,8 @@ def build(state: Path, output: Path, study: Path | None = None):
         subgroup[name]["scoring_completion"]["expected"] = len(prs) * 6
         subgroup[name]["operational"] = subgroup_operational(collection.get("results", []), selected, prs)
         subgroup[name]["paired_quality"] = paired_quality(subgroup[name]["per_pr"])
+        subgroup[name]["paired_speed"] = paired_speed(collection.get("results", []), prs)
+        subgroup[name].pop("per_pr", None)  # The same per-PR rows are published once below.
     mapped = {f: {s: mapping["counts"][f].get(s, 0) for s in ("supported", "conflict", "unknown")}
               for f in FACETS}
     mapping_total = {s: sum(r[s] for r in mapped.values()) for s in ("supported", "conflict", "unknown")}
@@ -278,6 +328,9 @@ def build(state: Path, output: Path, study: Path | None = None):
         "runtime_identity": study / "identity.json", "codex_runtime": study / "private-codex/runtime-snapshot.json",
         "codex_score_runtime": study / "private-codex/score-runtime-snapshot.json",
         "codex_preflight": study / "private-codex/preflight.json", "reviews_manifest": study / "reviews-manifest.json",
+        "native_diagnostics": state / "report-derived/native-diagnostics.json",
+        "raw_trace_index": state / "raw-trace-index.json",
+        "baseline_pr": state / "baseline-pr290.json",
     }.items():
         if path.exists(): inputs[name] = binding(path)
     terminal = completed == 72 and len(scores.get("samples", [])) == 72 and truth.get("frozen") and \
@@ -286,6 +339,7 @@ def build(state: Path, output: Path, study: Path | None = None):
              "generated_at_cn": datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai")).isoformat(),
              "status": ("completed" if collection.get("valid_reviews") == scored == 72 else "completed_with_failures") if terminal else "incomplete",
              "source_pin": PIN, "baseline_knowledge_commit": inventory["knowledge_commit"],
+             "baseline_pr_merge_commit": baseline_pr.get("mergeCommit", {}).get("oid"),
              "original": {"documents": inventory["original"]["documents"], "associated_features": inventory["association_count"],
                           "association_distinct_documents": inventory["association_distinct_documents"],
                           "mapped_facets": mapping_total, "by_facet": mapped, "source_consistency": mapping["source_consistency"],
@@ -295,13 +349,20 @@ def build(state: Path, output: Path, study: Path | None = None):
                          "facet_counts": final["facet_counts"], "structural_files": 2043, "production_files": 2199,
                          "depth_witness_files": 205, "explicit_production_references": len(refs["B"])},
              "experiment": {"scheduled": 72, "terminal_results": completed, "valid_reviews": collection.get("valid_reviews", 0),
-                            "scored_reviews": scored, "by_arm": collection.get("by_arm", {}),
+                            "configuration": {"native": runtime.get("native", {}), "limits": runtime.get("limits", {}),
+                                              "harness_sha256": runtime.get("harness_sha256"),
+                                              "served_models_observed": sorted({a.get("served_model", "unknown") or "unknown"
+                                                                                for r in formal_rows for a in r.get("attempts", [])}),
+                                              "effective_reasoning": "unknown unless provider-reported"},
+                            "scored_reviews": scored, "by_arm": {arm: {k: v for k, v in row.items() if k != "injected_dimensions"}
+                                                                  for arm, row in collection.get("by_arm", {}).items()},
                             "groups": groups, "subgroups": subgroup, "overall_macro": scores.get("macro", {}), "knowledge_exposure": exposure,
                             "diagnostics": diagnostics,
                             "per_pr": scores.get("per_pr", []), "truth_frozen": truth.get("frozen", False),
                             "truth_complete_prs": sum(r.get("status") == "complete" for r in truth.get("cases", [])),
                             "truth_unknown_prs": [r["pr"] for r in truth.get("cases", []) if r.get("status") != "complete"],
-                            "cases": [{"pr": c["number"], "target": c["target"], "base": c["base"], "head": c["head"],
+                            "cases": [{"pr": c["number"], "title": load(c["context_path"], {}).get("title"),
+                                       "target": c["target"], "base": c["base"], "head": c["head"],
                                        "changed_files": len(c["changed_files"]), "older_fork": c["target_base_diverged"]} for c in campaign["cases"]]},
              "freshness": freshness, "validation": validation, "actual_invoice_cost": None,
              "inputs": inputs, "raw_trace_archive": state.name,
@@ -310,6 +371,7 @@ def build(state: Path, output: Path, study: Path | None = None):
                              "Explicit source references, structural cards and depth witness files have different meanings.",
                              "Eight direct-baseline PRs form the primary comparison; four older forks are exploratory.",
                              "Independent automated Codex truth is a partial confirmed-issue set, not a maintainer gold standard.",
+                             "Blind scoring removes group labels and document paths; wording can still hint at provenance.",
                              "Unknown findings are not false positives; failures remain in completion denominators.",
                              "Actual billing is unknown unless provider-reported."]}
     primary = subgroup.get("primary_prospective", {})
@@ -322,11 +384,11 @@ def build(state: Path, output: Path, study: Path | None = None):
             delta = f"，B−A 为 {100*(b-a):+.2f} 个百分点" if a is not None and b is not None else "，分母不足时不可计算"
             metrics.append(f"{label} A {pct(a)}、B {pct(b)}{delta}（共同适用 {metric.get('applicable_prs',0)} PR）")
         latencies = [primary.get("operational", {}).get(a, {}).get("timings_valid", {}).get("native_seconds", {}).get("p50") for a in ("A", "B")]
-        change = f"（B−A {(latencies[1]/latencies[0]-1)*100:+.2f}%）" if all(v is not None and v > 0 for v in latencies) else ""
-        conclusion = "主样本实测：" + "；".join(metrics) + f"。有效评审的原生耗时 P50 为 A {num(latencies[0])} 秒、B {num(latencies[1])} 秒{change}；此处为观察差，包含限流和工具等待。结果来自 8 个所选 PR，不能推广为全项目准确率。"
+        conclusion = "主样本实测：" + "；".join(metrics) + f"。有效评审的原生耗时 P50 为 A {num(latencies[0])} 秒、B {num(latencies[1])} 秒；两组有效样本可能不同，仅作描述性统计，包含限流和工具等待。结果来自 8 个所选 PR，不能推广为全项目准确率。"
     value["conclusion_cn"] = conclusion
     lines = ["# JiuwenSwarm 原项目文档与当前知识库对比报告", "",
              f"生成时间：{value['generated_at_cn']}（北京时间）。源码知识基线：`{PIN}`；当前知识内容为 PR #290 已合并版本。", "",
+             f"实际知识 checkout 为 `{inventory['knowledge_commit']}`；PR #290 合并提交为 `{value['baseline_pr_merge_commit'] or '未知'}`。checkout、文档逐文件哈希和评估运行版本分别归档。", "",
              "当前知识库在功能组织、源码关联和可审计性方面更完整；原资料保留了作者的设计意图、被拒绝方案、完整使用手册和维护风险，两者都能为评审提供有价值的上下文。",
              f"当前认可 **552/553（99.82%）**；原作者正文在本次有界映射中提供 **{mapping_total['supported']}/553（{100*mapping_total['supported']/553:.2f}%）** 项说明。两项统计的依据不同，不能将其差额直接解释为新增正确知识。", "",
              f"实测状态：**{value['status']}**；72 个计划评审中已有 {completed} 个终态结果、{collection.get('valid_reviews',0)} 个有效评审、{scored} 个完成独立评分。", "",
@@ -346,12 +408,15 @@ def build(state: Path, output: Path, study: Path | None = None):
     lines += ["", "当前 552 项包括严格认可 207 项和轻量认可 345 项，均为 supported，verified_absent 为零。唯一未知是 `im-feishu / 设计取舍`，不能据此声称飞书功能或测试不存在。",
               "79 个功能均有深度说明，78 个功能七维齐全。一个维度认可表示至少有一段可用解释；代表流程或单个 API 契约不能证明该功能的所有分支、接口或文件均已解释。",
               "原文档映射每个功能一次独立 Codex 调用；只计入实际解释该功能的原作者行段。候选段落有预算，未知包含未检索到、内容不足、引用不合法和读取失败，不能解释为项目没有相关知识。",
+              "原作者库存 488 篇包含 313 篇维护资料、143 篇主 docs 和 32 篇嵌套开发指南。本次去重识别 144 张符号卡片，集中在 4 个生产文件，其中作者元数据标为 agent_audited 61、unaudited 80、audit_expired 3；这些是作者历史标签，未审计正文仍可能有价值，也不能作为当前实现的认可证明。",
+              f"维护资料的 [README 历史库存]({source_link('.doc_project_maintainer/README.md',19)}) 与 [build-plan 账本]({source_link('.doc_project_maintainer/project/build-plan.md',30)}) 使用 1,275 文件、15,584 符号的旧范围；扫描库存和符号卡片数量不等于本报告的生产文件解释覆盖。",
               "每功能映射最多提供 24,000 字符作者正文和 16,000 字符源码候选，仅 15/79 个功能的候选正文全部送入，因此原资料的解释数是有界审计结果。初次整体格式校验只有 19/79 通过；随后对既有 79 份答复确定性重放，允许原文空行连接，不增加模型调用或声明。仍不合法的 7 个维度保持未知。",
               "这次原资料映射的完整 CLI 流未全部保存；精确输入、原始答复、哈希及已报告用量保留。后续 PR A/B 则保存完整原生流和工具记录，两者不混算。",
-              f"原正文与固定实现的一致性另计：{mapping['source_consistency'].get('supported',0)} 项得到所提供源码支持，{mapping['source_consistency'].get('conflict',0)} 项冲突，其余 {mapping['source_consistency'].get('unknown',0)} 项无法确认。无法确认不等于过时。", "",
+              f"原正文与固定实现的一致性另计：{mapping['source_consistency'].get('supported',0)} 项得到所提供源码支持，{mapping['source_consistency'].get('conflict',0)} 项冲突，其余 {mapping['source_consistency'].get('unknown',0)} 项无法确认。无法确认不等于过时。正文映射的 18 项 conflict 包括作者资料内部矛盾，并非 18 个已证明的实现缺陷。",
+              "源码一致性只核查实际提供的候选实现段落；候选来自当前知识的生产源码证明路径，不包含完整测试源码。89/12/452 不能视为原资料全库新鲜度测量，也不能与当前 552 项认可直接作正确率比较。", "",
               "## 双方内容的价值与时效性", "",
               f"原资料的 [AgentServer 预热会话 ADR]({source_link('.doc_project_maintainer/decisions/ADR-0001-agentserver-owned-prewarmed-sessions.md')}) 记录决策、后果和被拒绝方案，适合判断 PR 是否违背作者意图。原维护资料还集中保留 AgentServer 风险、审计状态与健康维度；这些内容不能被一个七维计数替代。",
-              "当前知识库按 owner 和功能整理代表流程、API 义务、配置默认值、失败分支及源码引用，减少评审时重新寻找入口的工作。轻量认可允许明确标注的推断；这与原作者明确陈述的设计理由分别呈现。",
+              "当前知识库按 owner 和功能整理代表流程、API 义务、配置默认值、失败分支及源码引用，便于评审定位入口。轻量认可允许明确标注的推断；这与原作者明确陈述的设计理由分别呈现。",
               "", "| 内容 | 原作者资料的具体价值 | 当前知识的具体价值及评审用途 |", "| --- | --- | --- |",
               f"| 架构 | [Runtime Session 参考链]({source_link('.doc_project_maintainer/project/flows/runtime-session-reference-chain.md')}) 解释迁移边界 | 按 owner 组织入口与下游，附固定源码和认可记录，便于回查实现 |",
               f"| 流程 | [Skill 自演进指南]({source_link('docs/zh/Skill自演进.md',92)}) 解释用户发起与审批过程 | [Skill 深读]({knowledge_link('knowledge/repos/jiuwenswarm/components/agent-server-runtime/feature-depth-skill-evolution.md')}) 补充 no_evolution_no_records 分支的返回映射 |",
@@ -362,19 +427,28 @@ def build(state: Path, output: Path, study: Path | None = None):
               "| 设计取舍 | 预热会话 ADR 有作者明确意图和被否决方案 | Cron 默认后端与 Skill watcher 代价明确标注为设计推断，不代替作者意图 |",
               "| 验证入口 | 测试、SDK 和客户端资料有完整操作指南 | Cron 表达式与文件锁断言、Skill helper 断言定位精确，并明确不是本次测试执行结果 |", "",
               f"原资料也存在局部不同步：较早的 [架构说明]({source_link('.doc_project_maintainer/project/architecture.md')}) 与较新的 [Runtime 会话参考链]({source_link('.doc_project_maintainer/project/flows/runtime-session-reference-chain.md')}) 对 AgentServer 迁移状态的表述不同。文档日期、源码版本和实际声明需逐项检查，不能用一次最后提交时间判定全部内容新鲜。",
+              f"具体默认值冲突：[企业微信指南]({source_link('docs/zh/国内频道.md',564)}) 写 `send_thinking_message` 默认 false，但固定版本的 [WecomConfig]({source_link('jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_connect.py',55)}) 定义为 True。评审若只沿用文档默认值，会误判新增配置或调用行为。",
               "原维护资料标为 partial；历史 ledger 的符号审计分母和统计日期与本报告不同。历史的 trusted/expired 数字不作为当前源码上的正确率。", "",
               "| 时效性证据 | 原作者资料 | 当前知识库 |", "| --- | --- | --- |",
               "| 文档/记录日期 | README 为 2026-08-01，manifest 为 2026-09-08，部分流程为 2026-09-11；不代表所有正文同日复核 | 本轮深度补齐于 2026-10-02，报告于 2026-10-03 复核 |",
               "| 声明版本 | 旧扫描记录仍声明 7 月版本 10afedf2，部分正文无可确认实现版本 | 生效深度区块绑定完整 f0a69728 SHA、引用哈希及严格/轻量认可记录 |",
               "| 与源码一致性 | 有界核查 89 支持、12 冲突、452 未知 | 552 项通过已有固定版本审计；未来 PR 仍须重新验证受影响声明 |", "",
               "本报告固定知识在 f0a69728；它不能自动保证对后来 PR 头部仍然有效。评审必须回到冻结 PR 源码验证。"]
-    lines += [f"交付核查的 develop 为 `{freshness.get('head_sha','未知')}`，核查时间 {freshness.get('checked_at_cn','未知')}；相对知识基线的新增提交数为 {freshness.get('ahead_by','未知')}，变更生产文件数为 {freshness.get('changed_production_files','未知')}。", "",
+    lines += [f"交付核查的 develop 为 `{freshness.get('head_sha','未知')}`，核查时间 {freshness.get('checked_at_cn','未知')}；相对知识基线的新增提交数为 {freshness.get('ahead_by','未知')}、基线独有提交数为 {freshness.get('behind_by','未知')}，变更生产文件数为 {freshness.get('changed_production_files','未知')}。受影响功能：{', '.join(freshness['affected_features']) or '无' if 'affected_features' in freshness else '未知'}。", "",
+              "develop 变更生产文件数仅按固定 2199 文件库存统计；新增文件另见配套 JSON 的 changed_paths。一次观测无提交差距不代表持续实时更新。",
               "验证维度有内容不等于运行时测试覆盖：当前分类包括 27 个运行时测试入口、1 个源码文本断言、14 个辅助函数测试、9 个文档手工验证入口和 28 个历史未分类区块。本轮 PR 评审是只读实验，没有执行 JiuwenSwarm 上游测试，也没有把作者历史测试通过的声明当成本轮通过。", "",
               "## GLM‑5.3 PR 评审实测", "",
               "A 组只检索原作者资料；B 组只检索当前 JiuwenSwarm 知识库。两组使用相同冻结源码、提示词、检索算法、两页初始检索和 6000 字符累计知识预算。后续搜索和读取扣除余量。并发 13，共享排期；每评审最多 60 次源码调用，每次结果最多 24,000 字符，原生超时 30 分钟。",
+              "模型配置冻结为 Zcode 订阅 GLM‑5.3、请求 reasoning=max；有效 reasoning 档位未由服务报告时保持未知。逐调用核查 served model 和订阅 provider，身份不符属于失败，不切换模型。",
               "12 PR × 两组 × 三重复，共 72 个评审。GitHub 的目标分支 SHA 与 PR 实际 diff 基线分开记录；diff 使用真实 merge-base→head，不将目标分支的历史变化当作 PR 修改。",
               "8 个直接基于 f0a69728 的 PR 为主样本；#7639、#7654、#7655、#7656 从较旧提交分叉，且头部提交早于知识基线，只作探索性对照。其知识可能描述较新的目标分支实现，不能混同为无时间泄漏的前瞻准确率。",
+              "主样本均为 2–4 文件的后端修复，涉及 cron、MCP、权限、hooks、gateway、agent-mode、runtime 和输出截断。52 文件的大型研究工作台（含前端改动）在旧分叉 #7639；主样本不足以代表大型功能或前端评审。",
               "独立 Codex 在正式 GLM 评审前冻结确认问题；随后对匿名、随机顺序的评论核验。只有新增或加重且有源码证据的缺陷计 TP；证实不成立计 FP；证据不足计 unknown。风格、文档和其他建议另计有效性。召回仅指对自动独立审计已确认问题的召回，无法覆盖全部真实缺陷。", ""]
+    lines += ["盲评输入移除 A/B 标签、重复序号和文档来源路径，评分入口不能访问来源映射；措辞或内容风格仍可能提供来源线索，不能保证绝对无法辨识。", ""]
+    lines += ["| 冻结样本 | PR 内容 | 变更文件数 | 分组 |", "| --- | --- | ---: | --- |"]
+    for c in value["experiment"]["cases"]:
+        lines.append(f"| #{c['pr']} | {(c['title'] or '未知').replace('|', '／')} | {c['changed_files']} | {'旧分叉探索' if c['older_fork'] else '主样本'} |")
+    lines.append("")
     lines += [f"源码基准审计成功 {value['experiment']['truth_complete_prs']}/12，未知 PR 为 {value['experiment']['truth_unknown_prs'] or '无'}。#7656 的原答复缺少现有源码的基线证据，未重抽样；它的确认问题数和召回率保持未知。主样本只在 #7647、#7649 确认各一个问题，主样本召回率最多有 2 个适用 PR，应谨慎解读。", ""]
     for group_name, label in (("primary_prospective", "主样本：8 PR / 48 次"), ("older_fork_exploratory", "旧分叉探索：4 PR / 24 次")):
         result = subgroup.get(group_name, {})
@@ -386,6 +460,7 @@ def build(state: Path, output: Path, study: Path | None = None):
                 cells.append(f"{pct(metric.get('mean'))}（适用 {metric.get('applicable_prs',0)} PR）")
             lines.append(f"| {title} | {cells[0]} | {cells[1]} |")
         operational = result.get("operational", {})
+        lines.append(f"| 已完成独立评分 / 有效评审 | {operational.get('A',{}).get('scored',0)}/{operational.get('A',{}).get('valid',0)} | {operational.get('B',{}).get('scored',0)}/{operational.get('B',{}).get('valid',0)} |")
         lines.append(f"| 缺陷判断中的未知比例 | {pct(operational.get('A',{}).get('unknown_share'))} | {pct(operational.get('B',{}).get('unknown_share'))} |")
         for field, title in (("TP", "有效缺陷评论"), ("FP", "误报"), ("unknown", "未知缺陷判断"),
                              ("nondefect_advice", "非缺陷建议"), ("advice_valid_actionable", "有效且可操作的建议"),
@@ -408,7 +483,19 @@ def build(state: Path, output: Path, study: Path | None = None):
             lines.append(f"| {title} | {pct(metric.get('A'))} | {pct(metric.get('B'))} | {100*delta:+.2f} 个百分点 | {metric.get('applicable_prs',0)} |" if delta is not None else
                          f"| {title} | 不可计算 | 不可计算 | 不可计算 | {metric.get('applicable_prs',0)} |")
         lines.append("")
+        lines += ["| 同一 PR/重复均有效的耗时（先 PR 内均值，再 PR 均值） | A | B | B−A | PR / 成对重复数 |",
+                  "| --- | ---: | ---: | ---: | ---: |"]
+        for field, title in (("native_seconds", "原生评审"), ("queue_seconds", "worker 内等待"), ("end_to_end_seconds", "端到端")):
+            metric = result.get("paired_speed", {}).get(field, {})
+            lines.append(f"| {title} | {num(metric.get('A'))} 秒 | {num(metric.get('B'))} 秒 | {num(metric.get('B_minus_A_seconds'))} 秒 | {metric.get('applicable_prs',0)} / {metric.get('paired_repeats',0)} |")
+        lines += ["", "耗时成对比较仍只覆盖双方均成功的试次；限流、工具等待与运行次序会影响观察差，不是纯知识处理速度或因果加速估计。", ""]
     lines += ["评论数按每次评审的根因去重，三次重复仍是三个观测，不称作不同缺陷总数。未知比例为 unknown/(TP+FP+unknown)，非缺陷建议不进入该分母。精确率排除未知，须结合未知比例和完成率阅读。", ""]
+    lines += ["### 失败归因", "", "| 冻结运行的失败原因 | A | B |", "| --- | ---: | ---: |"]
+    reasons = sorted(set().union(*(set(diagnostics.get("by_arm", {}).get(a, {}).get("invalid_run_reason_counts", {})) for a in ("A", "B"))))
+    for reason in reasons:
+        lines.append(f"| `{reason}` | {diagnostics.get('by_arm',{}).get('A',{}).get('invalid_run_reason_counts',{}).get(reason,0)} | {diagnostics.get('by_arm',{}).get('B',{}).get('invalid_run_reason_counts',{}).get(reason,0)} |")
+    if not reasons: lines.append("| 未产生完整同快照诊断，或无失败 | 未知 | 未知 |")
+    lines += ["", "原因标签可在同一失败评审中并存，不能将这一表直接相加当作失败总数。失败评审不进入缺陷评论准确率，仍计入完成率。", ""]
     lines += ["### 速度、完成率与实际注入", "", "| 指标 | A 原资料 | B 当前知识 |", "| --- | ---: | ---: |"]
     for kind, title in (("native_seconds", "原生评审耗时"), ("queue_seconds", "worker 内排期等待"), ("retrieval_seconds", "初始知识检索耗时"), ("end_to_end_seconds", "每评审端到端耗时")):
         cells = []
@@ -433,9 +520,11 @@ def build(state: Path, output: Path, study: Path | None = None):
                          ("internal_retry_schedules_observed", "原生 CLI 内部退避记录")):
         numbers = [diagnostics.get("by_arm",{}).get(a,{}).get("rate_limits",{}).get(field) for a in ("A","B")]
         lines.append(f"| {label} | {numbers[0] if numbers[0] is not None else '未知'} | {numbers[1] if numbers[1] is not None else '未知'} |")
+    numbers = [diagnostics.get("by_arm", {}).get(a, {}).get("source_calls_cumulative", {}).get("p50") for a in ("A", "B")]
+    lines.append(f"| 源码/计算工具累计调用 P50（含失败评审） | {num(numbers[0])} | {num(numbers[1])} |")
     b = exposure["B"]
     lines += ["",
-              f"当前知识组初始每次完整注入的维度均值为 {num(b['initial_intact_facets']['mean'])}，片段维度均值为 {num(b['initial_partial_facets']['mean'])}；所选页面可用维度均值为 {num(b['available_facets_on_selected_pages']['mean'])}。只按实际正文匹配计算完整注入，库存 552 项并非全部进入模型。原作者页没有 kb:depth 标记，不能把其标记数为零解释为没有知识。",
+              f"当前知识组初始每次完整注入的功能×维度区块均值为 {num(b['initial_intact_facets']['mean'])}，片段区块均值为 {num(b['initial_partial_facets']['mean'])}；所选页面可用区块均值为 {num(b['available_facets_on_selected_pages']['mean'])}（跨页面累计，同一维度可涉及多个功能）。只按实际正文匹配计算完整注入，库存 552 项并非全部进入模型。原作者页没有 kb:depth 标记，不能把其标记数为零解释为没有知识。",
               "速度表列出有效评审；失败、超时和额外尝试保留在完成率及配套 JSON 中，不删除较慢或失败样本。排期等待从 worker 开始计算，不包含尚未获得 worker 的排队。P90 使用线性插值。知识库存、初始实际注入及后续工具读取分别记录。",
               "6000 字符按知识正文和后续搜索片段累计；导航元数据、PR diff、源码工具输出及协议提示词另记输入 token。原生耗时是 CLI 执行时间，包含工具读写和服务内部退避，不等同于纯推理时间。",
               "订阅服务的 HTTP429 可触发 Zcode 内部请求退避，观测 maxAttempts 为 11；这是原生请求重试，与最多一次外层 CLI 传输重试分开。共享排期初始间隔 15 秒、限流冷却 90 秒，可放缓到 60 秒。请求的退避延迟不是测得的等待时间，排队延迟不能归因于检索质量。",
@@ -461,7 +550,13 @@ def build(state: Path, output: Path, study: Path | None = None):
     for arm, digest in value["snapshot_sha256"].items(): lines.append(f"| {arm} 组文档快照 | 见 inventory | `{digest}` |")
     checks = validation.get("full_pytest", {})
     lines += ["", f"本地验证：{validation.get('status','未知')}；全量 pytest {checks.get('passed','未知')} 通过、{checks.get('skipped','未知')} 跳过；知识目录 {validation.get('knowledge_tree',{}).get('errors','未知')} 错误、{validation.get('knowledge_tree',{}).get('warnings','未知')} 提醒。CLI、doctor JSON、文档链接、引用、SPEC 和独立安装包检查的日志哈希保留在配套 JSON。GitHub CI：{validation.get('github_ci','未知')}。", "",
-              "当前结论只适用于所选 PR、固定 GLM 配置和相同检索预算。扩大样本、增加人工确认基准、改善未注入维度的检索，是后续评估方向；不能把知识认可率当作缺陷识别准确率。", ""]
+              "## 改善建议", "",
+              "1. 下一版封闭工具允许安全的目录尾斜杠写法，并先做路径规范化和边界校验；本轮失败保留，不能事后替换结果。",
+              "2. 将长提示词读取改为顺序游标协议，增加完整输入确认和输出 schema 检查，减少跳读与格式失败；内容不合格仍不重新采样。",
+              "3. 检索按 PR 涉及的功能与维度选段，优先注入 API、失败分支及测试义务；保留作者 ADR 的决策与被拒绝方案，避免把库存覆盖率当作已注入覆盖率。",
+              "4. 用共享排期对订阅限流做适应，分别观察排队、原生耗时与有效完成率；不能将包含 429 的耗时差全部归因于知识质量。",
+              "5. 增加真实 PR 及维护者人工确认的问题基准，尤其补充有确认缺陷的前瞻样本。本轮主样本召回仅涉及 2 个 PR，不足以推断全项目召回率。", "",
+              "当前结论只适用于所选 PR、固定 GLM 配置和相同检索预算；不能把知识认可率当作缺陷识别准确率。", ""]
     output.mkdir(parents=True, exist_ok=True)
     value = public_paths(value, state, project)
     basename = "jiuwenswarm-original-docs-comparison-cn-20261003"

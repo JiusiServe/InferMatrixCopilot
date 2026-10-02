@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from eval.jiuwenswarm_ab_report import distribution, paired_quality, pct, public_paths, subgroup_operational, validate_evaluation
+from eval.jiuwenswarm_ab_report import distribution, matching_diagnostics, paired_quality, paired_speed, pct, public_paths, subgroup_operational, validate_evaluation
 
 
 def test_subgroup_keeps_failures_unknown_and_excludes_other_prs():
@@ -25,6 +25,7 @@ def test_subgroup_keeps_failures_unknown_and_excludes_other_prs():
     assert result["A"]["timings_valid"]["native_seconds"]["p50"] == 10
     assert result["B"]["unknown_share"] is None
     assert result["B"]["terminal"] == 0
+    assert result["B"]["counts"]["FP"] is None
 
 
 def test_missing_metrics_are_not_zero_and_percentiles_are_linear():
@@ -60,3 +61,31 @@ def test_quality_delta_uses_same_applicable_prs():
     assert result["defect_precision"] == {"A": .5, "B": .75, "B_minus_A": .25, "applicable_prs": 1, "prs": [2]}
     assert result["confirmed_recall"]["A"] is None
     assert result["confirmed_recall"]["applicable_prs"] == 0
+
+
+def test_speed_pairs_same_repeats_and_weights_prs_equally():
+    def row(pr, arm, rep, seconds, status="valid"):
+        return {"number": pr, "arm": arm, "repetition": rep, "native_seconds": seconds, "status": status}
+    reviews = [row(1,"A",1,10), row(1,"B",1,20), row(1,"A",2,30), row(1,"B",2,40),
+               row(1,"A",3,900), row(1,"B",3,1800,"timeout"), row(2,"A",1,100), row(2,"B",1,90),
+               row(2,"B",2,1), row(3,"A",1,1000), row(3,"B",1,1)]
+    result = paired_speed(reviews,[1,2])["native_seconds"]
+    assert result["A"] == 60
+    assert result["B"] == 60
+    assert result["B_minus_A_seconds"] == 0
+    assert result["applicable_prs"] == 2
+    assert result["paired_repeats"] == 3
+
+
+def test_final_diagnostics_cannot_mix_equal_slot_counts_with_different_statuses():
+    rows = [{"number": pr, "arm": arm, "repetition": rep, "status": "valid"}
+            for pr in range(12) for arm in "AB" for rep in (1,2,3)]
+    collection = {"completed_results": 72, "results": rows}
+    diagnostics = {"identity_sha256": "fixed", "reviews": [
+        {"pr": r["number"], "arm": r["arm"], "repeat": r["repetition"] - 1, "status": r["status"]} for r in rows]}
+    assert matching_diagnostics(diagnostics, collection, {"identity_sha256": "fixed"})
+    diagnostics["reviews"][0]["status"] = "invalid_run"
+    with pytest.raises(ValueError, match="statuses"):
+        matching_diagnostics(diagnostics, collection, {"identity_sha256": "fixed"})
+    collection["completed_results"] = 71
+    assert not matching_diagnostics(diagnostics, collection, {"identity_sha256": "fixed"})

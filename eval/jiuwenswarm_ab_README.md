@@ -74,8 +74,19 @@ git worktree add --detach "$AB_KB" 58279d334cd827adb631891a760bb14efe376420
   --campaign "$AB_STUDY/campaign.json" --workers 4 \
   --reviews-manifest "$AB_STUDY/reviews-manifest.json"
 
+# 最终更新上游观测，并定稿 final-validation.json、ci-code-checks.json 等补充输入。
+"$AB_PYTHON" - "$AB_STATE" <<'PY'
+import sys
+from pathlib import Path
+from eval.jiuwenswarm_ab_report import refresh_upstream
+refresh_upstream(Path(sys.argv[1]))
+PY
+
+"$AB_PYTHON" eval/jiuwenswarm_ab_archive.py \
+  --state "$AB_STATE" --output "$AB_STATE/raw-trace-index.json"
+
 "$AB_PYTHON" eval/jiuwenswarm_ab_report.py \
-  --state "$AB_STATE" --study "$AB_STUDY" --output-dir "$AB_STATE/report" --refresh-upstream
+  --state "$AB_STATE" --study "$AB_STUDY" --output-dir "$AB_STATE/report"
 ```
 
 [Codex 基准与盲评](jiuwenswarm_ab_judge.py)仅通过 `read_task/source_read/source_grep` 读取固定 base/head 代码，关闭 shell、网络及继承 MCP。基准阶段不读取 A/B 文档、GLM 回复或 GitHub 讨论。`truth-manifest.json` 冻结全部 12 个样本及失败记录，GLM 的 `run` 必须绑定该文件；它不向 GLM 暴露基准。
@@ -92,11 +103,16 @@ started/completed/failed 检查点及身份摘要约束恢复；Codex 基准与�
 
 [报告脚本](jiuwenswarm_ab_report.py)可对已有归档离线重建精简中文 `.md/.json`，输入摘要随报告保存。`extraction-timing.json`、`upstream-freshness.json`、`final-validation.json` 是独立补充输入；缺失时保持未知。知识提取耗时由 [提取时间脚本](jiuwenswarm_extraction_timing.py)的 `--archive/--output` 汇总，与本次 PR 评审耗时分别统计。
 
+[归档索引脚本](jiuwenswarm_ab_archive.py)只在 72 个评审槽位与 12 个盲评记录均为终态后生成 `raw-trace-index.json`。索引按路径排序，仅保存相对路径、字节数与 SHA256；覆盖映射、文档快照及 v2 原生记录，排除运行缓存、临时锁、派生汇总和索引自身。索引与完整原始材料都留在 Git 外，不内联认证信息或模型原文。
+
+`baseline-pr290.json`、`ci-code-checks.json`、提取时间、上游观测与最终验证属于交付补充输入，可在交付前更新。顺序须为**最终刷新与验证 → 生成索引 → 生成报告**；索引之后不再运行 `--refresh-upstream`。任何已索引补充文件的修改，都需要重新生成索引并重建报告，避免报告绑定过期摘要。
+
 ```bash
 "$AB_PYTHON" -m pytest -q \
   test/test_jiuwenswarm_docs_compare.py test/test_jiuwenswarm_ab_prepare.py \
   test/test_jiuwenswarm_pr_review_ab.py test/test_jiuwenswarm_ab_judge.py \
-  test/test_jiuwenswarm_ab_diagnostics.py test/test_jiuwenswarm_ab_report.py
+  test/test_jiuwenswarm_ab_diagnostics.py test/test_jiuwenswarm_ab_archive.py \
+  test/test_jiuwenswarm_ab_report.py
 ```
 
 上述测试不调用模型；覆盖固定输入、真实 merge-base、工具隔离、预算、引用校验、恢复与计数。完整原生日志保存在外部归档，提交到 Git 的报告使用精简指标和摘要。
