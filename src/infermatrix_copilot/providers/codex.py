@@ -19,8 +19,10 @@ auth under HOME (~/.codex)."""
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
@@ -43,6 +45,29 @@ class CodexTransport(HarnessTransport):
     """codex CLI (exec mode) as a Strict backend."""
 
     spec = PROVIDERS["codex"]
+
+    @property
+    def subscription_billing(self) -> bool:
+        """Only confirmed ChatGPT login on the default provider is uncapped.
+
+        Authentication success alone also includes API-key logins. Unknown or
+        custom provider settings never establish subscription billing.
+        """
+        cli = self.cli_path()
+        if not cli or os.environ.get("OPENAI_BASE_URL"):
+            return False
+        config = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "config.toml"
+        try:
+            data = tomllib.loads(config.read_text(encoding="utf-8")) if config.exists() else {}
+            provider = data.get("model_provider", "openai")
+            providers = data.get("model_providers", {})
+            if data.get("profile") or provider != "openai" or not isinstance(providers, dict) or providers.get(provider):
+                return False
+            result = subprocess.run([cli, "login", "status"], capture_output=True, text=True,
+                                    encoding="utf-8", errors="replace", timeout=15, check=False)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return False
+        return result.returncode == 0 and "Logged in using ChatGPT" in result.stdout + result.stderr
 
     def auth_gap(self) -> str | None:
         cli = self.cli_path()

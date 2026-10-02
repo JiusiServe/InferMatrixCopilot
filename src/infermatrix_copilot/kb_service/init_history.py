@@ -84,7 +84,7 @@ or discover repositories. The caller binds this verdict to the exact base/head."
 class _CheckpointBudget(Budget):
     """Persist an outstanding reservation before dispatch (crash-safe spend)."""
 
-    def __init__(self, limit: float, record: InitRecord, state_dir: Path):
+    def __init__(self, limit: float | None, record: InitRecord, state_dir: Path):
         super().__init__(limit, spent_usd=record.spent_usd)
         self.record, self.state_dir = record, state_dir
 

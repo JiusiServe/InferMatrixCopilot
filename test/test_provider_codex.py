@@ -56,6 +56,38 @@ def _transport(tmp_path: Path) -> CodexTransport:
         strict_backend_cli=str(cli)))
 
 
+def test_subscription_requires_chatgpt_login_and_default_provider(tmp_path, monkeypatch):
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    transport = _transport(tmp_path)
+    assert not transport.subscription_billing
+    (tmp_path / "bin" / "logged-in").touch()
+    assert transport.subscription_billing
+    config = tmp_path / "codex-home" / "config.toml"
+    config.parent.mkdir()
+    config.write_text('model_provider = "custom"\n')
+    assert not transport.subscription_billing
+    config.write_text('profile = "custom"\n[profiles.custom]\nmodel_provider = "api-provider"\n')
+    assert not transport.subscription_billing
+    config.write_text('[model_providers.openai]\nbase_url = "https://example.invalid"\n')
+    assert not transport.subscription_billing
+    config.write_text('malformed = [\n')
+    assert not transport.subscription_billing
+
+
+def test_api_login_and_base_url_do_not_establish_subscription(tmp_path, monkeypatch):
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    transport = _transport(tmp_path)
+    cli = tmp_path / "bin" / "codex"
+    cli.write_text('#!/usr/bin/env python3\nprint("Logged in using an API key")\n')
+    assert not transport.subscription_billing
+    cli.write_text('#!/usr/bin/env python3\nprint("Logged in using ChatGPT")\n')
+    assert transport.subscription_billing
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://example.invalid")
+    assert not transport.subscription_billing
+
+
 def _request(tmp_path: Path, with_bridge: bool = True) -> AgentSessionRequest:
     worktree = tmp_path / "worktree"
     worktree.mkdir()

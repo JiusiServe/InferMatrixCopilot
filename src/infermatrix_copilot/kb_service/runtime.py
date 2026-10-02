@@ -120,9 +120,9 @@ def trace_recorder(traces):
     """Every model call (inputs, outputs, usage, failure) as a trace/1
     ``model_call`` record, under the caller's bound trace context."""
 
-    def record(entry: dict) -> None:
+    def record(entry: dict) -> dict | None:
         try:
-            traces.append(
+            return traces.append(
                 "model_call",
                 inputs={"system": entry["system"], "prompt": entry["prompt"]},
                 outputs={"reply": entry["reply"]},

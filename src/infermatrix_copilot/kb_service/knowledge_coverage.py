@@ -11,6 +11,7 @@ import ast
 import fnmatch
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -78,6 +79,7 @@ class CoveragePolicy:
     required: bool = True
     filenames: tuple[str, ...] = FILENAMES
     catalog_sources: tuple[str, ...] = ()
+    semantic_depth_per_facet_gt: float | None = None
 
 
 def policy_path(repo: str) -> str:
@@ -97,7 +99,7 @@ def load_policy(text: str, repo_dir: str) -> CoveragePolicy:
     data = yaml.safe_load(text)
     if not isinstance(data, dict) or type(data.get("schema_version")) is not int or data["schema_version"] != 1:
         raise ValueError("knowledge coverage needs schema_version: 1")
-    if set(data) - {"schema_version", "core", "features", "required", "catalog_sources"}:
+    if set(data) - {"schema_version", "core", "features", "required", "catalog_sources", "semantic_depth"}:
         raise ValueError("unknown knowledge coverage policy key")
     core = data.get("core")
     if not isinstance(core, dict) or set(core) - {"roots", "exclude", "suffixes", "filenames", "target"}:
@@ -108,6 +110,16 @@ def load_policy(text: str, repo_dir: str) -> CoveragePolicy:
     required = data.get("required", True)
     if not isinstance(required, bool):
         raise ValueError("required must be a boolean")
+    semantic = data.get("semantic_depth")
+    semantic_target = None
+    if semantic is not None:
+        if not isinstance(semantic, dict) or set(semantic) != {"per_facet_gt"}:
+            raise ValueError("semantic_depth needs only per_facet_gt")
+        semantic_target = semantic["per_facet_gt"]
+        if isinstance(semantic_target, bool) or not isinstance(semantic_target, (int, float)) \
+                or not math.isfinite(semantic_target) or not 0 <= semantic_target < 1:
+            raise ValueError("semantic_depth per_facet_gt must be finite and in [0, 1)")
+        semantic_target = float(semantic_target)
     extensions = tuple(core.get("suffixes", SUFFIXES))
     if not extensions or any(s not in SUFFIXES for s in extensions):
         raise ValueError("unsupported production-code suffix")
@@ -138,7 +150,8 @@ def load_policy(text: str, repo_dir: str) -> CoveragePolicy:
     return CoveragePolicy(_paths(core.get("roots"), "core roots"),
                           _paths(core.get("exclude"), "core exclude"), extensions,
                           tuple(features), float(target), required, tuple(filenames),
-                          _paths(data["catalog_sources"], "catalog_sources") if "catalog_sources" in data else ())
+                          _paths(data["catalog_sources"], "catalog_sources") if "catalog_sources" in data else (),
+                          semantic_target)
 
 
 def matches(path: str, patterns: tuple[str, ...]) -> bool:

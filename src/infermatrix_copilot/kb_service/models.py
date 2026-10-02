@@ -79,6 +79,8 @@ class ModelReply:
     usage: dict
     seconds: float
     cost_usd: float | None = None  # the transport's reported spend (None: unknown)
+    trace_id: str = ""
+    reply_sha256: str = ""
 
 
 def parse_json_object(text: str) -> dict:
@@ -223,11 +225,12 @@ class ModelGateway:
                                                allow_fallback=False) from exc
             except ModelUnavailable as exc:
                 failure = exc
-        if self._recorder is not None:
-            self._recorder({**record, "error": str(failure) if failure else ""})
+        receipt = self._recorder({**record, "error": str(failure) if failure else ""}) if self._recorder else None
         if failure is not None:
             raise failure
-        return ModelReply(role, data, text, record["served_model"], usage, seconds, cost_usd)
+        receipt = receipt if isinstance(receipt, dict) else {}
+        return ModelReply(role, data, text, record["served_model"], usage, seconds, cost_usd,
+                          receipt.get("id", ""), receipt.get("outputs", {}).get("reply", "").removeprefix("sha256:"))
 
     def subscription_billing(self, role: ModelRole) -> bool:
         """Bind the authenticated subscription backend to the next dispatch."""

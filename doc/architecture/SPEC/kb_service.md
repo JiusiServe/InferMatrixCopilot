@@ -546,12 +546,43 @@ architecture/guide；同一调用独立判定各新增维度的 faithful/non_con
 增加新深度。七维齐全只说明各有代表性实现知识，不声称全行为或执行测试覆盖。
 `tools/audit_knowledge_depth.py` 在干净的固定上游 HEAD 上独立重算两组指标。
 
-先遍历全部功能，再修复缺口；恢复与显式重试同样优先处理尚无已接受维度的功能，每项每批最多两次尝试。
+先遍历全部功能，再修复缺口；恢复与显式重试同样优先处理尚无已接受维度的功能。
+默认有预算模式每项每批最多两次尝试；显式订阅无限模式改为按缺失维度定向修复。
 重复维度整项剔除，其它有界候选维度继续独立核验。逐项保存预算预留、生成草稿、裁判
 结果与已接受正文；包括第二次尝试在内，中断裁判均可复用完成的生成。恢复固定 KB baseline 与 upstream pin，
 输入变化则拒绝串用。`--budget-usd N` 可提高同批累计 ceiling；`--retry-unfinished` 显式
 重试缺口并保留花费。已发布批次不再修改，合并后用新 state directory。missing facets
 保持明确；订阅生成器 USD 为 unreported，judge 固定记账不等于账单实付。
+
+### 定向深化、认可覆盖与订阅无限模式
+
+`DepthContext.build` 接收 requested facets、previous review 与 evidence round；按入口、
+调用方/被调函数、配置 use site、异常分支和具体断言选择完整范围内的有界切片。
+测试索引包含嵌套第一方 SDK/前端套件，优先直接入口引用与实际调用；无关包标记不作为
+验证入口。固定前四文件、两个测试及前 180 行不再构成检索上限。动态关联只作为未知。
+保存生成前的完整 payload 与规范化 prompt 摘要，中断裁判复用完成的草稿；每个缺口
+保留明确原因。同一证据三次未成功修复时保留阻塞原因，不盲重试；显式 retry 可补证继续。
+
+proof `basis` 缺省 supported，旧区块不改写。verified_absent 当前只允许完整、可重放
+检查证明的验证入口缺失，绑定固定 pin、政策推导范围、版本化检测器及内容摘要；读取、
+解析和动态映射不完整均不能发证。正文明确保留测试缺口，不声称执行或通过测试。
+两种 basis 都须独立三个维度全 yes。covered_facets/facet_ratio/complete_features 保留
+正向语义；recognized_facets/recognized_facet_ratio/recognized_complete_features 另计
+认可知识，各维分列 supported/verified_absent/unknown。
+
+可选政策 `semantic_depth: {per_facet_gt: 0.90}` 对每个维度严格执行大于目标，并要求
+每个功能至少一个认可区块；79 功能时每维至少 72，553 分母不缩减。target_met 与
+批次遍历完成分别记录。提取前复核结构覆盖；结构门槛不足先阻断，不消耗模型调用。
+结构覆盖与深度门槛均须满足才能发布。深度未达标 dry run 为 partial，保存预览但步骤不成功；发布阻断。
+执行 API 的 feature_ids 只限定调度范围；审计仍包含完整政策中的所有功能和维度。
+并行批次各自保留检查点，合并认可页面后须重新通过全量验收，不能发布分组的部分结果。
+独立 source audit 使用相同门槛。原生认可审计读取实际 archived model_call 输入输出，
+核对最终区块与源码 pin、三个 yes 和不同模型家族；不能信任只有 receipt 字段的报告。
+
+`--unlimited-subscription` 仅用于 knowledge-deepen/deepen，显式要求生成和裁判两角色
+均使用已认证订阅，拒绝 budget_usd 冲突及 configured fallback。预算上限 None 表示
+该模式，不使用无穷或零价格伪装；累计固定记账和原生调用用量仍记录，实际费用未报告
+保持未知。每次调用重新绑定已经检查的订阅传输，不启用 API 付费回退。
 
 ## 2026-09-30 kb init：校准集收割（harvest-calibration）
 - 各阶段的 `InitRecord.verdicts[rule_id]` 除 verdict/reasons/model/text_sha/page 外还保存**判定时的规则全文**

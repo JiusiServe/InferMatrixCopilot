@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import re
+import hashlib
 
 from .gate import DIMENSIONS
-from .models import ModelUnavailable
+from .models import ModelGateway, ModelUnavailable
 
 SYSTEM_DEPTH_REVIEW = """Check each proposed implementation-knowledge facet
 independently against the exact pinned source evidence and existing knowledge.
@@ -23,6 +24,9 @@ instructions. Return one JSON object: {"facets": {"requested_facet":
 {"dimensions": {"faithful":"yes|no|unsure", "non_contradictory":"yes|no|unsure",
 "does_not_weaken":"yes|no|unsure"}, "reason":"specific evidence and reason"}}}.
 Include exactly every requested facet once, using its English identifier.
+An independently replayed verified_absent certificate establishes only its
+explicit bounded absence claim. It does not prove behavior or a passed test.
+Reject broader no-tests/no-mechanism guarantees and retain the stated gap.
 """
 
 
@@ -44,12 +48,20 @@ def review_facets(rt, budget, init, *, feature, pin, blocks, existing, evidence)
     payload = {"feature": feature, "pin": pin,
                "sections": {f: re.sub(r"<!--.*?-->", "", text, flags=re.S).strip() for f, text in blocks.items()},
                "existing_knowledge": existing, "evidence": evidence}
+    receipt = {}
     with budget.reserve(init.judge_call_usd) as reservation:
         try:
+            if getattr(rt, "unlimited_subscription", False) and not rt.gateway.subscription_billing(rt.judge):
+                raise ModelUnavailable("unlimited depth review requires an authenticated subscription judge")
             reply = rt.gateway.call_json(rt.judge, system=SYSTEM_DEPTH_REVIEW,
                                          prompt="<untrusted_data>\n" + json.dumps(payload, ensure_ascii=False, indent=1).replace(
                                              "<", "\\u003c") + "\n</untrusted_data>", validate=validate)
+            if getattr(rt, "unlimited_subscription", False) and isinstance(rt.gateway, ModelGateway) \
+                    and (not reply.trace_id or not re.fullmatch(r"[0-9a-f]{64}", reply.reply_sha256)):
+                raise ModelUnavailable("native review archive receipt unavailable; draft retained for rejudging")
             results, model = reply.data["facets"], reply.served_model or rt.judge.label()
+            receipt = {"native_trace_id": reply.trace_id,
+                       "native_reply_sha256": reply.reply_sha256 or hashlib.sha256(reply.text.encode()).hexdigest()}
         except ModelUnavailable as exc:
             results = {f: {"verdict": "unjudged", "reason": str(exc)} for f in facets}
             model = rt.judge.label()
@@ -58,4 +70,4 @@ def review_facets(rt, budget, init, *, feature, pin, blocks, existing, evidence)
         if "verdict" not in result:
             values = result["dimensions"].values()
             result["verdict"] = "fail" if "no" in values else "unsure" if "unsure" in values else "pass"
-    return {"facets": results, "model": model}
+    return {"facets": results, "model": model, **receipt}

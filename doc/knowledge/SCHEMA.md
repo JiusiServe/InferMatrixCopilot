@@ -40,12 +40,20 @@ validation 六个维度。它生成的非规则段使用 `kb:knowledge` HTML 注
 实现知识；旧标记、静态接口卡、规则和索引不计入此深度。正文或证据改变、pin 不符或重复
 facet 均失效。页面仍使用既有 architecture/guide 类型，设计推断与未验证测试明确标出。
 
+深读 proof 的可选 `basis` 缺省为 `supported`，旧区块原文和哈希无需迁移。
+`verified_absent` 当前仅用于已核验的验证入口缺失：由版本化检查器按 feature policy
+推导完整范围，并绑定固定 pin、范围和文件内容摘要；读取、解析、动态关联或范围不完整
+均保留未知。缺失正文必须限定范围，不能把缺失说成测试通过。缺失区块同样要求三个
+独立认可维度均为 yes。认可指标合计 supported 与 verified_absent；原正向指标保留，
+分别列出正向知识、已核验缺失和 unknown，不删除分母。
+
 功能解释页可声明 `feature`（功能 ID）、`entry_points`（生产入口路径列表）和
 `source_globs`（所属源码 glob 列表）。`knowledge`/`knowledge-deepen` 从同一份已审阅
 coverage policy 生成这些匹配提示，刷新时保留正文、来源和深读证明。提示只选择审查背景，
 不增加文件或行为覆盖率；旧页仍可通过 `sources` 中的固定源码路径匹配。
 Direct 的 `related_knowledge` 与 Agent 的 `doc_related` 共用确定性检索，最多提供两页、
 共 6,000 字符，附来源 pin、已有/缺失 facet 和截断状态；它不把推断变成硬规则。
+检索另返回 facet basis、已核验缺失和未注入维度；可用知识不等于已注入全部正文。
 
 `check_wiki_lint.py` 强制的只有前五项（`title`、`created`、`updated`、`type`、
 非空 `tags`）；其余为约定字段，写了就必须合法（`confidence` 只能取三值）。

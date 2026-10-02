@@ -21,9 +21,15 @@ params:
   from_existing: "explanatory knowledge: enrich a merged index and owner routes without local earlier-stage records"
   retry_unfinished: "knowledge-deepen only: retry unsupported facets while retaining accepted work and cumulative spend"
   subscription_generator: "explicit subscription backend; generator USD unreported, fees outside stage USD accounting"
+  unlimited_subscription: "knowledge-deepen only: authenticated subscription generator and judge without fixed accounting ceiling; incompatible with budget_usd"
 steps:
   - {id: init, step: knowledge.init}
-success: the stage's PR is open (or its dry run is written), or the record says why it is blocked
+success: the stage's PR is open or its complete dry run is written; an unmet required semantic target returns partial or blocked
+depth_acceptance:
+  workflow: "breadth audit -> targeted deepen -> source/native approval audit -> retrieval audit -> independent review -> CI -> merge"
+  target: "optional semantic_depth.per_facet_gt applies strictly to every dimension; unknown never counts and denominators stay fixed"
+  provenance: "audit_native_depth_approvals.py verifies actual archived generator/judge calls; audit_knowledge_depth.py --require-approvals replays proofs and checks targets"
+  reporting: "supported implementation/test knowledge and verified absence are separate; a bounded absence retains the mechanism/test gap"
 retrieval_acceptance:
   after: "knowledge / knowledge-deepen, in the complete merged checkout"
   command: "PYTHONPATH=src python tools/audit_review_retrieval.py --repo <repo> --report <eval-report.json>"

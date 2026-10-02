@@ -10,10 +10,10 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 
 from ..knowledge_service.lifecycle import (
-    DEPTH_BLOCK as _BLOCK, DEPTH_FACETS as FACETS, Page, safe_source_path as safe_path,
+    DEPTH_BLOCK as _BLOCK, DEPTH_FACETS as FACETS, Page, depth_proof_basis, safe_source_path as safe_path,
 )
 from .init_stages import neutral_headings
-from .knowledge_coverage import _LEXICAL_NO_CODE, inventory
+from .knowledge_coverage import _LEXICAL_NO_CODE, inventory, matches
 
 _PROOF = re.compile(r"\n<!-- kb:depth-proof (.*?) -->\s*$", re.S)
 _PRIVATE_PATH = re.compile(r"/(?:home/(?!models(?:/|\b)|<)|data/(?!models?(?:/|\b)|<))[A-Za-z0-9_-]+")
@@ -42,6 +42,15 @@ def validate_draft(data: dict) -> None:
             raise ValueError("depth prose contains machine-specific information")
         if section.get("interpretation") not in ("fact", "inference"):
             raise ValueError("depth interpretation must be fact or inference")
+        basis = section.get("basis", "supported")
+        if basis not in ("supported", "verified_absent"):
+            raise ValueError("unknown depth basis")
+        if basis == "verified_absent":
+            if section["facet"] != "validation" or section["interpretation"] != "fact" \
+                    or not isinstance(section.get("absence_certificate"), dict) or section.get("trace"):
+                raise ValueError("verified absence needs a deterministic validation certificate")
+        elif section.get("absence_certificate") is not None:
+            raise ValueError("supported knowledge cannot carry an absence certificate")
         evidence = section.get("evidence")
         if not isinstance(evidence, list) or not 1 <= len(evidence) <= 4:
             raise ValueError("each depth facet needs one to four evidence spans")
@@ -127,12 +136,16 @@ def _calls_next(module, definition, step, target):
                 if _module_matches(target["path"], step["path"], node, alias.name):
                     aliases[alias.asname or alias.name] = ""
     owner = step["symbol"].rsplit(".", 1)[0] if "." in step["symbol"] else ""
+    parameters = {argument.arg for argument in definition.args.posonlyargs + definition.args.args
+                  + definition.args.kwonlyargs}
+    parameters.update(argument.arg for argument in (definition.args.vararg, definition.args.kwarg) if argument)
     # Defaults, decorators and annotations run when a definition is created,
     # so their calls cannot witness the function's runtime flow.
     runtime_nodes = []
     for statement in definition.body:
         if not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             runtime_nodes.extend([statement, *_scope_nodes(statement)])
+    assigned = {node.id for node in runtime_nodes if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)}
     for call in runtime_nodes:
         if not isinstance(call, ast.Call) or not step["start"] <= call.lineno <= step["end"]:
             continue
@@ -144,6 +157,8 @@ def _calls_next(module, definition, step, target):
             continue  # object dispatch needs a runtime/type witness, not a name guess
         names.insert(0, function.id)
         root = names[0]
+        if root in assigned or root in parameters and not (root in ("self", "cls") and owner):
+            continue
         if root in aliases:
             resolved = ".".join(([aliases[root]] if aliases[root] else []) + names[1:])
             if resolved == target["symbol"]:
@@ -153,6 +168,70 @@ def _calls_next(module, definition, step, target):
             if root in ("self", "cls") and owner:
                 resolved = owner + "." + ".".join(names[1:])
             if resolved == target["symbol"]:
+                return True
+    return False
+
+
+def _lexical_calls_next(tree: Path, raw: str, span: str, step: dict, target: dict) -> bool:
+    """Admit only an unshadowed local name or a bound relative ES import."""
+    symbol = target["symbol"]
+    if "." in symbol:
+        return False  # object/type dispatch needs a language-specific witness
+    name = re.escape(symbol)
+    clean = _LEXICAL_NO_CODE.sub("", raw)
+    candidates = []
+    if step["path"] == target["path"]:
+        declarations = [match for match in re.finditer(
+            r"(?:function|fun)\s+" + name + r"\b|\b(?:const|let|var)\s+" + name + r"\s*(?::[^=;\n]+)?=", clean)
+            if clean[:match.start()].count("{") == clean[:match.start()].count("}")]
+        if len(declarations) != 1:
+            return False
+        candidates.append((symbol, r"(?<![\w$.])" + name + r"\s*\("))
+    else:
+        imports = _LEXICAL_NO_CODE.sub(lambda match: match.group() if match.group().startswith(("'", '"'))
+                                      else "\n" * match.group().count("\n"), raw)
+
+        def resolves(specifier):
+            if not specifier.startswith("."):
+                return False
+            root = tree.resolve()
+            base = (tree / step["path"]).parent.joinpath(specifier).resolve()
+            if not base.is_relative_to(root):
+                return False
+            paths = [base] if base.suffix else [Path(str(base) + extension) for extension in
+                    (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")] + [base / ("index" + extension)
+                    for extension in (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")]
+            existing = [path for path in paths if path.is_file() and not path.is_symlink()]
+            return len(existing) == 1 and existing[0] == (tree / target["path"]).resolve()
+
+        for bindings, specifier in re.findall(r"\bimport\s*\{([^}]*)\}\s*from\s*['\"]([^'\"]+)['\"]", imports):
+            if not resolves(specifier):
+                continue
+            for binding in bindings.split(","):
+                match = re.fullmatch(r"\s*([\w$]+)(?:\s+as\s+([\w$]+))?\s*", binding)
+                if match and match[1] == symbol:
+                    local = match[2] or match[1]
+                    candidates.append((local, r"(?<![\w$.])" + re.escape(local) + r"\s*\("))
+        for local, specifier in re.findall(r"\bimport\s*\*\s+as\s+([\w$]+)\s*from\s*['\"]([^'\"]+)['\"]", imports):
+            if resolves(specifier):
+                candidates.append((local, r"(?<![\w$.])" + re.escape(local) + r"\s*\.\s*" + name + r"\s*\("))
+    # A TypeScript object type in parameters is not the function body.
+    opening = span.find("(")
+    level, closing = 0, None
+    if opening >= 0:
+        for index in range(opening, len(span)):
+            level += (span[index] == "(") - (span[index] == ")")
+            if level == 0:
+                closing = index + 1
+                break
+    header = span[:closing] if closing else span.split("{", 1)[0]
+    for local, pattern in candidates:
+        if re.search(r"\b" + re.escape(local) + r"\b", header) \
+                or re.search(r"\b(?:const|let|var)\s+" + re.escape(local) + r"\b", span) \
+                or re.search(r"(?<![\w$.])" + re.escape(local) + r"\s*=(?!=|>)", span):
+            continue
+        for call in re.finditer(pattern, span):
+            if not re.search(r"\b(?:function|fun)\s*$", span[:call.start()]):
                 return True
     return False
 
@@ -185,18 +264,84 @@ def verify_trace(tree: Path, trace: list[dict]) -> None:
                   r"(?:function\b|(?:\([^;\n]*?\)|[\w$]+)\s*(?::[^=;\n]+)?=>))", span)
             if not declared:
                 raise ValueError("flow symbol is not declared in the supplied span")
-            if i + 1 < len(trace) and not re.search(
-                    r"\b" + re.escape(trace[i + 1]["symbol"].rsplit(".", 1)[-1]) + r"\s*\(", span):
+            if i + 1 < len(trace) and not _lexical_calls_next(tree, raw, span, step, trace[i + 1]):
                 raise ValueError("flow span does not show the next call")
 
 
-def render_block(feature, section: dict, tree: Path, full_name: str, pin: str) -> str:
+def build_absence_certificate(tree: Path, policy, feature, pin: str, facet: str = "validation") -> dict | None:
+    """Attest absence of statically associated test entries, never global absence.
+
+    The detector owns the complete test inventory and unresolved relationships.
+    A generator-provided search, omitted result, or partial scope cannot certify
+    absence. Replaying the same factory verifies persisted certificates.
+    """
+    if facet != "validation":
+        return None
+    from .depth_inputs import DepthContext
+
+    production = inventory(tree, policy)
+    scope = sorted(set(feature.entry_points) | {p for p in production if matches(p, feature.source_globs)})
+    if not scope or any(p not in production for p in scope):
+        return None
+    docs, doc_hashes = [], []
+    for path in feature.docs:
+        document = tree / path
+        if not safe_path(path) or not document.is_file() or document.is_symlink() \
+                or not document.resolve().is_relative_to(tree.resolve()):
+            return None
+        try:
+            raw = document.read_bytes()
+            docs.append({"path": path, "text": raw.decode("utf-8")})
+            doc_hashes.append((path, hashlib.sha256(raw).hexdigest()))
+        except (OSError, UnicodeError):
+            return None
+    try:
+        association = DepthContext(tree, production).test_association(feature, docs)
+    except (OSError, UnicodeError, SyntaxError, ValueError):
+        return None
+    if association.get("complete") is not True or association.get("matched_files") \
+            or association.get("unresolved_files") or sorted(association.get("source_scope", [])) != scope \
+            or association.get("checker_version") != "static-test-association-v1":
+        return None
+    source_hashes = []
+    for path in scope:
+        source = tree / path
+        if not source.is_file() or source.is_symlink() or not source.resolve().is_relative_to(tree.resolve()):
+            return None
+        try:
+            source_hashes.append((path, hashlib.sha256(source.read_bytes()).hexdigest()))
+        except OSError:
+            return None
+    policy_scope = {"roots": policy.roots, "exclude": policy.exclude, "suffixes": policy.suffixes,
+                    "filenames": policy.filenames, "feature": feature.id,
+                    "source_globs": feature.source_globs, "entry_points": feature.entry_points, "docs": feature.docs}
+    certificate = {"version": 1, "detector": "static-test-association-v1", "feature": feature.id,
+                   "facet": facet, "pin": pin, "policy_sha256": digest(json.dumps(policy_scope, sort_keys=True)),
+                   "source_scope_sha256": digest(json.dumps(source_hashes)), "source_files": len(scope),
+                   "docs_scope_sha256": digest(json.dumps(doc_hashes)),
+                   "test_inventory_sha256": association.get("inventory_sha256"),
+                   "test_files": len(association.get("scope_files", []))}
+    depth_proof_basis({"basis": "verified_absent", "absence_certificate": certificate}, facet=facet, pin=pin)
+    return certificate
+
+
+def render_block(feature, section: dict, tree: Path, full_name: str, pin: str, *, policy=None) -> str:
     proof = {"evidence": [{**e, "sha256": digest(source_span(tree, e))} for e in section["evidence"]],
-             "trace": section.get("trace", [])}
+             "trace": section.get("trace", []), "basis": section.get("basis", "supported")}
+    if proof["basis"] == "verified_absent":
+        if policy is None:
+            raise ValueError("absence proof needs the reviewed coverage policy")
+        certificate = build_absence_certificate(tree, policy, feature, pin, section["facet"])
+        if certificate is None or certificate != section.get("absence_certificate"):
+            raise ValueError("absence scope is unresolved or differs from the deterministic detector")
+        proof["absence_certificate"] = certificate
+    depth_proof_basis(proof, facet=section["facet"], pin=pin)
     if section["facet"] == "flow":
         verify_trace(tree, proof["trace"])
     title = " ".join(str(section.get("title") or section["facet"]).replace("#", "").split())
     body = neutral_headings(f"## {title}\n\n")
+    if proof["basis"] == "verified_absent":
+        body += "已核验缺口（非测试通过证明）：\n\n"
     if section["interpretation"] == "inference":
         body += "设计推断（非作者历史意图）：\n\n"
     body += section["body"].strip() + "\n\n"
@@ -206,12 +351,12 @@ def render_block(feature, section: dict, tree: Path, full_name: str, pin: str) -
     body += "来源：" + ", ".join(
         f"[{e['path']}:L{e['start']}–L{e['end']}](https://github.com/{full_name}/blob/{pin}/"
         f"{quote(e['path'], safe='/')}#L{e['start']}-L{e['end']})" for e in section["evidence"]) + "\n"
-    body += "\n<!-- kb:depth-proof " + json.dumps(proof, ensure_ascii=False, separators=(",", ":")) + " -->"
+    body += "\n<!-- kb:depth-proof " + json.dumps(proof, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + " -->"
     return (f"<!-- kb:depth feature={feature.id} facet={section['facet']} pin={pin} sha256={digest(body)} -->\n"
             + body + "\n<!-- /kb:depth -->")
 
 
-def verified_blocks(text: str, feature, tree: Path, pin: str) -> tuple[dict[str, str], list[str]]:
+def verified_blocks(text: str, feature, tree: Path, pin: str, *, policy=None) -> tuple[dict[str, str], list[str]]:
     blocks, problems, invalid = {}, [], set()
     try:
         page = Page.parse(text)
@@ -229,6 +374,12 @@ def verified_blocks(text: str, feature, tree: Path, pin: str) -> tuple[dict[str,
             if not match:
                 raise ValueError("depth block has no bound evidence proof")
             proof = json.loads(match.group(1))
+            basis = depth_proof_basis(proof, facet=facet, pin=pin)
+            if basis == "verified_absent":
+                if policy is None or proof["absence_certificate"]["feature"] != feature.id \
+                        or build_absence_certificate(tree, policy, feature, pin, facet) != proof["absence_certificate"] \
+                        or "已核验缺口（非测试通过证明）" not in body:
+                    raise ValueError("absence certificate failed its pinned policy replay")
             if not isinstance(proof.get("evidence"), list) or not 1 <= len(proof["evidence"]) <= 4:
                 raise ValueError("invalid depth proof spans")
             for e in proof["evidence"]:
@@ -243,7 +394,7 @@ def verified_blocks(text: str, feature, tree: Path, pin: str) -> tuple[dict[str,
                 verify_trace(tree, trace)
             blocks[facet] = (f"<!-- kb:depth feature={fid} facet={facet} pin={sha} sha256={hashed} -->\n"
                              + body + "\n<!-- /kb:depth -->")
-        except (ValueError, KeyError, TypeError, SyntaxError, OSError) as exc:
+        except (ValueError, KeyError, TypeError, SyntaxError, OSError, UnicodeError) as exc:
             problems.append(f"{feature.id}/{facet}: {exc}")
             invalid.add(facet)
             blocks.pop(facet, None)
@@ -254,30 +405,84 @@ def depth_page(feature) -> str:
     return str(PurePosixPath(feature.page).with_name(f"feature-depth-{feature.id}.md"))
 
 
-def audit_depth(head: dict[str, str], tree: Path, policy, pin: str) -> dict:
+def audit_depth(head: dict[str, str], tree: Path, policy, pin: str, *, approvals: list[dict] | None = None) -> dict:
+    """Recompute positive and recognized coverage without changing the denominator."""
     production = set(inventory(tree, policy))
-    witnessed, features, errors = set(), {}, []
+    witnessed, features, errors, binding_errors = set(), {}, [], []
+    approval_index = {}
+    if approvals is not None:
+        for row in approvals:
+            if not isinstance(row, dict) or row.get("facet") not in FACETS or not isinstance(row.get("feature"), str):
+                binding_errors.append("malformed native approval binding")
+                continue
+            key = (row["feature"], row["facet"])
+            if key in approval_index:
+                approval_index[key] = None
+                binding_errors.append("duplicate native approval binding: " + "/".join(key))
+            else:
+                approval_index[key] = row
     for feature in policy.features:
         page = depth_page(feature)
-        blocks, problems = verified_blocks(head[page], feature, tree, pin) if page in head else ({}, [])
+        blocks, problems = verified_blocks(head[page], feature, tree, pin, policy=policy) if page in head else ({}, [])
         if "flow" in blocks:
             proof = json.loads(_PROOF.search(_BLOCK.search(blocks["flow"]).group(5)).group(1))
             if any(s["path"] not in production for s in proof["trace"]):
                 blocks.pop("flow")
                 problems.append(f"{feature.id}/flow: trace must use production implementation")
         errors.extend(problems)
-        for block in blocks.values():
+        basis = {}
+        for facet, block in list(blocks.items()):
+            if approvals is not None:
+                row = approval_index.get((feature.id, facet))
+                expected_dimensions = {"faithful": "yes", "non_contradictory": "yes", "does_not_weaken": "yes"}
+                if not row or row.get("page") != page or row.get("block_sha256") != digest(block) \
+                        or row.get("dimensions") != expected_dimensions \
+                        or not isinstance(row.get("native_trace_id"), str) or not row["native_trace_id"] \
+                        or not isinstance(row.get("native_reply_sha256"), str) \
+                        or not re.fullmatch(r"[0-9a-f]{64}", row["native_reply_sha256"]) \
+                        or row.get("pin", pin) != pin:
+                    binding_errors.append(f"{feature.id}/{facet}: missing or mismatched all-yes native approval")
+                    blocks.pop(facet)
+                    continue
             proof = json.loads(_PROOF.search(_BLOCK.search(block).group(5)).group(1))
-            witnessed.update(e["path"] for e in proof["evidence"] if e["path"] in production)
-        features[feature.id] = {"owner": feature.owner, "page": page, "facets": list(blocks),
-                                "missing_facets": [f for f in FACETS if f not in blocks],
-                                "complete": len(blocks) == len(FACETS)}
+            basis[facet] = depth_proof_basis(proof, facet=facet, pin=pin)
+            if basis[facet] == "supported":
+                witnessed.update(e["path"] for e in proof["evidence"] if e["path"] in production)
+        supported = [f for f in FACETS if basis.get(f) == "supported"]
+        absent = [f for f in FACETS if basis.get(f) == "verified_absent"]
+        recognized = [f for f in FACETS if f in basis]
+        unknown = [f for f in FACETS if f not in basis]
+        features[feature.id] = {"owner": feature.owner, "page": page, "facets": supported,
+                               "missing_facets": [f for f in FACETS if f not in supported],
+                               "complete": len(supported) == len(FACETS), "basis": basis,
+                               "verified_absent_facets": absent, "recognized_facets": recognized,
+                               "unknown_facets": unknown, "recognized_complete": not unknown}
     slots = len(policy.features) * len(FACETS)
     covered = sum(len(x["facets"]) for x in features.values())
+    recognized = sum(len(x["recognized_facets"]) for x in features.values())
+    threshold = policy.semantic_depth_per_facet_gt
+    facet_counts = {}
+    for facet in FACETS:
+        supported = sum(x["basis"].get(facet) == "supported" for x in features.values())
+        absent = sum(x["basis"].get(facet) == "verified_absent" for x in features.values())
+        count = supported + absent
+        ratio = count / len(features) if features else 0.0
+        facet_counts[facet] = {"supported": supported, "verified_absent": absent,
+                               "unknown": len(features) - count, "recognized": count, "ratio": ratio,
+                               "target_met": threshold is None or ratio > threshold}
+    all_features_recognized = bool(features) and all(x["recognized_facets"] for x in features.values())
+    target_met = not errors and not binding_errors and (threshold is None or
+                 all_features_recognized and all(x["target_met"] for x in facet_counts.values()))
     return {"pin": pin, "features": features, "complete_features": sum(x["complete"] for x in features.values()),
             "total_features": len(features), "covered_facets": covered, "total_facets": slots,
-            "facet_ratio": covered / slots if slots else 0.0,
+            "facet_ratio": covered / slots if slots else 0.0, "recognized_facets": recognized,
+            "recognized_facet_ratio": recognized / slots if slots else 0.0,
+            "recognized_complete_features": sum(x["recognized_complete"] for x in features.values()),
+            "recognized_feature_count": sum(bool(x["recognized_facets"]) for x in features.values()),
+            "facet_counts": facet_counts, "per_facet_gt": threshold, "target_met": target_met,
+            "approval_bindings_checked": approvals is not None, "approval_binding_problems": binding_errors,
             "production_files_with_semantic_evidence": sorted(witnessed), "production_files_total": len(production),
-            "problems": errors, "complete": covered == slots and not errors,
-            "interpretation": "Pinned representative call/contract witnesses; neither static interface cards "
-                              "nor exhaustive behavior or executed-test coverage."}
+            "problems": errors, "complete": covered == slots and not errors and not binding_errors,
+            "recognized_complete": recognized == slots and not errors and not binding_errors,
+            "interpretation": "Positive supported witnesses remain separate from verified gaps. Recognized coverage "
+                              "includes both, without claiming capabilities, exhaustive behavior, or tests passed."}

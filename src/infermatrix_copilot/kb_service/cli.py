@@ -117,6 +117,9 @@ def _init_command(args, state_dir: Path) -> int:
     if args.suggest_seeds == bool(args.stage):
         print("kb init: pass exactly one of --stage or --suggest-seeds", file=sys.stderr)
         return 2
+    if args.unlimited_subscription and (args.stage != "knowledge-deepen" or args.budget_usd is not None):
+        print("--unlimited-subscription is for knowledge-deepen only and conflicts with --budget-usd", file=sys.stderr)
+        return 2
     if args.suggest_seeds:
         from .init_stages import suggest_seeds
         from .init_support import InitError, InitRuntime
@@ -143,6 +146,8 @@ def _init_command(args, state_dir: Path) -> int:
         params["from_existing"] = "true"
     if args.subscription_generator:
         params["subscription_generator"] = "true"
+    if args.unlimited_subscription:
+        params["unlimited_subscription"] = "true"
     if args.retry_unfinished:
         if args.stage != "knowledge-deepen":
             print("--retry-unfinished is for knowledge-deepen only", file=sys.stderr)
@@ -219,6 +224,8 @@ def main(argv: list[str] | None = None) -> int:
                       help="enrich a merged KB without local skeleton/modules records (knowledge stages)")
     init.add_argument("--subscription-generator", action="store_true",
                       help="explicit subscription generator; unreported fees outside stage USD accounting")
+    init.add_argument("--unlimited-subscription", action="store_true",
+                      help="uncapped knowledge-deepen with authenticated subscription generator and judge; no fallback")
     init.add_argument("--retry-unfinished", action="store_true", help="retry missing depth facets, preserving prior spend")
     for name, stage in (("widen", "knowledge"), ("deepen", "knowledge-deepen")):
         cmd = sub.add_parser(name, help="feature breadth" if name == "widen" else "feature implementation depth")
@@ -229,8 +236,10 @@ def main(argv: list[str] | None = None) -> int:
         if name == "deepen":
             cmd.add_argument("--budget-usd", type=float)
             cmd.add_argument("--retry-unfinished", action="store_true")
+            cmd.add_argument("--unlimited-subscription", action="store_true")
         cmd.set_defaults(stage=stage, from_existing=True, suggest_seeds=False, pr_count=None,
-                         **({"budget_usd": None, "retry_unfinished": False} if name == "widen" else {}))
+                         **({"budget_usd": None, "retry_unfinished": False, "unlimited_subscription": False}
+                            if name == "widen" else {}))
     publish = sub.add_parser("publish")
     where = publish.add_mutually_exclusive_group(required=True)
     where.add_argument("--remote", help="host:/absolute/path of the service state directory (over ssh)")

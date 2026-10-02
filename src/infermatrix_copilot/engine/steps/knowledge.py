@@ -182,15 +182,16 @@ async def init_stage(ctx: StepContext) -> StepResult:
         ceiling = ctx.params.get("budget_usd")
         if ceiling not in (None, ""):
             kwargs["budget_usd"] = float(ceiling)
-        for option in ("from_existing", "subscription_generator", "retry_unfinished"):
+        for option in ("from_existing", "subscription_generator", "retry_unfinished", "unlimited_subscription"):
             if str(ctx.params.get(option, "false")).lower() in ("1", "true", "yes"):
                 kwargs[option] = True
         record = run_stage(rt, lifecycle, stage, dry_run=dry_run, pin=pin, **kwargs)
     except (InitError, NotImplementedError, ValueError) as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
     updates = {"kb_init_stage": stage, "kb_init_status": record.status, "kb_init_pr": dict(record.pr)}
-    if record.status == "blocked":
-        return StepResult(False, FailureKind.BLOCKED, "; ".join(record.problems)[:2000],
+    if record.status in ("blocked", "partial"):
+        return StepResult(False, FailureKind.BLOCKED, "; ".join(record.problems)[:2000] or
+                          "semantic depth target unmet; partial preview and checkpoint retained",
                           outputs={"state_updates": updates})
     return StepResult(True, summary=f"kb init {stage} for {repo}: {record.status}",
                       outputs={"state_updates": updates})
