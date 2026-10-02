@@ -26,8 +26,9 @@ from .models import ModelUnavailable
 
 
 def validate_container(data: dict) -> None:
-    if not isinstance(data, dict) or not isinstance(data.get("sections"), list) or len(data["sections"]) > len(FACETS):
-        raise ValueError("sections must list at most seven depth facets")
+    """Bound candidates; per-facet validation discards duplicates independently."""
+    if not isinstance(data, dict) or not isinstance(data.get("sections"), list) or len(data["sections"]) > 2 * len(FACETS):
+        raise ValueError("sections must be a bounded list of candidate facets")
 
 
 @dataclass
@@ -116,7 +117,13 @@ class _KnowledgeDepth(_Knowledge):
                     for f in policy.features}
         stopped = False
         for repair in (False, True):
-            for feature in policy.features:
+            order = policy.features
+            if repair:
+                progress = audit_depth(self.head, tree, policy, self.record.pin)
+                # Cover features with no accepted explanation before extending
+                # partial pages; stable sorting keeps policy order within groups.
+                order = sorted(order, key=lambda f: bool(progress["features"][f.id]["facets"]))
+            for feature in order:
                 entry = states.setdefault(feature.id, {})
                 current = audit_depth({depth_page(feature): self.head[depth_page(feature)]}, tree,
                                       replace(policy, features=(feature,)), self.record.pin) \
@@ -125,7 +132,9 @@ class _KnowledgeDepth(_Knowledge):
                     entry["status"] = "complete"
                     continue
                 attempts = entry.get("attempts", 0)
-                if (not repair and attempts >= ceilings[feature.id] - 1) or attempts >= ceilings[feature.id]:
+                pending_draft = "draft" in entry
+                if not pending_draft and ((not repair and attempts >= ceilings[feature.id] - 1)
+                                          or attempts >= ceilings[feature.id]):
                     continue
                 if self.budget.spent_usd + self.lifecycle.init.judge_call_usd > self.budget.limit_usd:
                     stopped = True

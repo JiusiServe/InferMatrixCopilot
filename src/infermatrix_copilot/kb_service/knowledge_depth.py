@@ -133,7 +133,13 @@ def _calls_next(module, definition, step, target):
                 if _module_matches(target["path"], step["path"], node, alias.name):
                     aliases[alias.asname or alias.name] = ""
     owner = step["symbol"].rsplit(".", 1)[0] if "." in step["symbol"] else ""
-    for call in _scope_nodes(definition):
+    # Defaults, decorators and annotations run when a definition is created,
+    # so their calls cannot witness the function's runtime flow.
+    runtime_nodes = []
+    for statement in definition.body:
+        if not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            runtime_nodes.extend([statement, *_scope_nodes(statement)])
+    for call in runtime_nodes:
         if not isinstance(call, ast.Call) or not step["start"] <= call.lineno <= step["end"]:
             continue
         names, function = [], call.func
@@ -169,7 +175,8 @@ def verify_trace(tree: Path, trace: list[dict]) -> None:
         if step["path"].endswith(".py"):
             module = ast.parse(raw)
             definition = python_definitions(module).get(step["symbol"])
-            if definition is None or not definition.lineno <= step["start"] <= step["end"] <= definition.end_lineno:
+            if (not isinstance(definition, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    or not definition.lineno <= step["start"] <= step["end"] <= definition.end_lineno):
                 raise ValueError("flow symbol/span is not a pinned definition")
             if i + 1 < len(trace):
                 if not _calls_next(module, definition, step, trace[i + 1]):
@@ -177,8 +184,11 @@ def verify_trace(tree: Path, trace: list[dict]) -> None:
         else:
             # Conservative lexical witnesses for clients/build languages.
             span = _LEXICAL_NO_CODE.sub("", span)
-            declared = re.search(r"(?:function|class|def|fun)\s+" + re.escape(name) + r"\b|\b"
-                                 + re.escape(name) + r"\s*(?:=|\([^\n]*\)\s*\{)", span)
+            callable_name = re.escape(name)
+            declared = re.search(
+                r"(?:function|def|fun)\s+" + callable_name + r"\b|\b" + callable_name
+                + r"\s*(?:\([^\n]*\)\s*\{|(?:\s*:[^=;\n]+)?=\s*(?:async\s+)?"
+                  r"(?:function\b|(?:\([^;\n]*?\)|[\w$]+)\s*(?::[^=;\n]+)?=>))", span)
             if not declared:
                 raise ValueError("flow symbol is not declared in the supplied span")
             if i + 1 < len(trace) and not re.search(

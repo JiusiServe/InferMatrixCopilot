@@ -359,3 +359,117 @@ def test_aliases_use_init_before_opening_a_ledger(monkeypatch, command, stage):
     monkeypatch.setattr(cli, "_init_command", capture)
     monkeypatch.setattr(cli, "_ledger", lambda *_: pytest.fail("alias must not open kb.db"))
     assert cli.main([command, "toy", "--dry-run", "--subscription-generator"]) == 0
+
+
+@pytest.mark.parametrize("body,valid", [
+    ("def run(value=helper()):\n    return value\n", False),
+    ("def run(value: helper()):\n    return value\n", False),
+    ("@helper()\ndef run():\n    return 1\n", False),
+    ("def run(value=helper()):\n    return helper()\n", True),
+    ("def run():\n    def inner():\n        return helper()\n    return inner()\n", False),
+])
+def test_flow_witness_is_a_call_in_the_function_body(tmp_path, body, valid):
+    from infermatrix_copilot.kb_service.knowledge_depth import verify_trace
+
+    (tmp_path / "core.py").write_text("def helper():\n    return 1\n" + body)
+    trace = [{"path": "core.py", "symbol": "run", "start": 4 if body.startswith("@") else 3,
+              "end": 2 + len(body.splitlines())},
+             {"path": "core.py", "symbol": "helper", "start": 1, "end": 2}]
+    if valid:
+        verify_trace(tmp_path, trace)
+    else:
+        with pytest.raises(ValueError, match="does not call"):
+            verify_trace(tmp_path, trace)
+
+
+@pytest.mark.parametrize("binding,valid", [
+    ("1", False),
+    ("(1)\nconst other = () => 2", False),
+    ("() => 1", True),
+    ("async (value) => value", True),
+    ("function () { return 1; }", True),
+    ("(value: number): number => value", True),
+])
+def test_client_flow_target_must_be_callable(tmp_path, binding, valid):
+    from infermatrix_copilot.kb_service.knowledge_depth import verify_trace
+
+    (tmp_path / "client.ts").write_text("function run() { return helper(); }\nconst helper = " + binding + ";\n")
+    trace = [{"path": "client.ts", "symbol": "run", "start": 1, "end": 1},
+             {"path": "client.ts", "symbol": "helper", "start": 2, "end": 1 + len(binding.splitlines())}]
+    if valid:
+        verify_trace(tmp_path, trace)
+    else:
+        with pytest.raises(ValueError, match="not declared"):
+            verify_trace(tmp_path, trace)
+
+
+def test_duplicate_facet_does_not_discard_other_supported_facets(world):
+    _baseline(world)
+
+    class RepeatedFlow(DepthGateway):
+        def call_json(self, role, **kwargs):
+            result = super().call_json(role, **kwargs)
+            if kwargs["system"] == SYSTEM_DEPTH:
+                result.data["sections"].append(_flow())
+                kwargs["validate"](result.data)
+            return result
+
+    record = _run(world, RepeatedFlow())
+    assert record.status == "dry_run", record.problems
+    assert record.coverage["semantic_depth"]["covered_facets"] == 6
+    assert record.coverage["semantic_depth"]["features"]["step0"]["missing_facets"] == ["flow"]
+    assert all("duplicate" in p for p in record.depth["features"]["step0"]["skipped_facets"])
+
+
+def test_repair_prioritizes_features_without_accepted_depth(world):
+    _baseline(world, features=2)
+
+    class CoverageFirst(DepthGateway):
+        def __init__(self):
+            super().__init__()
+            self.reviews = {}
+
+        def call_json(self, role, **kwargs):
+            if kwargs["system"] == SYSTEM_DEPTH_REVIEW:
+                payload = json.JSONDecoder().raw_decode(kwargs["prompt"][kwargs["prompt"].index("{"):])[0]
+                feature = payload["feature"]
+                self.reviews[feature] = self.reviews.get(feature, 0) + 1
+                self.reject = "api" if feature == "step0" else self.reviews[feature] == 1
+            return super().call_json(role, **kwargs)
+
+    gateway = CoverageFirst()
+    record = _run(world, gateway, budget=1.5)
+    assert record.status == "dry_run", record.problems
+    assert record.spent_usd == 1.5
+    assert gateway.reviews == {"step0": 1, "step1": 2}
+    assert record.coverage["semantic_depth"]["covered_facets"] == 13
+    assert record.coverage["semantic_depth"]["features"]["step1"]["complete"]
+
+
+def test_interrupted_repair_judge_reuses_its_completed_draft(world):
+    _baseline(world)
+
+    class InterruptedRepair(DepthGateway):
+        def __init__(self):
+            super().__init__()
+            self.reviews = 0
+
+        def call_json(self, role, **kwargs):
+            if kwargs["system"] == SYSTEM_DEPTH_REVIEW:
+                self.reviews += 1
+                if self.reviews == 2:
+                    raise KeyboardInterrupt()
+                self.reject = "api" if self.reviews == 1 else False
+            return super().call_json(role, **kwargs)
+
+    gateway = InterruptedRepair()
+    with pytest.raises(KeyboardInterrupt):
+        _run(world, gateway)
+    saved = InitRecord.load(world["tmp"] / "depth", "toy", "knowledge-deepen")
+    assert saved.depth["features"]["step0"]["attempts"] == 2
+    assert "draft" in saved.depth["features"]["step0"]
+    assert len(gateway.depth_calls) == 2
+    record = _run(world, gateway)
+    assert record.status == "dry_run", record.problems
+    assert record.coverage["semantic_depth"]["complete_features"] == 1
+    assert len(gateway.depth_calls) == 2
