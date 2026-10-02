@@ -1,7 +1,9 @@
 """Offline checks for bounded parallel dispatch, shared inputs and draining."""
 
 import argparse
+import hashlib
 import json
+import os
 import signal
 import sys
 from types import SimpleNamespace
@@ -85,8 +87,12 @@ def test_worker_forwards_lightweight_index_and_stop_boundary(runner, campaign_ar
     runtime = SimpleNamespace(registry={args.repo: "lifecycle"}, gateway=SimpleNamespace(configure_zcode_pacing=pacing.append))
     monkeypatch.setattr(InitRuntime, "from_env", lambda *_a, **_k: runtime)
     seen = []
+    monkeypatch.setenv("KB_DEPTH_REPAIR_GUIDANCE", "/stale/inherited-guidance.json")
+    monkeypatch.setenv("KB_DEPTH_REPAIR_GUIDANCE_SHA256", "a" * 64)
 
     def run_stage(*_a, **kwargs):
+        assert "KB_DEPTH_REPAIR_GUIDANCE" not in os.environ
+        assert "KB_DEPTH_REPAIR_GUIDANCE_SHA256" not in os.environ
         seen.append(kwargs)
         return InitRecord(stage="knowledge-deepen", repo=args.repo, kb_base_sha=args.baseline, pin=args.pin, status="complete")
 
@@ -97,6 +103,59 @@ def test_worker_forwards_lightweight_index_and_stop_boundary(runner, campaign_ar
     assert seen[0]["unlimited_subscription"] is True
     assert pacing[0].path == args.state / "zcode-pacing.json"
     assert pacing[0].config["start_interval_s"] == 15 and pacing[0].config["rate_cooldown_s"] == 90
+
+
+def test_parent_binds_every_guided_child_to_its_captured_input_hash(runner, campaign_args, monkeypatch):
+    args = campaign_args
+    (args.root / "src").mkdir()
+    (args.root / "src/core.py").write_text("def entry():\n    return 17\n")
+    _git(args.root, "add", ".")
+    _git(args.root, "commit", "--quiet", "-m", "Pinned repair evidence fixture")
+    args.pin = args.baseline = _git(args.root, "rev-parse", "HEAD")
+    args.acceptance_mode = "lightweight"
+    args.repair_guidance = args.state / "guidance.json"
+    policy = (args.root / "adapters/demo/knowledge-coverage.yaml").read_bytes()
+    args.repair_guidance.write_text(json.dumps({
+        "schema": "depth-repair-guidance-v1", "pin": args.pin, "baseline": args.baseline,
+        "policy_sha256": hashlib.sha256(policy).hexdigest(),
+        "rows": [{"feature": "f0", "facet": "flow",
+                  "evidence": [{"path": "src/core.py", "start": 1, "end": 2}]}],
+    }))
+    expected_hash = hashlib.sha256(args.repair_guidance.read_bytes()).hexdigest()
+    _offline_processes(runner, monkeypatch)
+    seen = []
+    spawn = runner.subprocess.Popen
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda argv, **kwargs: seen.append(argv) or spawn(argv, **kwargs))
+    assert runner.campaign(args, argparse.ArgumentParser()) == 0
+    assert seen and all(argv[argv.index("--repair-guidance-sha256") + 1] == expected_hash for argv in seen)
+    assert all(argv[argv.index("--repair-guidance") + 1] == str(args.repair_guidance) for argv in seen)
+    assert json.loads((args.state / "campaign.json").read_text())["repair_guidance_sha256"] == expected_hash
+
+    # Removing the flag must not erase the existing campaign's input binding.
+    original_metadata = (args.state / "campaign.json").read_bytes()
+    args.repair_guidance = None
+    resumed, _ = _offline_processes(runner, monkeypatch)
+    with pytest.raises(SystemExit) as error:
+        runner.campaign(args, argparse.ArgumentParser())
+    assert error.value.code == 2 and not resumed
+    assert (args.state / "campaign.json").read_bytes() == original_metadata
+
+
+@pytest.mark.parametrize("supplied_hash", [None, "a" * 63, "Z" * 64])
+def test_guided_worker_rejects_missing_or_malformed_parent_hash_before_dispatch(
+    runner, campaign_args, monkeypatch, supplied_hash,
+):
+    args = campaign_args
+    argv = ["campaign", "--root", str(args.root), "--state", str(args.state), "--repo", args.repo,
+            "--pin", args.pin, "--baseline", args.baseline, "--upstream-mirror", str(args.upstream_mirror),
+            "--worker", "0", "--feature-ids", "f0", "--repair-guidance", str(args.state / "guidance.json")]
+    if supplied_hash is not None:
+        argv += ["--repair-guidance-sha256", supplied_hash]
+    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(runner, "worker", lambda *_: pytest.fail("invalid guided worker dispatched"))
+    with pytest.raises(SystemExit) as error:
+        runner.main()
+    assert error.value.code == 2
 
 
 def test_existing_stop_file_prevents_new_workers_and_saves_drain_snapshot(runner, campaign_args, monkeypatch):

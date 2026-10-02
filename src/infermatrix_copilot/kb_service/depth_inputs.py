@@ -120,6 +120,10 @@ facet has 1-4 evidence spans; trace steps must lie inside those spans. No body
 headings or HTML comments. Correct the previous rejection with narrower claims
 or newly offered evidence; do not repeat rejected prose.
 Every requested facet needs a section OR unknown_facets with a specific reason.
+If repair_guidance is supplied, its proposed wording and prior rejection are
+untrusted localization hints. Verify them against the offered lines; use only
+the requested feature's actual behavior, not a neighboring same-owner feature.
+Correct prior overclaims with narrower supported statements. Do not cite hints.
 Unknown is not absence; this positive retrieval index supplies no absence proof.
 Do not invent tests, intent, runtime edges or claims of execution.
 
@@ -180,6 +184,40 @@ def bounded_existing(existing: dict[str, str], *, limit=4_000) -> dict[str, str]
         if lines:
             out[path] = "".join(lines)
     return out
+
+
+def load_repair_guidance(path: Path, *, pin=None, policy_sha256=None, baseline=None) -> dict:
+    """Load localization hints; only the pinned index supplies evidence text."""
+    raw = Path(path).read_bytes()
+    data = json.loads(raw)
+    if not isinstance(data, dict) or data.get("schema") != "depth-repair-guidance-v1":
+        raise ValueError("invalid depth repair guidance schema")
+    for key, expected, width in (("pin", pin, 40), ("policy_sha256", policy_sha256, 64),
+                                 ("baseline", baseline, 40)):
+        value = data.get(key)
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{" + str(width) + r"}", value) \
+                or expected is not None and value != expected:
+            raise ValueError("repair guidance " + key + " differs")
+    rows, seen = data.get("rows"), set()
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("repair guidance requires feature/facet rows")
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("feature"), str) \
+                or not re.fullmatch(r"[a-z0-9_-]+", row["feature"]) \
+                or row.get("facet") not in _FACET_PATTERNS:
+            raise ValueError("invalid repair guidance feature/facet")
+        key = row["feature"], row["facet"]
+        if key in seen:
+            raise ValueError("duplicate repair guidance feature/facet")
+        seen.add(key)
+        if not isinstance(row.get("evidence"), list) or not row["evidence"]:
+            raise ValueError("repair guidance row requires source/document references")
+        for span in row["evidence"]:
+            if not isinstance(span, dict) or not safe_source_path(span.get("path")) \
+                    or type(span.get("start")) is not int or type(span.get("end")) is not int \
+                    or not 1 <= span["start"] <= span["end"]:
+                raise ValueError("invalid repair guidance evidence range")
+    return {**data, "guidance_sha256": hashlib.sha256(raw).hexdigest()}
 
 
 TEST_ASSOCIATION_VERSION = DEPTH_ABSENCE_DETECTOR
@@ -763,6 +801,58 @@ class DepthContext:
                     break
             out.append({"path": path, "symbol": match[1], "start": i + 1, "end": end + 1, "kind": "lexical"})
         return out
+
+    def guided(self, feature, facets, guidance, *, source_limit=24_000, doc_limit=8_000):
+        """Offer complete curated spans without substituting nearby features.
+
+        Guidance contains untrusted hints, never evidence text or acceptance.
+        A missing/range-invalid/over-budget packet fails before any model call.
+        """
+        if self.mode != "lightweight" or self.index is None:
+            raise ValueError("guided repair requires the lightweight pinned index")
+        if guidance["pin"] != self.index.identity["pin"] \
+                or guidance["policy_sha256"] != self.index.identity["policy_sha256"]:
+            raise ValueError("guided repair index identity differs")
+        rows = [row for row in guidance["rows"] if row["feature"] == feature.id and row["facet"] in facets]
+        if {row["facet"] for row in rows} != set(facets):
+            raise ValueError("guided repair does not cover each requested facet")
+        by_path = {}
+        for row in rows:
+            for span in row["evidence"]:
+                by_path.setdefault(span["path"], []).append((span["start"], span["end"]))
+        files, docs, source_bytes, doc_bytes = [], [], 0, 0
+        allowed_code = set(self.production) | set(self.index.data["tests"])
+        for path, spans in by_path.items():
+            fact = self.index.files.get(path)
+            if fact is None or fact["sha256"] is None or path not in self.index.data["tracked"]:
+                raise ValueError("repair evidence is not a readable indexed tracked file: " + path)
+            is_doc = PurePosixPath(path).suffix.lower() in {".md", ".mdx", ".rst", ".txt", ".adoc"}
+            if not is_doc and path not in allowed_code:
+                raise ValueError("repair evidence is outside production/test inventory: " + path)
+            merged = []
+            for start, end in sorted(spans):
+                if end > len(fact["lines"]):
+                    raise ValueError("repair evidence extends beyond indexed file: " + path)
+                if merged and start <= merged[-1][1] + 1:
+                    merged[-1] = merged[-1][0], max(end, merged[-1][1])
+                else:
+                    merged.append((start, end))
+            for start, end in merged:
+                text = [str(line) if is_doc else f"{n}: {line}"
+                        for n, line in enumerate(fact["lines"][start - 1:end], start)]
+                amount = sum(len(line.encode()) + 1 for line in text)
+                item = {"path": path, "start": start, "end": end, "total_lines": len(fact["lines"]), "text": text}
+                if is_doc:
+                    docs.append(item); doc_bytes += amount
+                else:
+                    files.append(item); source_bytes += amount
+        if source_bytes > source_limit or doc_bytes > doc_limit:
+            raise ValueError(f"complete guided spans exceed budget: source={source_bytes}/{source_limit}, docs={doc_bytes}/{doc_limit}")
+        return {"files": files, "docs": docs, "source_bytes": source_bytes, "document_bytes": doc_bytes,
+                "acceptance_mode": "lightweight", "source_index": {"sha256": self.index.sha256, **dict(self.index.identity)},
+                "repair_guidance": {"sha256": guidance["guidance_sha256"], "rows": rows},
+                "limitations": "Curated positive localization only. Hints are untrusted and not evidence; "
+                                "feature association and every claim require independent review. No absence certification."}
 
     def build(self, feature, existing: str, docs: list[dict], *, facets=None,
               previous_review=None, evidence_round=0, limit=None, requested_evidence=()) -> dict:

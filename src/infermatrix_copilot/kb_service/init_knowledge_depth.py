@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
 import re
 import time
 from collections import Counter
@@ -73,6 +74,14 @@ class _KnowledgeDepth(_Knowledge):
                 index_options["depth_index_sha256"] = hashlib.sha256(self.depth_index_path.read_bytes()).hexdigest()
         else:
             index_options = {}
+        guidance_path = os.environ.get("KB_DEPTH_REPAIR_GUIDANCE")
+        if guidance_path:
+            from .depth_inputs import load_repair_guidance
+            self._repair_guidance = load_repair_guidance(Path(guidance_path))
+            expected_hash = os.environ.get("KB_DEPTH_REPAIR_GUIDANCE_SHA256")
+            if expected_hash and self._repair_guidance["guidance_sha256"] != expected_hash:
+                raise InitError("repair guidance differs from the campaign's immutable input")
+            index_options["repair_guidance_sha256"] = self._repair_guidance["guidance_sha256"]
         return {**super()._input_options(), "depth_version": 5 if self.acceptance_mode == "lightweight" else 4,
                 "depth_feature_ids": list(self.feature_ids),
                 **index_options}
@@ -112,6 +121,8 @@ class _KnowledgeDepth(_Knowledge):
             problems.append("depth execution partition contains unknown policy features")
         if self.acceptance_mode not in ("strict", "lightweight"):
             problems.append("acceptance_mode must be strict or lightweight")
+        if getattr(self, "_repair_guidance", None) and self.acceptance_mode != "lightweight":
+            problems.append("repair guidance requires lightweight recognition")
         return problems
 
     def _refresh_quick_maps(self) -> list[str]:
@@ -160,6 +171,13 @@ class _KnowledgeDepth(_Knowledge):
             context = DepthContext(tree, inventory(tree, policy), mode="lightweight",
                                    cache_path=self.depth_index_path, pin=self.record.pin,
                                    policy_sha256=digest(policy_text))
+            if getattr(self, "_repair_guidance", None):
+                from .depth_inputs import load_repair_guidance
+                checked_guidance = load_repair_guidance(
+                    Path(os.environ["KB_DEPTH_REPAIR_GUIDANCE"]), pin=self.record.pin,
+                    policy_sha256=digest(policy_text), baseline=self._base_sha)
+                if checked_guidance["guidance_sha256"] != self._repair_guidance["guidance_sha256"]:
+                    raise InitError("repair guidance changed after checkpoint identity was captured")
         else:
             context = DepthContext(tree, inventory(tree, policy))
         by_id = {f.id: f for f in policy.features}
@@ -403,15 +421,16 @@ class _KnowledgeDepth(_Knowledge):
             raise ValueError("; ".join(problems))
         owner = next((o for o in self.owners if o.owner == feature.owner),
                      Owner(feature.owner, feature.page, tuple(p.split("*", 1)[0] for p in feature.source_globs)))
-        docs = self._docs(tree, feature, owner)
+        guidance = getattr(self, "_repair_guidance", None)
+        docs = [] if guidance else self._docs(tree, feature, owner)
         existing = self._bounded_context(self._existing_knowledge(owner, self.head.get(feature.page, "")))
         if lightweight:
             docs = self._bounded_slices(docs, 8000)
             existing = self._bounded_texts(existing, 4000)
         requested = entry.get("requested_facets") or [f for f in FACETS if f not in old_blocks]
-        retrieval = context.build(feature, self.head.get(feature.page, ""), docs,
-                                  facets=requested, previous_review=entry.get("reason"),
-                                  evidence_round=entry.get("evidence_round", 0))
+        retrieval = context.guided(feature, requested, guidance) if guidance else context.build(
+            feature, self.head.get(feature.page, ""), docs, facets=requested,
+            previous_review=entry.get("reason"), evidence_round=entry.get("evidence_round", 0))
         if lightweight:
             docs = retrieval.get("docs", docs)
         files = retrieval["files"]

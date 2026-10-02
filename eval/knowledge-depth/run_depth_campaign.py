@@ -42,6 +42,12 @@ def run_worker(args, state):
 
     os.environ["KB_INIT_KNOWLEDGE_CLONE"] = str(state / "init/knowledge-repo")
     os.environ["ADAPTERS_DIR"] = str(args.root / "adapters")
+    if getattr(args, "repair_guidance", None):
+        os.environ["KB_DEPTH_REPAIR_GUIDANCE"] = str(args.repair_guidance)
+        os.environ["KB_DEPTH_REPAIR_GUIDANCE_SHA256"] = args.repair_guidance_sha256
+    else:
+        os.environ.pop("KB_DEPTH_REPAIR_GUIDANCE", None)
+        os.environ.pop("KB_DEPTH_REPAIR_GUIDANCE_SHA256", None)
     if KnowledgeRepo(state / "init/knowledge-repo").fetch() != args.baseline:
         raise RuntimeError("worker knowledge baseline differs from the immutable campaign")
     previous = InitRecord.load(state, args.repo, "knowledge-deepen")
@@ -80,6 +86,8 @@ def main():
     parser.add_argument("--workers", type=int, default=13)
     parser.add_argument("--acceptance-mode", choices=("strict", "lightweight"), default="lightweight")
     parser.add_argument("--depth-index-path", type=Path)
+    parser.add_argument("--repair-guidance", type=Path, help="Pinned, immutable localization hints for a newly authorized gap-repair batch")
+    parser.add_argument("--repair-guidance-sha256", help=argparse.SUPPRESS)
     parser.add_argument("--zcode-pacing-path", type=Path)
     parser.add_argument("--zcode-start-interval", type=float, default=15.0)
     parser.add_argument("--zcode-rate-cooldown", type=float, default=90.0)
@@ -95,6 +103,8 @@ def main():
     args.stop_file = (args.stop_file or args.state / "STOP").resolve()
     if args.depth_index_path:
         args.depth_index_path = args.depth_index_path.resolve()
+    if args.repair_guidance:
+        args.repair_guidance = args.repair_guidance.resolve()
     if args.zcode_pacing_path:
         args.zcode_pacing_path = args.zcode_pacing_path.resolve()
     from infermatrix_copilot.kb_service.depth_pacing import SharedZcodePacer
@@ -106,6 +116,8 @@ def main():
     if args.worker is not None:
         if not 0 <= args.worker < args.workers or not args.feature_ids:
             parser.error("worker must belong to the campaign and have feature IDs")
+        if args.repair_guidance and not re.fullmatch(r"[0-9a-f]{64}", args.repair_guidance_sha256 or ""):
+            parser.error("guided workers require their parent's immutable guidance hash")
         return worker(args)
     args.baseline = subprocess.check_output(["git", "-C", str(args.root), "rev-parse", args.baseline + "^{commit}"], text=True).strip()
     args.state.mkdir(parents=True, exist_ok=True)
@@ -144,10 +156,19 @@ def campaign(args, parser):
                "features": len(policy.features), "denominator": len(policy.features) * 7,
                "workers": args.workers, "partitions": partitions,
                "acceptance_mode": getattr(args, "acceptance_mode", "strict")}
+    if getattr(args, "repair_guidance", None):
+        from infermatrix_copilot.kb_service.depth_inputs import load_repair_guidance
+        guidance = load_repair_guidance(args.repair_guidance, pin=args.pin,
+                                        policy_sha256=hashlib.sha256(text.encode()).hexdigest(), baseline=args.baseline)
+        if summary["acceptance_mode"] != "lightweight" or set(row["feature"] for row in guidance["rows"]) - {f.id for f in policy.features}:
+            parser.error("repair guidance must address declared features in lightweight mode")
+        summary["repair_guidance_sha256"] = guidance["guidance_sha256"]
+        summary["repair_guidance_facets"] = len(guidance["rows"])
     metadata = args.state / "campaign.json"
     if metadata.exists():
         prior = json.loads(metadata.read_text())
-        if any(prior.get(key) != value for key, value in summary.items()):
+        if prior.get("repair_guidance_sha256") != summary.get("repair_guidance_sha256") or any(
+                prior.get(key) != value for key, value in summary.items()):
             parser.error("campaign identity changed; use a fresh state directory")
     stop_file = getattr(args, "stop_file", None) or args.state / "STOP"
     from infermatrix_copilot.kb_service.depth_pacing import SharedZcodePacer
@@ -203,6 +224,9 @@ def campaign(args, parser):
                 "--zcode-rate-cooldown", str(pacer.config["rate_cooldown_s"])]
         if index_path:
             argv += ["--depth-index-path", str(index_path)]
+        if getattr(args, "repair_guidance", None):
+            argv += ["--repair-guidance", str(args.repair_guidance),
+                     "--repair-guidance-sha256", summary["repair_guidance_sha256"]]
         if args.retry:
             argv.append("--retry")
         jobs.append((number, argv))

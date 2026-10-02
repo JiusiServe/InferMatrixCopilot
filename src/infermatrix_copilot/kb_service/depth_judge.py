@@ -16,6 +16,11 @@ For EACH facet answer all three dimensions with yes/no/unsure:
   branches, exceptions, callers and limitations. Reject overstated guarantees,
   documentary intent without evidence, or claims that tests ran now. Clearly
   labeled analysis may explain a tradeoff but cannot invent runtime behavior.
+  The explanation must belong to the requested feature, not merely its owner.
+  Reject citations about a neighboring rail, mode or generic shared helper when
+  they do not establish the requested feature's behavior. A test must exercise
+  the feature's actual symbols/configuration or an explicitly scoped helper;
+  an unrelated same-owner test does not establish feature validation.
 - non_contradictory: consistent with the existing knowledge and other facets.
 - does_not_weaken: does not soften an existing requirement or warning.
 A mistake in one facet is not grounds to reject unrelated correct facets.
