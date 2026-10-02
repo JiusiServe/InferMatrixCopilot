@@ -75,16 +75,20 @@ def test_http_client_does_not_forward_bearer_on_redirect():
             pass
 
         def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
             requests.append((self.path, self.headers.get("Authorization")))
             self.send_response(302)
             self.send_header("Location", "/unexpected")
+            self.send_header("Content-Length", "0")
             self.end_headers()
 
         def do_GET(self):
             requests.append((self.path, self.headers.get("Authorization")))
+            body = b'{"rfc_api_version":"1.0.0"}'
             self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(b'{"rfc_api_version":"1.0.0"}')
+            self.wfile.write(body)
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -100,6 +104,66 @@ def test_http_client_does_not_forward_bearer_on_redirect():
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+@pytest.mark.parametrize("failure", [ConnectionResetError, TimeoutError])
+def test_http_error_body_connection_failure_preserves_status_and_hides_details(monkeypatch, failure):
+    from urllib import error, request
+
+    class BrokenBody:
+        def read(self, size):
+            raise failure("private token and proxy details")
+
+        def close(self):
+            pass
+
+    class Refused:
+        def open(self, req, timeout):
+            raise error.HTTPError(req.full_url, 503, "private proxy message", {}, BrokenBody())
+
+    monkeypatch.setattr(request, "build_opener", lambda *handlers: Refused())
+    client = RFCClient(service_url="http://127.0.0.1:12345", token="private")
+    with pytest.raises(RFCClientError) as exc:
+        client.capabilities()
+    assert exc.value.status == 503
+    assert exc.value.code == "http_error"
+    assert "private" not in str(exc.value)
+
+
+@pytest.mark.parametrize("oversize", [False, True])
+def test_http_response_limit_accepts_16_mib_and_bounds_larger_payloads(monkeypatch, oversize):
+    from urllib import request
+
+    limit = 16 * 1024 * 1024
+    prefix = b'{"rfc_api_version":"1.0.0","data":"'
+    suffix = b'"}'
+    raw = prefix + b"x" * (limit - len(prefix) - len(suffix)) + suffix + (b" " if oversize else b"")
+    reads = []
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self, size):
+            reads.append(size)
+            return raw[:size]
+
+    class Opener:
+        def open(self, req, timeout):
+            return Response()
+
+    monkeypatch.setattr(request, "build_opener", lambda *handlers: Opener())
+    client = RFCClient(service_url="http://127.0.0.1:12345", token="example")
+    if oversize:
+        with pytest.raises(RFCClientError) as exc:
+            client.capabilities()
+        assert exc.value.code == "invalid_response"
+        assert "exceeds" in str(exc.value)
+    else:
+        assert len(client.capabilities()["data"]) == limit - len(prefix) - len(suffix)
+    assert reads == [limit + 1]
 
 
 def _workspace(tmp_path):
@@ -125,6 +189,10 @@ def test_local_sdk_and_authenticated_http_return_the_same_rfc(tmp_path):
         remote = RFCClient(service_url=server.public_url, token=bootstrap["token"])
         assert remote.capabilities() == local.capabilities()
         assert remote.get(draft["id"]) == local.get(draft["id"])
+        assert remote.status(draft["id"]) == local.status(draft["id"])
+        assert "body" not in remote.status(draft["id"])
+        assert "suggestions" not in remote.status(draft["id"])
+        assert remote.suggestions(draft["id"]) == local.suggestions(draft["id"])
         assert remote.get(draft["id"])["acceptance"] == "pending"
         with pytest.raises(RFCClientError) as exc:
             RFCClient(service_url=server.public_url, token="invalid").get(draft["id"])
@@ -148,10 +216,11 @@ def test_cli_bootstrap_and_private_import_need_no_model_credentials(tmp_path, mo
     repo = client.dispatch("repositories.create", {"name": "Local RFCs", "provider": "local"})
     path = tmp_path / "RFC.md"
     path.write_text("# Existing RFC\n\n- [ ] Implement the change.\n", encoding="utf-8")
+    original = path.read_bytes()
     assert main(["--state-dir", str(state), "import", "--repo", repo["id"], "--file", str(path)]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["title"] == "Existing RFC"
-    assert result["body"] == path.read_text(encoding="utf-8")
+    assert result["body"] == original.decode("utf-8")
     assert result["state"] == "draft"
     assert main(["--state-dir", str(state), "publish", result["id"], "--content-digest",
                  result["content_digest"], "--idempotency-key", "example"]) == 2
@@ -162,7 +231,7 @@ def test_cli_bootstrap_and_private_import_need_no_model_credentials(tmp_path, mo
     assert json.loads(exported.read_text(encoding="utf-8"))["markdown"] == result["body"]
     markdown = tmp_path / "export.md"
     assert main(["--state-dir", str(state), "export", result["id"], "--format", "markdown", "--out", str(markdown)]) == 0
-    assert markdown.read_text(encoding="utf-8") == result["body"]
+    assert markdown.read_bytes() == original
 
 
 def test_local_cli_worker_completes_sdk_publication(tmp_path, monkeypatch, capsys):
@@ -241,7 +310,7 @@ def test_mcp_rfc_tools_use_host_identity_without_endpoint_parameters(monkeypatch
     monkeypatch.setattr(RFCClient, "from_env", lambda: FakeClient())
     mcp, _ = _fake_mcp(monkeypatch)
     assert mcp.tools["rfc_status"]("rfc-1") == {"accepted": True}
-    assert calls == [("rfcs.get", {"rfc_id": "rfc-1"})]
+    assert calls == [("rfcs.status", {"rfc_id": "rfc-1"})]
     import inspect
 
     assert list(inspect.signature(mcp.tools["rfc_request"]).parameters) == ["action", "payload"]

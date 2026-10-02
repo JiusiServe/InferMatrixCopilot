@@ -500,7 +500,7 @@ def build_mcp(
         remain private until an explicit rfcs.publish with post=true, the exact
         previewed content_digest and an idempotency_key. Queueing an operation
         does not establish publication: read operations.get to its terminal state.
-        Use rfcs.get next_actions for actionable implementation and acceptance
+        Use rfcs.status next_actions for actionable implementation and acceptance
         work; a merged PR alone does not establish feature acceptance.
         """
         return rfc_call(action, payload)
@@ -517,7 +517,7 @@ def build_mcp(
         idempotentHint=True, openWorldHint=True))
     def rfc_status(rfc_id: str) -> dict:
         """Read cached evidence, acceptance, freshness and next actions for an RFC."""
-        return rfc_call("rfcs.get", {"rfc_id": rfc_id})
+        return rfc_call("rfcs.status", {"rfc_id": rfc_id})
 
     return mcp
 

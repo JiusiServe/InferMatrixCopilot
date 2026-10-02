@@ -390,9 +390,28 @@ class RFCService:
                         (key, rid, title, body, digest(encode(model) + body), encode(source), encode(model), 0, 0, p.user_id, now))
             self.store.audit(con, p.user_id, action, now, rid, key)
             return self._view(con, p, dict(con.execute("SELECT * FROM rfcs WHERE id=?", (key,)).fetchone()))
-        if action in ("rfcs.get", "rfcs.export", "rfcs.next"):
+        if action in ("rfcs.get", "rfcs.export", "rfcs.next", "rfcs.status", "rfcs.suggestions"):
             row = self._rfc(con, p, data.get("rfc_id", ""))
             view = self._view(con, p, row)
+            if action == "rfcs.status":
+                counts = {}
+                for item in view.pop("suggestions", []):
+                    state = item.get("status", "proposed")
+                    counts[state] = counts.get(state, 0) + 1
+                view.pop("body", None)
+                return {**view, "suggestion_counts": counts, "suggestions_total": sum(counts.values())}
+            if action == "rfcs.suggestions":
+                offset, limit = data.get("offset", 0), data.get("limit", 50)
+                if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 100:
+                    raise RFCError("Suggestion offset must be nonnegative and limit between 1 and 100")
+                items = view.get("suggestions", [])
+                if data.get("status"):
+                    items = [item for item in items if item.get("status", "proposed") == data["status"]]
+                if data.get("query"):
+                    query = str(data["query"]).casefold()
+                    items = [item for item in items if query in encode(item).casefold()]
+                return {"rfc_id": row["id"], "offset": offset, "limit": limit,
+                        "total": len(items), "suggestions": items[offset:offset + limit]}
             if action == "rfcs.export":
                 return {"rfc_id": row["id"], "markdown": row["body"], "content": row["body"], "tracking": view}
             return view
@@ -609,7 +628,7 @@ class RFCService:
         repo = con.execute("SELECT root FROM repositories WHERE id=?", (repo_id,)).fetchone()
         target = (Path(repo["root"]) / (ref.path or ref.identifier)).resolve() if ref.provider == "local" and repo else None
         matches = []
-        for r in con.execute("SELECT f.*,r.root FROM rfcs f JOIN repositories r ON r.id=f.repo_id WHERE f.source!='{}'"):
+        for r in con.execute("SELECT f.id,f.repo_id,f.source,r.root FROM rfcs f JOIN repositories r ON r.id=f.repo_id WHERE f.source!='{}'"):
             registered = SourceRef.from_dict(json.loads(r["source"]))
             same = self._same_source(registered, ref)
             if target and registered.provider == "local":

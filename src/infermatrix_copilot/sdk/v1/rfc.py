@@ -12,6 +12,8 @@ from ...rfc_service import RFC_API_VERSION
 from ...rfc_service.models import Principal, RFCError, SourceRef
 from .models import SDKError
 
+_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+
 
 class RFCClientError(SDKError):
     """Stable transport/domain failure without credentials in its message."""
@@ -93,14 +95,14 @@ class RFCClient:
         opener = request.build_opener(_NoRedirect())
         try:
             with opener.open(req, timeout=self.timeout) as response:
-                raw = response.read(4 * 1024 * 1024 + 1)
+                raw = response.read(_MAX_RESPONSE_BYTES + 1)
         except error.HTTPError as exc:
             # Only propagate structured application errors, not proxy HTML or
             # redirects that could echo private request headers.
             try:
                 value = json.loads(exc.read(65536))
                 detail = value.get("error", {})
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError, OSError):
                 detail = {}
             if not isinstance(detail, dict):
                 detail = {}
@@ -109,7 +111,7 @@ class RFCClient:
                                  status=exc.code) from None
         except (error.URLError, TimeoutError, OSError):
             raise RFCClientError("RFC service unavailable", code="transport_error", status=503) from None
-        if len(raw) > 4 * 1024 * 1024:
+        if len(raw) > _MAX_RESPONSE_BYTES:
             raise RFCClientError("RFC service response exceeds the client limit", code="invalid_response")
         try:
             value = json.loads(raw)
@@ -161,6 +163,18 @@ class RFCClient:
 
     def get(self, rfc_id: str) -> dict[str, Any]:
         return self.dispatch("rfcs.get", {"rfc_id": rfc_id})
+
+    def status(self, rfc_id: str) -> dict[str, Any]:
+        return self.dispatch("rfcs.status", {"rfc_id": rfc_id})
+
+    def suggestions(self, rfc_id: str, *, offset: int = 0, limit: int = 50,
+                    status: str = "", query: str = "") -> dict[str, Any]:
+        payload = {"rfc_id": rfc_id, "offset": offset, "limit": limit}
+        if status:
+            payload["status"] = status
+        if query:
+            payload["query"] = query
+        return self.dispatch("rfcs.suggestions", payload)
 
     def draft(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self.dispatch("rfcs.draft", payload)

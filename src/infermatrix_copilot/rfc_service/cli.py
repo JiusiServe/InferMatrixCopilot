@@ -178,9 +178,9 @@ def main(argv: list[str] | None = None) -> int:
         elif command == "list":
             result = client.list_rfcs(args.repo_id)
         elif command == "status":
-            result = client.get(args.rfc_id)
+            result = client.status(args.rfc_id)
         elif command == "next":
-            value = client.get(args.rfc_id)
+            value = client.status(args.rfc_id)
             result = {"rfc_id": args.rfc_id, "next_actions": value.get("next_actions", [])}
         elif command in {"enroll", "decision", "work"}:
             result = client.dispatch("rfcs." + command, {**_data(args.data), "rfc_id": args.rfc_id})

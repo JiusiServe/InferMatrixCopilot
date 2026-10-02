@@ -1,20 +1,24 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-10-02 -->
 
 `LOC ~490 · 默认 MCP：Direct 门面 + Strict 入口 · refactor-status: ok`
 
 ## 职责
 安装器**实际注册**的那个 MCP 门面：以**零模型**提供 Direct 模式的知识路由，
 并在被要求时桥接到 Strict。
+同时通过 RFC SDK 委托已配置工作区的草稿、纳管、进度与人工决策操作。
 
 ## 功能
-七个工具：`review`（按 `mode` 分流）、`validate_direct_review`、
+十个工具：`review`（按 `mode` 分流）、`validate_direct_review`、
 `get_review_status` / `get_review_result`（转发给 `CopilotMCP`）、
-`update_knowledge`、`doc_search`、`doc_read`。
+`update_knowledge`、`doc_search`、`doc_read`，以及
+`rfc_request`、`rfc_capabilities`、`rfc_status`。
 
 ## 公开契约
-上述七个工具；`build_mcp(...)`；`main()`。
+上述十个工具；`build_mcp(...)`；`main()`。
+RFC 工具签名为 `rfc_request(action, payload=None)`、`rfc_capabilities()`、
+`rfc_status(rfc_id)`；后者调用 `rfcs.status`，返回不含源正文和候选列表的紧凑视图。
 
 ## 不变量（**C1**、**C2**、**D1**）
 - **Direct 在这个 server 里不跑任何模型。** 它返回知识路由和一份治理契约；阅读由
@@ -59,9 +63,19 @@
 - `update_knowledge` 只返回知识贡献入口 —— 它**不是** `imupdate` 的发版审计器。
 - **每个工具都声明 `ToolAnnotations`，且提示必须真实。** 审批门控的宿主（codex 对
   无注解工具逐次弹批准框，headless 下自动取消，见 #86）靠这些提示放行只读面：
-  `review` 是唯一保留状态变更（预留 Strict run）与触网（Strict 子进程）的工具，
-  其余六个全部 `readOnlyHint=true`。把一个会写的工具标成只读，比不标更糟。
+  `review` 保留状态变更（预留 Strict run）与触网（Strict 子进程）；
+  `rfc_request` 能写工作区与排队发布，因此 `readOnlyHint=false`、
+  `destructiveHint=true`、`idempotentHint=false`。其余八个工具全部
+  `readOnlyHint=true`；RFC 能力与进度工具声明 `idempotentHint=true`。
+  把一个会写的工具标成只读，比不标更糟。
   （要求 `mcp>=1.8`，注解类型自该版本起可用。）
+- **RFC 工作区与身份来自宿主环境。** 每次调用用 `RFCClient.from_env()` 解析
+  `RFC_SERVICE_URL` / `RFC_STATE_DIR` 与 `RFC_TOKEN`；工具参数不接受 endpoint 或
+  token。共享应用在每次动作及后台执行时重新检查当前权限；远端失败不能切换本地库。
+  `RFCClientError` 返回结构化的 `error.code/message`，不暴露凭据。
+- **RFC 变更不通过 review run。** 本门面不实现 RFC 状态机、不调用模型、不改验收；
+  `rfc_request` 委托共享应用，发布要求明确的 `post=true`、预览摘要和幂等键。
+  返回排队操作不能当作发布成功，必须查询其终态。
 
 ## 边界 —— 不属于这里
 Direct 路径里不调模型；不含 Strict 后台机器（`mcp_server.py`）；不定义策略
@@ -70,13 +84,15 @@ Direct 路径里不调模型；不含 Strict 后台机器（`mcp_server.py`）�
 ## 依赖（允许）
 stdlib + `mcp` extra + `.direct_routing`（下划线别名 re-import）+
 `.adapters` + `.config` + `.intent.resolve_repo_alias` +
-`.knowledge_docs` + `.mcp_policy` + `.mcp_server`。
+`.knowledge_docs` + `.mcp_policy` + `.mcp_server` + 惰性导入 `.sdk.v1.rfc`。
 
 ## 测试
 `test_thin_mcp_server.py`（42 例，别名保持调用点不变）、`test_thin_mcp.py`、
 `test_imreview_output_contract.py`；外加 `test_contract.py`
 （`_direct_*` 的公开家与再导出仍然成立）与 `test_e2e_strict_mock.py`
 （Strict 快照绑定端到端）。
+RFC 工具签名、动作委托、工具注解及宿主身份：`test_rfc_integration.py`。
+应用权限与生命周期由 [rfc_service.md](rfc_service.md) 及其测试约束。
 
 ## 重构备注
 拆分**已发生**（→ `contract.py` / `direct_routing.py`，约 1420 → 627 行）；

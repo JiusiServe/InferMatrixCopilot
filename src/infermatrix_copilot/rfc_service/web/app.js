@@ -8,6 +8,8 @@ let viewDirty = false;
 let selectedTokenUser = "";
 let noticeTimer;
 let refreshCurrent = null;
+const suggestionPages = new Map();
+const SUGGESTIONS_PER_PAGE = 50;
 const labels = {
   draft: "草稿", proposed: "待评审", discussion: "讨论中", accepted: "已接受", rejected: "已拒绝",
   superseded: "已取代", planned: "待开始", ready: "就绪", active: "进行中", in_progress: "进行中",
@@ -71,6 +73,7 @@ function signedOut() {
   selectedTokenUser = "";
   routeSequence += 1;
   refreshCurrent = null;
+  suggestionPages.clear();
   content.replaceChildren();
   $("identity-name").textContent = "";
   $("issued-secret").value = "";
@@ -404,7 +407,7 @@ function dependencyGraph(features) {
   for (const feature of features) {
     const {x, y} = positions.get(feature.id);
     const group = svgNode("g");
-    const state = feature.state || "planned";
+    const state = feature.implementation || feature.state || "planned";
     group.append(svgNode("title", {}, `${feature.id}: ${feature.title}`), svgNode("rect", {x, y, width: 190, height: 64, rx: 8, class: `graph-node ${["accepted", "blocked", "active"].includes(state) ? state : ""}`}),
       svgNode("text", {x: x + 13, y: y + 24, class: "graph-text"}, String(feature.title || feature.id).slice(0, 15)),
       svgNode("text", {x: x + 13, y: y + 46, class: "graph-subtext"}, `${feature.id} · ${translated(state)}`));
@@ -588,17 +591,33 @@ function criteriaPanel(rfc) {
 function suggestionsPanel(rfc) {
   const list = element("div", {class: "item-list"});
   const suggestions = (rfc.suggestions || []).filter((suggestion) => !["accepted", "rejected", "obsolete", "applied"].includes(suggestion.status || suggestion.state || suggestion.verdict));
-  for (const suggestion of suggestions) {
-    list.append(element("article", {class: "suggestion"}, element("h4", {}, suggestion.title || suggestion.feature?.title || "待确认的关联"),
-      element("p", {class: "small muted"}, suggestion.reason || suggestion.explanation || "请核对这个实现是否属于当前 RFC。"), evidenceLines(suggestion.evidence),
-      canPublish(rfc) ? element("div", {class: "item-actions"}, ...["accepted", "rejected"].map((verdict) => button(verdict === "accepted" ? "接受建议" : "拒绝", async () => {
-        const reason = prompt(verdict === "accepted" ? "接受依据" : "拒绝原因（相同建议不会重复出现）");
-        if (reason === null || !reason.trim()) return;
-        await action("rfcs.decision", {rfc_id: rfc.id, kind: "suggestion", suggestion_id: suggestion.id, verdict, reason}); await route();
-      }, verdict === "rejected" ? "danger" : ""))) : null));
+  const pages = Math.max(1, Math.ceil(suggestions.length / SUGGESTIONS_PER_PAGE));
+  let page = Math.min(suggestionPages.get(rfc.id) || 0, pages - 1);
+  const count = element("span", {class: "small muted", "aria-live": "polite"});
+  const previous = element("button", {type: "button", onclick: () => { page -= 1; draw(); }}, "上一页");
+  const next = element("button", {type: "button", onclick: () => { page += 1; draw(); }}, "下一页");
+  const pagination = element("div", {class: "actions suggestion-pagination"}, count, previous, next);
+  function draw() {
+    page = Math.max(0, Math.min(page, pages - 1));
+    suggestionPages.set(rfc.id, page);
+    count.textContent = `${suggestions.length} 条待确认 · 第 ${page + 1} / ${pages} 页`;
+    previous.disabled = page === 0;
+    next.disabled = page >= pages - 1;
+    previous.hidden = next.hidden = suggestions.length <= SUGGESTIONS_PER_PAGE;
+    list.replaceChildren();
+    for (const suggestion of suggestions.slice(page * SUGGESTIONS_PER_PAGE, (page + 1) * SUGGESTIONS_PER_PAGE)) {
+      list.append(element("article", {class: "suggestion"}, element("h4", {}, suggestion.title || suggestion.feature?.title || "待确认的关联"),
+        element("p", {class: "small muted"}, suggestion.reason || suggestion.explanation || "请核对这个实现是否属于当前 RFC。"), evidenceLines(suggestion.evidence),
+        canPublish(rfc) ? element("div", {class: "item-actions"}, ...["accepted", "rejected"].map((verdict) => button(verdict === "accepted" ? "接受建议" : "拒绝", async () => {
+          const reason = prompt(verdict === "accepted" ? "接受依据" : "拒绝原因（相同建议不会重复出现）");
+          if (reason === null || !reason.trim()) return;
+          await action("rfcs.decision", {rfc_id: rfc.id, kind: "suggestion", suggestion_id: suggestion.id, verdict, reason}); await route();
+        }, verdict === "rejected" ? "danger" : ""))) : null));
+    }
+    if (!suggestions.length) list.append(element("p", {class: "small muted"}, "暂无需要确认的建议。明确关联在范围内自动更新，模糊关联留待你判断。"));
   }
-  if (!suggestions.length) list.append(element("p", {class: "small muted"}, "暂无需要确认的建议。明确关联在范围内自动更新，模糊关联留待你判断。"));
-  return panel("待确认建议", list);
+  draw();
+  return panel("待确认建议", element("div", {class: "stack"}, pagination, list));
 }
 function decisionPanel(rfc) {
   const form = element("form", {class: "stack"});

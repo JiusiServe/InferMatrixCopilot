@@ -173,6 +173,34 @@ def test_related_observations_do_not_export_another_rfcs_restricted_body(tmp_pat
         assert SECRET not in json.dumps(result), action
 
 
+def test_compact_status_and_suggestion_pages_filter_before_counting_and_search(tmp_path):
+    service, admin, repo, provider, actor, hidden, visible = restricted_pair(tmp_path)
+    model = json.loads(service.store.one("SELECT model FROM rfcs WHERE id=?", (visible["id"],))["model"])
+    # Imported history can retain a reference whose RFC access was narrowed later.
+    model["suggestions"] = [{"id": "hidden", "status": "proposed", "feature": {"title": SECRET},
+        "evidence": {"source": hidden["source"]}},
+        {"id": "allowed-one", "status": "proposed", "feature": {"title": "Allowed first work"}},
+        {"id": "allowed-two", "status": "proposed", "feature": {"title": "Allowed second work"}}]
+    with service.store.transaction() as con:
+        con.execute("UPDATE rfcs SET model=? WHERE id=?", (json.dumps(model), visible["id"]))
+    compact = service.dispatch(actor, "rfcs.status", {"rfc_id": visible["id"]})
+    assert "body" not in compact and "suggestions" not in compact
+    assert compact["suggestion_counts"] == {"proposed": 2} and compact["suggestions_total"] == 2
+    assert SECRET not in json.dumps(compact)
+    first = service.dispatch(actor, "rfcs.suggestions", {"rfc_id": visible["id"], "limit": 1})
+    second = service.dispatch(actor, "rfcs.suggestions", {"rfc_id": visible["id"], "limit": 1, "offset": 1})
+    assert first["total"] == second["total"] == 2
+    assert first["suggestions"][0]["id"] == "allowed-one" and second["suggestions"][0]["id"] == "allowed-two"
+    assert service.dispatch(actor, "rfcs.suggestions", {"rfc_id": visible["id"], "query": SECRET})["total"] == 0
+    for action in ("rfcs.status", "rfcs.suggestions"):
+        with pytest.raises(RFCError) as denied:
+            service.dispatch(actor, action, {"rfc_id": hidden["id"]})
+        assert denied.value.status == 403
+    for options in ({"limit": 0}, {"limit": 101}, {"offset": -1}, {"offset": True}):
+        with pytest.raises(RFCError):
+            service.dispatch(actor, "rfcs.suggestions", {"rfc_id": visible["id"], **options})
+
+
 @pytest.mark.parametrize("auto_add", [False, True])
 def test_related_discovery_does_not_copy_a_restricted_rfcs_title(tmp_path, auto_add):
     service, admin, repo, provider, actor, hidden, visible = restricted_pair(tmp_path)

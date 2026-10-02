@@ -147,7 +147,7 @@ feature acceptance is an explicit human decision with evidence. Merging a PR
 never automatically passes acceptance.
 
 Use `sync --rfc RFC_ID` to queue a manual refresh. `status` includes freshness,
-implementation, acceptance, blockers, suggestions and next actions. Failed
+implementation, acceptance, blockers, suggestion counts and next actions. Failed
 source reads leave unavailable/stale evidence visible instead of inventing
 progress. Use `rfcs.work` to maintain work and attachments and `rfcs.decision`
 for acceptance verdicts. `export RFC_ID --format markdown --out RFC-export.md`
@@ -162,6 +162,13 @@ workspace tracking records shown in the web interface and JSON export. Markdown
 export exchanges the RFC source body. Tracking changes do not automatically
 rewrite the published issue body. File import and Markdown file export preserve
 the source line endings, including Windows CRLF.
+
+For compact progress through MCP or the versioned API, use `rfc_status` or
+`rfcs.status`; they return suggestion counts with the source body and candidate
+list omitted. Inspect candidates through `rfcs.suggestions` with
+`{rfc_id, offset:0, limit:50}`. The page limit accepts 1–100, and optional `status`
+and `query` filters apply before the visible total is counted. `rfcs.get` and
+JSON export retain the full record; the SDK accepts JSON responses up to 16 MiB.
 
 ## Provider and state configuration
 
@@ -222,6 +229,8 @@ client = RFCClient.from_env()
 print(client.capabilities())
 print(client.list_rfcs())
 print(client.get("RFC_ID"))
+print(client.status("RFC_ID"))
+print(client.suggestions("RFC_ID", offset=0, limit=50))
 ```
 
 `RFCClient(state_dir=..., token=...)` chooses local execution;
