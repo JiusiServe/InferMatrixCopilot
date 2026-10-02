@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_config_validation.py:L70-L119, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_config_validation.py:L30-L67, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_config_validation.py:L70-L86, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/common/test_model_config_validation.py:L64-L86, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/common/test_model_config_validation.py:L116-L128, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/runtime/test_model_catalog.py:L72-L81]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_config_validation.py:L70-L119, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_config_validation.py:L30-L67, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_config_validation.py:L70-L86, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/common/test_model_config_validation.py:L64-L86, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/common/test_model_config_validation.py:L116-L128, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/runtime/test_model_catalog.py:L72-L81, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/config.py:L1609-L1620, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_config_validation.py:L275-L278, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_catalog.py:L80-L89, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/config.py:L1593-L1606, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_config_validation.py:L70-L89, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/model_config_validation.py:L103-L117]
 feature: "models"
 entry_points: ["jiuwenswarm/common/model_catalog.py", "jiuwenswarm/common/model_config_validation.py"]
 source_globs: ["jiuwenswarm/common/model_catalog.py", "jiuwenswarm/common/model_config_validation.py", "jiuwenswarm/common/model*.py"]
@@ -41,4 +41,31 @@ tests/unit_tests/common/test_model_config_validation.py 中的 test_probe_model_
 来源：[tests/unit_tests/common/test_model_config_validation.py:L64–L86](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/common/test_model_config_validation.py#L64-L86), [tests/unit_tests/common/test_model_config_validation.py:L116–L128](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/common/test_model_config_validation.py#L116-L128), [tests/unit_tests/runtime/test_model_catalog.py:L72–L81](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/runtime/test_model_catalog.py#L72-L81)
 
 <!-- kb:depth-proof {"evidence":[{"path":"tests/unit_tests/common/test_model_config_validation.py","start":64,"end":86,"sha256":"04da94b6e6cdbf8a09d837b89db13d43d9d77f3e7aade9157e8d3d7bac6c55e1"},{"path":"tests/unit_tests/common/test_model_config_validation.py","start":116,"end":128,"sha256":"d8f0c01196a99acdee83856abbc827598f7a6cac54cb0d58a433da9c371ed3ee"},{"path":"tests/unit_tests/runtime/test_model_catalog.py","start":72,"end":81,"sha256":"35d0338135373bde08b78f98541e83410780d5402812a3f7acb4bc9098a0ce43"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=models facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=ca6f12d451c021ff92681c565f622f3f0e0f5fe546cdfda95f666ff0cfd17c0d -->
+**ModelCatalog 构建快照后按 model_id 查找**
+__init__ 把 load_models_config(config if config is not None else get_config()) 存入 self.snapshot；load_models_config 深拷贝配置、解密 defaults、并入 agentos，并把非空 model_id 索引进 by_id。随后 get_model 命中 snapshot["by_id"] 即返回，未命中 raise ModelSelectionError(MODEL_SELECTION_NOT_FOUND, f"unknown model_id {model_id!r}")。
+
+来源：[jiuwenswarm/common/model_catalog.py:L80–L89](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/common/model_catalog.py#L80-L89), [jiuwenswarm/common/config.py:L1593–L1606](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/common/config.py#L1593-L1606)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":89,"path":"jiuwenswarm/common/model_catalog.py","sha256":"bbfa67ba48cd3c8d989709638ca4293433f4a9586727925e408db6d74f4fb48e","start":80},{"end":1606,"path":"jiuwenswarm/common/config.py","sha256":"f041a89387da363fa727896cd6ece6094b05140a1d943da698ee3864eaaa2fa3","start":1593}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=models facet=dependencies pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=96bc8a9150281ff7d6ceb8c4947198afc09954f5f2d811d08f2f8d794161cbb7 -->
+**save_models_candidate 依赖 raise_if_invalid 前置校验后才写配置**
+save_models_candidate 先 deepcopy 并 _ensure_model_business_ids，再函数内从 jiuwenswarm.common.model_config_validation 导入 raise_if_invalid，校验通过后才 update_config 替换 models 段；无效时抛 ModelSelectionError(MODEL_GROUP_INVALID, 以"; "连接的错误)，update_config 不会执行。
+
+来源：[jiuwenswarm/common/config.py:L1609–L1620](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/common/config.py#L1609-L1620), [jiuwenswarm/common/model_config_validation.py:L275–L278](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/common/model_config_validation.py#L275-L278)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":1620,"path":"jiuwenswarm/common/config.py","sha256":"37e2b4b6981d68ad407a6e729101bec4b18553d29c83071637ad7cd6a56d7aae","start":1609},{"end":278,"path":"jiuwenswarm/common/model_config_validation.py","sha256":"f1e06e59f8085b368650867c32476ce6d5f112b3111c663cb06d8876b5abdbf1","start":275}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=models facet=failure_modes pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=be432a45b26a826b77c69d272bbdf906cb8c2d98fdf73909a39f51a0f228ece3 -->
+**probe_model_connection：空 token_limits 直接 ValueError；无输出按档重试、仅末档重抛**
+token_limits 为空时 raise ValueError("token_limits must contain at least one value")。docstring 界定无 content、reasoning 或生成 token 用量的响应算失败尝试；_model_probe_output 判无输出即 raise ValueError("Empty response from model")，异常被逐次捕获，仅当 attempt + 1 >= len(limits) 才重抛，否则换下一档 max_tokens 重试并记 INFO 日志。
+
+来源：[jiuwenswarm/common/model_config_validation.py:L70–L89](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/common/model_config_validation.py#L70-L89), [jiuwenswarm/common/model_config_validation.py:L103–L117](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/common/model_config_validation.py#L103-L117)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":89,"path":"jiuwenswarm/common/model_config_validation.py","sha256":"d6c08527d131d4f71ded9136fed80664632653dc2d75105ef729be41c0133cb1","start":70},{"end":117,"path":"jiuwenswarm/common/model_config_validation.py","sha256":"3da92b9f148702783a89a9c40ca4312a6fbe9bbada674bafd4c24de11497b806","start":103}],"trace":[]} -->
 <!-- /kb:depth -->

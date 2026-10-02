@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L397-L397, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L858-L870, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L466-L482, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L872-L876, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L484-L501]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L397-L397, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L858-L870, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L466-L482, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L872-L876, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L484-L501, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L4134-L4151, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L560-L579, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/tests/sessionEventGate.test.mjs:L19-L31, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/components/AssetPublishDrawer/index.tsx:L876-L913]
 feature: "web-navigation"
 entry_points: ["jiuwenswarm/channels/web/frontend/src/App.tsx"]
 source_globs: ["jiuwenswarm/channels/web/frontend/src/App.tsx", "jiuwenswarm/channels/web/frontend/src/*"]
@@ -39,4 +39,42 @@ activeNav 默认为 'chat'（useState 初始值）。hiddenNavItems 的取值顺
 来源：[jiuwenswarm/channels/web/frontend/src/App.tsx:L466–L482](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/App.tsx#L466-L482), [jiuwenswarm/channels/web/frontend/src/App.tsx:L872–L876](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/App.tsx#L872-L876)
 
 <!-- kb:depth-proof {"evidence":[{"path":"jiuwenswarm/channels/web/frontend/src/App.tsx","start":466,"end":482,"sha256":"e1928d6526465d80c4a061dae1d88eb3f689447e1a161dbb9a9996984414e563"},{"path":"jiuwenswarm/channels/web/frontend/src/App.tsx","start":872,"end":876,"sha256":"0840dfb6e0fbd39c211b6bd208ba0027102a602fe350dc79922646d6030abb58"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=web-navigation facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=f04c5676354048d3111afa72e166077f0b95d73dfb29e195cf2972a478c5a565 -->
+**App 入口组件在单一 ErrorBoundary 内渲染 AppContent、DesktopTextEditContextMenu 与 AssetPublishHost**
+App 组件以 settingsPageDefinition 与 resolveSettingsRequest 两个 props 被调用,返回一棵 ErrorBoundary 包裹的元素树:DesktopTextEditContextMenu、原样转发这两个 props 的 AppContent,以及不接收 props 的 AssetPublishHost。
+
+来源：[jiuwenswarm/channels/web/frontend/src/App.tsx:L4134–L4151](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/App.tsx#L4134-L4151)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":4151,"path":"jiuwenswarm/channels/web/frontend/src/App.tsx","sha256":"d20814501cebf9c9e56c26e75bcaa264ac90d9617a6db4e53b6341fc5398c9ac","start":4134}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=web-navigation facet=dependencies pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=d7b194df7278d0fa2418c0d2f1e7c47e05e969922852011b64b1938df8b02e38 -->
+**App 在 ErrorBoundary 内挂载无 props 的 AssetPublishHost，发布抽屉入口耦合全局事件与 sessionStorage**
+App 渲染单个不接收 props 的 AssetPublishHost；宿主 useEffect 在 window 上监听 'asset-publish-open'，把 event.detail 设为 selection 打开抽屉，并在 'oauth-callback-complete' 后从 sessionStorage 的 PUBLISH_RESTORE_KEY 恢复（仅当 kind 属于 skill/agent_template/agent_group/plugin/mcp 且 local_id 为 string，异常时移除该键）。因此打开入口不经 App 的 props。
+
+来源：[jiuwenswarm/channels/web/frontend/src/App.tsx:L4134–L4151](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/App.tsx#L4134-L4151), [jiuwenswarm/channels/web/frontend/src/components/AssetPublishDrawer/index.tsx:L876–L913](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/AssetPublishDrawer/index.tsx#L876-L913)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":4151,"path":"jiuwenswarm/channels/web/frontend/src/App.tsx","sha256":"d20814501cebf9c9e56c26e75bcaa264ac90d9617a6db4e53b6341fc5398c9ac","start":4134},{"end":913,"path":"jiuwenswarm/channels/web/frontend/src/components/AssetPublishDrawer/index.tsx","sha256":"41f09a1f6e3a81cb9412cfcd64ff4e7af881377a9b23e9731b21e788e456a36a","start":876}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=web-navigation facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=92da7fa13c356c4b327bed82687222580fef2303d422f4c9a05224c3798d35cc -->
+**依赖 [sessionId] 的 effect 复位 historyPrepending 保住批次可揭示,代价是需前台 re-arm 输入意图闩**
+设计推断（非作者历史意图）：
+
+收益:该 effect 执行 setHistoryPrepending(false),注释指出若把后台预取当可见 prepend,再次访问的 Session 会因顶部边界门保持禁用而无法揭示已到达批次;成本:他处使用时保持挂载的 Session sessionId 不变,还需 rearmInputIntent 在页面回前台时重置输入意图闩。
+
+来源：[jiuwenswarm/channels/web/frontend/src/App.tsx:L560–L579](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/App.tsx#L560-L579)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":579,"path":"jiuwenswarm/channels/web/frontend/src/App.tsx","sha256":"2a74236a3a99ab707a78c5c90829bdf46fa6bcc8b9cf1d637cc5dc2472aacaf9","start":560}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=web-navigation facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=3e09083072c0e647df47e328406c74b72834769132062337abe75785dfb64f6a -->
+**sessionEventGate 用例断言挂起会话的事件此刻不送达**
+node:test 用例调用 createSessionEventGate 并 suspend('session-a'),随后派发 session-a 的 chat.delta/chat.tool_call 与 session-b 的 chat.delta,断言此刻仅送达 ['other session'];该断言只覆盖 gate 助手的输出。
+
+来源：[jiuwenswarm/channels/web/frontend/tests/sessionEventGate.test.mjs:L19–L31](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/tests/sessionEventGate.test.mjs#L19-L31)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":31,"path":"jiuwenswarm/channels/web/frontend/tests/sessionEventGate.test.mjs","sha256":"bb27b4d415d1792d88f3c30ac68c9c15d18e02ca126f9e529d9a4a1cbdc3838d","start":19}],"trace":[],"validation_kind":"helper_unit"} -->
 <!-- /kb:depth -->

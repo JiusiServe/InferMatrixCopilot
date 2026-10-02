@@ -1,6 +1,24 @@
 # JiuwenSwarm implementation-knowledge depth
 
-The pinned run at `f0a69728c96b5961d993449f1a901cbd2f4dac5b` added **173 checked facets across 77 feature-depth pages**. Every accepted block is bound to an actual Codex review, its exact prose, and pinned source spans. The independent audit reports no proof errors.
+## Current completion result: partial delivery
+
+The completion campaign at `f0a69728c96b5961d993449f1a901cbd2f4dac5b` retains **490 recognized facets: 207 strict and 283 lightweight**, counted once per feature/facet. This is **490/553 (88.61%)**. The fixed denominator remains 79 features × seven dimensions. **63 facets remain unknown**: 53 were unsupported after their bounded extraction/correction rounds, and 10 initially accepted lightweight facets were withdrawn after the final independent content review found wrong feature attribution or claims beyond the evidence. Withdrawal preserves the review record; it does not prove that the project lacks the capability or tests.
+
+The target requires each dimension to exceed 90% (at least 72/79), recognized depth for every feature, and production-file breadth of at least 85%. This delivery **does not meet the target**. Its partial result is reviewable in a draft PR; it is not eligible for merge. The campaign's initial attempt plus at most three corrections is a persisted lifetime limit, including across resumes; late withdrawals do not reset it.
+
+Current delivery reports:
+
+- [Chinese comparison and PR-review impact](jiuwenswarm-lightweight-comparison-cn-20261002.md), with [machine-readable comparison](jiuwenswarm-lightweight-comparison-cn-20261002.json).
+- [Final source/native audit summary](jiuwenswarm-lightweight-final-20261002.json), with [source bindings](jiuwenswarm-lightweight-source-depth-20261002.json) and [native approval bindings](jiuwenswarm-lightweight-native-approvals-20261002.json).
+- [Final retrieval acceptance](jiuwenswarm-lightweight-retrieval-after-20261002.json).
+- [Independent content review](jiuwenswarm-independent-content-review-20261002.json) and [withdrawn-content quarantine](jiuwenswarm-content-quarantine-20261002.json).
+- [Local validation record](jiuwenswarm-local-validation-20261002.json); final CI results are recorded on the draft PR.
+
+The campaign used 13 isolated feature workers, a shared immutable evidence index and a persistent Zcode start/cooldown schedule. Native Zcode/Codex attempt journals, prompts, streamed events and replies remain in ignored local campaign state outside Git and the knowledge tree. Git reports contain bounded findings, hashes and provenance rather than raw native trajectories. Unreported usage and invoiced cost remain unknown. The historical 173-facet report and the separate original artifacts-flow retirement archive below remain preserved as historical evidence, without adding retired blocks back to current recognition.
+
+## Historical 173-facet baseline
+
+The initial pinned run at `f0a69728c96b5961d993449f1a901cbd2f4dac5b` reported **173 checked facets across 77 feature-depth pages**, before the later artifacts-flow retirement. Each accepted block was bound to an actual Codex review, its exact prose, and pinned source spans. Its original independent audit reported no proof errors under the checks then in use.
 
 | Measure | Before | After |
 | --- | ---: | ---: |
@@ -13,13 +31,13 @@ The pinned run at `f0a69728c96b5961d993449f1a901cbd2f4dac5b` added **173 checked
 
 Breadth includes checked interface records and feature summaries. The 115 participating files are witnesses for particular claims, not files with exhaustive behavior coverage. Existing owner explanations also remain useful; this conservative depth metric counts only the new bound blocks.
 
-All 79 features received extraction attempts. **Cron and skill evolution have no approved depth facets** after retries; their existing summaries remain. Other missing facets are listed per feature in the [full report](jiuwenswarm-f0a69728c96b.json). A full seven-facet feature is still an open target.
+All 79 features received extraction attempts in that historical run. **Cron and skill evolution had no approved depth facets** after its retries; their existing summaries remained. Its missing facets are listed per feature in the [historical full report](jiuwenswarm-f0a69728c96b.json).
 
 Generation used Zcode GLM-5.3 at low effort; review requested Codex gpt-6-sol at low effort. The completed traces contain 121 generation calls and 112 review calls, including failures. The generator reports served identity when it returns a result; Codex does not report served-model identity. Two interrupted generation attempts have unreported usage and are recorded separately.
 
 Inputs included existing knowledge, 299 distinct source files, and 86 project documents. Of those documents, 24 came from the partial `.doc_project_maintainer` collection, used for 66 features. Historical test ledgers were context rather than evidence of current test passes. Validation facets describe assertions at the source pin; upstream JiuwenSwarm tests were not executed here.
 
-The final batch used $56 of fixed review accounting, plus $4 of earlier diagnostic accounting, within the original $60 ledger ceiling. Native subscription clients report no invoiced USD cost. These amounts are budget reservations, not measured billing or a cap on an actual invoice.
+The historical batch used $56 of fixed review accounting, plus $4 of earlier diagnostic accounting, within the original $60 ledger ceiling. Native subscription clients report no invoiced USD cost. These amounts are budget reservations, not measured billing or a cap on an actual invoice. The later completion campaign uses the explicit unlimited-subscription mode described below.
 
 The report contains the frozen knowledge baseline and input digest, code revisions used by the native calls, input paths, before/after audits, knowledge and policy hashes, and per-block native approval bindings. Raw prompts and verdict replies remain in ignored local state.
 
@@ -37,13 +55,13 @@ PYTHONPATH=src python tools/audit_knowledge_depth.py \
 
 ## Completion campaign at the same source pin
 
-The new policy fixes the denominator at 79 features × seven facets and requires **each facet above 90%** (at least 72/79), every feature to have recognized depth, and production-file breadth at least 85%. An incomplete checkpoint remains partial and cannot publish or merge. `--unlimited-subscription` requires authenticated Zcode GLM-5.3 extraction and an independent Codex subscription judge; no configured fallback or invoiced zero is inferred.
+The new policy fixes the denominator at 79 features × seven facets and requires **each facet above 90%** (at least 72/79), every feature to have recognized depth, and production-file breadth at least 85%. An incomplete checkpoint remains partial; a draft PR can document it, but it cannot be merged as a completed batch. `--unlimited-subscription` requires authenticated Zcode GLM-5.3 extraction and an independent Codex subscription judge; no configured fallback or invoiced zero is inferred.
 
-The workflow is structural coverage review → shared evidence indexing → targeted deepening → source-reference and actual native-record audits → retrieval acceptance → independent review → CI → merge. Positive knowledge and unknowns remain separate; historical strict absence records, if present, are not passing tests or demonstrated capabilities.
+The workflow is structural coverage review → shared evidence indexing → targeted deepening → source-reference and actual native-record audits → retrieval acceptance → independent review → CI → merge when the target and checks pass. Independent content review also checks feature attribution: a faithful description of a neighboring feature or shared-owner helper does not establish coverage for the requested feature. Withdrawn blocks are archived, excluded from recognition and retrieval, and reported as unknown without changing the denominator. Positive knowledge and unknowns remain separate; historical strict absence records, if present, are not passing tests or demonstrated capabilities.
 
 [The frozen retrieval baseline](jiuwenswarm-completion-retrieval-before-20261002.json) contains 237 probes and their actual context. Its `storage.format` is `depth-retrieval-deduplicated-v1`: cases reference hash-bound document metadata and execution budgets; `content_blobs` stores repeated text once. `audit_depth_retrieval.expand_report()` verifies every reference and reconstructs the original report against `expanded_report_sha256`. Large collections use one record per line. Baseline page hits do not mean all facets were injected: description plus paths delivers 162 of the 173 available facets within the unchanged two-page/6,000-character budget.
 
-[The archived artifacts flow block](jiuwenswarm-artifacts-flow-legacy-20261002.json) retains its exact original bytes, proof and native approval. The stricter caller-scope check cannot prove the flattened callback edges; with the user's confirmed repair choice it is excluded from current recognition pending a newly extracted and independently approved replacement. The other 172 original blocks stay unchanged; this retirement does not remove a feature or facet from the denominator.
+[The archived artifacts flow block](jiuwenswarm-artifacts-flow-legacy-20261002.json) retains its exact original bytes, proof and native approval. The stricter caller-scope check cannot prove the flattened callback edges; with the user's confirmed repair choice that historical block is excluded from current recognition. Any replacement is counted only through its own source evidence and independent approval. The other 172 original blocks stay unchanged; this retirement does not remove a feature or facet from the denominator.
 
 ## Lightweight recognition and 13 concurrent workers
 

@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L284-L314, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/A2A.md:L51-L58, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L151-L188, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/A2A.md:L122-L125, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/A2A.md:L134-L152]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L284-L314, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/A2A.md:L51-L58, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L151-L188, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/A2A.md:L122-L125, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/A2A.md:L134-L152, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L284-L359, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/A2A.md:L68-L84, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L29-L33, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L291-L299, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L111-L125, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L236-L247, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L405-L408]
 feature: "a2a"
 entry_points: ["jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py"]
 source_globs: ["jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py", "jiuwenswarm/gateway/channel_manager/protocol/a2a/*.py"]
@@ -41,4 +41,22 @@ docs/zh/A2A.md §8 给出针对 http://127.0.0.1:{A2A_SERVER_PORT:-19100}{A2A_SE
 来源：[docs/zh/A2A.md:L134–L152](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/A2A.md#L134-L152)
 
 <!-- kb:depth-proof {"evidence":[{"path":"docs/zh/A2A.md","start":134,"end":152,"sha256":"539c1fd6494415dc2daa5bb4dfc87e4837781a286c3fd8adb943977ab29d309c"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=a2a facet=api pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=9f0e887860a10f850756cf60e111b79049ef05135ca6a04e8a0ed8bc49a03a4a -->
+**`A2AChannel.start()` 幂等且受 `config.enabled` 门控；对外暴露 JSON-RPC 与 Agent Card 端点**
+`A2AChannel.start()` 幂等：`self._running` 已置位或 `config.enabled` 为假直接返回；成功时以 `config.app_name/app_description/app_version` 构造 `AgentCard`（`AgentCapabilities(streaming=True, push_notifications=False)`、单个 `chat` skill）并按 `card_path`/`rpc_path` 注册路由。文档：JSON-RPC 端点为 `http://{A2A_SERVER_HOST}:{A2A_SERVER_PORT}{A2A_SERVER_PATH}`，Agent Card 默认 `/.well-known/agent-card.json`。
+
+来源：[jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L284–L359](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py#L284-L359), [docs/zh/A2A.md:L68–L84](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/A2A.md#L68-L84)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":359,"path":"jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py","sha256":"0ccaab6e5a93504922ba40b11b5bb913a03c26fd698dca1bec081f6f6a89994d","start":284},{"end":84,"path":"docs/zh/A2A.md","sha256":"f6a85b939b2b268876f88e0daa4a9c1c36645b63b50a317e71761525f0b8a2a8","start":68}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=a2a facet=dependencies pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=adfdbadf39d6ec5ef1abf2aa640e1d86386a207ec14844fc854f62cb84d2c25d -->
+**a2a-sdk 与 fastapi 缺失时抛带安装指引的 RuntimeError；uvicorn 导入不在该守卫内**
+start() 把 a2a.server/a2a.types 与 fastapi 的导入包在 try 内，ImportError 经 _raise_missing_a2a_sdk 转为附 `pip install -e ".[a2a]"` / `uv sync --extra a2a` 指引的 RuntimeError；紧随其后的 `import uvicorn` 在该 try 之外，缺失时抛出的是原始 ImportError 而非该指引错误。
+
+来源：[jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L29–L33](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py#L29-L33), [jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py:L291–L299](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py#L291-L299)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":33,"path":"jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py","sha256":"fbd24cad107653f92de40ec03825370379f53b51817c7d645510d94835b546d9","start":29},{"end":299,"path":"jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py","sha256":"ceaa9fc69daa75919703dd716c7fcea02582d61f87f88530fbe5feda68271607","start":291}],"trace":[]} -->
 <!-- /kb:depth -->

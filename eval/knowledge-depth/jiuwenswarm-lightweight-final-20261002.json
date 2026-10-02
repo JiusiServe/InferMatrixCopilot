@@ -1,0 +1,218 @@
+{
+  "passed": false,
+  "gates": {
+    "native_raw_approvals": true,
+    "source_references_and_approval_bindings": true,
+    "source_and_policy_target": false,
+    "retrieval_exact237_and_budget": true,
+    "usage_ledger_integrity": true,
+    "protected_strict207_exact": true,
+    "original_172_exact": true,
+    "retired_1_raw_archive": true,
+    "retired_1_historical_native": true,
+    "current_subset_is_pre_independent_minus_canonical_rejections": true,
+    "original_and_explicitly_filtered_checkpoints_bound": true,
+    "full_independent_newlight_content_review": true,
+    "fixed_denominator": true
+  },
+  "source_pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "auditor_root_head": "d6a6d3f02e99fe37785c1660587d1938546bf017",
+  "recognized_facets": 490,
+  "strict_recognized_facets": 207,
+  "lightweight_recognized_facets": 283,
+  "unknown_facets": 63,
+  "extraction_unknown_facets": 53,
+  "late_independent_rejected_facets": 10,
+  "facet_counts": {
+    "flow": {
+      "supported": 69,
+      "verified_absent": 0,
+      "unknown": 10,
+      "recognized": 69,
+      "ratio": 0.8734177215189873,
+      "strict_recognized": 22,
+      "lightweight_recognized": 47,
+      "eligible_recognized": 69,
+      "eligible_ratio": 0.8734177215189873,
+      "target_met": false
+    },
+    "api": {
+      "supported": 74,
+      "verified_absent": 0,
+      "unknown": 5,
+      "recognized": 74,
+      "ratio": 0.9367088607594937,
+      "strict_recognized": 35,
+      "lightweight_recognized": 39,
+      "eligible_recognized": 74,
+      "eligible_ratio": 0.9367088607594937,
+      "target_met": true
+    },
+    "configuration": {
+      "supported": 75,
+      "verified_absent": 0,
+      "unknown": 4,
+      "recognized": 75,
+      "ratio": 0.9493670886075949,
+      "strict_recognized": 51,
+      "lightweight_recognized": 24,
+      "eligible_recognized": 75,
+      "eligible_ratio": 0.9493670886075949,
+      "target_met": true
+    },
+    "dependencies": {
+      "supported": 74,
+      "verified_absent": 0,
+      "unknown": 5,
+      "recognized": 74,
+      "ratio": 0.9367088607594937,
+      "strict_recognized": 23,
+      "lightweight_recognized": 51,
+      "eligible_recognized": 74,
+      "eligible_ratio": 0.9367088607594937,
+      "target_met": true
+    },
+    "failure_modes": {
+      "supported": 71,
+      "verified_absent": 0,
+      "unknown": 8,
+      "recognized": 71,
+      "ratio": 0.8987341772151899,
+      "strict_recognized": 24,
+      "lightweight_recognized": 47,
+      "eligible_recognized": 71,
+      "eligible_ratio": 0.8987341772151899,
+      "target_met": false
+    },
+    "tradeoffs": {
+      "supported": 65,
+      "verified_absent": 0,
+      "unknown": 14,
+      "recognized": 65,
+      "ratio": 0.8227848101265823,
+      "strict_recognized": 24,
+      "lightweight_recognized": 41,
+      "eligible_recognized": 65,
+      "eligible_ratio": 0.8227848101265823,
+      "target_met": false
+    },
+    "validation": {
+      "supported": 62,
+      "verified_absent": 0,
+      "unknown": 17,
+      "recognized": 62,
+      "ratio": 0.7848101265822784,
+      "strict_recognized": 28,
+      "lightweight_recognized": 34,
+      "eligible_recognized": 62,
+      "eligible_ratio": 0.7848101265822784,
+      "target_met": false
+    }
+  },
+  "validation_kind_counts": {
+    "automated_runtime": 23,
+    "automated_source_text": 1,
+    "helper_unit": 5,
+    "documented_manual": 5,
+    "unclassified": 28
+  },
+  "breadth_targets_met": true,
+  "pre_independent_history": {
+    "recognized_facets": 500,
+    "summary": {
+      "path": "/tmp/jiuwenswarm-final-depth-audit-20261002/summary.json",
+      "sha256": "ed429ffd97263448092b44d6a8bd4688193f48c5e6dee027380395e62211e51b"
+    }
+  },
+  "proposal_manifest": {
+    "path": "/tmp/jiuwenswarm-content-quarantine-20261002/manifest.json",
+    "sha256": "2e67541b34fa9c159ca92fc257dc9b1b41525f680686af982740c7b696a3e9f6"
+  },
+  "apply_receipt": {
+    "path": "/tmp/jiuwenswarm-content-quarantine-20261002/apply.json",
+    "sha256": "781736ade291b5bfe27cc07f5440cc8bd93b926de707e435de1a53e0e771834e"
+  },
+  "outside_block_whitespace_normalization": {
+    "path": "/tmp/jiuwenswarm-content-quarantine-20261002/whitespace-normalization.json",
+    "sha256": "702633a8053b25d9d8c791ed94b4d7dcfd80e9718acc32cb509d9c6c9677d69d"
+  },
+  "independent_content_review": {
+    "path": "/tmp/jiuwenswarm-independent-content-review-20261002.json",
+    "sha256": "320b51bbea693c249b047aad1426a8e02fde14071804c54c39564ce1efaf12af"
+  },
+  "native_approvals": {
+    "path": "/tmp/jiuwenswarm-post-content-review-20261002/native-approvals.json",
+    "sha256": "28a5a406991fa7998715cab43dfbb8e4f509b97b94b4f14baae5eaff18695e7b"
+  },
+  "source_depth": {
+    "path": "/tmp/jiuwenswarm-post-content-review-20261002/source-depth.json",
+    "sha256": "0988ed8f7b31ee284666720ac2820751bf9b3ae480cd04def9f19689ece2be98"
+  },
+  "retrieval": {
+    "path": "/tmp/jiuwenswarm-lightweight-retrieval-after-20261002.json",
+    "sha256": "975762ab024051c965ae0de678d6cc8b5fdf3ef365d363fc032988736f732aaa"
+  },
+  "native_usage": {
+    "path": "/tmp/jiuwenswarm-final-depth-audit-20261002/native-usage.json",
+    "sha256": "7f6c13133f526aa929abb529c698e1b81ee9360563bb7aaf1456af73f428fd7b"
+  },
+  "legacy_preservation": {
+    "path": "/tmp/jiuwenswarm-post-content-review-20261002/legacy-preservation.json",
+    "sha256": "85bf95b20c1ea3f09476b93192c06306903e598038e4851e6ed7ff02d48e786d"
+  },
+  "historical_native_approval": {
+    "path": "/tmp/jiuwenswarm-final-depth-audit-20261002/historical-native-approval.json",
+    "sha256": "2815710f76c2d38268ca0a22308384929ff9a344ed75fd54b809354ee34cd78e"
+  },
+  "protected_strict_baseline": {
+    "path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/eval/knowledge-depth/jiuwenswarm-pre-lightweight-approvals-20261002.json",
+    "sha256": "1703431b958037c31f739e0a53f87fe56b975961deb0a37d3ff49157daa99d4e"
+  },
+  "tool_sha256": {
+    "tools/audit_native_depth_approvals.py": "ffb6abd701f831221401f9665731749834c88ba0e0a62287c744e1ab9c2d6843",
+    "tools/audit_knowledge_depth.py": "471ea7779a9a1287d7be4547c969dfc5e83c8395b0eab1d0b9ecff10965f0781",
+    "eval/knowledge-depth/audit_depth_retrieval.py": "c3f5fe54dc369ac074c035c1ca13001b4c93f7279da716626b6696969d398444"
+  },
+  "summary_script_sha256": "3259685fb19067a3d40d284a0b668c4ac50827c1b06f20401d1c50ce0adab79f",
+  "native_usage_summary": {
+    "unique_model_call_records": 825,
+    "total_observed_attempts": 836,
+    "accounting_integrity": true,
+    "reported_usage_by_role": {
+      "generator": {
+        "model_call_records": 430,
+        "successful_model_records": 409,
+        "failed_model_records": 21,
+        "reported_input_tokens": 23353232,
+        "input_usage_reported_calls": 411,
+        "reported_output_tokens": 2959651,
+        "output_usage_reported_calls": 411,
+        "reported_cost_subtotal_usd": null,
+        "cost_reported_calls": 0,
+        "ambiguous_model_records": 0,
+        "usage_status": "reported_fields_only"
+      },
+      "judge": {
+        "model_call_records": 395,
+        "successful_model_records": 394,
+        "failed_model_records": 1,
+        "reported_input_tokens": 9822044,
+        "input_usage_reported_calls": 395,
+        "reported_output_tokens": 320859,
+        "output_usage_reported_calls": 395,
+        "reported_cost_subtotal_usd": null,
+        "cost_reported_calls": 0,
+        "ambiguous_model_records": 0,
+        "usage_status": "reported_fields_only"
+      }
+    },
+    "invoice_cost": "unknown"
+  },
+  "limitations": [
+    "Target unmet; checkpoint deliverable and draft PR only, no merge.",
+    "The proposal manifest applied:false is immutable preparation history; apply receipt applied:true binds actual490 subset. Outside-block whitespace normalization keeps all current raw blocks unchanged.",
+    "The53 original extraction gaps exhausted bounded corrections; the10 late exclusions previously had positive native receipts and are not extraction failures.",
+    "No new generation/runtime/state/trace modifications or model calls. No upstream test suite execution; independent review used one AST-extracted A2A cancellation harness.",
+    "Independent code/knowledge review and CI publication outcomes remain recorded separately in the PR. Real invoice costs unknown."
+  ]
+}

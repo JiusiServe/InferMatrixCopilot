@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: ["openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L26-L41", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L43-L43", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L92-L110", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L112-L125", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L174-L185"]
+sources: ["openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L26-L41", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L43-L43", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L92-L110", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L112-L125", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md:L174-L185", openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py:L274-L309, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py:L519-L541, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_evolution_helpers.py:L128-L138]
 feature: "skill-evolution"
 entry_points: ["jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py"]
 source_globs: ["jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py", "jiuwenswarm/agents/harness/common/rails/*"]
@@ -39,4 +39,31 @@ source_globs: ["jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py", 
 来源：[docs/zh/Skill自演进.md:L174–L185](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/Skill%E8%87%AA%E6%BC%94%E8%BF%9B.md#L174-L185)
 
 <!-- kb:depth-proof {"basis":"supported","evidence":[{"end":185,"path":"docs/zh/Skill自演进.md","sha256":"0a7b089fc5e11afefe90414e119d9a886d24ff09c52c4768d9383d3cf597bd91","start":174}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=skill-evolution facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=c39d923b4320e14f595e8ab514fbd8e3d52ec8d9157cd05c431d475ca52690ce -->
+**evolution_status_response：status 为 no_evolution_no_records 的分支返回 answer 类响应**
+evolve_result.status 去除空白后等于 "no_evolution_no_records" 时取 no_records_output，message 非空则以换行拼接，返回 {"output": 拼接结果, "result_type": "answer"}；status 为空时该本地分支直接返回 None，不做映射。
+
+来源：[jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py:L274–L309](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py#L274-L309)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":309,"path":"jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py","sha256":"51455f97010c4732fb9af08f31270fa9644f406556d537adac4e5866ebc6b1a3","start":274}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=skill-evolution facet=failure_modes pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=bf8bc33cc9ca10b5ec003eb91e07d968799cb9596620f962b0b49fa63bf67726 -->
+**resolve_evolution_event_timeout_sec：SDK 超时读取失败或值非法时回退 fallback**
+触发条件：读取 rail.evolution_total_timeout_secs 抛异常、float() 抛 TypeError/ValueError，或值非有限、≤0；各守卫分支返回 fallback（fallback_sec 为 None 时取 TEAM_EVOLUTION_EVENT_TIMEOUT_SEC），异常不向外传播；合法值返回 parsed_timeout + max(grace, 0.0)。
+
+来源：[jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py:L519–L541](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py#L519-L541)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":541,"path":"jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py","sha256":"2e632099e2f41b9f3ae81746e442b916ab544ddb22a1674a6ff7bb51cc313c52","start":519}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=skill-evolution facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=f68dfe5da1a4a60338dc3464806df1eebcb2811560b231bfee301828d284c754 -->
+**team_evolution_end_update 将 failed/timed_out 映射为 hidden 的 helper 单测**
+参数化用例（stage 为 "failed"/"timed_out"）直接调用 evolution_helpers.team_evolution_end_update("team_skill_evolve_req1", {"stage": stage, "message": "boom"})，断言返回 update.status == "end"、update.stage == "hidden"、message 保留 "boom"、request_id 不变；断言仅覆盖该 helper 的返回值，未触及 AgentServer 推送链路。
+
+来源：[tests/unit_tests/agentserver/test_evolution_helpers.py:L128–L138](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/agentserver/test_evolution_helpers.py#L128-L138)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":138,"path":"tests/unit_tests/agentserver/test_evolution_helpers.py","sha256":"9c9e8918344a0377ed989501b0436b8265dadd0c26c69db03748a8e23db2de82","start":128}],"trace":[],"validation_kind":"helper_unit"} -->
 <!-- /kb:depth -->

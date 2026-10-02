@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L144-L159, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:Dockerfile.claw:L78-L85, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L55-L68, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L301-L307, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build_config.py:L264-L299, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build_config.py:L164-L166, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build_config.py:L149-L150, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L143-L176, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/test_build_config.py:L80-L98, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/test_build_config.py:L308-L331]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L144-L159, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:Dockerfile.claw:L78-L85, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L55-L68, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L301-L307, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build_config.py:L264-L299, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build_config.py:L164-L166, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build_config.py:L149-L150, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L143-L176, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/test_build_config.py:L80-L98, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/test_build_config.py:L308-L331, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/desktop-electron-packaging.md:L97-L108, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L214-L219, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-electron-exe.sh:L260-L261, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/desktop-electron-packaging.md:L49-L51]
 feature: "deployment"
 entry_points: ["scripts/build-electron-exe.sh", "Dockerfile.claw", "docker/Dockerfile.claw", "docker/Dockerfile.claw.base", "docker/Dockerfile.yr.rt.mgr"]
 source_globs: ["scripts/build-electron-exe.sh", "scripts/*", "Dockerfile.claw", "docker/Dockerfile.claw", "docker/Dockerfile.claw.base", "docker/Dockerfile.yr.rt.mgr"]
@@ -50,4 +50,22 @@ test_check_detects_version_drift_before_write（80-98 行）在同步后的临�
 来源：[tests/unit_tests/test_build_config.py:L80–L98](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/test_build_config.py#L80-L98), [tests/unit_tests/test_build_config.py:L308–L331](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/test_build_config.py#L308-L331)
 
 <!-- kb:depth-proof {"basis":"supported","evidence":[{"end":98,"path":"tests/unit_tests/test_build_config.py","sha256":"a4e6bbcda0e3cccd65a7cd433d1afac3cb0a52a0b4e746739dfaf5f872fd6145","start":80},{"end":331,"path":"tests/unit_tests/test_build_config.py","sha256":"2492b6ef892d9630afbf3faa910113a773672a358174b8ada50ee9b32099d88b","start":308}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=deployment facet=api pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=87590f05078c081f8f15b4cac6fcedc41acc0b1a43d347fda6c26fa66ff79029 -->
+**FrontendOnly 开关：macOS 脚本在 FRONTEND_ONLY=true 时写 `.frontend-only` 标记、后端复制段以 =false 守卫跳过；Windows 文档记载为不打包后端**
+macOS 脚本在 `FRONTEND_ONLY`=true 时向 `$APP_DIR` 写入 `.frontend-only` 标记，PyInstaller 后端复制段位于 `if [ "$FRONTEND_ONLY" = false ]` 守卫内——所示行仅证明该复制段被跳过；Windows 打包文档另记载 `-Test -FrontendOnly` 为"写入 `.frontend-only` 标记，不打包后端"。
+
+来源：[scripts/build-electron-exe.sh:L214–L219](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/scripts/build-electron-exe.sh#L214-L219), [scripts/build-electron-exe.sh:L260–L261](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/scripts/build-electron-exe.sh#L260-L261), [docs/zh/desktop-electron-packaging.md:L49–L51](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/desktop-electron-packaging.md#L49-L51)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":219,"path":"scripts/build-electron-exe.sh","sha256":"3fd4aacc5e77318fb6e777a8887c06a60bf36943ea8c9a1beba6f7b307391063","start":214},{"end":261,"path":"scripts/build-electron-exe.sh","sha256":"f1d157ef800cfe889b2a4a32ad61347d4e580c6fd67d1f1917771229f9024c3e","start":260},{"end":51,"path":"docs/zh/desktop-electron-packaging.md","sha256":"cccb6749a064602574eb75a75f45c1637bb062ce4d2882cef94f8a250d95dac2","start":49}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=deployment facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=a8f84767c157a8ad91dbd418af9f5270d4a4cd23220c2bae4b892566108c1332 -->
+**CDP 自绑端口免竞态、不阻塞首屏；代价是 5s 未回读 DevToolsActivePort 即禁用浏览器 sideview**
+packaged 版以 --remote-debugging-port=0 让 Chromium 自选端口并回读 DevToolsActivePort：免竞态窗口、不占启动关键路径（旧同步预留端口方案冷启动被杀软拖到数秒且串行阻塞首屏）；代价是文件 5s 未出现即禁用浏览器 sideview。
+
+来源：[docs/zh/desktop-electron-packaging.md:L97–L108](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/desktop-electron-packaging.md#L97-L108)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":108,"path":"docs/zh/desktop-electron-packaging.md","sha256":"e69dae0e60cb5f7244a0381df953976f60e694b945ef35c4a72f10b27726b44f","start":97}],"trace":[]} -->
 <!-- /kb:depth -->

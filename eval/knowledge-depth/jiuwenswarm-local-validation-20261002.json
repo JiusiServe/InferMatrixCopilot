@@ -1,0 +1,37 @@
+{
+  "collected": 2897,
+  "initial_full_run": {
+    "passed": 2874,
+    "skipped": 17,
+    "failed": 6,
+    "cause": "Knowledge EOF normalization after first cached resource revision triggered the integrity gate"
+  },
+  "frozen_knowledge_exact_failed_nodes_rerun": {
+    "passed": 6,
+    "failed": 0,
+    "reviewer": "/root/depth_gap_diagnosis",
+    "tool_session": 17299,
+    "exit_code": 0
+  },
+  "code_changes_for_test_failures": false,
+  "ci_status": "pending",
+  "frozen_knowledge_tree_sha256": "6acb3b2a3e836f3f1e9e1cd6d0114615ba00ab3f7aa83bdfd42d79c3f4f8758b",
+  "knowledge_validator_regressions": {
+    "passed": 69,
+    "failed": 0
+  },
+  "checks": {
+    "knowledge_tree_errors": 0,
+    "wiki_lint_errors": 0,
+    "spec_declared_verified": 93,
+    "spec_stale": 0,
+    "spec_undeclared": 0,
+    "spec_orphan": 0,
+    "doc_links": "passed336files",
+    "doc_citations": "passed56citations",
+    "cli_help_exit_code": 0,
+    "doctor_json": "valid_expected_exit0or1",
+    "git_diff_check": "passed"
+  },
+  "interpretation": "The six frozen-KB reruns are separate from the initial full run. Final commit CI results live on the PR; no full local green run is inferred."
+}

@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L154-L173, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/system_tests/test_init_workspace.py:L54-L177, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L44-L151, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L1674-L1677, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L378-L394, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L63-L71, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L26-L41, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L100-L144]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L154-L173, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/system_tests/test_init_workspace.py:L54-L177, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L44-L151, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L1674-L1677, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L378-L394, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L63-L71, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L26-L41, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L100-L144, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L44-L98, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L146-L151, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/init_workspace.py:L73-L98]
 feature: "bootstrap"
 entry_points: ["jiuwenswarm/init_workspace.py"]
 source_globs: ["jiuwenswarm/init_workspace.py"]
@@ -59,4 +59,22 @@ run_init 的命名实例分支直接复用 jiuwenswarm.instance_manager（27-41 
 来源：[jiuwenswarm/init_workspace.py:L26–L41](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/init_workspace.py#L26-L41), [jiuwenswarm/init_workspace.py:L100–L144](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/init_workspace.py#L100-L144)
 
 <!-- kb:depth-proof {"basis":"supported","evidence":[{"end":41,"path":"jiuwenswarm/init_workspace.py","sha256":"8d1f57776977744471c0ce09c29c2c180743c7c42068ce1fd37a877d87f76910","start":26},{"end":144,"path":"jiuwenswarm/init_workspace.py","sha256":"f04b26b2735fdbcd3d3ceef7a869846cdb201e1c0fd249d51095a63a88830c2b","start":100}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=bootstrap facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=db86f9cc56a1f2d2b6dafea04f75bad89c34d5d2fca85b30e3f32b814ba52389 -->
+**run_init default branch (no --name, no -f): initialize ~/.jiuwenswarm, return 0 when not cancelled**
+Without --name and -f, `if name:`/`elif force:` are both false, run_init skips the running check and sets the workspace to `get_user_home()/.jiuwenswarm`, calls `init_user_workspace(overwrite=False, workspace_dir=...)` (deletion/confirmation handled by it); when target is not "cancelled", it logs `initialized: {target}` and returns 0.
+
+来源：[jiuwenswarm/init_workspace.py:L44–L98](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/init_workspace.py#L44-L98), [jiuwenswarm/init_workspace.py:L146–L151](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/init_workspace.py#L146-L151), [jiuwenswarm/init_workspace.py:L154–L173](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/init_workspace.py#L154-L173)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":98,"path":"jiuwenswarm/init_workspace.py","sha256":"258096140b32fa578cf706af2533594d97a1fd4e839a1adac6e5ed3980e769b1","start":44},{"end":151,"path":"jiuwenswarm/init_workspace.py","sha256":"dbf37888c8cf5b966814433df20a2df29ea2a129fd61d15ce6c834ac65c3fd4c","start":146},{"end":173,"path":"jiuwenswarm/init_workspace.py","sha256":"5d395f1ebf980b618e14c76438c1a9431c9fbb1734d74d773c80f20f005d7422","start":154}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=bootstrap facet=failure_modes pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=1f84bdefb43c6b7e4f10f0e066fc4d1549c41c6a34f5c979a2f54b4dfeb1470c -->
+**run_init: named instance running blocks init and returns 1; port group scan failure only warns and degrades**
+When --name is given and `get_instance_status(config).running` is true, run_init logs the PID ERROR and --stop hint and returns 1 (before calling init_user_workspace); when --name is given and target is not "cancelled", if the index's port group has conflicts and `find_available_ports(scan_range=20)` returns None, it only logs a WARNING, still calls update_instances_yaml with the index's ports and returns 0.
+
+来源：[jiuwenswarm/init_workspace.py:L73–L98](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/init_workspace.py#L73-L98), [jiuwenswarm/init_workspace.py:L100–L144](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/init_workspace.py#L100-L144)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":98,"path":"jiuwenswarm/init_workspace.py","sha256":"f96e6098b3fa534219bf7667b4cda3035eeef461cc910e04f2768f72a46e157a","start":73},{"end":144,"path":"jiuwenswarm/init_workspace.py","sha256":"f04b26b2735fdbcd3d3ceef7a869846cdb201e1c0fd249d51095a63a88830c2b","start":100}],"trace":[]} -->
 <!-- /kb:depth -->

@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L304-L316, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L556-L568, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/config.py:L71-L79, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L293-L302, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/config.py:L21-L28]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L304-L316, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L556-L568, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/config.py:L71-L79, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L293-L302, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/config.py:L21-L28, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_debug_trace.py:L692-L701, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/config.py:L58-L59, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/config.py:L71-L95, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/config.py:L47-L55, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/config.py:L76-L85, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L240-L249, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L378-L380]
 feature: "debug-trace"
 entry_points: ["jiuwenswarm/server/runtime/debug_trace/config.py", "jiuwenswarm/server/runtime/debug_trace/stream_logger.py"]
 source_globs: ["jiuwenswarm/server/runtime/debug_trace/config.py", "jiuwenswarm/server/runtime/debug_trace/stream_logger.py", "jiuwenswarm/server/runtime/debug_trace/*.py"]
@@ -43,4 +43,31 @@ resolve_debug_trace_settings(*, mode: str, request_debug: bool) 是关键字-onl
 来源：[jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L556–L568](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/debug_trace/stream_logger.py#L556-L568)
 
 <!-- kb:depth-proof {"evidence":[{"path":"jiuwenswarm/server/runtime/debug_trace/stream_logger.py","start":556,"end":568,"sha256":"dbc5d18ca0504b57956a6e4a08e64de7911d372768605a21de006dc8e27822c5"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=debug-trace facet=configuration pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=6d7d02dde8ea5da6062d278099efac9055b9db9161a06316e536c011cc23bd85 -->
+**resolve_debug_trace_settings 内的 debug/dump/otel 判定（仅本函数）**
+mode 以 code 前缀取 debug_trace.code，否则取 agent 块；debug_enabled = request_debug 或该块 enabled；dump_enabled 在其下默认开、仅当值恰为 False 才关；otel_enabled 还需该块 otel_enabled（默认 False）——已为 true 的 agent_observability 由 sync_agent_observability 处理，不在此函数。
+
+来源：[jiuwenswarm/server/runtime/debug_trace/config.py:L58–L59](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/debug_trace/config.py#L58-L59), [jiuwenswarm/server/runtime/debug_trace/config.py:L71–L95](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/debug_trace/config.py#L71-L95)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":59,"path":"jiuwenswarm/server/runtime/debug_trace/config.py","sha256":"3f270c18e16c69eda9ea3d759eae769258c79ba680af1e2c94958e68e84de524","start":58},{"end":95,"path":"jiuwenswarm/server/runtime/debug_trace/config.py","sha256":"127f3d5d2f3d7a112b45c6b880b7ee6c692e5a3aa3ec14d5d19028391f49a1f1","start":71}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=debug-trace facet=dependencies pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=c3f07ce19ac12ae2d945f52dec6610a31c5c3c4a2c0dd96d6125a832b597fc47 -->
+**_load_debug_trace_config 对 jiuwenswarm.common.config 的尽力读取**
+函数体内延迟 import common.config.get_config 来读 debug_trace 块；任何异常或非 dict 值都返回 {}，随后 resolve_debug_trace_settings 把 mode/limits/redaction 三个块当空 dict 继续计算。
+
+来源：[jiuwenswarm/server/runtime/debug_trace/config.py:L47–L55](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/debug_trace/config.py#L47-L55), [jiuwenswarm/server/runtime/debug_trace/config.py:L76–L85](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/debug_trace/config.py#L76-L85)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":55,"path":"jiuwenswarm/server/runtime/debug_trace/config.py","sha256":"5fe96bcfb7fe943672893d250dc1e95929ea624d08a38605f182f0bd5f6589e0","start":47},{"end":85,"path":"jiuwenswarm/server/runtime/debug_trace/config.py","sha256":"11c30da1c583e077ccd107c890306b6153b84eda2f57bec1aa7044b5971a748b","start":76}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=debug-trace facet=failure_modes pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=804dcfbfc32bc184023a39f7da3c046b5e8e7c207eed4f290df01b79e027b2a2 -->
+**dump 文件 mkdir/open 失败仅禁用当前 DebugTraceLogger 实例**
+init 这段 try 中 mkdir/open 抛异常即被 except 捕获：记 '[DebugTrace] disabled ... open failed' 警告并置 _disabled=True；此后 flush() 命中 _disabled 守卫直接 return，feed_subagent() 在 _disabled（或 include_subagent_flow 关闭）时同样 no-op 不写文件。
+
+来源：[jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L240–L249](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/debug_trace/stream_logger.py#L240-L249), [jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L293–L302](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/debug_trace/stream_logger.py#L293-L302), [jiuwenswarm/server/runtime/debug_trace/stream_logger.py:L378–L380](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/server/runtime/debug_trace/stream_logger.py#L378-L380)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":249,"path":"jiuwenswarm/server/runtime/debug_trace/stream_logger.py","sha256":"f10aa3a3fc8f8a6eb63240f86b2b23054e59df7576186e24e14ff4e10525f7a1","start":240},{"end":302,"path":"jiuwenswarm/server/runtime/debug_trace/stream_logger.py","sha256":"f6a7ebb3d6b34f38331f990515ee075ae38d5bd0107d45c03909b01a2f435581","start":293},{"end":380,"path":"jiuwenswarm/server/runtime/debug_trace/stream_logger.py","sha256":"932392490e0cc9a1c00928ddc3c9f018daad175223fee007f21ef54db2220a09","start":378}],"trace":[]} -->
 <!-- /kb:depth -->
