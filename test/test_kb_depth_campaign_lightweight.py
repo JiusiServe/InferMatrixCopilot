@@ -81,7 +81,8 @@ def test_worker_forwards_lightweight_index_and_stop_boundary(runner, campaign_ar
     args.depth_index_path = args.state / "depth-index.json"
     args.stop_file = args.state / "STOP"
     monkeypatch.setattr(KnowledgeRepo, "fetch", lambda _: args.baseline)
-    runtime = SimpleNamespace(registry={args.repo: "lifecycle"})
+    pacing = []
+    runtime = SimpleNamespace(registry={args.repo: "lifecycle"}, gateway=SimpleNamespace(configure_zcode_pacing=pacing.append))
     monkeypatch.setattr(InitRuntime, "from_env", lambda *_a, **_k: runtime)
     seen = []
 
@@ -94,6 +95,8 @@ def test_worker_forwards_lightweight_index_and_stop_boundary(runner, campaign_ar
     assert seen[0]["acceptance_mode"] == "lightweight"
     assert seen[0]["depth_index_path"] == args.depth_index_path and seen[0]["stop_file"] == args.stop_file
     assert seen[0]["unlimited_subscription"] is True
+    assert pacing[0].path == args.state / "zcode-pacing.json"
+    assert pacing[0].config["start_interval_s"] == 15 and pacing[0].config["rate_cooldown_s"] == 90
 
 
 def test_existing_stop_file_prevents_new_workers_and_saves_drain_snapshot(runner, campaign_args, monkeypatch):

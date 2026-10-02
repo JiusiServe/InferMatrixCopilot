@@ -48,6 +48,12 @@ def run_worker(args, state):
     if previous and (previous.kb_base_sha != args.baseline or previous.pin != args.pin):
         raise RuntimeError("worker checkpoint source or knowledge baseline differs from campaign")
     runtime = InitRuntime.from_env(Settings(_env_file=None), state_dir=state)
+    from infermatrix_copilot.kb_service.depth_pacing import SharedZcodePacer
+    runtime.gateway.configure_zcode_pacing(SharedZcodePacer(
+        getattr(args, "zcode_pacing_path", None) or args.state / "zcode-pacing.json",
+        start_interval=getattr(args, "zcode_start_interval", 15.0),
+        rate_cooldown=getattr(args, "zcode_rate_cooldown", 90.0),
+        stop_file=getattr(args, "stop_file", None) or args.state / "STOP"))
     runtime.upstream_remote = lambda _: str(args.upstream_mirror)
     record = run_stage(runtime, runtime.registry[args.repo], "knowledge-deepen", dry_run=True,
                        from_existing=True, pin=args.pin, unlimited_subscription=True,
@@ -74,6 +80,9 @@ def main():
     parser.add_argument("--workers", type=int, default=13)
     parser.add_argument("--acceptance-mode", choices=("strict", "lightweight"), default="lightweight")
     parser.add_argument("--depth-index-path", type=Path)
+    parser.add_argument("--zcode-pacing-path", type=Path)
+    parser.add_argument("--zcode-start-interval", type=float, default=15.0)
+    parser.add_argument("--zcode-rate-cooldown", type=float, default=90.0)
     parser.add_argument("--stop-file", type=Path, help="Create this file to stop new dispatch and drain active calls")
     parser.add_argument("--priority-features", default="", help="Visit these policy features first without changing audit scope")
     parser.add_argument("--retry", action="store_true")
@@ -86,6 +95,14 @@ def main():
     args.stop_file = (args.stop_file or args.state / "STOP").resolve()
     if args.depth_index_path:
         args.depth_index_path = args.depth_index_path.resolve()
+    if args.zcode_pacing_path:
+        args.zcode_pacing_path = args.zcode_pacing_path.resolve()
+    from infermatrix_copilot.kb_service.depth_pacing import SharedZcodePacer
+    try:
+        SharedZcodePacer(args.zcode_pacing_path or args.state / "zcode-pacing.json",
+                         start_interval=args.zcode_start_interval, rate_cooldown=args.zcode_rate_cooldown)
+    except ValueError as exc:
+        parser.error(str(exc))
     if args.worker is not None:
         if not 0 <= args.worker < args.workers or not args.feature_ids:
             parser.error("worker must belong to the campaign and have feature IDs")
@@ -133,6 +150,12 @@ def campaign(args, parser):
         if any(prior.get(key) != value for key, value in summary.items()):
             parser.error("campaign identity changed; use a fresh state directory")
     stop_file = getattr(args, "stop_file", None) or args.state / "STOP"
+    from infermatrix_copilot.kb_service.depth_pacing import SharedZcodePacer
+    pacing_path = getattr(args, "zcode_pacing_path", None) or args.state / "zcode-pacing.json"
+    pacer = SharedZcodePacer(pacing_path, start_interval=getattr(args, "zcode_start_interval", 15.0),
+                            rate_cooldown=getattr(args, "zcode_rate_cooldown", 90.0), stop_file=stop_file)
+    pacer.prepare()
+    summary["zcode_pacing"] = {"path": str(pacing_path), **pacer.config}
     index_path = getattr(args, "depth_index_path", None)
     if summary["acceptance_mode"] == "lightweight":
         from infermatrix_copilot.kb_service.depth_index import build_depth_index, load_depth_index
@@ -174,7 +197,10 @@ def campaign(args, parser):
                 "--repo", args.repo, "--pin", args.pin, "--upstream-mirror", str(args.upstream_mirror),
                 "--baseline", args.baseline, "--workers", str(args.workers),
                 "--worker", str(number), "--feature-ids", ",".join(features),
-                "--acceptance-mode", summary["acceptance_mode"], "--stop-file", str(stop_file)]
+                "--acceptance-mode", summary["acceptance_mode"], "--stop-file", str(stop_file),
+                "--zcode-pacing-path", str(pacing_path),
+                "--zcode-start-interval", str(pacer.config["start_interval_s"]),
+                "--zcode-rate-cooldown", str(pacer.config["rate_cooldown_s"])]
         if index_path:
             argv += ["--depth-index-path", str(index_path)]
         if args.retry:
@@ -184,27 +210,56 @@ def campaign(args, parser):
     atomic_write_json(metadata, summary)
     processes = []
 
+    last_snapshots = {}
+
     def snapshots():
         result = []
         for number, path in enumerate(checkpoints):
-            if path.exists():
-                record = json.loads(path.read_text())
-                entries = record.get("depth", {}).get("features", {})
-                result.append({"worker": number, "visited": sum(e.get("attempts", 0) > 0 for e in entries.values()),
+            try:
+                record = json.loads(path.read_bytes())
+            except FileNotFoundError:
+                continue
+            except (OSError, json.JSONDecodeError) as exc:
+                result.append({**last_snapshots.get(number, {"worker": number}),
+                               "snapshot_error": {"type": type(exc).__name__, "errno": getattr(exc, "errno", None)},
+                               "using_last_safe_snapshot": number in last_snapshots})
+                continue
+            entries = record.get("depth", {}).get("features", {})
+            snapshot = {"worker": number, "visited": sum(e.get("attempts", 0) > 0 for e in entries.values()),
                                "pages": len(record.get("depth", {}).get("accepted", {})),
                                "active": [f for f, e in entries.items() if e.get("status") in ("extracting", "extracted")],
-                               "accounted_usd": record.get("spent_usd"), "status": record["status"]})
+                               "accounted_usd": record.get("spent_usd"), "status": record["status"]}
+            last_snapshots[number] = snapshot
+            result.append(snapshot)
         return result
 
     def save_drain():
         inflight = []
-        for path in args.state.glob("worker-*/init/traces/attempts/*/attempt.json"):
-            attempt = json.loads(path.read_text())
+        try:
+            journals = list(args.state.glob("worker-*/init/traces/attempts/*/attempt.json"))
+        except OSError as exc:
+            journals = []
+            inflight.append({"operation": "journal_glob", "read_error": {"type": type(exc).__name__, "errno": exc.errno}})
+        for path in journals:
+            try:
+                attempt = json.loads(path.read_bytes())
+            except (OSError, json.JSONDecodeError) as exc:
+                inflight.append({"path": str(path), "read_error": {"type": type(exc).__name__, "errno": getattr(exc, "errno", None)}})
+                continue
             if attempt.get("status") == "inflight":
                 inflight.append({"path": str(path), "id": attempt["id"], "model": attempt.get("model", {})})
-        atomic_write_json(args.state / "drain.json", {"requested_at": stop_file.stat().st_mtime,
+        try:
+            requested_at = stop_file.stat().st_mtime
+        except OSError as exc:
+            requested_at = None
+            inflight.append({"operation": "stop_stat", "read_error": {"type": type(exc).__name__, "errno": exc.errno}})
+        report = {"requested_at": requested_at,
                           "observed_at": time.time(), "progress": snapshots(), "inflight": inflight,
-                          "running_workers": [n for n, p, _ in processes if p.poll() is None]})
+                          "running_workers": [n for n, p, _ in processes if p.poll() is None]}
+        try:
+            atomic_write_json(args.state / "drain.json", report)
+        except OSError as exc:
+            print(json.dumps({"drain_snapshot_error": {"type": type(exc).__name__, "errno": exc.errno}}), flush=True)
 
     def request_drain(signum, _frame):
         if not stop_file.exists():

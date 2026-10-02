@@ -530,7 +530,7 @@ knowledge-deepen 需要显式 feature/production coverage policy，逐项访问�
 只保存有证据的内容到最近 owner 的 `feature-depth-<id>.md`，链接功能概览与 owner 索引。
 只追加索引链接，保留已有 Direct quick map；最终仍检查地图存在且未被截断。
 源码按定义切片，可检索文件前缀之外的实现，并补充可静态解析的第一方被调函数与相关测试。
-flow 至少包含两个不同定义的直接调用；Python 校验限定符号、词法 owner 和导入目标，其它
+默认 strict 模式的 flow 至少包含两个不同定义的直接调用；Python 校验限定符号、词法 owner 和导入目标，其它
 语言检查去除注释/字符串后的声明和调用。动态对象分派不能靠同名猜测，语义仍由模型裁判复核。
 
 每维用 `kb:depth` 绑定 feature、facet、完整 pin 与正文哈希，`kb:depth-proof` 绑定精确证据
@@ -594,6 +594,36 @@ proof `basis` 缺省 supported，旧区块不改写。verified_absent 当前只�
 及 configured fallback。预算上限 None 表示
 该模式，不使用无穷或零价格伪装；累计固定记账和原生调用用量仍记录，实际费用未报告
 保持未知。每次调用重新绑定已经检查的订阅传输，不启用 API 付费回退。
+
+### 2026-10-02 轻量认可、13 功能任务与轨迹留存
+
+政策可指定 `semantic_depth.acceptance_mode: lightweight`，CLI 可显式选择
+`--acceptance-mode lightweight`；缺省仍为 strict。轻量区块绑定固定源码 pin、真实展示的
+源码或项目文档引用、区间及正文哈希，允许代表性流程及明确标注的设计推断，不要求形式化
+调用链，也不生成缺失证明。每个功能的一次 Codex 调用同时判定全部新增维度，三个维度
+均 yes 才认可。保留旧 strict 区块的原文及哈希，按功能/维度去重统计 strict/lightweight
+与 supported/verified_absent/unknown；旧原生记录默认 strict。源码、原生记录、检索和
+发布使用相同政策门槛，未知项不计认可，分母不减少。
+
+轻量 validation 必须分类为 automated_runtime、automated_source_text、helper_unit 或
+documented_manual；人工步骤须来自已有文档并标明本轮未执行。测试文件名、未找到测试及
+源码字面匹配均不能冒充运行断言或核实缺失。检索分别展示已有和实际注入的模式、维度状态
+与验证类型，仍受两页和 6,000 字符预算约束。
+
+共享的源码/测试/文档索引绑定 pin、政策、完整生产范围、版本与摘要；只建立一次。
+轻量组包保持完整小片段，修正优先补读评审指出的符号和范围。每个缺口至多首轮加三次
+自动修正，计数在派发前落盘，恢复或显式 retry 不清零；通过的维度冻结，失败只留在该项。
+未派发评审的草稿可在原轮恢复。逐批核对格式、引用、哈希与计数，完整验收集中在交付前。
+
+`eval/knowledge-depth/run_depth_campaign.py` 默认及最大 13 个隔离功能 worker，共享
+Zcode 调度文件。默认启动间隔 15 秒、原生 429/account-1302 退避 90 秒，后续间隔可增至
+60 秒并逐步恢复；仍保留 13 个任务，供应商限流仅延迟派发，不新增内部重试或重置修正计数。
+调度等待、开始、冷却与停止事件与原生输入输出一起脱敏保存于每个 worker 的
+`init/traces/attempts/`，最终关联唯一 model_call；未完成调用及未报告账单费用保持未知。
+监控读取错误记录诊断、沿用最后安全快照，不停止其它任务。
+
+交付顺序为：复核结构覆盖 → 定向深化 → 源码与原生认可记录审计 → 检索验收 → 独立审查
+→ CI → 合并。完整批次未达到政策门槛时保存真实缺口和检查点，不发布为已完成。
 
 ## 2026-09-30 kb init：校准集收割（harvest-calibration）
 - 各阶段的 `InitRecord.verdicts[rule_id]` 除 verdict/reasons/model/text_sha/page 外还保存**判定时的规则全文**

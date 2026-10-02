@@ -258,3 +258,32 @@ def test_strict_defaults_and_prompt_schema_remain_compatible(tmp_path):
     assert not DepthContext(root, ["core.py"], mode="lightweight").test_association(_feature(["core.py"]))["complete"]
     existing = bounded_existing({"page": "汉字\n" * 3000})
     assert sum(len(text.encode()) for text in existing.values()) <= 4000
+
+
+@pytest.mark.parametrize("round", [1, 2, 3, 8])
+def test_named_rejections_offer_actual_small_definitions_before_rotation(tmp_path, round):
+    root = tmp_path / "source"
+    caller, helper = "pkg/entry.py", "pkg/helper.py"
+    _write(root, caller, "from pkg.helper import prepare_workspace, Settings\ndef run():\n    return prepare_workspace()\n" + "# unrelated\n" * 300)
+    _write(root, helper, "# padding\n" * 700 + "def prepare_workspace(workspace_dir=None):\n    if workspace_dir is None:\n        workspace_dir = Path('workspace')\n    workspace_dir.mkdir(parents=True, exist_ok=True)\n    return workspace_dir\n\nclass Settings:\n    def get_bootstrap_env_path(self):\n        return self.workspace / '.env'\n")
+    index = _index(root, [caller, helper])
+    packet = _context(root, [caller, helper], index).build(_feature([caller]), "", [], facets=["flow", "failure_modes"],
+                 previous_review="prepare_workspace implementation was missing; cite get_bootstrap_env_path() actual return",
+                 evidence_round=round, limit=4000)
+    windows = packet["files"]
+    assert any("def prepare_workspace" in "\n".join(window["text"]) and "workspace_dir.mkdir" in "\n".join(window["text"]) for window in windows)
+    assert any("def get_bootstrap_env_path" in "\n".join(window["text"]) and "self.workspace / '.env'" in "\n".join(window["text"]) for window in windows)
+    assert packet["source_bytes"] <= 4000
+
+
+def test_lightweight_preserves_complete_guard_signature_and_assertion_windows(tmp_path):
+    root = tmp_path / "source"
+    source, test = "pkg/core.py", "tests/test_core.py"
+    _write(root, source, "def send(timeout=30, destroyed=False):\n    if destroyed:\n        return None\n    if timeout <= 0:\n        raise ValueError('timeout')\n    return timeout\n")
+    _write(root, test, "from pkg.core import send\ndef test_destroyed_guard():\n    actual = send(timeout=30, destroyed=True)\n    assert actual is None\n")
+    index = _index(root, [source])
+    packet = _context(root, [source], index).build(_feature([source]), "", [], facets=["flow", "failure_modes", "validation"], limit=1400)
+    assert any(item["path"] == source and item["start"] == 1 and item["end"] == 6 for item in packet["files"])
+    assert any(item["path"] == test and item["start"] == 1 and item["end"] == 4 for item in packet["files"])
+    tiny = _context(root, [source], index).build(_feature([source]), "", [], facets=["flow"], limit=20)
+    assert not tiny["files"]  # skip an oversized branch instead of isolated hit lines

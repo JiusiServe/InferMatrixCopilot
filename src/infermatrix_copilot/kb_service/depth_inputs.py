@@ -105,6 +105,12 @@ expected result, explicitly marked NOT EXECUTED. Do not invent manual steps.
 Never say tests passed now. Static hints, filenames and bundle inputs alone do
 not establish assertions or runtime coverage. Cite the actual test/doc lines.
 
+Choose one complete visible local branch per facet. Title and body must preserve
+its guards, default conditions and local-return scope: returning 1 is not proof
+of a process exit code, and a configurable timeout default is not a hard bound.
+Do not turn helper names, test expectations or log messages into global behavior
+guarantees. Benefit/cost inferences must stay within the shown implementation.
+
 Keep each facet to one or two precise claims, normally 60-180 characters. Titles
 must carry the same qualifications as the body. Preserve exact setting names,
 defaults, guards and errors. Use the language sample for prose, English schema
@@ -785,9 +791,18 @@ class DepthContext:
                  for path in relevant}
         ranges, edges, flow_pairs, headers = [], [], [], {}
         repairs = list(requested_evidence)
+        if self.mode == "lightweight" and previous_review:
+            review = str(previous_review)
+            for path in relevant:
+                for definition in self._definitions(path):
+                    symbol = definition["symbol"].rsplit(".", 1)[-1]
+                    if re.search(r"(?<![\w$])" + re.escape(symbol) + r"(?![\w$])", review):
+                        repairs.append({"path": path, "start": definition["start"],
+                                        "end": min(definition["end"], definition["start"] + 39)})
         for match in re.finditer(r"([\w./-]+):L?(\d+)(?:[-:]L?(\d+))?", str(previous_review or "")):
             repairs.append({"path": match[1], "start": int(match[2]), "end": int(match[3] or match[2])})
         allowed = set(relevant) | set(tests["matched_files"])
+        repair_windows = []
         for repair in repairs:
             if not isinstance(repair, dict) or repair.get("path") not in allowed:
                 continue
@@ -795,6 +810,7 @@ class DepthContext:
             start, end = repair.get("start"), repair.get("end")
             if value and type(start) is int and type(end) is int and 1 <= start <= end <= len(value[0]):
                 ranges.append((10_000, repair["path"], start, end))
+                repair_windows.append((repair["path"], start, end))
         for path in relevant + tests["matched_files"]:
             value = self._file(path)
             if not value:
@@ -875,7 +891,7 @@ class DepthContext:
         caps = {True: int(quotas[True] * 0.80) if len(test_paths) > 1 else quotas[True],
                 False: quotas[False] // max(1, min(4, len(source)))}
 
-        def offer(spans, *, atomic=False):
+        def offer(spans, *, atomic=False, complete=False):
             nonlocal used
             if not atomic:
                 active = []
@@ -895,10 +911,23 @@ class DepthContext:
                        for path, start, end in spans for number in range(start, end + 1)
                        if (path, number) not in seen}
             size = sum(len(text.encode("utf-8")) for text in pending.values())
+            if complete:
+                by_file, by_kind, by_scope = {}, {True: 0, False: 0}, {True: 0, False: 0}
+                for (path, _), text in pending.items():
+                    amount = len(text.encode("utf-8"))
+                    by_file[path] = by_file.get(path, 0) + amount
+                    by_kind[path in test_paths] += amount
+                    if path not in test_paths:
+                        by_scope[path in source] += amount
+                if (used + size > limit or any(kind_used[kind] + amount > quotas[kind] for kind, amount in by_kind.items())
+                        or any(file_used.get(path, 0) + amount > caps[path in test_paths] for path, amount in by_file.items())
+                        or scope_used[True] + by_scope[True] > source_quota
+                        or scope_used[False] + by_scope[False] > support_quota):
+                    return
             if atomic and (size > quotas[False] // 3 or kind_used[False] + size > quotas[False]):
                 return
             items = list(pending.items())
-            if not atomic:
+            if not atomic and not complete:
                 def rank(item):
                     (path, number), text = item
                     hits = sum(bool(pattern.search(text)) for pattern in patterns)
@@ -922,6 +951,11 @@ class DepthContext:
                     scope_used[own] += size
                 seen.add((path, number))
 
+        if self.mode == "lightweight":
+            # Real rejection names are read before tier/tie rotation. These
+            # are bounded source windows, not formal runtime-call proofs.
+            for window in dict.fromkeys(repair_windows):
+                offer([window], complete=True)
         # One small complete, statically proved pair is more useful than a
         # truncated giant caller. Reserve it, then diversify by owner/file.
         for _, _, pair in sorted(flow_pairs, key=lambda item: (-item[0], -item[1], item[2])):
@@ -932,7 +966,7 @@ class DepthContext:
         for _, path, start, end in ordered:
             if limit - used < 3:
                 break
-            offer([(path, start, end)])
+            offer([(path, start, end)], complete=self.mode == "lightweight")
         files = []
         for path, numbered in selected.items():
             span = []
