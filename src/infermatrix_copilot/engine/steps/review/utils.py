@@ -636,7 +636,8 @@ def _render_review_md(output: dict, pr_state: str = "") -> str:
             entry += f"\n\nProposed change (not a ready patch): {suggestion}"
         lines.append(entry)
     parts = _review_summary_parts(output)
-    parts.append("\n\n".join(lines) if lines else output.get("summary", "No findings."))
+    parts.append("\n\n".join(lines) if lines else
+                 (output.get("summary") or "No actionable findings."))
     overflow = output.get("_review_overflow") or []
     if overflow:
         # findings the comment budget cut — one line each, so a real (often

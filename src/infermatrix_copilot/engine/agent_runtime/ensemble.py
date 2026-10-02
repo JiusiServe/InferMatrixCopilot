@@ -603,6 +603,15 @@ async def run_agent_step_ensemble(
                     kept[i]["severity"] = str(v["severity"])
         merged["summary"] = str(reduced.get("summary")
                                 or merged.get("summary") or "")
+        if merge_key == "review_comments":
+            # Later coverage passes need the selection decisions too. Raw
+            # findings alone can otherwise resurrect a concern the reducer
+            # already established was harmless or outside this change.
+            merged["_rejected_review_comments"] = [
+                {"candidate": candidates[i], "reason": str(v.get("why") or "")}
+                for i, v in by_i.items()
+                if str(v.get("action", "")).lower() == "drop"
+            ]
     else:
         merged["summary"] = (f"ensemble of {len(samples)} samples "
                              "(merge reduction failed; unverified union)")
