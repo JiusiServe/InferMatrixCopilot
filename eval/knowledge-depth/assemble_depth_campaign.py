@@ -197,7 +197,7 @@ def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
     features = {feature.id: feature for feature in policy.features}
     partitions = campaign.get("partitions")
     workers = campaign.get("workers")
-    if type(workers) is not int or not 1 <= workers <= 4 or not isinstance(partitions, dict) \
+    if type(workers) is not int or not 1 <= workers <= 13 or not isinstance(partitions, dict) \
             or set(partitions) != {str(n) for n in range(workers)} \
             or any(not isinstance(group, list) or any(not isinstance(f, str) for f in group) for group in partitions.values()):
         raise ValueError("invalid campaign worker partitions")

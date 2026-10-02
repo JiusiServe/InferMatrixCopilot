@@ -143,6 +143,20 @@ def test_assembly_preserves_old_body_metadata_and_overviews_with_distinct_hashes
     assert not any(feature.page in writes for feature in world.policy.features)
 
 
+def test_thirteen_worker_assembly_keeps_unique_ownership_and_full_policy(assembler, world):
+    world.campaign["workers"] = 13
+    for number in range(2, 13):
+        world.campaign["partitions"][str(number)] = []
+        record = {**world.records[0], "depth": {"accepted": {}, "features": {}}, "verdicts": {}}
+        _write(world.state, f"worker-{number}/init/demo/knowledge-deepen.json", json.dumps(record))
+        _write(world.state, f"worker-{number}/.worker.lock", "")
+    (world.state / "campaign.json").write_text(json.dumps(world.campaign))
+    report, _ = assembler.assemble(world.root, world.state, world.source)
+    assert report["workers"] == 13 and report["denominator"] == 14
+    assert report["new_receipt_bound_facets"] == 2
+    assert report["source_verified_facets"] == 3
+
+
 @pytest.mark.parametrize("key", ["pin", "kb_base_sha", "repo", "stage"])
 def test_checkpoint_identity_mismatch_fails(assembler, world, key):
     world.records[0][key] = "different"
