@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L230-L281, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L162-L188, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L156-L159, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/mode_matrix.py:L309-L326, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L119-L131, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L1-L19, "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/项目与会话管理.md:L130-L149", openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/system_tests/test_process_cli_session_runtime_live.py:L78-L142, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/system_tests/test_process_cli_session_runtime_live.py:L24-L31, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L94-L98]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L230-L281, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L162-L188, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L156-L159, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/mode_matrix.py:L309-L326, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L119-L131, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L1-L19, "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/项目与会话管理.md:L130-L149", openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/system_tests/test_process_cli_session_runtime_live.py:L78-L142, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/system_tests/test_process_cli_session_runtime_live.py:L24-L31, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L94-L98, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session_catalog.py:L211-L227, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session/coordinator.py:L763-L789, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/session/work_scheduler.py:L132-L152, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/runtime/service.py:L1120-L1140]
 feature: "projects-sessions"
 entry_points: ["jiuwenswarm/runtime/session_catalog.py", "jiuwenswarm/runtime/session_lifecycle.py"]
 source_globs: ["jiuwenswarm/runtime/session_catalog.py", "jiuwenswarm/runtime/session_lifecycle.py", "jiuwenswarm/runtime/session*.py"]
@@ -50,4 +50,33 @@ tests/system_tests/test_process_cli_session_runtime_live.py::test_process_cli_tw
 来源：[tests/system_tests/test_process_cli_session_runtime_live.py:L78–L142](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/system_tests/test_process_cli_session_runtime_live.py#L78-L142), [tests/system_tests/test_process_cli_session_runtime_live.py:L24–L31](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/system_tests/test_process_cli_session_runtime_live.py#L24-L31)
 
 <!-- kb:depth-proof {"evidence":[{"path":"tests/system_tests/test_process_cli_session_runtime_live.py","start":78,"end":142,"sha256":"fe0e8c48bcae7b6fb6609ecc6bee187904b2b4b4d141a94468b80456ff39a46d"},{"path":"tests/system_tests/test_process_cli_session_runtime_live.py","start":24,"end":31,"sha256":"c4fd4976697e8bb10ee9e3f6ccde3bcc1ac799a2860a16446b606de1d6b65186"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=projects-sessions facet=dependencies pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=234a4589188548aa8cd0d2490e112effe1324fc942775da200ddddbfe00f005f -->
+**协调器超时先抛错、无超时才关调度器；Runtime cancel_all 委托 AgentManager**
+协调器 close：timed_out 非空先抛 SessionCloseTimeoutError，否则才以 self._cancel_timeout 调 self._scheduler.close（默认 wait_timeout=5.0 被覆盖）；AgentRuntime.cancel_all_inflight_work 经 _closed 守卫（否则抛 RuntimeStateError）委托 _agent_manager 同名方法。
+
+来源：[jiuwenswarm/runtime/session/coordinator.py:L763–L789](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/runtime/session/coordinator.py#L763-L789), [jiuwenswarm/runtime/session/work_scheduler.py:L132–L152](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/runtime/session/work_scheduler.py#L132-L152), [jiuwenswarm/runtime/service.py:L1120–L1140](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/runtime/service.py#L1120-L1140)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":789,"path":"jiuwenswarm/runtime/session/coordinator.py","sha256":"5ffbf1698153d2bde82f88dcf157fc92e69ca7fb640e4c887e5350b282da26ef","start":763},{"end":152,"path":"jiuwenswarm/runtime/session/work_scheduler.py","sha256":"08a0349dee6291a1d562631836ffdb2be951de018099e0a2122c34cbaf888c34","start":132},{"end":1140,"path":"jiuwenswarm/runtime/service.py","sha256":"225dbab5a831d41cbe073be1b6b9df90f4388efb5405f24ea8f75f067ba120c7","start":1120}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=projects-sessions facet=failure_modes pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=4112a2b80176b9351cdc52fb8d92597821ce0d11f0cfd5ea8ec9b7a71ca24346 -->
+**get_session：非目录异常包装为 READ_FAILED，空元数据返回 None**
+在 `get_session` 中，`_read_session_metadata` 抛出的 `SessionCatalogError` 原样上抛；其余 `Exception` 被包装为 `SessionCatalogError("failed to read session", code="READ_FAILED")` 并以 `from None` 传播给调用方；若读到的 metadata 为空或非 Mapping，则返回 None 而不抛错。
+
+来源：[jiuwenswarm/runtime/session_catalog.py:L211–L227](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/runtime/session_catalog.py#L211-L227)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":227,"path":"jiuwenswarm/runtime/session_catalog.py","sha256":"c86d5b5ee0dc6f9972ed8e2d64964efeeed2d4e775bcf6cfff583eef3856d5b1","start":211}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=projects-sessions facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=43134f01c72f972cf02f15975cd68c758e049e12f81bc4c6ff64cca6cfbc444a -->
+**Coordinator.close 聚合各会话关闭异常但只抛 errors[0]；timed_out 非空时在调度器关闭前抛 SessionCloseTimeoutError**
+设计推断（非作者历史意图）：
+
+收益（推断）：单条 close_session 异常仅追加进 errors，循环继续关闭其余 record（772-779）；代价：无超时时只有 errors[0] 向上传播（788-789），timed_out 非空则 780-783 在 785 的 _scheduler.close 之前抛出，该分支跳过调度器关闭。
+
+来源：[jiuwenswarm/runtime/session/coordinator.py:L763–L789](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/runtime/session/coordinator.py#L763-L789)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":789,"path":"jiuwenswarm/runtime/session/coordinator.py","sha256":"5ffbf1698153d2bde82f88dcf157fc92e69ca7fb640e4c887e5350b282da26ef","start":763}],"trace":[]} -->
 <!-- /kb:depth -->

@@ -34,10 +34,32 @@ Cursor 用 slash 形式：
 /imdesign <目标 / issue / PR>
 /imcifix <issue 或 URL>
 /imupdate vllm-omni
+/imkbinit <仓库名>               # 初始化，或按要求拓宽/深化已有知识库
 ```
 
 `integrations/cursor/` 下另有 `imreview.md` / `imcifix.md` 两份提示词文件，
 供直接粘贴或自定义命令使用。
+
+## 初始化与深化知识
+
+`/imkbinit` 使用同一份 [init skill](../../../plugins/infermatrix-copilot/skills/imkbinit/SKILL.md)
+和原生 CLI。`kb widen` 补结构覆盖，`kb deepen` 选择独立的 `knowledge-deepen`
+阶段；普通 `kb init --stage deepen` 仍负责热点模块规则。项目文档与维护者笔记作为
+上下文，行为结论须对应固定源码版本。
+
+覆盖政策可声明 `semantic_depth: {per_facet_gt: 0.90}`：七个维度逐项严格超过 90%，
+且每个功能至少有一项认可知识。`supported` 表示正向证据，`verified_absent`
+表示已核验缺失并保留真实缺口，`unknown` 表示尚未认可；不存在测试不等于测试通过。
+达到门槛与填完所有缺口分别报告，遍历结束不能代替完成。
+
+用户明确要求不限次数订阅提取时，使用 `--unlimited-subscription`，设置
+`KB_GENERATOR=zcode:GLM-5.3:low` 和 `KB_JUDGE=codex:gpt-6-sol:medium`；两个通道
+都须通过订阅身份检查，该参数与 `--budget-usd` 冲突。不可自动转为 API
+计费或替换模型，未报告的真实费用保持未知。已有用户授权适用于后续发布与合并。
+
+交付前在包含全部候选变更的完整 checkout 中校验源码及原生认可记录，再检查检索、
+独立审查和 CI。检索仍最多注入两页、6,000 字符，区分已有维度与实际注入维度，
+按原有预算补读相关内容；不要把检索命中率表述为真实 PR 问题召回率。
 
 ## 一条 Cursor 特有的注意事项
 

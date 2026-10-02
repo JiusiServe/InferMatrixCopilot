@@ -263,6 +263,7 @@ class InitRuntime:
     upstream_remote: Callable[[str], str] | None = None   # full_name -> clone URL (tests)
     pull: Callable[[str, int], dict] | None = None        # PR lookup for pinned claims (tests)
     subscription_generator: bool = False
+    unlimited_subscription: bool = False
 
     @property
     def init_dir(self) -> Path:
@@ -320,9 +321,11 @@ def generate(rt: InitRuntime, budget: Budget, init, *, system: str, prompt: str,
     """One generator call, reserved first: threshold + one worst-case request.
     Raises ``PriceError`` (no price: nothing is dispatched), ``BudgetExhausted``
     or ``ModelUnavailable``."""
-    if rt.subscription_generator:
+    if rt.subscription_generator or rt.unlimited_subscription:
+        if rt.unlimited_subscription and rt.generator.fallback is not None:
+            raise ModelUnavailable("unlimited subscription generation must not configure a fallback", allow_fallback=False)
         if not rt.gateway.subscription_billing(rt.generator):
-            raise ModelUnavailable("subscription generator needs an authenticated subscription backend")
+            raise ModelUnavailable("subscription generator needs an authenticated subscription backend", allow_fallback=False)
         # No API spend threshold applies to this explicitly selected coding
         # subscription. Preserve unreported USD and token usage; subscription
         # fees are outside the stage's separate judge USD accounting.

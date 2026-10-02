@@ -55,3 +55,5 @@ sources: []
 - [绑定会话的心跳续跑任务：实现深读](feature-depth-heartbeat.md)
 - [SkillDev 创建、评测与打包边界：实现深读](feature-depth-skill-development.md)
 - [主动推荐、频率限制与主 Agent 交付：实现深读](feature-depth-proactive-recommendation.md)
+
+- [Skill 自演进：实现深读](feature-depth-skill-evolution.md)

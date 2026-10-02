@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L3514-L3536, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L3565-L3598, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L416-L433, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L384-L402, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L673-L707, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L3105-L3119, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L3121-L3126]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L3514-L3536, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L3565-L3598, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L416-L433, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L384-L402, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L673-L707, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L3105-L3119, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L3121-L3126, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L340-L381, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/instance_manager/config.py:L454-L497, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/desktop-electron-packaging.md:L29-L41, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/test_desktop_port_resolve.py:L223-L252, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/desktop/desktop_app.py:L67-L85]
 feature: "desktop"
 entry_points: ["jiuwenswarm/channels/desktop/desktop_app.py"]
 source_globs: ["jiuwenswarm/channels/desktop/desktop_app.py", "jiuwenswarm/channels/desktop/*"]
@@ -48,4 +48,31 @@ _clear_webview_http_cache 的文档说明：过去每次启动整目录清空 st
 来源：[jiuwenswarm/channels/desktop/desktop_app.py:L3105–L3119](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/desktop/desktop_app.py#L3105-L3119), [jiuwenswarm/channels/desktop/desktop_app.py:L3121–L3126](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/desktop/desktop_app.py#L3121-L3126)
 
 <!-- kb:depth-proof {"evidence":[{"path":"jiuwenswarm/channels/desktop/desktop_app.py","start":3105,"end":3119,"sha256":"ca4ad336663c03b36a2f9dbe467d8f7fb47da72a8cba7df0b280f7677a259252"},{"path":"jiuwenswarm/channels/desktop/desktop_app.py","start":3121,"end":3126,"sha256":"d8ef806aa2100fbd1fa18d2afded8fdce022fc03552299f0800b652b5442dcd6"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=desktop facet=dependencies pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=2932f89fa29f416b557882325edb3e9f39d9c0715144ae0e78c81ccd27c08ee3 -->
+**桌面端口解析复用 instance_manager 的端口组扫描**
+resolve_desktop_ports（desktop_app.py 354-358 行）直接调用 instance_manager 的 find_available_ports(base_index=0)：每个 index 由 calculate_instance_ports 得到整组端口，须全部 is_port_available 且不在 exclude_ports 才采用，桌面因此与多实例服务共用 base + index×1000 的同一分配规则；docstring 声明结果仅存在于本次进程内存/子进程 env（no config persistence），Electron 壳文档亦把端口模型标注为与 Python 桌面完全一致、来源即 instance_manager/config.py。
+
+来源：[jiuwenswarm/channels/desktop/desktop_app.py:L340–L381](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/desktop/desktop_app.py#L340-L381), [jiuwenswarm/instance_manager/config.py:L454–L497](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/instance_manager/config.py#L454-L497), [docs/zh/desktop-electron-packaging.md:L29–L41](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/desktop-electron-packaging.md#L29-L41)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":381,"path":"jiuwenswarm/channels/desktop/desktop_app.py","sha256":"24af54762da619b3c0dc0d4260e5b60ad1337140229b6239aadb74157dc45174","start":340},{"end":497,"path":"jiuwenswarm/instance_manager/config.py","sha256":"932b053300d6b18c688d53657412f9b3d6565d70cd77996d150cd850cdfa5e01","start":454},{"end":41,"path":"docs/zh/desktop-electron-packaging.md","sha256":"38ab54535a1a3dc9328a5acdbbdc4af5a96184ebb15ddd81d3180ef785776de8","start":29}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=desktop facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=1ff9b611a090d4f9fd35fde2d2122bfcc95c2e0eab2ea95558c41fb82f2cfb58 -->
+**resolve_desktop_ports 的端口组测试断言**
+tests/unit_tests/test_desktop_port_resolve.py:223-252 三个用例均 monkeypatch desktop_app.find_available_ports 后断言 resolve_desktop_ports：默认组等于 calculate_instance_ports(0) 且 frontend/web 与 BASE_PORTS 一致；回退组 index=1 时端口为 BASE_PORTS+1000；返回 None 时抛 RuntimeError 匹配 'No available desktop port group'。此为测试断言的静态记录，不证明当前已运行通过。
+
+来源：[tests/unit_tests/test_desktop_port_resolve.py:L223–L252](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/test_desktop_port_resolve.py#L223-L252)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":252,"path":"tests/unit_tests/test_desktop_port_resolve.py","sha256":"6219d27bbefa463eaa1223addefbdf678627f7f7613122075da9f3a7690ff2d3","start":223}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=desktop facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=f7730a503659503a96cd7a85ec1c65348a4029f190cdd271aadc51cb67fc4e95 -->
+**desktop_app.main：desktop_install_update 为假（getattr 默认 False）分支的启动路径与收尾**
+desktop_install_update 为假时，main() 先执行 _cleanup_stale_update_artifacts() 与 _setup_tui_path()，再调用 resolve_desktop_ports()；若抛 RuntimeError 仅记日志并 raise SystemExit(1)；成功后以 FRONTEND_HOST=127.0.0.1 构造 DesktopRuntime 并 run()，finally 中调用 runtime.shutdown()。
+
+来源：[jiuwenswarm/channels/desktop/desktop_app.py:L3565–L3598](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/desktop/desktop_app.py#L3565-L3598), [jiuwenswarm/channels/desktop/desktop_app.py:L67–L85](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/desktop/desktop_app.py#L67-L85)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":3598,"path":"jiuwenswarm/channels/desktop/desktop_app.py","sha256":"64367dd549d0d83d2a1a9cb911bb7957d1fe03ed282f24a9a27ddf03070c2b08","start":3565},{"end":85,"path":"jiuwenswarm/channels/desktop/desktop_app.py","sha256":"e6aac00e59a7536bb5775c62b5d9b7bd9f94d454f95f84ce2fac36dd89ecac3d","start":67}],"trace":[]} -->
 <!-- /kb:depth -->

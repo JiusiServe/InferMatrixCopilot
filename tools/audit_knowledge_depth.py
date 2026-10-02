@@ -22,6 +22,10 @@ def main() -> int:
     parser.add_argument("--pin", required=True)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--report", type=Path)
+    parser.add_argument("--approval-report", type=Path, action="append",
+                        help="Repeatable native all-yes block binding report, outside product knowledge")
+    parser.add_argument("--require-approvals", action="store_true",
+                        help="Fail unless every recognized block has a matching native all-yes approval")
     args = parser.parse_args()
     current = subprocess.check_output(["git", "-C", str(args.upstream), "rev-parse", "HEAD"], text=True).strip()
     if current != args.pin or len(args.pin) != 40:
@@ -35,13 +39,24 @@ def main() -> int:
     repo_dir = manifest["knowledge"]["repo_subdir"]
     policy_file = args.root / policy_path(args.repo)
     policy = load_policy(policy_file.read_text(), repo_dir)
+    if args.require_approvals and not args.approval_report:
+        parser.error("--require-approvals requires at least one --approval-report")
+    approvals = [] if args.approval_report else None
+    for path in args.approval_report or []:
+        data = json.loads(path.read_text())
+        rows = data.get("approvals", data.get("native_execution", {}).get("approvals")) if isinstance(data, dict) else None
+        if not isinstance(rows, list):
+            parser.error("each approval report must contain an approvals list")
+        approvals.extend(rows)
     head = {p.relative_to(knowledge).as_posix(): p.read_text() for p in (knowledge / repo_dir).rglob("*.md")}
-    report = {"semantic_depth": audit_depth(head, args.upstream, policy, args.pin),
+    report = {"semantic_depth": audit_depth(head, args.upstream, policy, args.pin, approvals=approvals),
               "breadth": audit_coverage(head, args.upstream, policy, full_name=manifest["repo"]["full_name"], pin=args.pin),
               "provenance": {
                   "policy_sha256": hashlib.sha256(policy_file.read_bytes()).hexdigest(),
                   "knowledge_sha256": hashlib.sha256(json.dumps(head, ensure_ascii=False, sort_keys=True).encode()).hexdigest(),
                   "upstream_tracked_files_clean": True,
+                  "native_approval_reports": [{"name": p.name, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
+                                              for p in args.approval_report or []],
                   "reproduce": f"PYTHONPATH=src python tools/audit_knowledge_depth.py --repo {args.repo} "
                                f"--upstream /path/to/pinned/{args.repo} --pin {args.pin}"}}
     if args.report:
@@ -49,9 +64,14 @@ def main() -> int:
         args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     depth = report["semantic_depth"]
     print(json.dumps({"depth": {k: depth[k] for k in ("complete_features", "total_features", "covered_facets", "total_facets")},
+                      "recognized_facets": depth["recognized_facets"], "facet_counts": depth["facet_counts"],
+                      "semantic_depth_target_met": depth["target_met"],
+                      "approval_bindings_checked": depth["approval_bindings_checked"],
+                      "approval_binding_problems": depth["approval_binding_problems"],
                       "production_files_with_semantic_evidence": len(depth["production_files_with_semantic_evidence"]),
                       "breadth_targets_met": report["breadth"]["met"], "problems": depth["problems"]}, indent=2))
-    return 1 if depth["problems"] else 0
+    return 1 if depth["problems"] or depth["approval_binding_problems"] or not depth["target_met"] \
+        or not report["breadth"]["met"] else 0
 
 
 if __name__ == "__main__":

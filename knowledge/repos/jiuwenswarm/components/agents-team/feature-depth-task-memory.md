@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L204-L269, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L104-L194, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/config.py:L237-L244, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L37-L39, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L1751-L1760, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L150-L194, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L266-L269]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L204-L269, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L104-L194, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/config.py:L237-L244, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L37-L39, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/utils.py:L1751-L1760, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L150-L194, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L266-L269, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L96-L101, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L121-L146, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L150-L158, "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/经验记忆.md:L12-L22", openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/task_tools.py:L175-L187, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/memory/test_external_memory_config.py:L117-L126, "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/经验记忆.md:L7-L22", "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/经验记忆.md:L28-L38"]
 feature: "task-memory"
 entry_points: ["jiuwenswarm/agents/harness/common/tools/task_tools.py"]
 source_globs: ["jiuwenswarm/agents/harness/common/tools/task_tools.py", "jiuwenswarm/agents/harness/common/memory/*"]
@@ -50,4 +50,35 @@ _get_service 中若 api_key、llm_model 或 embedding_model 任一缺失，记�
 来源：[jiuwenswarm/agents/harness/common/tools/task_tools.py:L150–L194](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/task_tools.py#L150-L194), [jiuwenswarm/agents/harness/common/tools/task_tools.py:L266–L269](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/task_tools.py#L266-L269)
 
 <!-- kb:depth-proof {"evidence":[{"path":"jiuwenswarm/agents/harness/common/tools/task_tools.py","start":150,"end":194,"sha256":"992fcb6fdc7b2aab7d0c6aebcd85488b7ca48ea5f85214426573d5e6db43d097"},{"path":"jiuwenswarm/agents/harness/common/tools/task_tools.py","start":266,"end":269,"sha256":"6027115973baf703e79d9c047aacf5f6a49da68dbcca6be6aa3785d1dc26420e"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=task-memory facet=configuration pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=dc281445d0a60b74c89396a50bde4b90f1ed0234b498e897971b04cf83569139 -->
+**task_memory.enabled 默认关闭，模型与凭据经 YAML→专用环境变量→embed 回退链解析，缺项时停用服务**
+_is_task_memory_enabled() 只读取 get_config()['task_memory']['enabled']，未设置时返回 False；文档记载 enabled: true 后 Agent 获得三个经验工具。_get_service() 构造服务时，llm_model/embedding_model/api_key/api_base 依次取自 YAML task_memory 小节、TASK_MEMORY_* 环境变量、embed 小节或 EMBED_*/通用环境变量；api_key、llm_model 或 embedding_model 任一无法解析时记录「task tools will be disabled」警告并返回 None。
+
+来源：[jiuwenswarm/agents/harness/common/tools/task_tools.py:L96–L101](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/task_tools.py#L96-L101), [jiuwenswarm/agents/harness/common/tools/task_tools.py:L121–L146](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/task_tools.py#L121-L146), [jiuwenswarm/agents/harness/common/tools/task_tools.py:L150–L158](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/task_tools.py#L150-L158), [docs/zh/经验记忆.md:L12–L22](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/%E7%BB%8F%E9%AA%8C%E8%AE%B0%E5%BF%86.md#L12-L22)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":101,"path":"jiuwenswarm/agents/harness/common/tools/task_tools.py","sha256":"6cafbac8a7c6f04a6a8149654e04e1cc2a39cd46f7d91edca214d9252dd9809d","start":96},{"end":146,"path":"jiuwenswarm/agents/harness/common/tools/task_tools.py","sha256":"0a5f07f0ad78329a56edc9bb60d48f06c381dd50ba00e6dab5b2283059586daf","start":121},{"end":158,"path":"jiuwenswarm/agents/harness/common/tools/task_tools.py","sha256":"0738db826c10f0338041aab03b7e1aa0b881d332c2cdd7faf0a619db695f1ace","start":150},{"end":22,"path":"docs/zh/经验记忆.md","sha256":"d67263b43fbdec69b0877978469241ac107d3b1a2f6f15cfc53c9325e0bcb71c","start":12}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=task-memory facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=2487c7581f51e2875972225f37c85aee906dbe5cdb6e5452c07592993c6bc08a -->
+**仅当 api_base 为真时临时覆写进程环境变量 API_BASE，TaskMemoryService 构造返回后才恢复**
+设计推断（非作者历史意图）：
+
+该分支在 api_base 为真时覆写 os.environ["API_BASE"]，仅在 TaskMemoryService(**kwargs) 返回后按原值恢复或删除；同进程内此窗口中的其他环境变量读取者可能看到被覆写的值（代码注释自述构造器无 api_base 参数、借环境变量传递；收益/代价权衡为我的推断）。
+
+来源：[jiuwenswarm/agents/harness/common/tools/task_tools.py:L175–L187](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/task_tools.py#L175-L187)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":187,"path":"jiuwenswarm/agents/harness/common/tools/task_tools.py","sha256":"06620dfcd91439e496ab071a092ce196961f7b1dec63ff28742f7309577e5b3a","start":175}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=task-memory facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=08333f31e632c4223b75d90626182a0d16ef173f151e194a84a07201bb5b3a6a -->
+**task_memory 启用与 experience_retrieve 调用的文档化验收（本轮未执行）**
+文档中的人工验收步骤（本轮未执行）：
+
+文档化人工验收步骤（NOT EXECUTED）：在 config/config.yaml 将 task_memory.enabled 设为 true（文档标注为总开关），文档称 Agent 将获得三个工具；再按文档建议在任务开始时以 query 描述当前任务或问题调用 experience_retrieve，检查返回的 memory_string（可读文本）与 retrieved_memory（结构化列表）。不据此声称检索必命中或服务已运行。
+
+来源：[docs/zh/经验记忆.md:L7–L22](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/%E7%BB%8F%E9%AA%8C%E8%AE%B0%E5%BF%86.md#L7-L22), [docs/zh/经验记忆.md:L28–L38](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/%E7%BB%8F%E9%AA%8C%E8%AE%B0%E5%BF%86.md#L28-L38)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":22,"path":"docs/zh/经验记忆.md","sha256":"e92d53e20efff560b7ecc5d7720f0ca83373c70b738f71abc5963f57e6b2c08a","start":7},{"end":38,"path":"docs/zh/经验记忆.md","sha256":"f475a15809bd7dc4c645329949e0fc43cd82fc2d62c3ee4803b80e46d1e6bfd2","start":28}],"trace":[],"validation_kind":"documented_manual"} -->
 <!-- /kb:depth -->

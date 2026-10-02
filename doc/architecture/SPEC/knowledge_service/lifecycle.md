@@ -2,6 +2,9 @@
 
 <!-- verified-against: 2026-10-02 -->
 
+深度验证入口缺失证书的当前检测器为 `static-test-association-v2`；解析、证书工厂和
+检索形状校验共用 `DEPTH_ABSENCE_DETECTOR`，算法升级不复用旧检测器身份。
+
 `LOC ~330 · 规则页数据模型与生命周期尾注 · refactor-status: stable`
 
 ## 职责
@@ -14,6 +17,8 @@ reason、evidence、supersedes、superseded_by、protected）；无尾注即 act
 `DEPTH_FACETS`、`DEPTH_BLOCK` 和 `depth_sections` 是 init/audit 与检索共享的深读数据格式。
 后者只返回正文哈希完整、facet 唯一且 proof evidence 形状合法的段落，隐藏 proof 注释，
 不重新读取上游证据。固定源码验证仍由 `kb_service.knowledge_depth` 负责。
+proof 的 basis 缺省 supported；verified_absent 要有形状完整的版本化 certificate，
+返回结果显式携带 basis 与缺失范围。形状校验不能替代 source audit 的完整重放。
 `Page.parse/render`、`Page.rules/rule/replace_section/append_section`、
 `Page.sources/with_sources`（按页面原风格写 flow 或 block 列表）、`Section.footer/
 with_footer/body_without_footer/content_sha256/citations`、`Footer.parse/render/check`、

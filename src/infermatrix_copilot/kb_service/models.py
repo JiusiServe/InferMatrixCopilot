@@ -79,6 +79,8 @@ class ModelReply:
     usage: dict
     seconds: float
     cost_usd: float | None = None  # the transport's reported spend (None: unknown)
+    trace_id: str = ""
+    reply_sha256: str = ""
 
 
 def parse_json_object(text: str) -> dict:
@@ -103,11 +105,16 @@ class ModelGateway:
     transports. ``transport_factory(provider_id)`` is injectable for tests."""
 
     def __init__(self, settings, *, transport_factory: Callable[[str], Any] | None = None,
-                 recorder: Callable[[dict], None] | None = None):
+                 recorder: Callable[[dict], None] | None = None, zcode_pacer=None):
         self._settings = settings
         self._factory = transport_factory
         self._recorder = recorder
         self._subscription_transports: dict[str, Any] = {}
+        self._zcode_pacer = zcode_pacer
+
+    def configure_zcode_pacing(self, pacer):
+        """Only the explicit native campaign configures shared dispatch pacing."""
+        self._zcode_pacer = pacer
 
     def _transport(self, provider: str):
         if self._factory is not None:
@@ -163,7 +170,35 @@ class ModelGateway:
         started = time.time()
         identity = {"role": role.name, "requested": role.label(), "provider": role.provider,
                     "model": role.model, "effort": role.effort, "fallback_from": fallback_from}
+        payload = {"system": system if record_payload else "", "prompt": prompt if record_payload else ""}
+        begin = getattr(self._recorder, "begin_call", None)
+        archive = begin({**identity, **payload}) if callable(begin) else None
+        native_events: list[dict] = []
+        transport = None
+        pacer = self._zcode_pacer if role.provider == "zcode" else None
+        pacing_ticket = None
+
+        def event_sink(event):
+            native_events.append(event)
+            if archive is not None and record_payload:
+                archive.event(event)
+            if pacer is not None and pacing_ticket is not None:
+                pacer.observe(pacing_ticket, event, event_sink)
+
+        def record_call(entry, status):
+            if archive is not None:
+                entry.update(archive.payload())
+            receipt = self._recorder(entry) if self._recorder else None
+            if archive is not None:
+                archive.finish(receipt if isinstance(receipt, dict) else None, entry, status=status)
+            return receipt
+
         try:
+            if self._zcode_pacer is not None and self._zcode_pacer.stop_file and self._zcode_pacer.stop_file.exists():
+                event_sink({"type": "native.throttle.stopped", "payload": {"at": time.time(), "before_dispatch": True}})
+                canceled = ModelUnavailable("campaign stop requested before native dispatch", allow_fallback=False)
+                canceled.pre_dispatch_cancelled = True
+                raise canceled
             transport = self._subscription_transports.pop(role.label(), None)
             if transport is None:
                 transport = self._transport(role.provider)
@@ -175,17 +210,41 @@ class ModelGateway:
                     raise ModelUnavailable(f"{role.provider} cannot stop a call at a spend threshold",
                                            allow_fallback=False)
                 cap = {"max_budget_usd": max_budget_usd}
+            if (archive is not None or pacer is not None) and getattr(transport, "supports_native_events", False):
+                cap["native_event_sink"] = event_sink
+            if pacer is not None:
+                if not getattr(transport, "supports_native_events", False):
+                    raise ModelUnavailable("paced Zcode dispatch requires native error events", allow_fallback=False)
+                from .depth_pacing import PacingStopped
+                try:
+                    pacing_ticket = pacer.acquire(event_sink)
+                    if pacer.stop_file and pacer.stop_file.exists():
+                        event_sink({"type": "native.throttle.stopped", "payload": {"at": time.time(), "before_dispatch": True}})
+                        raise PacingStopped("campaign stop requested before Zcode dispatch")
+                except PacingStopped as exc:
+                    canceled = ModelUnavailable(str(exc), allow_fallback=False)
+                    canceled.pre_dispatch_cancelled = True
+                    raise canceled from exc
             reply = transport.complete(
                 system=system, messages=[{"role": "user", "content": prompt}],
                 model=role.model, effort=role.effort, role=role.name, **cap)
-        except Exception as exc:  # the transport's own failure modes
-            if self._recorder is not None:
-                self._recorder({**identity, "served_model": "", "stop_reason": "", "usage": {},
-                                "cost_usd": None, "max_budget_usd": max_budget_usd,
+            if pacer is not None:
+                pacer.finish(pacing_ticket, success=True, sink=event_sink)
+        except BaseException as exc:  # preserve partial native events on interruption too
+            snapshot = getattr(transport, "native_snapshot", None)
+            partial = snapshot(native_events) if callable(snapshot) else {}
+            reported_cost = (partial.get("usage") or {}).get("cost_usd")
+            partial_cost = float(reported_cost) if isinstance(reported_cost, (int, float)) and not isinstance(reported_cost, bool) else None
+            record_call({**identity, "served_model": partial.get("served_model", ""),
+                                "stop_reason": "canceled_before_dispatch" if getattr(exc, "pre_dispatch_cancelled", False) else "", "usage": partial.get("usage") or {},
+                                "cost_usd": partial_cost, "max_budget_usd": max_budget_usd,
                                 "seconds": round(time.time() - started, 3),
-                                "system": system if record_payload else "",
-                                "prompt": prompt if record_payload else "", "reply": "",
-                                "error": str(exc)[:2000] if record_payload else "transport failed (payload omitted)"})
+                                **payload, "reply": partial.get("text", "") if record_payload else "",
+                                "error": (str(exc) or type(exc).__name__)[:2000] if record_payload else "transport failed (payload omitted)"},
+                        "canceled_before_dispatch" if getattr(exc, "pre_dispatch_cancelled", False)
+                        else "failed" if isinstance(exc, Exception) else "interrupted")
+            if not isinstance(exc, Exception):
+                raise
             if isinstance(exc, ModelUnavailable):
                 raise
             raise ModelUnavailable(f"{role.label()} failed: {exc}") from exc
@@ -223,11 +282,19 @@ class ModelGateway:
                                                allow_fallback=False) from exc
             except ModelUnavailable as exc:
                 failure = exc
-        if self._recorder is not None:
-            self._recorder({**record, "error": str(failure) if failure else ""})
+            except BaseException as exc:
+                # A native response may already have returned when the caller
+                # interrupts validation. Preserve that response and its usage.
+                record_call({**record, "error": (str(exc) or type(exc).__name__)[:2000]},
+                            "failed" if isinstance(exc, Exception) else "interrupted")
+                raise
+        receipt = record_call({**record, "error": str(failure) if failure else ""},
+                              "failed" if failure else "complete")
         if failure is not None:
             raise failure
-        return ModelReply(role, data, text, record["served_model"], usage, seconds, cost_usd)
+        receipt = receipt if isinstance(receipt, dict) else {}
+        return ModelReply(role, data, text, record["served_model"], usage, seconds, cost_usd,
+                          receipt.get("id", ""), receipt.get("outputs", {}).get("reply", "").removeprefix("sha256:"))
 
     def subscription_billing(self, role: ModelRole) -> bool:
         """Bind the authenticated subscription backend to the next dispatch."""

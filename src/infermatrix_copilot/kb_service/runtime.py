@@ -120,12 +120,13 @@ def trace_recorder(traces):
     """Every model call (inputs, outputs, usage, failure) as a trace/1
     ``model_call`` record, under the caller's bound trace context."""
 
-    def record(entry: dict) -> None:
+    def record(entry: dict) -> dict | None:
         try:
-            traces.append(
+            return traces.append(
                 "model_call",
                 inputs={"system": entry["system"], "prompt": entry["prompt"]},
-                outputs={"reply": entry["reply"]},
+                outputs={"reply": entry["reply"],
+                         **({"native_events": entry["native_events"]} if "native_events" in entry else {})},
                 model={k: entry.get(k, "") for k in ("role", "provider", "model", "effort", "served_model")},
                 usage=entry.get("usage") or {}, seconds=entry.get("seconds"),
                 # spend: the requested stop threshold and the reported cost
@@ -133,11 +134,13 @@ def trace_recorder(traces):
                 result={"stop_reason": entry.get("stop_reason", ""),
                         "max_budget_usd": entry.get("max_budget_usd"),
                         "cost_usd": entry.get("cost_usd"),
+                        **({k: entry[k] for k in ("native_attempt_id", "native_session_ids") if k in entry}),
                         **({"fallback_from": entry["fallback_from"]} if entry.get("fallback_from") else {})},
                 error=entry.get("error", ""))
         except Exception:  # noqa: BLE001 - tracing never breaks a model call
             pass
 
+    record.begin_call = traces.begin_call
     return record
 
 

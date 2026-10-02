@@ -1,6 +1,6 @@
 ---
 name: imkbinit
-description: Bootstrap a repository's InferMatrixCopilot knowledge base with `kb init`, one reviewed stage at a time (skeleton, modules, knowledge, deepen, pr-history, harvest-calibration). Use when the user invokes /imkbinit or $imkbinit, asks to initialise or onboard a repository's knowledge base, or wants the next kb init stage run.
+description: Bootstrap a repository's InferMatrixCopilot knowledge base with `kb init`, one reviewed stage at a time (skeleton, modules, knowledge, deepen, pr-history, harvest-calibration). Use when the user invokes /imkbinit or $imkbinit, asks to initialise or onboard a repository's knowledge base, or wants the next kb init stage or an existing knowledge base widened or deepened.
 ---
 
 # InferMatrix knowledge-base init
@@ -40,6 +40,10 @@ This skill only drives the `kb init` CLI and reports what it did. The CLI owns
 every decision: what to generate, the checks, the budget, publishing. Never
 edit the generated pages, adapters, or stage records yourself.
 
+The user's explicit instructions for batch scope, models, publication and merging
+override the default one-stage stopping boundary below. Reuse authorization
+already given; CLI checks and publication gates still apply.
+
 ## 1. Resolve the repository
 
 `kb init` takes the knowledge repository name: the `repos/<name>` in an
@@ -66,6 +70,8 @@ Which stages count as done depends on the mode of this invocation:
   next rather than skipped.
 - **Dry run** (the default): a stage is also done when its record exists with
   `status: dry_run`, so stages can be previewed end to end before any PR.
+  A semantic-depth record with `status: partial` or `depth.target_met: false`
+  is unfinished. Visiting every feature does not establish semantic completion.
 
 The next stage is the first one that isn't done. If an earlier stage's PR is
 open, stop and say it's waiting for the owner's review. If a record says
@@ -75,6 +81,13 @@ For an explicit knowledge rerun of an already merged KB with no local
 skeleton/modules records, use `--stage knowledge --from-existing`. The CLI
 checks the merged index and every owner route. Existing stage records still
 keep their review and merge gates; never manufacture records to skip them.
+
+For implementation knowledge in an existing KB, use the independent stage
+`knowledge-deepen` (`kb deepen <repo>` is its `--from-existing` alias).
+It is distinct from the ordinary `deepen` stage that generates hot-module rules.
+`kb widen <repo>` similarly selects `knowledge --from-existing`.
+Use a new state directory when the knowledge baseline or source pin changes;
+retain prior native records and accepted blocks as audit evidence.
 
 ## 3. Run it
 
@@ -90,6 +103,21 @@ The CLI pins and checks the served model. It rejects custom API providers in
 this mode; default API spend-cap checks remain in place. Report generator USD
 as unreported and subscription fees outside stage USD accounting, alongside
 token usage and the judge's accounted spend. Never claim a measured zero cost.
+
+When the user explicitly selects uncapped subscription extraction, the independent
+`knowledge-deepen` stage and `kb deepen` accept `--unlimited-subscription`:
+
+```text
+KB_GENERATOR=zcode:GLM-5.3:low KB_JUDGE=codex:gpt-6-sol:medium <imc> kb deepen <repo> --pin <source-sha> --subscription-generator --unlimited-subscription --dry-run
+```
+
+The generator must be Zcode GLM-5.3 and the independent judge must be Codex;
+both must be authenticated subscription roles. Other model protocols fail
+before authentication or dispatch. This mode conflicts with `--budget-usd`, removes the stage's fixed
+accounting ceiling, and preserves call, served-model and token receipts. It does
+not authorize API spending or fallback to another provider; unavailable
+subscription roles stop with their reason. Actual USD remains unknown when the
+provider does not report it. Keep the requested source pin and reviewed policy.
 
 Only publish when the user explicitly asks (`--publish`, "open the PR").
 Publishing needs `ALLOW_PUSH=1`, `ALLOW_POST=1` and
@@ -128,6 +156,34 @@ What each stage opens:
   policy on explanatory feature pages, preserving prose and source proofs.
   These hints let Direct and Agent review retrieve relevant knowledge automatically;
   they do not count toward structural or behavioral coverage.
+- Independent `knowledge-deepen`: fill a worklist of feature × semantic facet,
+  preserving existing approved blocks and their proofs. Retrieve facet-specific
+  implementation and associated tests across the full reviewed source scope;
+  use project/owner docs as context and pinned code to resolve disagreements.
+  Retries address the recorded refusal or missing evidence rather than resending
+  the same slices. Omitted, invalid, rejected and unjudged facets stay unknown.
+  Optional `semantic_depth: {per_facet_gt: 0.90}` in the coverage policy requires
+  every facet's recognized feature ratio to be strictly greater than 0.90,
+  and every feature to have recognized depth. For 79 features this means at
+  least 72 recognized items in each of seven dimensions, with denominator 553.
+  An overall average cannot replace per-row acceptance. Keep breadth and all
+  first-party production-file coverage separate.
+  Recognition has two admitted bases: `supported` is source-backed positive
+  knowledge; `verified_absent` is a replayable deterministic absence certificate
+  plus the same three-criterion independent Codex approval. Existing blocks
+  default to `supported`. Absence keeps a visible capability/test gap, never
+  claims tests passed or that an implementation is verified. A partial search,
+  parse/read error or unresolved association remains `unknown`; never shrink
+  the denominator or manufacture absence. Report all three categories separately.
+  The tracked test inventory includes every policy-supported first-party code
+  suffix, even when a feature uses only one source language. Unsupported syntax
+  or association checkers remain unknown; cross-language tests cannot be omitted
+  to certify absence (`static-test-association-v2`).
+  The target gate and processing the full gap worklist are distinct: retain
+  `target_met`, `all_resolved` and each slot's reason. An unmet required target
+  leaves a resumable partial preview and blocks publication. Reaching the
+  threshold does not mean every gap is filled; continue the authorized worklist
+  and report genuine remaining blockers.
 - `deepen`: code rules for the hot modules, plus the adapter flip to
   `enabled: true, mode: shadow`.
 - `pr-history`: reads the latest 1,000 merged upstream PRs as of the upstream
@@ -167,19 +223,34 @@ have merged. Once a history record exists it must finish before harvest.
 
 ## 4. Report
 
-After `knowledge` or `knowledge-deepen` has merged, verify retrieval in the complete
-InferMatrixCopilot checkout (not a partial dry-run delta):
+Before publishing a completed knowledge batch, audit the complete candidate
+checkout containing the baseline plus all accepted changes (a partial dry-run
+delta is insufficient). Preserve its pinned source proof and native generator/
+judge receipts, then run:
 
 ```text
+PYTHONPATH=src python tools/audit_knowledge_depth.py --repo <repo> --upstream <pinned-source-checkout> --pin <source-sha> --approval-report <native-approval-report.json> --require-approvals
 PYTHONPATH=src python tools/audit_review_retrieval.py --repo <repo> --report <eval-report.json>
 ```
 
-The offline audit checks every catalog feature using description plus entry points,
-and separately measures paths-only ambiguity. It must return bounded prose, including
-approved depth where available; explicit missing facets remain gaps. Save reports
-outside `knowledge/`. Report delivery results separately from breadth/depth and real
-PR quality; this audit does not establish bug recall or revalidate the PR head.
-If no complete merged checkout is available yet, report retrieval as unverified.
+Repeat `--approval-report` for earlier and current native approval batches when
+needed. Validate source spans and approval bindings, rather than treating a
+structurally valid marker or a visited worklist as approval. The required semantic policy uses
+one target predicate in init, audit and publication.
+
+The retrieval audit checks every catalog feature using description plus entry
+points, and separately measures paths-only ambiguity. Retrieval remains bounded
+to two documents and 6,000 content characters. Distinguish all `available_facets`
+from actually delivered `included_facets`, `not_injected_facets`, and their bases;
+read the remaining relevant facets through the existing bounded doc tools.
+`verified_gaps` describe absent evidence, not tests passed; missing facets remain
+unknown. Save reports outside `knowledge/` and report retrieval separately from
+breadth/depth and actual PR quality. This audit does not establish bug recall.
+
+The delivery order is breadth review, targeted deepening, source/native-proof
+audit, retrieval acceptance, independent full-change review, CI, then an authorized
+merge. Report checks that could not run as unverified. Never label threshold
+acceptance as complete gap closure when unknown slots remain.
 
 Read the stage record and the PR body (`PR_BODY.md` under `pr.dry_run_dir` for
 a dry run, otherwise the opened PR). Summarise:
@@ -191,7 +262,7 @@ a dry run, otherwise the opened PR). Summarise:
 - the "needs human edit" checklist
 - spend against the budget, and any `unfinished` units
 
-## 5. Stop
+## 5. Default stopping boundary
 
-Stop after one stage. The owner reviews and merges its PR before the next
+Without explicit authorization for a broader batch or merge, stop after one stage. The owner reviews and merges its PR before the next
 stage can run. Never run two stages in one invocation, and never merge a PR.

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "repo": "jiuwenswarm",
+  "pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "feature": "artifacts",
+  "facet": "flow",
+  "page": "repos/jiuwenswarm/components/web-frontend/feature-depth-artifacts.md",
+  "historical_knowledge_base_sha": "bf1dfc377095a0016bcbeb05b78f02aa84c00550",
+  "original_page_sha256": "153ecf378adeb26bf3bd62453dccd0431c4eba852f62ba2a35cecb6b1d8ff7ce",
+  "raw_block_sha256": "4e8983b100d73bf52a2bd41b2163be5eb7c5bb81baf2fd8403b2ae8adf46432b",
+  "body_sha256": "060c20b4e44e8a30e011492104f5504a1eb22556ea53c89dc8458e43a98fe856",
+  "raw_block": "<!-- kb:depth feature=artifacts facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=060c20b4e44e8a30e011492104f5504a1eb22556ea53c89dc8458e43a98fe856 -->\n**从会话消息构建产物列表**\nuseSessionArtifacts 从 useChatStore 读取 activeSessionId 对应会话的 messages，经 useMemo 交给 buildArtifacts；buildArtifacts 遍历每条 message.fileItems，过滤无名或无资源的项后逐个调用 fileItemToArtifact 生成 ArtifactItem，再按 getFileIdentityKey 去重（冲突用 preferArtifact 合并），最后按 timestamp 降序返回数组供列表渲染。\n\n调用路径：`jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx`（`useSessionArtifacts`） → `jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts`（`buildArtifacts`） → `jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts`（`fileItemToArtifact`）\n\n来源：[jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx:L23–L28](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx#L23-L28), [jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts:L95–L119](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts#L95-L119), [jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts:L75–L93](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts#L75-L93)\n\n<!-- kb:depth-proof {\"evidence\":[{\"path\":\"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx\",\"start\":23,\"end\":28,\"sha256\":\"4062ef2d150be5e8b4ac2669b3a0b2d2b79127bd94a0e6c8fcd2ac99b5fda19c\"},{\"path\":\"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts\",\"start\":95,\"end\":119,\"sha256\":\"999efec876d5cf0e6c2603c13dcae555ed14e423bf1d099ec7e70dfdc77b9bd9\"},{\"path\":\"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts\",\"start\":75,\"end\":93,\"sha256\":\"da33d82df3f0799eff14877545259837cf62940ef0e8347b4525705491b60c92\"}],\"trace\":[{\"path\":\"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx\",\"symbol\":\"useSessionArtifacts\",\"start\":23,\"end\":28},{\"path\":\"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts\",\"symbol\":\"buildArtifacts\",\"start\":95,\"end\":103},{\"path\":\"jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts\",\"symbol\":\"fileItemToArtifact\",\"start\":75,\"end\":93}]} -->\n<!-- /kb:depth -->",
+  "native_approval": {
+    "feature": "artifacts",
+    "facet": "flow",
+    "page": "repos/jiuwenswarm/components/web-frontend/feature-depth-artifacts.md",
+    "pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+    "block_sha256": "4e8983b100d73bf52a2bd41b2163be5eb7c5bb81baf2fd8403b2ae8adf46432b",
+    "dimensions": {
+      "faithful": "yes",
+      "non_contradictory": "yes",
+      "does_not_weaken": "yes"
+    },
+    "native_trace_id": "1790910836824-7abd0ab67169",
+    "native_reply_sha256": "9b180d0eb007f718acacf425b4d9f21df89d81ae890557722d7076effa3279d0",
+    "model": {
+      "role": "judge",
+      "provider": "codex",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "served_model": ""
+    },
+    "native_generator_trace_id": "1790910813239-3d9df65d9768",
+    "generator_model": {
+      "role": "generator",
+      "provider": "zcode",
+      "model": "GLM-5.3",
+      "effort": "low",
+      "served_model": "GLM-5.3"
+    }
+  },
+  "current_status": "unknown_pending_replacement",
+  "reason": "The original representative trace calls buildArtifacts and fileItemToArtifact inside React/useMemo and property-method callbacks; conservative direct-execution scope analysis cannot prove these deferred runtime edges. The historical three-yes review remains recorded, but does not establish acceptance under the stronger checker.",
+  "authorization": "User selected: 保留原文及证明档案，重新提取后替换失效项（推荐）",
+  "replacement_requirements": [
+    "pinned source proof",
+    "native GLM-5.3 extraction",
+    "independent Codex review with exactly three yes dimensions"
+  ],
+  "interpretation": "This archive is historical evidence, outside product knowledge; it is not counted as an active recognized facet."
+}

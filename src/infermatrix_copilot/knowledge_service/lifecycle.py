@@ -29,6 +29,7 @@ from typing import Iterable
 import yaml
 
 DEPTH_FACETS = ("flow", "api", "configuration", "dependencies", "failure_modes", "tradeoffs", "validation")
+DEPTH_ABSENCE_DETECTOR = "static-test-association-v2"
 DEPTH_BLOCK = re.compile(r"<!-- kb:depth feature=([a-z0-9-]+) facet=([a-z_]+) pin=([0-9a-f]{40}) "
                          r"sha256=([0-9a-f]{64}) -->\n(.*?)\n<!-- /kb:depth -->", re.S)
 
@@ -38,6 +39,36 @@ def safe_source_path(path: object) -> bool:
     return isinstance(path, str) and bool(path) and not path.startswith("/") \
         and "\\" not in path and ":" not in path \
         and all(part not in ("", ".", "..") for part in path.split("/"))
+
+
+def depth_proof_basis(proof: dict, *, facet: str, pin: str) -> str:
+    """Validate stored evidence kinds; source replay belongs to the depth auditor."""
+    if not isinstance(proof, dict):
+        raise ValueError("depth proof must be an object")
+    basis = proof.get("basis", "supported")
+    if basis not in ("supported", "verified_absent"):
+        raise ValueError("unknown depth proof basis")
+    certificate = proof.get("absence_certificate")
+    if basis == "supported":
+        if certificate is not None:
+            raise ValueError("supported proof cannot contain an absence certificate")
+        return basis
+    required = {"version", "detector", "feature", "facet", "pin", "policy_sha256",
+                "source_scope_sha256", "source_files", "docs_scope_sha256", "test_inventory_sha256", "test_files"}
+    if facet != "validation" or not isinstance(certificate, dict) or set(certificate) != required \
+            or certificate.get("version") != 1 or isinstance(certificate.get("version"), bool) \
+            or certificate.get("facet") != facet or certificate.get("pin") != pin \
+            or certificate.get("detector") != DEPTH_ABSENCE_DETECTOR \
+            or not isinstance(certificate.get("feature"), str) \
+            or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", certificate["feature"]):
+        raise ValueError("invalid validation absence certificate")
+    for key in ("policy_sha256", "source_scope_sha256", "docs_scope_sha256", "test_inventory_sha256"):
+        if not isinstance(certificate.get(key), str) or not re.fullmatch(r"[0-9a-f]{64}", certificate[key]):
+            raise ValueError("absence certificate needs bound inventory hashes")
+    if any(type(certificate.get(key)) is not int or certificate[key] < 0
+           for key in ("source_files", "test_files")) or not certificate["source_files"]:
+        raise ValueError("absence certificate needs complete inventory counts")
+    return basis
 
 
 def depth_sections(text: str) -> list[dict]:
@@ -50,7 +81,19 @@ def depth_sections(text: str) -> list[dict]:
             continue
         proof = re.search(r"\n<!-- kb:depth-proof (.*?) -->\s*$", body, re.S)
         try:
-            evidence = json.loads(proof.group(1))["evidence"] if proof else []
+            data = json.loads(proof.group(1)) if proof else {}
+            evidence = data["evidence"]
+            basis = depth_proof_basis(data, facet=facet, pin=pin)
+            acceptance_mode = data.get("acceptance_mode", "strict")
+            if acceptance_mode not in ("strict", "lightweight") or (
+                    acceptance_mode == "lightweight" and basis != "supported"):
+                continue
+            validation_kind = data.get("validation_kind")
+            if validation_kind is not None and (facet != "validation" or validation_kind not in (
+                    "automated_runtime", "automated_source_text", "helper_unit", "documented_manual")):
+                continue
+            if basis == "verified_absent" and data["absence_certificate"]["feature"] != feature:
+                continue
             if not isinstance(evidence, list) or not 1 <= len(evidence) <= 4:
                 continue
             if any(not isinstance(e, dict) or not safe_source_path(e.get("path"))
@@ -62,7 +105,10 @@ def depth_sections(text: str) -> list[dict]:
         except (ValueError, KeyError, TypeError):
             continue
         rows.append({"feature": feature, "facet": facet, "pin": pin,
-                     "content": visible_text(body[:proof.start()]), "evidence": evidence})
+                     "content": visible_text(body[:proof.start()]), "evidence": evidence,
+                     "basis": basis,
+                     "acceptance_mode": acceptance_mode, "validation_kind": validation_kind,
+                     "gap_label": "no_statically_associated_test_entry" if basis == "verified_absent" else None})
     return [row for row in rows if counts[(row["feature"], row["facet"])] == 1]
 
 RULE_HEADING = re.compile(r"^(?P<level>#{2,3})\s+(?P<rule>[A-Za-z0-9][A-Za-z0-9-]{1,40})\s+[—-]\s+\S")

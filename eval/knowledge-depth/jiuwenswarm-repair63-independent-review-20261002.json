@@ -1,0 +1,487 @@
+{
+  "schema": "jiuwenswarm-repair63-independent-review/1",
+  "source_pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "runtime_sha": "182851e9b4e08f5632983204e6d42e93dd462287",
+  "knowledge_baseline": "5a4580e735de76d7377c02b392aaedf4e813a9d5",
+  "complete": true,
+  "reviewer": "/root/repair63_delivery_review",
+  "reviewed_new_blocks": [
+    {
+      "feature": "permissions",
+      "facet": "validation",
+      "block_sha256": "bbd2d512f400c4f1d35fe6cac88420bdd5aab62c422daa4ba4faa480552aace5"
+    },
+    {
+      "feature": "goal-mode",
+      "facet": "dependencies",
+      "block_sha256": "5d4fdeb7908ef2349d55043b4d7ae2807d4b39a9754b602c91e52378d1fb3e50"
+    },
+    {
+      "feature": "goal-mode",
+      "facet": "tradeoffs",
+      "block_sha256": "2fcdafb8314dd26e4d015697de32da7710c892eea2871c3247de9b383a5a9129"
+    },
+    {
+      "feature": "goal-mode",
+      "facet": "validation",
+      "block_sha256": "d8d6687aa477df0b9b935a13055def377db8c7303f074c121799a97f7ff8ddab"
+    },
+    {
+      "feature": "skill-evolution",
+      "facet": "tradeoffs",
+      "block_sha256": "4ec813787de0c3d5bcc21671311616f76092b1221c7543820af95d8e9c316f5d"
+    },
+    {
+      "feature": "symphony",
+      "facet": "tradeoffs",
+      "block_sha256": "5939d90cf021aac55414cbe8731521d77813346489dae9ddaf4c1e537ab4dd74"
+    },
+    {
+      "feature": "a2a",
+      "facet": "failure_modes",
+      "block_sha256": "05004404ef6d835ab230fc0bdfae16fc86a0b25f158ca5d0569aaf15934264fa"
+    },
+    {
+      "feature": "context",
+      "facet": "tradeoffs",
+      "block_sha256": "e0b93caf6262aca64be4649ec33258cc25fb26556f9fb361d4ef7f1fbe807248"
+    },
+    {
+      "feature": "hooks",
+      "facet": "validation",
+      "block_sha256": "a790ecce411888c78b4af4bc2c7a25359c1dafd7af59a379f42adf7d2a3838eb"
+    },
+    {
+      "feature": "im-wechat",
+      "facet": "tradeoffs",
+      "block_sha256": "c08621e41b8d8c7c7ba8bf8fb0721be2b531551a346cbb26a309a3ff52d44181"
+    },
+    {
+      "feature": "im-wechat",
+      "facet": "validation",
+      "block_sha256": "6e0d5ca48dff200c3a87ef40d9964943452d245e1830bf85772461da13f1686d"
+    },
+    {
+      "feature": "image-generation",
+      "facet": "failure_modes",
+      "block_sha256": "fb2e575047b78c8878de14d98ccb5e72f545e81b91274f0adb907fd3c1f60d26"
+    },
+    {
+      "feature": "image-generation",
+      "facet": "validation",
+      "block_sha256": "eb7b0363182a84976add341f4cb0b52f7394fc8db0cc18bce8e53c00f57cb24b"
+    },
+    {
+      "feature": "lsp",
+      "facet": "configuration",
+      "block_sha256": "d2e1ce3befc5c296cbb61d2e4515ef9ef5de6a504a00725d927de15e056137c8"
+    },
+    {
+      "feature": "lsp",
+      "facet": "flow",
+      "block_sha256": "22a012623bf3baa4c6c88c6eca03f10b66e66bc9efea4e2ce49874337fcbf45c"
+    },
+    {
+      "feature": "lsp",
+      "facet": "validation",
+      "block_sha256": "82acda5fac7e0a042c26243ad216c366bbb1605acac01c5c191bb08b1446ea42"
+    },
+    {
+      "feature": "observability",
+      "facet": "tradeoffs",
+      "block_sha256": "976436a960efc152388ec695b4e4bf27cf58ab42976108edc8b593047a32fc28"
+    },
+    {
+      "feature": "task-memory",
+      "facet": "validation",
+      "block_sha256": "302e728f17383ba550b0733bc0dfc76d390d049388ff0897fd4fc09e4b8b998b"
+    },
+    {
+      "feature": "a2a",
+      "facet": "flow",
+      "block_sha256": "6dbca7f0a3355764905b694ca045308b17f457a013b5c5a6015d697e2c5509f0"
+    },
+    {
+      "feature": "autofix",
+      "facet": "failure_modes",
+      "block_sha256": "bb9f171601d44e7413b96e55b45d4d5378852dbea4ea1842569114658eb91281"
+    },
+    {
+      "feature": "autofix",
+      "facet": "validation",
+      "block_sha256": "a59949e6a31106b00c1e65f351cc6bc492c0660489acd02ac9a3035ab980934f"
+    },
+    {
+      "feature": "coding-memory",
+      "facet": "validation",
+      "block_sha256": "71e7f0a6832dbc51f52592229cf4d3b6533e1dd22e13f920f419e4103ffb8b0a"
+    },
+    {
+      "feature": "human-team",
+      "facet": "configuration",
+      "block_sha256": "20fe948658df970269c5305667443aa91779cbd95bcbac942415d91c08c3e217"
+    },
+    {
+      "feature": "human-team",
+      "facet": "flow",
+      "block_sha256": "25f622c8a8be93defb4b50df3a636c6fef9d9180f6a33ed85843f532bcf23ce0"
+    },
+    {
+      "feature": "im-discord",
+      "facet": "tradeoffs",
+      "block_sha256": "e7e7756c0fa893fb215ea38e06e813418fae81457b38e632d8a6eb9754a8a9e5"
+    },
+    {
+      "feature": "im-feishu",
+      "facet": "dependencies",
+      "block_sha256": "4a5cae784ba732d4291c82508dbe205af8fe5d95e77393285f4c231230ac5551"
+    },
+    {
+      "feature": "mcp",
+      "facet": "flow",
+      "block_sha256": "fc5efffebd1d12de36684a902d718c3e3b16d5e74de9ca1757346af0e56933ff"
+    },
+    {
+      "feature": "a2ui",
+      "facet": "flow",
+      "block_sha256": "5841af8155fb76d2abbccb4f368809ab22df78e70aef431c8a10738f55d6b6f0"
+    },
+    {
+      "feature": "auto-memory",
+      "facet": "validation",
+      "block_sha256": "f48a9941fc84c25fb6fd6d40410d86e34ef059110a5055dd10744ea9d392e251"
+    },
+    {
+      "feature": "deployment",
+      "facet": "failure_modes",
+      "block_sha256": "9b8b6dc333082658a462857822ccb210928ac486227addb35178296abd5d1035"
+    },
+    {
+      "feature": "im-dingtalk",
+      "facet": "validation",
+      "block_sha256": "c65af612339f2a59ebd7878ea1bfe36d2fee9c66a2c8409e7d9413e3c1d9001c"
+    },
+    {
+      "feature": "skills",
+      "facet": "api",
+      "block_sha256": "a1cf1fe187627e66ce6966b516977a2e5f0841456791cea2d20c7bad61eb2f01"
+    },
+    {
+      "feature": "ttse",
+      "facet": "api",
+      "block_sha256": "3101a787931d9c57492af3e29f38db16e91941df92c8a09c9461f029564f9540"
+    },
+    {
+      "feature": "ttse",
+      "facet": "configuration",
+      "block_sha256": "dfc244e39a460fb71a3f0a4e2b841b9e4f57474db8363abf9df2e2b328eb4232"
+    },
+    {
+      "feature": "ttse",
+      "facet": "failure_modes",
+      "block_sha256": "eb1965f81a49937a1b27fa16bcd50a35316bb1a28a5f089243356e9f40413b70"
+    },
+    {
+      "feature": "ttse",
+      "facet": "tradeoffs",
+      "block_sha256": "68ee8d380de19fb2e420ba7d71ddebe8f6fac5a0f78ff881217a5cfcbce03945"
+    },
+    {
+      "feature": "ttse",
+      "facet": "validation",
+      "block_sha256": "4c9b5307b1412f91ff2be7e27be4094123fe1e8bf6d182e6c54640285ff86194"
+    },
+    {
+      "feature": "worktree",
+      "facet": "validation",
+      "block_sha256": "6920b5a1a77f20c62901cae08d6b1d4ac8fbc6302a107dd74f2710fb2ba08ac4"
+    },
+    {
+      "feature": "browser-tools",
+      "facet": "validation",
+      "block_sha256": "b3707aaf90662ac858235c124cdc0ade672e369311c915b4e619970bd741271d"
+    },
+    {
+      "feature": "connectors",
+      "facet": "dependencies",
+      "block_sha256": "1009e95aabdb2b071c0175f650891d8025c9f0721dbf41803a9db5a007c023f4"
+    },
+    {
+      "feature": "external-cli-agents",
+      "facet": "validation",
+      "block_sha256": "83617010121aa0d53b49477211b5e0e37dacbe5a9d25e174e869bb10849428c1"
+    },
+    {
+      "feature": "harness",
+      "facet": "failure_modes",
+      "block_sha256": "ab59015ad67fbd468e3c2586560d463b109bbe3ad181c3d5f18420c790441c27"
+    },
+    {
+      "feature": "video-duplex",
+      "facet": "api",
+      "block_sha256": "7a1830e5119b8bbbb76087d01733f2221cdccb7d281268c962951ea95532dc71"
+    },
+    {
+      "feature": "vscode",
+      "facet": "dependencies",
+      "block_sha256": "ccd20dbc811a17318955b3d07fd5909ed356195b26ceca29909882436d693adf"
+    },
+    {
+      "feature": "acp",
+      "facet": "flow",
+      "block_sha256": "aad81cb73529d8920e3ee085b47e341e2f137b045c9853e2031ee4c45f75ba41"
+    },
+    {
+      "feature": "debug-trace",
+      "facet": "validation",
+      "block_sha256": "62a362c3710115c6af26b753368f87259b1ae219b2f3dd7d0021dbb1dee50abd"
+    },
+    {
+      "feature": "lsp",
+      "facet": "failure_modes",
+      "block_sha256": "7b8ac2375685e544666c7b29302bb9ca8aba7a53867afc1b44d031b2266ff995"
+    },
+    {
+      "feature": "models",
+      "facet": "api",
+      "block_sha256": "cdc6cdda982ab0b078974dd8995ba2db2630c388b1079fad5badc44a574ebff0"
+    },
+    {
+      "feature": "skill-development",
+      "facet": "validation",
+      "block_sha256": "53838ca56a63ab82d9f17e824f716485b003cb98c773739b2b0ae78a718f26ec"
+    },
+    {
+      "feature": "heartbeat",
+      "facet": "tradeoffs",
+      "block_sha256": "461e4306f745cb88bc63c1a1dd65b91cc1758dc0f24b35226253b1ff17682a6e"
+    },
+    {
+      "feature": "im-wecom",
+      "facet": "api",
+      "block_sha256": "592478e516140de56945eb2ad8c2dc2fdae8f3b499db37ba8e90ca1d75eb9b64"
+    },
+    {
+      "feature": "im-whatsapp",
+      "facet": "tradeoffs",
+      "block_sha256": "725e3d86341f7d2c48361b6fad25efa25bffbca2467dcbe27eb775b579577749"
+    },
+    {
+      "feature": "lsp",
+      "facet": "tradeoffs",
+      "block_sha256": "9b3203012c5697d4d708c2d8fd6a3f50be359612a00223ca810b9abd9e911bda"
+    },
+    {
+      "feature": "web-chat",
+      "facet": "tradeoffs",
+      "block_sha256": "bd3917d3dbc3b456f93b037af5e25f85d6f12714a044bc626deb66715982dc07"
+    },
+    {
+      "feature": "context",
+      "facet": "dependencies",
+      "block_sha256": "91f757e676175716e77f0977fc51221b3041982efd6aa171996bbfa2f97749d4"
+    },
+    {
+      "feature": "context",
+      "facet": "failure_modes",
+      "block_sha256": "20b4923b1fcc36b7f760f0ab70138ae9bc58c2d382b35d0f9ececc3740775f28"
+    },
+    {
+      "feature": "harness",
+      "facet": "tradeoffs",
+      "block_sha256": "a3ccd4e81028a97cdb1503611f9dc99724fa2723fd958f7db700f362254fb75e"
+    },
+    {
+      "feature": "login",
+      "facet": "flow",
+      "block_sha256": "c5eb5e8fc1e7ce168b3e8d915c2d14507faf0a7027fc9e041953ac485ea60860"
+    },
+    {
+      "feature": "ssh",
+      "facet": "configuration",
+      "block_sha256": "f47d5545495ce628b8e4bccdeddea0d807bb3a61a46746272e5bfa888d1a920c"
+    },
+    {
+      "feature": "ttse",
+      "facet": "flow",
+      "block_sha256": "5118add2b77248d668ee9602131b362d07443057f45d3c8b82cdca4feb604833"
+    },
+    {
+      "feature": "im-slack",
+      "facet": "flow",
+      "block_sha256": "305278614e5b3a2e451c1a77d3afe6cbed571836b3a6f5966ff9e1e3d08da648"
+    },
+    {
+      "feature": "distributed-team",
+      "facet": "flow",
+      "block_sha256": "50f7db8a00536b41414d5096a62ed23896a9794ba7c30bc0fb4319e2ab055a68"
+    }
+  ],
+  "rejections": [],
+  "content_manifest_sha256": "d51394913a363eff2ff961cba8bba034da7fc93b61a6f3c69cc4006ea384bac6",
+  "candidate_binding_sha256": "71698f5c8eedbe79eae30532e314e6a2ec05b530f2eb52c1042de6588c741a24",
+  "existing490_unchanged": true,
+  "recognized": 552,
+  "unknown": 1,
+  "all_requested_gaps_filled": false,
+  "code_review": {
+    "approved": true,
+    "closed_findings": [
+      "Bind child repair inputs to parent guidance hash",
+      "Clear inherited guidance when no flag is supplied",
+      "Reject removing repair guidance on resume"
+    ],
+    "focused_tests_passed": 24
+  },
+  "retrieval_review": {
+    "schema": "jiuwenswarm-repair63-independent-retrieval-review/1",
+    "reviewer": "/root/repair63_delivery_review",
+    "author_independent": true,
+    "passed": true,
+    "source_pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+    "retrieval_artifact_sha256": "16a1e7d9227005f991fe911061a9f0874339a8e11bd95dba31bd6d03065ea62b",
+    "candidate_pages_sha256": {
+      "repos/jiuwenswarm/components/launch/feature-depth-bootstrap.md": "381c95f4876caa2eb88499a87969f2f38b19bd32d73dbcc1fccced5950032f64",
+      "repos/jiuwenswarm/components/launch/jiuwenswarm.md": "5b73fcc2e605fb13367b5123414218d186491e37b8a2b815986fe90753e406ab",
+      "repos/jiuwenswarm/components/launch/feature-depth-instances.md": "98537d50b52038d54446c42b3647aea12296dccbb003cb79ad1014956406a9c1",
+      "repos/jiuwenswarm/components/launch/jiuwenswarm-instance-manager.md": "8f598f1e242e5304b49fcc51269e6c768312643d17275c0a6f31da4c43fb0b04",
+      "repos/jiuwenswarm/components/launch/feature-depth-desktop.md": "cf6334c5d9b28fc3fc5fe9cab34ca6aaf3ffee5baf1bf41ffdb9b9f782931eba",
+      "repos/jiuwenswarm/components/packaging-deploy/feature-depth-deployment.md": "3e42bc791793acd3c3f50ef2b908e5acc24a51ec0ad92aec07df36f35cf2535b",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-process-cli.md": "3bdbe205ac11ffc7e7e59cb828b36ffc46ded174587200a1516aba14ea3ba716",
+      "repos/jiuwenswarm/components/gateway-channels/design-tradeoffs.md": "60b6f37cd6c78492c641ba7e345788045ffd6c13a4d26f88c0eb6c45bfd62762",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-cli.md": "791e59503d101fc171a2b09cae7f20b5bac2a4a0b0179b5f57ab8161a97c73ab",
+      "repos/jiuwenswarm/components/tui-client/feature-depth-tui.md": "10fb839096d435547f118e152760c016bf162120b3bb7189471c683c7eacb809",
+      "repos/jiuwenswarm/components/web-frontend/feature-depth-web-chat.md": "29f175822f747b5ee66136f0fa873c220269ae7b9bbfd29a8d154f6065cf7b89",
+      "repos/jiuwenswarm/components/web-frontend/feature-depth-goal-mode.md": "c3ef90d5cf4d8ab891b56635dd51617ea072e4dc284a2f844cf98301d3cc833d",
+      "repos/jiuwenswarm/components/web-frontend/feature-depth-web-navigation.md": "ef678826d5fa8b18f0dc5e2f3ab395816eccfbf143b3a40ff1bb06e46776c0b3",
+      "repos/jiuwenswarm/components/agent-runtime/feature-depth-projects-sessions.md": "5b8f43190ae060c72b7ae2808df0202ec6dc91ff82f2ea3dd81620beccf3466e",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-modes.md": "a3a14186442df2735578b7082aad698f38085132b419b1aff81d57c698430b46",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-team.md": "6e59be89d21451766fc164e98122bdc39fef5136c19c5a3f00c6a41db86562b6",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-human-team.md": "abb41c3d6c8c122933522d50cc82c41ce6b5e6b7f6bd37de5af1501b11f22ae4",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-distributed-team.md": "5a2d26a5d425039d95037cae0693775675caff1b7370a2689c10d1051234baf9",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-swarmflow.md": "bb1abe04271ecf193410c60cce60a9fc491327c8adea0680068fea443959e480",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-harness.md": "6c895dc8aff147c1ca9e5d53050e0647c82c8282d583b255cd6a9cba4f3b25b1",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-context.md": "924eb9bda0a4b4d65ab238f03704b68549617ea09737492c983c7f881e1f0261",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-planning.md": "85346a75e29534277de4bf5e53494ed86239f6efb5bd3c41a83a30c4d3a12df5",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-coding-memory.md": "b24b984eddef25d041431b6136c7f409ffe40800dd13155456ec7cb6e4f72b6c",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-subagents.md": "d77848d2cb341823bb0c07347f4d5d8c8ec4a90ca20aa9c8285bcfd6c0705d57",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-skills.md": "b9a3aa8a821809adbae4ee754edcc2f9ccf88fae00394fc51cd782bb1ee5f428",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-permissions.md": "1fd3d3a556f224c19ab4693a4eced8aead0977ece77e0b91186135c7e5073041",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-swarm-skills.md": "ff8e77c28c775068450a7f0c2ca1b2edd9dd109b55033876368d95d1b983b619",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-skill-hub.md": "28eff8a2dff3e0d0895bbd3ed6952ea334fb252e5ef1a5772a173a6f2580fe69",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-skill-evolution.md": "f3ae7ccf8fdcc4e57fb1ff7ed26f9b95832eca3263fce8420bf032dd211e7e6b",
+      "repos/jiuwenswarm/components/symphony-orchestration/feature-depth-symphony.md": "a1a5545ccd777296c4cc05420fe0128cd3c86d7c5092caa50a61f8ab106e0612",
+      "repos/jiuwenswarm/components/symphony-orchestration/design-tradeoffs.md": "bbb9d4512f53b3eab6afd716c14d32ebc0c7e155df1d35f6dcaae4ee33b345aa",
+      "repos/jiuwenswarm/components/auto-harness/feature-depth-auto-harness.md": "6f94022571e3308065056d8d452c92134cee5d1551f45ae003b66cc1053006e6",
+      "repos/jiuwenswarm/components/auto-harness/feature-depth-rsi-packages.md": "f0ace7b15f173ca64491c51b7452c08355bc0d74edcf4143bd8fb9df36e41d94",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-browser-tools.md": "8de3caaa8d7924558f59f8f235ce6811b1d4bee7e61756a4a791bc2236099095",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-ttse.md": "93249dd774b850d298bc69ef8045651135d3be43e760467bec78c9c98fbd020a",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-memory.md": "4f05a04f8249d7c6f02b3427c87f2ad047a06b42665ce3730b3c576d7b8529f5",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-auto-memory.md": "8bba284d1ebc90998abad512c7cdf73655f0c7366101398b412b86a21fd80e01",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-lsp.md": "fac010eeb9a55cc8958af11ff453cb7fdf7ccc26a2c61d8b8971b4178d8f2dfb",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-task-memory.md": "5b98020522080e7942d1b166d97c2b101850f49527cc2f552211b3766ef37974",
+      "repos/jiuwenswarm/components/extensions-plugins/feature-depth-hooks.md": "0b41167174f508e7c8d6387a0daeeceb6c925f3de3a5b176e095591f1bcf1a19",
+      "repos/jiuwenswarm/components/extensions-plugins/jiuwenswarm-extensions.md": "72c6e70e0b92b301996595bdcf840a1208600867cd7cdc47156e8e3d45d1c56d",
+      "repos/jiuwenswarm/components/extensions-plugins/feature-depth-applications.md": "a8c438edee1ce3105ab32634232858871f1e9df03ee91c805c47550bbe69025d",
+      "repos/jiuwenswarm/components/extensions-plugins/jiuwenswarm-application-plugins.md": "70aae55f33197fef3faa8eadc564d784cb89e223e452b57ee2e2ecc9f9cfa852",
+      "repos/jiuwenswarm/components/extensions-plugins/feature-depth-video-duplex.md": "b51876422788f5a6f7bd1c930b92cc5f860b0d3c777c8488a43ac6d4a4a46411",
+      "repos/jiuwenswarm/components/protocols/feature-depth-e2a.md": "d670eed588e583c4310b5e872c5f24ed6081047a252aab72d96ce67fd8d8c845",
+      "repos/jiuwenswarm/components/protocols/feature-depth-a2a.md": "5941fc1adb14bf48d33c30a8182276b31d544e6728fb651a3c84b3e2f6240e6e",
+      "repos/jiuwenswarm/components/protocols/feature-depth-acp.md": "4d2944e892b46490cbfb00339986a2b0b3aacca8daa42f6e715e342b51252394",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-ssh.md": "6a37921a4dfc23f5faaa653cf907d3f9557884a31bd66d6926f29424ab841e61",
+      "repos/jiuwenswarm/components/a2ui/feature-depth-a2ui.md": "084cbfd1758220c1c3eec39e58535630679a15e3e53e59063be770a3c5ee3ae2",
+      "repos/jiuwenswarm/components/browser-client/feature-depth-browser-client.md": "a4e7a0141feb6174b73fdb0952c2a195247dc3017218265514a9c86a8b0b8e29",
+      "repos/jiuwenswarm/components/ide-clients/feature-depth-vscode.md": "88b3d2a4f116dbd383faec313d7a15b5d77e58729746026e31a4104b03d098c4",
+      "repos/jiuwenswarm/components/ide-clients/feature-depth-jetbrains.md": "46190b24619888213ff95eb18ad17f531d22ee9c72e42d9b5e679d97d2983e45",
+      "repos/jiuwenswarm/components/sdk-clients/feature-depth-sdk.md": "97da4d1d0c543eddf0416b4b3bc1a03529f254839d43b96a26442526f3152442",
+      "repos/jiuwenswarm/components/sandbox-runtime/feature-depth-sandbox.md": "e84bd1695893ca08a7a131961c56ebb20d29f36186ab726b639e97d6729e841f",
+      "repos/jiuwenswarm/components/common-core/feature-depth-models.md": "8907e7b29d94165b8bfa5e582f0537229da58f20b70b4ecb21196b98d88273d0",
+      "repos/jiuwenswarm/components/common-core/jiuwenswarm-common-model-catalog.md": "a89bf55bcbdabad9aa9b3a33f130de1e6aa90947b7c0829cc5dc4643ccea7ce4",
+      "repos/jiuwenswarm/components/common-core/feature-depth-mcp.md": "8d6d4c649dd787f4409a892c1d6500d2e2c34aaa802f59328bf6fdc90d3fbb44",
+      "repos/jiuwenswarm/components/common-core/jiuwenswarm-common.md": "bf8619413d1e941d03fcbc48743b02ffa42195ca3e9083dd0f1748205c3e10da",
+      "repos/jiuwenswarm/components/login-auth/feature-depth-login.md": "507ae8a5473b1a71d3f87061c257ed33140610d03c0eb1acc1c6bc101f07d5fa",
+      "repos/jiuwenswarm/components/login-auth/design-tradeoffs.md": "783d8d48262cb13b9b8f5164ef96c84532ad9b73a3d352e6a83d7849209a9b3c",
+      "repos/jiuwenswarm/components/cron-scheduling/feature-depth-cron.md": "9402a4bd83440769059b90486a5286b3ed2cf5abaf10c7490c62f1ff33e5786d",
+      "repos/jiuwenswarm/components/cron-scheduling/design-tradeoffs.md": "22eaca04f1be75bddbd18d3af8db9aeff9a53deea8253592f8904eb23256c241",
+      "repos/jiuwenswarm/components/observability/feature-depth-observability.md": "3ff4107760ff295cfc358cf9ab420d20abd198a0c7509a3f17b04831d1e2e5b3",
+      "repos/jiuwenswarm/components/observability/design-tradeoffs.md": "58190b78f9012085689aff5589e9f595828c43f7d7d4fad8c52217d4083f9c2c",
+      "repos/jiuwenswarm/components/observability/feature-depth-debug-trace.md": "61650c07712bf4b742df8be1f917f2e6e5b61aff24ea4ddbd6adbf387364e907",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-multimodal.md": "7fcb731cb77abe0dff97d9a3b628778d0365fded7a536e2a3e4741aea1915dc9",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-image-generation.md": "3d01c9ed6361b44c06bc71a6224a4ed2a123e8f817d70ec461fd57ac25cfafb9",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-worktree.md": "145c92db144f57fc25ba36f3af97e3b7d2ab9187ce29ec0f56cd0161a0a762ac",
+      "repos/jiuwenswarm/components/tui-client/feature-depth-autofix.md": "38604d9a00a9122d886918b0d1f2153dbf4bf4a5bc63db12a737c8812282dd2a",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-im-feishu.md": "79e18a3dcd7cb5610332b0eb4966e24594a7e8b1c6975c9ac1a6506bc6be21a6",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-im-wechat.md": "655d4ae14062d77039ad93cafd9bc98401dfad0bb3b542504c011ea3cb096ab8",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-im-wecom.md": "f089da3eb5650853533af41275dfb6c78dc1b72540230b91248e6c14d193bc17",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-im-dingtalk.md": "5ef8b20a3ac8d8bbcfb1b025891a868eaf02b3af397b971263db78beda7b6d8c",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-im-xiaoyi.md": "efe282d3e06679cadff6bc758088a6db34df5bcba8fb742be655cfc35d3775cc",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-im-slack.md": "e6df254ab0925527b61c3bd93c3e7802bd486cce6173f73e7b6cc5b727cbbe75",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-im-telegram.md": "ed14d70a93436f8200906b373df5429a710468656f14d61957c8eedf5efebf53",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-im-discord.md": "d2693094f31d7ef6e59effde4229a752dea7c1ec18e2729d07dc774ec1fd9010",
+      "repos/jiuwenswarm/components/gateway-channels/feature-depth-im-whatsapp.md": "6b6cb540132b183765046a6593f71fa15e7c7c40595cd24db239941138950e0e",
+      "repos/jiuwenswarm/components/web-frontend/feature-depth-agent-management.md": "fc57497167d4da18d30270cce74800418246d7c776b488ee5aac5ac60834e0fe",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-jiuwen-memory-sdk.md": "09bb705759a12d93bbfa08bcf8b993b5a2dec83579854de0b6b181c0a4ba4cfc",
+      "repos/jiuwenswarm/components/sandbox-runtime/feature-depth-sandbox-privacy-proxy.md": "40d6250587cb133d4062fc8ff32e07e11ce6c7e8c2a834fb3502265cbd4b86f6",
+      "repos/jiuwenswarm/components/agents-team/feature-depth-digital-avatar.md": "f1991e9489fdd4047b3c6fb23b46955bf73afe9e47b2c5aad6b660888709492a",
+      "repos/jiuwenswarm/components/web-frontend/feature-depth-connectors.md": "8fb1e314f8c41433db2bd8779e8c2a2273a948da033475ec6b734a6c4e556903",
+      "repos/jiuwenswarm/components/common-core/feature-depth-external-cli-agents.md": "c124eef7edc63c83d904500a42fd60b94ef632e87ef4464c4e071d35d2929559",
+      "repos/jiuwenswarm/components/web-frontend/feature-depth-plan-mode.md": "c3f910f6e490952b64324e14f1f64ca14742709a874957e054c310a50e2e2867",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-heartbeat.md": "4f1eefb36f24da0e3c21b96e7de8f7ef1223204b8a20f22c493cb7d2d82fe581",
+      "repos/jiuwenswarm/components/web-frontend/feature-depth-artifacts.md": "d2e39af5c9092842fac70b3ebc6541c510c975e8644b84d5568b2ee8b9a008ce",
+      "repos/jiuwenswarm/components/web-frontend/feature-depth-speech-interaction.md": "30733f2215c0d9e9580a225502dc78f7da5639dd47a66337945439aeb20ad1c5",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-skill-development.md": "04763292fe537d22eb382f4774974f9e18eb0d21f2d2fb0836fd0c9864ab29dc",
+      "repos/jiuwenswarm/components/agent-server-runtime/feature-depth-proactive-recommendation.md": "a444f32829103834ce88b6c8ff1333dad75cf55d6152c80e0b569b59f918307d"
+    },
+    "cases_checked": 237,
+    "summary": {
+      "total_features": 79,
+      "total_facets": 553,
+      "features_with_intact_depth": 79,
+      "available_facet_status": {
+        "supported": 552,
+        "verified_absent": 0,
+        "unknown": 1
+      },
+      "probes": {
+        "description_and_paths": {
+          "cases": 79,
+          "feature_hits": 79,
+          "depth_hits": 79,
+          "max_documents": 2,
+          "max_content_chars": 5991,
+          "target_feature_injection": {
+            "full": 282,
+            "partial": 0,
+            "not_injected": 271
+          }
+        },
+        "query_only": {
+          "cases": 79,
+          "feature_hits": 79,
+          "depth_hits": 79,
+          "max_documents": 2,
+          "max_content_chars": 5873,
+          "target_feature_injection": {
+            "full": 293,
+            "partial": 0,
+            "not_injected": 260
+          }
+        },
+        "paths_only": {
+          "cases": 79,
+          "feature_hits": 77,
+          "depth_hits": 77,
+          "max_documents": 2,
+          "max_content_chars": 5991,
+          "target_feature_injection": {
+            "full": 273,
+            "partial": 0,
+            "not_injected": 280
+          }
+        }
+      }
+    },
+    "actionable_findings": [],
+    "limits": "Independent saved-content and arithmetic reconciliation, not an additional runtime retrieval run or PR bug-recall measurement."
+  }
+}

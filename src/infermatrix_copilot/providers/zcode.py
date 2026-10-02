@@ -56,6 +56,9 @@ import json
 import logging
 import os
 import re
+import selectors
+import signal
+import time
 import shutil
 import subprocess
 import sys
@@ -128,6 +131,7 @@ _ARG_BUDGET = 100_000
 class ZCodeTransport(HarnessTransport):
     """zcode CLI (headless prompt mode) as a Strict backend."""
 
+    supports_native_events = True
     spec = PROVIDERS["zcode"]
 
     @cached_property
@@ -248,7 +252,7 @@ class ZCodeTransport(HarnessTransport):
         return path
 
     def _run(self, text: str, *, session: Path, timeout_s: float,
-             tool_less: bool = False, model: str = "") -> tuple[list[dict], bool]:
+             tool_less: bool = False, model: str = "", native_event_sink=None) -> tuple[list[dict], bool]:
         """One CLI invocation → (parsed events, timed_out). A timeout kills
         the process but keeps the partial stream as salvage material.
         `tool_less` also removes the native reads unless an oversized prompt
@@ -278,6 +282,8 @@ class ZCodeTransport(HarnessTransport):
                     if k in os.environ})
         if model:
             env[_PERSONAL_CONFIG_ENV] = str(self._write_model_config(session, model))
+        if native_event_sink is not None:
+            return self._stream_run(cmd, session, env, timeout_s, native_event_sink)
         timed_out = False
         returncode, stderr = 0, ""
         try:
@@ -314,6 +320,84 @@ class ZCodeTransport(HarnessTransport):
         return events, timed_out
 
     @staticmethod
+    def _stream_run(cmd, session, env, timeout_s, sink):
+        """Drain both native pipes while journaling, including failed runs."""
+        proc = subprocess.Popen(cmd, cwd=str(session), env=env, stdin=subprocess.DEVNULL,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+        events, stderr, buffers = [], [], {"stdout": b"", "stderr": b""}
+        deadline = time.monotonic() + timeout_s
+        timed_out = False
+
+        def line(channel, raw):
+            text = raw.decode("utf-8", "replace")
+            if channel == "stdout":
+                try:
+                    event = json.loads(text)
+                except ValueError:
+                    event = None
+                if isinstance(event, dict):
+                    events.append(event)
+                    sink(event)
+                    return
+            if channel == "stderr":
+                stderr.append(text)
+            sink({"type": "native." + channel, "text": text})
+
+        def kill():
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+        try:
+            with selectors.DefaultSelector() as selector:
+                selector.register(proc.stdout, selectors.EVENT_READ, "stdout")
+                selector.register(proc.stderr, selectors.EVENT_READ, "stderr")
+                while selector.get_map():
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0 and not timed_out:
+                        timed_out = True
+                        kill()
+                    for key, _ in selector.select(0.25 if timed_out else min(1, max(0, remaining))):
+                        chunk = os.read(key.fileobj.fileno(), 65536)
+                        channel = key.data
+                        if not chunk:
+                            if buffers[channel]:
+                                line(channel, buffers[channel])
+                            buffers[channel] = b""
+                            selector.unregister(key.fileobj)
+                            continue
+                        buffers[channel] += chunk
+                        while b"\n" in buffers[channel]:
+                            raw, buffers[channel] = buffers[channel].split(b"\n", 1)
+                            line(channel, raw)
+            proc.wait()
+        except BaseException:
+            # A stream interruption can arrive between a pipe read and its
+            # next newline. Preserve every tail we already received, while
+            # retaining the original exception if the journal itself failed.
+            for channel, raw in buffers.items():
+                for tail in raw.splitlines():
+                    try:
+                        line(channel, tail)
+                    except BaseException:
+                        pass
+                buffers[channel] = b""
+            raise
+        finally:
+            # This group belongs only to this invocation, including children
+            # left after its CLI leader exits or our event writer is interrupted.
+            kill()
+            proc.wait()
+            proc.stdout.close()
+            proc.stderr.close()
+        if not timed_out and (proc.returncode != 0 or not any(e.get("type") == "result" for e in events)):
+            detail = " ".join(stderr[-3:])[:400]
+            raise RuntimeError(f"zcode exited {proc.returncode} without a result event"
+                               + (f": {detail}" if detail else ""))
+        return events, timed_out
+
+    @staticmethod
     def _final_text(events: list[dict]) -> str:
         for event in reversed(events):
             if event.get("type") == "result":
@@ -334,6 +418,24 @@ class ZCodeTransport(HarnessTransport):
                 usage.input_tokens = int(raw.get("inputTokens") or 0)
                 usage.output_tokens = int(raw.get("outputTokens") or 0)
         return usage
+
+    @classmethod
+    def native_snapshot(cls, events: list[dict]) -> dict:
+        """Reported native facts; omitted counters and invoice cost are unknown."""
+        usage, served_model = {}, ""
+        keys = {"inputTokens": "input_tokens", "outputTokens": "output_tokens",
+                "cacheReadInputTokens": "cache_read_input_tokens",
+                "cacheCreationInputTokens": "cache_creation_input_tokens", "costUsd": "cost_usd"}
+        for event in events:
+            payload = event.get("payload")
+            if event.get("type") == "session.updated" and isinstance(payload, dict) and payload.get("modelId"):
+                served_model = str(payload["modelId"])
+            if event.get("type") == "result" and isinstance(event.get("usage"), dict):
+                raw = event["usage"]
+                usage = {target: raw[source] for source, target in keys.items()
+                         if isinstance(raw.get(source), (int, float)) and not isinstance(raw[source], bool)}
+        return {"served_model": served_model, "usage": usage,
+                "text": cls._final_text(events)}
 
     @staticmethod
     def _tool_calls(events: list[dict]) -> list[tuple[str, dict]]:
@@ -452,7 +554,7 @@ class ZCodeTransport(HarnessTransport):
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
                  role: str = "", effort: str = "",
-                 max_budget_usd: float | None = None) -> Reply:
+                 max_budget_usd: float | None = None, native_event_sink=None) -> Reply:
         """Tool-less one-shot in an empty scratch cwd with no bridge. Every
         native read is removed, except `Read` when the prompt is too big for
         argv and rides an attachment — then any read outside the scratch dir
@@ -463,7 +565,8 @@ class ZCodeTransport(HarnessTransport):
             events, timed_out = self._run(
                 flatten_messages(system, messages), session=session,
                 timeout_s=self.settings.strict_backend_timeout_s,
-                tool_less=True, model=model or self.settings.strict_backend_model)
+                tool_less=True, model=model or self.settings.strict_backend_model,
+                **({"native_event_sink": native_event_sink} if native_event_sink is not None else {}))
         finally:
             shutil.rmtree(session, ignore_errors=True)
         violations = self._audit(self._tool_calls(events),
@@ -478,8 +581,5 @@ class ZCodeTransport(HarnessTransport):
         return Reply(
             blocks=[Block(type="text", text=text)] if text else [],
             stop_reason="max_tokens" if timed_out else "end_turn",
-            usage={"input_tokens": usage.input_tokens,
-                   "output_tokens": usage.output_tokens,
-                   "cache_read_input_tokens": 0,
-                   "cache_creation_input_tokens": 0},
+            usage=self.native_snapshot(events)["usage"],
             model=usage.served_model)

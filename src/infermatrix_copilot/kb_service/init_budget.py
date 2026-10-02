@@ -17,6 +17,10 @@ price is refused (fail closed).
 Judge calls go through a subscription transport with no per-call price; they
 count a fixed ``judge_call_usd`` each. That part is an accounting convention,
 not a spend bound.
+
+Explicit unlimited-subscription depth uses a None ceiling after authenticating
+both subscription roles. Reservations still record fixed accounted amounts;
+they neither invent API prices nor report unknown subscription costs as zero.
 """
 
 from __future__ import annotations
@@ -123,21 +127,28 @@ class Reservation:
 
 
 class Budget:
-    """What a stage may still spend. Not thread-safe (stages call models one
-    at a time)."""
+    """A finite stage ceiling, or explicit None for uncapped accounting.
+    Not thread-safe (stages call models one at a time)."""
 
-    def __init__(self, limit_usd: float, *, spent_usd: float = 0.0):
-        if not math.isfinite(limit_usd) or limit_usd <= 0:
+    def __init__(self, limit_usd: float | None, *, spent_usd: float = 0.0):
+        if limit_usd is not None and (not math.isfinite(limit_usd) or limit_usd <= 0):
             raise ValueError("limit_usd must be a finite number > 0")
         if not math.isfinite(spent_usd) or spent_usd < 0:
             raise ValueError("spent_usd must be a finite number >= 0")
-        self.limit_usd = float(limit_usd)
+        self.limit_usd = float(limit_usd) if limit_usd is not None else None
         self.spent_usd = float(spent_usd)
         self._reserved = 0.0
 
     @property
-    def remaining_usd(self) -> float:
-        return self.limit_usd - self.spent_usd - self._reserved
+    def remaining_usd(self) -> float | None:
+        return None if self.limit_usd is None else self.limit_usd - self.spent_usd - self._reserved
+
+    def can_reserve(self, amount: float) -> bool:
+        """An explicit None ceiling keeps accounting without limiting calls."""
+        if not math.isfinite(amount) or amount < 0:
+            raise ValueError("a reservation must be a finite number >= 0")
+        remaining = self.remaining_usd
+        return remaining is None or amount <= remaining + 1e-12
 
     @contextmanager
     def reserve(self, amount: float) -> Iterator[Reservation]:
@@ -145,9 +156,7 @@ class Budget:
         call when it does not fit. On exit the charge (or, when the block did
         not charge, e.g. because the call raised, the whole reservation) is
         added to what was spent."""
-        if not math.isfinite(amount) or amount < 0:
-            raise ValueError("a reservation must be a finite number >= 0")
-        if amount > self.remaining_usd + 1e-12:
+        if not self.can_reserve(amount):
             raise BudgetExhausted(
                 f"reserving ${amount:.4f} would exceed the budget "
                 f"(spent ${self.spent_usd:.4f} of ${self.limit_usd:.2f})")

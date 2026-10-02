@@ -106,6 +106,27 @@ def _baseline(world, *, features=1):
     return load_policy(yaml.safe_dump(policy), "repos/toy")
 
 
+def _complete_breadth(world, policy):
+    """A strict semantic campaign starts from a structurally covered baseline."""
+    from infermatrix_copilot.kb_service.knowledge_coverage import FACETS as BREADTH_FACETS, contract_block
+    from test_kb_init_skeleton import _git
+
+    pin = _git(world["upstream"], "rev-parse", "HEAD")
+    files = {}
+    for feature in policy.features:
+        path = "knowledge/" + feature.page
+        text = (world["origin"] / path).read_text()
+        for facet in BREADTH_FACETS:
+            text += f"\n<!-- kb:knowledge owner=feature-{feature.id} facet={facet} pin={pin} -->\n\n"
+            text += "Engine.step validates integer input and calls the helper function to return the incremented value.\n\n"
+            text += f"[Implementation](https://github.com/o/toy/blob/{pin}/pkg/core.py#L3-L6) "
+            text += f"[Guide](https://github.com/o/toy/blob/{pin}/docs/guide.md#L1-L2)\n"
+        for source in ("pkg/core.py", "pkg/util.py"):
+            text += "\n" + contract_block("o/toy", pin, source, (world["upstream"] / source).read_text()) + "\n"
+        files[path] = text
+    _commit(world["origin"], files, "merge structurally covered feature baseline")
+
+
 def _run(world, gateway, *, budget=10, retry=False):
     lifecycle = _modules_lifecycle()
     lifecycle = replace(lifecycle, init=replace(lifecycle.init, budget_usd=budget))

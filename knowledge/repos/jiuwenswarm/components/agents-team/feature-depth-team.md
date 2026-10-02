@@ -4,7 +4,7 @@ created: 2026-10-02
 updated: 2026-10-02
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/team_manager.py:L130-L209, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/config.py:L299-L301, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/config.py:L112-L154, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/team_manager.py:L212-L227, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/runtime.py:L124-L136, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/team_manager.py:L178-L209, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/a2x/a2x_registry_runtime.py:L254-L283]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/team_manager.py:L130-L209, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/common/config.py:L299-L301, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/config.py:L112-L154, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/team_manager.py:L212-L227, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/runtime.py:L124-L136, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/team_manager.py:L178-L209, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/a2x/a2x_registry_runtime.py:L254-L283, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/team_manager.py:L141-L144, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/team_manager.py:L212-L219, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/observability/runtime.py:L130-L136, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agentserver/test_team_runtime_inheritance.py:L168-L181, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/team_manager.py:L1735-L1761, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/team/team_manager.py:L2179-L2181]
 feature: "team"
 entry_points: ["jiuwenswarm/agents/harness/team/team_manager.py"]
 source_globs: ["jiuwenswarm/agents/harness/team/team_manager.py", "jiuwenswarm/agents/harness/team/*.py"]
@@ -39,4 +39,40 @@ sync_team_observability 初始化失败时：若 evolution 请求了 provider，
 来源：[jiuwenswarm/agents/harness/team/team_manager.py:L178–L209](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/team/team_manager.py#L178-L209), [jiuwenswarm/agents/harness/team/a2x/a2x_registry_runtime.py:L254–L283](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/team/a2x/a2x_registry_runtime.py#L254-L283)
 
 <!-- kb:depth-proof {"evidence":[{"path":"jiuwenswarm/agents/harness/team/team_manager.py","start":178,"end":209,"sha256":"6e4be0ce367bdade68a04843fbb2c9e4b376bde490a2961eec56cbba8149b321"},{"path":"jiuwenswarm/agents/harness/team/a2x/a2x_registry_runtime.py","start":254,"end":283,"sha256":"99ad0035ef79fca2773bc05bca8f5c009da784a57e876e5cea76700bb878a8e6"}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=team facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=f8fc1a26bcd5afecf4a468b7d0d5c632abe3dd5f0d7ae576ba4a2a495706af4b -->
+**轨迹 sink 的 demand 引用计数：跨运行时共存收益，代价是 drain 推迟到无人持有 demand**
+选择：进程级轨迹 sink 按 demand 计数共享，shutdown_team_observability 以 demand="team" 调用 shutdown_trajectory_runtime（216），后者 discard 该 demand 后若 _runtime_demands 仍非空直接 return True 而不 drain，只有最后一个 demand 释放才走 _shutdown_locked（observability/runtime.py 130–136）。收益（docstring 写明）：Team tracing 保留自己的 demand，禁用 Team 观测不会拆掉其他运行时仍在用的轨迹 sink（141–144）；代价：真正的 drain 与关闭被推迟到没有任何 demand 持有为止。
+
+来源：[jiuwenswarm/agents/harness/team/team_manager.py:L141–L144](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/team/team_manager.py#L141-L144), [jiuwenswarm/agents/harness/team/team_manager.py:L212–L219](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/team/team_manager.py#L212-L219), [jiuwenswarm/observability/runtime.py:L130–L136](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/observability/runtime.py#L130-L136)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":144,"path":"jiuwenswarm/agents/harness/team/team_manager.py","sha256":"689ba12e360be661aa202186a672304d0b97310be6834cec3d93b04d711f0907","start":141},{"end":219,"path":"jiuwenswarm/agents/harness/team/team_manager.py","sha256":"5bab61b948745448c75072f5315bc427a5aec7b0937b19878cb6e63979ac630f","start":212},{"end":136,"path":"jiuwenswarm/observability/runtime.py","sha256":"aa1fff1d976afcdb5beddbd083e49e528771895ac479bc8ad7c7fcd57747f3e4","start":130}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=team facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=7f21b5b2a66f65da1574d724c61594613ef65611b6b96dc664a817c496a8d04b -->
+**test_build_member_rails_omits_task_planning_for_leader_only：断言成员 rail 按角色分化**
+pytest 入口 tests/unit_tests/agentserver/test_team_runtime_inheritance.py::test_build_member_rails_omits_task_planning_for_leader_only（168–181）分别以 role="leader" 与 role="teammate"、runtime=RuntimeInfo(language="cn") 调用 build_member_rails 两次，断言 leader 的 rails 中不存在 TaskPlanningRail 而 teammate 的存在，且两者均不含 HeartbeatRail——检验成员 rail 装配的角色分化行为。此处仅陈述测试断言内容，不声明这些测试当前已运行通过。
+
+来源：[tests/unit_tests/agentserver/test_team_runtime_inheritance.py:L168–L181](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/agentserver/test_team_runtime_inheritance.py#L168-L181)
+
+<!-- kb:depth-proof {"basis":"supported","evidence":[{"end":181,"path":"tests/unit_tests/agentserver/test_team_runtime_inheritance.py","sha256":"6a3c580622f358f5cc3377ab75d70a93852e922de7af200c54de940978802610","start":168}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=team facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=9d621555086a9f04133f3f1d6b8c50e308e3f2a33f47adbb1e8fd7fcc4b47abb -->
+**get_or_create_team：_bootstrap_lock 内命中缓存即返回；未命中先 _destroy_other_sessions 再 create_team**
+进入 self._bootstrap_lock 后先取 self._team_agents.get(session_id)，非 None 即原样返回缓存的 TeamAgent；未命中分支先 await self._destroy_other_sessions(session_id, channel_id)，再 return await self.create_team(session_id, deep_agent, request_id, channel_id, request_metadata)。docstring 限定此缓存仅供分布式 teammate 进程的 remote member bootstrap 使用。
+
+来源：[jiuwenswarm/agents/harness/team/team_manager.py:L1735–L1761](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/team/team_manager.py#L1735-L1761)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":1761,"path":"jiuwenswarm/agents/harness/team/team_manager.py","sha256":"d3aa860d141b2fb6dd27445b690bbe0b82d40a7fb677892308db00b46a853f0e","start":1735}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=team facet=api pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=6bc59d4921d44f9b7b715c6cc02c49772c2026f2a242aa1e2616e620000cc10f -->
+**get_team_agent(session_id)：_team_agents 的 truthy 值优先，否则回落 _runner_team_agents，可能返回 None**
+输入 session_id，方法体仅一行返回 `self._team_agents.get(session_id) or self._runner_team_agents.get(session_id)`：第一张映射查出 truthy 值即短路返回；否则返回第二张映射的 get 结果，两张都未命中时为 None。该方法是只读查询，不创建 TeamAgent，也不做存活检查。
+
+来源：[jiuwenswarm/agents/harness/team/team_manager.py:L2179–L2181](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/team/team_manager.py#L2179-L2181)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":2181,"path":"jiuwenswarm/agents/harness/team/team_manager.py","sha256":"311e34ae003f45e7fd43ec830beec0e86b6a05e715dafa5d0f23b53f95af6aed","start":2179}],"trace":[]} -->
 <!-- /kb:depth -->

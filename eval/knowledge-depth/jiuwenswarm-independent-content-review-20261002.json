@@ -1,0 +1,258 @@
+{
+  "schema": "jiuwenswarm-independent-content-review/1",
+  "complete": true,
+  "source_pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "reviewer": "/root/final_code_review (author-independent); >=memory partition additionally reviewed by /root/depth_gap_diagnosis",
+  "review_scope": "All 293 NEW lightweight prose/metadata blocks scanned; focused exact pinned-source checks for feature attribution, guards/defaults, validation categories, inference labels and documented manual procedures. No knowledge generation, model calls, campaign changes or WT edits. Protected strict207 preserved. This is a content review and does not grant release/merge approval.",
+  "category_contract": {
+    "path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/src/infermatrix_copilot/kb_service/depth_judge.py",
+    "start": 41,
+    "end": 44,
+    "rule": "helper_unit checks a helper rather than production integration; reject an overstated category"
+  },
+  "rejections": [
+    {
+      "feature": "a2a",
+      "facet": "failure_modes",
+      "block_sha256": "b8fd51d3f46410cd7298d05161e80785184c14bac13cd73932d3a0d923beb57c",
+      "body_sha256": "fb9f46198c3b8d2a2d472fe5327ddd5170ef0328f9819f2cf47375fe09c32528",
+      "knowledge_path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/knowledge/repos/jiuwenswarm/components/protocols/feature-depth-a2a.md",
+      "line": 64,
+      "priority": "P2",
+      "reason": "The title/body promise that any exception inside the try becomes FAILED. The implementation catches Exception, which excludes asyncio.CancelledError. A read-only replay of the actual execute AST with a transport raising CancelledError propagated cancellation, enqueued only WORKING, and still cleared pending state/closed the queue; it did not emit FAILED. The blanket failure guarantee is unsupported.",
+      "sources": [
+        {
+          "path": "jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py",
+          "start": 127,
+          "end": 145
+        },
+        {
+          "path": "jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py",
+          "start": 236,
+          "end": 247
+        }
+      ]
+    },
+    {
+      "feature": "context",
+      "facet": "dependencies",
+      "block_sha256": "2bb441f88bca27c6db47797d24e3f81b7e98a56370ac39e96b74bf1212190f2b",
+      "body_sha256": "cb99810f7d64fd8524c757f8ab0f32a7abeadba52fbaf857947c0ca8292d7760",
+      "knowledge_path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/knowledge/repos/jiuwenswarm/components/agent-server-runtime/feature-depth-context.md",
+      "line": 53,
+      "priority": "P2",
+      "reason": "The cited _finalize_external_memory_session flushes and commits ExternalMemoryRail session messages via provider.on_session_end. It does not describe context-summary or tool-result offload dependencies; unloading an external memory rail is distinct from context compression/offload. This decision excludes only the new lightweight block and does not reinterpret the protected strict baseline.",
+      "sources": [
+        {
+          "path": "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py",
+          "start": 18315,
+          "end": 18329
+        },
+        {
+          "path": "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py",
+          "start": 18358,
+          "end": 18375
+        },
+        {
+          "path": "docs/zh/上下文压缩.md",
+          "start": 18,
+          "end": 26
+        }
+      ]
+    },
+    {
+      "feature": "context",
+      "facet": "failure_modes",
+      "block_sha256": "f90e9a8760b1ad9e5a1e7b9580a50f16250a2c4c8372b9d98af7f9486dceb444",
+      "body_sha256": "63fa13136bfe4d6b83daff0f0fee91dbb879cab1023835a0a3b13a98ea169f9d",
+      "knowledge_path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/knowledge/repos/jiuwenswarm/components/agent-server-runtime/feature-depth-context.md",
+      "line": 62,
+      "priority": "P2",
+      "reason": "The cited branch is _reload_session_adapter_if_stale permission-policy reload: permission delta, smart lifecycle, external CHAT_SEND, deferred permission reload and cancellation eviction. It does not handle context compression, summary construction or tool-result offload failures.",
+      "sources": [
+        {
+          "path": "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py",
+          "start": 3046,
+          "end": 3115
+        },
+        {
+          "path": "docs/zh/上下文压缩.md",
+          "start": 18,
+          "end": 26
+        }
+      ]
+    },
+    {
+      "feature": "debug-trace",
+      "facet": "validation",
+      "block_sha256": "6347697df21bbb2cf529b21dea40b67f6438d6855f7bc18f1a402d01e2098eb9",
+      "body_sha256": "89afaf483a06d5454783f50a2b292044ea24e55a8ea91dee95fa9da83850d214",
+      "knowledge_path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/knowledge/repos/jiuwenswarm/components/observability/feature-depth-debug-trace.md",
+      "line": 75,
+      "priority": "P2",
+      "reason": "The current validation_kind is automated_runtime, but the cited test only stubs the configuration loader and calls the resolve_debug_trace_settings helper to assert a returned field. It does not exercise logger, stream or tracing integration. Under the current helper-versus-production-integration category contract, the evidence is helper_unit; retaining the frozen raw block would overstate the category.",
+      "sources": [
+        {
+          "path": "tests/unit_tests/agentserver/test_debug_trace.py",
+          "start": 692,
+          "end": 701
+        },
+        {
+          "path": "jiuwenswarm/server/runtime/debug_trace/config.py",
+          "start": 71,
+          "end": 95
+        }
+      ]
+    },
+    {
+      "feature": "external-cli-agents",
+      "facet": "validation",
+      "block_sha256": "a09d1ed2426513e39cf0f339176e5d353b54e02670146c527df4f0b58f460b18",
+      "body_sha256": "c2ecd8726afe2d8d041b7909940a96cf5c347212fe9e60385bbc9408890baa2b",
+      "knowledge_path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/knowledge/repos/jiuwenswarm/components/common-core/feature-depth-external-cli-agents.md",
+      "line": 73,
+      "priority": "P2",
+      "reason": "The current validation_kind is automated_runtime, but the cited test only calls the pure reconcile_builtin_models helper on dict/list fixtures and asserts its return values. It exercises no native CLI harness, probe, authentication, refresh or persistence integration. Under the current helper-versus-production-integration category contract, this is helper_unit; retaining the frozen raw block would overstate the category.",
+      "sources": [
+        {
+          "path": "tests/unit_tests/common/test_external_cli_catalog.py",
+          "start": 35,
+          "end": 47
+        },
+        {
+          "path": "jiuwenswarm/common/external_cli_catalog.py",
+          "start": 30,
+          "end": 71
+        }
+      ]
+    },
+    {
+      "feature": "goal-mode",
+      "facet": "validation",
+      "block_sha256": "cff3e20191a88e7d410a5c820bb52411dcd2f20edd09798ed6e3b61ec4b1d749",
+      "body_sha256": "b27d5536eca896885ae97722e28deb75bd3f8a302509a4117a19bf257b014f1c",
+      "knowledge_path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/knowledge/repos/jiuwenswarm/components/web-frontend/feature-depth-goal-mode.md",
+      "line": 55,
+      "priority": "P2",
+      "reason": "The cited sessionInput test checks ordinary queued chat receipt cleanup after clearMessages and late chat.error. It contains no command.goal, goal snapshot/update, objective, or goal-mode state assertion. This does not establish goal-mode validation.",
+      "sources": [
+        {
+          "path": "jiuwenswarm/channels/web/frontend/tests/sessionInput.test.mjs",
+          "start": 1061,
+          "end": 1073
+        },
+        {
+          "path": "jiuwenswarm/channels/web/frontend/src/services/webClient.ts",
+          "start": 773,
+          "end": 792
+        }
+      ]
+    },
+    {
+      "feature": "human-team",
+      "facet": "flow",
+      "block_sha256": "7fef0632fbbccc56a2eecb91af19572bd90734b4e6613dab93260bd6aff1ecf8",
+      "body_sha256": "6af163c9847cd9393e132d50f67e9012e500fbbb935b77e41fa2e165d336bfaf",
+      "knowledge_path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/knowledge/repos/jiuwenswarm/components/agents-team/feature-depth-human-team.md",
+      "line": 64,
+      "priority": "P2",
+      "reason": "The cited fail/outcome methods belong to generic _TurnOutcomeTracker. Its waiting_user flag is set by ordinary chat.ask_user_question, with no human seat, HITT, join, member identity or team-message routing. This cannot establish the flow of human members participating in an AgentTeam.",
+      "sources": [
+        {
+          "path": "jiuwenswarm/server/agent_ws_server.py",
+          "start": 543,
+          "end": 577
+        },
+        {
+          "path": "docs/zh/AgentTeam人类成员联机协作.md",
+          "start": 15,
+          "end": 76
+        }
+      ]
+    },
+    {
+      "feature": "image-generation",
+      "facet": "validation",
+      "block_sha256": "6f8ca12818e5e3cd3d8a10e3077c9f6beac3519fa29052cb176d87f08bee3efa",
+      "body_sha256": "35c8cf6df71127aea5dac40d01300ba57724a7320e776f0611050d7931175b32",
+      "knowledge_path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/knowledge/repos/jiuwenswarm/components/agents-team/feature-depth-image-generation.md",
+      "line": 66,
+      "priority": "P2",
+      "reason": "The cited helpers are tested only with model_type='vision' and VISION_ENABLED. Their supported model types are audio/vision/video, explicitly excluding image_gen. Image generation instead uses apply_image_gen_model_config_from_yaml and _invoke_model_image_generation. These tests cannot count as image-generation helper validation.",
+      "sources": [
+        {
+          "path": "tests/unit_tests/agents/harness/test_multimodal_config.py",
+          "start": 26,
+          "end": 48
+        },
+        {
+          "path": "jiuwenswarm/agents/harness/common/tools/multimodal_config.py",
+          "start": 71,
+          "end": 117
+        },
+        {
+          "path": "jiuwenswarm/agents/harness/common/tools/image_tools.py",
+          "start": 468,
+          "end": 477
+        }
+      ]
+    },
+    {
+      "feature": "task-memory",
+      "facet": "validation",
+      "block_sha256": "813ecf618aec3a2ea779d22d8b1b2b4a14d7c23111ce01596df35523d41a3277",
+      "body_sha256": "c260ee940e33c8f38ceecc7dfd1e9a3094f45c6f6bf52560b02088977dd72c82",
+      "knowledge_path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/knowledge/repos/jiuwenswarm/components/agents-team/feature-depth-task-memory.md",
+      "line": 75,
+      "priority": "P2",
+      "reason": "The cited truth-table test exercises memory.engine helpers for MemoryRail and ExternalMemoryRail. TaskMemory experience tools use a separate task_memory.enabled gate and TaskMemoryService initialization. No cited assertion calls or checks that task-memory implementation.",
+      "sources": [
+        {
+          "path": "tests/unit_tests/agentserver/memory/test_external_memory_config.py",
+          "start": 117,
+          "end": 126
+        },
+        {
+          "path": "jiuwenswarm/agents/harness/common/memory/external_memory_config.py",
+          "start": 33,
+          "end": 50
+        },
+        {
+          "path": "jiuwenswarm/agents/harness/common/tools/task_tools.py",
+          "start": 96,
+          "end": 107
+        }
+      ]
+    },
+    {
+      "feature": "ttse",
+      "facet": "failure_modes",
+      "block_sha256": "df673afe3032ca40f1c684aba994f11fa57dfddac14ac8c801e8b3548030bac5",
+      "body_sha256": "c4e939a0d2c2ff6e6c1a497290ecc5373e86ec90a7a4bb2473b67495cd292017",
+      "knowledge_path": "/data/zhoutaichang/copilot/wt-jiuwenswarm-depth-completion/knowledge/repos/jiuwenswarm/components/agent-server-runtime/feature-depth-ttse.md",
+      "line": 26,
+      "priority": "P2",
+      "reason": "The cited _validate_extractor validates EternalConversation snapshots and changed_uts, not TTSE FACT/TIP evolution. TTSERail and EternalConversationRail are separate implementations and builders. Accurate local prose from the wrong feature cannot establish TTSE failure coverage.",
+      "sources": [
+        {
+          "path": "jiuwenswarm/agents/harness/common/rails/eternal_conversation/coordinator.py",
+          "start": 153,
+          "end": 174
+        },
+        {
+          "path": "jiuwenswarm/agents/harness/common/rails/eternal_conversation/rail.py",
+          "start": 33,
+          "end": 42
+        },
+        {
+          "path": "docs/zh/TTSE.md",
+          "start": 1,
+          "end": 7
+        }
+      ]
+    }
+  ],
+  "no_additional_actionable_findings": true,
+  "legacy_note": "TTSE strict dependencies at feature-depth-ttse.md18-23 correctly cite docs/zh/TTSE.md5-7; do not retire that genuine TTSE dependency block. Protected strict207 and original172 are unchanged by these decisions.",
+  "release_note": "The pre-independent500 snapshot and native/source approvals remain immutable historical evidence. Effective recognition must exclude these exact NEW-light blocks, recompute source/native/retrieval/CN reports, and continue to block merge because coverage targets remain unmet."
+}

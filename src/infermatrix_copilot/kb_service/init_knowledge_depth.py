@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import os
 import re
 import time
 from collections import Counter
@@ -21,7 +23,10 @@ from .init_knowledge import MAX_DOC_BYTES, _Knowledge
 from .init_stages import _one_line, _page_frontmatter
 from .init_support import InitError, InitRecord, generate
 from .knowledge_coverage import audit_coverage, feature_metadata, inventory
-from .knowledge_depth import FACETS, audit_depth, depth_page, digest, render_block, validate_draft, verified_blocks
+from .knowledge_depth import (
+    FACETS, audit_depth, build_absence_certificate, depth_page, digest,
+    render_block, validate_draft, verified_blocks,
+)
 from .models import ModelUnavailable
 
 
@@ -31,10 +36,21 @@ def validate_container(data: dict) -> None:
         raise ValueError("sections must be a bounded list of candidate facets")
 
 
+def _stable_prompt(payload: dict) -> str:
+    # Checkpoint JSON sorts keys. Canonicalize before the first dispatch too,
+    # so a saved successful extraction resumes byte-for-byte without a call.
+    value = json.loads(json.dumps(payload, sort_keys=True, ensure_ascii=False))
+    return prompt(value, mode=value.get("acceptance_mode", "strict")) if "acceptance_mode" in value else prompt(value)
+
+
 @dataclass
 class _KnowledgeDepth(_Knowledge):
     STAGE = "knowledge-deepen"
     retry_unfinished: bool = False
+    feature_ids: tuple[str, ...] = ()  # execution partition, never a smaller audit denominator
+    acceptance_mode: str = "strict"
+    depth_index_path: Path | None = None
+    stop_file: Path | None = None
 
     def _chain_boundary(self) -> str:
         return "knowledge"  # same prerequisites as explanatory knowledge, no shadow flip
@@ -47,10 +63,28 @@ class _KnowledgeDepth(_Knowledge):
 
     def _init_identity(self) -> str:
         return repr(replace(self.lifecycle.init, budget_usd=0.0)) + (
-            ":subscription-generator" if self.rt.subscription_generator else "")
+            ":subscription-generator" if self.rt.subscription_generator else "") + (
+            ":unlimited-subscription" if getattr(self.rt, "unlimited_subscription", False) else "")
 
     def _input_options(self) -> dict:
-        return {**super()._input_options(), "depth_version": 3}
+        if self.acceptance_mode == "lightweight":
+            from .depth_index import INDEX_VERSION
+            index_options = {"acceptance_mode": self.acceptance_mode, "depth_index_version": INDEX_VERSION}
+            if self.depth_index_path and self.depth_index_path.exists():
+                index_options["depth_index_sha256"] = hashlib.sha256(self.depth_index_path.read_bytes()).hexdigest()
+        else:
+            index_options = {}
+        guidance_path = os.environ.get("KB_DEPTH_REPAIR_GUIDANCE")
+        if guidance_path:
+            from .depth_inputs import load_repair_guidance
+            self._repair_guidance = load_repair_guidance(Path(guidance_path))
+            expected_hash = os.environ.get("KB_DEPTH_REPAIR_GUIDANCE_SHA256")
+            if expected_hash and self._repair_guidance["guidance_sha256"] != expected_hash:
+                raise InitError("repair guidance differs from the campaign's immutable input")
+            index_options["repair_guidance_sha256"] = self._repair_guidance["guidance_sha256"]
+        return {**super()._input_options(), "depth_version": 5 if self.acceptance_mode == "lightweight" else 4,
+                "depth_feature_ids": list(self.feature_ids),
+                **index_options}
 
     def _base_for_run(self, latest: str) -> str:
         previous = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, self.STAGE)
@@ -75,13 +109,20 @@ class _KnowledgeDepth(_Knowledge):
             self.record.status = "started"
             self.record.problems = []
             self.record.dry_run = self.dry_run
-        self.budget = _CheckpointBudget(self.lifecycle.init.budget_usd, self.record, self.rt.state_dir)
+        self.budget = _CheckpointBudget(None if getattr(self.rt, "unlimited_subscription", False)
+                                       else self.lifecycle.init.budget_usd, self.record, self.rt.state_dir)
         return []
 
     def _precheck(self) -> list[str]:
         problems = super()._precheck()
         if not getattr(self, "coverage_policy", None):
             problems.append("knowledge-deepen requires an explicit feature/production coverage policy")
+        elif set(self.feature_ids) - {f.id for f in self.coverage_policy.features}:
+            problems.append("depth execution partition contains unknown policy features")
+        if self.acceptance_mode not in ("strict", "lightweight"):
+            problems.append("acceptance_mode must be strict or lightweight")
+        if getattr(self, "_repair_guidance", None) and self.acceptance_mode != "lightweight":
+            problems.append("repair guidance requires lightweight recognition")
         return problems
 
     def _refresh_quick_maps(self) -> list[str]:
@@ -100,52 +141,96 @@ class _KnowledgeDepth(_Knowledge):
         expected = {depth_page(f) for f in policy.features}
         if set(accepted) - expected or set(states) - {f.id for f in policy.features}:
             return self._blocked(["depth checkpoint contains pages or features outside the current policy"])
+        self._block_cache = {}
         for feature in policy.features:
             page = depth_page(feature)
             if page in accepted:
-                blocks, problems = verified_blocks(accepted[page], feature, tree, self.record.pin)
+                blocks, problems = verified_blocks(accepted[page], feature, tree, self.record.pin, policy=policy)
                 entry = states.get(feature.id, {})
                 if problems or not blocks or entry.get("accepted_sha256") != digest(accepted[page]):
                     return self._blocked(["depth checkpoint accepted page failed its pinned proof"])
                 self.head[page] = accepted[page]
+                self._block_cache[feature.id] = blocks
                 self._link_page(page, _one_line(feature.title) + "：实现深读")
             elif page in self.head:
-                _, problems = verified_blocks(self.head[page], feature, tree, self.record.pin)
+                blocks, problems = verified_blocks(self.head[page], feature, tree, self.record.pin, policy=policy)
                 if problems:
                     return self._blocked(problems + ["refresh stale/edited depth explicitly before extending it"])
+                self._block_cache[feature.id] = blocks
         initial = audit_depth(self.head, tree, policy, self.record.pin)
         if initial["problems"]:
             return self._blocked(initial["problems"])
-        context = DepthContext(tree, inventory(tree, policy))
-        # A completed first pass takes priority over repairs, so one difficult
-        # feature cannot consume the budget before the others get visited.
+        breadth = audit_coverage(self.head, tree, policy, full_name=self.lifecycle.full_name, pin=self.record.pin)
+        if policy.semantic_depth_per_facet_gt is not None and not breadth["met"]:
+            self.record.coverage = {"semantic_depth": initial, "breadth": breadth}
+            state["done"] = False
+            return self._blocked(["structural coverage target is unmet; restore feature and production-file coverage before depth extraction"])
+        if self.acceptance_mode == "lightweight":
+            from .knowledge_coverage import policy_path
+            policy_text = self.rt.knowledge.show(self._base_sha, policy_path(self.lifecycle.repo))
+            context = DepthContext(tree, inventory(tree, policy), mode="lightweight",
+                                   cache_path=self.depth_index_path, pin=self.record.pin,
+                                   policy_sha256=digest(policy_text))
+            if getattr(self, "_repair_guidance", None):
+                from .depth_inputs import load_repair_guidance
+                checked_guidance = load_repair_guidance(
+                    Path(os.environ["KB_DEPTH_REPAIR_GUIDANCE"]), pin=self.record.pin,
+                    policy_sha256=digest(policy_text), baseline=self._base_sha)
+                if checked_guidance["guidance_sha256"] != self._repair_guidance["guidance_sha256"]:
+                    raise InitError("repair guidance changed after checkpoint identity was captured")
+        else:
+            context = DepthContext(tree, inventory(tree, policy))
+        by_id = {f.id: f for f in policy.features}
+        selected_features = tuple(by_id[fid] for fid in dict.fromkeys(self.feature_ids)) if self.feature_ids else policy.features
+        # Finish a fair first pass before targeted repairs. Subscription mode
+        # stops on converged evidence rather than on an artificial USD ceiling.
+        unlimited = getattr(self.rt, "unlimited_subscription", False)
         ceilings = {f.id: states.get(f.id, {}).get("attempts", 0) + 2 if self.retry_unfinished else 2
                     for f in policy.features}
+        for feature in policy.features:
+            slots = states.setdefault(feature.id, {}).setdefault("facets", {})
+            for facet in initial["features"][feature.id]["unknown_facets"]:
+                slot = slots.setdefault(facet, {"status": "unknown", "attempts": 0, "evidence_visits": {}})
+                if self.retry_unfinished and self.acceptance_mode == "strict":
+                    slot.pop("blocked", None)
+                    slot["evidence_visits"] = {}
         stopped = False
-        for repair in (False, True):
+        evidence_round = 0
+        if self.acceptance_mode == "lightweight":
+            stopped = self._run_lightweight(tree, context, states, initial, selected_features)
+        while True:
+            if self.acceptance_mode == "lightweight":
+                break
             progress = audit_depth(self.head, tree, policy, self.record.pin)
-            # Include resumed and explicit retry passes in coverage priority.
-            # Stable sorting keeps policy order within each coverage group.
-            order = sorted(policy.features, key=lambda f: bool(progress["features"][f.id]["facets"]))
+            order = sorted(selected_features, key=lambda f: bool(progress["features"][f.id]["recognized_facets"]))
+            attempted = False
             for feature in order:
                 entry = states.setdefault(feature.id, {})
-                current = audit_depth({depth_page(feature): self.head[depth_page(feature)]}, tree,
-                                      replace(policy, features=(feature,)), self.record.pin) \
-                    if depth_page(feature) in self.head else None
-                if current and current["complete"]:
+                current = progress["features"][feature.id]
+                missing = current["unknown_facets"]
+                if not missing:
                     entry["status"] = "complete"
                     continue
                 attempts = entry.get("attempts", 0)
                 pending_draft = "draft" in entry
-                if not pending_draft and ((not repair and attempts >= ceilings[feature.id] - 1)
-                                          or attempts >= ceilings[feature.id]):
+                if not unlimited and not pending_draft and ((not evidence_round and attempts >= ceilings[feature.id] - 1)
+                                                            or attempts >= ceilings[feature.id]):
                     if entry.get("status") == "extracting":
                         entry["status"] = "interrupted"
                         entry["reason"] = "extraction interrupted before a durable draft"
                     continue
-                if self.budget.spent_usd + self.lifecycle.init.judge_call_usd > self.budget.limit_usd:
+                available = [f for f in missing if not entry["facets"][f].get("blocked")]
+                if not available:
+                    continue
+                if not self.budget.can_reserve(self.lifecycle.init.judge_call_usd):
                     stopped = True
                     break
+                if not pending_draft:
+                    priority = sorted(available, key=lambda f: (
+                        entry["facets"][f]["attempts"], progress["facet_counts"][f]["recognized"], FACETS.index(f)))
+                    entry["requested_facets"] = priority if evidence_round == 0 or not unlimited else priority[:2]
+                    entry["evidence_round"] = attempts
+                attempted = True
                 try:
                     self._attempt(tree, context, feature, entry)
                 except BudgetExhausted:
@@ -154,29 +239,141 @@ class _KnowledgeDepth(_Knowledge):
                 except (ModelUnavailable, ValueError) as exc:
                     entry["status"] = "unavailable"
                     entry["reason"] = str(exc)[:1000]
+                    for facet in entry.get("requested_facets", []):
+                        self._slot_result(entry, facet, "unjudged", entry["reason"])
                     entry.pop("draft", None)
+                    entry.pop("payload", None)
                 finally:
                     self.record.save(self.rt.state_dir)
             if stopped:
                 break
-        state["done"] = not stopped
+            evidence_round += 1
+            if not attempted or (not unlimited and evidence_round >= 2):
+                break
         if accepted:
             for feature in policy.features:
                 for page in (feature.page, depth_page(feature)):
                     if page in self.head:
                         self.head[page] = feature_metadata(self.head[page], feature)
         depth = audit_depth(self.head, tree, policy, self.record.pin)
+        state["target_met"] = depth["target_met"]
+        state["all_resolved"] = not any(x["unknown_facets"] for x in depth["features"].values())
         breadth = audit_coverage(self.head, tree, policy, full_name=self.lifecycle.full_name, pin=self.record.pin)
+        state["done"] = not stopped and (depth["target_met"] and breadth["met"]
+                                         if policy.semantic_depth_per_facet_gt is not None else True)
         self.record.coverage = {"semantic_depth": depth, "breadth": breadth}
         self.record.unfinished = [f"depth {id_}/{facet}" for id_, item in depth["features"].items()
-                                  for facet in item["missing_facets"]]
+                                  for facet in item["unknown_facets"]]
         self.record.notes = [n for n in self.record.notes if not n.startswith("knowledge depth stopped:")]
         self.record.notes.append("knowledge depth stopped: " + ("budget exhausted; checkpoints preserve remaining work"
                                   if stopped else "all features visited; unsupported facets remain explicit"))
         self.record.save(self.rt.state_dir)
         claims = {page: text for page, text in accepted.items()}
         entries = [Evidence.from_dict(e) for group in self.record.evidence.values() for e in group]
-        return self._conclude(claims, entries)
+        result = self._conclude(claims, entries)
+        if policy.semantic_depth_per_facet_gt is not None and not depth["target_met"] and result.status == "empty":
+            return self._blocked(["semantic depth target is unmet; retained checkpoint is incomplete"])
+        return result
+
+    def _begin_light_round(self, entry, requested):
+        """Charge a durable logical round before dispatch, including interrupted reviews."""
+        entry["acceptance_mode"] = "lightweight"
+        entry["light_round_id"] = entry.get("light_round_id", 0) + 1
+        entry["requested_facets"] = list(requested)
+        entry["review_dispatched"] = False
+        for facet in requested:
+            slot = entry["facets"][facet]
+            slot["total_attempts"] = slot.get("total_attempts", 0) + 1
+        self.record.save(self.rt.state_dir)
+
+    def _run_lightweight(self, tree, context, states, initial, selected_features):
+        counts = {f: initial["facet_counts"][f]["recognized"] for f in FACETS}
+        positions = {feature.id: i for i, feature in enumerate(selected_features)}
+        while True:
+            attempted = False
+            order = sorted(selected_features, key=lambda feature: (
+                bool(self._block_cache.get(feature.id)),
+                min((counts[f] for f in FACETS if f not in self._block_cache.get(feature.id, {})), default=80),
+                positions[feature.id]))
+            for feature in order:
+                if self.stop_file and self.stop_file.exists():
+                    return True
+                entry = states.setdefault(feature.id, {})
+                old = set(self._block_cache.get(feature.id, {}))
+                finishing = ("draft" in entry and (not entry.get("review_dispatched") or "checked" in entry))
+                requested = [f for f in FACETS if f not in old and (
+                    entry["facets"][f].get("total_attempts", 0) < 4 or
+                    finishing and f in entry.get("payload", {}).get("facets", []))]
+                if not requested:
+                    entry["status"] = "complete" if len(old) == len(FACETS) else "exhausted"
+                    continue
+                attempted = True
+                # A saved draft with no dispatched review continues its original round.
+                if "draft" not in entry or entry.get("review_dispatched") and "checked" not in entry:
+                    self._begin_light_round(entry, requested)
+                else:
+                    entry["requested_facets"] = requested
+                entry["evidence_round"] = max(entry["facets"][f].get("total_attempts", 1) for f in requested) - 1
+                try:
+                    self._attempt(tree, context, feature, entry)
+                except BudgetExhausted:
+                    return True
+                except (ModelUnavailable, ValueError, OSError, SyntaxError) as exc:
+                    entry["status"] = "unavailable"
+                    entry["reason"] = str(exc)[:1000]
+                    for facet in requested:
+                        self._slot_result(entry, facet, "unjudged", entry["reason"])
+                    entry.pop("draft", None)
+                    entry.pop("payload", None)
+                    entry.pop("checked", None)
+                finally:
+                    self.record.save(self.rt.state_dir)
+                for facet in set(self._block_cache.get(feature.id, {})) - old:
+                    counts[facet] += 1
+            if not attempted:
+                return False
+
+    def _publish(self, changed):
+        depth = self.record.coverage.get("semantic_depth", {})
+        unmet = self.coverage_policy.semantic_depth_per_facet_gt is not None and (
+            not depth.get("target_met") or not self.record.coverage.get("breadth", {}).get("met"))
+        if unmet and not self.dry_run:
+            return self._blocked(["semantic depth target is unmet; publication is blocked, checkpoint retained"])
+        result = super()._publish(changed)
+        if unmet and result.status == "dry_run":
+            result.status = "partial"
+            result.notes.append("reviewable partial preview; semantic depth target is not met")
+            result.save(self.rt.state_dir)
+        return result
+
+    @staticmethod
+    def _slot_result(entry, facet, status, reason):
+        slot = entry.setdefault("facets", {}).setdefault(facet, {"attempts": 0, "evidence_visits": {}})
+        event = [entry.get("attempts", 0), entry.get("review_attempts", 0)]
+        if entry.get("acceptance_mode") == "lightweight":
+            event.append(entry.get("light_round_id", 0))
+        if slot.get("last_attempt") == event and status != "pass":
+            return
+        history = slot.setdefault("history", [])
+        outcome = {"attempt": event[0], "review_attempt": event[1], "status": status,
+                   "reason": reason, "evidence_sha256": entry.get("evidence_sha256"),
+                   "context_sha256": entry.get("context_sha256")}
+        if not history or history[-1] != outcome:
+            history.append(outcome)
+        slot["last_attempt"] = event
+        slot.update(status=status, reason=reason)
+        if status == "pass":
+            slot.pop("blocked", None)
+            return
+        if entry.get("acceptance_mode") == "lightweight":
+            if slot.get("total_attempts", 0) >= 4:
+                slot["blocked"] = "initial attempt and three corrections exhausted; evidence remains unknown"
+            return
+        key = entry.get("evidence_sha256", "no-durable-evidence")
+        visits = slot.setdefault("evidence_visits", {})
+        visits[key] = visits.get(key, 0) + 1
+        if visits[key] >= 3:
+            slot["blocked"] = "three unsuccessful repairs with the same pinned evidence; needs new evidence or a corrected candidate"
 
     def _docs(self, tree: Path, feature, owner) -> list[dict]:
         docs = self._sources(tree, list(feature.docs), MAX_DOC_BYTES // 2)
@@ -217,56 +414,121 @@ class _KnowledgeDepth(_Knowledge):
     def _attempt(self, tree, context, feature, entry):
         page = depth_page(feature)
         old = self.head.get(page, "")
-        old_blocks, problems = verified_blocks(old, feature, tree, self.record.pin) if old else ({}, [])
+        lightweight = self.acceptance_mode == "lightweight"
+        old_blocks, problems = (self._block_cache.get(feature.id, {}), []) if lightweight else (
+            verified_blocks(old, feature, tree, self.record.pin, policy=self.coverage_policy) if old else ({}, []))
         if problems:
             raise ValueError("; ".join(problems))
         owner = next((o for o in self.owners if o.owner == feature.owner),
                      Owner(feature.owner, feature.page, tuple(p.split("*", 1)[0] for p in feature.source_globs)))
-        docs = self._docs(tree, feature, owner)
+        guidance = getattr(self, "_repair_guidance", None)
+        docs = [] if guidance else self._docs(tree, feature, owner)
         existing = self._bounded_context(self._existing_knowledge(owner, self.head.get(feature.page, "")))
-        retrieval = context.build(feature, self.head.get(feature.page, ""), docs)
+        if lightweight:
+            docs = self._bounded_slices(docs, 8000)
+            existing = self._bounded_texts(existing, 4000)
+        requested = entry.get("requested_facets") or [f for f in FACETS if f not in old_blocks]
+        retrieval = context.guided(feature, requested, guidance) if guidance else context.build(
+            feature, self.head.get(feature.page, ""), docs, facets=requested,
+            previous_review=entry.get("reason"), evidence_round=entry.get("evidence_round", 0))
+        if lightweight:
+            docs = retrieval.get("docs", docs)
         files = retrieval["files"]
-        if not files:
+        if not files and not (lightweight and docs):
             entry["attempts"] = entry.get("attempts", 0) + 1
             raise ModelUnavailable("feature has no implementation source slices")
         payload = {"repository": self.lifecycle.full_name, "pin": self.record.pin,
                    "feature": {"id": feature.id, "title": feature.title, "owner": feature.owner},
-                   "facets": [f for f in FACETS if f not in old_blocks], **retrieval, "docs": docs,
+                   "facets": requested, **retrieval, "docs": docs,
                    "existing_knowledge": {p: text.splitlines() for p, text in existing.items()},
                    "language_sample": self._language_sample()}
+        if lightweight:
+            payload["acceptance_mode"] = "lightweight"
         if entry.get("reason"):
             payload["previous_review"] = entry["reason"]
+        search = retrieval.get("test_search", {})
+        certificate = build_absence_certificate(tree, self.coverage_policy, feature, self.record.pin) \
+            if not lightweight and "validation" in requested and search.get("complete") and not search.get("matched_files") else None
+        if certificate:
+            payload["verified_absences"] = {"validation": certificate}
         if "draft" not in entry:
+            entry["payload"] = payload
+            entry["evidence_sha256"] = digest(json.dumps(
+                {"files": sorted(files, key=lambda f: (f["path"], f["start"], f["end"])),
+                 "docs": sorted(docs, key=lambda f: (f["path"], f["start"], f["end"])),
+                 "absence": certificate}, sort_keys=True, ensure_ascii=False))
             entry["attempts"] = entry.get("attempts", 0) + 1
+            for facet in requested:
+                slot = entry.setdefault("facets", {}).setdefault(facet, {"attempts": 0, "evidence_visits": {}})
+                slot["attempts"] += 1
             entry["status"] = "extracting"
+            entry["context_sha256"] = digest(_stable_prompt(payload))
             self.record.save(self.rt.state_dir)
-            entry["draft"] = generate(self.rt, self.budget, self.lifecycle.init, system=SYSTEM_DEPTH,
-                                      prompt=prompt(payload), validate=validate_container).data
-            entry["context_sha256"] = digest(prompt(payload))
+            from .depth_inputs import system_prompt
+            entry["draft"] = generate(self.rt, self.budget, self.lifecycle.init,
+                                      system=system_prompt(self.acceptance_mode) if lightweight else SYSTEM_DEPTH,
+                                      prompt=_stable_prompt(payload), validate=validate_container).data
             entry["status"] = "extracted"
             self.record.save(self.rt.state_dir)
-        elif entry.get("context_sha256") != digest(prompt(payload)):
-            raise ValueError("checkpoint draft context changed")
+        else:
+            payload = entry.get("payload", payload)
+            if entry.get("context_sha256") != digest(_stable_prompt(payload)):
+                raise ValueError("checkpoint draft context changed")
+            files, docs = payload["files"], payload["docs"]
+            requested = [f for f in payload["facets"] if f in requested] if lightweight else payload["facets"]
+            certificate = payload.get("verified_absences", {}).get("validation")
         data = entry["draft"]
         validate_container(data)
+        sections = list(data["sections"])
+        if certificate and not any(s.get("facet") == "validation" for s in sections if isinstance(s, dict)):
+            anchor = files[0]
+            sections.append({"facet": "validation", "title": "验证入口：已核验缺失", "basis": "verified_absent",
+                             "interpretation": "fact", "absence_certificate": certificate,
+                             "body": "在该固定源码版本及完整的已跟踪测试检查范围内，未找到可静态关联到本功能入口的自动化测试。"
+                                     "这是测试入口缺口；动态或外部测试覆盖仍未验证，也不代表测试已执行或通过。",
+                             "evidence": [{"path": anchor["path"], "start": anchor["start"],
+                                           "end": min(anchor["end"], anchor["start"] + 20)}]})
         offered = files + docs
         blocks = dict(old_blocks)
-        duplicates = Counter(s.get("facet") for s in data["sections"] if isinstance(s, dict) and isinstance(s.get("facet"), str))
+        duplicates = Counter(s.get("facet") for s in sections if isinstance(s, dict) and isinstance(s.get("facet"), str))
         skipped = []
-        for section in data["sections"]:
+        offered_facets = set()
+        for section in sections:
             try:
-                validate_draft({"sections": [section]})
-                if duplicates[section["facet"]] > 1 or section["facet"] not in payload["facets"]:
+                if not isinstance(section, dict):
+                    raise ValueError("depth section must be an object")
+                if section.get("basis") == "verified_absent":
+                    if section.get("facet") != "validation" or certificate is None:
+                        raise ValueError("no independently replayable absence certificate")
+                    section = {**section, "absence_certificate": certificate}
+                validate_draft({"sections": [section]}, acceptance_mode=self.acceptance_mode)
+                if duplicates[section["facet"]] > 1 or section["facet"] not in requested:
                     raise ValueError("duplicate or unrequested depth facet")
                 for evidence in section["evidence"]:
                     if not any(item["path"] == evidence["path"] and item["start"] <= evidence["start"]
                                <= evidence["end"] <= item["end"] for item in offered):
                         raise ValueError("depth evidence crosses an unshown source gap")
-                if section["facet"] == "flow" and any(s["path"] not in context.production for s in section["trace"]):
+                if not lightweight and section["facet"] == "flow" and any(s["path"] not in context.production for s in section["trace"]):
                     raise ValueError("flow must trace production implementation")
-                blocks[section["facet"]] = render_block(feature, section, tree, self.lifecycle.full_name, self.record.pin)
+                blocks[section["facet"]] = render_block(feature, section, tree, self.lifecycle.full_name,
+                                                       self.record.pin, policy=self.coverage_policy,
+                                                       acceptance_mode=self.acceptance_mode)
+                offered_facets.add(section["facet"])
             except (ValueError, TypeError, KeyError, SyntaxError) as exc:
-                skipped.append(str(section.get("facet", "invalid")) + ": " + str(exc) if isinstance(section, dict) else str(exc))
+                facet = str(section.get("facet", "invalid")) if isinstance(section, dict) else "invalid"
+                skipped.append(facet + ": " + str(exc))
+                if facet in requested:
+                    self._slot_result(entry, facet, "invalid", str(exc))
+        for facet in requested:
+            if facet not in offered_facets and not any(s.startswith(facet + ":") for s in skipped):
+                unknown = data.get("unknown_facets", {})
+                if isinstance(unknown, list):
+                    unknown = {u["facet"]: u.get("reason", "explicitly unsupported") for u in unknown
+                               if isinstance(u, dict) and u.get("facet") in requested}
+                if not isinstance(unknown, dict):
+                    unknown = {}
+                reason = unknown.get(facet, "generator omitted requested facet")
+                self._slot_result(entry, facet, "unknown" if facet in unknown else "omitted", reason)
         entry["skipped_facets"] = skipped
         if blocks == old_blocks:
             raise ModelUnavailable("no supported new depth facets; " + "; ".join(skipped))
@@ -288,9 +550,30 @@ class _KnowledgeDepth(_Knowledge):
         cached = entry.get("checked")
         if not cached or cached.get("text_sha256") != hashed:
             new = {f: block for f, block in blocks.items() if f not in old_blocks}
+            if lightweight and self.stop_file and self.stop_file.exists():
+                return  # durable draft is reviewed after resuming this same round
+            if lightweight and entry.get("review_dispatched"):
+                raise ModelUnavailable("dispatched review has no matching durable receipt; start a bounded correction round")
+            if lightweight:
+                new_evidence = []
+                for block in new.values():
+                    proof = json.loads(re.search(r"<!-- kb:depth-proof (.*?) -->", block, re.S).group(1))
+                    new_evidence += [evidence_for(self.observer, e["path"], e["start"], e["end"]) for e in proof["evidence"]]
+                shown = self._judge_evidence(new_evidence)
+            else:
+                shown = self._judge_evidence(evidence)
+            for block in new.values():
+                proof = json.loads(re.search(r"<!-- kb:depth-proof (.*?) -->", block, re.S).group(1))
+                if proof.get("basis") == "verified_absent":
+                    shown.append({"kind": "replayed_absence_certificate", "certificate": proof["absence_certificate"]})
+            entry["review_attempts"] = entry.get("review_attempts", 0) + 1
+            if lightweight:
+                entry["review_dispatched"] = True
+            self.record.save(self.rt.state_dir)
             entry["checked"] = {**review_facets(self.rt, self.budget, self.lifecycle.init,
                                   feature=feature.id, pin=self.record.pin, blocks=new,
-                                  existing={**existing, page: old}, evidence=self._judge_evidence(evidence)),
+                                  existing={**existing, page: old}, evidence=shown,
+                                  acceptance_modes={f: self.acceptance_mode for f in new}),
                                 "text_sha256": hashed}
             self.record.save(self.rt.state_dir)
         checked = entry["checked"]
@@ -300,13 +583,22 @@ class _KnowledgeDepth(_Knowledge):
         key = "depth:" + feature.id
         prior = self.record.verdicts.setdefault(key, {"facets": {}, "calls": []})
         for f, result in checked["facets"].items():
-            prior["facets"][f] = {**result, "block_sha256": digest(blocks[f]), "model": checked["model"]}
+            prior["facets"][f] = {**result, "block_sha256": digest(blocks[f]), "model": checked["model"],
+                                  "native_trace_id": checked.get("native_trace_id", ""),
+                                  "native_reply_sha256": checked.get("native_reply_sha256", "")}
+            if lightweight:
+                prior["facets"][f]["acceptance_mode"] = "lightweight"
+            self._slot_result(entry, f, result["verdict"], result.get("reason", ""))
         prior["calls"].append(checked)
         entry["shown_source_files"] = sorted({f["path"] for f in files})
         entry["status"] = label
         entry["reason"] = json.dumps({"review": checked["facets"], "unsupported_facets": skipped}, ensure_ascii=False)
+        if labels == {"unjudged"}:
+            entry.pop("checked", None)
+            return
         entry.pop("draft", None)
         entry.pop("checked", None)
+        entry.pop("payload", None)
         if label != "pass":
             return
         blocks = {f: block for f, block in blocks.items() if f in old_blocks or f in passed}
@@ -318,7 +610,36 @@ class _KnowledgeDepth(_Knowledge):
         sources = [f"{self.lifecycle.full_name}@{self.record.pin}:{e.path}:L{e.start}-L{e.end}" for e in kept_evidence]
         proposed = Page.parse(proposed).with_sources(list(dict.fromkeys(sources))).render()
         self.head[page] = proposed
+        if lightweight:
+            self._block_cache[feature.id] = blocks
         self.record.depth["accepted"][page] = proposed
         entry["accepted_sha256"] = digest(proposed)
         self.record.evidence[key] = [e.to_dict() for e in kept_evidence]
         self._link_page(page, _one_line(feature.title) + "：实现深读")
+
+    @staticmethod
+    def _bounded_slices(items, limit):
+        out, used = [], 0
+        for item in items:
+            lines = item["text"] if isinstance(item["text"], list) else item["text"].splitlines()
+            kept = []
+            for line in lines:
+                size = len(line.encode("utf-8")) + 1
+                if used + size > limit:
+                    break
+                kept.append(line)
+                used += size
+            if kept:
+                out.append({**item, "text": kept, "end": item.get("start", 1) + len(kept) - 1})
+        return out
+
+    @staticmethod
+    def _bounded_texts(items, limit):
+        out, used = {}, 0
+        for path, value in items.items():
+            raw = value.encode("utf-8")[:max(0, limit - used)]
+            text = raw.decode("utf-8", errors="ignore")
+            if text:
+                out[path] = text
+                used += len(text.encode("utf-8"))
+        return out
