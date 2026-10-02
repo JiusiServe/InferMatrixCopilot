@@ -1,6 +1,6 @@
 # knowledge_service/ — provider curation components
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-02 -->
 
 The provider owns knowledge curation beneath the public SDK v1 facade.
 `KnowledgeCurator` composes four domain components over one explicit work
@@ -20,6 +20,9 @@ contracts across the move.
 
 Knowledge Ops API 2.0 sits beside the v1 curator and does not change it:
 `lifecycle` parses rule pages (byte-exact) and their `kb:rule` footers,
+and owns the shared depth format, intact-prose reader and safe source-path
+syntax used by retrieval and init/audit; upstream proof verification stays in
+`kb_service.knowledge_depth`.
 `ops.apply_operations` applies typed add / edit_same_meaning / replace / retire
 / purge changes with their mechanical consequences, and `l1` is the
 deterministic half of the quality gate (`check_tree`, `check_changeset`). The
