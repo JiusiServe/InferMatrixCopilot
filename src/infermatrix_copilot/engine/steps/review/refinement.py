@@ -66,6 +66,11 @@ async def _promote_uncovered(ctx: StepContext, output: dict,
         "'covered by weekly only') is a FINDING wearing a validation "
         "stamp — promote it as the pointed question or ask it implies. "
         "Rules: "
+        "A true code fact is not automatically a defect. Require a concrete "
+        "current trigger and adverse effect or an unmet requirement. Do not "
+        "promote harmless unused configuration or hypothetical future code "
+        "changes. Respect REJECTED COMMENTS and their reasons; reopen one "
+        "only with new evidence that defeats the rejection. "
         "(1) ONLY promote what the raw lines already state — no new claims, "
         "no re-investigation; quote the source line in `evidence`. (2) A "
         "promoted line KEEPS its directive force: a concern naming a "
@@ -84,6 +89,9 @@ async def _promote_uncovered(ctx: StepContext, output: dict,
                                              "comment")}
                       for c in comments], ensure_ascii=False, indent=1)
         + "\n\n## RAW FINDINGS\n" + "\n".join(f"- {x}" for x in findings)
+        + "\n\n## REJECTED COMMENTS\n"
+        + json.dumps(output.get("_rejected_review_comments") or [],
+                     ensure_ascii=False)
         + ("\n\n## BLOCKERS\n" + "\n".join(f"- {x}" for x in blockers)
            if blockers else "")
         + ("\n\n## ASSUMPTIONS\n" + "\n".join(f"- {x}" for x in assumptions)
@@ -229,6 +237,11 @@ async def _second_round(ctx: StepContext, output: dict, common: dict,
         "You are the SECOND-ROUND reviewer. The first round produced the "
         "KEPT COMMENTS in your evidence; your job is ONLY its coverage "
         "holes — do not re-litigate or duplicate what is already covered.\n"
+        "Respect rejected_comments and their reasons. Reopen a rejected "
+        "concern only with new evidence defeating that reason. A true code "
+        "fact needs a current trigger and adverse effect or an unmet "
+        "requirement to become a finding; harmless unused values and "
+        "hypothetical future changes are not defects.\n"
         + (("These diff hunks (file:start-line) have NO comment and NO "
             "recorded verification near them. Review each AT MAINTAINER "
             "INLINE GRANULARITY: page to the hunk in situ, and either raise "
@@ -271,7 +284,10 @@ async def _second_round(ctx: StepContext, output: dict, common: dict,
                     "evidence": {**common["evidence"],
                                  "uncovered_hunk_diffs": hunk_evidence,
                                  "kept_comments": json.dumps(
-                                     kept, ensure_ascii=False)}}
+                                     kept, ensure_ascii=False),
+                                 "rejected_comments": json.dumps(
+                                     output.get("_rejected_review_comments")
+                                     or [], ensure_ascii=False)}}
     result, extra = await run_agent_step(
         ctx, **round_kwargs,
         max_iters=ctx.settings.review_second_round_max_iters, **routing)
@@ -333,13 +349,20 @@ In order, with the minimum tool calls (your budget is small):
 2. Claim: is the asserted problem true of the code you just read? If the
    comment asserts consumers/callers/tests elsewhere, grep for them and read
    the one that decides the claim.
-3. Severity: major requires a real defect in the changed code or a required
+3. Actionability: establish a concrete trigger on this PR head and its
+   adverse effect, or a specific unmet requirement. A code fact being true
+   does not establish a defect. Unused optional configuration without an
+   affected consumer, and a problem contingent on hypothetical future code
+   changes, are not actionable. Check rejected_comments before reopening
+   a concern; identify new evidence that defeats its rejection.
+4. Severity: major requires a real defect in the changed code or a required
    update the diff lacks; "consider adding X" polish is minor at most.
 
 Verdicts:
 - confirmed: you READ the code that makes the claim true. You MUST return
   `evidence` as SELF-CONTAINED PROOF a reader with no repo access can check:
-  the decisive code line(s) QUOTED VERBATIM with their file:line, e.g.
+  the current trigger and adverse effect (or unmet requirement), together
+  with the decisive code line(s) QUOTED VERBATIM with their file:line, e.g.
   'serving_speech.py:3711 `extra_args["tts_local_seed"] = seed` — set for
   every model, no qwen3_tts gate'. A narrative like "read the file, claim
   holds" is NOT proof and scores as speculation downstream. When the
@@ -352,6 +375,9 @@ Verdicts:
   the substance, never soften a confirmed defect.
 - refuted: the code CONTRADICTS the claim (misread, already handled, wrong
   file). Refuted is an evidence conclusion, never a budget one.
+- not_actionable: the cited facts may be true, but no current defect or
+  unmet requirement is demonstrated. Explain why the proposed ask is not
+  needed on this head. This verdict drops the comment.
 - unverifiable: you could not decide within budget.
 
 Confirming from plausibility alone is the one failure this pass exists to
@@ -363,7 +389,7 @@ async def _verify_comments(ctx: StepContext, output: dict,
     """Per-comment agentic verification (val-gate lesson: with recall at
     parity the arm lost on per-comment grounding). Each draft comment gets
     one small tool-loop that must anchor and re-derive the claim on the
-    PR-time tree: refuted comments drop, unverifiable ones demote one
+    PR-time tree: refuted and non-actionable comments drop, unverifiable ones demote one
     severity step, confirmed ones may be tightened in wording/position. A
     verification-step failure keeps the comment unchanged — this pass may
     only improve precision, never silently delete recall."""
@@ -385,19 +411,23 @@ async def _verify_comments(ctx: StepContext, output: dict,
                 purpose="Verify one draft review comment against the "
                         "PR-time tree.",
                 guidance=_VERIFY_GUIDANCE,
-                expected="verdict confirmed|refuted|unverifiable, with "
+                expected="verdict confirmed|refuted|not_actionable|unverifiable, with "
                          "optional comment/line/severity corrections",
                 evidence={"pr_diff": diff_ev,
                           "draft_comment": json.dumps(
-                              probe, ensure_ascii=False)},
+                              probe, ensure_ascii=False),
+                          "rejected_comments": json.dumps(
+                              output.get("_rejected_review_comments") or [],
+                              ensure_ascii=False)},
                 output_extension={
-                    "verdict": "confirmed|refuted|unverifiable",
+                    "verdict": "confirmed|refuted|not_actionable|unverifiable",
                     "comment": "optional tightened rewrite",
                     "line": "optional corrected line number",
                     "severity": "optional corrected severity",
                     "evidence": "confirmed only: verbatim-quoted decisive "
-                                "code line(s) with file:line — proof a "
-                                "repo-less reader can check"},
+                                "code line(s) with file:line, current trigger "
+                                "and adverse effect or unmet requirement — "
+                                "proof a repo-less reader can check"},
                 extra_tools=common.get("extra_tools"),
                 max_iters=ctx.settings.review_verify_max_iters)
             return i, result, (out or {})
@@ -411,10 +441,10 @@ async def _verify_comments(ctx: StepContext, output: dict,
         c = dict(comments[i])
         verdict = str(out.get("verdict") or "").lower()
         if not result.ok or verdict not in ("confirmed", "refuted",
-                                            "unverifiable"):
+                                            "not_actionable", "unverifiable"):
             kept.append(c)          # fail-open: never delete on pass failure
             continue
-        if verdict == "refuted":
+        if verdict in ("refuted", "not_actionable"):
             n_drop += 1
             continue
         if verdict == "confirmed":
