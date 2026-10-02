@@ -45,3 +45,6 @@ sources: []
 - [video-duplex-backend](video-duplex-backend/_index.md)
 - [video-duplex](video-duplex/_index.md)
 - [video-duplex-frontend](video-duplex-frontend/_index.md)
+- [生命周期 Hooks 与扩展：实现深读](feature-depth-hooks.md)
+- [Application Plugin 与前端贡献：实现深读](feature-depth-applications.md)
+- [音视频双工扩展：实现深读](feature-depth-video-duplex.md)

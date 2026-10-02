@@ -15,3 +15,4 @@ sources: []
 - [deploy-yuanrong](deploy-yuanrong/_index.md)
 - [scripts](scripts/_index.md)
 - [scripts-nfs](scripts-nfs/_index.md)
+- [打包与部署：实现深读](feature-depth-deployment.md)

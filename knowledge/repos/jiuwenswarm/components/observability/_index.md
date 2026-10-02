@@ -28,3 +28,5 @@ sources: []
 - [执行轨迹与保留 功能知识](feature-observability.md)
 - [Debug Dump 与 OTel 功能知识](feature-debug-trace.md)
 - [observability 源码接口与集成边界 01](source-contracts-01.md)
+- [执行轨迹与保留：实现深读](feature-depth-observability.md)
+- [Debug Dump 与 OTel：实现深读](feature-depth-debug-trace.md)

@@ -51,3 +51,4 @@ sources: []
 - [symphony-orchestration 源码接口与集成边界 01](source-contracts-01.md)
 - [shared](shared/_index.md)
 - [skill-retrieval](skill-retrieval/_index.md)
+- [Symphony 检索与图谱编排：实现深读](feature-depth-symphony.md)

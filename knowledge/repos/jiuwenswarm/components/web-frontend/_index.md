@@ -97,3 +97,11 @@ sources: []
 - [会话产物列表、预览与下载功能知识](feature-artifacts.md)
 - [语音输入、回复朗读与停止功能知识](feature-speech-interaction.md)
 - [Web 静态入口：产物、接口、配置与验证](knowledge-web-frontend.md) — 说明接口、配置与集成边界，关联源码和维护者文档。
+- [Web 对话与流式状态：实现深读](feature-depth-web-chat.md)
+- [Web 页面与功能入口：实现深读](feature-depth-web-navigation.md)
+- [智能体资产管理与工作区浏览：实现深读](feature-depth-agent-management.md)
+- [连接器市场与 MCP 授权流程：实现深读](feature-depth-connectors.md)
+- [持续目标与会话控制：实现深读](feature-depth-goal-mode.md)
+- [计划模式与多入口切换限制：实现深读](feature-depth-plan-mode.md)
+- [会话产物列表、预览与下载：实现深读](feature-depth-artifacts.md)
+- [语音输入、回复朗读与停止：实现深读](feature-depth-speech-interaction.md)
