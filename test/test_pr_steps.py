@@ -509,8 +509,9 @@ def test_review_event_mapping(comments, pr_state, review_text, event):
     assert _event_for_review(comments, pr_state, review_text) == event
 
 
+@pytest.mark.parametrize("commit_count", [1, 100])
 def test_post_review_submits_one_review_with_inline_comments(
-        registry, settings, trace, tmp_path, monkeypatch):
+        registry, settings, trace, tmp_path, monkeypatch, commit_count):
     from infermatrix_copilot.engine.steps.pr import publish
 
     settings.allow_post = True
@@ -533,7 +534,12 @@ def test_post_review_submits_one_review_with_inline_comments(
 
     def fake_gh(args, cwd=None):
         if args[:2] == ["pr", "view"]:
-            return 0, json.dumps({"commits": [{"oid": "b" * 40}]})
+            # A longer PR's first 100 commits can end before the reviewed head.
+            data = {"commits": [{"oid": "b" * 40 if commit_count == 1 else "a" * 40}
+                                for _ in range(commit_count)]}
+            if "headRefOid" in args[args.index("--json") + 1].split(","):
+                data["headRefOid"] = "b" * 40
+            return 0, json.dumps(data)
         captured["args"] = args
         captured["cwd"] = cwd
         payload_path = Path(args[args.index("--input") + 1])
@@ -547,11 +553,37 @@ def test_post_review_submits_one_review_with_inline_comments(
     assert result.ok, result.summary
     assert captured["args"][:3] == ["api", "--method", "POST"]
     assert captured["args"][3] == "repos/owner/repo/pulls/7/reviews"
+    assert captured["payload"]["commit_id"] == "b" * 40
     assert len(captured["payload"]["comments"]) == 1
     assert result.outputs["inline"] == 1
     assert result.outputs["downgraded"] == 1
     assert result.outputs["event"] == "COMMENT"
     assert result.outputs["url"].endswith("#review")
+
+
+@pytest.mark.parametrize("head", [None, ""])
+def test_post_review_without_authoritative_head_does_not_write(
+        registry, settings, trace, tmp_path, monkeypatch, head):
+    from infermatrix_copilot.engine.steps.pr import publish
+
+    settings.allow_post = True
+    state = {"repo_path": str(tmp_path), "task_spec": {"pr": 7, "post": True},
+             "diff_text": _REVIEW_DIFF, "review_comments": [_finding("a.py", 10)],
+             "review_text": "Review complete.", "pr_head_sha": "b" * 40}
+    monkeypatch.setattr(publish, "_repo_full_name", lambda ctx, repo: "owner/repo")
+
+    def fake_gh(args, cwd=None):
+        assert args[:2] == ["pr", "view"], "must not submit an unverified review"
+        assert "headRefOid" in args[args.index("--json") + 1].split(",")
+        return 0, json.dumps({"headRefOid": head, "commits": [{"oid": "b" * 40}]})
+
+    monkeypatch.setattr(publish, "_gh", fake_gh)
+    ctx = _ctx(settings, trace, tmp_path, state)
+    result = asyncio.run(registry.get("pr.post_review").handler(ctx))
+
+    assert not result.ok and result.failure is FailureKind.ESCALATE
+    assert "PR head SHA missing" in result.summary
+    assert not (ctx.run_dir / "github_review_payload.json").exists()
 
 
 def test_post_review_api_failure_escalates_with_payload(
@@ -573,7 +605,7 @@ def test_post_review_api_failure_escalates_with_payload(
 
     def fake_gh(args, cwd=None):
         if args[:2] == ["pr", "view"]:
-            return 0, json.dumps({"commits": [{"oid": "c" * 40}]})
+            return 0, json.dumps({"headRefOid": "c" * 40})
         return 1, "HTTP 422 stale line"
 
     monkeypatch.setattr(publish, "_gh", fake_gh)
@@ -789,6 +821,62 @@ def test_pinned_diff_ignores_a_stale_origin_tracking_ref(tmp_path):
     assert "pr.py" in text and "churn.py" not in text
 
 
+def test_fetch_diff_uses_authoritative_head_with_truncated_commits(
+        registry, settings, trace, tmp_path, monkeypatch):
+    """The first 100 commits of a longer PR must not falsely trip the stale gate.
+
+    The authoritative head governs the real fetch, diff and materialized tree,
+    even when the returned commit list ends at an earlier commit.
+    """
+    from infermatrix_copilot.engine import worktrees as wt_mod
+    from infermatrix_copilot.engine.steps.pr import fetch as fetch_mod
+
+    work, _base_tip, pr_head = _pr_upstream(tmp_path)
+    commits = [{"oid": f"{index:040x}"} for index in range(1, 101)]
+    assert commits[-1]["oid"] != pr_head
+
+    def fake_gh(args, cwd=None):
+        if args[:2] == ["pr", "view"]:
+            fields = args[args.index("--json") + 1].split(",")
+            data = {"baseRefName": "main", "commits": commits}
+            if "headRefOid" in fields:
+                data["headRefOid"] = pr_head
+            return 0, json.dumps(data)
+        return 0, "{}"
+
+    monkeypatch.setattr(fetch_mod, "_gh", fake_gh)
+    monkeypatch.setattr(wt_mod.Path, "home", staticmethod(lambda: tmp_path))
+    state = {"task_spec": {"kind": "pr_review", "pr": 7, "repo": "vllm-omni",
+                           "expected_head_sha": pr_head},
+             "repo_path": str(work)}
+    result = asyncio.run(registry.get("pr.fetch_diff").handler(
+        _ctx(settings, trace, tmp_path, state)))
+
+    assert result.ok, result.summary
+    updates = result.outputs["state_updates"]
+    assert updates["pr_head_sha"] == pr_head
+    assert "pr.py" in updates["diff_text"]
+    assert (Path(updates["repo_path"]) / "pr.py").read_text() == "PR = 1\n"
+    assert not list(trace.events("expected_head_mismatch"))
+
+
+@pytest.mark.parametrize("head", [None, ""])
+def test_resolve_pr_head_does_not_infer_missing_head_from_commits(
+        tmp_path, monkeypatch, head):
+    from infermatrix_copilot.engine.steps.pr import fetch as fetch_mod
+
+    def fake_gh(args, cwd=None):
+        assert "headRefOid" in args[args.index("--json") + 1].split(",")
+        return 0, json.dumps({"baseRefName": "main", "headRefOid": head,
+                              "commits": [{"oid": "a" * 40}]})
+
+    monkeypatch.setattr(fetch_mod, "_gh", fake_gh)
+    base, actual, error = fetch_mod._resolve_pr_head(tmp_path, 7)
+    assert base == "main"
+    assert actual == ""
+    assert error == "PR head unresolvable from pr view"
+
+
 def test_merged_pr_falls_back_to_the_api_diff(settings, trace, tmp_path,
                                               monkeypatch):
     """A merged PR's head is an ancestor of the base, so the three-dot diff is
@@ -812,8 +900,7 @@ def test_merged_pr_falls_back_to_the_api_diff(settings, trace, tmp_path,
 
     def fake_gh(args, cwd=None):
         if args[:2] == ["pr", "view"]:
-            return 0, json.dumps({"baseRefName": "main",
-                                  "commits": [{"oid": pr_head}]})
+            return 0, json.dumps({"baseRefName": "main", "headRefOid": pr_head})
         return 0, "diff --git a/pr.py b/pr.py\n+PR = 1\n"
 
     monkeypatch.setattr(fetch_mod, "_gh", fake_gh)
@@ -882,8 +969,7 @@ def test_fetch_diff_blocks_on_a_stale_expected_head(settings, trace, tmp_path,
     def fake_gh(args, cwd=None):
         calls.append(list(args))
         if args[:2] == ["pr", "view"]:
-            return 0, _json.dumps({"baseRefName": "main",
-                                   "commits": [{"oid": actual}]})
+            return 0, _json.dumps({"baseRefName": "main", "headRefOid": actual})
         return 0, "diff --git a/x b/x"
 
     monkeypatch.setattr(fetch_mod, "_gh", fake_gh)
