@@ -1,7 +1,7 @@
 ---
 title: "MiniMax H3 VAE eager-ops rules"
 created: 2026-09-05
-updated: 2026-09-09
+updated: 2026-09-22
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #6607", vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/models/minimax_h3/ops/README.md, vllm_omni/diffusion/models/minimax_h3/ops/vae/__init__.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/dispatch.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/qk_norm_rope.py, vllm_omni/diffusion/models/minimax_h3/ops/vae/scaled_residual.py, tests/diffusion/models/minimax_h3/test_minimax_h3_vae_ops.py, "PR #7191"]
@@ -41,3 +41,10 @@ confidence: high
 - 强制：仅在 CUDA 设备上进入 scoped context：`cudnn.enabled=True`、`benchmark=False`、`deterministic=True`、`allow_tf32=True`；成功与异常退出都必须恢复调用方原 backend 状态。非 CUDA 设备 no-op。该 pin 只包裹 keyframe encode，不改变非 keyframe 路径或 accuracy 阈值。
 - 禁止：依赖进程 ambient cuDNN algorithm 选择；把 pin 做成进程级永久开关；把单次卡组差异描述成已证明的跨 SKU/driver 完全确定性。
 - 验收：CPU/mock 覆盖 enter/exit 四标志 pin 与 restore、encode 成功与失败路径都离开 context；真实 GPU accuracy gate 另绑定固定拓扑与 workload，不得用本 context 单测代替。^[PR #7191]
+
+## MMH3-4e — Hopper keyframe encode 必须关闭 cuDNN TF32 且与 determinism 解耦
+
+- 触发：修改 `MiniMaxH3VideoVAE` keyframe/`encode_image` 的 `torch.backends.cudnn.flags`、`allow_tf32`，或该 latent 作为 I2VA/Ref2VA 条件锚点的数值敏感路径。
+- 强制：scoped context 仍固定 `enabled=True`、`benchmark=False`、`deterministic=True`，并在成功与异常路径恢复调用方原 backend。CUDA 且 `current_omni_platform.get_device_capability(...).major == 9` 时必须 `allow_tf32=False`；其他 capability 或非 CUDA 保持既有 `allow_tf32=True` / no-op。deterministic 与 TF32 是独立控制，不得用 `deterministic=True` 推断已走 FP32 卷积。
+- 禁止：在 Hopper 上为 keyframe 保留 TF32；把 pin 做成进程级永久开关；仅调低 SSIM/PSNR 阈值或改 reference asset 来掩盖精度漂移；把单次 H100/H800 结果外推为所有 Hopper 拓扑必现失败。
+- 验收：参数化 capability（含 `(9,0)`、非 9、`None`）与 enter/exit/失败路径，断言 `allow_tf32` 选择与四标志 restore；真实 I2VA gate 仍绑定固定阈值与 workload，不得用本单测代替。^[PR #7913]

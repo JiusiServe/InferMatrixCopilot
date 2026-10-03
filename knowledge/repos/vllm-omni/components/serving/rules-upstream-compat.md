@@ -92,3 +92,10 @@ confidence: high
   已删除就宣称所有内部兼容路径已移除。
 - 验收：公开 rejection 与 canonical forwarding 测试通过；每个暂留内部/direct 路径有独立
   compatibility test，直到后续迁移显式删除。 ^[PR #5647]
+
+## SERV-7i — Speech 错误响应不得依赖 Request 上的 tokenization instrumentator
+
+- 触发：修改 `_create_speech_error_json_response`、voice list/upload/delete 路由，或 diffusion TTS 在 `serving_tokenization is None` 时的错误路径。
+- 强制：使用 upstream 独立的 `create_error_response` 构造 `ErrorResponse`，helper 不再要求 `raw_request` / `base(raw_request)`。无 Speech handler、校验失败与内部错误仍返回既有 OpenAI JSON 与状态码，不因缺 tokenization 升级为 500。
+- 禁止：在单测里 mock 掉 `base()` 从而掩盖生产路径对 instrumentator 的依赖；让 diffusion TTS voice 错误在无 tokenization 时落到未捕获异常。
+- 验收：构造 `app.state.serving_tokenization=None` 的真实 Request，覆盖 list/upload/delete 的 404/400/校验路径，断言 JSON error shape 且非 500。^[PR #7798]
