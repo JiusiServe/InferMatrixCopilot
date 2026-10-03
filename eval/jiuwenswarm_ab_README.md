@@ -118,3 +118,40 @@ started/completed/failed 检查点及身份摘要约束恢复；Codex 基准与�
 ```
 
 上述测试不调用模型；覆盖固定输入、真实 merge-base、工具隔离、预算、引用校验、恢复与计数。完整原生日志保存在外部归档，提交到 Git 的报告使用精简指标和摘要。
+
+## 协议修复后复测
+
+原始 72 次结果及其失败保持不变。复测通过 [准备工具](jiuwenswarm_ab_retest.py)核对已发布报告的哈希绑定、12 个 PR 的固定源码、文档快照及模型预算，再创建独立外部目录。复用原来评审前冻结的 Codex 问题清单，包含 #7656 的未知状态；只重绑定实验元数据，问题正文、数量和原始记录另存哈希，不重新抽样问题基准。
+
+```bash
+AB_PREVIOUS=/absolute/path/outside/repository/jiuwenswarm-docs-ab-original/evaluation-v2
+AB_RETEST=/absolute/path/outside/repository/jiuwenswarm-docs-ab-retest
+AB_STUDY="$AB_RETEST/evaluation-v2"
+
+"$AB_PYTHON" eval/jiuwenswarm_ab_retest.py prepare \
+  --previous-study "$AB_PREVIOUS" --run-root "$AB_STUDY"
+
+"$AB_PYTHON" eval/jiuwenswarm_ab_judge.py preflight \
+  --campaign "$AB_STUDY/campaign.json" --preflight-tag protocol-fix
+
+"$AB_PYTHON" eval/jiuwenswarm_pr_review_ab.py preflight \
+  --campaign "$AB_STUDY/campaign.json"
+
+"$AB_PYTHON" eval/jiuwenswarm_pr_review_ab.py run \
+  --campaign "$AB_STUDY/campaign.json" --workers 13 \
+  --truth-manifest "$AB_STUDY/private-codex/truth-manifest.json"
+
+"$AB_PYTHON" eval/jiuwenswarm_pr_review_ab.py collect \
+  --campaign "$AB_STUDY/campaign.json"
+
+"$AB_PYTHON" eval/jiuwenswarm_ab_judge.py score \
+  --campaign "$AB_STUDY/campaign.json" --workers 4
+
+"$AB_PYTHON" eval/jiuwenswarm_ab_retest_report.py \
+  --previous-study "$AB_PREVIOUS" --study "$AB_STUDY" \
+  --output-dir "$AB_RETEST/report"
+```
+
+此次修复统一评估提示词与严格输出校验：所有评审条目都有字符串锚点，无法提供精确锚点时为空字符串；重复候选合并在 findings 中。目录检索允许安全的 `.` 根目录别名与一个尾部 `/`，文件读取和路径边界保持严格。提示词工具使用连续游标，完整读完后才开放源码与文档工具。原生预检实际分页读取大型 PR 的上下文和完整 diff，验证修复后的目录写法及规范空评审格式。
+
+预检不计入正式 72 次；预检失败则停止正式派发。代码和输入冻结后不修改协议；无效内容和格式不补采样、不事后晋升。新报告同时列前后完成率、有效评审的条件精确率、有限基准召回和速度，记录提示词协议变化与服务排期差异，不能将前后差额单独归因于知识库。

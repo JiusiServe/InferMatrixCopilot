@@ -18,7 +18,7 @@ sys.modules[SPEC.name] = ab
 SPEC.loader.exec_module(ab)
 
 
-def _tools(tmp_path, initial=0):
+def _tools(tmp_path, initial=0, complete=True):
     source = tmp_path / "source"
     source.mkdir()
     (source / "core.py").write_text("VALUE = 1\n" * 4000)
@@ -37,11 +37,16 @@ def _tools(tmp_path, initial=0):
                      "sources": {p.name: ab.digest(p.read_bytes()) for p in source.iterdir()}},
             "arm": {"doc_root": str(docs), "repo_subdir": "repos/jiuwenswarm",
                     "documents": {page.relative_to(docs).as_posix(): ab.digest(page.read_bytes())}}}
-    return ab.ClosedTools(spec), spec
+    tools = ab.ClosedTools(spec)
+    if complete:
+        page = json.loads(tools.call("read_prompt", {"offset": 0}))
+        while page["next_offset"] is not None:
+            page = json.loads(tools.call("read_prompt", {"offset": page["next_offset"]}))
+    return tools, spec
 
 
 def test_prompt_paging_must_cover_all_bytes(tmp_path):
-    tools, spec = _tools(tmp_path)
+    tools, spec = _tools(tmp_path, complete=False)
     result = json.loads(tools.call("read_prompt", {"offset": 0}))
     assert not ab.covered_prompt(tools.state, result["total_chars"])
     while result["next_offset"] is not None:
@@ -50,6 +55,81 @@ def test_prompt_paging_must_cover_all_bytes(tmp_path):
     assert tools.state["knowledge_chars"] == 0
     Path(spec["prompt_path"]).write_text("changed")
     assert "frozen prompt changed" in tools.call("read_prompt", {})
+
+
+def test_sequential_prompt_skip_and_early_tools_recover_without_spending_budgets(tmp_path):
+    tools, _ = _tools(tmp_path, initial=5900, complete=False)
+    first = json.loads(tools.call("read_prompt", {"offset": 0}))
+    assert first["prompt_complete"] is False
+    assert "nonsequential_prompt_offset" in tools.call("read_prompt", {"offset": 44000})
+    for name, args in [("source_list", {"path": "."}), ("source_read", {"path": "core.py"}),
+                       ("doc_read", {"path": "repos/jiuwenswarm/guide.md"}), ("calc", {"expr": "1+1"})]:
+        refused = json.loads(tools.call(name, args))
+        assert f"read_prompt(offset={first['next_offset']})" in refused["error"]
+    assert tools.state["source_calls"] == 0
+    assert tools.state["knowledge_chars"] == 5900
+    assert tools.state["violations"] == []
+    page = first
+    while page["next_offset"] is not None:
+        page = json.loads(tools.call("read_prompt", {"offset": page["next_offset"]}))
+    assert page["prompt_complete"] is True
+    assert page["cursor"] == page["total_chars"] == 54000
+    assert ab.covered_prompt(tools.state, 54000)
+    assert "paths" in json.loads(tools.call("source_list", {"path": "."}))
+
+
+def test_large_escape_heavy_prompt_every_character_and_encoded_page_fits(tmp_path):
+    tools, spec = _tools(tmp_path, complete=False)
+    text = '"\\\n\t中' * 85000
+    Path(spec["prompt_path"]).write_text(text)
+    spec["prompt_sha256"] = ab.digest(text)
+    chunks, offset = [], 0
+    while True:
+        encoded = tools.call("read_prompt", {"offset": offset})
+        assert len(encoded) <= ab.RESULT_CHARS
+        page = json.loads(encoded)
+        chunks.append(page["content"])
+        assert page["cursor"] == offset + len(page["content"])
+        assert page["prompt_sha256"] == ab.digest(text)
+        if page["next_offset"] is None:
+            assert page["prompt_complete"] is True
+            break
+        assert page["next_offset"] > offset
+        offset = page["next_offset"]
+    assert "".join(chunks) == text
+    assert len(chunks) > 20
+    assert ab.covered_prompt(tools.state, len(text))
+    assert not ab.covered_prompt({**tools.state, "prompt_complete": False}, len(text))
+    assert not ab.covered_prompt({**tools.state, "prompt_cursor": len(text) - 1}, len(text))
+    assert not ab.covered_prompt({**tools.state, "prompt_ranges": [[0, 2], [3, len(text)]]}, len(text))
+
+
+@pytest.mark.parametrize("tool", ["source_list", "source_grep"])
+def test_source_directory_root_alias_and_terminal_separator(tmp_path, tool):
+    tools, spec = _tools(tmp_path)
+    directory = Path(spec["case"]["source_root"]) / "tests/nested"
+    directory.mkdir(parents=True)
+    target = directory / "test_core.py"
+    target.write_text("VALUE = 2\n")
+    spec["case"]["sources"]["tests/nested/test_core.py"] = ab.digest(target.read_bytes())
+    args = {"pattern": "VALUE"} if tool == "source_grep" else {}
+    plain = json.loads(tools.call(tool, {**args, "path": "tests/nested"}))
+    slash = json.loads(tools.call(tool, {**args, "path": "tests/nested/"}))
+    assert plain == slash
+    root = json.loads(tools.call(tool, {**args, "path": ""}))
+    assert json.loads(tools.call(tool, {**args, "path": "."})) == root
+    assert tools.state["violations"] == []
+
+
+@pytest.mark.parametrize("path", ["./", "tests//", "tests//nested/", "tests/./nested/",
+                                  "tests/../", "../tests/", "/tests/", ".git/", "tests/.git/",
+                                  "docs/", ".doc_project_maintainer/", "guide.md/"])
+@pytest.mark.parametrize("tool", ["source_list", "source_grep"])
+def test_directory_normalization_keeps_scope_and_document_isolation(tmp_path, tool, path):
+    tools, _ = _tools(tmp_path)
+    args = {"path": path, **({"pattern": "VALUE"} if tool == "source_grep" else {})}
+    assert "error" in json.loads(tools.call(tool, args))
+    assert tools.state["violations"]
 
 
 def test_knowledge_reads_share_closed_cumulative_quota(tmp_path):
@@ -99,6 +179,33 @@ def test_source_outputs_and_calls_bounded_and_binary_grep_skipped(tmp_path):
     assert tools.state["violations"] == []
 
 
+@pytest.mark.parametrize("tool", ["source_read", "file_at_base"])
+def test_source_paging_accounts_for_json_expansion(tmp_path, monkeypatch, tool):
+    tools, spec = _tools(tmp_path)
+    text = '"\\\n\t中' * 11000
+    if tool == "source_read":
+        Path(spec["case"]["source_root"], "core.py").write_text(text)
+        spec["case"]["sources"]["core.py"] = ab.digest(text)
+    else:
+        def fake_git(root, *args):
+            return b"100644 blob abc\tcore.py\0" if args[0] == "ls-tree" else text.encode() if args[0] == "show" else b""
+        monkeypatch.setattr(ab, "git", fake_git)
+    chunks, offset = [], 0
+    while True:
+        encoded = tools.call(tool, {"path": "core.py", "offset": offset})
+        assert len(encoded) <= 24000
+        page = json.loads(encoded)
+        assert page["start_line"] == text[:offset].count("\n") + 1
+        chunks.append(page["content"])
+        if page["next_offset"] is None:
+            break
+        assert page["next_offset"] == offset + len(page["content"])
+        offset = page["next_offset"]
+    assert "".join(chunks) == text
+    assert tools.state["source_calls"] == len(chunks) < 60
+    assert tools.state["violations"] == []
+
+
 def test_changed_source_or_other_arm_document_is_refused(tmp_path):
     tools, spec = _tools(tmp_path)
     Path(spec["case"]["source_root"], "core.py").write_text("tampered")
@@ -114,6 +221,45 @@ def test_reply_fences_allowed_without_model_repair():
         ab.validate_reply('{"status":"success","review_comments":[],"tests_run":["pytest"]}')
     with pytest.raises(ValueError):
         ab.validate_reply("malformed")
+
+
+def test_canonical_contract_required_anchors_enums_and_json_remain_strict():
+    fields = {"file": "core.py", "line": 1, "anchor_snippet": "", "severity": "minor",
+              "comment": "A scoped suggestion.", "evidence": 'core.py:1: VALUE = "1"', "disposition": "excluded"}
+    output = {"status": "success", "review_comments": [fields], "tests_run": []}
+    assert ab.validate_reply(json.dumps(output)) == output
+    for patch in [{"severity": "P2"}, {"evidence": ["core.py:1"]}, {"disposition": "duplicate"}]:
+        with pytest.raises(ValueError):
+            ab.validate_reply(json.dumps({**output, "review_comments": [{**fields, **patch}]}))
+    without_anchor = {key: value for key, value in fields.items() if key != "anchor_snippet"}
+    with pytest.raises(ValueError, match="missing required"):
+        ab.validate_reply(json.dumps({**output, "review_comments": [without_anchor]}))
+    for syntax_error in ['{"status":"success","review_comments":[],}',
+                         '{"status":"success","review_comments":[],"summary":"bad "quote""}']:
+        with pytest.raises(ValueError):
+            ab.validate_reply(syntax_error)
+    with pytest.raises(ValueError, match="cannot execute tests"):
+        ab.validate_reply(json.dumps({"status": "success", "bootstrap": True, "review_comments": [], "tests_run": ["pytest"]}), preflight=True)
+    guidance = ab.review_guidance()
+    assert "omit the field entirely" not in guidance
+    assert "`duplicate` for" not in guidance
+    assert "the other four" not in guidance
+    schema_fields = ab.output_contract()["properties"]["review_comments"]["items"]
+    assert set(schema_fields["required"]) == set(fields)
+    assert schema_fields["properties"]["evidence"]["type"] == "string"
+
+
+def test_preflight_uses_full_frozen_context_and_diff_without_review(tmp_path):
+    case, _ = _native_case(tmp_path)
+    diff = "diff --git a/core.py b/core.py\n" + "+VALUE = 2\n" * 40000
+    Path(case["diff_path"]).write_text(diff)
+    prompt = ab.make_prompt(case, {"documents": [], "content_chars": 0}, preflight=True)
+    assert "Do not analyze defects or review this PR" in prompt
+    assert "source_list(path='.')" in prompt
+    assert "source_read(path='core.py', offset=0)" in prompt
+    assert '"bootstrap": true' in prompt
+    assert diff in prompt
+    assert len(prompt) > 400000
 
 
 def test_native_command_disables_reads_and_session_tools(tmp_path, monkeypatch):
@@ -156,8 +302,9 @@ tools = m.ClosedTools(json.loads((root/'bridge-spec.json').read_text()))
 result = json.loads(tools.call('read_prompt', {'offset':0}))
 while result['next_offset'] is not None:
     result = json.loads(tools.call('read_prompt', {'offset':result['next_offset']}))
-tools.call('source_list', {})
-for _ in range(SOURCE_USES - 1):
+tools.call('source_list', {'path':'.'})
+tools.call('source_read', {'path':'core.py'})
+for _ in range(SOURCE_USES - 2):
     tools.call('source_list', {})
 tools.call('doc_search', {'query':'__bootstrap_no_match__'})
 if KNOWLEDGE_NEARCAP:
@@ -246,6 +393,18 @@ def test_native_nameless_results_and_batches_require_known_bridge_call_ids():
     assert ab.native_tool_violations(events) == []
     assert ab.native_tool_violations(events + [event(kind="completed", toolName="Read", toolCallId="c1")]) == ["Read"]
     assert ab.native_tool_violations(events + [event(kind="result", toolCallId="unknown")]) == ["unrecognized_tool_event"]
+
+
+def test_native_tool_lifecycle_correlation_reordered_but_names_remain_closed():
+    def event(**payload):
+        return {"type": "tool.updated", "payload": payload}
+    events = [event(kind="result", toolCallId="c1"), event(kind="started", toolCallId="c1"),
+              event(kind="batch", toolCallIds=["c1"]),
+              event(kind="scheduled", toolName=ab.BRIDGE_PREFIX + "source_list", toolCallId="c1")]
+    assert ab.native_tool_violations(events) == []
+    assert ab.native_tool_violations(events + [event(kind="scheduled", toolName="mcp__other__source_list", toolCallId="c1")]) == ["mcp__other__source_list"]
+    assert ab.native_tool_violations(events + [event(kind="error", toolCallId="unseen")]) == ["unrecognized_tool_event"]
+    assert ab.native_tool_violations(events + [event(kind="future_protocol", toolCallId="c1")]) == ["unrecognized_tool_event"]
 
 
 def test_source_limit_cumulative_across_only_transport_retry(tmp_path):
