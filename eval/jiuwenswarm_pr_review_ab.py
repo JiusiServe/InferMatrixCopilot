@@ -37,12 +37,18 @@ MODEL = "GLM-5.3"
 KNOWLEDGE_CHARS = 6000
 SOURCE_CALLS = 60
 RESULT_CHARS = 24000
+RESULT_UTF8_BYTES = 24000
 TIMEOUT_S = 1800
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BRIDGE_NAME = "jiuwenswarm-ab"
 BRIDGE_PREFIX = f"mcp__{BRIDGE_NAME}__"
 TOOLS = {"read_prompt", "source_read", "source_grep", "source_list",
          "file_at_base", "calc", "doc_search", "doc_read"}
+SOURCE_TOOLS = {"source_read", "source_grep", "source_list", "file_at_base", "calc"}
+PROTOCOL_GUARDS = {"mcp_structured_output": False, "bridge_result_utf8_bytes": RESULT_UTF8_BYTES,
+                   "native_result_chars": RESULT_CHARS, "native_result_utf8_bytes": RESULT_UTF8_BYTES,
+                   "reject_native_truncated": True, "count_source_calls_before_prompt_gate": True,
+                   "native_source_request_limit": SOURCE_CALLS}
 DOC_SUFFIXES = {".md", ".mdx", ".rst", ".adoc"}
 
 
@@ -56,17 +62,20 @@ def digest(data: bytes | str) -> str:
 
 def bounded_page(make_page, offset, end):
     """Fit an exact text prefix under the encoded tool-result ceiling."""
-    if len(json.dumps(make_page(end), ensure_ascii=False)) > RESULT_CHARS:
+    def fits(stop):
+        encoded = json.dumps(make_page(stop), ensure_ascii=False)
+        return len(encoded) <= RESULT_CHARS and len(encoded.encode("utf-8")) <= RESULT_UTF8_BYTES
+    if not fits(end):
         lo, hi = offset, end
         while lo < hi:
             mid = (lo + hi + 1) // 2
-            if len(json.dumps(make_page(mid), ensure_ascii=False)) <= RESULT_CHARS:
+            if fits(mid):
                 lo = mid
             else:
                 hi = mid - 1
         end = lo
     page = make_page(end)
-    if len(json.dumps(page, ensure_ascii=False)) > RESULT_CHARS:
+    if not fits(end):
         raise ValueError("page metadata exceeds result budget")
     return end, page
 
@@ -262,6 +271,7 @@ def load_campaign(path):
                 "limits": {"knowledge_chars": KNOWLEDGE_CHARS, "source_calls": SOURCE_CALLS,
                            "source_result_chars": RESULT_CHARS, "timeout_s": TIMEOUT_S,
                            "start_interval_s": 15, "rate_cooldown_s": 90, "workers": 13}}
+    identity["protocol_guards"] = PROTOCOL_GUARDS.copy()
     identity["identity_sha256"] = digest(json.dumps(identity, sort_keys=True))
     return campaign, identity, transport
 
@@ -409,13 +419,14 @@ class ClosedTools:
             try:
                 if name not in TOOLS:
                     raise SecurityViolation("unknown bridge tool")
+                if name in SOURCE_TOOLS:
+                    self._source_budget()
                 if name != "read_prompt" and not self.state["prompt_complete"]:
                     raise ValueError(f"prompt_not_complete: read_prompt(offset={self.state['prompt_cursor']}) before other tools")
                 result = getattr(self, name)(**args)
                 encoded = json.dumps(result, ensure_ascii=False)
-                if name.startswith("source_") or name in {"file_at_base", "calc"}:
-                    if len(encoded) > RESULT_CHARS:
-                        raise ValueError("source result exceeds budget")
+                if len(encoded) > RESULT_CHARS or len(encoded.encode("utf-8")) > RESULT_UTF8_BYTES:
+                    raise ValueError("tool result exceeds character/UTF-8 byte budget")
                 error = ""
             except (OSError, UnicodeError, ValueError, TypeError) as exc:
                 error = str(exc)
@@ -467,7 +478,6 @@ class ClosedTools:
         self.state["source_calls"] += 1
 
     def source_read(self, path, offset=0):
-        self._source_budget()
         offset = self._offset(offset)
         path = safe_relative(path)
         if not is_source(path):
@@ -487,7 +497,6 @@ class ClosedTools:
         return [p for p in self.spec["case"]["sources"] if not path or p == path or p.startswith(path.rstrip("/") + "/")]
 
     def source_list(self, path=""):
-        self._source_budget()
         paths = self._matching_paths(path)
         if path and not paths:
             raise FileNotFoundError("path not found in source manifest")
@@ -495,7 +504,6 @@ class ClosedTools:
         return {"paths": text[:21000], "truncated": len(text) > 21000, "total_files": len(paths)}
 
     def source_grep(self, pattern, path=""):
-        self._source_budget()
         if not isinstance(pattern, str) or not 1 <= len(pattern) <= 200:
             raise ValueError("pattern must be a 1–200 character literal")
         paths = self._matching_paths(path)
@@ -520,7 +528,6 @@ class ClosedTools:
         return {"matches": "\n".join(hits), "truncated": truncated, "literal": True}
 
     def file_at_base(self, path, offset=0):
-        self._source_budget()
         path = safe_relative(path)
         offset = self._offset(offset)
         if not is_source(path):
@@ -544,7 +551,6 @@ class ClosedTools:
         return bounded_page(page, offset, end)[1]
 
     def calc(self, expr):
-        self._source_budget()
         from infermatrix_copilot.engine.steps.review.repo_tools import _calc
         return {"result": _calc(expr)}
 
@@ -581,35 +587,35 @@ def bridge(spec_path):
     from mcp.server.fastmcp import FastMCP
     tools = ClosedTools(read_json(spec_path))
     server = FastMCP(BRIDGE_NAME)
-    @server.tool()
+    @server.tool(structured_output=False)
     def read_prompt(offset: int = 0) -> str:
         """Read sequentially from offset=0, then exact next_offset; finish when prompt_complete=true."""
         return tools.call("read_prompt", {"offset": offset})
-    @server.tool()
+    @server.tool(structured_output=False)
     def source_read(path: str, offset: int = 0) -> str:
         """Read frozen PR-head code/test text. Documentation uses doc_read."""
         return tools.call("source_read", {"path": path, "offset": offset})
-    @server.tool()
+    @server.tool(structured_output=False)
     def source_list(path: str = "") -> str:
         """List tracked code/test files. Root is '' or '.'; one trailing directory '/' is allowed."""
         return tools.call("source_list", {"path": path})
-    @server.tool()
+    @server.tool(structured_output=False)
     def source_grep(pattern: str, path: str = "") -> str:
         """Find a literal in frozen code/tests. Root '' or '.', and a terminal directory '/', are allowed."""
         return tools.call("source_grep", {"pattern": pattern, "path": path})
-    @server.tool()
+    @server.tool(structured_output=False)
     def file_at_base(path: str, offset: int = 0) -> str:
         """Read code/test text at the frozen pre-PR base."""
         return tools.call("file_at_base", {"path": path, "offset": offset})
-    @server.tool()
+    @server.tool(structured_output=False)
     def doc_search(query: str) -> str:
         """Search this arm's frozen documents; snippets consume knowledge quota."""
         return tools.call("doc_search", {"query": query})
-    @server.tool()
+    @server.tool(structured_output=False)
     def calc(expr: str) -> str:
         """Evaluate bounded pure arithmetic, without I/O or Python execution."""
         return tools.call("calc", {"expr": expr})
-    @server.tool()
+    @server.tool(structured_output=False)
     def doc_read(path: str, offset: int = 0) -> str:
         """Read this arm's frozen docs within the remaining 6000-character quota."""
         return tools.call("doc_read", {"path": path, "offset": offset})
@@ -716,6 +722,75 @@ def native_tool_violations(events):
     return rogue
 
 
+def native_protocol_guard(events, prior_source_calls=0):
+    """Audit native journal observations; provider request bodies stay unknown."""
+    violations = []
+    for name in native_tool_violations(events):
+        violations.append({"check": "unauthorized_or_unknown_tool", "tool": name})
+    names, scheduled = {}, {}
+    tool_events = [e.get("payload", {}) for e in events if e.get("type") == "tool.updated"]
+    for payload in tool_events:
+        if not isinstance(payload, dict):
+            continue
+        name, call_id = payload.get("toolName"), payload.get("toolCallId")
+        if not isinstance(name, str) or not name.startswith(BRIDGE_PREFIX) or name[len(BRIDGE_PREFIX):] not in TOOLS:
+            continue
+        if not isinstance(call_id, str) or not call_id:
+            if payload.get("kind") == "scheduled":
+                violations.append({"check": "scheduled_call_missing_id", "tool": name})
+            continue
+        tool = name[len(BRIDGE_PREFIX):]
+        if call_id in names and names[call_id] != tool:
+            violations.append({"check": "native_call_id_conflict", "toolCallId": call_id})
+        names[call_id] = tool
+        if payload.get("kind") == "scheduled":
+            definition = (tool, json.dumps(payload.get("input"), sort_keys=True))
+            if call_id in scheduled and scheduled[call_id] != definition:
+                violations.append({"check": "scheduled_call_definition_conflict", "toolCallId": call_id})
+            scheduled[call_id] = definition
+    source_ids = {call_id for call_id, definition in scheduled.items() if definition[0] in SOURCE_TOOLS}
+    for call_id, tool in names.items():
+        if tool in SOURCE_TOOLS and call_id not in source_ids:
+            violations.append({"check": "source_lifecycle_missing_schedule", "toolCallId": call_id})
+    cumulative = prior_source_calls + len(source_ids)
+    if cumulative > SOURCE_CALLS:
+        violations.append({"check": "native_source_call_budget", "actual": cumulative, "limit": SOURCE_CALLS})
+    records = maximum_chars = maximum_bytes = truncated = 0
+    for payload in tool_events:
+        if not isinstance(payload, dict) or "result" not in payload:
+            continue
+        tool = names.get(payload.get("toolCallId"))
+        result = payload["result"]
+        if tool not in TOOLS or not isinstance(result, dict):
+            continue
+        content = result.get("content")
+        if not isinstance(content, str):
+            violations.append({"check": "native_result_content_unrecognized", "tool": tool})
+            continue
+        records += 1
+        chars, byte_count = len(content), len(content.encode("utf-8"))
+        maximum_chars, maximum_bytes = max(maximum_chars, chars), max(maximum_bytes, byte_count)
+        if chars > RESULT_CHARS or byte_count > RESULT_UTF8_BYTES:
+            violations.append({"check": "native_result_budget", "tool": tool,
+                               "chars": chars, "utf8_bytes": byte_count, "toolCallId": payload.get("toolCallId")})
+        if result.get("truncated") is not False:
+            truncated += 1
+            violations.append({"check": "native_result_truncated_or_unknown", "tool": tool,
+                               "truncated": result.get("truncated"), "toolCallId": payload.get("toolCallId")})
+        original, returned = result.get("originalBytes"), result.get("returnedBytes")
+        if (type(original) is not int or type(returned) is not int or original != returned or returned != byte_count):
+            violations.append({"check": "native_result_size_receipt", "tool": tool,
+                               "originalBytes": original, "returnedBytes": returned,
+                               "toolCallId": payload.get("toolCallId")})
+    return {"schema": "jiuwenswarm-native-protocol-guard-v1", "status": "failed" if violations else "passed",
+            "native_source_calls": len(source_ids), "native_source_calls_cumulative": cumulative,
+            "prior_source_calls": prior_source_calls, "native_source_call_ids": sorted(source_ids),
+            "native_tool_calls": {tool: sum(d[0] == tool for d in scheduled.values()) for tool in TOOLS},
+            "tool_result_records": records, "max_native_result_chars": maximum_chars,
+            "max_native_result_utf8_bytes": maximum_bytes, "truncated_result_records": truncated,
+            "violations": violations, "provider_request_serialization": "unknown"}
+
+
 def run_one(identity, transport, case, arm_name, repetition, run_root, pacer, *, preflight=False):
     item = ("preflight" if preflight else "review") + f"-pr{case['number']}-{arm_name}-r{repetition}"
     item_root = Path(run_root) / "items" / item
@@ -764,6 +839,8 @@ def run_one(identity, transport, case, arm_name, repetition, run_root, pacer, *,
                 if ticket is not None:
                     pacer.observe(ticket, event, archive.event)
             status, error, output, raw, usage, served = "transport_failed", "", None, "", {}, ""
+            prior_native_calls = sum(a["native_protocol_guard"]["native_source_calls"] for a in attempts)
+            guard = native_protocol_guard([], prior_native_calls)
             try:
                 ticket = pacer.acquire(archive.event)
                 native_started = time.time()
@@ -771,6 +848,9 @@ def run_one(identity, transport, case, arm_name, repetition, run_root, pacer, *,
                 snapshot = transport.native_snapshot(events)
                 usage, served = snapshot["usage"], snapshot["served_model"]
                 raw = transport._final_text(events)
+                guard = native_protocol_guard(events, prior_native_calls)
+                if guard["status"] != "passed":
+                    raise ValueError(f"native protocol guard failed: {guard['violations']}")
                 if timed_out:
                     raise RuntimeError("native transport timed out")
                 status = "invalid_run"
@@ -789,8 +869,11 @@ def run_one(identity, transport, case, arm_name, repetition, run_root, pacer, *,
                 state = read_json(attempt_root / "tool-state.json")
                 if state["violations"] or not covered_prompt(state, len(prompt)):
                     raise ValueError("bridge violations or complete prompt was not read")
+                bridge_events = [json.loads(s) for s in (attempt_root / "bridge-events.jsonl").read_text().splitlines()]
+                if (any(sum(e["tool"] == tool for e in bridge_events) > guard["native_tool_calls"][tool] for tool in TOOLS)
+                        or guard["tool_result_records"] < len(bridge_events)):
+                    raise ValueError("native tool journal does not account for complete bridge delivery")
                 if preflight:
-                    bridge_events = [json.loads(s) for s in (attempt_root / "bridge-events.jsonl").read_text().splitlines()]
                     successful = [e for e in bridge_events if not e["error"]]
                     probe_path, directory = preflight_probes(case)
                     required_lists = {"."} | ({directory + "/"} if directory else set())
@@ -811,6 +894,10 @@ def run_one(identity, transport, case, arm_name, repetition, run_root, pacer, *,
                 snapshot = transport.native_snapshot(events)
                 usage, served = snapshot["usage"], snapshot["served_model"]
                 raw = raw or transport._final_text(events)
+                guard = native_protocol_guard(events, prior_native_calls)
+                if isinstance(exc, Exception) and guard["status"] != "passed":
+                    status = "invalid_run"
+                    error = f"{error}; native protocol guard failed: {guard['violations']}"
             finished = time.time()
             (attempt_root / "reply.txt").write_text(raw, encoding="utf-8")
             receipt = store.append("model_call", inputs={"prompt": prompt}, outputs={"reply": raw},
@@ -826,7 +913,8 @@ def run_one(identity, transport, case, arm_name, repetition, run_root, pacer, *,
                        "error": error, "native_seconds": finished - native_started if native_started else None,
                        "gateway_seconds": finished - call_started, "usage": usage, "served_model": served,
                        "queue_seconds": native_started - call_started if native_started else None,
-                       "artifacts": artifacts, "output": output, "native_trace_id": receipt["id"]}
+                       "artifacts": artifacts, "output": output, "native_trace_id": receipt["id"],
+                       "native_protocol_guard": guard}
             state_file = attempt_root / "tool-state.json"
             final_state = read_json(state_file) if state_file.exists() else {}
             attempt["source_calls_cumulative"] = final_state.get("source_calls", spec["initial_source_calls"])
