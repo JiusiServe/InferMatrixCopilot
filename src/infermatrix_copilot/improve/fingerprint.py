@@ -69,7 +69,9 @@ def compute(decl: WorkflowDeclaration, settings: Any, *, state: dict | None = No
     covers = manifest["covers"]
     for entry in decl.fingerprint_covers:
         if entry == "playbook_yaml_sha":
-            path = _playbook_file(decl.playbook, settings)
+            path = root.parents[1] / "playbooks" / f"{decl.playbook}.yaml" if package_root else _playbook_file(decl.playbook, settings)
+            if path is not None and not path.is_file():
+                path = None
             if path is None:
                 manifest["missing"].append(f"playbook:{decl.playbook}")
             else:

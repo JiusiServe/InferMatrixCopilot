@@ -97,7 +97,7 @@ class MetaBenchAdapter:
             return None
         res = rec.get("result") or {}
         scores = {}
-        for key in ("kappa", "lint_recall", "agreement"):
+        for key in ("kappa", "lint_recall", "agreement", "accuracy"):
             value = res.get(key)
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 scores[key] = float(value)

@@ -254,9 +254,16 @@ class Executor:
         from .. import tracing
         from ..trace_store import trace_context
 
+        from ..improve.artifacts import runtime_settings
+        effective_settings = runtime_settings(self.settings, f"{state.get('playbook', '')}.{spec.name}")
+        step_llm = self.llm
+        if effective_settings is not self.settings and hasattr(self.llm, "settings"):
+            from copy import copy
+            step_llm = copy(self.llm)
+            step_llm.settings = effective_settings
         ctx = StepContext(
-            settings=self.settings, state=state, params=params or {},
-            run_dir=self.run_dir, trace=self.trace, llm=self.llm, item=item,
+            settings=effective_settings, state=state, params=params or {},
+            run_dir=self.run_dir, trace=self.trace, llm=step_llm, item=item,
         )
         attempts = 1 + max(0, self.settings.max_step_retries)
         last: StepResult | None = None
@@ -352,7 +359,8 @@ class Executor:
 
         context["workflow"] = decl.workflow
         context["item"] = item_for(decl, state)
-        digest, manifest = compute(decl, self.settings, state=state)
+        from ..improve.artifacts import runtime_settings
+        digest, manifest = compute(decl, runtime_settings(self.settings, decl.workflow), state=state)
         if digest:
             context["fingerprint"] = digest
         else:

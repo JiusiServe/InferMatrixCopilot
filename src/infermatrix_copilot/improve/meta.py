@@ -178,6 +178,8 @@ def run_case(sink: TraceStore, case: MetaCase, agents: dict, *, meta_dir: Path, 
     result = {"type": "meta_eval", "case": case.name, "item": case.item, "human": human, "engine": engine,
               "disputed": disputed, "agreement": agreement, "kappa": kappa, "lint_recall": recall,
               "lint_hits": hits, "families": sorted(agents), "cells": len(cells), "attributed": len(scored)}
+    # Legacy agreement/kappa remain diagnostic; evolution uses full-denominator accuracy.
+    result["accuracy"] = sum(engine.get(g) == human[g] and g not in disputed for g in human) / len(human) if human else None
     # the caller's unit context (the engine's forensics unit, item meta:<case>)
     # is inherited; `of` names the investigated unit
     sink.append("outcome", context={"of": case.unit.unit_id}, result=result)

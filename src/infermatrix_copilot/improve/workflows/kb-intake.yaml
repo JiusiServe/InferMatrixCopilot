@@ -11,6 +11,8 @@ unit: step_call
 item_key: "{repo}#{pr}"
 fingerprint:
   covers:
+    - settings: [kb_draft_max_operations, agent_model, eco_model, performance_model, llm_max_tokens]
+    - resolved_models
     - prompts: ["kb_service/intake.py"]
     # routing knobs read from the environment, then the same-named setting
     # when the tree has it (zcode's reasoning level is a Settings field only
@@ -22,3 +24,12 @@ outcome_adapter: infermatrix_copilot.improve.adapters.kb_intake:KbIntakeAdapter
 tier2_min_items: 8
 shadow_tools: []
 shadow_executables: [python3, git, grep]
+experiment_driver: kb-intake
+evolution:
+  paths: [src/infermatrix_copilot/kb_service/intake.py]
+  settings: [KB_DRAFT_MAX_OPERATIONS]
+  tests: [test/test_improve_kb_intake_adapter.py, test/test_kb_intake_gate.py]
+  metric: net_pass_review
+  direction: higher
+  min_effect: 0.05
+  guards: {recall_gold: higher, fail_review: lower, usd_review: lower}

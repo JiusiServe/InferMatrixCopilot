@@ -44,6 +44,8 @@ class WorkflowDeclaration:
     shadow_executables: tuple[str, ...] = ("python3", "git", "grep")
     source: str = ""
     raw: dict = field(default_factory=dict, compare=False, hash=False)
+    evolution: dict = field(default_factory=dict, compare=False, hash=False)
+    experiment_driver: str = ""
 
     @property
     def playbook(self) -> str:
@@ -94,13 +96,23 @@ def parse_declaration(doc: dict, source: str = "<memory>") -> WorkflowDeclaratio
     min_items = int(doc.get("tier2_min_items", 8))
     if min_items < 1:
         raise DeclarationError(f"{source}: tier2_min_items must be >= 1")
+    evolution = doc.get("evolution") or {}
+    if not isinstance(evolution, dict):
+        raise DeclarationError(f"{source}: evolution must be a mapping")
+    if evolution:
+        for key in ("paths", "settings", "tests"):
+            if not isinstance(evolution.get(key, []), list) or not all(isinstance(v, str) for v in evolution.get(key, [])):
+                raise DeclarationError(f"{source}: evolution.{key} must be a string list")
+        from .artifacts import validate_policy
+        validate_policy(evolution)
     return WorkflowDeclaration(
         workflow=workflow, kind=kind, unit=unit, item_key=str(_require(doc, "item_key", source)),
         fingerprint_covers=tuple(covers), capture=capture,
         outcome_adapter=str(doc.get("outcome_adapter") or ""), tier2_min_items=min_items,
         shadow_tools=tuple(str(t) for t in doc.get("shadow_tools") or ()),
         shadow_executables=tuple(str(t) for t in doc.get("shadow_executables") or ("python3", "git", "grep")),
-        source=source, raw=dict(doc))
+        source=source, raw=dict(doc), evolution=evolution,
+        experiment_driver=str(doc.get("experiment_driver") or ""))
 
 
 def declaration_dirs(extra: Iterable[str | Path] | None = None, environ: dict | None = None) -> list[Path]:

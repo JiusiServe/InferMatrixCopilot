@@ -539,11 +539,12 @@ def test_workflow_improve_is_a_read_only_l2_kind_with_a_vetted_playbook(tmp_path
     store.load()
     pb = store.get("workflow-improve")
     assert pb is not None and [s.step for s in pb.steps] == ["improve.mode", "improve.preflight", "improve.sync",
-                                                              "improve.lint", "improve.experiments", "improve.forensics",
-                                                              "improve.ledger", "improve.publish", "report.final_summary"]
+                                                              "improve.coordinate", "improve.lint", "improve.experiments", "improve.forensics",
+                                                              "improve.ledger", "improve.publish", "improve.evolve_publish", "report.final_summary"]
     # the meta mode gates every cycle step off; forensics and the report always run
     assert [s.when for s in pb.steps if s.step not in ("improve.mode", "improve.forensics", "report.final_summary")] \
-        == ["not improve_meta"] * 6
+        == ["not improve_meta", "not improve_meta", "improve_coordinated", "improve_legacy", "improve_legacy",
+            "not improve_meta", "not improve_meta", "improve_coordinated"]
     resolution = Planner(store, registry).resolve(spec)
     assert resolution.mode == "reuse" and resolution.playbook.name == "workflow-improve"
 

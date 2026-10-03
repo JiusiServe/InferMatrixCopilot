@@ -1,12 +1,14 @@
 # improve/ —— 规范（元改进引擎）
 
-<!-- verified-against: 2026-10-01 -->
+<!-- verified-against: 2026-10-04 -->
 
 `设计：/data/zhoutaichang/copilot/meta-improvement-engine-design.md v1（GPT-6 sol 批准 2026-09-29） · refactor-status: building (P0–P4 已落地)`
 
 ## 职责
-面向任意 trace/1 工作流的"取证—实验—提案"循环。**只提案**：引擎的写权限限于追加自己的 trace/1 记录、
-写自己的账本目录、在影子环境跑实验；产线变更一律走 PR。
+面向任意 trace/1 工作流的"取证—候选—实验—人审 PR—上线观察"循环。使用入口和数据契约见 [自进化使用指南](../../guide/self-evolution.md)。引擎的写权限限于追加自己的 trace/1 记录、
+写自己的账本和源码制品目录、在 OS 隔离环境跑候选；产线变更一律走人审 PR。
+
+新增 `artifacts.py`（不可变源码及补丁）、`isolation.py/worker.py`（无凭据沙箱与可信预算代理）、`drivers.py`（PR/知识/元基准驱动及父进程评分）、`evolution.py`（周度候选状态机）、`coordinator.py`（统一续跑周期）、`annotations.py`（历史 trace 导出与人工标签导入）、`evolution_publish.py`（独立 `evolve-outbox/1` 与部署跟踪）。`IMPROVE_EVOLVE_ENABLED` 默认关闭，`IMPROVE_ENABLED` 保留总停止作用。
 
 ## 模块
 | 文件 | 阶段 | 作用 |
@@ -47,11 +49,11 @@
 - 自实验：`experiments.run` 对 `human_labelled` 适配器不要求判官；`_find_unit` 优先取声明工作流的单元。
 
 ## 不变量
-- 周期内唯一外向写是 `improve.publish` 写入 outbox 的提案动作；引擎不持有 GitHub 令牌，issue 的开/改/关由 maintainer routine 执行并以 ack 回报。
+- 既有提案的外向写是 `improve.publish`，代码候选另由 `improve.evolve_publish` 经 post/push 双门写独立 outbox；引擎不持有 GitHub 令牌，issue 的开/改/关由 maintainer routine 执行并以 ack 回报。
 - 未通过 `lint_proposal` 的提案永不发布（记 `proposal_lint_failed`）；hold 只暂停发布，lint 与实验照常。
 - 元基准只读：任何触及 `eval/dataset/meta` 的指纹 diff 或 `IMPROVE_*` 覆盖在注册时被拒。
 - 引擎自身的记录（`playbook=workflow-improve`）是下一周期的 Tier 1 单元（自登记）。
 - lint 只读 trace，不调模型；无证据形态的 lint 不猜。
 
 ## 测试
-`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`、`test_improve_p3.py`、`test_improve_p4.py`、`test_improve_kb_intake_adapter.py`。
+`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`、`test_improve_p3.py`、`test_improve_p4.py`、`test_improve_kb_intake_adapter.py`、`test_evolution.py`。

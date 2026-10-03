@@ -269,6 +269,10 @@ def environment_fingerprint() -> dict:
         except (OSError, subprocess.SubprocessError):
             pass
         _ENV = {"copilot_version": __version__, "copilot_sha": sha}
+        root = Path(__file__).resolve().parents[2]
+        if (root / "src").is_dir() and (root / "playbooks").is_dir():
+            from .improve.artifacts import tree_hash
+            _ENV["source_tree_sha"] = tree_hash(root)
     return dict(_ENV)
 
 

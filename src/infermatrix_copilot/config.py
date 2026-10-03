@@ -563,6 +563,11 @@ class Settings(BaseSettings):
     # UTC, after the 04:00 PR-state sweep; the ledgers and reports live under
     # improve_ledger_dir (default ~/.infermatrix-copilot/improve).
     improve_enabled: bool = False
+    improve_evolve_enabled: bool = False
+    improve_evolve_source_dir: str = ""
+    improve_evolve_data_dir: str = ""
+    improve_evolve_outbox_dir: str = ""
+    kb_draft_max_operations: int = 6
     # IMPROVE_GOVERNED=1: this process binds the weekly budget governor for
     # its whole run (a shadow subprocess of an experiment), so every model
     # call is reserved against the same weekly files as the parent's

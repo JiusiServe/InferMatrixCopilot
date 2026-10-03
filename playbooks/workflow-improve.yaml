@@ -9,7 +9,7 @@
 # own forensics role against ONE frozen meta-benchmark case (the shadow
 # self-experiment unit, §11.2): only `improve.forensics` runs.
 name: workflow-improve
-version: 2
+version: 3
 status: active
 provenance:
   created_by: human
@@ -21,11 +21,13 @@ steps:
   - {id: mode, step: improve.mode}
   - {id: preflight, step: improve.preflight, when: not improve_meta}
   - {id: sync, step: improve.sync, when: not improve_meta}
-  - {id: lint, step: improve.lint, when: not improve_meta}
-  - {id: experiments, step: improve.experiments, when: not improve_meta}
-  - {id: forensics, step: improve.forensics}
+  - {id: coordinate, step: improve.coordinate, when: improve_coordinated}
+  - {id: lint, step: improve.lint, when: improve_legacy}
+  - {id: experiments, step: improve.experiments, when: improve_legacy}
+  - {id: forensics, step: improve.forensics, when: improve_forensics_run}
   - {id: ledger, step: improve.ledger, when: not improve_meta}
   - {id: publish, step: improve.publish, when: not improve_meta}
+  - {id: evolve_publish, step: improve.evolve_publish, when: improve_coordinated}
   - {id: report, step: report.final_summary}
 success: one cycle recorded (decision type=cycle), the per-workflow ledgers
   updated, the cycle report written, publishable proposals handed to the

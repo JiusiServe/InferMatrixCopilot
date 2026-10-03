@@ -60,6 +60,9 @@ async def _mode(ctx: StepContext) -> StepResult:
     if case and ("/" in case or case.startswith(".")):
         return StepResult(False, FailureKind.BLOCKED, f"meta_case must be a case name, got {case!r}")
     updates = {"improve_meta": bool(case), "meta_case": case, "improve_item": f"meta:{case}" if case else "cycle"}
+    updates.update(improve_coordinated=not bool(case) and bool(ctx.settings.improve_evolve_enabled),
+                   improve_legacy=not bool(case) and not bool(ctx.settings.improve_evolve_enabled),
+                   improve_forensics_run=bool(case) or not bool(ctx.settings.improve_evolve_enabled))
     ctx.state.update(updates)
     return StepResult(True, summary=f"mode: {'meta case ' + case if case else 'weekly cycle'}",
                       outputs={"state_updates": updates})
@@ -70,6 +73,30 @@ def _ledger_dir(ctx: StepContext) -> Path:
 
     override = str(ctx.params.get("ledger_dir") or "")
     return Path(override).expanduser() if override else ledger_dir_for(ctx.settings)
+
+
+@step("improve.coordinate", "deterministic", "read", "Run the shared resumable improvement/evolution coordinator.")
+async def _coordinate(ctx: StepContext) -> StepResult:
+    import asyncio
+    from ...improve.coordinator import run
+    store = _trace_store(ctx)
+    if store is None: return StepResult(False, FailureKind.BLOCKED, "no trace store")
+    report = await asyncio.to_thread(run, ctx.settings, store, llm=ctx.llm)
+    updates = {"improve_cycle": report.get("stages", {}).get("lint", {}), "improve_evolution": report.get("stages", {}).get("evolve", {})}
+    ctx.state.update(updates)
+    return StepResult(True, summary=f"evolution coordinator: {report.get('state')}", outputs={"report": report, "state_updates": updates})
+
+
+@step("improve.evolve_publish", "deterministic", "push", "Publish verified evolution candidates to the maintainer outbox.")
+async def _evolve_publish(ctx: StepContext) -> StepResult:
+    from ._common import task_spec
+    from ...improve.evolution_publish import publish
+    c = ctx.state.get("improve_evolution", {})
+    spec = task_spec(ctx)
+    if not spec.get("post") or not ctx.settings.allow_post or not ctx.settings.allow_push or c.get("state") != "pr-ready":
+        return StepResult(True, summary="evolution publication preview: post/push gates closed or no passing candidate")
+    report = publish(ctx.settings, _trace_store(ctx), c)
+    return StepResult(True, summary=str(report), outputs=report)
 
 
 def _trace_store(ctx: StepContext):
@@ -331,7 +358,7 @@ async def _forensics(ctx: StepContext) -> StepResult:
         for name, decl in decls.items():
             if not decl.tier2 or (only and name != only):
                 continue
-            wf_units = [u for u in units.values() if u.workflow == name]
+            wf_units = [u for u in units.values() if u.workflow == name and (not ctx.params.get("repo") or u.item.split("#", 1)[0] == ctx.params["repo"])]
             if len(wf_units) < decl.tier2_min_items and not ctx.params.get("force"):
                 results[name] = {"skipped": f"{len(wf_units)} units < tier2_min_items {decl.tier2_min_items}"}
                 continue

@@ -87,6 +87,8 @@ class Experiment:
     state: str = "registered"
     gold_versions: dict = field(default_factory=dict)
     result: dict = field(default_factory=dict)
+    source_artifacts: dict = field(default_factory=dict)
+    snapshot_versions: dict = field(default_factory=dict)
 
 
 # -- settings under overrides -----------------------------------------------------------
@@ -189,9 +191,8 @@ def _dir(ledger_dir: Path) -> Path:
 
 def save(ledger_dir: Path, exp: Experiment) -> Path:
     path = _dir(ledger_dir) / f"{exp.experiment_id}.json"
-    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex[:6]}.tmp")
-    tmp.write_text(json.dumps(asdict(exp), ensure_ascii=False, indent=1, default=str), encoding="utf-8")
-    tmp.replace(path)
+    from .artifacts import atomic_json
+    atomic_json(path, json.loads(json.dumps(asdict(exp), default=str)))
     return path
 
 
@@ -217,7 +218,8 @@ def register(store: TraceStore, settings: Any, ledger_dir: str | Path, *, workfl
              metric: str, items: list[str], arm_overrides: dict[str, str], incumbent_overrides: dict[str, str] | None = None,
              direction: str = "higher", min_effect: float = 0.05, replicates: int = 3, proposal_id: str = "",
              cost_per_unit_usd: float | None = None, governor: Governor | None = None, registered_by: str = "engine",
-             sd_item: float | None = None, now: float | None = None) -> Experiment:
+             sd_item: float | None = None, now: float | None = None,
+             source_artifacts: dict | None = None, snapshot_versions: dict | None = None) -> Experiment:
     now = time.time() if now is None else now
     ledger_dir = Path(ledger_dir)
     decls = declarations_for(settings)
@@ -247,6 +249,22 @@ def register(store: TraceStore, settings: Any, ledger_dir: str | Path, *, workfl
             raise ExperimentError(f"harness-not-isolated: the {label} resolves to {harness}; v1 shadow experiments are API-only")
     arm_fp, arm_manifest = compute(decl, arm_settings, environ=arm_env)
     inc_fp, inc_manifest = compute(decl, inc_settings, environ=inc_env)
+    source_artifacts = dict(source_artifacts or {})
+    if source_artifacts:
+        from .artifacts import verify
+        if set(source_artifacts) != {"arm", "incumbent"}:
+            raise ExperimentError("versioned experiments need both source artifacts")
+        for side, st, env in (("arm", arm_settings, arm_env), ("incumbent", inc_settings, inc_env)):
+            root = Path(source_artifacts[side])
+            artifact = verify(root)
+            fp, manifest = compute(decl, st, environ=env, package_root=root / "src" / "infermatrix_copilot")
+            manifest["covers"]["source_tree_sha"] = artifact["tree_sha"]
+            from .evolution import public_settings
+            manifest["covers"]["execution_settings"] = public_settings(st)
+            manifest["covers"]["experiment_driver"] = decl.experiment_driver
+            fp = hashlib.sha256(json.dumps(manifest["covers"], sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest() if manifest["complete"] else ""
+            if side == "arm": arm_fp, arm_manifest = fp, manifest
+            else: inc_fp, inc_manifest = fp, manifest
     if not arm_fp or not inc_fp:
         raise ExperimentError(f"incomplete fingerprint: arm missing {arm_manifest.get('missing')}, "
                               f"incumbent missing {inc_manifest.get('missing')}")
@@ -258,10 +276,13 @@ def register(store: TraceStore, settings: Any, ledger_dir: str | Path, *, workfl
     # gold must exist for every item (a comparative experiment needs the matrix or the judge's paired verdicts)
     gold_versions = {}
     for item in items:
-        gold = adapter.gold(item)
-        if gold is None:
-            raise ExperimentError(f"no curated gold for {item}: it cannot be scored")
-        gold_versions[item] = gold.version
+        if source_artifacts and snapshot_versions and item in snapshot_versions:
+            gold_versions[item] = snapshot_versions[item]
+        else:
+            gold = adapter.gold(item)
+            if gold is None:
+                raise ExperimentError(f"no curated gold for {item}: it cannot be scored")
+            gold_versions[item] = gold.version
     if sd_item is None:
         sd_item = _historical_sd(ledger_dir, workflow, metric) or PRIOR_SD
     n_required = stats.items_required(sd_item, min_effect)
@@ -289,7 +310,8 @@ def register(store: TraceStore, settings: Any, ledger_dir: str | Path, *, workfl
         adequately_powered=n_available >= n_required, arm_overrides=arm_overrides,
         incumbent_overrides=incumbent_overrides, arm_fingerprint=arm_fp, incumbent_fingerprint=inc_fp,
         fingerprint_diff=diff, manifests=manifests, cost_estimate_usd=cost, budget_reserved=reserved,
-        proposal_id=proposal_id, registered_by=registered_by, registered_at=now, gold_versions=gold_versions)
+        proposal_id=proposal_id, registered_by=registered_by, registered_at=now, gold_versions=gold_versions,
+        source_artifacts=source_artifacts, snapshot_versions=dict(snapshot_versions or {}))
     save(ledger_dir, exp)
     store.append("decision", inputs={"fingerprint_diff": json.dumps(diff, sort_keys=True, default=str)},
                  context={"playbook": "workflow-improve", "workflow": workflow},
@@ -388,7 +410,7 @@ def _terminal_invalid(ledger_dir: Path, exp: Experiment, governor, settings, err
     planning hold: a terminal experiment must never keep consuming the
     weekly envelope."""
     exp.state = "invalid"
-    exp.result = {"error": error}
+    exp.result = {**exp.result, "error": error, "promotable": False}
     if exp.budget_reserved:
         try:
             if governor is None:
@@ -451,6 +473,14 @@ def _run_locked(store, settings, ledger_dir: Path, exp: Experiment, *, run_unit,
 
     decls = declarations_for(settings)
     decl = decls[exp.workflow]
+    if exp.source_artifacts:
+        from .evolution import evaluate
+        from .isolation import Sandbox
+        return evaluate(store, settings, ledger_dir, exp, llm=judge_llm or _api_llm(settings),
+                        sandbox=Sandbox(), governor=governor)
+    if decl.experiment_driver and decl.experiment_driver not in ("pr-review", "meta") and run_unit is None:
+        return _terminal_invalid(ledger_dir, exp, governor, settings,
+                                 f"{decl.experiment_driver} requires pinned dataset/source artifacts; use improve evolve run")
     adapter = load_adapter(decl.outcome_adapter, **_adapter_kwargs(settings, decl))
     if governor is None:
         from .cycle import governor_for

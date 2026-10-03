@@ -108,6 +108,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="infermatrix-copilot improve",
                                      description="operate the meta-improvement engine's trace index")
     sub = parser.add_subparsers(dest="command", required=True)
+    for name, choices in (("workflows", ["list", "check", "import-meta"]), ("evolve", ["run", "list", "show"])):
+        p = sub.add_parser(name)
+        p.add_argument("action", choices=choices)
+        p.add_argument("id", nargs="?", default="")
+        p.add_argument("--workflow", default="all")
+        p.add_argument("--repo", default="")
+        p.add_argument("--post", action="store_true")
+        p.add_argument("--trace-root", default=None)
+        p.add_argument("--ledger-dir", default=None)
+        p.add_argument("--data-dir", default=None)
     ex = sub.add_parser("experiment")
     ex.add_argument("action", choices=["register", "run", "list"])
     ex.add_argument("id", nargs="?", default="")
@@ -137,12 +147,17 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--dry-run", action="store_true", help="plan only; write nothing")
     for name in ("gold", "meta"):
         p = sub.add_parser(name)
-        p.add_argument("action", choices=["draft", "check"] if name == "gold" else ["lint-check", "bench"])
+        p.add_argument("action", choices=["draft", "check"] if name == "gold" else ["lint-check", "bench", "export", "annotate"])
         p.add_argument("--item", default="")
         p.add_argument("--gt-dir", default="eval/dataset/gt")
         p.add_argument("--meta-dir", default="eval/dataset/meta")
         if name == "meta":
-            p.add_argument("--case", default="", help="bench: one case (default every case)")
+            p.add_argument("--case", default="", help="bench/export/annotate: case name")
+            p.add_argument("--unit-id", default="")
+            p.add_argument("--gold-file", default="")
+            p.add_argument("--labels-file", default="")
+            p.add_argument("--human-verified", action="store_true")
+            p.add_argument("--split", choices=["development", "holdout"], default="development")
             p.add_argument("--trace-root", default=None)
             p.add_argument("--ledger-dir", default=None)
     for name in ("migrate-index", "rebuild-index", "rollback-index", "compare-index", "verify-index",
@@ -165,6 +180,34 @@ def main(argv: list[str] | None = None) -> int:
         if name == "ledger":
             p.add_argument("--workflow", default=None)
     args = parser.parse_args(argv)
+    if args.command in ("workflows", "evolve"):
+        from ..config import Settings
+        from . import evolution
+        settings = Settings()
+        updates = {}
+        if args.ledger_dir: updates["improve_ledger_dir"] = args.ledger_dir
+        if args.data_dir: updates["improve_evolve_data_dir"] = args.data_dir
+        settings = settings.model_copy(update=updates)
+        store = _store(args)
+        try:
+            if args.command == "workflows":
+                if args.action == "list": result = evolution.list_workflows(settings, store)
+                elif args.action == "check": result = evolution.check(settings, store, args.workflow, repo=args.repo)
+                else:
+                    from .drivers import export_meta
+                    if not settings.improve_evolve_data_dir: raise ValueError("import-meta needs --data-dir or IMPROVE_EVOLVE_DATA_DIR")
+                    result = export_meta(settings, Path(settings.improve_evolve_data_dir))
+            elif args.action == "list": result = evolution.candidates(settings)
+            elif args.action == "show": result = evolution.candidate(settings, args.id)
+            else:
+                from .coordinator import run
+                coordinated = run(settings, store, workflow=args.workflow, repo=args.repo, post=args.post)
+                result = coordinated.get("stages", {}).get("evolve", coordinated)
+            print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+            return 3 if isinstance(result, dict) and (result.get("state") in ("disabled", "deferred", "rejected") or result.get("ready") is False) else 0
+        except (ValueError, OSError) as exc:
+            print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
+            return 1
     if args.command in ("gold", "meta"):
         return _gold_meta_commands(args)
     if args.command in ("experiment", "budget"):
@@ -227,9 +270,17 @@ def _cycle_commands(args) -> int:
                                         "claim": p.claim, "issue": p.issue} for p in wl.proposals]}
         print(json.dumps(out, ensure_ascii=False, indent=1, default=str))
         return 0
+    settings = Settings()
+    if args.command == "cycle" and settings.improve_evolve_enabled:
+        from .coordinator import run
+        if args.ledger_dir:
+            settings = settings.model_copy(update={"improve_ledger_dir": args.ledger_dir})
+        report = run(settings, _store(args))
+        print(json.dumps(report, ensure_ascii=False, indent=2, default=str))
+        return 0
     store = _store(args)
     try:
-        report = run_cycle(store, Settings(), ledger_dir, since=args.since, until=args.until,
+        report = run_cycle(store, settings, ledger_dir, since=args.since, until=args.until,
                            dry_run=True, force=args.force)
     except CycleRefused as exc:
         print(json.dumps({"refused": str(exc)}), file=sys.stderr)
@@ -261,6 +312,15 @@ def _gold_meta_commands(args) -> int:
                 problems[path.name] = f"INVALID: {exc}"
         print(json.dumps(problems, ensure_ascii=False, indent=1))
         return 0 if not any(v.startswith("INVALID") for v in problems.values()) else 1
+    if args.command == "meta" and args.action in ("export", "annotate"):
+        from .annotations import operate
+        try:
+            report = operate(args, _store(args))
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+            return 0
+        except (ValueError, OSError, KeyError) as exc:
+            print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
+            return 1
     if args.command == "meta" and args.action == "bench":
         return _meta_bench(args)
     from ..trace_store import TraceStore

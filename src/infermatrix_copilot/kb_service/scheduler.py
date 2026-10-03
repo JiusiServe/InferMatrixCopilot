@@ -73,6 +73,17 @@ class Scheduler:
             return None
         from ..improve.cycle import ledger_dir_for, maybe_run_weekly
 
+        if getattr(settings, "improve_evolve_enabled", False):
+            from ..improve.cycle import is_due, _cursor
+            from ..improve.coordinator import run
+            cursor = _cursor(ledger_dir_for(settings))
+            checkpoint = ledger_dir_for(settings) / "coordinator.json"
+            incomplete = checkpoint.is_file() and json.loads(checkpoint.read_text()).get("state") == "running"
+            if incomplete or is_due(rt.clock(), float(cursor.get("last_run_at") or 0), weekday=settings.improve_cycle_weekday,
+                      hour=settings.improve_cycle_hour):
+                return run(settings, rt.traces, now=rt.clock())
+            return None
+
         return maybe_run_weekly(rt.traces, settings, ledger_dir_for(settings), now=rt.clock())
 
     def _record(self, repo: str, event: str, **detail) -> None:

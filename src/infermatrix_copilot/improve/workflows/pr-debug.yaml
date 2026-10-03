@@ -1,0 +1,15 @@
+workflow: pr-debug.pr.group_failures
+kind: static
+unit: step_call
+item_key: "{repo}#{pr}@{head_sha}"
+fingerprint:
+  covers:
+    - prompts: [engine/steps/pr/debug.py]
+    - copilot_sha
+capture: full
+experiment_driver: mechanical
+evolution:
+  paths: [src/infermatrix_copilot/engine/steps/pr/debug.py]
+  dependencies: [src/infermatrix_copilot/engine/agent_runtime/*.py]
+  settings: []
+  tests: [test/test_pr_steps.py, test/test_ci_and_repo_map.py]
