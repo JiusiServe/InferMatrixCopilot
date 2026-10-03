@@ -17,6 +17,8 @@ PRS = (7639, 7641, 7642, 7645, 7647, 7649, 7650, 7651, 7654, 7655, 7656, 7675)
 PRIMARY = (7641, 7642, 7645, 7647, 7649, 7650, 7651, 7675)
 EXPLORATORY = (7639, 7654, 7655, 7656)
 NAME = "jiuwenswarm-ab-retest-cn-20261003"
+SOURCE_TOOLS = {"source_read", "source_list", "source_grep", "file_at_base", "calc"}
+BRIDGE_PREFIX = "mcp__jiuwenswarm-ab__"
 
 
 def sha(value):
@@ -46,11 +48,17 @@ def _verify_files(root, manifest, cache):
 
 def actual_source_calls(row, limit=60):
     """Count requests in bound bridge events, including denied/failed requests."""
-    total = early = 0
+    total = early = unknown_attempts = proven_empty = 0
     for attempt in row.get("attempts", []):
         root = Path(attempt["attempt_root"])
         state_path, events_path = root / "tool-state.json", root / "bridge-events.jsonl"
         artifacts = attempt.get("artifacts", {})
+        if not state_path.is_file() and "tool-state.json" not in artifacts and attempt.get("status") == "transport_failed":
+            if empty_transport_evidence(attempt):
+                proven_empty += 1
+            else:
+                unknown_attempts += 1
+            continue
         if not state_path.is_file() or binding(state_path)["sha256"] != artifacts.get("tool-state.json"):
             raise ValueError("source call audit state bytes changed or missing")
         state = load(state_path)
@@ -64,14 +72,192 @@ def actual_source_calls(row, limit=60):
         requests = [e for e in events if e.get("tool") in {"source_read", "source_list", "source_grep", "file_at_base", "calc"}]
         total += len(requests)
         early += sum(str(e.get("error", "")).startswith("prompt_not_complete:") for e in requests)
-    if total > limit:
+    if row["status"] == "valid" and unknown_attempts:
+        raise ValueError("valid trial has unknown source/compute request evidence")
+    if row["status"] == "valid" and total > limit:
         raise ValueError("actual source/compute call requests exceed frozen budget")
     return {"pr": row["number"], "arm": row["arm"], "repeat": row["repetition"] - 1,
-            "actual_requests": total, "early_prompt_gate_denied": early,
+            "actual_requests": None if unknown_attempts else total, "observed_requests_lower_bound": total,
+            "unknown_attempts": unknown_attempts, "proven_empty_transport_attempts": proven_empty,
+            "budget_passed": not unknown_attempts and total <= limit, "early_prompt_gate_denied": early,
             "stored_counter": row.get("source_calls_cumulative"), "budget": limit}
 
 
-def read_study(study, cache=None):
+def empty_transport_evidence(attempt):
+    """Only a finalized, bound empty native journal proves an early transport miss."""
+    if attempt.get("status") != "transport_failed": return False
+    root, artifacts = Path(attempt["attempt_root"]), attempt.get("artifacts", {})
+    if any((root / name).exists() or name in artifacts for name in ("tool-state.json", "bridge-events.jsonl")):
+        return False
+    metadata = [name for name in artifacts if name.endswith("/attempt.json")]
+    if not metadata: return False
+    for name in metadata:
+        path = (root / name).resolve()
+        if not path.is_relative_to(root.resolve()) or binding(path)["sha256"] != artifacts[name]:
+            raise ValueError("transport proof metadata changed")
+        record = load(path)
+        if record.get("schema") != "native-attempt/1" or record.get("status") != "transport_failed" or \
+                not isinstance(record.get("finished_at"), (int, float)) or record.get("trace_id") != attempt.get("native_trace_id"):
+            return False
+        journal = path.with_name("native-events.jsonl")
+        relative = journal.relative_to(root).as_posix()
+        data = journal.read_bytes() if journal.exists() else b""
+        if journal.exists() and binding(journal)["sha256"] != artifacts.get(relative):
+            raise ValueError("transport proof native journal changed")
+        if record.get("native_events_sha256") != "sha256:" + hashlib.sha256(data).hexdigest(): return False
+        if any(json.loads(line).get("type") == "tool.updated" for line in data.decode().splitlines()): return False
+    return True
+
+
+def native_journal_guard(row, *, require_certified=False, limit=60):
+    """Audit literal native results; the provider's final request body is unobserved."""
+    calls = maximum_chars = maximum_bytes = results = truncations = doubles = 0
+    issues, missing = [], 0
+    for attempt in row.get("attempts", []):
+        root, artifacts = Path(attempt["attempt_root"]), attempt.get("artifacts", {})
+        local_chars = local_bytes = local_truncated = 0
+        journals = [name for name in artifacts if name.endswith("/native-events.jsonl")]
+        if not journals:
+            if empty_transport_evidence(attempt):
+                continue
+            missing += 1
+            continue
+        bridge = root / "bridge-events.jsonl"
+        bridge_results = []
+        if bridge.is_file():
+            if binding(bridge)["sha256"] != artifacts.get("bridge-events.jsonl"):
+                raise ValueError("native guard bridge bytes changed")
+            bridge_results = [json.loads(line)["result"] for line in bridge.read_text().splitlines()]
+        used_results = Counter()
+        named = {}
+        for name in journals:
+            path = (root / name).resolve()
+            if not path.is_relative_to(root.resolve()) or binding(path)["sha256"] != artifacts[name]:
+                raise ValueError("native guard journal bytes changed")
+            events = [json.loads(line) for line in path.read_text().splitlines()]
+            for event in events:
+                if event.get("type") != "tool.updated":
+                    continue
+                payload = event.get("payload", {})
+                tool, call_id = payload.get("toolName"), payload.get("toolCallId")
+                if isinstance(tool, str):
+                    if not isinstance(call_id, str):
+                        issues.append("named_tool_missing_call_id")
+                    elif call_id in named and named[call_id] != tool:
+                        issues.append("tool_call_id_name_mismatch")
+                    else:
+                        named[call_id] = tool
+            seen, delivered = set(), {}
+            for event in events:
+                payload = event.get("payload", {})
+                if event.get("type") != "tool.updated" or "result" not in payload:
+                    continue
+                call_id = payload.get("toolCallId")
+                tool = named.get(call_id, "")
+                if not tool.startswith(BRIDGE_PREFIX):
+                    issues.append("result_tool_identity_unknown")
+                    continue
+                result = payload["result"]
+                if not isinstance(result, dict) or not isinstance(result.get("content"), str):
+                    issues.append("native_content_unknown")
+                    continue
+                content = result["content"]
+                chars, size = len(content), len(content.encode("utf-8"))
+                results += 1
+                maximum_chars, maximum_bytes = max(maximum_chars, chars), max(maximum_bytes, size)
+                local_chars, local_bytes = max(local_chars, chars), max(local_bytes, size)
+                if chars > 24000: issues.append("native_result_character_cap_exceeded")
+                if size > 24000: issues.append("native_result_utf8_cap_exceeded")
+                if result.get("truncated") is True:
+                    truncations += 1
+                    local_truncated += 1
+                    issues.append("native_adapter_truncated")
+                elif result.get("truncated") is not False:
+                    issues.append("native_truncation_status_unknown")
+                if result.get("originalBytes") != size or result.get("returnedBytes") != size:
+                    issues.append("native_size_metadata_mismatch_or_unknown")
+                if "\n\nStructured content:" in content:
+                    doubles += 1
+                    issues.append("native_structured_content_duplicate")
+                delivery = content, result.get("success")
+                if call_id in delivered and delivered[call_id] != delivery:
+                    issues.append("native_result_delivery_conflict")
+                delivered[call_id] = delivery
+                if call_id not in seen:
+                    if content in bridge_results:
+                        used_results[content] += 1
+                    elif result.get("success") is not False:
+                        issues.append("successful_native_content_not_bound_to_bridge")
+                    seen.add(call_id)
+            for call_id, tool in named.items():
+                if call_id not in seen:
+                    issues.append("native_tool_result_missing")
+            calls += sum(tool.startswith(BRIDGE_PREFIX) and tool[len(BRIDGE_PREFIX):] in SOURCE_TOOLS for tool in named.values())
+        if Counter(bridge_results) != used_results:
+            issues.append("native_bridge_result_multiplicity_mismatch")
+        if require_certified:
+            stored_attempt = attempt.get("native_protocol_guard", {})
+            if stored_attempt.get("schema") != "jiuwenswarm-native-protocol-guard-v1" or stored_attempt.get("status") != "passed" or stored_attempt.get("violations") != []:
+                issues.append("stored_attempt_native_guard_not_passed")
+            for key, expected in (("native_source_calls_cumulative", calls), ("max_native_result_chars", local_chars),
+                                  ("max_native_result_utf8_bytes", local_bytes), ("truncated_result_records", local_truncated)):
+                if stored_attempt.get(key) != expected:
+                    issues.append("stored_native_guard_measurement_mismatch:" + key)
+    if calls > limit and row["status"] == "valid":
+        raise ValueError("actual native source/compute call IDs exceed frozen budget")
+    if calls > limit: issues.append("native_source_request_limit_exceeded")
+    stored = row.get("native_protocol_guard", {})
+    if require_certified:
+        if stored.get("schema") != "jiuwenswarm-native-protocol-guard-v1" or stored.get("status") != "passed":
+            issues.append("stored_native_guard_not_passed")
+        for key, expected in (("native_source_calls_cumulative", calls),):
+            if stored.get(key) != expected:
+                issues.append("stored_native_guard_measurement_mismatch:" + key)
+        if stored.get("violations") != []:
+            issues.append("stored_native_guard_violations")
+    certified = bool(row.get("attempts")) and not missing and not issues
+    if require_certified and row["status"] == "valid" and not certified:
+        raise ValueError("valid current trial lacks certified native rendering guard: " + ",".join(sorted(set(issues))))
+    return {"pr": row["number"], "arm": row["arm"], "repeat": row["repetition"] - 1,
+            "certified": certified if require_certified else False,
+            "evidence_basis": "hash-bound native journal ToolResult; provider request body unavailable",
+            "baseline_literal_cap_certified": False if not require_certified else None,
+            "source_call_ids": calls, "native_results_observed": results, "missing_attempt_journals": missing,
+            "maximum_content_chars": maximum_chars if results else None, "maximum_content_utf8_bytes": maximum_bytes if results else None,
+            "adapter_truncated_results": truncations, "structured_content_duplicate_results": doubles,
+            "violation_counts": dict(Counter(issues))}
+
+
+def audit_terminal_trials(study):
+    """Fast native-only checkpoint: no full source, docs, truth or scoring audit."""
+    study = Path(study).resolve()
+    campaign, identity = load(study / "campaign.json"), load(study / "identity.json")
+    validate_evaluation(study, campaign, {}, {}, {})
+    if Path(campaign["run_root"]).resolve() != study or not identity.get("protocol_guards"):
+        raise ValueError("native audit needs this guarded runtime")
+    expected = {(c["number"], arm, rep) for c in campaign["cases"] for arm in "AB" for rep in (1,2,3)}
+    rows, preflights, seen = [], [], set()
+    for path in sorted((study / "items").glob("*/result.json")):
+        row = load(path)
+        slot = row.get("number"), row.get("arm"), row.get("repetition")
+        preflight = row.get("preflight") is True
+        approved = slot[0] in {c["number"] for c in campaign["cases"]} and slot[1] in "AB" and slot[2] == 0 if preflight else slot in expected
+        if not approved or (preflight, slot) in seen or path.parent.name != row.get("item") or type(row.get("preflight")) is not bool or \
+                row.get("campaign_sha256") != identity["campaign_sha256"] or row.get("identity_sha256") != identity["identity_sha256"]:
+            raise ValueError("terminal checkpoint slot or runtime differs")
+        seen.add((preflight, slot))
+        (preflights if preflight else rows).append({"pr": row["number"], "arm": row["arm"], "repeat": row["repetition"] - 1,
+                     "native_status": row["status"], "result_sha256": binding(path)["sha256"],
+                     "bridge_source_calls": actual_source_calls(row),
+                     "native_rendering_guard": native_journal_guard(row, require_certified=True)})
+    return {"schema": "jiuwenswarm-native-retest-checkpoint-v1", "status": "native_checkpoint_only",
+            "campaign_sha256": identity["campaign_sha256"], "identity_sha256": identity["identity_sha256"],
+            "terminal": len(rows), "valid": sum(r["native_status"] == "valid" for r in rows), "planned": 72,
+            "results": rows, "preflight_results": preflights, "preflight_valid": sum(r["native_status"] == "valid" for r in preflights),
+            "source_docs_truth_scoring_audited": False, "provider_request_body_available": False}
+
+
+def read_study(study, cache=None, *, require_native_guard=False):
     """Check persisted receipts; never invoke a model, collector or source command."""
     study = Path(study).resolve()
     campaign = load(study / "campaign.json")
@@ -107,8 +293,13 @@ def read_study(study, cache=None):
             raise ValueError("document snapshot inventory changed")
     if identity["native"].get("model") != "GLM-5.3" or "coding-plan" not in identity["native"].get("provider_id", ""):
         raise ValueError("retained model must be subscribed GLM-5.3")
+    expected_guards = {"mcp_structured_output": False, "bridge_result_utf8_bytes": 24000, "native_result_chars": 24000,
+                       "native_result_utf8_bytes": 24000, "reject_native_truncated": True,
+                       "count_source_calls_before_prompt_gate": True, "native_source_request_limit": 60}
+    if require_native_guard and identity.get("protocol_guards") != expected_guards:
+        raise ValueError("current runtime must freeze native rendering guards")
     rows = [r for r in collection.get("results", []) if not r.get("preflight")]
-    call_audits = []
+    call_audits, native_guards = [], []
     for row in rows:
         path = study / "items" / row["item"] / "result.json"
         if not path.resolve().is_relative_to(study / "items") or load(path) != row:
@@ -116,6 +307,7 @@ def read_study(study, cache=None):
         if row["status"] == "valid" and row.get("served_model") != "GLM-5.3":
             raise ValueError("valid trial has mismatched served model")
         call_audits.append(actual_source_calls(row, campaign.get("budget", {}).get("source_calls", 60)))
+        native_guards.append(native_journal_guard(row, require_certified=require_native_guard, limit=campaign.get("budget", {}).get("source_calls", 60)))
     if len(rows) == 72:
         prepared, _ = bound_reviews(campaign, binding(study / "campaign.json")["sha256"], load(study / "reviews-manifest.json", {}))
         native = {(r["number"], r["arm"], r["repetition"] - 1): r for r in rows}
@@ -124,7 +316,8 @@ def read_study(study, cache=None):
                 raise ValueError("collection and manifest statuses differ")
     truths = {r["pr"]: load(r["path"]) for r in truth["cases"]}
     return {"study": study, "campaign": campaign, "identity": identity, "collection": collection,
-            "truth": truth, "truth_records": truths, "scores": scores, "rows": rows, "source_call_audits": call_audits}
+            "truth": truth, "truth_records": truths, "scores": scores, "rows": rows, "source_call_audits": call_audits,
+            "native_guard_audits": native_guards, "native_guard_required": require_native_guard}
 
 
 def verify_comparable(previous, current, provenance):
@@ -240,9 +433,20 @@ def summarize(value, diagnostics):
             "usage": {arm: value["collection"].get("by_arm", {}).get(arm, {}).get("reported_usage", {}) for arm in "AB"},
             "knowledge_exposure": knowledge_exposure(rows, value["campaign"]),
             "actual_source_calls": {arm: {"requests": distribution([r["actual_requests"] for r in value.get("source_call_audits", []) if r["arm"] == arm]),
-                                          "maximum": max((r["actual_requests"] for r in value.get("source_call_audits", []) if r["arm"] == arm), default=None),
+                                          "maximum": max((r["actual_requests"] for r in value.get("source_call_audits", []) if r["arm"] == arm and r["actual_requests"] is not None), default=None),
                                           "early_prompt_gate_denied": sum(r["early_prompt_gate_denied"] for r in value.get("source_call_audits", []) if r["arm"] == arm),
+                                          "unknown_trials": sum(r.get("unknown_attempts", 0) > 0 for r in value.get("source_call_audits", []) if r["arm"] == arm),
+                                          "budget_failed_or_unknown_trials": sum(not r.get("budget_passed", False) for r in value.get("source_call_audits", []) if r["arm"] == arm),
                                           "stored_counter": distribution([r["stored_counter"] for r in value.get("source_call_audits", []) if r["arm"] == arm])} for arm in "AB"},
+            "native_rendering_guard": {"required": value.get("native_guard_required", False), "provider_request_body_available": False,
+                "evidence_basis": "hash-bound native journal ToolResult, not final provider request bytes",
+                "by_arm": {arm: {"certified_trials": sum(r["certified"] for r in value.get("native_guard_audits", []) if r["arm"] == arm),
+                    "source_call_ids_maximum": max((r["source_call_ids"] for r in value.get("native_guard_audits", []) if r["arm"] == arm), default=None),
+                    "max_content_chars": max((r["maximum_content_chars"] for r in value.get("native_guard_audits", []) if r["arm"] == arm and r["maximum_content_chars"] is not None), default=None),
+                    "max_content_utf8_bytes": max((r["maximum_content_utf8_bytes"] for r in value.get("native_guard_audits", []) if r["arm"] == arm and r["maximum_content_utf8_bytes"] is not None), default=None),
+                    "adapter_truncated_results": sum(r["adapter_truncated_results"] for r in value.get("native_guard_audits", []) if r["arm"] == arm),
+                    "structured_content_duplicate_results": sum(r["structured_content_duplicate_results"] for r in value.get("native_guard_audits", []) if r["arm"] == arm),
+                    "violation_counts": dict(sum((Counter(r["violation_counts"]) for r in value.get("native_guard_audits", []) if r["arm"] == arm), Counter()))} for arm in "AB"}},
             "scorer": {"requested_models": sorted({r.get("requested_model") for r in scorer if r.get("requested_model")}),
                        "served_models": sorted({r["served_model"] for r in scorer if r.get("served_model")}),
                        "served_model_unknown_calls": sum(not r.get("served_model") for r in scorer),
@@ -303,9 +507,12 @@ def render(value):
             lines.append(f"| {label} | {docs} | {a['valid']}/{a['expected']} | {b['valid']}/{b['expected']} | {pct(a['valid']/a['expected'])} → {pct(b['valid']/b['expected'])} |")
     audit = value["previous_failure_audit"]
     lines += ["", "## 修复范围与解释边界", "", f"旧{len(audit['slots'])}次无效评审中，{audit['harness_conflict_or_directory_syntax']}次涉及评估接口冲突或普通目录写法，{audit['counts'].get('malformed_json',0)}次为模型JSON语法错误，{audit['counts'].get('incomplete_prompt',0)}次未完整读取大PR提示。共享评审提示允许省略锚点和使用 duplicate，却与旧验证器冲突。所有旧失败均保留；本次新建批次，不事后补算为成功。", "",
-              "本轮源代码、作者资料、知识库、12个PR、三次重复和两个模型通道保持固定，修改评估协议与提示一致性。随机生成、共享排期、服务限流及提示变化也会影响结果，不能把修复前后的变化全部归因于知识库。", "",
+              "本轮源代码、作者资料、知识库、12个PR、三次重复和两个模型通道保持固定，修改评估协议、提示一致性、MCP结果渲染和UTF‑8预算。随机生成、共享排期、服务限流、上下文呈现及提示变化都会影响结果，不能把修复前后的变化全部归因于知识库，也不能据此证明知识库加速。", "",
               f"旧 harness SHA：`{value['protocol']['previous_harness_sha256']}`；新 harness SHA：`{value['protocol']['retest_harness']['sha256']}`。具体变更：{value['protocol'].get('change_scope','见归档')}", "",
               "路径逃逸、跨组文档、未完整输入、错误模型身份和未经授权工具仍属于失败；目录尾斜线与根目录 shorthand 只在受控目录检索中规范化。没有补写证据、模型切换或内容失败后重新采样。", "",
+              "原始基线保留既有完成率与评分，但其字面原生24,000字符预算未获认证：FastMCP字符串返回可能额外渲染Structured content，同一结果重复呈现；原生适配器也可能截断。旧bridge载荷满足预算不等于旧native ToolResult满足预算，不能把旧试验称为已通过新的渲染审计。", "",
+              "当前有效评审逐次要求哈希绑定的原生日志结果无适配器截断、无重复结构内容，字符及UTF‑8字节均不超过24,000，并核对源码/计算请求ID累计不超过60，包含MCP执行前被拒绝的请求。证据止于native日志ToolResult；最终provider请求体未归档，不冒称已核验其完整序列化或实际模型接收字节。", "",
+              "中止的v3批次与预检作为单独外部证明保存，不纳入本轮72个正式槽位、评分分母或速度统计。", "",
               "## 本次失败归因", "", "| 阶段 | 组别 | 原生状态/失败原因 | 次数 |", "| --- | --- | --- | ---: |"]
     for stage, run in (("修复前", previous), ("复测", current)):
         for arm in "AB":
@@ -334,7 +541,7 @@ def render(value):
     for row in current["per_pr"]:
         cells = [f"{old[row['pr']]['arms'][a]['valid']}/3 → {row['arms'][a]['valid']}/3" for a in "AB"]
         lines.append(f"| #{row['pr']} | {cells[0]} | {cells[1]} | {pct(row['arms']['A']['defect_precision'])} | {pct(row['arms']['B']['defect_precision'])} |")
-    lines += ["", "## 输入、用量与可追溯性", "", "累计知识预算6000字符、初始两页；实际注入内容与补读均归档，库存总量不代表模型收到的上下文。每次最多60次源码/计算工具调用，单次结果24000字符，原生超时1800秒，并发13。", "",
+    lines += ["", "## 输入、用量与可追溯性", "", "逻辑检索与bridge下发知识累计预算6000字符、初始两页；注入内容与补读均归档，库存总量不代表模型收到的上下文。旧native渲染中的额外重复另行披露，6000逻辑字符不冒称旧provider只收到了6000字符。每次最多60次源码/计算工具调用，单次结果24000字符，原生超时1800秒，并发13。", "",
               "所有有效调用的GLM服务实际模型均核查为GLM‑5.3；失败调用保留记录中的身份或未知状态。独立评分请求Codex gpt-6-sol/medium；原生记录未报告served model时保持未知。用量为服务记录的累计步骤tokens，不等于新增计费tokens；实际费用未知。", "",
               "#7639、#7654、#7655、#7656仅为旧分叉探索样本，不能视为无时间泄漏的前瞻评审；#7656预冻结真值仍未知。主样本8个PR均为小型后端修复，不能推广到全项目、大型功能或前端。没有执行JiuwenSwarm运行时测试。", "",
               "完整输入、流、工具调用、注入文档、评分和配置保存在Git外归档，公开JSON只保存紧凑统计与哈希。复跑入口：`python -m eval.jiuwenswarm_ab_retest_report --previous-study OLD --study NEW --output-dir OUT`。", "",
@@ -350,7 +557,13 @@ def render(value):
     for field, title in (("maximum", "实际源码/计算请求最大值"), ("early_prompt_gate_denied", "提示未完成而被拒绝的请求")):
         vals = [current["actual_source_calls"][a][field] for a in "AB"]
         lines.append(f"| {title} | {vals[0] if vals[0] is not None else '未知'} | {vals[1] if vals[1] is not None else '未知'} |")
-    lines += ["", "冻结协议的内部计数器未累加提示读完前被拒绝的源码/计算请求；因此交付审计从原始bridge事件重计所有请求（含错误和拒绝），跨传输尝试累计，任一正式评审超过60次即阻止报告发布。实际请求与内部计数分别记录，不修改已运行的harness。"]
+    lines += ["", "旧协议的内部计数器未累加提示读完前被拒绝的源码/计算请求；当前协议先计数后执行门禁。交付审计分别重计bridge请求与native独立请求ID（含错误和拒绝），跨传输尝试累计；有效评审超限或证据未知时阻止认可与报告发布。超限、证据未知的失败调用仍保留在失败分母，不删除也不记为有效。", "",
+              "| 原生渲染审计 | 修复前A | 修复前B | 复测A | 复测B |", "| --- | ---: | ---: | ---: | ---: |"]
+    for field, title in (("certified_trials", "获本次原生规则认证的评审"), ("source_call_ids_maximum", "源码/计算请求ID最大值"),
+                         ("max_content_chars", "结果字符最大值"), ("max_content_utf8_bytes", "结果UTF‑8字节最大值"),
+                         ("adapter_truncated_results", "适配器截断结果"), ("structured_content_duplicate_results", "额外结构内容重复结果")):
+        vals = [run["native_rendering_guard"]["by_arm"][a][field] for run in (previous, current) for a in "AB"]
+        lines.append(f"| {title} | " + " | ".join(str(v) if v is not None else "未知" for v in vals) + " |")
     lines += ["", f"独立评分实际served model未报告的调用数：{current['scorer']['served_model_unknown_calls']}；费用保持未知。", "",
               "| 归档 | 逻辑路径 | SHA256 |", "| --- | --- | --- |"]
     for name, item in value["inputs"].items():
@@ -361,7 +574,7 @@ def render(value):
 def build(previous_study, study, output_dir, extra_bindings=None):
     from eval.jiuwenswarm_ab_diagnostics import diagnose_run
     cache = set()
-    old, new = read_study(previous_study, cache), read_study(study, cache)
+    old, new = read_study(previous_study, cache), read_study(study, cache, require_native_guard=True)
     provenance = load(new["study"] / "retest-provenance.json", {})
     verify_comparable(old, new, provenance)
     summaries = []
@@ -384,7 +597,7 @@ def build(previous_study, study, output_dir, extra_bindings=None):
         inputs[label] = binding(path)
     result = {"schema": "jiuwenswarm-protocol-retest-report-v1", "generated_at": datetime.now(timezone.utc).isoformat(),
               "status": summaries[1]["status"], "previous": summaries[0], "current": summaries[1],
-              "protocol": provenance["protocol"], "previous_failure_audit": previous_failure_audit(old),
+              "protocol": {**provenance["protocol"], "current_native_guards": new["identity"].get("protocol_guards")}, "previous_failure_audit": previous_failure_audit(old),
               "cases": [{k: c[k] for k in ("number", "target", "base", "head", "context_sha256", "diff_sha256")} for c in new["campaign"]["cases"]],
               "document_content_manifest_sha256": {a: sha(new["identity"]["arms"][a]["documents"]) for a in "AB"},
               "inputs": inputs, "actual_invoice_cost": "unknown"}
@@ -407,13 +620,26 @@ def build(previous_study, study, output_dir, extra_bindings=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--previous-study", type=Path, required=True)
-    parser.add_argument("--study", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--previous-study", type=Path)
+    parser.add_argument("--study", type=Path)
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--audit-study", type=Path)
+    parser.add_argument("--audit-output", type=Path)
     parser.add_argument("--binding", action="append", default=[], metavar="NAME=FILE")
     parser.add_argument("--raw-index", type=Path)
     parser.add_argument("--validation", type=Path)
     args = parser.parse_args(argv)
+    if args.audit_study:
+        if any((args.previous_study, args.study, args.output_dir)):
+            parser.error("audit-study is independent of report arguments")
+        value = audit_terminal_trials(args.audit_study)
+        if args.audit_output:
+            args.audit_output.parent.mkdir(parents=True, exist_ok=True)
+            args.audit_output.write_text(json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n")
+        print(json.dumps({k: value[k] for k in ("status", "terminal", "valid", "planned")}))
+        return value
+    if not all((args.previous_study, args.study, args.output_dir)):
+        parser.error("report requires previous-study, study and output-dir")
     bindings = {}
     if args.raw_index: bindings["raw_trace_index"] = args.raw_index
     if args.validation: bindings["validation"] = args.validation

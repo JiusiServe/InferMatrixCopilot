@@ -218,7 +218,7 @@ def test_invalid_native_trial_cannot_be_scored_as_valid():
 
 
 def traced_row(tmp_path, count):
-    row = {"number": 7641, "arm": "B", "repetition": 1, "source_calls_cumulative": count-1, "attempts": []}
+    row = {"number": 7641, "arm": "B", "repetition": 1, "status": "valid", "source_calls_cumulative": count-1, "attempts": []}
     for index, size in enumerate((1, count-1)):
         root = tmp_path / f"attempt-{index}"
         state = write(root / "tool-state.json", {"events": size})
@@ -260,3 +260,114 @@ def test_old_failure_label_requires_actual_matching_output_shape(tmp_path, missi
     result = report.previous_failure_audit({"rows": [row]})
     assert result["counts"] == {reason: 1}
     assert result["old_failures_remain_failures"] is True
+
+
+def native_row(tmp_path, *, content='{"paths":"entry.py"}', truncated=False, before_mcp_error=False, calls=1, certified=True):
+    root = tmp_path / "native-attempt"
+    root.mkdir(parents=True)
+    bridge = root / "bridge-events.jsonl"
+    bridge.write_text("" if before_mcp_error else "\n".join(json.dumps({"result": content}) for _ in range(calls)))
+    events = []
+    for index in range(calls):
+        events += [{"type": "tool.updated", "payload": {"kind": "scheduled", "toolCallId": f"call-{index}", "toolName": report.BRIDGE_PREFIX + "source_list"}},
+                   {"type": "tool.updated", "payload": {"kind": "result", "toolCallId": f"call-{index}", "result": {
+                       "content": content, "truncated": truncated, "success": not before_mcp_error,
+                       "originalBytes": len(content.encode()), "returnedBytes": len(content.encode())}}}]
+    journal = root / "traces/attempts/native/native-events.jsonl"
+    journal.parent.mkdir(parents=True)
+    journal.write_text("\n".join(json.dumps(event) for event in events))
+    row = {"number": 7641, "arm": "B", "repetition": 1, "status": "valid", "attempts": [{"attempt_root": str(root),
+           "artifacts": {"bridge-events.jsonl": binding(bridge)["sha256"], "traces/attempts/native/native-events.jsonl": binding(journal)["sha256"]}}]}
+    if certified:
+        row["native_protocol_guard"] = {"schema": "jiuwenswarm-native-protocol-guard-v1", "status": "passed",
+            "native_source_calls_cumulative": calls, "max_native_result_chars": len(content),
+            "max_native_result_utf8_bytes": len(content.encode()), "truncated_result_records": int(truncated)*calls,
+            "violations": []}
+        row["attempts"][0]["native_protocol_guard"] = row["native_protocol_guard"]
+    return row
+
+
+def test_current_native_guard_requires_literal_cap_no_truncation_and_bound_bytes(tmp_path):
+    row = native_row(tmp_path)
+    value = report.native_journal_guard(row, require_certified=True)
+    assert value["certified"] is True and value["source_call_ids"] == 1
+    assert "provider request body unavailable" in value["evidence_basis"]
+    row["native_protocol_guard"]["native_source_calls_cumulative"] = 0
+    with pytest.raises(ValueError, match="measurement_mismatch"):
+        report.native_journal_guard(row, require_certified=True)
+
+
+@pytest.mark.parametrize("content,truncated", [("x"*24001, False), ("中"*8001, False), ("small", True), ('{}\n\nStructured content:{}', False)])
+def test_literal_cap_utf8_truncation_and_double_render_reject_valid_trial(tmp_path, content, truncated):
+    with pytest.raises(ValueError, match="lacks certified native"):
+        report.native_journal_guard(native_row(tmp_path, content=content, truncated=truncated), require_certified=True)
+
+
+def test_old_baseline_keeps_stats_but_literal_rendering_is_not_certified(tmp_path):
+    row = native_row(tmp_path, content="x"*24001, truncated=True, certified=False)
+    value = report.native_journal_guard(row, require_certified=False)
+    assert value["certified"] is False and value["baseline_literal_cap_certified"] is False
+    assert value["adapter_truncated_results"] == 1
+    assert value["violation_counts"]["native_result_character_cap_exceeded"] == 1
+    assert row["status"] == "valid"
+
+
+def test_native_call_limit_includes_schema_rejections_before_bridge_execution(tmp_path):
+    row = native_row(tmp_path, content="invalid tool arguments", before_mcp_error=True, calls=60)
+    value = report.native_journal_guard(row, require_certified=True)
+    assert value["source_call_ids"] == 60 and value["certified"] is True
+    row = native_row(tmp_path / "over-limit", content="invalid tool arguments", before_mcp_error=True, calls=61)
+    with pytest.raises(ValueError, match="native source/compute call IDs"):
+        report.native_journal_guard(row, require_certified=True)
+
+
+def test_missing_native_guard_cannot_certify_current_valid_result(tmp_path):
+    with pytest.raises(ValueError, match="stored_native_guard"):
+        report.native_journal_guard(native_row(tmp_path, certified=False), require_certified=True)
+
+
+def test_invalid_budget_breaches_stay_failed_in_denominator(tmp_path):
+    row = traced_row(tmp_path, 61)
+    row["status"] = "invalid_run"
+    actual = report.actual_source_calls(row)
+    assert actual["actual_requests"] == 61 and actual["budget_passed"] is False
+    row = native_row(tmp_path / "native", calls=61)
+    row["status"] = "invalid_run"
+    guard = report.native_journal_guard(row, require_certified=True)
+    assert guard["certified"] is False and guard["source_call_ids"] == 61
+
+
+def test_unknown_early_transport_failure_stays_unknown_not_zero(tmp_path):
+    row = {"number": 7641, "arm": "B", "repetition": 1, "status": "transport_failed", "attempts": [
+           {"attempt_root": str(tmp_path), "status": "transport_failed", "artifacts": {}}]}
+    audit = report.actual_source_calls(row)
+    assert audit["actual_requests"] is None and audit["unknown_attempts"] == 1 and audit["budget_passed"] is False
+
+
+def test_finalized_hash_bound_empty_transport_can_precede_valid_retry(tmp_path):
+    empty = tmp_path / "empty"
+    metadata = write(empty / "traces/attempts/id/attempt.json", {"schema": "native-attempt/1", "status": "transport_failed",
+        "finished_at": 1, "trace_id": "t", "native_events_sha256": "sha256:" + hashlib.sha256(b"").hexdigest()})
+    attempt = {"attempt_root": str(empty), "status": "transport_failed", "native_trace_id": "t",
+               "artifacts": {"traces/attempts/id/attempt.json": binding(metadata)["sha256"]}}
+    row = {"number": 7641, "arm": "B", "repetition": 1, "status": "valid", "attempts": [attempt]}
+    audit = report.actual_source_calls(row)
+    assert audit["actual_requests"] == 0 and audit["proven_empty_transport_attempts"] == 1
+    assert report.empty_transport_evidence(attempt) is True
+
+
+def test_duplicate_result_phase_is_still_checked_for_cap_and_content_conflict(tmp_path):
+    row = native_row(tmp_path)
+    attempt = row["attempts"][0]
+    journal = Path(attempt["attempt_root"]) / "traces/attempts/native/native-events.jsonl"
+    events = [json.loads(line) for line in journal.read_text().splitlines()]
+    phase = copy.deepcopy(events[-1])
+    phase["payload"]["kind"] = "running"
+    phase["payload"]["result"].update(content="x"*24001, originalBytes=24001, returnedBytes=24001)
+    journal.write_text("\n".join(json.dumps(e) for e in [*events, phase]))
+    attempt["artifacts"]["traces/attempts/native/native-events.jsonl"] = binding(journal)["sha256"]
+    row["status"] = "invalid_run"
+    guard = report.native_journal_guard(row, require_certified=True)
+    assert guard["maximum_content_chars"] == 24001
+    assert guard["violation_counts"]["native_result_delivery_conflict"] == 1
+    assert guard["violation_counts"]["native_result_character_cap_exceeded"] == 1
