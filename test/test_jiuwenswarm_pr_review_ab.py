@@ -18,7 +18,7 @@ sys.modules[SPEC.name] = ab
 SPEC.loader.exec_module(ab)
 
 
-def _tools(tmp_path, initial=0):
+def _tools(tmp_path, initial=0, complete=True):
     source = tmp_path / "source"
     source.mkdir()
     (source / "core.py").write_text("VALUE = 1\n" * 4000)
@@ -37,11 +37,16 @@ def _tools(tmp_path, initial=0):
                      "sources": {p.name: ab.digest(p.read_bytes()) for p in source.iterdir()}},
             "arm": {"doc_root": str(docs), "repo_subdir": "repos/jiuwenswarm",
                     "documents": {page.relative_to(docs).as_posix(): ab.digest(page.read_bytes())}}}
-    return ab.ClosedTools(spec), spec
+    tools = ab.ClosedTools(spec)
+    if complete:
+        page = json.loads(tools.call("read_prompt", {"offset": 0}))
+        while page["next_offset"] is not None:
+            page = json.loads(tools.call("read_prompt", {"offset": page["next_offset"]}))
+    return tools, spec
 
 
 def test_prompt_paging_must_cover_all_bytes(tmp_path):
-    tools, spec = _tools(tmp_path)
+    tools, spec = _tools(tmp_path, complete=False)
     result = json.loads(tools.call("read_prompt", {"offset": 0}))
     assert not ab.covered_prompt(tools.state, result["total_chars"])
     while result["next_offset"] is not None:
@@ -50,6 +55,82 @@ def test_prompt_paging_must_cover_all_bytes(tmp_path):
     assert tools.state["knowledge_chars"] == 0
     Path(spec["prompt_path"]).write_text("changed")
     assert "frozen prompt changed" in tools.call("read_prompt", {})
+
+
+def test_sequential_prompt_skip_and_early_tools_recover_with_denied_calls_counted(tmp_path):
+    tools, _ = _tools(tmp_path, initial=5900, complete=False)
+    first = json.loads(tools.call("read_prompt", {"offset": 0}))
+    assert first["prompt_complete"] is False
+    assert "nonsequential_prompt_offset" in tools.call("read_prompt", {"offset": 44000})
+    for name, args in [("source_list", {"path": "."}), ("source_read", {"path": "core.py"}),
+                       ("doc_read", {"path": "repos/jiuwenswarm/guide.md"}), ("calc", {"expr": "1+1"})]:
+        refused = json.loads(tools.call(name, args))
+        assert f"read_prompt(offset={first['next_offset']})" in refused["error"]
+    assert tools.state["source_calls"] == 3
+    assert tools.state["knowledge_chars"] == 5900
+    assert tools.state["violations"] == []
+    page = first
+    while page["next_offset"] is not None:
+        page = json.loads(tools.call("read_prompt", {"offset": page["next_offset"]}))
+    assert page["prompt_complete"] is True
+    assert page["cursor"] == page["total_chars"] == 54000
+    assert ab.covered_prompt(tools.state, 54000)
+    assert "paths" in json.loads(tools.call("source_list", {"path": "."}))
+
+
+def test_large_escape_heavy_prompt_every_character_and_encoded_page_fits(tmp_path):
+    tools, spec = _tools(tmp_path, complete=False)
+    text = '"\\\n\t中' * 85000
+    Path(spec["prompt_path"]).write_text(text)
+    spec["prompt_sha256"] = ab.digest(text)
+    chunks, offset = [], 0
+    while True:
+        encoded = tools.call("read_prompt", {"offset": offset})
+        assert len(encoded) <= ab.RESULT_CHARS
+        assert len(encoded.encode("utf-8")) <= ab.RESULT_UTF8_BYTES
+        page = json.loads(encoded)
+        chunks.append(page["content"])
+        assert page["cursor"] == offset + len(page["content"])
+        assert page["prompt_sha256"] == ab.digest(text)
+        if page["next_offset"] is None:
+            assert page["prompt_complete"] is True
+            break
+        assert page["next_offset"] > offset
+        offset = page["next_offset"]
+    assert "".join(chunks) == text
+    assert len(chunks) > 20
+    assert ab.covered_prompt(tools.state, len(text))
+    assert not ab.covered_prompt({**tools.state, "prompt_complete": False}, len(text))
+    assert not ab.covered_prompt({**tools.state, "prompt_cursor": len(text) - 1}, len(text))
+    assert not ab.covered_prompt({**tools.state, "prompt_ranges": [[0, 2], [3, len(text)]]}, len(text))
+
+
+@pytest.mark.parametrize("tool", ["source_list", "source_grep"])
+def test_source_directory_root_alias_and_terminal_separator(tmp_path, tool):
+    tools, spec = _tools(tmp_path)
+    directory = Path(spec["case"]["source_root"]) / "tests/nested"
+    directory.mkdir(parents=True)
+    target = directory / "test_core.py"
+    target.write_text("VALUE = 2\n")
+    spec["case"]["sources"]["tests/nested/test_core.py"] = ab.digest(target.read_bytes())
+    args = {"pattern": "VALUE"} if tool == "source_grep" else {}
+    plain = json.loads(tools.call(tool, {**args, "path": "tests/nested"}))
+    slash = json.loads(tools.call(tool, {**args, "path": "tests/nested/"}))
+    assert plain == slash
+    root = json.loads(tools.call(tool, {**args, "path": ""}))
+    assert json.loads(tools.call(tool, {**args, "path": "."})) == root
+    assert tools.state["violations"] == []
+
+
+@pytest.mark.parametrize("path", ["./", "tests//", "tests//nested/", "tests/./nested/",
+                                  "tests/../", "../tests/", "/tests/", ".git/", "tests/.git/",
+                                  "docs/", ".doc_project_maintainer/", "guide.md/"])
+@pytest.mark.parametrize("tool", ["source_list", "source_grep"])
+def test_directory_normalization_keeps_scope_and_document_isolation(tmp_path, tool, path):
+    tools, _ = _tools(tmp_path)
+    args = {"path": path, **({"pattern": "VALUE"} if tool == "source_grep" else {})}
+    assert "error" in json.loads(tools.call(tool, args))
+    assert tools.state["violations"]
 
 
 def test_knowledge_reads_share_closed_cumulative_quota(tmp_path):
@@ -99,6 +180,34 @@ def test_source_outputs_and_calls_bounded_and_binary_grep_skipped(tmp_path):
     assert tools.state["violations"] == []
 
 
+@pytest.mark.parametrize("tool", ["source_read", "file_at_base"])
+def test_source_paging_accounts_for_json_expansion(tmp_path, monkeypatch, tool):
+    tools, spec = _tools(tmp_path)
+    text = '"\\\n\t中' * 11000
+    if tool == "source_read":
+        Path(spec["case"]["source_root"], "core.py").write_text(text)
+        spec["case"]["sources"]["core.py"] = ab.digest(text)
+    else:
+        def fake_git(root, *args):
+            return b"100644 blob abc\tcore.py\0" if args[0] == "ls-tree" else text.encode() if args[0] == "show" else b""
+        monkeypatch.setattr(ab, "git", fake_git)
+    chunks, offset = [], 0
+    while True:
+        encoded = tools.call(tool, {"path": "core.py", "offset": offset})
+        assert len(encoded) <= 24000
+        assert len(encoded.encode("utf-8")) <= 24000
+        page = json.loads(encoded)
+        assert page["start_line"] == text[:offset].count("\n") + 1
+        chunks.append(page["content"])
+        if page["next_offset"] is None:
+            break
+        assert page["next_offset"] == offset + len(page["content"])
+        offset = page["next_offset"]
+    assert "".join(chunks) == text
+    assert tools.state["source_calls"] == len(chunks) < 60
+    assert tools.state["violations"] == []
+
+
 def test_changed_source_or_other_arm_document_is_refused(tmp_path):
     tools, spec = _tools(tmp_path)
     Path(spec["case"]["source_root"], "core.py").write_text("tampered")
@@ -114,6 +223,45 @@ def test_reply_fences_allowed_without_model_repair():
         ab.validate_reply('{"status":"success","review_comments":[],"tests_run":["pytest"]}')
     with pytest.raises(ValueError):
         ab.validate_reply("malformed")
+
+
+def test_canonical_contract_required_anchors_enums_and_json_remain_strict():
+    fields = {"file": "core.py", "line": 1, "anchor_snippet": "", "severity": "minor",
+              "comment": "A scoped suggestion.", "evidence": 'core.py:1: VALUE = "1"', "disposition": "excluded"}
+    output = {"status": "success", "review_comments": [fields], "tests_run": []}
+    assert ab.validate_reply(json.dumps(output)) == output
+    for patch in [{"severity": "P2"}, {"evidence": ["core.py:1"]}, {"disposition": "duplicate"}]:
+        with pytest.raises(ValueError):
+            ab.validate_reply(json.dumps({**output, "review_comments": [{**fields, **patch}]}))
+    without_anchor = {key: value for key, value in fields.items() if key != "anchor_snippet"}
+    with pytest.raises(ValueError, match="missing required"):
+        ab.validate_reply(json.dumps({**output, "review_comments": [without_anchor]}))
+    for syntax_error in ['{"status":"success","review_comments":[],}',
+                         '{"status":"success","review_comments":[],"summary":"bad "quote""}']:
+        with pytest.raises(ValueError):
+            ab.validate_reply(syntax_error)
+    with pytest.raises(ValueError, match="cannot execute tests"):
+        ab.validate_reply(json.dumps({"status": "success", "bootstrap": True, "review_comments": [], "tests_run": ["pytest"]}), preflight=True)
+    guidance = ab.review_guidance()
+    assert "omit the field entirely" not in guidance
+    assert "`duplicate` for" not in guidance
+    assert "the other four" not in guidance
+    schema_fields = ab.output_contract()["properties"]["review_comments"]["items"]
+    assert set(schema_fields["required"]) == set(fields)
+    assert schema_fields["properties"]["evidence"]["type"] == "string"
+
+
+def test_preflight_uses_full_frozen_context_and_diff_without_review(tmp_path):
+    case, _ = _native_case(tmp_path)
+    diff = "diff --git a/core.py b/core.py\n" + "+VALUE = 2\n" * 40000
+    Path(case["diff_path"]).write_text(diff)
+    prompt = ab.make_prompt(case, {"documents": [], "content_chars": 0}, preflight=True)
+    assert "Do not analyze defects or review this PR" in prompt
+    assert "source_list(path='.')" in prompt
+    assert "source_read(path='core.py', offset=0)" in prompt
+    assert '"bootstrap": true' in prompt
+    assert diff in prompt
+    assert len(prompt) > 400000
 
 
 def test_native_command_disables_reads_and_session_tools(tmp_path, monkeypatch):
@@ -153,18 +301,31 @@ import importlib.util
 s = importlib.util.spec_from_file_location('ab_child', MODULE)
 m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
 tools = m.ClosedTools(json.loads((root/'bridge-spec.json').read_text()))
-result = json.loads(tools.call('read_prompt', {'offset':0}))
+counter = 0
+def call(name, args):
+    global counter
+    counter += 1
+    cid = 'call-' + str(counter)
+    print(json.dumps({'type':'tool.updated','payload':{'kind':'scheduled','toolName':m.BRIDGE_PREFIX+name,'toolCallId':cid,'input':args}}))
+    result = tools.call(name,args)
+    print(json.dumps({'type':'tool.updated','payload':{'kind':'result','toolCallId':cid,'result':{'content':result,'truncated':False,'originalBytes':len(result.encode()),'returnedBytes':len(result.encode()),'success':True}}}))
+    return result
+result = json.loads(call('read_prompt', {'offset':0}))
 while result['next_offset'] is not None:
-    result = json.loads(tools.call('read_prompt', {'offset':result['next_offset']}))
-tools.call('source_list', {})
-for _ in range(SOURCE_USES - 1):
-    tools.call('source_list', {})
-tools.call('doc_search', {'query':'__bootstrap_no_match__'})
+    result = json.loads(call('read_prompt', {'offset':result['next_offset']}))
+if tools.state['source_calls'] < m.SOURCE_CALLS:
+    call('source_list', {'path':'.'})
+if tools.state['source_calls'] < m.SOURCE_CALLS:
+    call('source_read', {'path':'core.py'})
+for _ in range(SOURCE_USES - 2):
+    if tools.state['source_calls'] < m.SOURCE_CALLS:
+        call('source_list', {})
+call('doc_search', {'query':'__bootstrap_no_match__'})
 if KNOWLEDGE_NEARCAP:
     page = 'repos/jiuwenswarm/guide.md'
     size = len(tools.docs.read(page, limit=65536)['content'])
-    tools.call('doc_read', {'path':page, 'offset':size-2990})
-    tools.call('doc_read', {'path':page, 'offset':0})
+    call('doc_read', {'path':page, 'offset':size-2990})
+    call('doc_read', {'path':page, 'offset':0})
 print(json.dumps({'type':'session.updated','payload':{'modelId':MODEL,'providerId':'account:bigmodel-individual-coding-plan'}}))
 if ROGUE:
     print(json.dumps({'type':'tool.updated','payload':{'kind':PHASE,'toolName':'Read','input':{'file_path':'/etc/passwd'}}}))
@@ -246,6 +407,139 @@ def test_native_nameless_results_and_batches_require_known_bridge_call_ids():
     assert ab.native_tool_violations(events) == []
     assert ab.native_tool_violations(events + [event(kind="completed", toolName="Read", toolCallId="c1")]) == ["Read"]
     assert ab.native_tool_violations(events + [event(kind="result", toolCallId="unknown")]) == ["unrecognized_tool_event"]
+
+
+def test_native_tool_lifecycle_correlation_reordered_but_names_remain_closed():
+    def event(**payload):
+        return {"type": "tool.updated", "payload": payload}
+    events = [event(kind="result", toolCallId="c1"), event(kind="started", toolCallId="c1"),
+              event(kind="batch", toolCallIds=["c1"]),
+              event(kind="scheduled", toolName=ab.BRIDGE_PREFIX + "source_list", toolCallId="c1")]
+    assert ab.native_tool_violations(events) == []
+    assert ab.native_tool_violations(events + [event(kind="scheduled", toolName="mcp__other__source_list", toolCallId="c1")]) == ["mcp__other__source_list"]
+    assert ab.native_tool_violations(events + [event(kind="error", toolCallId="unseen")]) == ["unrecognized_tool_event"]
+    assert ab.native_tool_violations(events + [event(kind="future_protocol", toolCallId="c1")]) == ["unrecognized_tool_event"]
+
+
+def native_call(tool="source_read", call_id="one", content='{"content":"source"}', **result_overrides):
+    result = {"content": content, "truncated": False, "originalBytes": len(content.encode()),
+              "returnedBytes": len(content.encode()), "success": True, **result_overrides}
+    return [{"type": "tool.updated", "payload": {"kind": "scheduled", "toolName": ab.BRIDGE_PREFIX + tool,
+             "toolCallId": call_id, "input": {"path": "core.py"}}},
+            {"type": "tool.updated", "payload": {"kind": "result", "toolCallId": call_id, "result": result}}]
+
+
+@pytest.mark.parametrize("tool", ["source_read", "read_prompt", "doc_read"])
+def test_native_rendered_oversize_refused_despite_small_bridge_body(tool):
+    content = '{"content":"small"}' + "\n\nStructured content:\n" + "x" * 24000
+    guard = ab.native_protocol_guard(native_call(tool=tool, content=content))
+    assert guard["status"] == "failed"
+    assert any(v["check"] == "native_result_budget" for v in guard["violations"])
+
+
+def test_small_structured_duplicate_and_unbound_success_refused():
+    bridge = '{"content":"source"}'
+    rendered = bridge + '\n\nStructured content:\n{"result":"duplicate"}'
+    guard = ab.native_protocol_guard(native_call(content=rendered), bridge_results=[bridge])
+    assert guard["status"] == "failed"
+    assert any(v["check"] == "native_structured_content_duplicate" for v in guard["violations"])
+    unbound = ab.native_protocol_guard(native_call(content="extra unbound content"), bridge_results=[bridge])
+    assert unbound["status"] == "failed"
+    assert any(v["check"] == "successful_native_content_not_bound_to_bridge" for v in unbound["violations"])
+
+
+def test_native_delivery_dedup_preserves_all_phase_caps_and_multiplicity():
+    bridge = '{"content":"source"}'
+    events = native_call(content=bridge)
+    repeated = json.loads(json.dumps(events[-1]))
+    repeated["payload"]["kind"] = "completed"
+    good = ab.native_protocol_guard(events + [repeated], bridge_results=[bridge])
+    assert good["status"] == "passed"
+    assert good["tool_result_records"] == 2
+    assert good["delivered_result_sha256_counts"] == {ab.digest(bridge): 1}
+    missing = ab.native_protocol_guard(events, bridge_results=[bridge, bridge])
+    assert missing["status"] == "failed"
+    repeated["payload"]["result"]["content"] = "x" * 24001
+    repeated["payload"]["result"]["originalBytes"] = 24001
+    repeated["payload"]["result"]["returnedBytes"] = 24001
+    bad = ab.native_protocol_guard(events + [repeated], bridge_results=[bridge])
+    assert bad["status"] == "failed"
+    assert bad["max_native_result_chars"] == 24001
+    assert any(v["check"] == "native_result_budget" for v in bad["violations"])
+
+
+@pytest.mark.parametrize("overrides", [{"truncated": True}, {"truncated": None},
+                                        {"originalBytes": 99}, {"originalBytes": 99, "returnedBytes": 99}])
+def test_native_truncation_and_size_receipts_fail_closed(overrides):
+    guard = ab.native_protocol_guard(native_call(**overrides))
+    assert guard["status"] == "failed"
+    assert guard["violations"]
+
+
+def test_native_cjk_bytes_cap_and_every_result_phase_checked():
+    events = native_call(content="中" * 9000)
+    events[-1]["payload"]["kind"] = "completed"
+    guard = ab.native_protocol_guard(events)
+    assert guard["max_native_result_chars"] == 9000
+    assert guard["max_native_result_utf8_bytes"] == 27000
+    assert guard["status"] == "failed"
+
+
+def test_native_pre_mcp_validation_calls_and_cross_attempt_limit_count():
+    # MCP rejects these requests before ClosedTools can journal/charge them.
+    events = sum((native_call(call_id=f"bad-{i}", content="Invalid MCP arguments", success=False) for i in range(61)), [])
+    guard = ab.native_protocol_guard(events)
+    assert guard["native_source_calls"] == 61
+    assert guard["native_source_calls_cumulative"] == 61
+    assert guard["status"] == "failed"
+    first = ab.native_protocol_guard(events[:120])
+    assert first["native_source_calls"] == 60 and first["status"] == "passed"
+    retry = ab.native_protocol_guard(native_call(call_id="retry"), prior_source_calls=60)
+    assert retry["status"] == "failed"
+    assert retry["native_source_calls_cumulative"] == 61
+
+
+def test_actual_stdio_mcp_client_receives_text_only_without_structured_duplicate(tmp_path):
+    import anyio
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    tools, spec = _tools(tmp_path, complete=False)
+    source_text = '中"\\\n' * 8000
+    Path(spec["case"]["source_root"], "core.py").write_text(source_text)
+    spec["case"]["sources"]["core.py"] = ab.digest(source_text)
+    spec_path = tmp_path / "stdio-spec.json"
+    ab.atomic_json(spec_path, spec)
+    async def exercise():
+        params = StdioServerParameters(command=sys.executable, args=[str(MODULE_PATH), "bridge", "--spec", str(spec_path)],
+                                       env={"PYTHONPATH": str(ab.REPO_ROOT / "src")})
+        async with stdio_client(params) as (reader, writer):
+            async with ClientSession(reader, writer) as session:
+                await session.initialize()
+                listed = await session.list_tools()
+                assert {t.name for t in listed.tools} == ab.TOOLS
+                assert all(t.outputSchema is None for t in listed.tools)
+                offset = 0
+                while True:
+                    reply = await session.call_tool("read_prompt", {"offset": offset})
+                    assert reply.structuredContent is None
+                    assert len(reply.content) == 1 and reply.content[0].type == "text"
+                    text = reply.content[0].text
+                    assert len(text.encode()) <= 24000
+                    page = json.loads(text)
+                    if page["next_offset"] is None:
+                        assert page["prompt_complete"] is True
+                        break
+                    offset = page["next_offset"]
+                reply = await session.call_tool("source_read", {"path": "core.py"})
+                assert reply.structuredContent is None
+                assert len(reply.content) == 1
+                text = reply.content[0].text
+                assert len(text) <= 24000 and len(text.encode()) <= 24000
+                assert "\n\nStructured content:\n" not in text
+                page = json.loads(text)
+                assert source_text.startswith(page["content"])
+                assert page["next_offset"] is not None
+    anyio.run(exercise)
 
 
 def test_source_limit_cumulative_across_only_transport_retry(tmp_path):

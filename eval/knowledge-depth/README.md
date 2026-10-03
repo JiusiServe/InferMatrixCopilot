@@ -10,6 +10,8 @@ All 490 previously active blocks retain exact bytes and native approval bindings
 
 Current delivery reports:
 
+- [Original author-document comparison](jiuwenswarm-original-docs-comparison-cn-20261003.md), with [compact data](jiuwenswarm-original-docs-comparison-cn-20261003.json), preserves the content/coverage baseline and historical A/B results unchanged.
+- [GLM-5.3 protocol-fix retest](jiuwenswarm-ab-retest-cn-20261003.md), with [compact data](jiuwenswarm-ab-retest-cn-20261003.json), reports the new evaluation batch separately from that immutable baseline.
 - [Chinese comparison and PR-review impact](jiuwenswarm-repair63-comparison-cn-20261002.md), with [compact data](jiuwenswarm-repair63-comparison-cn-20261002.json).
 - [Final audit summary](jiuwenswarm-repair63-final-20261002.json), [source bindings](jiuwenswarm-repair63-source-depth-20261002.json), and [actual native approval bindings](jiuwenswarm-repair63-native-approvals-20261002.json).
 - [237-case retrieval acceptance](jiuwenswarm-repair63-retrieval-after-20261002.json), [independent review](jiuwenswarm-repair63-independent-review-20261002.json), and [local validation](jiuwenswarm-repair63-local-validation-20261002.json).
