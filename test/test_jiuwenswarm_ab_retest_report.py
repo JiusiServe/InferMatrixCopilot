@@ -371,3 +371,16 @@ def test_duplicate_result_phase_is_still_checked_for_cap_and_content_conflict(tm
     assert guard["maximum_content_chars"] == 24001
     assert guard["violation_counts"]["native_result_delivery_conflict"] == 1
     assert guard["violation_counts"]["native_result_character_cap_exceeded"] == 1
+
+
+def test_unknown_tool_cannot_pass_just_by_using_the_bridge_prefix(tmp_path):
+    row = native_row(tmp_path)
+    attempt = row["attempts"][0]
+    journal = Path(attempt["attempt_root"]) / "traces/attempts/native/native-events.jsonl"
+    events = [json.loads(line) for line in journal.read_text().splitlines()]
+    events[0]["payload"]["toolName"] = report.BRIDGE_PREFIX + "evil"
+    journal.write_text("\n".join(json.dumps(e) for e in events))
+    attempt["artifacts"]["traces/attempts/native/native-events.jsonl"] = binding(journal)["sha256"]
+    row["native_protocol_guard"]["native_source_calls_cumulative"] = 0
+    with pytest.raises(ValueError, match="unauthorized_native_tool_name"):
+        report.native_journal_guard(row, require_certified=True)

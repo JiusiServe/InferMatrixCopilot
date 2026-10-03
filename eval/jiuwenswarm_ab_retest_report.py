@@ -18,6 +18,7 @@ PRIMARY = (7641, 7642, 7645, 7647, 7649, 7650, 7651, 7675)
 EXPLORATORY = (7639, 7654, 7655, 7656)
 NAME = "jiuwenswarm-ab-retest-cn-20261003"
 SOURCE_TOOLS = {"source_read", "source_list", "source_grep", "file_at_base", "calc"}
+APPROVED_TOOLS = SOURCE_TOOLS | {"read_prompt", "doc_search", "doc_read"}
 BRIDGE_PREFIX = "mcp__jiuwenswarm-ab__"
 
 
@@ -141,6 +142,8 @@ def native_journal_guard(row, *, require_certified=False, limit=60):
                 payload = event.get("payload", {})
                 tool, call_id = payload.get("toolName"), payload.get("toolCallId")
                 if isinstance(tool, str):
+                    if not tool.startswith(BRIDGE_PREFIX) or tool[len(BRIDGE_PREFIX):] not in APPROVED_TOOLS:
+                        issues.append("unauthorized_native_tool_name")
                     if not isinstance(call_id, str):
                         issues.append("named_tool_missing_call_id")
                     elif call_id in named and named[call_id] != tool:
@@ -154,7 +157,7 @@ def native_journal_guard(row, *, require_certified=False, limit=60):
                     continue
                 call_id = payload.get("toolCallId")
                 tool = named.get(call_id, "")
-                if not tool.startswith(BRIDGE_PREFIX):
+                if not tool.startswith(BRIDGE_PREFIX) or tool[len(BRIDGE_PREFIX):] not in APPROVED_TOOLS:
                     issues.append("result_tool_identity_unknown")
                     continue
                 result = payload["result"]
