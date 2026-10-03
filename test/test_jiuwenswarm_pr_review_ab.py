@@ -437,6 +437,37 @@ def test_native_rendered_oversize_refused_despite_small_bridge_body(tool):
     assert any(v["check"] == "native_result_budget" for v in guard["violations"])
 
 
+def test_small_structured_duplicate_and_unbound_success_refused():
+    bridge = '{"content":"source"}'
+    rendered = bridge + '\n\nStructured content:\n{"result":"duplicate"}'
+    guard = ab.native_protocol_guard(native_call(content=rendered), bridge_results=[bridge])
+    assert guard["status"] == "failed"
+    assert any(v["check"] == "native_structured_content_duplicate" for v in guard["violations"])
+    unbound = ab.native_protocol_guard(native_call(content="extra unbound content"), bridge_results=[bridge])
+    assert unbound["status"] == "failed"
+    assert any(v["check"] == "successful_native_content_not_bound_to_bridge" for v in unbound["violations"])
+
+
+def test_native_delivery_dedup_preserves_all_phase_caps_and_multiplicity():
+    bridge = '{"content":"source"}'
+    events = native_call(content=bridge)
+    repeated = json.loads(json.dumps(events[-1]))
+    repeated["payload"]["kind"] = "completed"
+    good = ab.native_protocol_guard(events + [repeated], bridge_results=[bridge])
+    assert good["status"] == "passed"
+    assert good["tool_result_records"] == 2
+    assert good["delivered_result_sha256_counts"] == {ab.digest(bridge): 1}
+    missing = ab.native_protocol_guard(events, bridge_results=[bridge, bridge])
+    assert missing["status"] == "failed"
+    repeated["payload"]["result"]["content"] = "x" * 24001
+    repeated["payload"]["result"]["originalBytes"] = 24001
+    repeated["payload"]["result"]["returnedBytes"] = 24001
+    bad = ab.native_protocol_guard(events + [repeated], bridge_results=[bridge])
+    assert bad["status"] == "failed"
+    assert bad["max_native_result_chars"] == 24001
+    assert any(v["check"] == "native_result_budget" for v in bad["violations"])
+
+
 @pytest.mark.parametrize("overrides", [{"truncated": True}, {"truncated": None},
                                         {"originalBytes": 99}, {"originalBytes": 99, "returnedBytes": 99}])
 def test_native_truncation_and_size_receipts_fail_closed(overrides):

@@ -9,6 +9,7 @@ Raw native journals and prompts belong in the external campaign run_root.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 import hashlib
@@ -722,7 +723,7 @@ def native_tool_violations(events):
     return rogue
 
 
-def native_protocol_guard(events, prior_source_calls=0):
+def native_protocol_guard(events, prior_source_calls=0, bridge_results=None):
     """Audit native journal observations; provider request bodies stay unknown."""
     violations = []
     for name in native_tool_violations(events):
@@ -756,6 +757,7 @@ def native_protocol_guard(events, prior_source_calls=0):
     if cumulative > SOURCE_CALLS:
         violations.append({"check": "native_source_call_budget", "actual": cumulative, "limit": SOURCE_CALLS})
     records = maximum_chars = maximum_bytes = truncated = 0
+    deliveries = {}
     for payload in tool_events:
         if not isinstance(payload, dict) or "result" not in payload:
             continue
@@ -768,11 +770,19 @@ def native_protocol_guard(events, prior_source_calls=0):
             violations.append({"check": "native_result_content_unrecognized", "tool": tool})
             continue
         records += 1
+        call_id = payload.get("toolCallId")
+        delivery = (content, result.get("success"))
+        if call_id in deliveries and deliveries[call_id] != delivery:
+            violations.append({"check": "native_result_delivery_conflict", "toolCallId": call_id})
+        deliveries.setdefault(call_id, delivery)
         chars, byte_count = len(content), len(content.encode("utf-8"))
         maximum_chars, maximum_bytes = max(maximum_chars, chars), max(maximum_bytes, byte_count)
         if chars > RESULT_CHARS or byte_count > RESULT_UTF8_BYTES:
             violations.append({"check": "native_result_budget", "tool": tool,
                                "chars": chars, "utf8_bytes": byte_count, "toolCallId": payload.get("toolCallId")})
+        if "\n\nStructured content:" in content:
+            violations.append({"check": "native_structured_content_duplicate", "tool": tool,
+                               "toolCallId": payload.get("toolCallId")})
         if result.get("truncated") is not False:
             truncated += 1
             violations.append({"check": "native_result_truncated_or_unknown", "tool": tool,
@@ -782,12 +792,25 @@ def native_protocol_guard(events, prior_source_calls=0):
             violations.append({"check": "native_result_size_receipt", "tool": tool,
                                "originalBytes": original, "returnedBytes": returned,
                                "toolCallId": payload.get("toolCallId")})
+    delivered_counts = None
+    if bridge_results is not None:
+        expected = Counter(bridge_results)
+        delivered = Counter()
+        for content, success in deliveries.values():
+            if content in expected:
+                delivered[content] += 1
+            elif success is not False:
+                violations.append({"check": "successful_native_content_not_bound_to_bridge"})
+        if delivered != expected:
+            violations.append({"check": "native_bridge_result_multiplicity_mismatch"})
+        delivered_counts = {digest(text): count for text, count in delivered.items()}
     return {"schema": "jiuwenswarm-native-protocol-guard-v1", "status": "failed" if violations else "passed",
             "native_source_calls": len(source_ids), "native_source_calls_cumulative": cumulative,
             "prior_source_calls": prior_source_calls, "native_source_call_ids": sorted(source_ids),
             "native_tool_calls": {tool: sum(d[0] == tool for d in scheduled.values()) for tool in TOOLS},
             "tool_result_records": records, "max_native_result_chars": maximum_chars,
             "max_native_result_utf8_bytes": maximum_bytes, "truncated_result_records": truncated,
+            "delivered_result_sha256_counts": delivered_counts,
             "violations": violations, "provider_request_serialization": "unknown"}
 
 
@@ -841,6 +864,7 @@ def run_one(identity, transport, case, arm_name, repetition, run_root, pacer, *,
             status, error, output, raw, usage, served = "transport_failed", "", None, "", {}, ""
             prior_native_calls = sum(a["native_protocol_guard"]["native_source_calls"] for a in attempts)
             guard = native_protocol_guard([], prior_native_calls)
+            bridge_results = None
             try:
                 ticket = pacer.acquire(archive.event)
                 native_started = time.time()
@@ -870,6 +894,12 @@ def run_one(identity, transport, case, arm_name, repetition, run_root, pacer, *,
                 if state["violations"] or not covered_prompt(state, len(prompt)):
                     raise ValueError("bridge violations or complete prompt was not read")
                 bridge_events = [json.loads(s) for s in (attempt_root / "bridge-events.jsonl").read_text().splitlines()]
+                if any(not isinstance(e.get("result"), str) or digest(e["result"]) != e.get("result_sha256") for e in bridge_events):
+                    raise SecurityViolation("bridge result hash differs before native delivery validation")
+                bridge_results = [e["result"] for e in bridge_events]
+                guard = native_protocol_guard(events, prior_native_calls, bridge_results)
+                if guard["status"] != "passed":
+                    raise ValueError(f"native protocol guard failed: {guard['violations']}")
                 if (any(sum(e["tool"] == tool for e in bridge_events) > guard["native_tool_calls"][tool] for tool in TOOLS)
                         or guard["tool_result_records"] < len(bridge_events)):
                     raise ValueError("native tool journal does not account for complete bridge delivery")
@@ -894,7 +924,7 @@ def run_one(identity, transport, case, arm_name, repetition, run_root, pacer, *,
                 snapshot = transport.native_snapshot(events)
                 usage, served = snapshot["usage"], snapshot["served_model"]
                 raw = raw or transport._final_text(events)
-                guard = native_protocol_guard(events, prior_native_calls)
+                guard = native_protocol_guard(events, prior_native_calls, bridge_results)
                 if isinstance(exc, Exception) and guard["status"] != "passed":
                     status = "invalid_run"
                     error = f"{error}; native protocol guard failed: {guard['violations']}"
