@@ -25,6 +25,7 @@ kb = ["cryptography>=42"]
 infermatrix-copilot = "infermatrix_copilot.cli:main"
 infermatrix-copilot-mcp = "infermatrix_copilot.thin_mcp_server:main"
 infermatrix-copilot-workflow-mcp = "infermatrix_copilot.mcp_server:main"
+infermatrix-rfc = "infermatrix_copilot.rfc_service.cli:main"
 imx-omni-pytest = "infermatrix_copilot.rebase_engine.module_pytest:main"
 
 [build-system]
@@ -39,6 +40,8 @@ packages = ["src/infermatrix_copilot"]
 "playbooks" = "infermatrix_copilot/_runtime/playbooks"
 "adapters" = "infermatrix_copilot/_runtime/adapters"
 "skills" = "infermatrix_copilot/_runtime/skills"
+"plugins/infermatrix-copilot/skills" = "infermatrix_copilot/_runtime/host_skills"
+"doc/features/rfc-service.md" = "infermatrix_copilot/_runtime/docs/rfc-service.md"
 
 [tool.pytest.ini_options]
 testpaths = ["test"]

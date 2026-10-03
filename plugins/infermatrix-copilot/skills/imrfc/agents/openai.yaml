@@ -1,0 +1,4 @@
+interface:
+  display_name: "InferMatrix RFC"
+  short_description: "Create RFCs and track evidence and acceptance"
+  default_prompt: "Use $imrfc to draft an RFC and track its implementation and acceptance."

@@ -92,12 +92,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="infermatrix-copilot",
                                      description="Conversational repo-maintenance copilot")
     parser.add_argument("command", nargs="?",
-                        choices=["doctor", "migrate-knowledge"],
+                        choices=["doctor", "migrate-knowledge", "rfc"],
                         help="doctor: preflight diagnostics with exact "
                              "fixes; migrate-knowledge: the PR4d "
                              "deployment-time knowledge migration "
                              "(explicit owner action; see "
-                             "doc/RUNBOOK-rebase.md)")
+                             "doc/RUNBOOK-rebase.md); rfc: portable RFC "
+                             "drafting and progress service")
     parser.add_argument("--repo", default="",
                         help="with migrate-knowledge: the target repo name")
     parser.add_argument("--dry-run", action="store_true",
@@ -138,6 +139,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute-strict-reserved", metavar="RUN_ID",
                         help=argparse.SUPPRESS)
     raw = list(sys.argv[1:] if argv is None else argv)
+    if raw and raw[0] == "rfc":
+        from ..rfc_service.cli import main as rfc_main
+
+        return rfc_main(raw[1:])
     if raw and raw[0] == "kb":  # the knowledge service has its own subcommands
         from ..kb_service.cli import main as kb_main
 

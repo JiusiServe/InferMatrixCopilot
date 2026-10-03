@@ -1,6 +1,6 @@
 # cli/ —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-10-02 -->
 
 `LOC ~1420（6 个文件） · 接口 + 编排门面 · refactor-status: ok`
 
@@ -19,6 +19,8 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
 - `doctor.py` —— 预检诊断（2026-07 新增）：逐项 ✓/✗，每个失败给出**唯一**确切的修复命令。
 - 子命令：`doctor` 与 `migrate-knowledge`（PR4d 部署期知识迁移；**显式 owner
   动作，零 LLM**，需 `--repo <name>`，支持 report-only；见 RUNBOOK）。
+- `rfc`：在主 argparse 解析前把其余 argv 原样交给 `rfc_service.cli.main`，
+  与独立的 `infermatrix-rfc` 共用入口，不创建 Copilot run 或调用模型。
 
 ## 公开契约（可从 `infermatrix_copilot.cli` import）
 `main(argv)`；`Copilot`（`resolve`、`run_task`、`run_playbook`、`run_queue`、
@@ -75,6 +77,8 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
 ## 依赖（允许）
 `engine/*`、`playbooks/*`、`intent`、`task_spec`、`adapters/base`、`push`、
 `review/reviewer`、`notify`、`run_trace`、`config`、`ui`、`chat`。
+独立服务入口允许惰性委托 `kb_service.cli`、`rfc_service.cli`；服务自身的授权、
+状态与执行契约分别属于对应服务规范。
 **任何下层都不得 import 它**（**§ARCH.4.2**）。
 
 ## 扩展点
@@ -85,6 +89,8 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
 `test_cli.py`、`test_phase_b.py`、`test_chat.py`、`test_ui.py`；
 预约/claim/repo_path 冻结：`test_mcp.py`、`test_idempotency.py`、
 `test_contract.py`。
+RFC 子命令原样转发与共享入口：`test_rfc_integration.py`；服务契约见
+[rfc_service.md](rfc_service.md)。
 
 ## 重构备注
 拆分**已完成**（它曾是内聚拆分候选）。`Copilot` 类完整留在 `copilot.py`，
@@ -93,3 +99,9 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
 
 ## 2026-09-28 kb 子命令
 `infermatrix-copilot kb …` 在 argparse 之前分派到 `kb_service.cli.main`（知识服务运维命令），不启动 Copilot/LLM。
+
+## 2026-10-02 RFC 子命令
+`infermatrix-copilot rfc …` 原样转发 RFC 服务选项、子命令与退出码。草稿、文件导入、
+进度查询与发布操作由 RFC 服务处理；这条路径不经过维护任务的 planner 或 run 状态。
+`--post`、内容摘要、权限与操作恢复均遵循 RFC 服务契约，不能由 Copilot 的 `--yes`
+替代。

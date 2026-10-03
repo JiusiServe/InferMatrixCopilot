@@ -480,6 +480,45 @@ def build_mcp(
 
         return _guard(run)
 
+    def rfc_call(action: str, payload: dict | None = None) -> dict:
+        from .sdk.v1.rfc import RFCClient, RFCClientError
+
+        try:
+            return RFCClient.from_env().dispatch(action, payload)
+        except RFCClientError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
+
+    @mcp.tool(annotations=ToolAnnotations(
+        title="Operate a portable RFC workspace", readOnlyHint=False,
+        destructiveHint=True, idempotentHint=False, openWorldHint=True))
+    def rfc_request(action: str, payload: dict | None = None) -> dict:
+        """Invoke an authorized RFC action using the host's configured identity.
+
+        RFC_SERVICE_URL/RFC_STATE_DIR and RFC_TOKEN configure the workspace;
+        callers cannot supply an endpoint or credential through this tool.
+        Start with rfc_capabilities, repositories.list and rfcs.list. Drafts
+        remain private until an explicit rfcs.publish with post=true, the exact
+        previewed content_digest and an idempotency_key. Queueing an operation
+        does not establish publication: read operations.get to its terminal state.
+        Use rfcs.status next_actions for actionable implementation and acceptance
+        work; a merged PR alone does not establish feature acceptance.
+        """
+        return rfc_call(action, payload)
+
+    @mcp.tool(annotations=ToolAnnotations(
+        title="Read RFC service capabilities", readOnlyHint=True,
+        idempotentHint=True, openWorldHint=True))
+    def rfc_capabilities() -> dict:
+        """Read the configured RFC service's version and supported operations."""
+        return rfc_call("capabilities")
+
+    @mcp.tool(annotations=ToolAnnotations(
+        title="Read RFC progress and next actions", readOnlyHint=True,
+        idempotentHint=True, openWorldHint=True))
+    def rfc_status(rfc_id: str) -> dict:
+        """Read cached evidence, acceptance, freshness and next actions for an RFC."""
+        return rfc_call("rfcs.status", {"rfc_id": rfc_id})
+
     return mcp
 
 
