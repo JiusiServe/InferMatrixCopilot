@@ -155,6 +155,67 @@ def slots():
     return [{"number": pr, "arm": arm, "repetition": rep, "status": "valid"} for pr in report.PRS for arm in "AB" for rep in (1,2,3)]
 
 
+@pytest.fixture
+def report_context(tmp_path, monkeypatch):
+    monkeypatch.setattr(report, "knowledge_exposure", lambda *_: {
+        arm: {"knowledge_chars_consumed": {"p50": None}} for arm in "AB"})
+    summary = report.summarize({"rows": [], "scores": {}, "collection": {}, "campaign": {}, "study": tmp_path}, {})
+    return {"status": "incomplete", "previous": summary, "current": summary,
+            "previous_failure_audit": {"slots": [], "counts": {}, "harness_conflict_or_directory_syntax": 0},
+            "protocol": {"previous_harness_sha256": "old", "retest_harness": {"sha256": "new"}}, "inputs": {}}
+
+
+def freshness_record():
+    return {"schema": "jiuwenswarm-upstream-freshness-v1", "source_pin": "f"*40,
+            "checked_at_cn": "2026-10-03T19:30:00+08:00", "head_sha": "d"*40,
+            "head_date": "2026-10-03T11:00:00Z", "ahead_by": 3, "behind_by": 1,
+            "changed_production_files": 2, "production_scope": "fixed 2199-file inventory",
+            "affected_features": ["cron", "api"]}
+
+
+@pytest.mark.parametrize("label", ["upstream_freshness", "delivery/upstream-freshness"])
+def test_bound_delivery_freshness_is_rendered_with_real_drift_and_baseline_links(tmp_path, report_context, label):
+    path = write(tmp_path / "upstream-freshness.json", freshness_record())
+    report_context["inputs"][label] = binding(path)
+    report_context["delivery_freshness"] = report.delivery_freshness(report_context["inputs"], "f"*40)
+    report_context["current"] = copy.deepcopy(report_context["current"])
+    report_context["previous"]["valid"], report_context["current"]["valid"] = 55, 62
+    main = report_context["current"]["groups"]["primary_prospective"]
+    main["paired_quality"]["defect_precision"].update(A=0.65, B=0.64, applicable_prs=7)
+    main["paired_quality"]["confirmed_recall"].update(A=1, B=1, applicable_prs=2)
+    main["paired_speed"]["native_seconds"].update(A=500, B=530, B_minus_A_seconds=30, paired_repeats=19, applicable_prs=7)
+    text = report.render(report_context)
+    assert "2026-10-03T19:30:00+08:00" in text and "2026-10-03T11:00:00Z" in text
+    assert "`" + "d"*40 + "`" in text and "`" + "f"*40 + "`" in text
+    assert "新增提交 3，基线独有提交 1" in text and "变更生产文件 2，受影响功能：cron、api" in text
+    assert "一次分支观测" in text and "未更新本轮冻结语料" in text
+    assert "(jiuwenswarm-original-docs-comparison-cn-20261003.md)" in text
+    assert "(jiuwenswarm-original-docs-comparison-cn-20261003.json)" in text
+    assert report_context["delivery_freshness"]["binding_label"] == label
+    assert "有效完成率提高：76.39% → 86.11%" in text
+    assert "B−A -1.00个百分点" in text and "B−A +30.00秒（19对重复、7个PR）" in text
+    assert "未证明知识库带来精确率或速度收益" in text and "仅针对2个PR的预冻结有限问题清单" in text
+
+
+def test_unbound_freshness_remains_optional_without_inventing_a_delivery_check(report_context):
+    assert report.delivery_freshness({}, "f"*40) is None
+    assert "交付时效性核查" not in report.render(report_context)
+    assert "(jiuwenswarm-original-docs-comparison-cn-20261003.md)" in report.render(report_context)
+
+
+def test_delivery_freshness_rejects_changed_bytes_and_another_source_pin(tmp_path):
+    path = write(tmp_path / "freshness.json", freshness_record())
+    inputs = {"upstream_freshness": binding(path)}
+    changed = freshness_record()
+    changed["ahead_by"] = 0
+    write(path, changed)
+    with pytest.raises(ValueError, match="bound bytes changed"):
+        report.delivery_freshness(inputs, "f"*40)
+    inputs["upstream_freshness"] = binding(path)
+    with pytest.raises(ValueError, match="fixed source pin differs"):
+        report.delivery_freshness(inputs, "c"*40)
+
+
 def test_all_slots_and_every_valid_scored_are_required():
     rows = slots()
     samples = [{"pr": r["number"], "arm": r["arm"], "repeat": r["repetition"]-1, "status": "complete"} for r in rows]

@@ -526,15 +526,58 @@ def current_failure_explanations(value):
             "native_status_unchanged": True, "original_diagnostics_unchanged": True}
 
 
+def delivery_freshness(inputs, source_pin):
+    """Read freshness only from the exact bytes already bound into this report."""
+    labels = [name for name in ("upstream_freshness", "delivery/upstream-freshness") if name in inputs]
+    if not labels:
+        return None
+    if len(labels) != 1:
+        raise ValueError("delivery freshness binding is ambiguous")
+    label = labels[0]
+    proof = inputs[label]
+    data = Path(proof["path"]).read_bytes()
+    if hashlib.sha256(data).hexdigest() != proof.get("sha256"):
+        raise ValueError("delivery freshness bound bytes changed")
+    record = json.loads(data)
+    if record.get("schema") != "jiuwenswarm-upstream-freshness-v1" or record.get("source_pin") != source_pin:
+        raise ValueError("delivery freshness schema or fixed source pin differs")
+    for key in ("ahead_by", "behind_by", "changed_production_files"):
+        number = record.get(key)
+        if number is not None and (type(number) is not int or number < 0):
+            raise ValueError("delivery freshness count is invalid")
+    features = record.get("affected_features")
+    if features is not None and (not isinstance(features, list) or any(not isinstance(feature, str) for feature in features)):
+        raise ValueError("delivery freshness affected features are invalid")
+    return {"binding_label": label, **{key: record.get(key) for key in (
+        "source_pin", "checked_at_cn", "head_sha", "head_date", "ahead_by", "behind_by",
+        "changed_production_files", "production_scope", "affected_features")}}
+
+
 def render(value):
     previous, current = value["previous"], value["current"]
+    main = current["groups"]["primary_prospective"]
+    precision, recall = (main["paired_quality"][field] for field in ("defect_precision", "confirmed_recall"))
+    speed = main["paired_speed"]["native_seconds"]
+    precision_delta = None if precision["A"] is None or precision["B"] is None else (precision["B"] - precision["A"]) * 100
+    signed = lambda number: "未知" if number is None else f"{number:+.2f}"
+    direction = "提高" if current["valid"] > previous["valid"] else "降低" if current["valid"] < previous["valid"] else "保持不变"
     lines = ["# JiuwenSwarm GLM‑5.3 协议修复与复测", "", f"状态：`{value['status']}`；复测有效评审 {current['valid']}/72，已独立评分 {current['scored_valid']} 份。", "",
+             f"本轮有效完成率{direction}：{pct(previous['valid']/72)} → {pct(current['valid']/72)}。主样本精确率为A {pct(precision['A'])}、B {pct(precision['B'])}，B−A {signed(precision_delta)}个百分点（共同可计算{precision['applicable_prs']}个PR）；成对原生耗时B−A {signed(speed['B_minus_A_seconds'])}秒（{speed['paired_repeats']}对重复、{speed['applicable_prs']}个PR）。这些描述性结果未证明知识库带来精确率或速度收益。已确认问题召回率A {pct(recall['A'])}、B {pct(recall['B'])}，仅针对{recall['applicable_prs']}个PR的预冻结有限问题清单。", "",
+             "原作者资料与知识库的内容、覆盖及固定版本比较见[原中文报告](jiuwenswarm-original-docs-comparison-cn-20261003.md)及其[紧凑数据](jiuwenswarm-original-docs-comparison-cn-20261003.json)。原报告及其中的旧A/B结果保留不变，本报告交付协议修复后的新批次结果。", "",
              "完成率指交付可评分结果的比例；全部调用结束不等于全部有效。失败继续计入原分母，旧结果保持原判定。", "",
              "| 样本 | 资料 | 修复前有效/计划 | 复测有效/计划 | 完成率变化 |", "| --- | --- | ---: | ---: | --- |"]
     for name, label in (("primary_prospective", "主样本"), ("all", "全部样本")):
         for arm, docs in (("A", "原作者资料"), ("B", "当前知识库")):
             a = previous["groups"][name]["operational"][arm]; b = current["groups"][name]["operational"][arm]
             lines.append(f"| {label} | {docs} | {a['valid']}/{a['expected']} | {b['valid']}/{b['expected']} | {pct(a['valid']/a['expected'])} → {pct(b['valid']/b['expected'])} |")
+    freshness = value.get("delivery_freshness")
+    if freshness:
+        unknown = lambda key: freshness.get(key) if freshness.get(key) is not None else "未知"
+        features = freshness.get("affected_features")
+        affected = "未知" if features is None else "、".join(features) if features else "无"
+        lines += ["", "## 交付时效性核查", "",
+                  f"核查时间：{unknown('checked_at_cn')}；固定源码基线：`{unknown('source_pin')}`；交付时 develop：`{unknown('head_sha')}`（提交日期 {unknown('head_date')}）。相对固定基线新增提交 {unknown('ahead_by')}，基线独有提交 {unknown('behind_by')}；变更生产文件 {unknown('changed_production_files')}，受影响功能：{affected}。", "",
+                  f"文件统计范围：{unknown('production_scope')}。依据为归档表中的 `{freshness['binding_label']}` 哈希绑定记录；这只是一次分支观测，不代表持续实时更新，也未更新本轮冻结语料。"]
     audit = value["previous_failure_audit"]
     lines += ["", "## 修复范围与解释边界", "", f"旧{len(audit['slots'])}次无效评审中，{audit['harness_conflict_or_directory_syntax']}次涉及评估接口冲突或普通目录写法，{audit['counts'].get('malformed_json',0)}次为模型JSON语法错误，{audit['counts'].get('incomplete_prompt',0)}次未完整读取大PR提示。共享评审提示允许省略锚点和使用 duplicate，却与旧验证器冲突。所有旧失败均保留；本次新建批次，不事后补算为成功。", "",
               "本轮源代码、作者资料、知识库、12个PR、三次重复和两个模型通道保持固定，修改评估协议、提示一致性、MCP结果渲染和UTF‑8预算。随机生成、共享排期、服务限流、上下文呈现及提示变化都会影响结果，不能把修复前后的变化全部归因于知识库，也不能据此证明知识库加速。", "",
@@ -553,10 +596,10 @@ def render(value):
                 lines.append(f"| {stage} | {arm} | {reason} | {count} |")
     explanations = value.get("current_failure_explanations", {}).get("slots", [])
     if explanations:
-        lines += ["", "原始诊断保留不变。以下槽位的状态与事件哈希证明：模型通过源码工具请求文档，违反独立文档预算，属于单次调用的边界拒绝。原始诊断中的unknown_bridge_protocol是未匹配错误字符串的兜底标签，不据此声称存在共享协议故障。", "",
+        lines += ["", "原始诊断保留不变。以下槽位的状态与事件哈希证明：模型尝试通过源码工具读取文档，被独立文档预算边界拒绝。原始诊断中的unknown_bridge_protocol是未匹配错误字符串的兜底标签，不据此声称存在共享协议故障。", "",
                   "| PR | 组别 | 重复 | 复核原因 |", "| --- | --- | ---: | --- |"]
         for item in explanations:
-            lines.append(f"| #{item['pr']} | {item['arm']} | {item['repeat']} | 通过源码工具访问文档，绕过文档预算 |")
+            lines.append(f"| #{item['pr']} | {item['arm']} | {item['repeat']} | 尝试读取文档，被预算边界拒绝 |")
     lines += ["", "同一无效评审可能有多项拒绝原因，原因计数不直接相加当作失败调用数；源码或协议信息不足的原因保持unknown。旧失败逐槽位人工归因与原始诊断分别保存在JSON。", "",
               "## 本次准确率与速度", "", "以下精确率只统计有效、已评分输出，并按两组均有可计算结果的同一PR取均值。unknown不计误报，非缺陷建议另计。召回只针对预先冻结的自动独立审计有限问题清单，新发现不回填分母；无确认问题的PR不可计算召回。", "",
               "| 分组 | 指标 | A 原作者资料 | B 当前知识库 | 同时可计算PR数 |", "| --- | --- | ---: | ---: | ---: |"]
@@ -564,6 +607,17 @@ def render(value):
         for field, text in (("defect_precision", "缺陷评论精确率"), ("confirmed_recall", "已确认问题召回"), ("advice_validity", "建议有效性")):
             item = current["groups"][name]["paired_quality"][field]
             lines.append(f"| {label} | {text} | {pct(item['A'])} | {pct(item['B'])} | {item['applicable_prs']} |")
+    lines += ["", "以下按各组有效且已评分的评审累计评论，unknown比例为unknown/(TP+FP+unknown)，非缺陷建议不进入该分母。每次评审内部按根因去重，三次重复仍是三个观测；这些计数不是不同缺陷总数，也不限定为两组同时可计算的PR。", "",
+              "| 分组 | 评论统计 | A | B |", "| --- | --- | ---: | ---: |"]
+    for name, label in (("primary_prospective", "主样本"), ("all", "全部"), ("older_fork_exploratory", "旧分叉探索")):
+        operational = current["groups"][name]["operational"]
+        lines.append(f"| {label} | 缺陷判断中的未知比例 | {pct(operational['A']['unknown_share'])} | {pct(operational['B']['unknown_share'])} |")
+        for field, title in (("TP", "有效缺陷评论"), ("FP", "误报"), ("unknown", "未知缺陷判断"),
+                             ("nondefect_advice", "非缺陷建议"), ("advice_valid", "有效建议"),
+                             ("advice_invalid", "无效建议"), ("advice_unknown", "有效性未知的建议"),
+                             ("novel_valid_defects", "新发现有效缺陷，不回填召回基准")):
+            counts = [operational[arm]["counts"][field] for arm in "AB"]
+            lines.append(f"| {label} | {title} | " + " | ".join(str(count) if count is not None else "未知" for count in counts) + " |")
     lines += ["", "| 主样本速度（秒） | A | B |", "| --- | ---: | ---: |"]
     for field, title in (("native_seconds", "原生评审"), ("queue_seconds", "worker内排队"), ("end_to_end_seconds", "worker入口至结束")):
         for stat in ("p50", "p90_linear"):
@@ -637,6 +691,7 @@ def build(previous_study, study, output_dir, extra_bindings=None):
               "current_failure_explanations": current_failure_explanations(new),
               "cases": [{k: c[k] for k in ("number", "target", "base", "head", "context_sha256", "diff_sha256")} for c in new["campaign"]["cases"]],
               "document_content_manifest_sha256": {a: sha(new["identity"]["arms"][a]["documents"]) for a in "AB"},
+              "delivery_freshness": delivery_freshness(inputs, new["campaign"]["baseline_source_sha"]),
               "inputs": inputs, "actual_invoice_cost": "unknown"}
     project = Path(__file__).resolve().parents[1]
     def logical(value):
