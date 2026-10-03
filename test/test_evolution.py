@@ -247,7 +247,7 @@ def test_interrupted_pair_is_not_replayed_and_needs_three_replicates(bench):
         evolution.run(st, store, workflow="workflow-improve.improve.forensics", llm=model, sandbox=worker)
     worker.run = original
     result = evolution.run(st, store, workflow="workflow-improve.improve.forensics", llm=model, sandbox=worker)
-    assert len(model.calls) == 1 and result["state"] == "rejected"
+    assert len(model.calls) == 1 and result["state"] == "deferred"
     assert result["evaluation"]["n_retained"] == 7
     assert any("interrupted" in v for v in result["evaluation"]["excluded"].values())
 
@@ -518,3 +518,33 @@ def test_evolution_and_experiment_cli_share_the_same_execution_lock(bench, monke
     monkeypatch.setattr(experiments, "run", original)
     result = evolution.run(st, store, workflow="workflow-improve.improve.forensics", llm=model, sandbox=worker)
     assert result["state"] == "pr-ready" and len(model.calls) == 1 and len(worker.calls) == 49
+
+
+def test_isolation_loss_defers_without_success_or_replaying_paid_generation(bench):
+    st, store, worker, model = bench()
+    original = worker.run
+    def unavailable(source, payload, work, **kwargs):
+        if payload["mode"] == "predict": raise SandboxUnavailable("namespace disappeared")
+        return original(source, payload, work, **kwargs)
+    worker.run = unavailable
+    first = evolution.run(st, store, workflow="workflow-improve.improve.forensics", llm=model, sandbox=worker)
+    assert first["state"] == "deferred" and first["evaluation"]["blocking"] == "isolation"
+    assert not first["evaluation"].get("promotable")
+    worker.run = original
+    again = evolution.run(st, store, workflow=first["workflow"], llm=model, sandbox=worker)
+    assert again["state"] == "deferred" and len(model.calls) == 1
+    assert "fresh-holdout" in again["reason"]
+
+
+def test_direct_versioned_experiment_cannot_bypass_kill_switch(bench, monkeypatch):
+    st, store, worker, model = bench()
+    original = experiments.run
+    def locked(*args, **kwargs): raise experiments.ExperimentError("already running")
+    monkeypatch.setattr(experiments, "run", locked)
+    c = evolution.run(st, store, workflow="workflow-improve.improve.forensics", llm=model, sandbox=worker)
+    monkeypatch.setattr(experiments, "run", original)
+    disabled = st.model_copy(update={"improve_enabled": False})
+    with pytest.raises(experiments.ExperimentError, match="IMPROVE_ENABLED"):
+        experiments.run(store, disabled, Path(st.improve_ledger_dir), c["experiment"], judge_llm=model, sandbox=worker)
+    assert experiments.load(Path(st.improve_ledger_dir), c["experiment"]).state == "registered"
+    assert len(worker.calls) == 1

@@ -391,6 +391,8 @@ def run(store: TraceStore, settings: Any, ledger_dir: str | Path, experiment_id:
         # the state is read INSIDE the lock: a caller that waited for the
         # lock must see the verdict the previous holder wrote, never rerun
         exp = load(ledger_dir, experiment_id)
+        if exp.source_artifacts and (not settings.improve_enabled or not settings.improve_evolve_enabled):
+            raise ExperimentError("code experiments require IMPROVE_ENABLED and IMPROVE_EVOLVE_ENABLED")
         if exp.state != "registered" and not (exp.source_artifacts and exp.state == "running"):
             raise ExperimentError(f"{experiment_id} is {exp.state}, not registered")
         exp.state = "running"

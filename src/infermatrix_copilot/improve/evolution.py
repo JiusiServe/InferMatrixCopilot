@@ -190,6 +190,8 @@ def evaluate(store, settings, ledger_dir: Path, exp, *, llm, sandbox, governor=N
     for item in exp.item_set:
         if item not in rows or rows[item]["version"] != exp.snapshot_versions.get(item):
             return experiments._terminal_invalid(ledger_dir, exp, governor, settings, "pinned dataset changed")
+    isolation = sandbox.check()
+    if not isolation["ready"]: raise SandboxUnavailable(isolation["reason"])
     used_path = directory(settings) / "holdouts.json"
     with file_lock(directory(settings) / "holdouts.lock", blocking=True) as held:
         if not held: raise SandboxUnavailable("holdout registry locked")
@@ -247,7 +249,11 @@ def evaluate(store, settings, ledger_dir: Path, exp, *, llm, sandbox, governor=N
             except (SandboxUnavailable, artifacts.ArtifactError) as exc:
                 progress[key] = {"state": "excluded", "reason": str(exc)}
                 exp.result["progress"] = progress
-                return experiments._terminal_invalid(ledger_dir, exp, governor, settings, str(exc))
+                invalid = experiments._terminal_invalid(ledger_dir, exp, governor, settings, str(exc))
+                if isinstance(exc, SandboxUnavailable):
+                    invalid.result["blocking"] = "isolation"
+                    experiments.save(ledger_dir, invalid)
+                return invalid
             except BudgetRefused as exc:
                 progress[key] = {"state": "excluded", "reason": str(exc)}
                 experiments.save(ledger_dir, exp)
@@ -267,6 +273,8 @@ def evaluate(store, settings, ledger_dir: Path, exp, *, llm, sandbox, governor=N
             unit_keys[f"{item}/{side}/{rep}"] = sample["units"][side]
     completed = experiments._adjudicate(store, ledger_dir, exp, scores, excluded, unit_keys, time.time())
     completed.result["progress"] = progress
+    if completed.result["n_retained"] < exp.n_required:
+        completed.result["blocking"] = "data"
     guards = {}
     for metric, direction in decl.evolution.get("guards", {}).items():
         deltas = {}
@@ -390,6 +398,15 @@ def _run(settings, store, workflow, repo, post, llm, sandbox, now):
             (work / "candidate.patch").write_text(artifacts.patch(work / "incumbent", work / "arm"))
             c["patch_sha"] = artifacts.digest((work / "candidate.patch").read_bytes())
             c["state"] = "verified"; save(settings, c, store)
+        if c.get("experiment"):
+            previous = experiments.load(ledger_dir_for(settings), c["experiment"])
+            if previous.state == "underpowered" or previous.result.get("blocking") in ("isolation", "data"):
+                status = check(settings, store, c["workflow"], repo=repo, sandbox=sandbox)
+                if not status["ready"]:
+                    c.update(state="deferred", reason="; ".join(status["reasons"]))
+                    save(settings, c, store); return c
+                c.setdefault("past_experiments", []).append(c.pop("experiment"))
+                save(settings, c, store)
         if "experiment" not in c:
             if not decl.tier2 or c.get("mode") == "mechanical" or set(c["artifact"]["paths"]) == {"src/infermatrix_copilot/improve/lints.py"}:
                 path = reproducer(settings, c["workflow"])
@@ -425,9 +442,10 @@ def _run(settings, store, workflow, repo, post, llm, sandbox, now):
         if exp.state in ("registered", "running"):
             exp = experiments.run(store, settings, ledger_dir_for(settings), exp.experiment_id, judge_llm=llm, sandbox=sandbox, governor=governor)
         c["evaluation"] = exp.result
-        c["state"] = "pr-ready" if exp.result.get("promotable") else "rejected"
-        c["reason"] = "" if c["state"] == "pr-ready" else "experiment did not meet the primary/guardrail promotion criteria"
+        c["state"] = "pr-ready" if exp.result.get("promotable") else "deferred" if exp.state == "underpowered" or exp.result.get("blocking") in ("isolation", "data") else "rejected"
+        c["reason"] = "" if c["state"] == "pr-ready" else "waiting for isolation and fresh adequately powered data" if c["state"] == "deferred" else "experiment did not meet the primary/guardrail promotion criteria"
         save(settings, c, store)
+        if c["state"] == "deferred": return c
         from .evolution_publish import draft
         draft(settings, c)
         if post: publish(settings, store, c)
