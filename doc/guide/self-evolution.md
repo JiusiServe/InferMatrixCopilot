@@ -6,7 +6,15 @@
 
 ## 开始使用
 
-先从干净、已提交的 Copilot 源码检出运行；源码制品只包含 `src`、`playbooks`、`adapters`、`skills`，不包含产品知识库、评估标签或账本。使用当前 Python 环境的固定依赖版本；依赖指纹变化会拒绝执行。
+先从干净、已提交的 Copilot 源码检出运行。建议在该检出中创建专用环境，安装源码与仓库声明的可选依赖：
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev,mcp,kb]'
+```
+
+源码制品只包含 `src`、`playbooks`、`adapters`、`skills`，不包含产品知识库、评估标签或账本。使用当前 Python 环境的固定依赖版本；依赖指纹变化会拒绝执行。
 
 ```bash
 export IMPROVE_ENABLED=true
@@ -15,7 +23,9 @@ export IMPROVE_EVOLVE_SOURCE_DIR="$PWD"
 export IMPROVE_EVOLVE_DATA_DIR=/srv/copilot/evolution-data
 export IMPROVE_LEDGER_DIR=/srv/copilot/improve-ledger
 export TRACE_STORE_ROOT=/srv/copilot/traces
-# 使用现有 provider 配置；比较实验还需要固定判官。
+# 复用现有 provider 配置，显式固定两条 API 路由；比较实验还需固定判官。
+export ECO_MODEL=YOUR_PINNED_GENERATOR_MODEL
+export PERFORMANCE_MODEL=YOUR_PINNED_INVESTIGATOR_MODEL
 export IMPROVE_JUDGE=api:YOUR_PINNED_JUDGE_MODEL
 
 infermatrix-copilot improve workflows list

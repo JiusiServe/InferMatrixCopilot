@@ -47,7 +47,13 @@ def check(settings, store, workflow: str, *, repo: str = "", sandbox=None, mecha
         reasons.append("no-mutation-policy: mechanical diagnostics only")
     if not decl.experiment_driver:
         reasons.append("no-experiment-driver")
-    if any(settings.tier_target(mode).kind != "api" for mode in ("eco", "performance")):
+    targets = {}
+    for mode in ("eco", "performance"):
+        try:
+            targets[mode] = settings.tier_target(mode)
+        except (RuntimeError, ValueError):
+            reasons.append("model-tier-unconfigured: " + mode)
+    if any(target.kind != "api" for target in targets.values()):
         reasons.append("harness-not-isolated: evolution requires API proxy targets")
     rows = drivers.dataset(settings, workflow)
     rows = [r for r in rows if not repo or r["item"].split("#", 1)[0] == repo]
@@ -103,10 +109,10 @@ def check(settings, store, workflow: str, *, repo: str = "", sandbox=None, mecha
     if tier2 and decl.experiment_driver == "pr-review":
         if settings.review_lens_backends or settings.llm_mixture:
             reasons.append("mixed-or-harness-review-routes-need-a-trusted-proxy-driver")
-        allowed_models = {settings.tier_target(m).model for m in ("eco", "performance")}
+        allowed_models = {target.model for target in targets.values()}
         if any(model and model not in allowed_models for model in (settings.review_planner_model, settings.review_promotion_model)):
             reasons.append("additional-review-role-model-needs-a-trusted-proxy-route")
-    if tier2 and decl.experiment_driver == "kb-intake" and any(r["payload"].get("generator_model") != settings.tier_target("eco").model for r in rows):
+    if tier2 and decl.experiment_driver == "kb-intake" and "eco" in targets and any(r["payload"].get("generator_model") != targets["eco"].model for r in rows):
         reasons.append("pinned-generator-model-does-not-match-broker")
     budget = governor_for(settings, ledger_dir_for(settings)).remaining()
     if budget["usd_remaining"] <= 0: reasons.append("budget-exhausted")
@@ -417,7 +423,7 @@ def _run(settings, store, workflow, repo, post, llm, sandbox, now):
             artifacts.atomic_json(used_path, used)
         exp = experiments.load(ledger_dir_for(settings), c["experiment"])
         if exp.state in ("registered", "running"):
-            exp = evaluate(store, settings, ledger_dir_for(settings), exp, llm=llm, sandbox=sandbox, governor=governor)
+            exp = experiments.run(store, settings, ledger_dir_for(settings), exp.experiment_id, judge_llm=llm, sandbox=sandbox, governor=governor)
         c["evaluation"] = exp.result
         c["state"] = "pr-ready" if exp.result.get("promotable") else "rejected"
         c["reason"] = "" if c["state"] == "pr-ready" else "experiment did not meet the primary/guardrail promotion criteria"
@@ -428,7 +434,7 @@ def _run(settings, store, workflow, repo, post, llm, sandbox, now):
     except (BudgetRefused, SandboxUnavailable) as exc:
         c.update(state="deferred", reason=str(exc)); save(settings, c, store)
     except experiments.ExperimentError as exc:
-        c.update(state="deferred" if "planning estimate" in str(exc) else "rejected", reason=str(exc)); save(settings, c, store)
+        c.update(state="deferred" if "planning estimate" in str(exc) or "already running" in str(exc) else "rejected", reason=str(exc)); save(settings, c, store)
     except (artifacts.ArtifactError, ValueError, RuntimeError, KeyError, TypeError, OSError) as exc:
         c.update(state="rejected", reason=str(exc)); save(settings, c, store)
     return c

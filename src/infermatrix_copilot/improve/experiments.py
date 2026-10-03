@@ -381,7 +381,7 @@ def default_run_unit(*, side: str, item: str, replicate: int, env: dict, snapsho
 
 def run(store: TraceStore, settings: Any, ledger_dir: str | Path, experiment_id: str, *, run_unit: RunUnit | None = None,
         stage: Callable[..., dict] | None = None, governor: Governor | None = None, now: float | None = None,
-        shadow_store: TraceStore | None = None, judge_llm: Any = None) -> Experiment:
+        shadow_store: TraceStore | None = None, judge_llm: Any = None, sandbox: Any = None) -> Experiment:
     """Execute a registered experiment end to end and adjudicate it."""
     now = time.time() if now is None else now
     ledger_dir = Path(ledger_dir)
@@ -391,16 +391,18 @@ def run(store: TraceStore, settings: Any, ledger_dir: str | Path, experiment_id:
         # the state is read INSIDE the lock: a caller that waited for the
         # lock must see the verdict the previous holder wrote, never rerun
         exp = load(ledger_dir, experiment_id)
-        if exp.state != "registered":
+        if exp.state != "registered" and not (exp.source_artifacts and exp.state == "running"):
             raise ExperimentError(f"{experiment_id} is {exp.state}, not registered")
         exp.state = "running"
         save(ledger_dir, exp)
         try:
             return _run_locked(store, settings, ledger_dir, exp, run_unit=run_unit, stage=stage, governor=governor,
-                               now=now, shadow_store=shadow_store, judge_llm=judge_llm)
-        except BaseException:
+                               now=now, shadow_store=shadow_store, judge_llm=judge_llm, sandbox=sandbox)
+        except BaseException as exc:
             exp = load(ledger_dir, experiment_id)
-            if exp.state == "running":
+            from .isolation import SandboxUnavailable
+            resumable = exp.source_artifacts and isinstance(exc, (BudgetRefused, SandboxUnavailable, KeyboardInterrupt, SystemExit))
+            if exp.state == "running" and not resumable:
                 _terminal_invalid(ledger_dir, exp, governor, settings, "the run raised before adjudication")
             raise
 
@@ -467,7 +469,7 @@ def _meta_stage(settings, item: str, *, shadow_root: Path, run_dir: Path) -> dic
 
 
 def _run_locked(store, settings, ledger_dir: Path, exp: Experiment, *, run_unit, stage, governor, now,
-                shadow_store, judge_llm) -> Experiment:
+                shadow_store, judge_llm, sandbox=None) -> Experiment:
     from .judges import judge_spec_from
     from .shadow import DEFAULT_EXECUTABLES, assert_boundaries, make_executables_dir, shadow_env
 
@@ -477,7 +479,7 @@ def _run_locked(store, settings, ledger_dir: Path, exp: Experiment, *, run_unit,
         from .evolution import evaluate
         from .isolation import Sandbox
         return evaluate(store, settings, ledger_dir, exp, llm=judge_llm or _api_llm(settings),
-                        sandbox=Sandbox(), governor=governor)
+                        sandbox=sandbox or Sandbox(), governor=governor)
     if decl.experiment_driver and decl.experiment_driver not in ("pr-review", "meta") and run_unit is None:
         return _terminal_invalid(ledger_dir, exp, governor, settings,
                                  f"{decl.experiment_driver} requires pinned dataset/source artifacts; use improve evolve run")

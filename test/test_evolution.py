@@ -495,3 +495,26 @@ def test_coordinator_scopes_forensics_and_resumes_each_paid_scope(bench, monkeyp
     for workflow in ("pr-review.agent.review_diff", "pr-review.agent.review_diff", "kb-intake.draft"):
         assert coordinator.run(st, store, workflow=workflow, repo="demo")["state"] == "complete"
     assert seen == [{"workflow": "pr-review.agent.review_diff", "repo": "demo"}, {"workflow": "kb-intake.draft", "repo": "demo"}]
+
+
+def test_unconfigured_model_tier_is_a_readiness_reason(bench):
+    st, store, worker, _ = bench()
+    st = st.model_copy(update={"performance_model": "", "strict_backend": "", "strict_backend_model": ""})
+    result = evolution.check(st, store, "workflow-improve.improve.forensics", sandbox=worker)
+    assert not result["ready"] and "model-tier-unconfigured: performance" in result["reasons"]
+
+
+def test_evolution_and_experiment_cli_share_the_same_execution_lock(bench, monkeypatch):
+    st, store, worker, model = bench()
+    from infermatrix_copilot.trace_store import file_lock
+    original = experiments.run
+    def concurrently_locked(sink, settings, root, eid, **kwargs):
+        with file_lock(Path(root) / "experiments" / (eid + ".lock"), blocking=False):
+            return original(sink, settings, root, eid, **kwargs)
+    monkeypatch.setattr(experiments, "run", concurrently_locked)
+    result = evolution.run(st, store, workflow="workflow-improve.improve.forensics", llm=model, sandbox=worker)
+    assert result["state"] == "deferred" and "already running" in result["reason"]
+    assert len(worker.calls) == 1
+    monkeypatch.setattr(experiments, "run", original)
+    result = evolution.run(st, store, workflow="workflow-improve.improve.forensics", llm=model, sandbox=worker)
+    assert result["state"] == "pr-ready" and len(model.calls) == 1 and len(worker.calls) == 49

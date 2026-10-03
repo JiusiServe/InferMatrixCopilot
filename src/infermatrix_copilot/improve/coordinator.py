@@ -33,11 +33,14 @@ def run(settings, store, *, workflow="all", repo="", post=False, now=None, llm=N
             state["stages"]["lint"] = run_cycle(store, settings, root, now=state["at"])
             atomic_json(path, state)
         # Previously registered experiments always have priority over a new candidate.
-        if "experiments" not in state["stages"]:
-            completed = []
-            for exp in experiments.list_experiments(root, "registered"):
+        pending = [e for e in experiments.list_experiments(root) if e.state in ("registered", "running")]
+        attempted = {r["id"] for r in state["stages"].get("experiments", [])}
+        if "experiments" not in state["stages"] or any(e.experiment_id not in attempted for e in pending):
+            completed = list(state["stages"].get("experiments", []))
+            for exp in pending:
+                if exp.experiment_id in attempted: continue
                 try:
-                    result = experiments.run(store, settings, root, exp.experiment_id, judge_llm=llm)
+                    result = experiments.run(store, settings, root, exp.experiment_id, judge_llm=llm, sandbox=sandbox)
                     completed.append({"id": result.experiment_id, "state": result.state})
                 except Exception as exc:
                     completed.append({"id": exp.experiment_id, "error": str(exc)})
