@@ -262,6 +262,26 @@ def test_old_failure_label_requires_actual_matching_output_shape(tmp_path, missi
     assert result["old_failures_remain_failures"] is True
 
 
+@pytest.mark.parametrize("state_violation,expected", [(True, 1), (False, 0)])
+def test_current_doc_budget_explanation_requires_bound_state_and_event(tmp_path, state_violation, expected):
+    message = "documentation is readable only through the doc budget"
+    root = tmp_path / "attempt"
+    violation = {"tool": "source_grep", "error": message}
+    write(root / "tool-state.json", {"violations": [violation] if state_violation else []})
+    write(root / "bridge-events.jsonl", {**violation, "args": {"path": "docs", "pattern": "entry"}})
+    row = {"number": 7650, "arm": "A", "repetition": 1, "status": "invalid_run",
+           "attempts": [{"attempt_root": str(root), "artifacts": {
+               name: binding(root / name)["sha256"] for name in ("tool-state.json", "bridge-events.jsonl")}}]}
+    result = report.current_failure_explanations({"rows": [row]})
+    assert result["counts"] == {"A": expected, "B": 0}
+    assert result["native_status_unchanged"] and result["original_diagnostics_unchanged"]
+    if expected:
+        assert result["slots"][0]["reason"] == "documentation_budget_boundary_violation"
+    (root / "bridge-events.jsonl").write_text("")
+    with pytest.raises(ValueError, match="explanation bytes changed"):
+        report.current_failure_explanations({"rows": [row]})
+
+
 def native_row(tmp_path, *, content='{"paths":"entry.py"}', truncated=False, before_mcp_error=False, calls=1, certified=True):
     root = tmp_path / "native-attempt"
     root.mkdir(parents=True)

@@ -499,6 +499,33 @@ def previous_failure_audit(value):
             "harness_conflict_or_directory_syntax": sum(counts[k] for k in ("directory_syntax_false_rejection", "optional_anchor_contract_conflict", "duplicate_disposition_contract_conflict"))}
 
 
+def current_failure_explanations(value):
+    """Explain a known boundary rejection without changing the frozen diagnosis."""
+    message = "documentation is readable only through the doc budget"
+    slots = []
+    for row in value["rows"]:
+        if row["status"] != "invalid_run":
+            continue
+        attempt = row["attempts"][-1]
+        root = Path(attempt["attempt_root"])
+        paths = {name: root / name for name in ("tool-state.json", "bridge-events.jsonl")}
+        if not all(path.is_file() for path in paths.values()):
+            continue
+        proofs = {name: binding(path) for name, path in paths.items()}
+        if any(proof["sha256"] != attempt["artifacts"].get(name) for name, proof in proofs.items()):
+            raise ValueError("current failure explanation bytes changed")
+        state = load(paths["tool-state.json"])
+        events = [json.loads(line) for line in paths["bridge-events.jsonl"].read_text().splitlines()]
+        rejected = {(event.get("tool"), event.get("error")) for event in events
+                    if event.get("tool") in SOURCE_TOOLS and event.get("error") == message}
+        if any((violation.get("tool"), violation.get("error")) in rejected for violation in state.get("violations", [])):
+            slots.append({"pr": row["number"], "arm": row["arm"], "repeat": row["repetition"],
+                          "reason": "documentation_budget_boundary_violation", "native_status": row["status"],
+                          "evidence": proofs})
+    return {"slots": slots, "counts": {arm: sum(row["arm"] == arm for row in slots) for arm in "AB"},
+            "native_status_unchanged": True, "original_diagnostics_unchanged": True}
+
+
 def render(value):
     previous, current = value["previous"], value["current"]
     lines = ["# JiuwenSwarm GLM‑5.3 协议修复与复测", "", f"状态：`{value['status']}`；复测有效评审 {current['valid']}/72，已独立评分 {current['scored_valid']} 份。", "",
@@ -524,6 +551,12 @@ def render(value):
                 lines.append(f"| {stage} | {arm} | status:{reason} | {count} |")
             for reason, count in diag.get("invalid_run_reason_counts", {}).items():
                 lines.append(f"| {stage} | {arm} | {reason} | {count} |")
+    explanations = value.get("current_failure_explanations", {}).get("slots", [])
+    if explanations:
+        lines += ["", "原始诊断保留不变。以下槽位的状态与事件哈希证明：模型通过源码工具请求文档，违反独立文档预算，属于单次调用的边界拒绝。原始诊断中的unknown_bridge_protocol是未匹配错误字符串的兜底标签，不据此声称存在共享协议故障。", "",
+                  "| PR | 组别 | 重复 | 复核原因 |", "| --- | --- | ---: | --- |"]
+        for item in explanations:
+            lines.append(f"| #{item['pr']} | {item['arm']} | {item['repeat']} | 通过源码工具访问文档，绕过文档预算 |")
     lines += ["", "同一无效评审可能有多项拒绝原因，原因计数不直接相加当作失败调用数；源码或协议信息不足的原因保持unknown。旧失败逐槽位人工归因与原始诊断分别保存在JSON。", "",
               "## 本次准确率与速度", "", "以下精确率只统计有效、已评分输出，并按两组均有可计算结果的同一PR取均值。unknown不计误报，非缺陷建议另计。召回只针对预先冻结的自动独立审计有限问题清单，新发现不回填分母；无确认问题的PR不可计算召回。", "",
               "| 分组 | 指标 | A 原作者资料 | B 当前知识库 | 同时可计算PR数 |", "| --- | --- | ---: | ---: | ---: |"]
@@ -601,6 +634,7 @@ def build(previous_study, study, output_dir, extra_bindings=None):
     result = {"schema": "jiuwenswarm-protocol-retest-report-v1", "generated_at": datetime.now(timezone.utc).isoformat(),
               "status": summaries[1]["status"], "previous": summaries[0], "current": summaries[1],
               "protocol": {**provenance["protocol"], "current_native_guards": new["identity"].get("protocol_guards")}, "previous_failure_audit": previous_failure_audit(old),
+              "current_failure_explanations": current_failure_explanations(new),
               "cases": [{k: c[k] for k in ("number", "target", "base", "head", "context_sha256", "diff_sha256")} for c in new["campaign"]["cases"]],
               "document_content_manifest_sha256": {a: sha(new["identity"]["arms"][a]["documents"]) for a in "AB"},
               "inputs": inputs, "actual_invoice_cost": "unknown"}
