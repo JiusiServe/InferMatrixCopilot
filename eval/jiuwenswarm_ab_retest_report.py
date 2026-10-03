@@ -251,6 +251,7 @@ def summarize(value, diagnostics):
 
 def previous_failure_audit(value):
     """Explain old failures from bound reply/state bytes; never recategorize success."""
+    from infermatrix_copilot.llm import parse_json_reply
     counts, slots = Counter(), []
     for row in value["rows"]:
         if row["status"] != "invalid_run":
@@ -261,21 +262,28 @@ def previous_failure_audit(value):
             if binding(root / name)["sha256"] != attempt["artifacts"].get(name):
                 raise ValueError("previous failure audit bytes changed")
         state = load(root / "tool-state.json")
+        parsed = parse_json_reply((root / "reply.txt").read_text())
+        comments = parsed.get("review_comments", []) if isinstance(parsed, dict) else []
         error = row["error"]
         if state.get("violations"):
             events = [json.loads(line) for line in (root / "bridge-events.jsonl").read_text().splitlines()]
             aliases = [e for e in events if e.get("error") == "path must be repository-relative without traversal" and
                        e["tool"] in ("source_list", "source_grep") and (e["args"].get("path") == "." or
-                       (isinstance(e["args"].get("path"), str) and e["args"]["path"].endswith("/") and ".." not in e["args"]["path"].split("/")))]
+                       (isinstance(e["args"].get("path"), str) and e["args"]["path"].endswith("/") and
+                        not e["args"]["path"].startswith(("/", "\\", "-")) and
+                        not any(p in ("", ".", "..", ".git") for p in e["args"]["path"][:-1].split("/"))))]
             reason = "directory_syntax_false_rejection" if len(aliases) == len(state["violations"]) else "unclassified"
         elif error == "bridge violations or complete prompt was not read":
             reason = "incomplete_prompt"
         elif error == "model output does not satisfy successful review contract":
-            reason = "malformed_json"
+            reason = "malformed_json" if parsed is None else "unclassified"
         elif error == "review comment has missing required fields":
-            reason = "optional_anchor_contract_conflict"
+            missing = set().union(*({"file", "line", "anchor_snippet", "severity", "comment", "evidence", "disposition"} - set(c) for c in comments if isinstance(c, dict)))
+            reason = "optional_anchor_contract_conflict" if comments and all(isinstance(c, dict) for c in comments) and missing == {"anchor_snippet"} else "unclassified"
         elif error == "review comment severity/disposition is invalid":
-            reason = "duplicate_disposition_contract_conflict"
+            enums = {c.get("disposition") for c in comments if isinstance(c, dict)}
+            valid_severity = all(isinstance(c, dict) and c.get("severity") in {"blocker", "major", "minor", "nit"} for c in comments)
+            reason = "duplicate_disposition_contract_conflict" if valid_severity and enums - {"publish", "excluded", "resolved", "no_issue"} == {"duplicate"} else "unclassified"
         else:
             reason = "unclassified"
         counts[reason] += 1
@@ -293,7 +301,8 @@ def render(value):
         for arm, docs in (("A", "原作者资料"), ("B", "当前知识库")):
             a = previous["groups"][name]["operational"][arm]; b = current["groups"][name]["operational"][arm]
             lines.append(f"| {label} | {docs} | {a['valid']}/{a['expected']} | {b['valid']}/{b['expected']} | {pct(a['valid']/a['expected'])} → {pct(b['valid']/b['expected'])} |")
-    lines += ["", "## 修复范围与解释边界", "", "旧17次失败中，14次涉及评估接口冲突或普通目录写法，2次为模型JSON语法错误，1次未完整读取大PR提示。共享评审提示允许省略锚点和使用 duplicate，却与旧验证器冲突。所有旧失败均保留；本次新建批次，不事后补算为成功。", "",
+    audit = value["previous_failure_audit"]
+    lines += ["", "## 修复范围与解释边界", "", f"旧{len(audit['slots'])}次无效评审中，{audit['harness_conflict_or_directory_syntax']}次涉及评估接口冲突或普通目录写法，{audit['counts'].get('malformed_json',0)}次为模型JSON语法错误，{audit['counts'].get('incomplete_prompt',0)}次未完整读取大PR提示。共享评审提示允许省略锚点和使用 duplicate，却与旧验证器冲突。所有旧失败均保留；本次新建批次，不事后补算为成功。", "",
               "本轮源代码、作者资料、知识库、12个PR、三次重复和两个模型通道保持固定，修改评估协议与提示一致性。随机生成、共享排期、服务限流及提示变化也会影响结果，不能把修复前后的变化全部归因于知识库。", "",
               f"旧 harness SHA：`{value['protocol']['previous_harness_sha256']}`；新 harness SHA：`{value['protocol']['retest_harness']['sha256']}`。具体变更：{value['protocol'].get('change_scope','见归档')}", "",
               "路径逃逸、跨组文档、未完整输入、错误模型身份和未经授权工具仍属于失败；目录尾斜线与根目录 shorthand 只在受控目录检索中规范化。没有补写证据、模型切换或内容失败后重新采样。", "",

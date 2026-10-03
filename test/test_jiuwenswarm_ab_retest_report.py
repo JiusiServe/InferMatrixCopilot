@@ -244,3 +244,19 @@ def test_actual_call_journal_is_hash_bound(tmp_path):
     Path(row["attempts"][0]["attempt_root"]).joinpath("bridge-events.jsonl").write_text("")
     with pytest.raises(ValueError, match="event bytes changed"):
         report.actual_source_calls(row)
+
+
+@pytest.mark.parametrize("missing,reason", [("anchor_snippet", "optional_anchor_contract_conflict"), ("evidence", "unclassified")])
+def test_old_failure_label_requires_actual_matching_output_shape(tmp_path, missing, reason):
+    root = tmp_path / "attempt"
+    root.mkdir()
+    comment = {"file": "entry.py", "line": 1, "anchor_snippet": "pass", "severity": "major", "comment": "fix", "evidence": "proof", "disposition": "publish"}
+    comment.pop(missing)
+    write(root / "tool-state.json", {"violations": []})
+    (root / "bridge-events.jsonl").write_text("")
+    write(root / "reply.txt", {"status": "success", "review_comments": [comment]})
+    artifacts = {name: binding(root / name)["sha256"] for name in ("tool-state.json", "bridge-events.jsonl", "reply.txt")}
+    row = {"number": 7641, "arm": "B", "repetition": 1, "status": "invalid_run", "error": "review comment has missing required fields", "attempts": [{"attempt_root": str(root), "artifacts": artifacts}]}
+    result = report.previous_failure_audit({"rows": [row]})
+    assert result["counts"] == {reason: 1}
+    assert result["old_failures_remain_failures"] is True
