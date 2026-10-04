@@ -1,6 +1,6 @@
 # engine/agent_runtime/ —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~1690（7 个文件） · 引擎（受治理的 agent 运行时） · refactor-status: ok`
 
@@ -108,3 +108,7 @@ step 专属的 prompt/lens 住在各自的 step 文件里（例如 `steps/review
 cheap-seat 与按 pass 路由、MoA harness 成员、考古工具）。有两条教训被编码在上面的不变量
 里而不是写成散文：**预算保证属于代码，不属于 prompt**；以及**无法履约的路由决策必须
 大声失败** —— 因为本轮战役已经测到过三条与其标签不符的 arm。
+
+## 自进化接入（2026-10-04）
+
+影子 agent 使用严格只读 scope，知识检索与 repo map 受读根约束，拒绝知识写入工具。API 与 harness 调用均记录 trace/1；工作流的采集和配置指纹由执行器绑定，普通生产运行保持既有工具能力。

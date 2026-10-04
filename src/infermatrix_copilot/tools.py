@@ -7,12 +7,15 @@ recorded — never silent.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from . import trace_store
 from .run_trace import RunTrace
 from .scopes import ToolScope
 
@@ -142,6 +145,12 @@ class ToolDef:
     input_schema: dict
     handler: Callable[..., str]
     write_path_arg: str | None = None  # arg holding the path a write lands on
+    # arg holding the path a READ touches, for extras that read the tree:
+    # under a scope with `read_roots` it is fenced like the builtin reads
+    read_path_arg: str | None = None
+    # the tool writes through an internal store rather than a path argument
+    # (a knowledge candidate, a cache): a strict (shadow) scope refuses it
+    internal_write: bool = False
     # Optional audit classifier for tools whose FAILURES are ordinary return
     # values (parent-shaped {"error": ...} strings): dispatch keeps the
     # transport payload ok=True (the bytes ARE the tool result) but records
@@ -311,9 +320,18 @@ def tool_definitions_for(scope: ToolScope | None,
         if t.name in names
     ]
     for t in (extra or {}).values():
+        if scope is not None and scope.strict_extras and (
+                t.name not in scope.allowed_tools or t.internal_write):
+            continue  # never advertised: a strict scope filters BEFORE the model sees it
         defs.append({"name": t.name, "description": t.description,
                      "input_schema": t.input_schema})
     return defs
+
+
+def _refuse(name: str, reason: str, trace: RunTrace | None) -> dict:
+    if trace:
+        trace.record("tool_refused", tool=name, reason=reason)
+    return {"ok": False, "error": f"refused: {reason}", "out_of_scope": False}
 
 
 def dispatch(
@@ -324,7 +342,46 @@ def dispatch(
     trace: RunTrace | None = None,
     extra: dict[str, ToolDef] | None = None,
 ) -> dict:
-    """Returns {"ok": bool, "result"|"error": str, "out_of_scope": bool}."""
+    """Returns {"ok": bool, "result"|"error": str, "out_of_scope": bool}.
+
+    The single choke point for every agent tool call (invariant 5). When a
+    trace/1 store is bound (``trace_store.bind_store``), every call — allowed,
+    failed or refused — is also captured as a ``tool_call`` record with its
+    arguments and result as blobs; capture never changes the payload."""
+    started = time.monotonic()
+    payload = _dispatch(name, args, scope=scope, trace=trace, extra=extra)
+    _capture_tool_call(name, args, payload, time.monotonic() - started)
+    return payload
+
+
+def _capture_tool_call(name: str, args: dict, payload: dict, seconds: float) -> None:
+    store = trace_store.current_store()
+    if store is None:
+        return
+    try:
+        error = str(payload.get("error") or "")
+        result_text = payload.get("result") if payload.get("ok") else error
+        store.append(
+            "tool_call",
+            inputs={"args": json.dumps(args, ensure_ascii=False, sort_keys=True, default=str)},
+            outputs={"result": str(result_text if result_text is not None else "")},
+            result={"tool": name, "ok": bool(payload.get("ok")),
+                    "refused": error.startswith("refused:"),
+                    "out_of_scope": bool(payload.get("out_of_scope")),
+                    "bytes": len(str(result_text or ""))},
+            seconds=round(seconds, 6), error="" if payload.get("ok") else error)
+    except Exception:  # noqa: BLE001 - capture never breaks a tool call
+        pass
+
+
+def _dispatch(
+    name: str,
+    args: dict,
+    *,
+    scope: ToolScope | None = None,
+    trace: RunTrace | None = None,
+    extra: dict[str, ToolDef] | None = None,
+) -> dict:
     tool = (extra or {}).get(name) or TOOLS.get(name)
     if tool is None:
         return {"ok": False, "error": f"unknown tool: {name}", "out_of_scope": False}
@@ -333,7 +390,24 @@ def dispatch(
         # them). Opt-in scoping extension: an extra ToolDef that declares
         # `write_path_arg` gets the same write-path enforcement as builtins
         # (read-only refusal, writable wall, out-of-scope recording); extras
-        # without the declaration keep the historical bypass unchanged.
+        # without the declaration keep the historical bypass unchanged —
+        # EXCEPT under a strict scope (shadow runs), where an extra must be
+        # in the allowlist, must not write through an internal store, and
+        # has its declared read path fenced like a builtin read.
+        if scope is not None and scope.strict_extras:
+            if name not in scope.allowed_tools:
+                return _refuse(name, f"extra tool '{name}' not allowed in strict scope '{scope.name}'", trace)
+            if tool.internal_write:
+                return _refuse(name, f"extra tool '{name}' writes through an internal store", trace)
+        if tool.read_path_arg and scope is not None and scope.read_roots:
+            read_path = args.get(tool.read_path_arg)
+            if isinstance(read_path, str) and read_path:
+                if not os.path.isabs(read_path) and scope.root:
+                    read_path = os.path.join(scope.root, read_path)
+                    args = {**args, tool.read_path_arg: read_path}  # the handler sees the resolved path
+                decision = scope.check_read(read_path)
+                if not decision.allowed:
+                    return _refuse(name, decision.reason, trace)
         write_path = (args.get(tool.write_path_arg)
                       if tool.write_path_arg else None)
         out_of_scope = False
@@ -393,10 +467,16 @@ def dispatch(
     if scope is not None:
         decision = scope.check(name, write_path=write_path)
         if not decision.allowed:
-            if trace:
-                trace.record("tool_refused", tool=name, reason=decision.reason)
-            return {"ok": False, "error": f"refused: {decision.reason}", "out_of_scope": False}
+            return _refuse(name, decision.reason, trace)
         out_of_scope = decision.out_of_scope
+        # the read fence: a builtin read/exec path must resolve inside the
+        # scope's read roots (realpath first, so `..` and symlinks cannot
+        # escape) — a shadow run may read its checkout and nothing else
+        read_path = args.get(_PATH_ARGS.get(name, ""))
+        if scope.read_roots and write_path is None and isinstance(read_path, str) and read_path:
+            decision = scope.check_read(read_path)
+            if not decision.allowed:
+                return _refuse(name, decision.reason, trace)
 
     try:
         result = tool.handler(**args)

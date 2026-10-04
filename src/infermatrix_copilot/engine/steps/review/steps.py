@@ -184,7 +184,7 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                           "optional, `untested_api` only for a missing unit "
                           "test on a listed untested-function candidate}"},
         extra_tools={**_gh_read_tools(_repo_path(ctx)),
-                     **review_repo_tools(_repo_path(ctx))},
+                     **review_repo_tools(_repo_path(ctx), str(ctx.state.get('pr_base_sha') or ''))},
     )
     plan = None
     if not ctx.settings.review_ensemble:   # legacy kill-switch: single pass
@@ -400,7 +400,7 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                       "pr_diff": str(diff)},
             output_extension={"finding_rechecks":
                 "list of {finding_id, head_sha, outcome: fixed|still_affected|unverified, evidence}"},
-            extra_tools=review_repo_tools(_repo_path(ctx)),
+            extra_tools=review_repo_tools(_repo_path(ctx), str(ctx.state.get('pr_base_sha') or '')),
         )
         rechecks, recheck_missing = checked_rechecks(
             carried, recheck_output.get("finding_rechecks") if recheck_result.ok else [],

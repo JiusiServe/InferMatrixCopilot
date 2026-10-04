@@ -1,6 +1,6 @@
 # chat.py —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~497 · 接口（对话式 REPL） · refactor-status: split-candidate`
 
@@ -43,3 +43,7 @@ repo_read/repo_grep/resume_run）；`ChatSession`（**永不切开工具对**的
 **建议拆分**：`chat_tools.py`（定义 + `_dispatch_tool` + 囚笼）与
 `chat.py`（会话/回合循环）。读取囚笼（`_allowed_roots`/`_check_read`）具有通用价值 ——
 如果还有别的面需要受囚笼的读取，可考虑提升为一个小的共享 helper。
+
+## 自进化接入（2026-10-04）
+
+对话任务 schema 和系统提示词包含 `workflow_improve`；调用仍经同一个 `run_task` 门，不扩大执行权限。

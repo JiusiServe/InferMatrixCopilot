@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-04 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -768,3 +768,7 @@ dry run 为旧快照建本地临时 baseline，再生成相同升级串与全量
 变更，保持 empty 阶段语义。提示不会增加 coverage、创建规则或改 owner 路由。
 完成合并后的完整 checkout 用 `tools/audit_review_retrieval.py` 验收 Direct 上下文交付，
 同时报告描述+路径与仅路径结果。报告在 eval/本地状态，与 breadth/depth 审计分开；不是 RQS 或缺陷召回率。
+
+## 自进化接入（2026-10-04）
+
+起草单元携带 `kb-intake.draft` 的 item、workflow 和配置指纹；起草使用该工作流已采用的最大操作数覆盖。调度器在同一服务租约内检查周度改进槽位；进化启用时调用可续跑协调器，未完成检查点优先续跑，异常单独记录。

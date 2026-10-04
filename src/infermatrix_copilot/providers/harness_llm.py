@@ -79,9 +79,22 @@ class HarnessLLM:
                 "harness backend supports tool-less create() only — agent "
                 "steps run through the provider's run_session "
                 "(doc/features/provider-registry.md)")
-        reply = self._transport.complete(
-            system=system, messages=messages, model=self._harness_model,
-            max_tokens=max_tokens, role=role)
+        import time
+
+        from ..llm import capture_model_call
+
+        kwargs = {"system": system, "messages": messages, "model": self._harness_model,
+                  "max_tokens": max_tokens, "tools": []}
+        provider = f"harness:{self._transport.spec.id}"
+        started = time.monotonic()
+        try:
+            reply = self._transport.complete(
+                system=system, messages=messages, model=self._harness_model,
+                max_tokens=max_tokens, role=role)
+        except Exception as exc:
+            capture_model_call(kwargs, role, provider, None, time.monotonic() - started, error=str(exc))
+            raise
+        capture_model_call(kwargs, role, provider, reply, time.monotonic() - started)
         if on_text is not None and reply.text:
             on_text(reply.text)
         return reply

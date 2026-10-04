@@ -67,6 +67,12 @@ async def run_agent_step(
     repo_root = ctx.state.get("repo_path") or ""
     if repo_root and not scope.root:
         scope = replace(scope, root=str(repo_root))
+    if getattr(ctx.settings, "improve_shadow", False):
+        # a shadow (experiment) run: strict extras, fenced reads, no writes —
+        # whatever scope the step asked for (meta-improvement design §8.2)
+        from ...improve.shadow import harden_scope
+
+        scope = harden_scope(scope, ctx, step_name)
     spec = ctx.state.get("task_spec") or {}
     # dual-path (双路径): the run's execution tier (set from intent, eco by
     # default) selects the agent BACKEND here — model + endpoint + credential
@@ -231,7 +237,10 @@ async def run_agent_step(
     # retrieval tie-breaker (skills.py score()); last_used_at is never read.
     spec_read_only = (spec.get("kind") in READ_ONLY_KINDS
                       and not spec.get("post")) or bool(spec.get("report_only"))
-    if str(output.get("status", "")).lower() == "success" and not spec_read_only:
+    # a shadow run leaves the production skill metadata and usage journal
+    # untouched whatever the task spec says (design §8.2: no writes at all)
+    shadow_run = bool(getattr(ctx.settings, "improve_shadow", False))
+    if str(output.get("status", "")).lower() == "success" and not spec_read_only and not shadow_run:
         for s in skills:  # injected skills earned a use — feed the run_count prior
             store.touch(s["name"])
     prefix = f"[{output.get('confidence', '?')}] "

@@ -1,0 +1,18 @@
+# The review bot's production review (dynamic). The bot writes one trace/1
+# decision per attempt with playbook "rb-review" and step "review"; its own
+# repository supplies the fingerprint inputs, so the covers here name only
+# what the bot's record already carries (knowledge snapshot + code sha). v1 is
+# descriptive-only: outcome collection and stage-of-loss forensics, never a
+# comparative claim and never an experiment (design §6.1).
+workflow: rb-review.review
+kind: dynamic
+unit: agent_loop
+item_key: "{repo}#{pr}@{head_sha}"
+fingerprint:
+  covers:
+    - knowledge_snapshot
+    - copilot_sha
+capture: full
+outcome_adapter: infermatrix_copilot.improve.adapters.rb_review:RbReviewAdapter
+tier2_min_items: 8
+shadow_tools: []

@@ -358,6 +358,16 @@ class Settings(BaseSettings):
     # eval arms (the frozen dataset's ground truth IS the review discussion;
     # PR_CONTEXT_MODE=no_discussion keeps candidate inputs baseline-equivalent).
     pr_context_mode: Literal["full", "no_discussion"] = "full"
+    # Where pr.fetch_diff / pr.gate_check / pr.fetch_ci_failures get their
+    # inputs: "live" calls gh/git (today's behaviour); "snapshot" reads the
+    # staged item snapshot in state (`pr_snapshot`, written by
+    # improve.stage_items) and never touches the network — the shadow
+    # experiment path (meta-improvement design §8.2).
+    pr_context_source: Literal["live", "snapshot"] = "live"
+    # IMPROVE_SHADOW=1 marks a shadow (experiment) run: the executor refuses
+    # every step whose risk is not read/report, the agent runtime hardens the
+    # tool scope, repo_map caches in the run dir. Set only by the engine.
+    improve_shadow: bool = False
     skills_top_k: int = 3
 
     # Ensemble agent steps (run_agent_step_ensemble): perspective-diverse
@@ -564,6 +574,58 @@ class Settings(BaseSettings):
     # zero module names that used to sit here were a neutrality leak
     # (2026-08-01 audit); the adapter manifest declares them.
     high_risk_modules: list[str] = []
+
+    # trace/1 full-fidelity capture (meta-improvement engine, design §7):
+    # TRACE_STORE_ROOT names the store every run binds; every model call and
+    # tool call then lands as a record with blobs. Empty = no capture (the
+    # legacy span/event files are unaffected either way).
+    trace_store_root: str = ""
+    # Extra directories of workflow declarations (os.pathsep separated),
+    # consulted after the package's builtin improve/workflows/.
+    improve_workflows_dirs: str = ""
+    # The weekly cycle (design §4/§10). improve_enabled is THE kill switch;
+    # the slot is `improve_cycle_weekday` (0=Monday) at `improve_cycle_hour`
+    # UTC, after the 04:00 PR-state sweep; the ledgers and reports live under
+    # improve_ledger_dir (default ~/.infermatrix-copilot/improve).
+    improve_enabled: bool = False
+    improve_evolve_enabled: bool = False
+    improve_evolve_source_dir: str = ""
+    improve_evolve_data_dir: str = ""
+    improve_evolve_outbox_dir: str = ""
+    kb_draft_max_operations: int = 6
+    # IMPROVE_GOVERNED=1: this process binds the weekly budget governor for
+    # its whole run (a shadow subprocess of an experiment), so every model
+    # call is reserved against the same weekly files as the parent's
+    improve_governed: bool = False
+    improve_cycle_weekday: int = 0
+    improve_cycle_hour: int = 5
+    improve_ledger_dir: str = ""
+    # the hard weekly envelope (P3 enforces it per model call)
+    improve_budget_usd_week: float = 20.0
+    improve_budget_judge_calls_week: int = 300
+    # the eval review adapter's inputs (design §6.1): the GT directory holding
+    # gt/curated/<item>.gold.json, the judgment sets, and the arm name whose
+    # verdicts belong to this copilot's units
+    improve_gt_dir: str = ""
+    improve_judgments_dir: str = ""
+    improve_eval_arm: str = ""
+    # the gold_match judge: "api:<model>" (through LLM.create) or
+    # "cli:<provider>:<model>" (cursor|claude|codex, tool-less); empty = no
+    # gold matching, cells stay unlabeled
+    improve_judge: str = ""
+    # the review bot's GitHub login, so its own replies never count as the
+    # author accepting or disputing a finding
+    improve_rb_bot_login: str = ""
+    # Publication (design §9.2): the engine holds no GitHub token; proposal
+    # actions are files in this outbox that the maintainer routine's `propose`
+    # routine picks up. Unset = the publish step is a no-op even when both
+    # post gates are open. `improve_proposal_repo` names the repository the
+    # proposal issues go to ("owner/name"); required for publication.
+    improve_outbox_dir: str = ""
+    improve_proposal_repo: str = ""
+    # The frozen meta-benchmark the engine measures itself against (§11.2);
+    # a shadow self-experiment gets a staged copy through IMPROVE_META_DIR.
+    improve_meta_dir: str = "eval/dataset/meta"
 
     # Metrics (eval/METRICS_RESEARCH.md) — per-run metrics.json: CATQ = Q·S/C.
     # Reference budgets are EXPLICIT deployment assumptions (RQS3e precedent):

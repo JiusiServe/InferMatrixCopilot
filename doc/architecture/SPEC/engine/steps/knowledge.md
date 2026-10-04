@@ -1,6 +1,6 @@
 # engine/steps/knowledge.py —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-04 -->
 
 `知识服务的 knowledge.* 步骤 · refactor-status: new`
 

@@ -1,0 +1,35 @@
+# PR review, the diff-review agent loop (dynamic): the copilot's eval arms and
+# any production pr-review run. Tier 2 comparative (design §6.1): the adapter
+# reads the paired judge's verdicts and the gold_match records; it needs the
+# curated gold set (eval/dataset/gt/curated) to build a coverage matrix.
+workflow: pr-review.agent.review_diff
+kind: dynamic
+unit: agent_loop
+item_key: "{repo}#{pr}@{head_sha}"
+fingerprint:
+  covers:
+    - playbook_yaml_sha
+    - settings: [review_second_round, review_second_round_max_iters, llm_max_tokens,
+                 review_lens_backends, strict_backend, strict_backend_model, agent_model,
+                 eco_model, performance_model, profile_briefing_enabled]
+    - prompts: ["engine/steps/review/prompts.py", "engine/agent_runtime/*.py"]
+    - routing: [ECO_MODEL, PERFORMANCE_MODEL, STRICT_BACKEND]
+    - resolved_models
+    - tools
+    - knowledge_snapshot
+    - copilot_sha
+capture: full
+outcome_adapter: infermatrix_copilot.improve.adapters.review_eval:ReviewEvalAdapter
+tier2_min_items: 8
+shadow_tools: [doc_read, doc_search, repo_map, repo_docs, diff_stat, file_at_base,
+               show_commit, search_history, calc]
+shadow_executables: [python3, git, grep]
+experiment_driver: pr-review
+evolution:
+  paths: [src/infermatrix_copilot/engine/steps/review/*.py, src/infermatrix_copilot/engine/agent_runtime/*.py]
+  settings: [REVIEW_SECOND_ROUND, REVIEW_SECOND_ROUND_MAX_ITERS, LLM_MAX_TOKENS, ECO_MODEL, PERFORMANCE_MODEL]
+  tests: [test/test_agent_runtime.py, test/test_improve_p0b.py]
+  metric: recall_review
+  direction: higher
+  min_effect: 0.05
+  guards: {precision_review: higher, usd_review: lower}

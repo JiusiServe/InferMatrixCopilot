@@ -319,7 +319,8 @@ def parse_intents(text: str, *, llm: LLM | None = None,
 
 _LLM_SYSTEM = """You convert one user command for a repo-maintenance copilot into JSON.
 Task kinds: repo_rebase, pr_rebase, pr_debug, pr_review, issue_answer, issue_filter,
-repo_profile (establish/refresh the repo's profile).
+repo_profile (establish/refresh the repo's profile), workflow_improve (run the
+meta-improvement cycle over the trace store).
 Output ONLY JSON:
 {"kind": "...", "pr": int|null, "issue": int|null, "report_only": bool, "post": bool,
  "performance": bool, "review_depth": "light"|"standard"|"full"|null,

@@ -1,6 +1,6 @@
 # cli/ —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~1420（6 个文件） · 接口 + 编排门面 · refactor-status: ok`
 
@@ -93,3 +93,7 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
 
 ## 2026-09-28 kb 子命令
 `infermatrix-copilot kb …` 在 argparse 之前分派到 `kb_service.cli.main`（知识服务运维命令），不启动 Copilot/LLM。
+
+## 自进化接入（2026-10-04）
+
+`infermatrix-copilot improve …` 在通用 argparse 之前分派到 `improve.cli.main`；工作流检查、候选生成、实验、发布和账本查询使用该入口。

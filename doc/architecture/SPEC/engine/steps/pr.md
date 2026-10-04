@@ -1,6 +1,6 @@
 # engine/steps/pr/ —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~1988（6 个文件） · step 库（PR） · refactor-status: ok`
 
@@ -122,3 +122,7 @@ BLOCK、worktree 分键/拒外来树、report-only rebase 的隔离与失效树�
 读/写轴是显式的：`fetch` 只读，`publish` 装着两个 risk=push 的 step。
 K3/K4/K7 的精简（require_repo/published/from_state）已在各子模块落地。
 `_enrich_ci_logs` 保持为通往 `ci/providers` 的**薄接缝**。
+
+## 自进化接入（2026-10-04）
+
+影子模式下 `pr.fetch_diff`、gate 和 CI 取数从可信控制器准备的 `pr_snapshot` 读取；快照缺少必要字段即阻塞，不回退到实时网络。基线和候选共用冻结的 base/head 与上下文。

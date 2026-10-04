@@ -1,6 +1,6 @@
 # providers/harness_llm.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~66 · 套在 harness 之上的 LLM 形状适配器（仅限无工具） · refactor-status: ok`
 
@@ -41,3 +41,7 @@ CLI 调用。
 ## 重构备注
 **要顶住"为了方便加一条带工具路径"的冲动** —— 那会把这个类存在的意义（防止不受治理的
 第二循环）原样请回来。
+
+## 自进化接入（2026-10-04）
+
+无工具 `create` 在绑定 store 时调用 `capture_model_call` 记录成功或异常的 trace/1；模型仍来自 harness 路由，工具请求仍拒绝。

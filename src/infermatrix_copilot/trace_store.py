@@ -1,4 +1,4 @@
-"""Trace schema v1: durable records of model calls, decisions and outcomes.
+"""Trace schema v1: durable records of model calls, tool calls, decisions and outcomes.
 
 Shared by the copilot and the review bot, so the expensive models' work can be
 replayed and turned into datasets for cheaper models plus workflows. Layout
@@ -7,27 +7,51 @@ under a trace root::
     records/<YYYY-MM-DD>.jsonl   one JSON record per line (append-only)
     blobs/<aa>/<sha256>.gz       content-addressed payloads (prompts, replies)
     index.db                     SQLite index: id, kind, run, repo, PR, rule
-                                 IDs, model, outcome -> the record itself
+                                 IDs, model, outcome, workflow, unit, fingerprint
+                                 -> the record itself
 
 A record (``schema: trace/1``)::
 
     {"schema", "id", "kind", "at",
-     "context":  {run_id, playbook, step, repo, changeset_id, pr, rule_ids, ...},
+     "context":  {run_id, playbook, step, repo, changeset_id, pr, rule_ids,
+                  workflow, unit_id, item, fingerprint, of, ...},
      "model":    {role, provider, model, effort, served_model},   # model_call
      "usage", "seconds",
      "inputs":   {name: "sha256:<hex>"},      # blobs, never inline text
      "outputs":  {name: "sha256:<hex>"},
-     "result":   {...},                       # decision / outcome / replay
+     "result":   {...},                       # decision / outcome / replay / tool_call
      "error":    "",
      "env":      {copilot_version, copilot_sha, ...}}
 
-``kind`` is ``model_call``, ``decision`` (a gate/review verdict), ``outcome``
-(what happened later: merged, closed, retired, accepted...) or ``replay``.
-Outcomes are the gold labels for evaluating a cheaper model.
+``kind`` is ``model_call``, ``tool_call`` (one agent tool invocation: its
+arguments and result as blobs, ``result`` = tool, ok, refused, out_of_scope,
+bytes), ``decision`` (a gate/review verdict), ``outcome`` (what happened later:
+merged, closed, retired, accepted...) or ``replay``. Outcomes are the gold
+labels for evaluating a cheaper model.
+
+Context keys understood by the improvement engine: ``workflow`` (the enrolled
+workflow's name), ``unit_id`` (one step call or agent loop), ``item`` (the
+external object a unit acts on, for pairing), ``fingerprint`` (the declared
+configuration hash) and ``of`` (an outcome's unit record id).
 
 Everything is redacted before it is hashed or written: known token shapes
 (GitHub, Anthropic, OpenAI, AWS, bearer headers, private keys) and the value
 of every environment variable whose name marks it as a secret.
+
+Index schema and migration (changelog)
+---------------------------------------
+* v0 (implicit ``user_version`` 0): 13 columns, positional inserts.
+* v2 (``PRAGMA user_version = 2``): adds ``workflow``, ``unit_id`` and
+  ``fingerprint`` columns with indexes.
+
+The JSONL records are the only source of truth; the index is derived. Opening
+a store never changes an existing index's schema: a v0 index is used in
+*compatibility mode* (writes omit the new columns, queries on them raise
+:class:`IndexNotMigrated`). Only the explicit :meth:`TraceStore.migrate_index`
+upgrades it, under a cross-process ``flock`` and only once every writer is paused;
+:meth:`TraceStore.rebuild_index` rebuilds atomically (temp file + rename) under
+the same gate and to an explicit target schema, and :meth:`TraceStore.compare_index`
+verifies a live index without touching it.
 
 Standard library only; importing it loads nothing else from the package.
 """
@@ -41,18 +65,22 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
+import tempfile
 import threading
 import time
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator, Mapping
+from typing import Any, Callable, Iterator, Mapping
 
 SCHEMA = "trace/1"
-KINDS = ("model_call", "decision", "outcome", "replay")
+KINDS = ("model_call", "tool_call", "decision", "outcome", "replay")
+SCHEMA_VERSION = 2
 _CONTEXT: contextvars.ContextVar[dict] = contextvars.ContextVar("trace_context", default={})
+_STORE: contextvars.ContextVar["TraceStore | None"] = contextvars.ContextVar("trace_store", default=None)
 
 _SECRET_SHAPES = re.compile(
     r"gh[pousr]_[A-Za-z0-9]{20,}"
@@ -66,6 +94,90 @@ _SECRET_SHAPES = re.compile(
 )
 _SECRET_NAME = re.compile(r"(TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|_KEY|_PAT|CREDENTIALS?)$", re.I)
 REDACTED = "[REDACTED]"
+
+# index columns per schema version; the record JSON is always the last column
+_COLUMNS_V0 = ("id", "kind", "at", "run_id", "playbook", "repo", "changeset_id", "pr",
+               "rule_ids", "role", "model", "outcome", "record")
+_COLUMNS_V2 = _COLUMNS_V0[:-1] + ("workflow", "unit_id", "fingerprint", "record")
+_NEW_COLUMNS = ("workflow", "unit_id", "fingerprint")
+_INDEXED = ("kind", "run_id", "repo", "changeset_id", "pr", "model", "outcome")
+
+
+class IndexNotMigrated(RuntimeError):
+    """A query needs an index column the live index does not have yet."""
+
+
+class MigrationError(RuntimeError):
+    """An index migration/rebuild was refused or failed; the index is unchanged."""
+
+
+def _try_lock_exclusive(fd: int) -> bool:
+    """Non-blocking exclusive lock on ``fd``: ``flock`` on POSIX, a one-byte
+    ``msvcrt.locking`` region on Windows. Either is released by the OS when
+    the holder exits. False when another holder has it."""
+    try:
+        import fcntl
+    except ImportError:  # Windows
+        import msvcrt
+
+        os.lseek(fd, 0, os.SEEK_SET)
+        if os.fstat(fd).st_size == 0:
+            os.write(fd, b"\0")  # the region to lock must exist
+            os.lseek(fd, 0, os.SEEK_SET)
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except BlockingIOError:
+        return False
+
+
+@contextmanager
+def file_lock(path: str | Path, *, blocking: bool = True, timeout: float = 30.0) -> Iterator[bool]:
+    """Cross-process exclusive lock on ``path`` (an ``flock`` / ``msvcrt``
+    region, released by the OS when the holder exits; the file is never
+    unlinked). Yields True when held. Non-blocking: yields False at once when
+    another holder has it. Blocking: polls up to ``timeout`` seconds, then
+    yields False. Used by the improvement engine for its ledgers and cycle."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+    held = False
+    try:
+        if os.fstat(fd).st_size == 0:
+            os.write(fd, b"\0")
+        deadline = time.monotonic() + timeout
+        while True:
+            held = _try_lock_exclusive(fd)
+            if held or not blocking or time.monotonic() >= deadline:
+                break
+            time.sleep(0.02)
+        try:
+            yield held
+        finally:
+            if held:
+                _unlock(fd)
+    finally:
+        os.close(fd)
+
+
+def _unlock(fd: int) -> None:
+    try:
+        import fcntl
+    except ImportError:  # Windows
+        import msvcrt
+
+        os.lseek(fd, 0, os.SEEK_SET)
+        try:
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+        return
+    fcntl.flock(fd, fcntl.LOCK_UN)
 
 
 def _secret_values(environ: Mapping[str, str]) -> list[str]:
@@ -124,6 +236,22 @@ def current_context() -> dict:
     return {k: v for k, v in _CONTEXT.get().items() if not k.startswith("_")}
 
 
+@contextmanager
+def bind_store(store: "TraceStore | None") -> Iterator["TraceStore | None"]:
+    """Make ``store`` the process/task-local sink that the capture points
+    (``tools.dispatch``, ``LLM.create``) write to; ``None`` unbinds."""
+    token = _STORE.set(store)
+    try:
+        yield store
+    finally:
+        _STORE.reset(token)
+
+
+def current_store() -> "TraceStore | None":
+    """The bound trace store, or None when nothing captures full-fidelity records."""
+    return _STORE.get()
+
+
 def accept_attempt(attempt: int) -> None:
     """Mark which attempt of the current draft was accepted. The caller binds a
     holder as ``_accepted={}``; the accepted call is then identified by its
@@ -154,12 +282,18 @@ def environment_fingerprint() -> dict:
         except (OSError, subprocess.SubprocessError):
             pass
         _ENV = {"copilot_version": __version__, "copilot_sha": sha}
+        root = Path(__file__).resolve().parents[2]
+        if (root / "src").is_dir() and (root / "playbooks").is_dir():
+            from .improve.artifacts import tree_hash
+            _ENV["source_tree_sha"] = tree_hash(root)
     return dict(_ENV)
 
 
 # -- the store ------------------------------------------------------------------------
 
 class TraceStore:
+    _lock_hook: Callable[[], None] | None = None  # test seam: runs once the migration lock is held
+
     def __init__(self, root: str | Path, *, clock=time.time, environ: Mapping[str, str] | None = None):
         self.root = Path(root)
         self._clock = clock
@@ -204,18 +338,57 @@ class TraceStore:
             raise ValueError(f"blob {ref} is corrupt")
         return data.decode("utf-8")
 
-    # records ---------------------------------------------------------------------
-    def _db(self) -> sqlite3.Connection:
-        self.root.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self.root / "index.db", timeout=30)
-        conn.execute("""CREATE TABLE IF NOT EXISTS records (
+    # index schema ----------------------------------------------------------------
+    @property
+    def index_path(self) -> Path:
+        return self.root / "index.db"
+
+    @staticmethod
+    def _create_schema(conn: sqlite3.Connection, version: int) -> None:
+        """Create the ``records`` table for ``version`` in a fresh database."""
+        extra = ", workflow TEXT, unit_id TEXT, fingerprint TEXT" if version >= 2 else ""
+        conn.execute(f"""CREATE TABLE IF NOT EXISTS records (
             id TEXT PRIMARY KEY, kind TEXT, at REAL, run_id TEXT, playbook TEXT, repo TEXT,
-            changeset_id TEXT, pr INTEGER, rule_ids TEXT, role TEXT, model TEXT, outcome TEXT,
+            changeset_id TEXT, pr INTEGER, rule_ids TEXT, role TEXT, model TEXT, outcome TEXT{extra},
             record TEXT)""")
-        for column in ("kind", "run_id", "repo", "changeset_id", "pr", "model", "outcome"):
+        for column in _INDEXED + (_NEW_COLUMNS if version >= 2 else ()):
             conn.execute(f"CREATE INDEX IF NOT EXISTS records_{column} ON records({column})")
+        conn.execute(f"PRAGMA user_version = {int(version)}")
+
+    @staticmethod
+    def _version(conn: sqlite3.Connection) -> int:
+        return int(conn.execute("PRAGMA user_version").fetchone()[0])
+
+    def _db(self, path: Path | None = None) -> sqlite3.Connection:
+        """Open the index. A fresh database is created at the current schema; an
+        existing one is used as-is (compatibility mode when older) — opening
+        never migrates."""
+        self.root.mkdir(parents=True, exist_ok=True)
+        path = path or self.index_path
+        fresh = not path.exists() or path.stat().st_size == 0
+        conn = sqlite3.connect(path, timeout=30)
+        if fresh:
+            with conn:
+                self._create_schema(conn, SCHEMA_VERSION)
         return conn
 
+    def index_version(self) -> int:
+        """The live index's schema version (0 for a pre-versioning index)."""
+        with self._db() as conn:
+            return self._version(conn)
+
+    @staticmethod
+    def _columns(version: int) -> tuple[str, ...]:
+        return _COLUMNS_V2 if version >= 2 else _COLUMNS_V0
+
+    def _insert(self, conn: sqlite3.Connection, record: dict, line: str, *, replace: bool = False) -> None:
+        """Named-column insert, so new code writes an old (v0) index too."""
+        columns = self._columns(self._version(conn))
+        verb = "INSERT OR REPLACE" if replace else "INSERT"
+        conn.execute(f"{verb} INTO records ({', '.join(columns)}) VALUES ({', '.join('?' * len(columns))})",
+                     _row(record, line, columns))
+
+    # records ---------------------------------------------------------------------
     def append(self, kind: str, *, inputs: Mapping[str, str] | None = None,
                outputs: Mapping[str, str] | None = None, model: Mapping[str, Any] | None = None,
                result: Mapping[str, Any] | None = None, usage: Mapping[str, Any] | None = None,
@@ -248,7 +421,7 @@ class TraceStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             with self._db() as conn:
-                conn.execute("INSERT INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", _row(record, line))
+                self._insert(conn, record, line)
         return record
 
     def get(self, record_id: str) -> dict:
@@ -261,11 +434,13 @@ class TraceStore:
     def query(self, *, kind: str | None = None, run_id: str | None = None, repo: str | None = None,
               changeset_id: str | None = None, pr: int | None = None, rule_id: str | None = None,
               role: str | None = None, model: str | None = None, playbook: str | None = None,
+              workflow: str | None = None, unit_id: str | None = None, fingerprint: str | None = None,
               limit: int = 1000) -> list[dict]:
         clauses, args = [], []
         for column, value in (("kind", kind), ("run_id", run_id), ("repo", repo),
                               ("changeset_id", changeset_id), ("pr", pr), ("role", role),
-                              ("model", model), ("playbook", playbook)):
+                              ("model", model), ("playbook", playbook), ("workflow", workflow),
+                              ("unit_id", unit_id), ("fingerprint", fingerprint)):
             if value is not None:
                 clauses.append(f"{column}=?")
                 args.append(value)
@@ -275,22 +450,255 @@ class TraceStore:
         sql = "SELECT record FROM records" + (" WHERE " + " AND ".join(clauses) if clauses else "") \
             + " ORDER BY at, id LIMIT ?"
         with self._db() as conn:
+            if any(v is not None for v in (workflow, unit_id, fingerprint)) and self._version(conn) < 2:
+                raise IndexNotMigrated(
+                    f"index.db is schema {self._version(conn)}: run `improve migrate-index` "
+                    "before querying by workflow/unit_id/fingerprint")
             return [json.loads(row[0]) for row in conn.execute(sql, (*args, int(limit)))]
 
-    def rebuild_index(self) -> int:
-        """Re-create index.db from the JSONL records (the source of truth)."""
-        (self.root / "index.db").unlink(missing_ok=True)
-        count = 0
+    # jsonl scans (the source of truth) -----------------------------------------
+    def iter_records(self) -> Iterator[tuple[dict, str]]:
+        """Every record in the JSONL files, oldest file first, as (record, line)."""
+        for path in sorted((self.root / "records").glob("*.jsonl")):
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    yield json.loads(line), line
+
+    # migration gate ---------------------------------------------------------------
+    @contextmanager
+    def _migration_lock(self) -> Iterator[Path]:
+        """Cross-process exclusive lock for index migrations/rebuilds: an
+        advisory ``flock`` on ``index.migrate.lock``. The kernel releases it
+        when the holder exits, so there is no stale-lock state and no takeover
+        path to race on (an unlink-and-recreate or rename-aside recovery lets
+        a delayed contender remove a FRESH holder's lock; this cannot). The
+        file itself is never unlinked: a contender that already opened the
+        old inode would otherwise lock an orphan while a newcomer locks a new
+        one. The payload (pid, time) is informational only. POSIX uses
+        ``flock``; Windows locks byte 0 with ``msvcrt.locking``."""
+        self.root.mkdir(parents=True, exist_ok=True)
+        lock = self.root / "index.migrate.lock"
+        fd = os.open(lock, os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            if os.fstat(fd).st_size == 0:
+                os.write(fd, b"\0")  # byte 0 is the lock region; the payload follows it
+            if not _try_lock_exclusive(fd):
+                try:
+                    # read the payload from byte 1 through our own handle: on
+                    # Windows the locked byte 0 is unreadable by another handle
+                    os.lseek(fd, 1, os.SEEK_SET)
+                    holder = json.loads(os.read(fd, 4096).decode("utf-8") or "{}")
+                except (OSError, ValueError):
+                    holder = {}
+                raise MigrationError(f"another migration holds {lock} (pid {holder.get('pid', '?')})")
+            if self._lock_hook is not None:
+                self._lock_hook()
+            try:
+                # the payload sits after the locked region (byte 0 on Windows)
+                # and is informational only; truncate-then-write keeps it fresh
+                os.lseek(fd, 1, os.SEEK_SET)
+                os.write(fd, json.dumps({"pid": os.getpid(), "at": time.time()}).encode("utf-8"))
+                yield lock
+            finally:
+                try:
+                    os.ftruncate(fd, 1)
+                except OSError:
+                    pass
+                _unlock(fd)
+        finally:
+            os.close(fd)
+
+    @staticmethod
+    def _require_paused(writers_paused: Callable[[], tuple[bool, str]] | None, offline_confirmed: bool) -> None:
+        if offline_confirmed:
+            return
+        if writers_paused is None:
+            raise MigrationError("no writer-pause check supplied; pass writers_paused=... or offline_confirmed=True")
+        paused, detail = writers_paused()
+        if not paused:
+            raise MigrationError(f"writers are not paused: {detail}")
+
+    def migrate_index(self, *, writers_paused: Callable[[], tuple[bool, str]] | None = None,
+                      offline_confirmed: bool = False, backup: bool = True,
+                      fail_after_alter: bool = False) -> dict:
+        """Upgrade the live index to the current schema in one transaction:
+        backup, ``ALTER TABLE ADD COLUMN`` for each missing column, backfill of
+        every existing row from its stored JSON, indexes, ``user_version``.
+        Verified afterwards (no row with a JSON value but a NULL column; every
+        workflow's indexed id set equals the JSONL scan). Refused unless the
+        writers are paused. ``fail_after_alter`` is a test hook that raises inside
+        the transaction to prove it rolls back."""
+        with self._migration_lock():
+            self._require_paused(writers_paused, offline_confirmed)
+            if not self.index_path.exists():
+                with self._db():
+                    pass  # created fresh at the current schema
+                return {"migrated": False, "from": SCHEMA_VERSION, "to": SCHEMA_VERSION, "backfilled": 0}
+            backup_path = None
+            if backup:
+                backup_path = self.root / f"index.db.bak-{int(self._clock())}"
+                shutil.copy2(self.index_path, backup_path)
+            conn = sqlite3.connect(self.index_path, timeout=30, isolation_level=None)
+            try:
+                before = self._version(conn)
+                if before >= SCHEMA_VERSION:
+                    return {"migrated": False, "from": before, "to": before, "backfilled": 0,
+                            "backup": str(backup_path) if backup_path else ""}
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    present = {row[1] for row in conn.execute("PRAGMA table_info(records)")}
+                    for column in _NEW_COLUMNS:
+                        if column not in present:
+                            conn.execute(f"ALTER TABLE records ADD COLUMN {column} TEXT")
+                    if fail_after_alter:
+                        raise RuntimeError("injected migration failure")
+                    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+                    backfilled = self._backfill(conn)
+                    caught_up = self._catch_up(conn)  # records written while the index missed them
+                    for column in _NEW_COLUMNS:
+                        conn.execute(f"CREATE INDEX IF NOT EXISTS records_{column} ON records({column})")
+                    # verified INSIDE the transaction: a failed check rolls the
+                    # schema back too, so a legacy writer never meets schema 2
+                    report = self._verify_conn(conn)
+                    if not report["ok"]:
+                        raise MigrationError(f"verification failed, migration rolled back: {report}")
+                    conn.execute("COMMIT")
+                except BaseException:
+                    conn.execute("ROLLBACK")
+                    raise
+            finally:
+                conn.close()
+            return {"migrated": True, "from": before, "to": SCHEMA_VERSION, "backfilled": backfilled,
+                    "caught_up": caught_up, "backup": str(backup_path) if backup_path else "",
+                    "verify": report}
+
+    @staticmethod
+    def _backfill(conn: sqlite3.Connection) -> int:
+        """Fill the new columns of every row lacking them from the row's JSON."""
+        rows = conn.execute("SELECT id, record FROM records WHERE workflow IS NULL "
+                            "AND unit_id IS NULL AND fingerprint IS NULL").fetchall()
+        for record_id, line in rows:
+            ctx = (json.loads(line).get("context") or {})
+            conn.execute("UPDATE records SET workflow=?, unit_id=?, fingerprint=? WHERE id=?",
+                         (_text(ctx.get("workflow")), _text(ctx.get("unit_id")),
+                          _text(ctx.get("fingerprint")), record_id))
+        return len(rows)
+
+    def _catch_up(self, conn: sqlite3.Connection) -> int:
+        """Insert every JSONL record the index lacks (a writer that raced the
+        index, or a legacy writer whose insert failed); the JSONL is the truth."""
+        indexed = {row[0] for row in conn.execute("SELECT id FROM records")}
+        added = 0
+        for record, line in self.iter_records():
+            if record["id"] not in indexed:
+                self._insert(conn, record, line, replace=True)
+                indexed.add(record["id"])
+                added += 1
+        return added
+
+    def verify_index(self) -> dict:
+        """Read-only check of the live index against the JSONL records: the id
+        sets are equal, and (schema >= 2) no row carries a JSON context value in
+        a NULL column and each workflow's indexed ids equal the JSONL scan's."""
         with self._db() as conn:
-            for path in sorted((self.root / "records").glob("*.jsonl")):
-                for line in path.read_text(encoding="utf-8").splitlines():
-                    if not line.strip():
-                        continue
-                    conn.execute("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                                 _row(json.loads(line), line))
+            return self._verify_conn(conn)
+
+    def _verify_conn(self, conn: sqlite3.Connection) -> dict:
+        """The verification over ``conn`` (inside a migration's own transaction
+        it sees the uncommitted state, so a failure can still roll back)."""
+        jsonl_ids: set[str] = set()
+        by_workflow: dict[str, set[str]] = {}
+        for record, _ in self.iter_records():
+            jsonl_ids.add(record["id"])
+            wf = _text((record.get("context") or {}).get("workflow"))
+            if wf:
+                by_workflow.setdefault(wf, set()).add(record["id"])
+        report: dict = {"ok": True, "jsonl": len(jsonl_ids), "problems": []}
+        index_ids = {row[0] for row in conn.execute("SELECT id FROM records")}
+        report["indexed"] = len(index_ids)
+        if index_ids != jsonl_ids:
+            report["problems"].append(
+                f"id sets differ: {len(jsonl_ids - index_ids)} missing from index, "
+                f"{len(index_ids - jsonl_ids)} extra in index")
+        version = self._version(conn)
+        report["schema"] = version
+        if version >= 2:
+            for column in _NEW_COLUMNS:
+                nulls = 0
+                for (line,) in conn.execute(f"SELECT record FROM records WHERE {column} IS NULL"):
+                    if _text((json.loads(line).get("context") or {}).get(column)):
+                        nulls += 1
+                if nulls:
+                    report["problems"].append(f"{nulls} rows have context.{column} but a NULL column")
+            for wf, ids in by_workflow.items():
+                indexed = {row[0] for row in conn.execute("SELECT id FROM records WHERE workflow=?", (wf,))}
+                if indexed != ids:
+                    report["problems"].append(f"workflow {wf!r}: index has {len(indexed)} ids, jsonl {len(ids)}")
+        report["ok"] = not report["problems"]
+        return report
+
+    def rebuild_index(self, *, to_schema: int = SCHEMA_VERSION,
+                      writers_paused: Callable[[], tuple[bool, str]] | None = None,
+                      offline_confirmed: bool = False) -> int:
+        """Re-create the index from the JSONL records into a temp file and swap it
+        in atomically; refused unless the writers are paused (the live index is
+        never unlinked in place). ``to_schema=0`` builds the pre-versioning 13
+        column table so an older pin can write it again. Returns the row count
+        and raises MigrationError if the rebuilt id set differs from the JSONL."""
+        if to_schema not in (0, SCHEMA_VERSION):
+            raise MigrationError(f"unknown target schema {to_schema}")
+        with self._migration_lock():
+            if self.index_path.exists():  # a restore into an empty root has no live index to clobber
+                self._require_paused(writers_paused, offline_confirmed)
+            tmp = self.root / f"index.db.tmp-{int(self._clock())}-{uuid.uuid4().hex[:6]}"
+            count = self._build_index(tmp, to_schema)
+            os.replace(tmp, self.index_path)
+            # a record appended between the build and the swap is caught up
+            # from the JSONL (the truth) before the index is declared good
+            with self._lock, self._db() as conn:
+                count += self._catch_up(conn)
+                report = self._verify_conn(conn)
+            if not report["ok"]:
+                raise MigrationError(f"rebuilt index does not match the records: {report}")
+            return count
+
+    def _build_index(self, path: Path, to_schema: int) -> int:
+        conn = sqlite3.connect(path, timeout=30)
+        try:
+            with conn:
+                self._create_schema(conn, to_schema)
+                count = 0
+                for record, line in self.iter_records():
+                    self._insert(conn, record, line, replace=True)
                     count += 1
+        finally:
+            conn.close()
         return count
 
+    def compare_index(self) -> dict:
+        """Read-only verification that never touches the live index: rebuilds a
+        throwaway index in a temp directory and compares it with the live one
+        (row ids, schema-2 columns), then deletes the temp copy."""
+        report = self.verify_index()
+        with tempfile.TemporaryDirectory(prefix="trace-index-compare-") as tmpdir:
+            tmp = Path(tmpdir) / "index.db"
+            count = self._build_index(tmp, SCHEMA_VERSION)
+            fresh = sqlite3.connect(tmp)
+            try:
+                fresh_rows = {row[0]: row[1:] for row in fresh.execute(
+                    "SELECT id, workflow, unit_id, fingerprint FROM records")}
+            finally:
+                fresh.close()
+        report["rebuilt"] = count
+        with self._db() as conn:
+            if self._version(conn) >= 2:
+                live_rows = {row[0]: row[1:] for row in conn.execute(
+                    "SELECT id, workflow, unit_id, fingerprint FROM records")}
+                mismatched = sum(1 for rid, cols in fresh_rows.items() if live_rows.get(rid) != cols)
+                if mismatched:
+                    report["problems"].append(f"{mismatched} rows differ in workflow/unit_id/fingerprint")
+        report["ok"] = not report["problems"]
+        return report
 
 class NativeCallArchive:
     """One isolated durable call journal under the runtime's trace directory."""
@@ -361,15 +769,26 @@ class NativeCallArchive:
         self._save()
 
 
-def _row(record: dict, line: str) -> tuple:
+
+def _text(value: Any) -> str:
+    return "" if value is None else str(value)
+
+
+def _row(record: dict, line: str, columns: tuple[str, ...] = _COLUMNS_V0) -> tuple:
     ctx = record.get("context") or {}
     model = record.get("model") or {}
     result = record.get("result") or {}
     rule_ids = ctx.get("rule_ids") or []
     pr = str(ctx.get("pr") or "")
-    return (record["id"], record["kind"], record["at"], str(ctx.get("run_id") or ""),
-            str(ctx.get("playbook") or ""), str(ctx.get("repo") or ""), str(ctx.get("changeset_id") or ""),
-            int(pr) if pr.isdigit() else None,
-            "," + ",".join(map(str, rule_ids)) + "," if rule_ids else "",
-            str(model.get("role") or ""), str(model.get("model") or ""),
-            str(result.get("outcome") or result.get("status") or ""), line)
+    values = {
+        "id": record["id"], "kind": record["kind"], "at": record["at"],
+        "run_id": _text(ctx.get("run_id")), "playbook": _text(ctx.get("playbook")),
+        "repo": _text(ctx.get("repo")), "changeset_id": _text(ctx.get("changeset_id")),
+        "pr": int(pr) if pr.isdigit() else None,
+        "rule_ids": "," + ",".join(map(str, rule_ids)) + "," if rule_ids else "",
+        "role": _text(model.get("role")), "model": _text(model.get("model")),
+        "outcome": _text(result.get("outcome") or result.get("status")),
+        "workflow": _text(ctx.get("workflow")), "unit_id": _text(ctx.get("unit_id")),
+        "fingerprint": _text(ctx.get("fingerprint")), "record": line,
+    }
+    return tuple(values[c] for c in columns)

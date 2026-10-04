@@ -246,11 +246,15 @@ def _run_intake_locked(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: i
             # attempt link exactly the call whose reply became the change to
             # the decision that later stages it
             key, holder = draft_key_for_event(lifecycle.repo, event["id"]), {}
+            from ..config import Settings
+            from ..improve.artifacts import runtime_settings
+            draft_settings = runtime_settings(getattr(rt, "settings", None) or Settings(), "kb-intake.draft")
             with trace_context(draft_key=key, _accepted=holder, step="draft"):
                 drafts.append(draft_changes(
                     repo=lifecycle.repo, repo_dir=lifecycle.knowledge_dir, event_id=event["id"],
                     evidence=event["payload"], files=base, gateway=rt.gateway,
-                    generator=rt.generator, release=release, today=today))
+                    generator=rt.generator, release=release, today=today,
+                    max_operations=max(1, min(6, draft_settings.kb_draft_max_operations))))
             if accepted_key(key, holder):
                 accepted[event["id"]] = accepted_key(key, holder)
         except ModelUnavailable as exc:

@@ -1,6 +1,6 @@
 # engine/executor.py —— 规范
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~293 · 引擎底座（那个循环） · refactor-status: ok`
 
@@ -54,3 +54,7 @@ helper：`_eval_when`、`_merge`。
 （它曾是 v2 的头号缺陷）—— **不要在没有重跑 resume 完整性测试的情况下"简化"它**。
 如果将来加入 DAG 边（目前只有有序列表），请把它们留在这里、藏在同一个 `RunOutcome`
 契约之后。
+
+## 自进化接入（2026-10-04）
+
+配置 trace 根时为整次执行绑定 store，并为每步绑定工作流、item、unit_id 和配置指纹；终局 `step_result` 保存实际报告与发现。影子运行在进入步骤前拒绝非 read/report 风险。已采用的配置覆盖按工作流限定，同时复制 LLM 的 settings，采集指纹与实际执行配置一致。

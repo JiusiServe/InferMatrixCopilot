@@ -1,6 +1,6 @@
 # knowledge_service/lifecycle.py —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-04 -->
 
 深度验证入口缺失证书的当前检测器为 `static-test-association-v2`；解析、证书工厂和
 检索形状校验共用 `DEPTH_ABSENCE_DETECTOR`，算法升级不复用旧检测器身份。

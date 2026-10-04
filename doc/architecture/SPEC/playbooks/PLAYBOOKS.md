@@ -1,6 +1,6 @@
 # playbooks/*.yaml —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-04 -->
 
 `9 个文件 · 声明式编排数据 · refactor-status: ok`
 
@@ -67,3 +67,7 @@ pr-history → harvest-calibration），每阶段一个由人合并的 PR。只�
 可显式传 `subscription_generator` 使用声明订阅计费的生成器；未报告的订阅费用不伪造为 USD。
 独立 knowledge-deepen 可传 `unlimited_subscription`，同时检查生成与裁判订阅；不兼容
 budget_usd，固定记账仍可观察。启用语义政策时 partial 预览不能当作阶段成功。
+
+## 自进化接入（2026-10-04）
+
+`workflow-improve` 通过 mode 区分元基准、旧周期与进化协调器；CLI、playbook 和周度调度共用协调器。`improve.evolve_publish` 是 push 风险步骤，只有候选 pr-ready 且任务 post、ALLOW_POST、ALLOW_PUSH 门均开放时才写独立进化 outbox。

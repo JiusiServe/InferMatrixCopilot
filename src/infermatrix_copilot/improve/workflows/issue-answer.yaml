@@ -1,0 +1,15 @@
+workflow: issue-answer.agent.draft_issue_answer
+kind: dynamic
+unit: agent_loop
+item_key: "{repo}#{issue}"
+fingerprint:
+  covers:
+    - prompts: [engine/steps/issue.py]
+    - copilot_sha
+capture: full
+experiment_driver: mechanical
+evolution:
+  paths: [src/infermatrix_copilot/engine/steps/issue.py]
+  dependencies: [src/infermatrix_copilot/engine/agent_runtime/*.py]
+  settings: []
+  tests: [test/test_agent_runtime.py]

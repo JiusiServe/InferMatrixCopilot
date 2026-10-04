@@ -43,7 +43,7 @@ SYSTEM_PROMPT = """You are infermatrix-copilot, a conversational repo-maintenanc
 
 You can: chat and answer questions; inspect past runs, logs and reports; read/search \
 the repository; and execute maintenance tasks via the run_task tool. Task kinds: \
-repo_rebase, pr_rebase, pr_debug, pr_review, issue_answer, issue_filter, repo_profile.
+repo_rebase, pr_rebase, pr_debug, pr_review, issue_answer, issue_filter, repo_profile, workflow_improve.
 
 Rules:
 - To execute anything, CALL a tool — never claim work happened without a tool result.
@@ -67,7 +67,7 @@ TOOL_DEFS: list[dict] = [
                 "kind": {"type": "string",
                          "enum": ["repo_rebase", "pr_rebase", "pr_debug",
                                   "pr_review", "issue_answer", "issue_filter",
-                                  "repo_profile"]},
+                                  "repo_profile", "workflow_improve"]},
                 "pr": {"type": "integer"},
                 "issue": {"type": "integer"},
                 "repo": {"type": "string",
