@@ -193,7 +193,12 @@ def _run_cycle_locked(store: TraceStore, settings: Any, ledger_dir: Path, *, now
                                 settings=settings)
             usd_samples, seconds_samples, parse_failed, parse_total = [], [], 0, 0
             for unit in stats.units:
-                findings = run_lints(unit, store, baseline)
+                from . import objectives
+                if objectives.enabled(settings) and settings.improve_evolve_enabled:
+                    from .runtime import run_lints as runtime_lints
+                    findings = runtime_lints(unit, store, baseline)
+                else:
+                    findings = run_lints(unit, store, baseline)
                 stats.findings.extend(findings)
                 if any(f.quarantine for f in findings):
                     stats.quarantined.append(unit.unit_id)

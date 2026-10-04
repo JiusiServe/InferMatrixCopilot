@@ -1,13 +1,5 @@
-# The engine's own forensics role (design §11.2, self-enrolment): every
-# `improve.forensics` step call is a unit — a cycle's Tier 2 pass in
-# production, or ONE frozen meta-benchmark case in a shadow self-experiment
-# (`--task-param meta_case=<case>`, item `meta:<case>`). The outcome adapter
-# scores a meta case by the stage labels' agreement with the HUMAN labels
-# (recall_gold = share of cells agreed, kappa_review = Cohen's kappa) and the
-# Tier 1 catalogue's recall on the injected lint samples (lint_recall_review).
-# No judge is involved: the labels are human, so the cross-family rule for
-# self-experiments is satisfied by construction. The benchmark is read-only
-# to the engine; a fingerprint diff touching it refuses registration.
+# Self-enrolled engine. Autonomous objective mode uses controller interventions
+# and one fixed model; the adapter below preserves optional gold-mode support.
 workflow: workflow-improve.improve.forensics
 kind: dynamic
 unit: step_call

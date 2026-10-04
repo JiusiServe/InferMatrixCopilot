@@ -1,144 +1,90 @@
 # 用自进化引擎改进 Copilot 工作流
 
-引擎根据 trace 中的损失提出一个机制假设，生成允许范围内的源码或配置补丁，再用冻结输入比较两个独立源码制品。通过可信回归检查和预注册评估后，它准备 PR 草稿，由人类评审和合并。相同机制用于 PR 评审、知识摄取及引擎自身。
+默认评估模式为 `objective`，采用模式为 `automatic`。开启进化后，系统自行收集输入、提出假设、生成补丁、运行隔离实验、采用通过评估的源码制品，并观察生产调用、自动回滚。整个闭环不要求人工标注、人工批准或更强的判官模型。生成、归因和业务执行复用一个固定 API 模型。
 
-默认关闭进化。每周最多生成一个候选，开发检查失败最多修复一次；所有工作流共用既有每周 20 美元预算。预算、样本或隔离不足会延期，CLI 退出码为 3；输入损坏等命令错误退出码为 1。不会自动提高预算。
+进化总开关仍默认关闭。每周最多一个新候选，开发检查失败最多修复一次。候选生成、实验、隔离生产请求及影子比较共用每周 20 美元预算；不足时延期或恢复上一版，不自行增加预算。
 
 ## 开始使用
 
-先从干净、已提交的 Copilot 源码检出运行。建议在该检出中创建专用环境，安装源码与仓库声明的可选依赖：
+从干净、已提交的 Copilot 源码运行，安装仓库的固定依赖：
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev,mcp,kb]'
-```
 
-源码制品只包含 `src`、`playbooks`、`adapters`、`skills`，不包含产品知识库、评估标签或账本。使用当前 Python 环境的固定依赖版本；依赖指纹变化会拒绝执行。
-
-```bash
 export IMPROVE_ENABLED=true
 export IMPROVE_EVOLVE_ENABLED=true
 export IMPROVE_EVOLVE_SOURCE_DIR="$PWD"
-export IMPROVE_EVOLVE_DATA_DIR=/srv/copilot/evolution-data
 export IMPROVE_LEDGER_DIR=/srv/copilot/improve-ledger
 export TRACE_STORE_ROOT=/srv/copilot/traces
-# 复用现有 provider 配置，显式固定两条 API 路由；比较实验还需固定判官。
-export ECO_MODEL=YOUR_PINNED_GENERATOR_MODEL
-export PERFORMANCE_MODEL=YOUR_PINNED_INVESTIGATOR_MODEL
-export IMPROVE_JUDGE=api:YOUR_PINNED_JUDGE_MODEL
+# 沿用现有 provider 凭据与一个固定模型，无需设置判官或 performance 模型。
+export ECO_MODEL=YOUR_PINNED_API_MODEL
+# 可选：明确指定同一个进化模型。
+# export IMPROVE_EVOLVE_MODEL=YOUR_PINNED_API_MODEL
 
 infermatrix-copilot improve workflows list
-infermatrix-copilot improve workflows check --workflow pr-review.agent.review_diff
+infermatrix-copilot improve workflows prepare --workflow all
+infermatrix-copilot improve workflows check --workflow workflow-improve.improve.forensics
+infermatrix-copilot improve evolve run --workflow workflow-improve.improve.forensics
 infermatrix-copilot improve evolve run --workflow pr-review.agent.review_diff
 infermatrix-copilot improve evolve run --workflow kb-intake.draft
-infermatrix-copilot improve evolve run --workflow workflow-improve.improve.forensics
 infermatrix-copilot improve evolve run --workflow all --repo OWNER/REPO
 infermatrix-copilot improve evolve list
 infermatrix-copilot improve evolve show CANDIDATE_ID
 ```
 
-`workflows check` 报告 trace、完整指纹、开发输入、新鲜留出样本、人工标注／策展金标、可信测试、成本估计及沙箱缺项。已具备结果适配器的工作流也可通过 `mechanical_readiness` 独立检查机械修复资格，不需要质量留出集。产生 trace 的未声明工作流仍被周度 lint 检查；比较质量需要额外接入契约。
+`prepare` 自动导入已有 replay trace，并生成引擎自身的受控故障及无故障对照。业务样本只能来自真实输入，不用模型编造标签。`evolve run` 经完整周期执行这些阶段；重复调用会刷新免费输入采集并继续已有候选，不重复完成的付费调用。`--repo` 只选择指定仓库的业务证据与输入。
 
-本机 `max_user_namespaces=0`，因此检查会报告 `sandbox-unavailable`。隔离依赖 Linux user namespace 与 bubblewrap；恢复主机隔离能力后须重新检查。程序不会修改内核配置，不会回退到无沙箱执行。
+`check` 报告固定 API 路由、冻结输入、测试、源码、预算、沙箱和功效样本缺项。CLI 延期退出码为 3，命令错误为 1。未配置固定模型时明确延期。混合模型与 harness 路由尚未接入此代理，不会静默调用其他模型。
 
-## 冻结实验输入
+当前主机 `max_user_namespaces=0`。恢复 Linux user namespace 与 bubblewrap 隔离前，只能准备数据、查看证据和执行可信测试；生成的代码不会执行，也不会采用。程序不会修改主机内核配置或回退到无沙箱执行。
 
-每个工作流使用 `<IMPROVE_EVOLVE_DATA_DIR>/<workflow>/dataset.json`，输入 JSON 为该目录下的相对路径。输入文件的 SHA-256 和完整条目元数据共同形成快照版本。
+## 系统如何判断改进
 
-```json
-{
-  "workflow": "kb-intake.draft",
-  "items": [
-    {
-      "item": "OWNER/REPO#123",
-      "split": "development",
-      "input": "event-123.json",
-      "sha256": "INPUT_FILE_SHA256"
-    },
-    {
-      "item": "OWNER/REPO#124",
-      "split": "holdout",
-      "input": "event-124.json",
-      "sha256": "INPUT_FILE_SHA256",
-      "gold": {
-        "entries": [{"gold_id": "rule-1", "path": "repos/demo/core/rules.md", "concern": "人工核实的完整规则契约"}]
-      }
-    }
-  ]
-}
-```
+没有独立证据时，模型的自我评价不能证明进步。这里用可信父进程持有的可执行目标代替金标与判官；候选只返回业务产物，不能修改评分、测试、预算、隔离、发布权限或控制器。
 
-输入不得携带 `labels`、`gold`、`scores`、`judgments` 或 `report` 字段。可信父进程持有留出标签和金标，只向隔离工作进程传入业务输入。生成器只看到开发样本、损失证据和允许修改的源码。晋级留出集被使用后记录到 `evolution/holdouts.json`，下一候选必须使用新样本；修改标签或输入会使已注册实验失效。
-
-| 工作流 | 输入 JSON 内容 | 父进程验证 |
+| 工作流 | 自动得到的实验输入 | 可证明的收益与保护 |
 |---|---|---|
-| PR 评审 | `repo`、`pr`、原始 `base_sha/head_sha`、完整 `base_files/head_files`、`diff`、`context_text`、`gate_report`、`knowledge_files` | 在临时仓库重建固定两个树，执行实际评审步骤；盲配对判官计算召回与精确率。原始 SHA 是快照身份，重建仓库的提交 SHA 用于本地源码工具 |
-| 知识摄取 | `repo`、`repo_dir`、`event_id`、`generator_model`、`evidence`、`files` 知识快照、`release`、`today`、可选 `external_texts` | 工作进程仅起草 typed operations；父进程在内存树运行生产知识操作与质量门，金标覆盖只计通过的规则，不写生产知识库；`generator_model` 必须与可信 API 代理的 eco 模型一致 |
-| 引擎归因 | `records`、`blobs`（引用到文本映射）、`concerns`、`cells` | 条目另存 `labels` 与 `label_source: human`；完整人工标注分母，缺失、弃答、分歧和无效证据均记错 |
+| 引擎归因／lint | 控制器注入输出截断、候选丢弃、规划回退，随机化记录标识与参数；同时保留无故障对照 | 对已知干预正确归因并引用实际证据，或正确检出对应 lint；漏答计错，负例误报计错，既有正例不得丢失。每次只改归因或 lint，避免未评估的混合变更 |
+| PR 评审 | 原生步骤冻结 base/head Git 树、diff、上下文、已有发现和知识快照，写入 replay trace | 非空报告，文件／行号／证据契约正确；有效基线上的发现、处置、复查与 verdict 必须保留；比较成本或耗时。不把结构通过率当作真实问题召回率 |
+| 知识草稿 | 原生起草冻结事件、证据、知识文件、版本与生成模型 | typed operations 在内存知识树可应用，范围及保护路径正确；已有有效操作不得丢失，空草稿可以正确。不奖励编造规则，不宣称新规则语义正确；实验不写生产知识库 |
+| CI debug、rebase、issue 回答等 | 既有 trace 及可信回归测试 | 持续获得 Tier 1 机械检查。已有测试的基线失败／候选通过可证明限定缺陷修复；尚无隔离生产驱动的工作流不能自动采用，不宣称比较质量提升 |
 
-在预注册前按 item 的固定排序选择达到功效要求的新鲜样本，避免把整个留出池都计入一周预算。每 item 固定三次成对运行；只有三对完整的 item 进入聚类统计。主要指标必须 `supported` 且达到最小效果；精确率、有效规则覆盖及无效规则数的显著退化会阻止晋级。成本也有保护指标。评分不采信工作进程返回的数字。隔离、源码或导入路径核验失败使实验无效。
+引擎默认生成受控案例，干预见证只在父进程清单中。生成器只能看到开发样本、trace 证据和允许源码；工作进程只收到冻结业务输入，不能访问晋级案例的见证或报告。候选返回的分数被忽略，费用、调用数、耗时、源码与导入路径由可信控制器核验。
 
-默认最小效果为 0.05。功效计算可能要求几十个新鲜 item；在缺少历史成本时，保守估计可能超过 20 美元。应先收集真实调用成本并补齐样本，不能通过降低可信保护或自行提高预算跳过检查。声明可提供由维护者核实的 `cost_per_unit_usd` 估计，实际请求始终受共享预算限制。
+默认目标为契约通过率；效率提案使用资源收益。每 item 三次配对，按 item 聚类计算置信区间，提升必须获得 `supported` 且达到预注册最小效果（默认 0.05）。已有契约及输出不得退化。若实际方差使实验功效不足，保留旧实验，用新鲜独立样本注册下一次；不重新评分已消费的留出集，也不重复生成补丁。受控场景可自动补充，真实业务样本须等待 trace。
 
-## 历史 trace 与人工标注
+上述结论只覆盖可执行契约、受控故障和资源收益。没有可验证结果信号时，系统记录限制，不声称任意 PR 召回率或知识语义质量变好。生产知识发布仍沿用宿主已有权限及质量门；进化评分本身不调用该门的模型判官，也不授权候选写知识库。
 
-当前仓库的元基准目录没有已提交的真实案例。工具不会生成或猜测人工标签。先人工策展真实 item 的金标，再导出完整历史单元：
+## 输入、声明与可信边界
 
-```bash
-infermatrix-copilot improve meta export --case incident-001 \
-  --unit-id HISTORICAL_UNIT_ID --gold-file /srv/curated/item.gold.json \
-  --meta-dir /srv/copilot/human-meta --trace-root /srv/copilot/traces
+默认输入位于 `<ledger>/evolution/inputs/<workflow>/dataset.json`，可用 `IMPROVE_EVOLVE_DATA_DIR` 指定其他目录。每个输入文件、条目元数据和源码制品都有内容指纹。重复业务 item 归为同一聚类；旧 trace 缺少完整输入时不会猜测快照。
 
-# 人工检查 trace 后写 labels.json，例如 {"gold-id": "S2"}；阶段定义见 forensics.STAGES。
-infermatrix-copilot improve meta annotate --case incident-001 \
-  --labels-file /srv/curated/labels.json --human-verified --split holdout \
-  --meta-dir /srv/copilot/human-meta
+PR 重放读取固定 Git 对象，拒绝符号链接、凭据文件、非 UTF-8 或超限文件；知识输入冻结当前生成模型，必须与代理固定模型一致。模型输出与输入都不携带生产凭据。候选在无网络、受限文件系统的沙箱执行，模型请求只能经过宿主代理及共享预算。
 
-export IMPROVE_META_DIR=/srv/copilot/human-meta
-infermatrix-copilot improve workflows import-meta --data-dir /srv/copilot/evolution-data
-```
+工作流声明在 `src/infermatrix_copilot/improve/workflows/*.yaml`。`evolution` 指定可改路径、配置键与可信测试；共享代码变更合并所有受影响工作流的回归检查。可选 `objective` 仅接受 `metric: contract_success|resource_gain`、`min_effect`、`prior_sd`；这类控制策略不在候选允许修改的范围内。
 
-开发集与留出集须由人工分别安排。未指定 split 的旧案例默认进入开发集；空标注不满足晋级条件。知识摄取及 PR 的输入 JSON 也需由维护者从固定事件、源码和知识快照导入，金标只写在父进程清单中。
+失败候选、修复尝试、补丁及报告保留在账本旁，不进入产品知识库。同一失败补丁不能通过换提案重试。结束的候选自动关闭对应提案；中断的生成不会重发，下周可继续提出新的改动。晋级使用的新鲜留出集记录在 `evolution/holdouts.json`。
 
-## 工作流声明与机械修复
+## 自动采用、观察与回滚
 
-扩展声明位于 `src/infermatrix_copilot/improve/workflows/*.yaml`，保留既有工作单元、item、fingerprint、capture 与 outcome_adapter，新增 `experiment_driver` 和 `evolution`：允许的 `paths/settings`、可信 `tests`、主要 `metric/direction/min_effect`、保护 `guards`、共享源码 `dependencies`。候选改动共享运行时后，受影响工作流的测试合并执行并记在候选中。
+通过测试及可信实验后，控制器重新应用允许范围内的补丁，核验与实际评估制品相同，然后把它复制为不可变本地 release。`evolution/active.json` 原子记录当前指针、上一版和谱系；不必创建或合并 PR。
 
-首版 API 代理接受固定 eco/performance 两条模型路由；使用混合成员、harness lens 或其他专用评审模型的配置会报告代理驱动缺项，不能静默改成默认路由。并发评审请求经代理串行预算结算。
+Copilot 原生评审、知识起草、周期 lint 与引擎诊断会在隔离进程执行活动制品。宿主仍控制生产写操作。真实执行 trace 确认源码指纹后才记录部署基线；指针激活本身不是部署证明。原始 Git 检出不会被自动改写。
 
-当前可信驱动为 `pr-review`、`kb-intake`、`meta` 和 `mechanical`。新增比较驱动需要维护者实现并审查父进程的快照、预测和评分契约，再通过声明选择；未知驱动不会回退成 PR 评审。
+首次试运行对同一冻结输入运行上一版，至少八个不同 item 的有效配对才能标记 `retained`。输出契约失败、已有有效产物变化、制品被篡改、隔离或预算失效，立即恢复确切上一版并阻断本次调用。七天没有足够试运行证据也自动恢复。保留后，每周最多八个新 item 继续配对；统计显著的资源退化触发回滚。无法验证上一版时关闭活动制品，不执行未知源码。
 
-CI debug、rebase 和 issue 回答已声明机械改动范围。无结果适配器时，在 dataset.json 额外提供 `reproducer`（Python 测试文件相对路径）及 `reproducer_sha256`。该可信复现测试必须在基线返回 pytest 失败码 1，在候选返回 0，且工作流回归检查通过。产物明确写 `quality_claim: false`。CI debug 和 rebase 首版不运行比较质量驱动，不在生产仓库执行修改或推送。
+关闭 `IMPROVE_ENABLED` 或 `IMPROVE_EVOLVE_ENABLED` 后，原生流程停止使用进化制品。候选目录 `<ledger>/evolution/candidates/<id>/` 包含补丁、两个源码制品、测试报告、`objective.json`、历次实验、候选状态和 `PR.md` 审计草稿；活动制品在 `evolution/releases/`。续跑、并发与采用操作使用锁和持久化阶段进度，中断的付费调用不自动重发。
 
-评分、基准、预算、隔离、发布、控制器及权限源码受保护。引擎自身只能改归因、lint 和声明允许的模型配置。失败候选、每次尝试的补丁、源码制品和测试报告会保留。同一失败提案不再次自动生成；同一基线上的已失败补丁也不会以新提案重复执行。
+## 可选人工评估与 PR 审计
 
-## 周期续跑、发布和上线观察
+旧金标流程保留供主动选择：`IMPROVE_EVALUATION_MODE=gold`、`IMPROVE_PROMOTION_MODE=pr`。此模式才要求人工标签、策展金标及相应判官。旧 `meta export/annotate` 与 `workflows import-meta` 命令保持兼容；自主模式无需使用。
 
-`improve cycle`、`workflow-improve` playbook 和 `kb serve` 周度槽位共用协调器：lint → 已注册实验 → 取证 → 候选生成／验证／实验 → 草稿。阶段及每一对实验均落盘；重启跳过完成阶段，中断的付费调用不自动重发。每周最多一个新候选；有待评审候选的工作流直接返回已有候选。
-
-候选目录在 `<ledger>/evolution/candidates/<id>/`，含 `candidate.json`、`incumbent/`、`arm/`、`candidate.patch`、`PR.md`、`bundle.json`；配对进度、判定、源码／依赖哈希、测试报告、失败原因和谱系都可检查。
-
-请求发布：
-
-```bash
-export ALLOW_POST=true
-export ALLOW_PUSH=true
-export IMPROVE_PROPOSAL_REPO=OWNER/InferMatrixCopilot
-export IMPROVE_EVOLVE_OUTBOX_DIR=/srv/copilot/evolution-outbox
-infermatrix-copilot improve evolve run --workflow pr-review.agent.review_diff --post
-
-# omni-maintainer，使用与候选基线相同且可信的源码仓库
-omni-maintainer evolve --outbox /srv/copilot/evolution-outbox \
-  --source /srv/repos/InferMatrixCopilot
-```
-
-新协议为 `evolve-outbox/1`，既有 `improve-outbox/1` 提案协议保留。maintainer 默认 `phase.evolution_prs_live=false`；只有维护者按仓库策略开启后才推送并创建草稿 PR。它核验实际补丁对应的源码树，拒绝过期主分支、受保护文件和哈希不符，重试复用同一候选分支／PR。进化 PR 禁止 arbiter 自主晋级，仍需人类 go。
-
-PR 合并只标记 `merged`。生产 trace 出现候选源码树 SHA，且采用配置与指纹清单一致后，才标记 `deployed` 并记录账本部署基线。下一周期读取生产样本及已有可信结果；不足八个共同 item 或缺少结果时报告等待，不宣称上线收益。有显著退化则生成回滚建议，由人类决定执行。
+`--post` 可额外生成 `evolve-outbox/1` 审计动作，仍遵守 `ALLOW_POST`、`ALLOW_PUSH` 和 maintainer 策略；不会绕过 GitHub 仓库发布权限。自主采用不等待这一审计 PR。旧 `improve-outbox/1` 与手动 PR 合并／部署跟踪保留。
 
 ## 验证范围
 
-`test/test_evolution.py` 包括三个驱动的离线闭环（脚本化模型／工作进程）、可信 PR 与知识评分、完整归因分母、受保护改动、指纹造假、续跑、并发去重、预算拒绝、一次修复、机械复现及合并未部署。真实 OS 沙箱测试在主机不可用时明确 skip。maintainer 测试覆盖补丁实际应用、哈希、过期基线和发布去重。
+`test/test_autonomous_evolution.py` 验证无人工／无判官的三个驱动闭环、可信评分、受控故障与负例、固定模型、实际制品采用、指纹篡改、自动恢复、观察、预算／隔离阻断和中断续跑。测试使用脚本化模型和工作进程来验证协议与状态机；真实 OS 沙箱不可用时相应测试明确跳过。
 
-离线闭环能检验协议与状态机；真实模型、真实人工基准及隔离执行的三个端到端验收，仍须在具备沙箱和评估数据的主机完成。
+当前主机尚未执行真实模型生成代码的生产闭环。上线前必须在具备隔离、真实业务输入及现有预算的主机完成实际运行；脚本化测试不能替代这一证明。

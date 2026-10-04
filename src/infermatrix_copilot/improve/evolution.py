@@ -1,4 +1,4 @@
-"""Resumable, human-promoted evolution for business workflows and the engine itself."""
+"""Resumable, objective-verified evolution for business workflows and the engine itself."""
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -17,7 +17,7 @@ from .enroll import declarations_for
 from .isolation import Sandbox, SandboxUnavailable
 from .ledger import Ledger
 
-TERMINAL = {"rejected", "closed", "deployed"}
+TERMINAL = {"rejected", "closed", "deployed", "retained", "rolled-back"}
 
 def directory(settings) -> Path:
     return ledger_dir_for(settings) / "evolution"
@@ -38,6 +38,9 @@ def save(settings, c: dict, store=None) -> None:
                      result={"type": "evolution", "candidate": c["id"], "state": c["state"], "reason": c.get("reason", "")})
 
 def check(settings, store, workflow: str, *, repo: str = "", sandbox=None, mechanical=False) -> dict:
+    from . import objectives
+    if objectives.enabled(settings):
+        return objectives.check(settings, store, workflow, repo=repo, sandbox=sandbox)
     decl = declarations_for(settings).get(workflow)
     reasons = []
     if not decl:
@@ -298,18 +301,35 @@ def run(settings, store, *, workflow="all", repo="", post=False, llm=None, sandb
         return _run(settings, store, workflow, repo, post, llm, sandbox or Sandbox(), now)
 
 def _run(settings, store, workflow, repo, post, llm, sandbox, now):
+    from . import objectives
+    autonomous = objectives.enabled(settings)
+    if autonomous:
+        if settings.review_lens_backends or settings.llm_mixture:
+            return {'state': 'deferred', 'reason': 'mixed-review-routes-not-supported-by-objective-proxy'}
+        try:
+            settings = objectives.execution_settings(settings)
+        except (ValueError, RuntimeError) as exc:
+            return {'state': 'deferred', 'reason': 'fixed-model-unconfigured: ' + str(exc)}
+        from .runtime import sync as runtime_sync
+        runtime_sync(settings, store, now=now)
     from .evolution_publish import sync, publish
     sync(settings, store)
     active = [c for c in candidates(settings) if c["state"] not in TERMINAL and (workflow == "all" or c["workflow"] == workflow) and (not repo or c.get("repo") == repo)]
     if active:
         c = active[0]
         if c.get("generation_interrupted"):
+            if autonomous:
+                c.update(state="rejected", reason="generation-interrupted; no paid-call replay")
+                save(settings, c, store)
             return c
-        if c["state"] in ("pr-ready", "published", "merged"):
+        if c["state"] in ("pr-ready", "published", "merged", "canary", "retained", "rolled-back"):
+            if autonomous and c["state"] == "pr-ready" and settings.improve_promotion_mode == "automatic":
+                from .runtime import promote
+                return promote(settings, store, c, sandbox=sandbox)
             if post: publish(settings, store, c)
             return c
         if c["state"] == "generating":
-            c.update(state="deferred", generation_interrupted=True, reason="generation-interrupted; paid request is not automatically repeated")
+            c.update(state="rejected" if autonomous else "deferred", generation_interrupted=True, reason="generation-interrupted; paid request is not automatically repeated")
             save(settings, c, store); return c
     else:
         if any(iso_week(c["created_at"]) == iso_week(now) for c in candidates(settings)):
@@ -338,6 +358,9 @@ def _run(settings, store, workflow, repo, post, llm, sandbox, now):
         save(settings, c, store)
     source = Path(settings.improve_evolve_source_dir or artifacts.source_root()).resolve()
     decl = declarations_for(settings)[c["workflow"]]
+    if autonomous:
+        from dataclasses import replace
+        decl = replace(decl, evolution={**decl.evolution, "settings": [k for k in decl.evolution.get("settings", []) if k not in ("ECO_MODEL", "PERFORMANCE_MODEL", "AGENT_MODEL")]})
     work = directory(settings) / "candidates" / c["id"]
     governor = governor_for(settings, ledger_dir_for(settings))
     try:
@@ -345,9 +368,13 @@ def _run(settings, store, workflow, repo, post, llm, sandbox, now):
         if c["state"] in ("new", "deferred") and "generated" not in c:
             status = check(settings, store, c["workflow"], repo=repo, sandbox=sandbox, mechanical=c.get("mode") == "mechanical")
             if not status["ready"]: c.update(state="deferred", reason="; ".join(status["reasons"])); save(settings, c, store); return c
-            base = artifacts.baseline(source, work / "incumbent")
+            if autonomous:
+                from .runtime import baseline
+                base = baseline(settings, c["workflow"], work / "incumbent")
+            else:
+                base = artifacts.baseline(source, work / "incumbent")
             c["base_revision"] = base["revision"]
-            rows = drivers.dataset(settings, c["workflow"])
+            rows = objectives.rows(settings, c["workflow"]) if autonomous else drivers.dataset(settings, c["workflow"])
             development = [r for r in rows if r["split"] == "development" and (not repo or r["item"].split("#")[0] == repo)]
             evidence_ids = set(c["evidence"])
             try:
@@ -358,12 +385,17 @@ def _run(settings, store, workflow, repo, post, llm, sandbox, now):
                 raise artifacts.ArtifactError("promotion labels/reports cannot be used as generation evidence")
             c["evidence_excerpt"] = evidence
             c["state"] = "generating"; save(settings, c, store)
+            if autonomous:
+                from dataclasses import replace
+                decl = replace(decl, evolution={**decl.evolution, "settings": [k for k in decl.evolution.get("settings", []) if k not in ("ECO_MODEL", "PERFORMANCE_MODEL", "AGENT_MODEL")]})
             c["generated"] = generate(settings, decl, work / "incumbent", c, development, llm, governor)
             c["state"] = "generated"; save(settings, c, store)
         if artifacts.git(source, "rev-parse", "HEAD") != c["base_revision"]:
             raise artifacts.ArtifactError("source baseline advanced; candidate needs re-evaluation")
         if "verified" not in c:
             arm = artifacts.apply_candidate(work / "incumbent", work / "arm", c["generated"], decl.evolution, workflow=c["workflow"])
+            if autonomous and c['workflow'] == objectives.ENGINE and 'src/infermatrix_copilot/improve/lints.py' in arm['paths'] and len(arm['paths']) > 1:
+                raise artifacts.ArtifactError('one self-evolution candidate must target either lints or attribution, with an independent objective')
             affected = [d for d in declarations_for(settings).values() if any(fnmatch.fnmatchcase(path, pattern)
                          for path in arm["paths"] for pattern in [*d.evolution.get("paths", []), *d.evolution.get("dependencies", [])])]
             tests = sorted(set(decl.evolution["tests"]) | {t for d in affected for t in d.evolution.get("tests", [])})
@@ -398,6 +430,19 @@ def _run(settings, store, workflow, repo, post, llm, sandbox, now):
             (work / "candidate.patch").write_text(artifacts.patch(work / "incumbent", work / "arm"))
             c["patch_sha"] = artifacts.digest((work / "candidate.patch").read_bytes())
             c["state"] = "verified"; save(settings, c, store)
+        if autonomous:
+            c["evaluation"] = objectives.evaluate(settings, store, c, sandbox, llm)
+            c["state"] = "pr-ready" if c["evaluation"].get("promotable") else "deferred" if c["evaluation"].get("blocking") else "rejected"
+            c["reason"] = "" if c["state"] == "pr-ready" else "objective experiment lacks sufficient evidence or improvement"
+            save(settings, c, store)
+            from .evolution_publish import draft
+            draft(settings, c)
+            if c["state"] == "pr-ready" and settings.improve_promotion_mode == "automatic":
+                from .runtime import promote
+                c = promote(settings, store, c, sandbox=sandbox)
+                if post and c["state"] == "canary": publish(settings, store, c)
+            elif post: publish(settings, store, c)
+            return c
         if c.get("experiment"):
             previous = experiments.load(ledger_dir_for(settings), c["experiment"])
             if previous.state == "underpowered" or previous.result.get("blocking") in ("isolation", "data"):

@@ -105,6 +105,15 @@ def parse_declaration(doc: dict, source: str = "<memory>") -> WorkflowDeclaratio
                 raise DeclarationError(f"{source}: evolution.{key} must be a string list")
         from .artifacts import validate_policy
         validate_policy(evolution)
+    objective = doc.get("objective", {})
+    if not isinstance(objective, dict) or set(objective) - {"metric", "min_effect", "prior_sd"}:
+        raise DeclarationError(f"{source}: unsupported objective policy")
+    if objective.get("metric", "contract_success") not in ("contract_success", "resource_gain"):
+        raise DeclarationError(f"{source}: objective metric must be executable")
+    import math
+    for key in ("min_effect", "prior_sd"):
+        if key in objective and (not math.isfinite(float(objective[key])) or not 0 < float(objective[key]) <= 1):
+            raise DeclarationError(f"{source}: objective.{key} must be finite in (0,1]")
     return WorkflowDeclaration(
         workflow=workflow, kind=kind, unit=unit, item_key=str(_require(doc, "item_key", source)),
         fingerprint_covers=tuple(covers), capture=capture,

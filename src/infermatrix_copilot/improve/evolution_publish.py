@@ -16,8 +16,8 @@ def draft(settings, c):
             f"Base: `{c['base_revision']}`. Candidate source: `{c['artifact']['tree_sha']}`.\n\n"
             f"Affected workflows: {', '.join(c.get('affected_workflows', []))}.\n\n"
             "Validation\n\n```json\n" + json.dumps({"tests": c.get("verified"), "experiment": evaluation}, indent=2) + "\n```\n\n"
-            "Rollback: revert this PR and restore the preceding configuration. Human approval is required.\n\n"
-            f"<!-- evolve:candidate:{c['id']} -->\n")
+            + ("Deployment: verified local sandbox release with automatic canary and rollback; this PR is an optional audit record.\n\n" if getattr(settings, "improve_promotion_mode", "pr") == "automatic" and getattr(settings, "improve_evaluation_mode", "gold") == "objective" else "Rollback: revert this PR and restore the preceding configuration. Human approval is required.\n\n")
+            + f"<!-- evolve:candidate:{c['id']} -->\n")
     (root / "PR.md").write_text(body, encoding="utf-8")
     atomic_json(root / "bundle.json", {"protocol": PROTOCOL, "candidate": c["id"], "workflow": c["workflow"],
                 "base_revision": c["base_revision"], "source_sha": c["artifact"]["tree_sha"],
@@ -28,8 +28,8 @@ def publish(settings, store, c):
     from .evolution import directory, save
     from .ledger import Ledger
     from .cycle import ledger_dir_for
-    if c["state"] != "pr-ready" or not settings.allow_post or not settings.allow_push:
-        return {"published": False, "reason": "requires pr-ready, ALLOW_POST=1 and ALLOW_PUSH=1"}
+    if c["state"] not in ("pr-ready", "canary", "retained") or not settings.allow_post or not settings.allow_push:
+        return {"published": False, "reason": "requires evaluated candidate, ALLOW_POST=1 and ALLOW_PUSH=1"}
     if Ledger(ledger_dir_for(settings)).load(c["workflow"]).hold:
         return {"published": False, "reason": "workflow publication hold"}
     if not settings.improve_evolve_outbox_dir or not settings.improve_proposal_repo:
@@ -62,8 +62,10 @@ def sync(settings, store):
         if ack_path.is_file():
             ack = json.loads(ack_path.read_text())
             if ack.get("candidate") == c["id"] and ack.get("source_sha") == c.get("artifact", {}).get("tree_sha"):
-                if ack.get("ok") and not ack.get("dry_run") and c["state"] == "pr-ready":
-                    c.update(state="published", pr=ack["url"], reason="")
+                if ack.get("ok") and not ack.get("dry_run"):
+                    if c["state"] == "pr-ready": c.update(state="published", pr=ack["url"], reason="")
+                    elif c["state"] in ("canary", "retained", "rolled-back"):
+                        c["pr"] = ack["url"]  # audit never changes runtime adoption
         obs_path = root / "inbox" / f"{c['id']}.json"
         if obs_path.is_file():
             obs = json.loads(obs_path.read_text())

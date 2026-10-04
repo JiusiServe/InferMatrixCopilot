@@ -589,6 +589,11 @@ class Settings(BaseSettings):
     # improve_ledger_dir (default ~/.infermatrix-copilot/improve).
     improve_enabled: bool = False
     improve_evolve_enabled: bool = False
+    # Autonomous evaluations use executable contracts and one pinned API model.
+    # "gold" retains the optional P0–P4 semantic benchmark path.
+    improve_evaluation_mode: Literal["objective", "gold"] = "objective"
+    improve_promotion_mode: Literal["automatic", "pr"] = "automatic"
+    improve_evolve_model: str = ""
     improve_evolve_source_dir: str = ""
     improve_evolve_data_dir: str = ""
     improve_evolve_outbox_dir: str = ""

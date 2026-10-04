@@ -43,8 +43,17 @@ def main():
             import pytest
             result["rc"] = pytest.main(["-q", "-p", "no:cacheprovider", "--confcutdir=/tests", *["/tests/" + p.removeprefix("test/") for p in payload["tests"]]])
         else:
-            from infermatrix_copilot.improve.drivers import worker_run
-            result = worker_run(payload, settings, LLM(settings))
+            try:
+                if payload.get("driver", "").startswith("objective-"):
+                    from infermatrix_copilot.improve.objectives import worker
+                    result = worker(payload, settings, LLM(settings))
+                else:
+                    from infermatrix_copilot.improve.drivers import worker_run
+                    result = worker_run(payload, settings, LLM(settings))
+            except Exception as exc:
+                if not payload.get("capture_errors"):
+                    raise
+                result = {"execution_error": f"{type(exc).__name__}: {str(exc)[:500]}"}
     result.update(source_sha=payload["source_sha"], package_path=str(infermatrix_copilot.__file__))
     wire.write(json.dumps({"type": "result", "result": result}, ensure_ascii=False) + "\n"); wire.flush()
 
