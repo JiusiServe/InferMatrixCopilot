@@ -128,6 +128,15 @@ review_routes:
 - prefix: afd_plugin/v1/worker/npu/attention_worker.py
   owner: attention-runtime
   doc: repos/afd-plugin/components/attention-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/attention_metadata.py
+  owner: attention-runtime
+  doc: repos/afd-plugin/components/attention-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/attention_model_runner_v2.py
+  owner: attention-runtime
+  doc: repos/afd-plugin/components/attention-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/npu/attention_model_runner_v2.py
+  owner: attention-runtime
+  doc: repos/afd-plugin/components/attention-runtime/architecture.md
 - prefix: afd_plugin/v1/worker/ffn_model_runner.py
   owner: ffn-runtime
   doc: repos/afd-plugin/components/ffn-runtime/architecture.md
@@ -138,6 +147,9 @@ review_routes:
   owner: ffn-runtime
   doc: repos/afd-plugin/components/ffn-runtime/architecture.md
 - prefix: afd_plugin/v1/worker/npu/ffn_worker.py
+  owner: ffn-runtime
+  doc: repos/afd-plugin/components/ffn-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/ffn_metadata.py
   owner: ffn-runtime
   doc: repos/afd-plugin/components/ffn-runtime/architecture.md
 - prefix: afd_plugin/connectors/
@@ -228,9 +240,30 @@ push:
 # Knowledge service: declared but disabled until afd-plugin has its own
 # calibration set and has run through a shadow period (rollout stage P3b).
 knowledge_lifecycle:
-  enabled: false
+  enabled: true
   mode: shadow
   knowledge_dir: repos/afd-plugin
   release:
     trigger: none
   upstream_visibility: public
+  # kb init (doc/design: kb-init-design.md §3). Read by `kb init afd-plugin`
+  # only; the service ignores it. Values checked against upstream
+  # vllm-project/afd-plugin main on 2026-09-30.
+  init:
+    seeds:
+      # linked, never copied: the repo-neutral review rules every vLLM-plugin
+      # review applies (design reuse, compatibility, tests-with-the-change)
+      - general/review/rules.md
+      # linked: afd-plugin wraps vLLM workers/model runners; algorithm-level
+      # choices must be checked against upstream vLLM first
+      - general/review/guides/upstream-first-for-algorithm.md
+      # adapt-copied: afd_plugin/compat/** and the v1 worker subclasses track
+      # vLLM releases, so the vLLM upstream API-drift patterns (renamed
+      # params, constructor migrations, subclass missing new fields) transfer;
+      # claims that do not resolve in afd-plugin are dropped by kb init
+      - repos/vllm-omni/rebase/upstream-api-drift.md
+    # the Python package only: csrc/ is C++/CUDA, which the Python module scan
+    # does not read (its knowledge stays with the execution-platforms owner)
+    source_roots: [afd_plugin/]
+    exclude: ["*/__init__.py", "*/py.typed"]
+  calibration_set: kb-calibration

@@ -1,0 +1,46 @@
+{
+  "schema": "jiuwenswarm-repair63-independent-delivery-signoff/1",
+  "reviewer": "/root/repair63_delivery_review",
+  "author_independent": true,
+  "delivery_review_approved": true,
+  "merge_approval": "conditional_on_required_CI_pass_for_final_pushed_commit",
+  "source_pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "knowledge_baseline": "5a4580e735de76d7377c02b392aaedf4e813a9d5",
+  "recognized_facets": 552,
+  "unknown_facets": 1,
+  "all_requested_gaps_filled": false,
+  "independently_reviewed_new_blocks": 62,
+  "rejected_new_blocks": 0,
+  "remaining_actionable_findings": [],
+  "checks": [
+    "All62 new exact hashes independently compared with pinned source/document/test spans",
+    "Protected490 byte-exact; frozen candidate62 equals reviewed set",
+    "Current worktree depth pages equal candidate pages",
+    "Public source/native/report counts and hashes agree",
+    "Saved237 actual retrieval cases and90pages independently reconciled without runtime rerun",
+    "Available552 separated from representative full injection282 and known-not-injected270",
+    "Unknown im-feishu/tradeoffs binds current four-round reason/checkpoint and native rejection identities",
+    "Validation test categories explicit; upstream tests not claimed executed",
+    "Chinese report labels lightweight mode and compares173/490/552",
+    "Public reports use relative artifact references without private workspace paths"
+  ],
+  "reviewed_artifact_sha256": {
+    "eval/knowledge-depth/jiuwenswarm-repair63-comparison-cn-20261002.json": "ae8185123894ffa4ed731e7afc00d8cda35e1431e72904fa47ed6287a3fd81f3",
+    "eval/knowledge-depth/jiuwenswarm-repair63-comparison-cn-20261002.md": "0a9c640797b97d73f618f5c0387124c53ad2dedb1a591fbadb677b0d33288102",
+    "eval/knowledge-depth/jiuwenswarm-repair63-final-20261002.json": "a6f0114ddf362e49839804042d0cd38639bd53f5a031dacbe4b444b887a65fbf",
+    "eval/knowledge-depth/jiuwenswarm-repair63-independent-review-20261002.json": "1d617293a3baf1a09ba1c86b70bdf48ca2644414b997932045ec8641aa407d49",
+    "eval/knowledge-depth/jiuwenswarm-repair63-local-validation-20261002.json": "4ef78c5d2476e4f57504a822dc37361d54de84f04a146d0fdc69749b0ef0d221",
+    "eval/knowledge-depth/jiuwenswarm-repair63-native-approvals-20261002.json": "a544c1609739c12471d68d4fd8de1f2dd4b7c67479be5c8d9b38b7fd2a283eb3",
+    "eval/knowledge-depth/jiuwenswarm-repair63-retrieval-after-20261002.json": "16a1e7d9227005f991fe911061a9f0874339a8e11bd95dba31bd6d03065ea62b",
+    "eval/knowledge-depth/jiuwenswarm-repair63-source-depth-20261002.json": "616fec02458281dd074d9fb13dccb75df24994eaeed686cf7fdc25088bcc2138",
+    "eval/knowledge-depth/README.md": "c735286156acdc258931c57ca172d9087bab4c8c293e6c8aaafbfe9a749c1acc"
+  },
+  "content_manifest_sha256": "d51394913a363eff2ff961cba8bba034da7fc93b61a6f3c69cc4006ea384bac6",
+  "candidate_binding_sha256": "71698f5c8eedbe79eae30532e314e6a2ec05b530f2eb52c1042de6588c741a24",
+  "retrieval_review_sha256": "8cffc0c9bd877884bd25c71c6488b5b57863358db402d318e5a35d65b993112e",
+  "limitations": [
+    "Recognition thresholds pass; one requested support gap remains unknown.",
+    "This supplements native Codex per-feature approvals.",
+    "Final pushed-commit CI remains required before merge; this reviewer did not execute CI or upstream tests."
+  ]
+}

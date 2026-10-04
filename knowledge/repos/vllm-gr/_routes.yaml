@@ -1,0 +1,75 @@
+schema_version: 1
+owners:
+- owner: engine-core
+  path: repos/vllm-gr/components/engine-core/architecture.md
+  signals:
+  - enginecore
+  - engine core
+  - scheduler
+  - scheduling
+  - beam plan
+  - beam cache
+  - ce
+  scope_prefixes:
+  - vllm_gr/v1/engine/
+  - vllm_gr/v1/core/
+- owner: beam-proc
+  path: repos/vllm-gr/components/beam-proc/architecture.md
+  signals:
+  - beamproc
+  - beam proc
+  - bp
+  - rust worker
+  - shared memory
+  - sharedmem
+  - iceoryx
+  - transport
+  scope_prefixes:
+  - rust/beam-proc/
+  - rust/ce-transport/
+  - rust/examples/
+- owner: serving
+  path: repos/vllm-gr/components/serving/architecture.md
+  signals:
+  - serving
+  - openai
+  - chat completion
+  - streaming
+  - sse
+  - beam stream
+  - beam metrics
+  - response
+  scope_prefixes:
+  - vllm_gr/entrypoints/
+- owner: attention
+  path: repos/vllm-gr/components/attention/architecture.md
+  signals:
+  - attention
+  - flash attention
+  - flashattn
+  - suffix lse
+  - cascade attention
+  - gqa
+  - kv cache
+  scope_prefixes:
+  - vllm_gr/v1/attention/
+- owner: packaging
+  path: repos/vllm-gr/components/packaging/architecture.md
+  signals:
+  - packaging
+  - wheel
+  - cargo
+  - native library
+  - build
+  - pre commit
+  - installation
+  scope_prefixes:
+  - setup.py
+  - pyproject.toml
+  - MANIFEST.in
+  - requirements/
+  - rust/Cargo.
+  - .github/workflows/
+  - .pre-commit-config.yaml
+  - tools/pre_commit/
+  - tests/packaging/

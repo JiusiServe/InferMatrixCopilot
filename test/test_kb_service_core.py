@@ -56,7 +56,8 @@ def test_shipped_adapters_register_with_repo_neutral_config():
     assert omni.enabled and omni.mode == "shadow" and not omni.auto_merge
     assert omni.release.trigger == "github_release" and omni.release.auditor == "release_audit.py"
     assert (omni.adapter_dir / omni.release.auditor).is_file()
-    assert registry["afd-plugin"].enabled is False
+    afd = registry["afd-plugin"]   # kb init flips `enabled`; shadow-only is the invariant
+    assert afd.mode == "shadow" and not afd.auto_merge
     assert registry["general"].intake.merged_prs is False
 
 

@@ -19,7 +19,7 @@ cd InferMatrixCopilot
 install.cmd                                     # Windows
 ```
 
-安装器自动识别 Claude Code，注册 MCP 与四个 Skill，用的是与 Codex、Cursor
+安装器自动识别 Claude Code，注册 MCP 与五个 Skill，用的是与 Codex、Cursor
 **同一份** MCP 描述符和 Skill。
 
 **重启 Claude Code。**
@@ -43,7 +43,7 @@ Claude Code 用 slash 形式（Codex 用 `$`）：
 Use InferMatrixCopilot in Direct mode to review this PR.
 ```
 
-## 四个 Skill 的边界
+## 五个 Skill 的边界
 
 | Skill | 做什么 | 不做什么 |
 |---|---|---|
@@ -51,6 +51,7 @@ Use InferMatrixCopilot in Direct mode to review this PR.
 | `imdesign` | 产出协同设计包（方案、边界、验证计划） | 不自动改代码 |
 | `imcifix` | 本地复现 → 最小修复 → 针对性验证 | 不 commit / push / 开 PR / 发评论 |
 | `imupdate` | 同步上游发版带来的结构事实 | 不修改目标仓库 |
+| `imkbinit` | 为一个仓库运行下一个 `kb init` 阶段并汇报（默认 dry-run） | 不自己改知识页、不连跑多个阶段、不合并 PR |
 
 `imcifix` 是**宿主 Agent 的本地补丁流程**——它不意味着 MCP 会去改你的仓库。
 

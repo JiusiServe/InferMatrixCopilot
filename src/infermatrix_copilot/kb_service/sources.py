@@ -219,8 +219,10 @@ class GitHubReader:
 
     API = "https://api.github.com"
 
-    def __init__(self, *, fetch: Callable[[str], Any] | None = None, token: str | None = None):
+    def __init__(self, *, fetch: Callable[[str], Any] | None = None, token: str | None = None,
+                 fetch_diff: Callable[[str, int], str] | None = None):
         self._fetch = fetch or self._urllib_fetch
+        self._fetch_diff = fetch_diff or self._urllib_diff
         self._token = token if token is not None else os.environ.get("KB_GITHUB_READ_TOKEN", "")
 
     def _urllib_fetch(self, url: str) -> Any:
@@ -237,6 +239,20 @@ class GitHubReader:
     def get(self, path: str, **params: Any) -> Any:
         query = ("?" + urllib.parse.urlencode(params)) if params else ""
         return self._fetch(f"{self.API}{path}{query}")
+
+    def _urllib_diff(self, url: str, max_bytes: int) -> str:
+        request = urllib.request.Request(url, headers={
+            "Accept": "application/vnd.github.diff", "X-GitHub-Api-Version": "2022-11-28",
+            **({"Authorization": f"Bearer {self._token}"} if self._token else {}),
+        })
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                data = response.read(max_bytes + 1)
+        except (urllib.error.URLError, TimeoutError) as exc:
+            raise SourceError("GitHub could not read the complete PR diff") from exc
+        if len(data) > max_bytes:
+            raise SourceError(f"PR diff exceeds {max_bytes} bytes; no partial extraction")
+        return data.decode("utf-8", "replace")
 
     def merged_prs_since(self, full_name: str, since_iso: str, *, after_number: int = 0,
                          limit: int = 50, max_pages: int = 10) -> list[tuple[int, str]]:
@@ -286,6 +302,82 @@ class GitHubReader:
             author=str((pr.get("user") or {}).get("login") or ""),
             changed_files=tuple(paths), diff_excerpt="".join(excerpt),
         )
+
+    def merged_pr_history(self, full_name: str, *, limit: int = 1000, before: str,
+                          max_pages: int = 1000) -> list[dict]:
+        """Latest merged PRs as of ``before``, replayed oldest first.
+
+        REST pagination avoids Search's 1,000-result ceiling. Closed pulls
+        include unmerged PRs, and update order differs from merge order. We
+        scan until a page's update boundary is older than the selected merge
+        boundary (updated_at >= merged_at), or the list ends. An incomplete
+        window is refused rather than silently represented as complete.
+        """
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+            raise SourceError("history limit must be a positive integer")
+        found: dict[int, dict] = {}
+        for page in range(1, max_pages + 1):
+            batch = self.get(f"/repos/{full_name}/pulls", state="closed", sort="updated",
+                             direction="desc", per_page=100, page=page)
+            if not isinstance(batch, list):
+                raise SourceError("GitHub returned a malformed PR-history page")
+            for item in batch:
+                merged = str(item.get("merged_at") or "")
+                if merged and merged <= before:
+                    number = int(item["number"])
+                    found[number] = {"number": number, "merged_at": merged,
+                                     "merge_commit_sha": str(item.get("merge_commit_sha") or "")}
+            ordered = sorted(found.values(), key=lambda pr: (pr["merged_at"], pr["number"]), reverse=True)
+            boundary = str(batch[-1].get("updated_at") or "") if batch else ""
+            # Strict < includes all ties before choosing by PR number.
+            if len(batch) < 100 or len(ordered) >= limit and boundary and boundary < ordered[limit - 1]["merged_at"]:
+                return list(reversed(ordered[:limit]))
+        raise SourceError(f"PR-history pagination exceeded {max_pages} pages; the requested window is incomplete")
+
+    def history_evidence(self, full_name: str, number: int, *, max_bytes: int = 500_000) -> dict:
+        """A complete PR discussion and patch, bounded by refusal, not truncation.
+
+        Raw evidence is only returned in memory. Review-comment reply IDs
+        preserve the thread; reviews and issue replies preserve chronology.
+        The service's existing small ``pull_request`` excerpt is unchanged.
+        """
+        root = f"/repos/{full_name}/pulls/{int(number)}"
+        pr = self.get(root)
+        payload = {"number": int(pr["number"]), "title": str(pr.get("title") or ""),
+                   "body": str(pr.get("body") or ""), "merged_at": str(pr.get("merged_at") or ""),
+                   "merge_commit_sha": str(pr.get("merge_commit_sha") or "")}
+        fields = {
+            "files": (root + "/files", ("filename", "status")),
+            "reviews": (root + "/reviews", ("id", "body", "state", "submitted_at", "commit_id")),
+            "threads": (root + "/comments", ("id", "in_reply_to_id", "body", "path", "line",
+                                              "original_line", "created_at", "commit_id")),
+            "replies": (f"/repos/{full_name}/issues/{int(number)}/comments", ("id", "body", "created_at")),
+        }
+        def check_size() -> None:
+            if len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) > max_bytes:
+                raise SourceError(f"PR #{number} evidence exceeds {max_bytes} bytes; no partial extraction")
+
+        check_size()
+        for kind, (endpoint, keys) in fields.items():
+            payload[kind] = []
+            for page in range(1, 101):
+                batch = self.get(endpoint, per_page=100, page=page)
+                if not isinstance(batch, list):
+                    raise SourceError(f"PR #{number} returned malformed {kind}")
+                payload[kind].extend({key: item.get(key) for key in keys} for item in batch)
+                check_size()
+                if len(batch) < 100:
+                    break
+            else:
+                raise SourceError(f"PR #{number} {kind} pagination is incomplete")
+        # GitHub's files endpoint has a documented 3,000-file ceiling.
+        if len(payload["files"]) != int(pr.get("changed_files") or 0):
+            raise SourceError(f"PR #{number} changed-file evidence is incomplete")
+        # Per-file REST patches can be omitted/truncated. Read the complete
+        # diff representation separately, refusing oversized evidence.
+        payload["diff"] = self._fetch_diff(self.API + root, max_bytes)
+        check_size()
+        return payload
 
     def issue_comments(self, full_name: str, number: int, *, after_id: int = 0, since: str = "",
                        max_pages: int = 20) -> list[dict]:

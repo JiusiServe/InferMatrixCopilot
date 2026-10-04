@@ -1,6 +1,6 @@
 # direct_routing.py —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-10-02 -->
 
 `LOC ~880 · Direct 模式完整策略包与仓库中立的知识路由 · refactor-status: stable`
 
@@ -11,6 +11,11 @@ owner/model 路由表是知识数据 `knowledge/repos/<repo>/_routes.yaml`，仓
 公开面由 `contract.py` 再导出。
 
 ## 公开契约
+
+`direct_review_plan` 另返回 `related_knowledge`：从本次 `KnowledgeView` 按 diff 路径和描述
+检索的有限解释性正文。`navigation_policy.related_document_read_paths` 只列截断背景页，
+每页增加一次 `execution_budget.knowledge_file_reads`；完整内嵌内容不需要再读文件。
+owner/model 路由仍先按描述选择，路径仍用于路由范围校验；背景检索不增补硬规则路由。
 经 `contract.py` 再导出的五个名字：`direct_review_plan`（完整、一次性的
 Direct policy bundle）、`direct_knowledge_routes`、
 `direct_execution_budget`、`direct_completion_result`、
@@ -21,7 +26,7 @@ Direct policy bundle）、`direct_knowledge_routes`、
 - **repo 守卫最先跑**：不支持的仓库在任何路由计算之前被拒 —— 修的是一个
   真实历史 bug（守卫曾排在空 intent 提前返回之后，向不支持的仓库泄漏
   owner 知识）。
-- **quick map fail-closed**：`_direct_quick_map` 返回内嵌代码地图与状态
+- **quick map fail-closed**：`_direct_quick_map(path)` 读文件后委托给 `_direct_quick_map_text(text)`（同一提取逻辑；kb init 用后者在落盘前检查它要路由的页面）返回内嵌代码地图与状态
   `{ok, truncated, unavailable}`，`truncated` 不是装饰 —— 把残图当全图
   与缺图同罪、且更难察觉；`_direct_route` 据此置
   `read_required = status != "ok"`（"自己去打开"是真回退，"什么都不给

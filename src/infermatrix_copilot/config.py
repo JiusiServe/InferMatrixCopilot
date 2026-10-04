@@ -13,6 +13,9 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 _PACKAGE_ROOT = Path(__file__).resolve().parent
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _USER_CONFIG = Path.home() / ".infermatrix-copilot" / ".env"
+# Upper bound on concurrently executing runs in one run service; each run is a
+# subprocess driving a vendor harness, so this is a sanity cap, not a target.
+MAX_STRICT_WORKERS_LIMIT = 32
 # Glob patterns, not fixed paths: the adapters probe must not name a specific repo
 # (the core stays repo-neutral — DESIGN §V2.2.1), so it asks "is there ANY adapter
 # directory here?" rather than naming one. A plain filename globs to itself, so one
@@ -159,6 +162,11 @@ class Settings(BaseSettings):
     # lost-response retry return the finished run instead of re-reviewing), so
     # it has to be bounded explicitly. Far longer than any retry window.
     idem_retention_days: int = 30
+    # How many reserved runs the run service executes at once (each is its
+    # own subprocess). Reported to consumers as `max_strict_workers`. Runs on
+    # the same checkout+PR never overlap regardless (run_service.py), because
+    # they share the PR-time worktree that harness sessions write config into.
+    strict_max_workers: int = 1
 
     # Strict execution backend (doc/features/provider-registry.md): which provider
     # powers runs. REQUIRED for Strict — `strict_readiness` names the exact
@@ -179,6 +187,12 @@ class Settings(BaseSettings):
     strict_backend_concurrency: int = 2  # concurrent harness sessions
     strict_backend_cli: str = ""         # binary path override (else PATH)
     strict_backend_timeout_s: float = 1800.0  # per-session wall-clock ceiling
+    # zcode pins the served model per run through a personal provider config
+    # written into the session dir (providers/zcode.py): the provider the
+    # entry names (empty: the host's own configured provider, else the Z.AI
+    # individual coding plan) and the reasoning level the entry must carry.
+    zcode_provider_id: str = ""
+    zcode_reasoning_level: Literal["low", "high", "max"] = "max"
 
     # Shared, human-curated knowledge base — vendored from the community docs
     # (see doc/architecture/KNOWLEDGE.md), organized as general/ (cross-repo experience) +
@@ -504,6 +518,17 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"STRICT_BACKEND must be one of {sorted(allowed - {''})} "
                 f"(or unset), got {v!r}")
+        return v
+
+    @field_validator("strict_max_workers")
+    @classmethod
+    def _validate_strict_max_workers(cls, v):
+        """A zero or negative worker count would accept runs that never
+        execute; an absurd one is a typo, not a capacity plan."""
+        if not 1 <= v <= MAX_STRICT_WORKERS_LIMIT:
+            raise ValueError(
+                f"STRICT_MAX_WORKERS must be between 1 and "
+                f"{MAX_STRICT_WORKERS_LIMIT}, got {v}")
         return v
 
     @model_validator(mode="after")

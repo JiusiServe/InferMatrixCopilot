@@ -64,6 +64,39 @@ def test_evidence_capped_and_archived(settings, trace, tmp_path):
     assert str(archived) in prompt  # agent told where the full text lives
 
 
+@pytest.mark.parametrize("enabled,changed,expected", [
+    (True, "pkg/models/catalog.py", True),
+    (True, "unrelated.py", False),
+    (False, "pkg/models/catalog.py", False),
+])
+def test_review_prompt_gets_scoped_knowledge_and_respects_ablation(
+        settings, trace, tmp_path, monkeypatch, enabled, changed, expected):
+    import types
+    from infermatrix_copilot.engine.agent_runtime import runner
+    from test_knowledge_retrieval import _block, _page
+
+    settings.knowledge_dir = tmp_path / "knowledge"
+    settings.profile_briefing_enabled = enabled
+    _page(settings.knowledge_dir, "repos/r/depth.md", _block(tmp_path))
+    adapter = types.SimpleNamespace(
+        manifest={"knowledge": {"repo_subdir": "repos/r"}},
+        briefing=lambda *args, **kwargs: "")
+    monkeypatch.setattr(runner, "_resolve_adapter", lambda _: adapter)
+    monkeypatch.setattr(runner, "_repo_map_tool", lambda *args: {})
+    diff = f"diff --git a/{changed} b/{changed}\n--- a/{changed}\n+++ b/{changed}\n@@ -1 +1 @@\n-old\n+new\n"
+    llm = ScriptedLLM([contract()])
+    result, _ = _run(_ctx(settings, trace, tmp_path, llm=llm), evidence={"pr_diff": diff})
+    assert result.ok
+    prompt = llm.calls[0]["messages"][0]["content"]
+    assert ("validates credentials" in prompt) is expected
+    events = list(trace.events("review_knowledge_context"))
+    if enabled:
+        assert events[0]["status"] == ("ready" if expected else "no_match")
+        assert bool(events[0]["pages"]) is expected
+    else:
+        assert events == []
+
+
 def test_skills_retrieved_and_injected(settings, trace, tmp_path):
     store = SkillStore(settings.skills_dir)
     store.propose(name="test-skill", description="guidance for t.step testing",

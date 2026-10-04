@@ -18,17 +18,28 @@ mappings so the service's gate and the publisher's local gate agree exactly:
                   pages, tombstones. Recomputed here; a mismatch is an issue,
                   never a block a verdict could cover.
 
-Standard library + PyYAML + ``lifecycle``/``ops`` only.
+``check_changeset`` with ``bootstrap`` set is for ``kb init`` only (the one
+allowed caller is ``kb_service/init_stages.py``; a test pins that). It relaxes
+exactly two rules so a repository's knowledge can be created: an ``_index.md``
+may be created in a directory that had no files before, and the shared
+``repos/_index.md`` may be edited to list a new repository.
+``check_index_links(base, head)`` is the init-side link check for the index
+edits that bootstrap produces.
+
+Standard library + PyYAML + ``lifecycle``/``ops``; ``check_index_links`` (and the
+bootstrap index check) also uses markdown-it-py, imported lazily.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import posixpath
 import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Iterable, Mapping
+from urllib.parse import unquote, urlsplit
 
 import yaml
 
@@ -48,6 +59,8 @@ _WHITELIST = (
 _DENY = re.compile(r"knowledge/(?:skills|tools|\.claude)/|knowledge/[^/]+$")
 _REGULAR_MODE = "100644"
 _INDEX_LINE = re.compile(r"- \[[^\]\n]+\]\((?P<file>[^)/\s]+\.md)\)")
+# bootstrap only: the shared list of repositories, edited to link a new one
+_REPOS_INDEX = "knowledge/repos/_index.md"
 
 
 @dataclass(frozen=True)
@@ -188,11 +201,13 @@ def _check_routes(path: str, text: str, files: Mapping[str, str]) -> list[Issue]
 
 # -- change-set level ----------------------------------------------------------
 
-def _whitelist_issues(changes: Iterable[Change]) -> list[Issue]:
+def _whitelist_issues(changes: Iterable[Change], bootstrap: bool = False) -> list[Issue]:
     issues = []
     for change in changes:
         path = change.path
-        if not path.startswith(KNOWLEDGE_PREFIX) or _DENY.match(path) \
+        if bootstrap and path == _REPOS_INDEX and change.status == "M":
+            pass  # a new repository is listed in the shared index
+        elif not path.startswith(KNOWLEDGE_PREFIX) or _DENY.match(path) \
                 or not any(p.fullmatch(path) for p in _WHITELIST):
             issues.append(Issue("path_not_whitelisted", path, "only knowledge rule/guide pages, _routes.yaml and _tombstones.yaml auto-merge"))
             continue
@@ -327,7 +342,11 @@ def _classify_page(path: str, base_text: str | None, head_text: str | None,
 
 def _index_mechanical(path: str, base_text: str | None, head_text: str | None,
                       new_pages: set[str], issues: list[Issue], blocks: list[Block],
-                      head: Mapping[str, str] | None = None) -> None:
+                      head: Mapping[str, str] | None = None, *,
+                      base: Mapping[str, str] | None = None, bootstrap: bool = False) -> None:
+    if bootstrap and base_text is None and head_text is not None and head is not None:
+        _index_created(path, base or {}, head, issues, blocks)
+        return
     if base_text is None or head_text is None:
         issues.append(Issue("index_added_or_deleted", path, "index files are never created or deleted by a change set"))
         return
@@ -361,6 +380,136 @@ def _index_mechanical(path: str, base_text: str | None, head_text: str | None,
                             f"index lines must cover new pages {expected_new} and only link unlisted pages; got {files}"))
 
 
+_MARKDOWN = None
+
+
+def _links(text: str) -> list[str]:
+    """The link destinations a CommonMark renderer (with GitHub's pipe tables)
+    makes of ``text``, as written (still percent-encoded). The parser settles
+    what a hand-written matcher cannot: reference definitions, titles, escapes,
+    code spans and blocks, HTML blocks and comments. Images are not links, and
+    neither is anything in an image's alt text."""
+    global _MARKDOWN
+    if _MARKDOWN is None:
+        from markdown_it import MarkdownIt  # lazy: only index checks need it
+
+        _MARKDOWN = MarkdownIt("commonmark").enable("table")
+    out: list[str] = []
+
+    def walk(tokens) -> None:
+        for token in tokens:
+            if token.type == "link_open":
+                out.append(str(token.attrGet("href") or ""))
+            if token.children and token.type != "image":
+                walk(token.children)
+
+    walk(_MARKDOWN.parse(text))
+    return out
+
+
+def link_targets(directory: str, text: str) -> set[str]:
+    """Knowledge-relative paths ``text`` (a page in ``directory``) links to,
+    as a CommonMark renderer makes its links (see ``_link_targets``)."""
+    return set(_link_targets(directory, text).values())
+
+
+def _link_targets(directory: str, text: str) -> dict[str, str]:
+    """Relative links of an index: {destination without anchor: resolved
+    knowledge-relative path}. URLs and anchor-only links are not targets; a
+    link that leaves the knowledge tree resolves to a path starting ``..``,
+    and an absolute one keeps its own normalised ``/...`` path (both escape)."""
+    out: dict[str, str] = {}
+    for href in _links(text):
+        parts = urlsplit(href)  # split first: an encoded "#" or ":" is part of the name
+        if parts.scheme or parts.netloc or not parts.path:
+            continue
+        target = unquote(parts.path)
+        out[target] = posixpath.normpath(target) if target.startswith("/") else \
+            posixpath.normpath(posixpath.join(directory, target))
+    return out
+
+
+def _dir_entries(head: Mapping[str, str], directory: str) -> list[str]:
+    """Pages directly in ``directory`` and the indexes of its child directories."""
+    prefix = f"{directory}/" if directory else ""
+    out = []
+    for p in sorted(head):
+        if not p.startswith(prefix) or not p.endswith(".md"):
+            continue
+        rest = p[len(prefix):].split("/")
+        if (len(rest) == 1 and rest[0] != INDEX_NAME) or (len(rest) == 2 and rest[1] == INDEX_NAME):
+            out.append(p)
+    return out
+
+
+def _index_created(path: str, base: Mapping[str, str], head: Mapping[str, str],
+                   issues: list[Issue], blocks: list[Block]) -> None:
+    """Bootstrap: an index created for a directory that is new in this change set."""
+    directory = posixpath.dirname(path)
+    if any(p.startswith(f"{directory}/") for p in base):
+        issues.append(Issue("index_added_or_deleted", path,
+                            "an index may be created only for a new directory"))
+        return
+    linked = set(_link_targets(directory, head[path]).values())
+    for entry in _dir_entries(head, directory):
+        if entry not in linked:
+            issues.append(Issue("index_missing", path, f"{entry} is not linked"))
+    if directory:
+        parent = posixpath.join(posixpath.dirname(directory), INDEX_NAME)
+        # a parent index created in the same change set reports its own children
+        if parent in base and parent in head and path not in set(
+                _link_targets(posixpath.dirname(parent), head[parent]).values()):
+            issues.append(Issue("index_missing", parent, f"the new {path} is not linked"))
+    blocks.append(Block("prose", path, "", "prose", _sha(head[path])))
+
+
+def check_index_links(base: Mapping[str, str], head: Mapping[str, str]) -> list[Issue]:
+    """Links of every index added or changed from ``base`` to ``head``: each
+    link the change adds resolves inside the knowledge tree to a file (or a
+    directory) of ``head``; a changed index keeps every link it had; every
+    page or child index new in ``head`` is linked from its parent index.
+    Links are what a CommonMark renderer makes (``_links``): text in code, a
+    comment or an HTML block is not a link, so moving a link there drops it.
+    Links an index already had are not re-judged (some point into doc/)."""
+    issues: list[Issue] = []
+    head_dirs = {posixpath.dirname(p) for p in head}
+    for path in sorted(p for p in head if posixpath.basename(p) == INDEX_NAME):
+        if base.get(path) == head[path]:
+            continue
+        directory = posixpath.dirname(path)
+        before = _link_targets(directory, base.get(path) or "")
+        after = _link_targets(directory, head[path])
+        kept = set(after.values())
+        for written, resolved in sorted(before.items()):
+            if resolved not in kept:
+                issues.append(Issue("index_link_dropped", path, written))
+        had = set(before.values())
+        for written, resolved in sorted(after.items()):
+            if resolved in had:
+                continue
+            if resolved == ".." or resolved.startswith(("../", "/")):
+                issues.append(Issue("index_link_escapes", path, written))
+            elif resolved in (".", ""):
+                continue  # the knowledge root itself: a directory every tree has
+            elif resolved not in head and not any(d == resolved or d.startswith(resolved + "/")
+                                                  for d in head_dirs):
+                issues.append(Issue("index_link_broken", path, written))
+    for page in sorted(p for p in head if p not in base and p.endswith(".md")):
+        directory = posixpath.dirname(page)
+        if posixpath.basename(page) == INDEX_NAME:
+            if not directory:
+                continue
+            directory = posixpath.dirname(directory)
+        parent = posixpath.join(directory, INDEX_NAME)
+        if parent not in head:
+            if directory:  # the knowledge root has no index
+                issues.append(Issue("index_unlinked", page, f"{parent} does not exist"))
+            continue
+        if page not in set(_link_targets(directory, head[parent]).values()):
+            issues.append(Issue("index_unlinked", page, f"{parent} does not link it"))
+    return issues
+
+
 def check_changeset(
     base: Mapping[str, str],
     head: Mapping[str, str],
@@ -368,6 +517,7 @@ def check_changeset(
     *,
     external_texts: Mapping[str, str] | None = None,
     release: str = "",
+    bootstrap: bool = False,
 ) -> ChangesetResult:
     """Gate one change set. ``base``/``head`` map knowledge-relative paths
     (``repos/...``) to text; ``changes`` are repository-relative git changes.
@@ -375,9 +525,9 @@ def check_changeset(
     for references to rules this change retires or purges. ``release`` is the
     trusted current release (from the signed verdict); when given, purges must
     carry it as ``purged_at``. A purge is always rejected in the release that
-    retired the rule."""
+    retired the rule. ``bootstrap`` is for ``kb init`` only (module docstring)."""
     changes = list(changes)
-    issues = _whitelist_issues(changes)
+    issues = _whitelist_issues(changes, bootstrap)
     blocks: list[Block] = []
     retired: list[str] = []
     purged: list[tuple[str, str]] = []  # (rule id, page)
@@ -400,7 +550,8 @@ def check_changeset(
     for path in sorted(knowledge_paths):
         name = PurePosixPath(path).name
         if name == INDEX_NAME:
-            _index_mechanical(path, base.get(path), head.get(path), new_pages, issues, blocks, head)
+            _index_mechanical(path, base.get(path), head.get(path), new_pages, issues, blocks, head,
+                              base=base, bootstrap=bootstrap)
         elif name == TOMBSTONES_NAME:
             tombstone_paths.append(path)
         elif name == ROUTES_NAME:

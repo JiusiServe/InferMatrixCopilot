@@ -1,6 +1,6 @@
 # engine/worktrees.py —— 规范
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-09-30 -->
 
 `LOC ~294 · PR-time worktree：身份、物化、持有 · refactor-status: ok`
 
@@ -38,6 +38,10 @@ worktree，允许本地 rebase，又不会改配置的 checkout 或复用评审�
   恰是 head 门要防的"评错树"。
 - 复用验证：`--git-common-dir` 必须解析回请求方仓库自己的 git dir **且**
   HEAD == sha；force-remove 只对外来/撕裂的树成立，绝不对同身份的活树。
+- 复用时在 `LOCK_EX` 内 `touch(dest)` 刷新 mtime：run 的共享持有要等到
+  后续 step 首次使用树时才取，`materialize` 释放锁到那一刻之间，一棵超过
+  保留期的旧树看起来无人使用；新 mtime 让 reaper（它在自己的 `LOCK_EX` 下
+  重读 mtime）放过它。
 - 可变树按 run_dir 分键，复用时只核对仓库归属（rebase 会改变 HEAD），
   拒绝 symlink、重定向到配置 checkout 的路径及外来仓库；调用方仅在 checkout
   step 重试时可重置此树。后续 step 经 checkpoint 恢复路径，并在树被清理后

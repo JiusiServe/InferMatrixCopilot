@@ -18,9 +18,12 @@ DeepSeek gateway) or repo credentials.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
+import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
@@ -33,6 +36,75 @@ from .base import (
     sanitized_env,
 )
 from .registry import PROVIDERS
+
+
+def _session_lock_path(cwd: Path) -> Path | None:
+    """Where to serialize cursor sessions in `cwd`, or None when no other
+    run can be in it.
+
+    The bridge config lives at ONE fixed path per working directory
+    (`.cursor/mcp.json`), so two sessions of different runs in the same cwd
+    overwrite each other's config and one agent binds to the other run's tool
+    scope and trace. A managed PR-time worktree is keyed by repo+PR+sha and the
+    run service never runs two runs on one PR at once, and a run directory is
+    one run's own, so neither needs anything here. A checkout does: issue
+    tasks and PR runs whose worktree could not be materialized all work in the
+    live checkout. The lock lives in that checkout's git dir, beside git's own
+    locks, never in the working tree."""
+    from ..engine import worktrees
+
+    if worktrees.is_managed_dest(cwd):
+        return None
+    dot_git = cwd / ".git"
+    if dot_git.is_dir():
+        return dot_git / "imx-cursor-session.lock"
+    if dot_git.is_file():  # a linked worktree: `gitdir: <its admin dir>`
+        try:
+            line = dot_git.read_text(encoding="utf-8").strip()
+        except OSError:
+            return None
+        if line.startswith("gitdir:"):
+            admin = Path(line.split(":", 1)[1].strip())
+            admin = admin if admin.is_absolute() else cwd / admin
+            if admin.is_dir():
+                return admin / "imx-cursor-session.lock"
+    return None
+
+
+@contextmanager
+def _exclusive_cwd(cwd: Path, timeout_s: float):
+    """Hold `cwd` exclusively for one session when other runs may share it
+    (see `_session_lock_path`). An `flock` serializes across threads,
+    processes and services. Yields False when the hold timed out."""
+    from ..engine.lifecycle import fcntl
+
+    lock = _session_lock_path(cwd)
+    if lock is None or fcntl is None:
+        yield True
+        return
+    fd = os.open(str(lock), os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        deadline = time.monotonic() + timeout_s
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    yield False
+                    return
+                time.sleep(0.2)
+        try:
+            yield True
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def _no_guard():
+    yield True
 
 
 class CursorTransport(HarnessTransport):
@@ -168,18 +240,31 @@ class CursorTransport(HarnessTransport):
 
         cwd = Path(req.scope.root or req.run_dir)
         created: list[Path] = []
-        if req.bridge_spec_path is not None:
-            created = self._write_mcp_config(cwd, req.bridge_spec_path)
-        try:
-            events, timed_out = self._run(
-                f"{req.system}\n\n{req.prompt}", cwd=str(cwd),
-                timeout_s=req.timeout_s, model=req.model)
-        finally:
-            for path in created:
-                if path.is_dir():
-                    shutil.rmtree(path, ignore_errors=True)
-                else:
-                    path.unlink(missing_ok=True)
+        # Waiting may outlast one session in the cwd, never an unbounded queue.
+        wait_s = max(60.0, float(req.timeout_s) + 60.0)
+        with (_exclusive_cwd(cwd, wait_s) if req.bridge_spec_path is not None
+              else _no_guard()) as held:
+            if not held:
+                reason = (f"working directory {cwd} stayed busy with another "
+                          f"run's cursor session for {wait_s:.0f}s")
+                if req.trace is not None:
+                    req.trace.record("capability_gap",
+                                     capability="cursor.exclusive_cwd",
+                                     step=req.step_name, detail=reason)
+                return AgentOutcome(text="", iterations=0, tool_calls=0,
+                                    truncated=True, refusals=[reason])
+            if req.bridge_spec_path is not None:
+                created = self._write_mcp_config(cwd, req.bridge_spec_path)
+            try:
+                events, timed_out = self._run(
+                    f"{req.system}\n\n{req.prompt}", cwd=str(cwd),
+                    timeout_s=req.timeout_s, model=req.model)
+            finally:
+                for path in created:
+                    if path.is_dir():
+                        shutil.rmtree(path, ignore_errors=True)
+                    else:
+                        path.unlink(missing_ok=True)
         audit = audit_events(events, roots=(str(cwd), str(req.run_dir)),
                              read_only=req.scope.read_only, cwd=str(cwd))
         usage = self._usage(events)
@@ -203,7 +288,8 @@ class CursorTransport(HarnessTransport):
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
-                 role: str = "", effort: str = "") -> Reply:
+                 role: str = "", effort: str = "",
+                 max_budget_usd: float | None = None) -> Reply:
         """Tool-less one-shot. Runs in an EMPTY scratch cwd so cursor-agent's
         native tools have nothing to read — the containment for calls that
         need no repo at all (intent, reducer, repair)."""

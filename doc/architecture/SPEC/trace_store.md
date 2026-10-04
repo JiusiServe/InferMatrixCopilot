@@ -1,6 +1,6 @@
 # trace_store.py —— 规范
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~500 · trace/1：Copilot 与 RB 共用的模型调用/工具调用/判定/结果记录 · refactor-status: stable`
 
@@ -13,6 +13,11 @@
   `usage`、`seconds`、`inputs`/`outputs`（只存 blob 引用，从不内联正文）、`result`、`error`、`env`
   （copilot 版本与 SHA）。`outcome` 是事后金标（merged、closed_unmerged、head_changed、rule_retired）。
 - `trace_context(**fields)`：用 contextvars 绑定上下文，嵌套叠加，线程/协程安全。
+- `begin_call(entry)`：在模型派发前保存输入 blob 及独立的
+  `attempts/<UUID>/attempt.json`。`NativeCallArchive.event` 逐条脱敏、追加并 fsync
+  `native-events.jsonl`，保留原生会话、输出、错误与调度等待事件。结束时绑定唯一的
+  `model_call` 回执及输出、用量、耗时与状态；journal 不是另一笔调用，不能重复计费。
+  中断未完成的 journal 保留输入和已收到的事件，未报告用量及费用保持未知。
 
 - `bind_store(store)` / `current_store()`：把一个 store 绑定为当前进程/任务的采集汇（`tools.dispatch` 与
   `LLM.create` 两个 choke point 据此写 `tool_call` / `model_call`，失败调用记 `error` 且无 `outputs`）；
@@ -42,4 +47,4 @@
 `test_improve_p0.py`（tool_call、版本化索引与兼容模式、门控迁移与回滚、锁互斥与陈旧接管、回填与查询等价、
 重建到 schema 0 + 旧代码位置式插入、只读比较、两处 choke point 的采集、声明与指纹、执行器上下文、CLI 门）；
 `test_trace_store.py`（schema 与去重 blob、索引与重建、脱敏、网关记录成功与失败调用、回放、导出的判定/结果
-关联与校准集泄漏过滤、SDK 导出、知识服务的 decision/outcome 记录）。
+关联与校准集泄漏过滤、SDK 导出、知识服务的 decision/outcome 记录、派发前输入留档、原生事件及中断保留）。

@@ -1,0 +1,70 @@
+---
+title: "agents-team"
+created: 2026-10-01
+updated: 2026-10-01
+type: index
+tags: [jiuwenswarm]
+sources: []
+---
+
+# agents-team
+
+理解该代码 owner 的职责、接口、配置与相关功能时查这里；通用审查方法不属于本目录。
+- [多智能体团队协作 功能知识](feature-team.md)
+- [跨进程分布式 Team 功能知识](feature-distributed-team.md)
+- [人类团队成员与人工协作 功能知识](feature-human-team.md)
+- [SwarmFlow 工作流与 HITL 功能知识](feature-swarmflow.md)
+- [任务规划与 Todo 功能知识](feature-planning.md)
+- [子代理派发与验证 功能知识](feature-subagents.md)
+- [技能安装、挂载与发现 功能知识](feature-skills.md)
+- [团队技能与能力复用 功能知识](feature-swarm-skills.md)
+- [Skill Hub 与市场流通 功能知识](feature-skill-hub.md)
+- [长期记忆 功能知识](feature-memory.md)
+- [对话后自动记忆 功能知识](feature-auto-memory.md)
+- [任务经验检索与沉淀 功能知识](feature-task-memory.md)
+- [浏览器服务与网页工具 功能知识](feature-browser-tools.md)
+- [多模态理解与媒体配置 功能知识](feature-multimodal.md)
+- [JiuwenMemory 进程内 SDK 接入功能知识](feature-jiuwen-memory-sdk.md)
+- [图片生成与产物落盘功能知识](feature-image-generation.md)
+- [群聊数字分身与 owner 权限功能知识](feature-digital-avatar.md)
+- [agents-team 源码接口与集成边界 01](source-contracts-01.md)
+- [code-prompt](code-prompt/_index.md)
+- [code-rails](code-rails/_index.md)
+- [code](code/_index.md)
+- [code-tools](code-tools/_index.md)
+- [common-auto-harness](common-auto-harness/_index.md)
+- [common-auto-memory](common-auto-memory/_index.md)
+- [common](common/_index.md)
+- [common-memory](common-memory/_index.md)
+- [common-plugins](common-plugins/_index.md)
+- [common-prompt](common-prompt/_index.md)
+- [common-rails](common-rails/_index.md)
+- [common-recommendation](common-recommendation/_index.md)
+- [common-rsi](common-rsi/_index.md)
+- [common-tools](common-tools/_index.md)
+- [team](team/_index.md)
+- [team-a2x](team-a2x/_index.md)
+- [team-handlers](team-handlers/_index.md)
+- [team-rails](team-rails/_index.md)
+- [work-prompt](work-prompt/_index.md)
+- [work-rails](work-rails/_index.md)
+- [swarm](swarm/_index.md)
+- [swarm-providers](swarm-providers/_index.md)
+- [Code harness：静态提示词、计划审批与观测开关](knowledge-agents-team.md) — 说明接口、配置与集成边界，关联源码和维护者文档。
+- [多智能体团队协作：实现深读](feature-depth-team.md)
+- [跨进程分布式 Team：实现深读](feature-depth-distributed-team.md)
+- [人类团队成员与人工协作：实现深读](feature-depth-human-team.md)
+- [SwarmFlow 工作流与 HITL：实现深读](feature-depth-swarmflow.md)
+- [任务规划与 Todo：实现深读](feature-depth-planning.md)
+- [子代理派发与验证：实现深读](feature-depth-subagents.md)
+- [技能安装、挂载与发现：实现深读](feature-depth-skills.md)
+- [团队技能与能力复用：实现深读](feature-depth-swarm-skills.md)
+- [Skill Hub 与市场流通：实现深读](feature-depth-skill-hub.md)
+- [长期记忆：实现深读](feature-depth-memory.md)
+- [对话后自动记忆：实现深读](feature-depth-auto-memory.md)
+- [任务经验检索与沉淀：实现深读](feature-depth-task-memory.md)
+- [浏览器服务与网页工具：实现深读](feature-depth-browser-tools.md)
+- [多模态理解与媒体配置：实现深读](feature-depth-multimodal.md)
+- [JiuwenMemory 进程内 SDK 接入：实现深读](feature-depth-jiuwen-memory-sdk.md)
+- [图片生成与产物落盘：实现深读](feature-depth-image-generation.md)
+- [群聊数字分身与 owner 权限：实现深读](feature-depth-digital-avatar.md)

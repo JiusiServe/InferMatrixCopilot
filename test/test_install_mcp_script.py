@@ -100,6 +100,8 @@ def test_cursor_install_preserves_existing_config(tmp_path):
     update_skill = cursor_root / "skills" / "imupdate" / "SKILL.md"
     assert update_skill.is_file()
     assert (cursor_root / "skills" / "imdesign" / "SKILL.md").is_file()
+    kbinit_skill = (cursor_root / "skills" / "imkbinit" / "SKILL.md").read_text(encoding="utf-8")
+    assert "{{INFERMATRIX_COPILOT_ROOT}}" not in kbinit_skill and str(ROOT) in kbinit_skill
     text = update_skill.read_text(encoding="utf-8")
     assert "{{INFERMATRIX_COPILOT_ROOT}}" not in text
     assert str(ROOT) in text
@@ -136,6 +138,7 @@ def test_zcode_install_preserves_existing_config(tmp_path):
     skills_root = tmp_path / ".zcode" / "skills"
     assert (skills_root / "imreview" / "SKILL.md").is_file()
     assert (skills_root / "imdesign" / "SKILL.md").is_file()
+    assert (skills_root / "imkbinit" / "SKILL.md").is_file()
     update_skill = skills_root / "imupdate" / "SKILL.md"
     assert update_skill.is_file()
     text = update_skill.read_text(encoding="utf-8")
@@ -225,6 +228,7 @@ def test_codex_install_sets_timeout_and_installs_current_skill_location(
     assert text.count("startup_timeout_") == 1
     assert (tmp_path / ".agents" / "skills" / "imreview" / "SKILL.md").is_file()
     assert (tmp_path / ".agents" / "skills" / "imdesign" / "SKILL.md").is_file()
+    assert (tmp_path / ".agents" / "skills" / "imkbinit" / "SKILL.md").is_file()
 
 
 def test_codex_timeout_supports_quoted_server_table(tmp_path):

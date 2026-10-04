@@ -336,7 +336,7 @@ def rebuild(rt, lifecycle, changeset: dict, why: str) -> str | None:
                                 draft_keys=[],
                                 # a rebuild continues the change's refine lineage: the
                                 # limit never resets because context moved meanwhile
-                                extra_detail={k: detail[k] for k in ("refine_round", "refine_history")
+                                extra_detail={k: detail[k] for k in ("refine_round", "refine_history", "generator")
                                               if k in detail})
     staged = rt.ledger.changeset(new_id)
     if staged["status"] not in ("gated", *IN_FLIGHT):

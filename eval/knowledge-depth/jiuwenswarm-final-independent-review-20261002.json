@@ -1,0 +1,25 @@
+{
+  "schema": "jiuwenswarm-final-independent-review/1",
+  "reviewer": "/root/final_code_review",
+  "author_independent": true,
+  "draft_delivery_approved": true,
+  "merge_approved": false,
+  "remaining_actionable_p1_p2": [],
+  "recognized_facets": 490,
+  "unknown_facets": 63,
+  "source_pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "checks": [
+    "canonical500minus10",
+    "protected207strict",
+    "original172andretiredarchive",
+    "current_source_native_hash_bindings",
+    "all237retrieval_cases_and_budget",
+    "chinese_report_arithmetic_and10_rejection_reasons"
+  ],
+  "reviewed_artifacts": {
+    "jiuwenswarm-lightweight-comparison-cn-20261002.json": "50f1e8a433cf26ad037e136df823fa4327fb018c5501fb2b5859fad641a3a412",
+    "jiuwenswarm-lightweight-comparison-cn-20261002.md": "cc237cf4b43aacb97a94abe6d245dad2d353d7a643168a2f7f50d85205fd4b5b",
+    "jiuwenswarm-lightweight-final-20261002.json": "f02bd6d594b2b250362abb964b628fc64e2ecf9c5dbf65470b16cabbbebea168"
+  },
+  "interpretation": "Final author-independent content and delivery review approved the partial draft only. Per-facet coverage remains unmet. This record is distinct from per-feature native Codex approval receipts."
+}

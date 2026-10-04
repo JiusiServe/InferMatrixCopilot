@@ -1,0 +1,983 @@
+schema_version: 1
+required: true
+semantic_depth:
+  per_facet_gt: 0.90
+  acceptance_mode: lightweight
+catalog_sources:
+- README_CN.md
+- docs/README.md
+- docs/zh/Harness.md
+- docs/zh/智能体.md
+- docs/zh/JiuwenMemory-SDK接入.md
+- docs/zh/配置信息.md
+- jiuwenbox/README_CN.md
+- jiuwenswarm/channels/web/AGENTS.md
+- jiuwenswarm/channels/web/frontend/README.md
+- docs/zh/设置与频道升级迁移指南.md
+- jiuwenswarm/server/runtime/skill/skilldev/DESIGN.md
+core:
+  roots:
+  - jiuwenswarm/
+  - jiuwenbox/src/jiuwenbox/
+  - jiuwenbox/scripts/
+  - sdks/
+  - packages/
+  - scripts/
+  - deploy/
+  - docker/
+  - Dockerfile.claw
+  - jiuwenbox/docker/
+  - Makefile
+  exclude:
+  - '*/tests/*'
+  - '*/test/*'
+  - '*/__tests__/*'
+  - '*.test.*'
+  - '*.spec.*'
+  - '*/node_modules/*'
+  - '*/third_party/*'
+  - '*/vendor/*'
+  - '*/dist/*'
+  - '*/build/*'
+  - '*/generated/*'
+  - '*/__pycache__/*'
+  - scripts/acceptance/*
+  - scripts/genai_semconv/*
+  - '*/third-party/*'
+  suffixes:
+  - .py
+  - .ts
+  - .tsx
+  - .mts
+  - .cts
+  - .js
+  - .jsx
+  - .mjs
+  - .cjs
+  - .kt
+  - .kts
+  - .java
+  - .rs
+  - .go
+  - .swift
+  - .ets
+  - .vue
+  - .svelte
+  - .html
+  - .css
+  - .scss
+  - .less
+  - .c
+  - .cc
+  - .cpp
+  - .h
+  - .hpp
+  - .sh
+  - .ps1
+  - .psm1
+  - .cmd
+  - .bat
+  - .iss
+  - .spec
+  target: 0.85
+  filenames:
+  - Dockerfile
+  - Dockerfile.*
+  - Makefile
+  - gradlew
+features:
+- id: bootstrap
+  title: 初始化与服务启动
+  owner: launch
+  source_globs:
+  - jiuwenswarm/init_workspace.py
+  docs:
+  - docs/zh/安装指南.md
+  page: repos/jiuwenswarm/components/launch/feature-bootstrap.md
+  entry_points:
+  - jiuwenswarm/init_workspace.py
+- id: instances
+  title: 单机多实例
+  owner: launch
+  source_globs:
+  - jiuwenswarm/instance_manager/bootstrap.py
+  - jiuwenswarm/instance_manager/*.py
+  docs:
+  - docs/zh/单机多实例运行.md
+  page: repos/jiuwenswarm/components/launch/feature-instances.md
+  entry_points:
+  - jiuwenswarm/instance_manager/bootstrap.py
+- id: desktop
+  title: 桌面宿主与自动更新
+  owner: launch
+  source_globs:
+  - jiuwenswarm/channels/desktop/desktop_app.py
+  - jiuwenswarm/channels/desktop/*
+  docs:
+  - docs/zh/windows自动更新设计.md
+  page: repos/jiuwenswarm/components/launch/feature-desktop.md
+  entry_points:
+  - jiuwenswarm/channels/desktop/desktop_app.py
+- id: deployment
+  title: 打包与部署
+  owner: packaging-deploy
+  source_globs:
+  - scripts/build-electron-exe.sh
+  - scripts/*
+  - Dockerfile.claw
+  - docker/Dockerfile.claw
+  - docker/Dockerfile.claw.base
+  - docker/Dockerfile.yr.rt.mgr
+  docs:
+  - docs/zh/desktop-electron-packaging.md
+  page: repos/jiuwenswarm/components/packaging-deploy/feature-deployment.md
+  entry_points:
+  - scripts/build-electron-exe.sh
+  - Dockerfile.claw
+  - docker/Dockerfile.claw
+  - docker/Dockerfile.claw.base
+  - docker/Dockerfile.yr.rt.mgr
+- id: process-cli
+  title: 机器执行与本地 CLI
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/channels/process_cli/app.py
+  - jiuwenswarm/channels/process_cli/*.py
+  docs:
+  - docs/zh/命令行指令.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-process-cli.md
+  entry_points:
+  - jiuwenswarm/channels/process_cli/app.py
+- id: cli
+  title: 交互式命令行
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/cli/main.py
+  - jiuwenswarm/cli/*.py
+  docs:
+  - docs/zh/命令行指令.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-cli.md
+  entry_points:
+  - jiuwenswarm/cli/main.py
+- id: tui
+  title: TUI 对话与命令
+  owner: tui-client
+  source_globs:
+  - jiuwenswarm/channels/tui/frontend/src/index.ts
+  - jiuwenswarm/channels/tui/*
+  docs:
+  - docs/zh/TUI使用指南.md
+  page: repos/jiuwenswarm/components/tui-client/feature-tui.md
+  entry_points:
+  - jiuwenswarm/channels/tui/frontend/src/index.ts
+- id: web-chat
+  title: Web 对话与流式状态
+  owner: web-frontend
+  source_globs:
+  - jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts
+  - jiuwenswarm/channels/web/frontend/src/*
+  docs:
+  - docs/zh/对话.md
+  page: repos/jiuwenswarm/components/web-frontend/feature-web-chat.md
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts
+- id: web-navigation
+  title: Web 页面与功能入口
+  owner: web-frontend
+  source_globs:
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  - jiuwenswarm/channels/web/frontend/src/*
+  docs:
+  - docs/zh/页面概览.md
+  page: repos/jiuwenswarm/components/web-frontend/feature-web-navigation.md
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+- id: projects-sessions
+  title: 项目、会话与历史管理
+  owner: agent-runtime
+  source_globs:
+  - jiuwenswarm/runtime/session_catalog.py
+  - jiuwenswarm/runtime/session_lifecycle.py
+  - jiuwenswarm/runtime/session*.py
+  docs:
+  - docs/zh/项目与会话管理.md
+  page: repos/jiuwenswarm/components/agent-runtime/feature-projects-sessions.md
+  entry_points:
+  - jiuwenswarm/runtime/session_catalog.py
+  - jiuwenswarm/runtime/session_lifecycle.py
+- id: modes
+  title: Agent、Code 与 Team 模式
+  owner: agent-server-runtime
+  source_globs:
+  - jiuwenswarm/runtime/mode_catalog.py
+  - jiuwenswarm/common/mode_matrix.py
+  - jiuwenswarm/server/runtime/agent_adapter/*.py
+  docs:
+  - docs/zh/模式系统.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-modes.md
+  entry_points:
+  - jiuwenswarm/runtime/mode_catalog.py
+  - jiuwenswarm/common/mode_matrix.py
+- id: team
+  title: 多智能体团队协作
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/team/team_manager.py
+  - jiuwenswarm/agents/harness/team/*.py
+  docs:
+  - docs/zh/AgentTeam.md
+  page: repos/jiuwenswarm/components/agents-team/feature-team.md
+  entry_points:
+  - jiuwenswarm/agents/harness/team/team_manager.py
+- id: distributed-team
+  title: 跨进程分布式 Team
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/team/distributed_runtime.py
+  docs:
+  - docs/zh/分布式Team.md
+  page: repos/jiuwenswarm/components/agents-team/feature-distributed-team.md
+  entry_points:
+  - jiuwenswarm/agents/harness/team/distributed_runtime.py
+- id: human-team
+  title: 人类团队成员与人工协作
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/team/team_manager.py
+  - jiuwenswarm/agents/harness/team/*
+  docs:
+  - docs/zh/AgentTeam人类成员联机协作.md
+  page: repos/jiuwenswarm/components/agents-team/feature-human-team.md
+  entry_points:
+  - jiuwenswarm/agents/harness/team/team_manager.py
+- id: swarmflow
+  title: SwarmFlow 工作流与 HITL
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/team/handlers/workflow_state.py
+  - jiuwenswarm/agents/harness/team/handlers/*
+  docs:
+  - docs/zh/TUI使用SwarmFlow指南.md
+  page: repos/jiuwenswarm/components/agents-team/feature-swarmflow.md
+  entry_points:
+  - jiuwenswarm/agents/harness/team/handlers/workflow_state.py
+- id: harness
+  title: Agent Loop 与 Rail 装配
+  owner: agent-server-runtime
+  source_globs:
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/agents/harness/common/rails/*
+  docs:
+  - docs/zh/Harness.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-harness.md
+  entry_points:
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+- id: planning
+  title: 任务规划与 Todo
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/code/rails/code_task_planning_rail.py
+  - jiuwenswarm/agents/harness/common/*
+  docs:
+  - docs/zh/任务规划.md
+  page: repos/jiuwenswarm/components/agents-team/feature-planning.md
+  entry_points:
+  - jiuwenswarm/agents/harness/code/rails/code_task_planning_rail.py
+- id: subagents
+  title: 子代理派发与验证
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/swarm/providers/code_subagents.py
+  - jiuwenswarm/agents/harness/common/tools/subagent_compat.py
+  - jiuwenswarm/agents/harness/common/rails/*
+  docs:
+  - docs/zh/Harness.md
+  page: repos/jiuwenswarm/components/agents-team/feature-subagents.md
+  entry_points:
+  - jiuwenswarm/agents/swarm/providers/code_subagents.py
+  - jiuwenswarm/agents/harness/common/tools/subagent_compat.py
+- id: skills
+  title: 技能安装、挂载与发现
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/server/runtime/skill/skill_manager.py
+  - jiuwenswarm/server/runtime/skill/*
+  docs:
+  - docs/zh/技能.md
+  page: repos/jiuwenswarm/components/agents-team/feature-skills.md
+  entry_points:
+  - jiuwenswarm/server/runtime/skill/skill_manager.py
+- id: swarm-skills
+  title: 团队技能与能力复用
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/swarm/assembly.py
+  - jiuwenswarm/agents/swarm/providers/skills.py
+  - jiuwenswarm/agents/swarm/*
+  docs:
+  - docs/zh/SwarmSkills.md
+  page: repos/jiuwenswarm/components/agents-team/feature-swarm-skills.md
+  entry_points:
+  - jiuwenswarm/agents/swarm/assembly.py
+  - jiuwenswarm/agents/swarm/providers/skills.py
+- id: skill-hub
+  title: Skill Hub 与市场流通
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/server/runtime/marketplace/hub_client.py
+  - jiuwenswarm/server/runtime/marketplace/*
+  docs:
+  - docs/zh/技能.md
+  page: repos/jiuwenswarm/components/agents-team/feature-skill-hub.md
+  entry_points:
+  - jiuwenswarm/server/runtime/marketplace/hub_client.py
+- id: skill-evolution
+  title: Skill 自演进
+  owner: agent-server-runtime
+  source_globs:
+  - jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py
+  - jiuwenswarm/agents/harness/common/rails/*
+  docs:
+  - docs/zh/Skill自演进.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-skill-evolution.md
+  entry_points:
+  - jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py
+- id: symphony
+  title: Symphony 检索与图谱编排
+  owner: symphony-orchestration
+  source_globs:
+  - jiuwenswarm/symphony/service.py
+  - jiuwenswarm/symphony/*.py
+  docs:
+  - docs/zh/Symphony-技能编排与分发.md
+  page: repos/jiuwenswarm/components/symphony-orchestration/feature-symphony.md
+  entry_points:
+  - jiuwenswarm/symphony/service.py
+- id: auto-harness
+  title: Auto Harness 评测优化
+  owner: auto-harness
+  source_globs:
+  - jiuwenswarm/agents/harness/common/auto_harness/service.py
+  - jiuwenswarm/agents/harness/common/auto_harness/*
+  docs:
+  - docs/zh/AutoHarness.md
+  page: repos/jiuwenswarm/components/auto-harness/feature-auto-harness.md
+  entry_points:
+  - jiuwenswarm/agents/harness/common/auto_harness/service.py
+- id: rsi-packages
+  title: Harness Package 与热激活
+  owner: auto-harness
+  source_globs:
+  - jiuwenswarm/agents/harness/common/rsi/harness_activation.py
+  - jiuwenswarm/agents/harness/common/rsi/*
+  docs:
+  - docs/zh/AutoHarness.md
+  page: repos/jiuwenswarm/components/auto-harness/feature-rsi-packages.md
+  entry_points:
+  - jiuwenswarm/agents/harness/common/rsi/harness_activation.py
+- id: ttse
+  title: FACT/TIP 双轨经验
+  owner: agent-server-runtime
+  source_globs:
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/agents/harness/common/*
+  docs:
+  - docs/zh/TTSE.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-ttse.md
+  entry_points:
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+- id: memory
+  title: 长期记忆
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/common/memory/manager.py
+  - jiuwenswarm/agents/harness/common/memory/*
+  docs:
+  - docs/zh/记忆.md
+  page: repos/jiuwenswarm/components/agents-team/feature-memory.md
+  entry_points:
+  - jiuwenswarm/agents/harness/common/memory/manager.py
+- id: auto-memory
+  title: 对话后自动记忆
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/common/auto_memory/extraction_runner.py
+  - jiuwenswarm/agents/harness/common/auto_memory/*
+  docs:
+  - docs/zh/自动记忆.md
+  page: repos/jiuwenswarm/components/agents-team/feature-auto-memory.md
+  entry_points:
+  - jiuwenswarm/agents/harness/common/auto_memory/extraction_runner.py
+- id: coding-memory
+  title: Code 模式编码记忆
+  owner: agent-server-runtime
+  source_globs:
+  - jiuwenswarm/server/runtime/agent_adapter/interface_code.py
+  - jiuwenswarm/agents/harness/code/*
+  docs:
+  - docs/zh/编码记忆.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-coding-memory.md
+  entry_points:
+  - jiuwenswarm/server/runtime/agent_adapter/interface_code.py
+- id: task-memory
+  title: 任务经验检索与沉淀
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/common/tools/task_tools.py
+  - jiuwenswarm/agents/harness/common/memory/*
+  docs:
+  - docs/zh/经验记忆.md
+  page: repos/jiuwenswarm/components/agents-team/feature-task-memory.md
+  entry_points:
+  - jiuwenswarm/agents/harness/common/tools/task_tools.py
+- id: context
+  title: 上下文压缩与卸载
+  owner: agent-server-runtime
+  source_globs:
+  - jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/agents/harness/common/*
+  docs:
+  - docs/zh/上下文压缩.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-context.md
+  entry_points:
+  - jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+- id: permissions
+  title: 工具权限与安全治理
+  owner: agent-server-runtime
+  source_globs:
+  - jiuwenswarm/agents/harness/common/rails/permissions/permission_interrupt_rail.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/policy_eval.py
+  - jiuwenswarm/server/*
+  docs:
+  - docs/zh/工具权限与安全防护.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-permissions.md
+  entry_points:
+  - jiuwenswarm/agents/harness/common/rails/permissions/permission_interrupt_rail.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/policy_eval.py
+- id: hooks
+  title: 生命周期 Hooks 与扩展
+  owner: extensions-plugins
+  source_globs:
+  - jiuwenswarm/extensions/manager.py
+  - jiuwenswarm/extensions/*.py
+  docs:
+  - docs/zh/Harness.md
+  page: repos/jiuwenswarm/components/extensions-plugins/feature-hooks.md
+  entry_points:
+  - jiuwenswarm/extensions/manager.py
+- id: applications
+  title: Application Plugin 与前端贡献
+  owner: extensions-plugins
+  source_globs:
+  - jiuwenswarm/extensions/application_host.py
+  docs:
+  - docs/zh/application-plugins.md
+  page: repos/jiuwenswarm/components/extensions-plugins/feature-applications.md
+  entry_points:
+  - jiuwenswarm/extensions/application_host.py
+- id: video-duplex
+  title: 音视频双工扩展
+  owner: extensions-plugins
+  source_globs:
+  - jiuwenswarm/extensions/video_duplex/backend/tasks/rail.py
+  - jiuwenswarm/extensions/video_duplex/*
+  docs:
+  - docs/zh/application-plugins.md
+  page: repos/jiuwenswarm/components/extensions-plugins/feature-video-duplex.md
+  entry_points:
+  - jiuwenswarm/extensions/video_duplex/backend/tasks/rail.py
+- id: e2a
+  title: E2A 统一请求响应协议
+  owner: protocols
+  source_globs:
+  - jiuwenswarm/common/e2a/models.py
+  - jiuwenswarm/common/e2a/*.py
+  docs:
+  - docs/zh/E2A-protocol.md
+  page: repos/jiuwenswarm/components/protocols/feature-e2a.md
+  entry_points:
+  - jiuwenswarm/common/e2a/models.py
+- id: a2a
+  title: A2A 接入与 AgentCard
+  owner: protocols
+  source_globs:
+  - jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py
+  - jiuwenswarm/gateway/channel_manager/protocol/a2a/*.py
+  docs:
+  - docs/zh/A2A.md
+  page: repos/jiuwenswarm/components/protocols/feature-a2a.md
+  entry_points:
+  - jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py
+- id: acp
+  title: ACP 与 stdio 桥接
+  owner: protocols
+  source_globs:
+  - jiuwenswarm/acp/stdio_client.py
+  - jiuwenswarm/acp/*.py
+  docs:
+  - docs/zh/ACP插件使用.md
+  page: repos/jiuwenswarm/components/protocols/feature-acp.md
+  entry_points:
+  - jiuwenswarm/acp/stdio_client.py
+- id: ssh
+  title: SSH 频道与远程终端
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/channel_manager/protocol/ssh/ssh_connect.py
+  - jiuwenswarm/gateway/channel_manager/protocol/ssh/*.py
+  docs:
+  - docs/zh/频道.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-ssh.md
+  entry_points:
+  - jiuwenswarm/gateway/channel_manager/protocol/ssh/ssh_connect.py
+- id: a2ui
+  title: A2UI 生成式界面
+  owner: a2ui
+  source_globs:
+  - jiuwenswarm/server/runtime/a2ui/runtime/finalizer.py
+  - jiuwenswarm/server/runtime/a2ui/*
+  docs:
+  - docs/zh/A2UI.md
+  page: repos/jiuwenswarm/components/a2ui/feature-a2ui.md
+  entry_points:
+  - jiuwenswarm/server/runtime/a2ui/runtime/finalizer.py
+- id: browser-tools
+  title: 浏览器服务与网页工具
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/swarm/browser_runtime.py
+  - jiuwenswarm/agents/harness/common/browser_config.py
+  - jiuwenswarm/agents/harness/common/*
+  docs:
+  - docs/zh/浏览器.md
+  page: repos/jiuwenswarm/components/agents-team/feature-browser-tools.md
+  entry_points:
+  - jiuwenswarm/agents/swarm/browser_runtime.py
+  - jiuwenswarm/agents/harness/common/browser_config.py
+- id: browser-client
+  title: Chromium 浏览器扩展
+  owner: browser-client
+  source_globs:
+  - jiuwenswarm/channels/browser/frontend/src/background/index.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts
+  - jiuwenswarm/channels/browser/frontend/src/*
+  docs:
+  - docs/zh/browser-extension/浏览器扩展.md
+  page: repos/jiuwenswarm/components/browser-client/feature-browser-client.md
+  entry_points:
+  - jiuwenswarm/channels/browser/frontend/src/background/index.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts
+- id: vscode
+  title: VS Code 客户端
+  owner: ide-clients
+  source_globs:
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts
+  - jiuwenswarm/channels/ide/packages/vscode-extension/*
+  docs:
+  - docs/zh/ide/vscode/VSCode插件.md
+  page: repos/jiuwenswarm/components/ide-clients/feature-vscode.md
+  entry_points:
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts
+- id: jetbrains
+  title: JetBrains 客户端
+  owner: ide-clients
+  source_globs:
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/JiuwenSwarmService.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/*
+  docs:
+  - docs/zh/ide/jetbrains/JetBrains插件.md
+  page: repos/jiuwenswarm/components/ide-clients/feature-jetbrains.md
+  entry_points:
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/JiuwenSwarmService.kt
+- id: sdk
+  title: Python 与 TypeScript SDK
+  owner: sdk-clients
+  source_globs:
+  - sdks/python/src/jiuwenswarm_sdk/client.py
+  - sdks/*
+  docs:
+  - sdks/README.md
+  page: repos/jiuwenswarm/components/sdk-clients/feature-sdk.md
+  entry_points:
+  - sdks/python/src/jiuwenswarm_sdk/client.py
+- id: sandbox
+  title: JiuwenBox 隔离执行
+  owner: sandbox-runtime
+  source_globs:
+  - jiuwenbox/src/jiuwenbox/server/app.py
+  - jiuwenbox/src/jiuwenbox/*
+  docs:
+  - jiuwenbox/README_CN.md
+  page: repos/jiuwenswarm/components/sandbox-runtime/feature-sandbox.md
+  entry_points:
+  - jiuwenbox/src/jiuwenbox/server/app.py
+- id: models
+  title: 模型平台与 API 配置
+  owner: common-core
+  source_globs:
+  - jiuwenswarm/common/model_catalog.py
+  - jiuwenswarm/common/model_config_validation.py
+  - jiuwenswarm/common/model*.py
+  docs:
+  - docs/zh/配置信息.md
+  page: repos/jiuwenswarm/components/common-core/feature-models.md
+  entry_points:
+  - jiuwenswarm/common/model_catalog.py
+  - jiuwenswarm/common/model_config_validation.py
+- id: mcp
+  title: MCP 配置、凭据与资源
+  owner: common-core
+  source_globs:
+  - jiuwenswarm/common/mcp_config.py
+  docs:
+  - docs/zh/MCP配置.md
+  page: repos/jiuwenswarm/components/common-core/feature-mcp.md
+  entry_points:
+  - jiuwenswarm/common/mcp_config.py
+- id: login
+  title: 账号登录与凭据续期
+  owner: login-auth
+  source_globs:
+  - jiuwenswarm/common/auth/service.py
+  - jiuwenswarm/common/auth/*.py
+  docs:
+  - docs/zh/华为账号登录.md
+  page: repos/jiuwenswarm/components/login-auth/feature-login.md
+  entry_points:
+  - jiuwenswarm/common/auth/service.py
+- id: cron
+  title: 定时任务与调度存储
+  owner: cron-scheduling
+  source_globs:
+  - jiuwenswarm/runtime/cron/factory.py
+  - jiuwenswarm/runtime/cron/*.py
+  docs:
+  - docs/zh/定时任务.md
+  page: repos/jiuwenswarm/components/cron-scheduling/feature-cron.md
+  entry_points:
+  - jiuwenswarm/runtime/cron/factory.py
+- id: observability
+  title: 执行轨迹与保留
+  owner: observability
+  source_globs:
+  - jiuwenswarm/observability/sink.py
+  - jiuwenswarm/observability/*.py
+  docs:
+  - docs/zh/日志.md
+  page: repos/jiuwenswarm/components/observability/feature-observability.md
+  entry_points:
+  - jiuwenswarm/observability/sink.py
+- id: debug-trace
+  title: Debug Dump 与 OTel
+  owner: observability
+  source_globs:
+  - jiuwenswarm/server/runtime/debug_trace/config.py
+  - jiuwenswarm/server/runtime/debug_trace/stream_logger.py
+  - jiuwenswarm/server/runtime/debug_trace/*.py
+  docs:
+  - docs/zh/调试追踪.md
+  page: repos/jiuwenswarm/components/observability/feature-debug-trace.md
+  entry_points:
+  - jiuwenswarm/server/runtime/debug_trace/config.py
+  - jiuwenswarm/server/runtime/debug_trace/stream_logger.py
+- id: multimodal
+  title: 多模态理解与媒体配置
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/common/tools/multimodal_config.py
+  - jiuwenswarm/agents/harness/common/tools/image_tools.py
+  - jiuwenswarm/agents/harness/common/tools/*
+  docs:
+  - docs/zh/Harness.md
+  page: repos/jiuwenswarm/components/agents-team/feature-multimodal.md
+  entry_points:
+  - jiuwenswarm/agents/harness/common/tools/multimodal_config.py
+  - jiuwenswarm/agents/harness/common/tools/image_tools.py
+- id: lsp
+  title: LSP 代码智能
+  owner: agent-server-runtime
+  source_globs:
+  - jiuwenswarm/server/runtime/agent_adapter/interface_code.py
+  - jiuwenswarm/agents/harness/common/rails/*
+  docs:
+  - docs/zh/Harness.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-lsp.md
+  entry_points:
+  - jiuwenswarm/server/runtime/agent_adapter/interface_code.py
+- id: worktree
+  title: Worktree 隔离工作
+  owner: agent-server-runtime
+  source_globs:
+  - jiuwenswarm/server/runtime/agent_adapter/interface_code.py
+  - jiuwenswarm/agents/harness/common/rails/*
+  docs:
+  - docs/zh/Harness.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-worktree.md
+  entry_points:
+  - jiuwenswarm/server/runtime/agent_adapter/interface_code.py
+- id: autofix
+  title: 已有 PR 自动修复
+  owner: tui-client
+  source_globs:
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr*.ts
+  docs:
+  - docs/zh/自动修复PR.md
+  page: repos/jiuwenswarm/components/tui-client/feature-autofix.md
+  entry_points:
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.watch.ts
+- id: im-feishu
+  title: 飞书 频道
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_connect.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/feishu/*
+  docs:
+  - docs/zh/国内频道.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-im-feishu.md
+  entry_points:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_connect.py
+- id: im-wechat
+  title: 微信 频道
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/wechat/wechat_connect.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/wechat/*
+  docs:
+  - docs/zh/国内频道.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-im-wechat.md
+  entry_points:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/wechat/wechat_connect.py
+- id: im-wecom
+  title: 企业微信 频道
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_connect.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/wecom/*
+  docs:
+  - docs/zh/国内频道.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-im-wecom.md
+  entry_points:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_connect.py
+- id: im-dingtalk
+  title: 钉钉 频道
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/dingtalk/dingtalk_connect.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/dingtalk/*
+  docs:
+  - docs/zh/国内频道.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-im-dingtalk.md
+  entry_points:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/dingtalk/dingtalk_connect.py
+- id: im-xiaoyi
+  title: 小艺 频道
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/xiaoyi_connect.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/*
+  docs:
+  - docs/zh/国内频道.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-im-xiaoyi.md
+  entry_points:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/xiaoyi_connect.py
+- id: im-slack
+  title: Slack 频道
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/slack/slack_connect.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/slack/*
+  docs:
+  - docs/zh/海外频道.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-im-slack.md
+  entry_points:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/slack/slack_connect.py
+- id: im-telegram
+  title: Telegram 频道
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/telegram/telegram_connect.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/telegram/*
+  docs:
+  - docs/zh/海外频道.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-im-telegram.md
+  entry_points:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/telegram/telegram_connect.py
+- id: im-discord
+  title: Discord 频道
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/discord/discord_connect.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/discord/*
+  docs:
+  - docs/zh/海外频道.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-im-discord.md
+  entry_points:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/discord/discord_connect.py
+- id: im-whatsapp
+  title: WhatsApp 频道
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/*
+  docs:
+  - docs/zh/海外频道.md
+  page: repos/jiuwenswarm/components/gateway-channels/feature-im-whatsapp.md
+  entry_points:
+  - jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py
+- id: agent-management
+  title: 智能体资产管理与工作区浏览
+  owner: web-frontend
+  source_globs: &id001
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/agentManagement/client.ts
+  - jiuwenswarm/channels/web/frontend/src/components/AgentPanel/index.tsx
+  docs:
+  - docs/zh/智能体.md
+  page: repos/jiuwenswarm/components/web-frontend/feature-agent-management.md
+  entry_points: *id001
+- id: jiuwen-memory-sdk
+  title: JiuwenMemory 进程内 SDK 接入
+  owner: agents-team
+  source_globs: &id002
+  - jiuwenswarm/agents/harness/common/memory/external_memory_builder.py
+  - jiuwenswarm/agents/harness/common/memory/external_memory_config.py
+  docs:
+  - docs/zh/JiuwenMemory-SDK接入.md
+  page: repos/jiuwenswarm/components/agents-team/feature-jiuwen-memory-sdk.md
+  entry_points: *id002
+- id: image-generation
+  title: 图片生成与产物落盘
+  owner: agents-team
+  source_globs: &id003
+  - jiuwenswarm/agents/harness/common/tools/image_tools.py
+  - jiuwenswarm/agents/harness/common/tools/multimodal_config.py
+  docs:
+  - docs/zh/配置信息.md
+  page: repos/jiuwenswarm/components/agents-team/feature-image-generation.md
+  entry_points: *id003
+- id: sandbox-privacy-proxy
+  title: JiuwenBox 推理隐私代理
+  owner: sandbox-runtime
+  source_globs: &id004
+  - jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy.py
+  - jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy_manager.py
+  docs:
+  - jiuwenbox/README_CN.md
+  page: repos/jiuwenswarm/components/sandbox-runtime/feature-sandbox-privacy-proxy.md
+  entry_points: *id004
+- id: digital-avatar
+  title: 群聊数字分身与 owner 权限
+  owner: agents-team
+  source_globs: &id005
+  - jiuwenswarm/agents/harness/common/rails/avatar_rail.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/owner_scopes.py
+  docs:
+  - docs/zh/频道.md
+  - docs/zh/国内频道.md
+  page: repos/jiuwenswarm/components/agents-team/feature-digital-avatar.md
+  entry_points: *id005
+- id: connectors
+  title: 连接器市场与 MCP 授权流程
+  owner: web-frontend
+  source_globs: &id006
+  - jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx
+  docs:
+  - docs/zh/MCP配置.md
+  - jiuwenswarm/channels/web/AGENTS.md
+  page: repos/jiuwenswarm/components/web-frontend/feature-connectors.md
+  entry_points: *id006
+- id: external-cli-agents
+  title: 外部 Claude 与 Codex CLI 智能体
+  owner: common-core
+  source_globs: &id007
+  - jiuwenswarm/common/external_cli_runtime.py
+  - jiuwenswarm/common/external_cli_catalog.py
+  docs:
+  - docs/zh/设置与频道升级迁移指南.md
+  page: repos/jiuwenswarm/components/common-core/feature-external-cli-agents.md
+  entry_points: *id007
+- id: goal-mode
+  title: 持续目标与会话控制
+  owner: web-frontend
+  source_globs: &id008
+  - jiuwenswarm/channels/web/frontend/src/features/goalMode/goalModeGate.ts
+  - jiuwenswarm/channels/web/frontend/src/stores/goalStore.ts
+  - jiuwenswarm/channels/web/frontend/src/services/webClient.ts
+  - jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts
+  docs:
+  - docs/zh/Harness.md
+  - jiuwenswarm/channels/web/AGENTS.md
+  page: repos/jiuwenswarm/components/web-frontend/feature-goal-mode.md
+  entry_points: *id008
+- id: plan-mode
+  title: 计划模式与多入口切换限制
+  owner: web-frontend
+  source_globs: &id009
+  - jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts
+  - jiuwenswarm/channels/web/frontend/src/stores/planStore.ts
+  docs:
+  - docs/zh/模式系统.md
+  - docs/zh/Harness.md
+  page: repos/jiuwenswarm/components/web-frontend/feature-plan-mode.md
+  entry_points: *id009
+- id: heartbeat
+  title: 绑定会话的心跳续跑任务
+  owner: agent-server-runtime
+  source_globs: &id010
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/models.py
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/controller.py
+  - jiuwenswarm/gateway/heartbeat/proxy.py
+  docs:
+  - docs/zh/项目与会话管理.md
+  - jiuwenswarm/channels/web/AGENTS.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-heartbeat.md
+  entry_points: *id010
+- id: artifacts
+  title: 会话产物列表、预览与下载
+  owner: web-frontend
+  source_globs: &id011
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/filePreviewModel.ts
+  docs:
+  - jiuwenswarm/channels/web/AGENTS.md
+  page: repos/jiuwenswarm/components/web-frontend/feature-artifacts.md
+  entry_points: *id011
+- id: speech-interaction
+  title: 语音输入、回复朗读与停止
+  owner: web-frontend
+  source_globs: &id012
+  - jiuwenswarm/channels/web/frontend/src/features/taskAsr/useTaskAsr.ts
+  - jiuwenswarm/channels/web/frontend/src/features/taskAsr/featureFlag.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/tts.ts
+  - jiuwenswarm/channels/web/frontend/src/hooks/useSpeech.ts
+  docs:
+  - jiuwenswarm/channels/web/frontend/README.md
+  page: repos/jiuwenswarm/components/web-frontend/feature-speech-interaction.md
+  entry_points: *id012
+- id: skill-development
+  title: SkillDev 创建、评测与打包边界
+  owner: agent-server-runtime
+  source_globs: &id013
+  - jiuwenswarm/server/runtime/skill/skilldev/service.py
+  - jiuwenswarm/server/runtime/skill/skilldev/pipeline.py
+  - jiuwenswarm/server/runtime/skill/skilldev/deps.py
+  - jiuwenswarm/server/runtime/skill/skilldev/context.py
+  docs:
+  - jiuwenswarm/server/runtime/skill/skilldev/DESIGN.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-skill-development.md
+  entry_points: *id013
+- id: proactive-recommendation
+  title: 主动推荐、频率限制与主 Agent 交付
+  owner: agent-server-runtime
+  source_globs: &id014
+  - jiuwenswarm/agents/harness/common/recommendation/proactive_engine.py
+  - jiuwenswarm/server/runtime/proactive_adapter.py
+  docs:
+  - docs/zh/设置与频道升级迁移指南.md
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-proactive-recommendation.md
+  entry_points: *id014

@@ -60,8 +60,8 @@ VALID_STATUSES = {
     "NOT_APPLICABLE",
 }
 RULE_DEFINITION_RE = re.compile(
-    r"\*\*([A-Z][A-Z0-9]*-\d+[a-z]?)"
-    r"(?:\s+—|\*\*\s*\|)"
+    r"(?:\*\*|^#{2,3}\s+)([A-Z][A-Z0-9]*-\d+[a-z]?)"
+    r"(?:\s+—|\*\*\s*\|)", re.MULTILINE
 )
 STABLE_RULE_ID_RE = re.compile(r"^[A-Z][A-Z0-9]*-\d+[a-z]?$")
 LEGACY_RULE_LABEL_RE = re.compile(r"^LEGACY:(.+?)#(\d+)$")

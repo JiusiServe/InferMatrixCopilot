@@ -1,0 +1,63 @@
+# Human-reviewed adapter for openJiuwen-ai/jiuwenswarm (kb init pilot 2).
+# Upstream facts checked 2026-09-30: public, default branch `develop`, Python
+# (package `jiuwenswarm/` plus the `jiuwenbox` sandbox service under
+# `jiuwenbox/src/jiuwenbox/`), pytest under `tests/`, docs in `docs/zh` and
+# `docs/en` (the same set in two languages), no GitHub Actions workflows.
+# Existing knowledge can be enriched with `kb init --stage knowledge --from-existing`.
+name: jiuwenswarm
+status: active
+created_by: human
+schema_version: 1
+capabilities: []
+
+repo:
+  path: ${JIUWENSWARM_REPO}
+  full_name: openJiuwen-ai/jiuwenswarm
+  aliases: [jiuwenswarm, openJiuwen-ai/jiuwenswarm]
+  default_branch: develop
+  language: python
+
+knowledge:
+  source: openJiuwen-ai/jiuwenswarm@develop
+  repo_subdir: repos/jiuwenswarm
+
+push:
+  default_remote: origin
+  protected_branches: [develop, main, master]
+  allowed: false
+
+# Knowledge service runs in shadow after reviewed initialization.
+knowledge_lifecycle:
+  enabled: true
+  mode: shadow
+  knowledge_dir: repos/jiuwenswarm
+  release:
+    trigger: none
+  upstream_visibility: public
+  init:
+    # deepen stops on this per-stage cap; the default $30 reaches ~5 owner groups
+    # (~$6 each), far short of this repository's ~20 routed owners
+    budget_usd: 60
+    seeds:
+      # linked, never copied: repo-neutral design-review rules
+      - general/review/rules.md
+      # linked: check the existing tests before proposing a fix; the repo
+      # has a large tests/ tree (unit, integration, system, e2e)
+      - general/ci/guides/inspect-existing-tests-first.md
+    # one language only: docs/zh and docs/en carry the same pages, and reading
+    # both would double the doc-corpus cost for no new facts
+    doc_globs:
+      - README_CN.md
+      - TESTING.md
+      - docs/README.md
+      - "docs/zh/**/*.md"
+      - jiuwenbox/README_CN.md
+      - jiuwenswarm/channels/web/frontend/README.md
+      - "jiuwenswarm/**/DESIGN.md"
+      - "sdks/**/README*.md"
+      - "packages/**/README*.md"
+      # Owner notes are partial; verify their claims against pinned code.
+      - ".doc_project_maintainer/**/*.md"
+    source_roots: [jiuwenswarm/, jiuwenbox/src/jiuwenbox/]
+    exclude: ["*/tests/*", "*/__init__.py", "*/resources/*", "*/node_modules/*"]
+  calibration_set: kb-calibration

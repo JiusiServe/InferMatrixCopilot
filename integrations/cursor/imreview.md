@@ -7,7 +7,11 @@ mergeability, and any early findings in the host conversation before reading
 knowledge, searching source, or running tests. Within 60 seconds, do this. Then
 call `review` once with
 `mode="direct"` plus `title`, `body`, and `changed_files`. Use the embedded
-`quick_map` in each returned `knowledge_routes` item. Do not open the full route
+`quick_map` in each returned `knowledge_routes` item and the bounded prose in
+`related_knowledge`. Verify source-pinned claims at the PR head; missing facets
+remain unknown and inferred tradeoffs are background. Use only budgeted
+`navigation_policy.related_document_read_paths` to read incomplete excerpts.
+Do not open the full route
 file unless a concrete ambiguity blocks source review, and do not walk
 `AGENTS.md`, `CLAUDE.md`, repository indexes, or model catalogs. Inspect the
 target at the pinned head SHA and return only evidence-backed findings with

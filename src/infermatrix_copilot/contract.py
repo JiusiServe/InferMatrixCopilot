@@ -104,9 +104,11 @@ def capabilities(*, max_strict_workers: int = 1,
                  supports_file_locking: bool = True) -> dict[str, Any]:
     """What this copilot can do, for a consumer's preflight.
 
-    `max_strict_workers` is reported, not assumed: the MCP server drains its
-    queue with a single worker, so a bot that fans out Strict requests should
-    know they serialize rather than infer concurrency that does not exist."""
+    `max_strict_workers` is reported, not assumed: the run service drains its
+    queue with `STRICT_MAX_WORKERS` workers (default 1), so a bot that fans out
+    Strict requests should size its own admission to this rather than infer
+    concurrency from the fact that `start` returns immediately. Runs on the
+    same checkout+PR still execute one at a time whatever this says."""
     # Compatibility shim: new consumers import ``infermatrix_copilot.sdk.v1``;
     # existing MCP and cross-repo callers keep receiving the legacy dict shape,
     # now with the distribution/SDK/resource identity added.

@@ -1,6 +1,6 @@
 # providers/claude_code.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-30 -->
 
 `LOC ~205 · harness transport（Claude 订阅） · refactor-status: ok`
 
@@ -43,3 +43,10 @@ stdlib + `.base` + `..agent_loop.AgentOutcome` + `..llm` 的类型。
 
 ## 2026-09-28
 `complete()` 接受并忽略 `effort`（与 base 契约一致）。
+
+## 2026-09-30 单次调用花费阈值
+`stops_at_spend = True`：`complete(max_budget_usd=x)` 把 `--max-budget-usd x` 传给 CLI（仅 print 模式有效，`_run` 正是 print 模式），
+x 必须为正。CLI 在每个 API 请求完成**之后**检查预算：它阻止下一个请求，不能截断当前请求，所以花费可超出 x 一个请求。CLI 因预算停下（`subtype` 含 budget）时返回 `stop_reason="max_budget"` 且无文本 —— 被截断的回答永远不可用。
+`total_cost_usd` 以 `usage["cost_usd"]` 返回。
+阈值参数由 `budget_arg()` 精确生成：浮点数的最短往返十进制、普通（非科学）记数法；非正、非有限值 → `ValueError`。
+固定精度格式会移动边界（`.4f` 把 0.00001 变成 "0.0000" 即没有阈值，把 0.12345 变成 "0.1235" 即更高的阈值），所以不允许。

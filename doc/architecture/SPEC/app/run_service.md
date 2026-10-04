@@ -1,10 +1,10 @@
 # app/run_service.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-09-30 -->
 
 `RunService` is the durable application boundary shared by the embedded
-Strict SDK and MCP transport. It owns policy-checked reserve/start, one
-serialized worker, isolated child launch, startup/orphan reconciliation,
+Strict SDK and MCP transport. It owns policy-checked reserve/start, a queue
+drained by `STRICT_MAX_WORKERS` workers (default 1), isolated child launch, startup/orphan reconciliation,
 readiness, bounded status/result polling, and repository-scoped knowledge
 reads. Construction and polling require no CLI or MCP module import.
 
@@ -39,3 +39,33 @@ run is pinned to this server's effective `knowledge_dir` (reported as `packaged`
 or `unverified` for a custom directory), with `KNOWLEDGE_ROOT` removed from the
 child's environment. Runs reserved before pinning
 existed have no record and use the process default.
+
+## 2026-09-30 Concurrent workers
+`Settings.strict_max_workers` (`STRICT_MAX_WORKERS`, 1–32, default 1; embedded
+hosts set it through `StrictRuntimeConfig.max_workers`) starts that many worker
+threads, and `capabilities()` reports the same number as `max_strict_workers`.
+Each worker launches one child at a time, so at most N children run at once.
+
+`RunQueue` never hands out two runs with the same **conflict key** at once:
+the checkout (resolved through the same `RepositoryContextResolver` execution
+uses: frozen path, `REPO_PATHS`, then the adapter manifest) plus the PR number (`None` for issue tasks, which work in
+the live checkout). Runs on one PR head share one PR-time worktree, and harness
+sessions write their tool-bridge config into their working directory (cursor's
+`.cursor/mcp.json` has one fixed path per tree), so overlapping them would bind
+one run's agent to the other run's tool scope and trace. A run whose key is busy
+stays queued in order without holding a worker; workers take the oldest run
+whose key is free, so one busy PR cannot stall other PRs. The key is computed
+from the persisted `request.json` at enqueue; an unreadable request shares the
+key `("?", None)`. A failed launch marks the run `failed` and always frees its
+key. `_reap()` is single-flight per service (a non-blocking lock): a worker that
+finishes while another is sweeping skips its sweep.
+
+The key cannot see a runtime fallback: a PR run whose worktree could not be
+materialized degrades to the live checkout, where issue tasks and other
+degraded runs also work. That shared directory is guarded where the hazard
+is — the cursor transport serializes bridge-carrying sessions in a shared
+checkout with an `flock` in its git dir (`providers/cursor.md`), across
+services and the CLI as well. Not covered: two agent sessions *inside one run*
+(ensemble lenses, per-comment verification, bounded by
+`strict_backend_concurrency`) still share their run's own tree; that predates
+this change and is independent of the worker count.

@@ -19,7 +19,7 @@
 
 ### Direct PR review 单次路由
 
-默认 Direct review 只执行一篇 Codex 审查。先固定 base/head，再一次性获取 PR title/body、changed files、diff、mergeability 和 CI；元数据返回后先在宿主对话发进度，再把 title/body/changed files 一次传给 Direct。使用返回的至多 3 个精确 owner/model `knowledge_routes` 内嵌 `quick_map`，随后停止知识导航；只有一个具体歧义阻塞源码审查时才打开对应完整规则文件，不得再从 `AGENTS.md`、本页、repo index 或 model catalog 逐层展开。执行返回的 docs/code `execution_budget`；只有明确未解决的 P1/高风险合同可追加一次有界调查。changed files 只校验并补全真实范围。把已读文件、caller 搜索、测试结果和 findings 放进同一份证据包，correctness 与 design/subtraction 在这次审查中共用，不能各自重新导航或重复采集。
+默认 Direct review 只执行一篇 Codex 审查。先固定 base/head，再一次性获取 PR title/body、changed files、diff、mergeability 和 CI；元数据返回后先在宿主对话发进度，再把 title/body/changed files 一次传给 Direct。使用返回的至多 3 个精确 owner/model `knowledge_routes` 内嵌 `quick_map` 和有界的 `related_knowledge` 正文，随后停止索引导航；背景声明须核对来源 pin 与 PR head，缺失维度保留为未知，截断页只沿预算内的 `related_document_read_paths` 读取；只有一个具体歧义阻塞源码审查时才打开对应完整规则文件，不得再从 `AGENTS.md`、本页、repo index 或 model catalog 逐层展开。执行返回的 docs/code `execution_budget`；只有明确未解决的 P1/高风险合同可追加一次有界调查。changed files 只校验并补全真实范围。把已读文件、caller 搜索、测试结果和 findings 放进同一份证据包，correctness 与 design/subtraction 在这次审查中共用，不能各自重新导航或重复采集。
 
 固定快照后先完成状态轨并发出宿主进度；不要让知识读取、源码搜索或测试挡住这条消息。随后知识/源码轨与验证轨并行：前者只读 Direct 返回的精确规则和命中源码，后者先做简短 import/version 兼容性预检，通过后运行目标测试与低成本静态检查。全程只维护当前审查的一份证据包，复用文件、限定目录/glob/输出量的 `rg`、caller、测试、repo-map、知识路由和 findings；不为 Direct 新建持久缓存或调度服务。
 

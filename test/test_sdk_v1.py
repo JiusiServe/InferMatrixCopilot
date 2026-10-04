@@ -83,6 +83,26 @@ def test_second_adapter_routes_from_packaged_adapter_registry():
     )
 
 
+def test_related_depth_reaches_sdk_with_content_addressed_refs_and_read_budget():
+    request = replace(_request("jiuwenswarm", "jiuwenswarm/common/model_catalog.py"),
+                      title="Model platform configuration", body="models API")
+    client = DirectClient()
+    plan = client.plan(request)
+    related = plan.related_knowledge
+    assert related["status"] == "ready" and related["content_chars"] <= 6000
+    models = next(d for d in related["documents"] if d["feature"] == "models")
+    assert "configuration" in models["available_facets"]
+    assert models["source_pins"] == ["f0a69728c96b5961d993449f1a901cbd2f4dac5b"]
+    document = models["document"]
+    assert document["document_id"] == models["path"]
+    assert document["sha256"].startswith("sha256:")
+    assert not Path(document["document_id"]).is_absolute()
+    assert plan.execution_budget["knowledge_file_reads"] == (
+        sum(route.read_required for route in plan.knowledge_routes)
+        + len(plan.mandatory_review_guides)
+        + len(plan.navigation_policy["related_document_read_paths"]))
+
+
 def test_completion_is_bound_to_context_and_frozen_head():
     client = DirectClient()
     plan = client.plan(
@@ -406,7 +426,7 @@ def test_strict_runtime_public_capabilities_smoke(tmp_path):
         caps = runtime.capabilities()
 
     assert caps.distribution_version == "0.2.0"
-    assert caps.strict_api_version == "1.3.0"
+    assert caps.strict_api_version == "1.4.0"
     assert caps.knowledge_api_version == KNOWLEDGE_API_VERSION
     assert caps.supports_knowledge_curation is True
 

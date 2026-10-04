@@ -45,7 +45,7 @@ def _resolve_pr_head(repo: Path, pr: int) -> tuple[str, str, str]:
     diff` resolves the head server-side; `_pr_time_checkout` resolved it again
     via `gh pr view`), so a push landing between them produced a diff and a
     review tree from different commits."""
-    code, out = _gh(["pr", "view", str(pr), "--json", "baseRefName,commits"],
+    code, out = _gh(["pr", "view", str(pr), "--json", "baseRefName,headRefOid"],
                     cwd=repo)
     if code != 0:
         return "", "", f"pr view failed: {out[:200]}"
@@ -54,10 +54,9 @@ def _resolve_pr_head(repo: Path, pr: int) -> tuple[str, str, str]:
     except json.JSONDecodeError:
         return "", "", "pr view returned non-JSON"
     base_ref = str(data.get("baseRefName") or "")
-    commits = data.get("commits") or []
-    # `headRefOid` is not exposed by every gh version — the last commit's oid is
-    # the PR head and is universally available
-    head_sha = str(commits[-1].get("oid") or "") if commits else ""
+    # The commits connection can be truncated at 100 entries; its last entry
+    # need not be the PR head. Resolve the authoritative head directly.
+    head_sha = str(data.get("headRefOid") or "")
     if not head_sha:
         return base_ref, "", "PR head unresolvable from pr view"
     return base_ref, head_sha, ""

@@ -204,6 +204,19 @@ def _redact_obj(value: Any, environ: Mapping[str, str] | None = None) -> Any:
     return value
 
 
+def _redact_native(value, environ):
+    if isinstance(value, dict):
+        clean = {}
+        for key, item in value.items():
+            secret = isinstance(key, str) and isinstance(item, str) and re.search(
+                r"(?:api_?key|access_?token|refresh_?token|secret|password|passwd|authorization|credentials?)$", key, re.I)
+            clean[redact(key, environ) if isinstance(key, str) else key] = REDACTED if secret else _redact_native(item, environ)
+        return clean
+    if isinstance(value, (list, tuple)):
+        return [_redact_native(item, environ) for item in value]
+    return _redact_obj(value, environ)
+
+
 # -- context -----------------------------------------------------------------------
 
 @contextmanager
@@ -287,6 +300,14 @@ class TraceStore:
         self._environ = environ
         self._lock = threading.Lock()
 
+    def begin_call(self, entry: Mapping[str, Any]) -> "NativeCallArchive":
+        """Publish inputs before dispatch; an unfinished archive survives a kill.
+
+        Attempts are not extra model_call records. Their final receipt links to
+        the single existing record, so usage accounting does not count twice.
+        """
+        return NativeCallArchive(self, entry)
+
     # blobs -----------------------------------------------------------------------
     def put_blob(self, content: str | bytes) -> str:
         """Store redacted text; bytes must be UTF-8 text (redaction needs text)."""
@@ -301,7 +322,10 @@ class TraceStore:
         if not path.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
             tmp = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
-            tmp.write_bytes(gzip.compress(data, mtime=0))
+            with tmp.open("wb") as handle:
+                handle.write(gzip.compress(data, mtime=0))
+                handle.flush()
+                os.fsync(handle.fileno())
             os.replace(tmp, path)
         return f"sha256:{digest}"
 
@@ -394,6 +418,8 @@ class TraceStore:
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("a", encoding="utf-8") as handle:
                 handle.write(line + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
             with self._db() as conn:
                 self._insert(conn, record, line)
         return record
@@ -673,6 +699,75 @@ class TraceStore:
                     report["problems"].append(f"{mismatched} rows differ in workflow/unit_id/fingerprint")
         report["ok"] = not report["problems"]
         return report
+
+class NativeCallArchive:
+    """One isolated durable call journal under the runtime's trace directory."""
+
+    def __init__(self, store: TraceStore, entry: Mapping[str, Any]):
+        self.store = store
+        self.id = uuid.uuid4().hex
+        self.path = store.root / "attempts" / self.id
+        self.path.mkdir(parents=True)
+        self.events_path = self.path / "native-events.jsonl"
+        self.session_ids: set[str] = set()
+        self.meta = {"schema": "native-attempt/1", "id": self.id, "status": "inflight",
+                     "at": store._clock(), "context": current_context(),
+                     "model": {k: entry.get(k, "") for k in ("role", "provider", "model", "effort")},
+                     "inputs": {k: store.put_blob(str(entry.get(k, ""))) for k in ("system", "prompt")},
+                     "usage": {}, "cost_usd": None, "served_model": "", "seconds": None,
+                     "native_session_ids": [], "env": environment_fingerprint()}
+        self._save()
+
+    def _save(self):
+        data = _redact_obj(self.meta, self.store._environ)
+        temporary = self.path / (uuid.uuid4().hex + ".tmp")
+        with temporary.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=False, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, self.path / "attempt.json")
+
+    def event(self, event: Mapping[str, Any]):
+        event = _redact_native(dict(event), self.store._environ)
+        prior_ids = set(self.session_ids)
+        for payload in (event, event.get("payload")):
+            if isinstance(payload, dict):
+                for key in ("sessionId", "session_id", "requestId", "request_id"):
+                    if isinstance(payload.get(key), str):
+                        self.session_ids.add(payload[key])
+        with self.events_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        payload = event.get("payload")
+        changed = prior_ids != self.session_ids
+        if event.get("type") == "session.updated" and isinstance(payload, dict) and payload.get("modelId"):
+            self.meta["served_model"] = str(payload["modelId"])
+            changed = True
+        if event.get("type") == "result" and isinstance(event.get("usage"), dict):
+            self.meta["native_usage"] = event["usage"]
+            changed = True
+        if changed:
+            self.meta["native_session_ids"] = sorted(self.session_ids)
+            self._save()
+
+    def payload(self) -> dict:
+        return {"native_attempt_id": self.id,
+                "native_session_ids": sorted(self.session_ids),
+                "native_events": self.events_path.read_text(encoding="utf-8") if self.events_path.exists() else ""}
+
+    def finish(self, receipt: Mapping[str, Any] | None, entry: Mapping[str, Any], *, status: str):
+        receipt = receipt or {}
+        self.meta.update({"status": status, "finished_at": self.store._clock(),
+                          "trace_id": receipt.get("id", ""),
+                          "outputs": receipt.get("outputs") or {"reply": self.store.put_blob(str(entry.get("reply", "")))},
+                          "usage": entry.get("usage") or {}, "cost_usd": entry.get("cost_usd"),
+                          "served_model": entry.get("served_model", ""), "seconds": entry.get("seconds"),
+                          "error": entry.get("error", ""), "native_session_ids": sorted(self.session_ids),
+                          "native_events_sha256": self.store.put_blob(self.payload()["native_events"])})
+        self._save()
+
 
 
 def _text(value: Any) -> str:

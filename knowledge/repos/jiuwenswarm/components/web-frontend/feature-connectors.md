@@ -1,0 +1,70 @@
+---
+title: 连接器市场与 MCP 授权流程的职责、接口与配置
+created: '2026-10-01'
+updated: '2026-10-01'
+type: guide
+tags:
+- jiuwenswarm
+sources:
+- openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts
+- openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx
+- openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/MCP配置.md
+- openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/AGENTS.md
+feature: "connectors"
+entry_points: ["jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts", "jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts", "jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx"]
+---
+
+# 连接器市场与 MCP 授权流程的职责、接口与配置
+
+本页提供该能力的基本知识与验证入口，固定基线 `f0a69728c96b`。
+
+<!-- kb:knowledge owner=feature-connectors facet=architecture pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b -->
+
+## 职责与边界
+
+连接器市场把预置、Hub 与自定义 MCP 的目录、详情、安装和连接流程装配成 Web 界面，connectorApi 是请求与响应字段的薄适配层。当前客户端以 connection_state 表达连接状态，忽略旧 connected 与 enabled 镜像；目录中存在一项并不代表其授权和工具装配已经完成。
+
+源码与文档：[jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts:L1–L278](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts#L1-L278)；[jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx:L1–L320](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx#L1-L320)；[docs/zh/MCP配置.md:L1–L126](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/MCP%E9%85%8D%E7%BD%AE.md#L1-L126)；[jiuwenswarm/channels/web/AGENTS.md:L1–L151](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/AGENTS.md#L1-L151)。
+
+<!-- kb:knowledge owner=feature-connectors facet=api pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b -->
+
+## 接口与调用入口（API）
+
+客户端方法族是 mcp.list、show、install、uninstall、connect、wait_auth、cancel_connect、disconnect、delete_custom、register_custom 与 save_credentials。list 区分 builtin 与 local；show 内含 tools。CLI OAuth 每一步使用一次 hold-open 的 wait_auth 请求等待后端结果，连接、注册和等待授权均使用十分钟客户端超时。
+
+源码与文档：[jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts:L1–L278](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts#L1-L278)；[jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx:L1–L320](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx#L1-L320)；[docs/zh/MCP配置.md:L1–L126](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/MCP%E9%85%8D%E7%BD%AE.md#L1-L126)；[jiuwenswarm/channels/web/AGENTS.md:L1–L151](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/AGENTS.md#L1-L151)。
+
+<!-- kb:knowledge owner=feature-connectors facet=configuration pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b -->
+
+## 配置入口与生效条件
+
+自定义连接声明 transport、command、args、env、url、headers 与 timeout_s；传输方式对应 stdio、SSE 或 HTTP 类服务。授权响应还携带 credential_kind、fields、step_index 与 auth_url 等字段，凭据提交走 save_credentials。具体字段按连接器返回的 schema 填写；删除自定义记录与断开连接是两个不同请求。
+
+源码与文档：[jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts:L1–L278](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts#L1-L278)；[jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx:L1–L320](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx#L1-L320)；[docs/zh/MCP配置.md:L1–L126](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/MCP%E9%85%8D%E7%BD%AE.md#L1-L126)；[jiuwenswarm/channels/web/AGENTS.md:L1–L151](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/AGENTS.md#L1-L151)。
+
+<!-- kb:knowledge owner=feature-connectors facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b -->
+
+## 设计取舍
+
+**设计推断**：把 OAuth 等待交给后端长请求减少前端轮询和跨步骤状态分叉，但客户端必须维持足够超时并支持取消。真实 MCP 调用失败会向调用方抛错；连接器状态不能借用插件目录的模拟兜底来推断，安装、连接与解绑也不能共用一个成功标志。
+
+源码与文档：[jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts:L1–L278](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts#L1-L278)；[jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx:L1–L320](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx#L1-L320)；[docs/zh/MCP配置.md:L1–L126](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/MCP%E9%85%8D%E7%BD%AE.md#L1-L126)；[jiuwenswarm/channels/web/AGENTS.md:L1–L151](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/AGENTS.md#L1-L151)。
+
+<!-- kb:knowledge owner=feature-connectors facet=features pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b -->
+
+## 数据流与关联功能
+
+从市场或本地目录打开详情，再安装、连接并按响应完成 token 或 OAuth 步骤；工具清单来自详情响应，后续由 Agent 的 MCP 装配使用。取消连接负责收尾挂起授权，disconnect 解绑而 delete_custom 删除自定义记录；界面应沿 source 和 connection_state 展示可用操作。
+
+源码与文档：[jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts:L1–L278](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts#L1-L278)；[jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx:L1–L320](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx#L1-L320)；[docs/zh/MCP配置.md:L1–L126](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/MCP%E9%85%8D%E7%BD%AE.md#L1-L126)；[jiuwenswarm/channels/web/AGENTS.md:L1–L151](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/AGENTS.md#L1-L151)。
+
+<!-- kb:knowledge owner=feature-connectors facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b -->
+
+## 怎样验证
+
+检查 builtin 与 local 目录、自定义注册、工具详情及安装后的连接状态，分别走 token、分步 OAuth 和取消路径。用后端错误验证界面不会展示假成功，再核对 disconnect 与 delete_custom 的结果，以及慢握手不会被默认短超时误判。本页列出验收入口，未执行上游授权集成。
+
+源码与文档：[jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts:L1–L278](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts#L1-L278)；[jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx:L1–L320](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx#L1-L320)；[docs/zh/MCP配置.md:L1–L126](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/MCP%E9%85%8D%E7%BD%AE.md#L1-L126)；[jiuwenswarm/channels/web/AGENTS.md:L1–L151](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/AGENTS.md#L1-L151)。
+
+关联阅读：[mcp](../common-core/feature-mcp.md)；[agent-management](feature-agent-management.md)；[applications](../extensions-plugins/feature-applications.md)。

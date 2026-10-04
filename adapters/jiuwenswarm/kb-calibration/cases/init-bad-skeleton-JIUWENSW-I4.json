@@ -1,0 +1,52 @@
+{
+ "base": {
+  "repos/jiuwenswarm/components/common-core/rules.md": "---\ntitle: \"jiuwenswarm/common 审查规则：配置读写事务、跨仓契约与持久化键稳定性\"\ncreated: 2026-09-30\nupdated: 2026-09-30\ntype: rule\ntags: [jiuwenswarm]\nsources: []\n---\n\n# jiuwenswarm/common 审查规则：配置读写事务、跨仓契约与持久化键稳定性\n\n## JIUWENSW-I1 — `jiuwenswarm/common/config.py::update_config` 的 mutator 不能再次进入写锁，返回值决定是否写盘\n\n- `_CONFIG_WRITE_LOCK`（`threading.Lock`）和 portalocker 文件锁都不可重入。如果 mutator 里调用了任何经过 `update_config` 或 `config_write_lock` 的函数（如 `update_ttse_enabled_in_config`、`save_models_candidate`、`update_permissions_*`），同一线程会一直阻塞，到 `lock_timeout` 后抛出 `TimeoutError`，写入失败。\n- mutator 的返回值才是要 dump 的对象。返回 `None` 表示不写盘（`delete_*` 没命中时就靠它跳过）。新写的 mutator 如果漏了 `return data`，修改会被悄悄丢掉。\n- mutator 内抛出异常会中止写入。校验（`raise_if_invalid`、重复 id 检查）必须放在 mutator 里面或调用之前，不能放到 `update_config` 返回之后。\n- 写盘后要读出来展示的数据，应在 `update_config` 返回后另发一次调用，不要在 mutator 里读。\n\n<!-- kb:rule status=active since=init-f0a69728c96b -->\n\n## JIUWENSW-I13 — 读取开关时注意字符串布尔值；evolution 开关只有一个来源\n\n- 通过 `${VAR:-false}` 注入的值是字符串，而 `bool(\"false\")` 为 True。可能来自环境变量替换的新开关应使用 `coerce_config_bool`。`is_subagent_runtime_enabled` 里的 `bool(...)` 就有这个问题，不要照抄。\n- `_get_evolution_config` 有意只读 `react.evolution`，不读顶层的 `evolution`，也不读环境变量覆盖，以免残留的部署变量改变运行中 agent 的能力。`get_skill_evolution_enabled` 和 `get_evolution_auto_save_enabled` 用 `is True` 严格判断。PR 不能把旧路径或 env 回退加回来。\n\n<!-- kb:rule status=active since=init-f0a69728c96b -->\n\n## JIUWENSW-I17 — `jiuwenswarm/common/client/` 下的抽象接口是跨仓库契约，改签名必须和 Gateway 副本同步\n\n- `AgentServerClient` 和 `ThirdAgent` 在 Gateway 仓库里各有一份副本，两边靠 E2A 线协议对齐。修改方法名、keyword-only 参数或返回类型时，必须同步 Gateway 副本和所有实现（WebSocket、AgentOS Router 等）。\n- 新增 `@abstractmethod` 会让所有没实现它的子类无法实例化。可选能力应提供默认实现（参考 `ThirdAgent.normalize_agent_type`）。\n- `send_request` 的 `timeout=None` 表示使用客户端默认值。实现方必须采用调用方传入的更大值（例如 cron 的 `timeout_seconds`），不能再被内层默认值提前截断。\n- `UnsupportedThirdAgent` 的返回形状（`ok` 为 False，带 `error`，`code` 为 UNSUPPORTED）是调用方依赖的约定。`normalize_agent_type` 只对内置的 jiuwenswarm 不区分大小写，registry 里的名称保留原大小写。\n\n<!-- kb:rule status=active since=init-f0a69728c96b -->\n"
+ },
+ "evidence": [
+  {
+   "kind": "upstream_text",
+   "source_reference": "openJiuwen-ai/jiuwenswarm@f0a69728c96b:docs/zh/A2A.md:L5-L5",
+   "text": "> **实现**：`jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py`（`A2AChannel` + `a2a-sdk`）。**入口进程**：`python -m jiuwenswarm.gateway.app_gateway`（`jiuwenswarm/gateway/app_gateway.py` 中注册并启动）。**冲突时**：以源码为准，并回头修正本文。"
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "openJiuwen-ai/jiuwenswarm@f0a69728c96b:docs/zh/A2A.md:L14-L15",
+   "text": "| `jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py` | A2A HTTP 服务、`AgentCard`、请求/响应与 `Message` 互转 |\n| `jiuwenswarm/gateway/app_gateway.py` | 环境变量读取、`A2AChannel` 构造与 `channel_manager.register_channel` |"
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "openJiuwen-ai/jiuwenswarm@f0a69728c96b:docs/zh/A2A.md:L25-L25",
+   "text": "- **出站**：Agent 侧通过 A2A MCP Hub 等工具访问外部 A2A，接线在 AgentServer 适配层（见 §7），不在 `A2AChannel` 内实现。"
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "openJiuwen-ai/jiuwenswarm@f0a69728c96b:docs/zh/A2A.md:L43-L53",
+   "text": "启用 A2A 前请先安装可选依赖：\n\n```bash\npip install \"jiuwenswarm[a2a]\"\n# 或（仓库/开发环境）\nuv sync --extra a2a\n```\n\n| 变量 | 默认 | 说明 |\n|------|------|------|\n| `A2A_SERVER_ENABLED` | 未设则关闭 | `1` / `true` / `yes` / `on` 为开启 |"
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "openJiuwen-ai/jiuwenswarm@f0a69728c96b:docs/zh/A2A.md:L67-L67",
+   "text": "当 `A2A_SERVER_ENABLED=true` 且未安装 `jiuwenswarm[a2a]`（或 `uv sync --extra a2a`）时，Gateway 主流程仍会继续启动；A2A 通道启动失败会在日志中输出明确安装指引。"
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "openJiuwen-ai/jiuwenswarm@f0a69728c96b:docs/zh/A2A.md:L158-L158",
+   "text": "- 鉴权、限流、超时与观测指标：由网关或前置代理统一补强时，保持 `A2AChannel` 只做协议与消息映射为宜。"
+  },
+  {
+   "kind": "upstream_text",
+   "source_reference": "openJiuwen-ai/jiuwenswarm@f0a69728c96b:docs/zh/E2A-protocol.md:L165-L165",
+   "text": "| `e2a_response_to_a2a_stream_payload` | **`E2AResponse`**（`a2a.stream_event`）→ A2A **`StreamResponse`** 形 JSON（四选一）；不适用时返回 `None` |"
+  }
+ ],
+ "expected": "reject",
+ "head": {
+  "repos/jiuwenswarm/components/common-core/rules.md": "---\ntitle: \"jiuwenswarm/common 审查规则：配置读写事务、跨仓契约与持久化键稳定性\"\ncreated: 2026-09-30\nupdated: 2026-09-30\ntype: rule\ntags: [jiuwenswarm]\nsources: []\n---\n\n# jiuwenswarm/common 审查规则：配置读写事务、跨仓契约与持久化键稳定性\n\n## JIUWENSW-I1 — `jiuwenswarm/common/config.py::update_config` 的 mutator 不能再次进入写锁，返回值决定是否写盘\n\n- `_CONFIG_WRITE_LOCK`（`threading.Lock`）和 portalocker 文件锁都不可重入。如果 mutator 里调用了任何经过 `update_config` 或 `config_write_lock` 的函数（如 `update_ttse_enabled_in_config`、`save_models_candidate`、`update_permissions_*`），同一线程会一直阻塞，到 `lock_timeout` 后抛出 `TimeoutError`，写入失败。\n- mutator 的返回值才是要 dump 的对象。返回 `None` 表示不写盘（`delete_*` 没命中时就靠它跳过）。新写的 mutator 如果漏了 `return data`，修改会被悄悄丢掉。\n- mutator 内抛出异常会中止写入。校验（`raise_if_invalid`、重复 id 检查）必须放在 mutator 里面或调用之前，不能放到 `update_config` 返回之后。\n- 写盘后要读出来展示的数据，应在 `update_config` 返回后另发一次调用，不要在 mutator 里读。\n\n<!-- kb:rule status=active since=init-f0a69728c96b -->\n\n## JIUWENSW-I13 — 读取开关时注意字符串布尔值；evolution 开关只有一个来源\n\n- 通过 `${VAR:-false}` 注入的值是字符串，而 `bool(\"false\")` 为 True。可能来自环境变量替换的新开关应使用 `coerce_config_bool`。`is_subagent_runtime_enabled` 里的 `bool(...)` 就有这个问题，不要照抄。\n- `_get_evolution_config` 有意只读 `react.evolution`，不读顶层的 `evolution`，也不读环境变量覆盖，以免残留的部署变量改变运行中 agent 的能力。`get_skill_evolution_enabled` 和 `get_evolution_auto_save_enabled` 用 `is True` 严格判断。PR 不能把旧路径或 env 回退加回来。\n\n<!-- kb:rule status=active since=init-f0a69728c96b -->\n\n## JIUWENSW-I17 — `jiuwenswarm/common/client/` 下的抽象接口是跨仓库契约，改签名必须和 Gateway 副本同步\n\n- `AgentServerClient` 和 `ThirdAgent` 在 Gateway 仓库里各有一份副本，两边靠 E2A 线协议对齐。修改方法名、keyword-only 参数或返回类型时，必须同步 Gateway 副本和所有实现（WebSocket、AgentOS Router 等）。\n- 新增 `@abstractmethod` 会让所有没实现它的子类无法实例化。可选能力应提供默认实现（参考 `ThirdAgent.normalize_agent_type`）。\n- `send_request` 的 `timeout=None` 表示使用客户端默认值。实现方必须采用调用方传入的更大值（例如 cron 的 `timeout_seconds`），不能再被内层默认值提前截断。\n- `UnsupportedThirdAgent` 的返回形状（`ok` 为 False，带 `error`，`code` 为 UNSUPPORTED）是调用方依赖的约定。`normalize_agent_type` 只对内置的 jiuwenswarm 不区分大小写，registry 里的名称保留原大小写。\n\n<!-- kb:rule status=active since=init-f0a69728c96b -->\n\n## JIUWENSW-I4 — A2A SDK 只能在 A2A 通道内部延迟导入，不能影响 Gateway 启动\n\n- 文档要求：没装 `jiuwenswarm[a2a]` 时，Gateway 主流程仍要正常启动，只在 A2A 通道启动失败时在日志里给出安装指引。\n- 所以 `a2a` 包只能在 `jiuwenswarm/gateway/channel_manager/protocol/a2a/` 内部导入。`jiuwenswarm/gateway/app_gateway.py` 只有在 `A2A_SERVER_ENABLED` 为真时才导入和构造 `A2AChannel`，并且要捕获导入失败、记日志后继续启动。\n- 如果 PR 在 `app_gateway.py`、`channel_manager.py`、`message_handler.py` 或 `jiuwenswarm/common/e2a/` 的模块顶层导入了 `a2a`，没装这个 extra 的用户会直接启动失败。E2A 适配器用 JSON 形状表示 A2A 对象，不应引入对 `a2a-sdk` 的硬依赖。\n- 鉴权、限流和出站 A2A 不要放进 `A2AChannel`，它只负责协议和 `Message` 之间的映射。\n\n<!-- kb:rule status=active since=init-f0a69728c96b -->\n"
+ },
+ "id": "init-bad-skeleton-JIUWENSW-I4",
+ "note": "kb init skeleton: judge said fail; on main the text is changed",
+ "rule_id": "JIUWENSW-I4",
+ "source": "judge",
+ "stage": "skeleton",
+ "verdict": "fail"
+}

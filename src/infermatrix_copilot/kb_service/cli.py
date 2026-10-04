@@ -14,6 +14,14 @@
     kb traces [--kind K] [--changeset ID] [--rule ID] [--limit N]   query trace/1 records
     kb replay --record ID --model PROVIDER:MODEL[:EFFORT]           re-ask a recorded call
     kb export --out FILE [--role judge|generator]                   dataset (calibration-safe)
+    kb init REPO --stage STAGE [--dry-run] [--pin SHA]
+                                      bootstrap a repository's knowledge base, one
+                                      human-merged stage at a time (skeleton, modules,
+                                      knowledge, deepen, pr-history, harvest-calibration);
+                                      never touches kb.db
+    kb init REPO --suggest-seeds      rank existing knowledge pages worth seeding from (no model call)
+    kb widen REPO [--dry-run]         enrich existing feature and file knowledge
+    kb deepen REPO [--dry-run]        deepen implementation knowledge per feature
     kb publish (--remote HOST:/STATE_DIR | --local DIR) [--once]
                                       the publisher (GPU box, owner's gh login): perform
                                       the signed outbox items; writes need ALLOW_POST=1
@@ -103,6 +111,70 @@ def _refresh(state_dir: Path, ledger, registry) -> None:
     _outbox(state_dir, ledger).transition(lambda: None)
 
 
+def _init_command(args, state_dir: Path) -> int:
+    from ..config import Settings
+
+    if args.suggest_seeds == bool(args.stage):
+        print("kb init: pass exactly one of --stage or --suggest-seeds", file=sys.stderr)
+        return 2
+    if args.unlimited_subscription and (args.stage != "knowledge-deepen" or args.budget_usd is not None):
+        print("--unlimited-subscription is for knowledge-deepen only and conflicts with --budget-usd", file=sys.stderr)
+        return 2
+    if args.suggest_seeds:
+        from .init_stages import suggest_seeds
+        from .init_support import InitError, InitRuntime
+
+        try:
+            rt = InitRuntime.from_env(Settings(), state_dir=state_dir)
+            lifecycle = rt.registry.get(args.repo)
+            if lifecycle is None:
+                print(f"no adapter declares knowledge repo {args.repo!r}", file=sys.stderr)
+                return 2
+            for path, score, shared in suggest_seeds(rt, lifecycle):
+                print(f"{score:6.3f}  {path}  ({', '.join(shared[:8])})")
+        except InitError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        return 0
+    from .runner import run_playbook
+
+    params = {"stage": args.stage, "dry_run": "true" if args.dry_run else "false", "pin": args.pin or ""}
+    if getattr(args, "acceptance_mode", "strict") != "strict":
+        if args.stage != "knowledge-deepen":
+            print("--acceptance-mode is for knowledge-deepen only", file=sys.stderr)
+            return 2
+        params["acceptance_mode"] = args.acceptance_mode
+    if args.from_existing:
+        if args.stage not in ("knowledge", "knowledge-deepen"):
+            print("--from-existing is for --stage knowledge or knowledge-deepen only", file=sys.stderr)
+            return 2
+        params["from_existing"] = "true"
+    if args.subscription_generator:
+        params["subscription_generator"] = "true"
+    if args.unlimited_subscription:
+        params["unlimited_subscription"] = "true"
+    if args.retry_unfinished:
+        if args.stage != "knowledge-deepen":
+            print("--retry-unfinished is for knowledge-deepen only", file=sys.stderr)
+            return 2
+        params["retry_unfinished"] = "true"
+    if args.pr_count is not None:
+        if args.stage != "pr-history" or args.pr_count < 1:
+            print("--pr-count is a positive integer for --stage pr-history only", file=sys.stderr)
+            return 2
+        params["pr_count"] = str(args.pr_count)
+    if args.budget_usd is not None:
+        import math
+
+        if args.stage not in ("pr-history", "knowledge-deepen") or not math.isfinite(args.budget_usd) or args.budget_usd <= 0:
+            print("--budget-usd is a finite positive ceiling for pr-history or knowledge-deepen", file=sys.stderr)
+            return 2
+        params["budget_usd"] = str(args.budget_usd)
+    outcome, run_dir = run_playbook(Settings(), "kb-init", args.repo, state_dir=state_dir, params=params)
+    print(f"kb init {args.repo} {args.stage}: {outcome.status} ({run_dir})")
+    return 0 if outcome.status == "done" else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="infermatrix-copilot kb")
     parser.add_argument("--state-dir", help="default: $KB_STATE_DIR or ~/.infermatrix-copilot/kb")
@@ -142,6 +214,40 @@ def main(argv: list[str] | None = None) -> int:
     export = sub.add_parser("export")
     export.add_argument("--out", required=True)
     export.add_argument("--role", default="judge", choices=("judge", "generator"))
+    init = sub.add_parser("init")
+    init.add_argument("repo")
+    from .init_support import INDEPENDENT_STAGES, STAGES
+
+    init.add_argument("--stage", choices=STAGES + INDEPENDENT_STAGES)
+    init.add_argument("--pr-count", type=int, help="PR-history window (default: adapter pr_history_count or 1000)")
+    init.add_argument("--budget-usd", type=float, help="incremental history/depth cumulative ceiling; may be raised to resume")
+    init.add_argument("--dry-run", action="store_true",
+                      help="write the tree and PR body under the state directory instead of opening a PR")
+    init.add_argument("--pin", help="upstream commit to pin (default: the default branch head)")
+    init.add_argument("--suggest-seeds", action="store_true")
+    init.add_argument("--from-existing", action="store_true",
+                      help="enrich a merged KB without local skeleton/modules records (knowledge stages)")
+    init.add_argument("--subscription-generator", action="store_true",
+                      help="explicit subscription generator; unreported fees outside stage USD accounting")
+    init.add_argument("--unlimited-subscription", action="store_true",
+                      help="uncapped knowledge-deepen with authenticated subscription generator and judge; no fallback")
+    init.add_argument("--retry-unfinished", action="store_true", help="retry missing depth facets, preserving prior spend")
+    init.add_argument("--acceptance-mode", choices=("strict", "lightweight"), default="strict",
+                      help="depth recognition standard; lightweight uses pinned citations and one independent feature review")
+    for name, stage in (("widen", "knowledge"), ("deepen", "knowledge-deepen")):
+        cmd = sub.add_parser(name, help="feature breadth" if name == "widen" else "feature implementation depth")
+        cmd.add_argument("repo")
+        cmd.add_argument("--dry-run", action="store_true")
+        cmd.add_argument("--pin")
+        cmd.add_argument("--subscription-generator", action="store_true")
+        if name == "deepen":
+            cmd.add_argument("--budget-usd", type=float)
+            cmd.add_argument("--retry-unfinished", action="store_true")
+            cmd.add_argument("--unlimited-subscription", action="store_true")
+            cmd.add_argument("--acceptance-mode", choices=("strict", "lightweight"), default="strict")
+        cmd.set_defaults(stage=stage, from_existing=True, suggest_seeds=False, pr_count=None,
+                         **({"budget_usd": None, "retry_unfinished": False, "unlimited_subscription": False}
+                            if name == "widen" else {}))
     publish = sub.add_parser("publish")
     where = publish.add_mutually_exclusive_group(required=True)
     where.add_argument("--remote", help="host:/absolute/path of the service state directory (over ssh)")
@@ -163,6 +269,9 @@ def main(argv: list[str] | None = None) -> int:
         return _publish(args)
     if args.command in {"traces", "replay", "export"}:
         return _traces_command(args, _state_dir(args.state_dir))
+    if args.command in ("init", "widen", "deepen"):
+        # before any ledger is opened: kb init never touches the service's kb.db
+        return _init_command(args, _state_dir(args.state_dir))
 
     state_dir = _state_dir(args.state_dir)
     ledger = _ledger(state_dir)

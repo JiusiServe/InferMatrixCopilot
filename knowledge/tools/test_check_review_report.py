@@ -70,6 +70,17 @@ GROUPED_RULES = """# Demo rules
 
 
 class ReviewReportCheckerTest(unittest.TestCase):
+    def test_heading_form_owner_rules_pass_the_same_report(self):
+        rules = "## DEMO-1a — first rule\n### DEMO-1b — second rule\n"
+        code, output = self.run_checker(VALID_REPORT, rules)
+        self.assertEqual(code, 0, output)
+
+    def test_mixed_heading_and_bold_duplicate_definition_fails(self):
+        rules = "## DEMO-1a — first rule\n- **DEMO-1a — repeated.**\n### DEMO-1b — second\n"
+        code, output = self.run_checker(VALID_REPORT, rules)
+        self.assertEqual(code, 1, output)
+        self.assertIn("duplicate owner rule definition: DEMO-1a", output)
+
     def run_checker(
         self,
         report: str,

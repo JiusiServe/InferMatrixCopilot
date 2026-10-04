@@ -1,10 +1,15 @@
 # engine/agent_runtime/ —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-10-02 -->
 
 `LOC ~1690（7 个文件） · 引擎（受治理的 agent 运行时） · refactor-status: ok`
 
 ## 职责
+
+开启 `profile_briefing_enabled` 且证据包含 `pr_diff` 时，runner 使用既有 diff parser 提取
+路径，通过 `doc_related` 在首个模型调用前注入同一有界知识背景。内容放入 untrusted
+围栏并转义标签；`review_knowledge_context` 记录命中页面、状态和正文长度。
+关闭 briefing 时自动背景注入也关闭；无关路径不补入知识。Agent 可按需调用该只读工具。
 每个 `kind == "agent"` step 的**唯一**受治理入口，外加评审质量 ensemble。
 它是全库信息密度最高、杠杆最大的子系统 —— 曾经是一个 685 行的模块，
 现在是一个把底座（dispatch/knowledge/utils）与两个入口（runner/ensemble）分开的包。

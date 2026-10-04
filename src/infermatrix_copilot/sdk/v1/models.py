@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 SDK_API_VERSION = "1.0.0"
 DIRECT_API_VERSION = "1.1.0"
-STRICT_API_VERSION = "1.3.0"  # explicit carried-finding rechecks
+STRICT_API_VERSION = "1.4.0"  # StrictRuntimeConfig.max_workers
 QUALITY_API_VERSION = "1.0.0"
 KNOWLEDGE_API_VERSION = "1.1.0"
 
@@ -260,6 +260,7 @@ class DirectReviewPlan(_Serializable):
     # new public functions no test in the request's diff names (#164);
     # {"status": "no_diff"} when the request carried no diff
     untested_public_api: dict[str, Any] = field(default_factory=dict)
+    related_knowledge: dict[str, Any] = field(default_factory=dict)
 
 FeedbackStatus = Literal[
     "checked", "disabled", "unavailable", "not_applicable"
@@ -315,12 +316,18 @@ class StrictRuntimeConfig(_Serializable):
     allowed_root: str
     backend: str = ""
     run_root: str = ""
+    # Runs this host executes at once; reported back as `max_strict_workers`.
+    max_workers: int = 1
 
     def __post_init__(self) -> None:
         if not self.repository.alias or self.repository.full_name.count("/") != 1:
             raise InvalidRequestError("Strict runtime needs a repository alias and full name")
         if not self.checkout_path or not self.allowed_root:
             raise InvalidRequestError("Strict runtime needs a checkout and allowed root")
+        if (isinstance(self.max_workers, bool)
+                or not isinstance(self.max_workers, int)
+                or self.max_workers < 1):
+            raise InvalidRequestError("Strict runtime max_workers must be a positive integer")
 
 
 @dataclass(frozen=True)

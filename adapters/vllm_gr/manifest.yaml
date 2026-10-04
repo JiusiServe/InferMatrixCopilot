@@ -1,0 +1,118 @@
+# GR review support authorized by the repository maintainer.
+name: vllm_gr
+status: active
+created_by: human
+schema_version: 1
+capabilities: []
+repo:
+  path: ${VLLM_GR_REPO}
+  full_name: JiusiServe/vllm-gr
+  aliases:
+  - vllm-gr
+  - vllm_gr
+  - JiusiServe/vllm-gr
+  default_branch: main
+  language: python
+knowledge:
+  source: JiusiServe/vllm-gr@a05103dc16c7b8dfd2213b73c5ee2d4f28cb6fee
+  repo_subdir: repos/vllm-gr
+  briefing_docs:
+  - repos/vllm-gr/_index.md
+modules:
+  engine_core:
+    local_paths:
+    - vllm_gr/v1/engine/
+    - vllm_gr/v1/core/
+    wave: 1
+    risk: high
+  beam_proc:
+    local_paths:
+    - rust/beam-proc/
+    - rust/ce-transport/
+    - rust/examples/
+    wave: 1
+    risk: high
+  serving:
+    local_paths:
+    - vllm_gr/entrypoints/
+    wave: 1
+    risk: high
+  attention:
+    local_paths:
+    - vllm_gr/v1/attention/
+    wave: 1
+    risk: high
+  packaging:
+    local_paths:
+    - setup.py
+    - pyproject.toml
+    - MANIFEST.in
+    - requirements/
+    - rust/Cargo.
+    - .github/workflows/
+    - .pre-commit-config.yaml
+    - tools/pre_commit/
+    - tests/packaging/
+    wave: 1
+    risk: high
+review_routes:
+- prefix: vllm_gr/v1/engine/
+  owner: engine-core
+  doc: repos/vllm-gr/components/engine-core/architecture.md
+- prefix: vllm_gr/v1/core/
+  owner: engine-core
+  doc: repos/vllm-gr/components/engine-core/architecture.md
+- prefix: rust/beam-proc/
+  owner: beam-proc
+  doc: repos/vllm-gr/components/beam-proc/architecture.md
+- prefix: rust/ce-transport/
+  owner: beam-proc
+  doc: repos/vllm-gr/components/beam-proc/architecture.md
+- prefix: rust/examples/
+  owner: beam-proc
+  doc: repos/vllm-gr/components/beam-proc/architecture.md
+- prefix: vllm_gr/entrypoints/
+  owner: serving
+  doc: repos/vllm-gr/components/serving/architecture.md
+- prefix: vllm_gr/v1/attention/
+  owner: attention
+  doc: repos/vllm-gr/components/attention/architecture.md
+- prefix: setup.py
+  owner: packaging
+  doc: repos/vllm-gr/components/packaging/architecture.md
+- prefix: pyproject.toml
+  owner: packaging
+  doc: repos/vllm-gr/components/packaging/architecture.md
+- prefix: MANIFEST.in
+  owner: packaging
+  doc: repos/vllm-gr/components/packaging/architecture.md
+- prefix: requirements/
+  owner: packaging
+  doc: repos/vllm-gr/components/packaging/architecture.md
+- prefix: rust/Cargo.
+  owner: packaging
+  doc: repos/vllm-gr/components/packaging/architecture.md
+- prefix: .github/workflows/
+  owner: packaging
+  doc: repos/vllm-gr/components/packaging/architecture.md
+- prefix: .pre-commit-config.yaml
+  owner: packaging
+  doc: repos/vllm-gr/components/packaging/architecture.md
+- prefix: tools/pre_commit/
+  owner: packaging
+  doc: repos/vllm-gr/components/packaging/architecture.md
+- prefix: tests/packaging/
+  owner: packaging
+  doc: repos/vllm-gr/components/packaging/architecture.md
+validation:
+  test_manifest_sources:
+  - .github/workflows/
+  precommit: true
+ci:
+  provider: github_actions
+push:
+  default_remote: origin
+  protected_branches:
+  - main
+  - master
+  allowed: false

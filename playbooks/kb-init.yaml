@@ -1,0 +1,37 @@
+# kb init for ONE repository: one stage per run (skeleton, then modules, optional knowledge, then
+# deepen + lifecycle flip, then pr-history, then harvest-calibration), each opened as a
+# human-merged PR (design kb-init v3). Runs outside the knowledge service: it
+# never writes the service ledger. Candidate.
+name: kb-init
+version: 1
+status: candidate
+provenance:
+  created_by: human
+  source: kb init design v3 (bootstrap a repository's knowledge base)
+task_kinds: [knowledge_maintenance]
+repos: []
+requires: []
+params:
+  repo: "knowledge repository name"
+  stage: "skeleton | modules | knowledge | deepen | pr-history | harvest-calibration | knowledge-deepen (independent)"
+  dry_run: "true (default): write the tree and PR body locally; false needs ALLOW_PUSH=1 and ALLOW_POST=1"
+  pin: "upstream commit to pin (default: the default branch head)"
+  pr_count: "pr-history only: merged upstream PRs to replay (default: adapter pr_history_count or 1000)"
+  budget_usd: "pr-history/depth: cumulative spend ceiling; increasing it resumes the same pinned batch"
+  from_existing: "explanatory knowledge: enrich a merged index and owner routes without local earlier-stage records"
+  retry_unfinished: "knowledge-deepen only: retry unsupported facets while retaining accepted work and cumulative spend"
+  subscription_generator: "explicit subscription backend; generator USD unreported, fees outside stage USD accounting"
+  unlimited_subscription: "knowledge-deepen only: authenticated Zcode GLM-5.3 generator and independent Codex subscription judge without fixed accounting ceiling; incompatible with budget_usd"
+steps:
+  - {id: init, step: knowledge.init}
+success: the stage's PR is open or its complete dry run is written; an unmet required semantic target returns partial or blocked
+depth_acceptance:
+  workflow: "breadth audit -> targeted deepen -> source/native approval audit -> retrieval audit -> independent review -> CI -> merge"
+  target: "optional semantic_depth.per_facet_gt applies strictly to every dimension; unknown never counts and denominators stay fixed"
+  provenance: "audit_native_depth_approvals.py verifies actual archived generator/judge calls; audit_knowledge_depth.py --require-approvals replays proofs and checks targets"
+  reporting: "supported implementation/test knowledge and verified absence are separate; a bounded absence retains the mechanism/test gap"
+retrieval_acceptance:
+  after: "knowledge / knowledge-deepen, in the complete merged checkout"
+  command: "PYTHONPATH=src python tools/audit_review_retrieval.py --repo <repo> --report <eval-report.json>"
+  checks: "catalog description+path probes receive bounded feature prose; paths-only ambiguity is reported separately"
+  meaning: "context delivery only; report breadth, checked depth, missing facets and real PR quality separately"

@@ -30,12 +30,22 @@ Governance (disclosed, per doc/features/provider-registry.md):
   (measured live: ``mcp__infermatrix-tools__read_file`` called, bridge
   trace recorded), so scoped reads still pass ``tools.dispatch``.
 
-Model selection: zcode has NO per-run model flag (``--model`` does not
-exist; ``ZCODE_PERSONAL_PROVIDER_CONFIG_FILE`` was measured not to change the
-served model). It serves the host's configured default (``/model`` in the
-zcode TUI). ``STRICT_BACKEND_MODEL`` is therefore an ASSERTION here, checked
-against the served ``modelId`` under ``MODEL_MISMATCH_POLICY`` — a mislabeled
-arm is the failure this campaign has already paid for three times.
+Model selection: zcode has no ``--model`` flag; a session takes the
+*configured default* of its personal provider config, and only when that
+entry is *selectable* — the CLI (0.16.9, ``resolveInitialModelSelection``)
+requires ``options.reasoningLevel`` on the entry and otherwise falls back to
+the first catalog model without a word (which is why an entry written by
+hand without a level "did nothing"). The transport therefore pins the model
+PER RUN: it writes a minimal personal provider config into the session
+scratch dir — only ``defaultModelSelection`` (the host's provider id, the
+requested model in the catalog's casing, ``zcode_reasoning_level``) on empty
+rule sets, never the host's provider rules, which may carry API keys and
+would otherwise sit inside a read root of the session — and points the
+subprocess at it through ``ZCODE_PERSONAL_PROVIDER_CONFIG_FILE``; the host's
+file is never touched.
+``STRICT_BACKEND_MODEL`` / the request's model is still ASSERTED against the
+served ``modelId`` under ``MODEL_MISMATCH_POLICY`` — a mislabeled arm is the
+failure this campaign has already paid for three times.
 
 Env is the shared allowlist (`base.sanitized_env`); zcode keeps its Z.AI
 OAuth login under HOME (``~/.zcode/v2``)."""
@@ -46,10 +56,14 @@ import json
 import logging
 import os
 import re
+import selectors
+import signal
+import time
 import shutil
 import subprocess
 import sys
 import tempfile
+from functools import cached_property
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
@@ -88,6 +102,22 @@ _READ_TOOLS = frozenset({
 # Env the zcode subprocess keeps on top of `sanitized_env()`: the data dir
 # `auth_gap` checks must be the one the run logs in with.
 _ZCODE_ENV_KEEP = ("ZCODE_DATA_BASE_DIR",)
+# The personal provider config the CLI reads its configured default model
+# from (see the module docstring): written per run into the session dir.
+_PERSONAL_CONFIG_ENV = "ZCODE_PERSONAL_PROVIDER_CONFIG_FILE"
+_PERSONAL_CONFIG_NAME = "provider_config.json"
+# The Z.AI coding-plan provider the OAuth login provisions; the host's own
+# personal config names it when one exists, settings can override it.
+_DEFAULT_PROVIDER_ID = "account:bigmodel-individual-coding-plan"
+_REASONING_LEVELS = ("low", "high", "max")
+# Model ids as zcode 0.16.9 spells them (its own catalog list): the CLI
+# selects a configured model by case-sensitive equality.
+_KNOWN_MODEL_IDS = (
+    "GLM-5.3", "GLM-5.3-Flash", "GLM-5V-Turbo", "GLM-5.2", "GLM-5.1", "GLM-5.1-Highspeed",
+    "GLM-5", "GLM-5-Turbo", "GLM-4.7", "GLM-4.7-FlashX", "GLM-4.7-Flash", "GLM-4.6",
+    "GLM-4.5-Air", "GLM-4.5", "GLM-4.6V", "GLM-4.6V-Flash",
+)
+_KNOWN_ID = re.compile(r'"(GLM-[A-Za-z0-9.\-]+)"')
 
 # Input keys under which zcode's native tools name a filesystem path.
 _PATH_KEYS = ("file_path", "path", "notebook_path")
@@ -101,7 +131,21 @@ _ARG_BUDGET = 100_000
 class ZCodeTransport(HarnessTransport):
     """zcode CLI (headless prompt mode) as a Strict backend."""
 
+    supports_native_events = True
     spec = PROVIDERS["zcode"]
+
+    @cached_property
+    def _selected_provider_id(self) -> str:
+        return (str(getattr(self.settings, "zcode_provider_id", "") or "")
+                or self._host_provider_id() or _DEFAULT_PROVIDER_ID)
+
+    @property
+    def subscription_billing(self) -> bool:
+        """Known OAuth coding plan only; custom API providers still need caps.
+
+        Billing mode is not a measured zero-dollar call cost.
+        """
+        return self._selected_provider_id == _DEFAULT_PROVIDER_ID
 
     def auth_gap(self) -> str | None:
         """zcode has no login-status command; the OAuth login writes
@@ -121,7 +165,8 @@ class ZCodeTransport(HarnessTransport):
         package_root = Path(__file__).resolve().parents[2]
         config = session / ".zcode" / "config.json"
         config.parent.mkdir()
-        config.write_text(json.dumps({"mcp": {"servers": {_BRIDGE_SERVER: {
+        config.write_text(json.dumps({"features": {"memory": False}, "memory": {"use": False},
+                                     "mcp": {"servers": {_BRIDGE_SERVER: {
             "type": "stdio",
             "command": sys.executable,
             "args": ["-m", "infermatrix_copilot.tool_bridge",
@@ -129,12 +174,90 @@ class ZCodeTransport(HarnessTransport):
             "env": {"PYTHONPATH": str(package_root)},
         }}}}, indent=2), encoding="utf-8")
 
+    @staticmethod
+    def _write_oneshot_config(session: Path) -> None:
+        """Disable implicit memory, plugins and MCP in structured calls.
+
+        Oversized prompts need native Read for their attachment. That must
+        never also load personal memory outside the declared evidence roots.
+        """
+        config = session / ".zcode" / "config.json"
+        config.parent.mkdir()
+        storage = session / "storage"
+        config.write_text(json.dumps({
+            "features": {"memory": False, "skill": False, "subagent": False, "mcp": False},
+            "memory": {"use": False}, "plugins": {"enabled": False},
+            "storage": {"dir": str(storage), "sessionDbPath": str(storage / "db.sqlite")},
+        }), encoding="utf-8")
+
+    @staticmethod
+    def _zcode_home() -> Path:
+        return Path(os.environ.get("ZCODE_DATA_BASE_DIR") or str(Path.home())) / ".zcode" / "v2"
+
+    def _host_provider_id(self) -> str:
+        """The provider the host's own configured default names — the one id
+        read from that file; its provider rules (which may carry API keys for
+        key-based providers) are never read into anything the session can see."""
+        host = self._zcode_home() / _PERSONAL_CONFIG_NAME
+        try:
+            data = json.loads(host.read_text(encoding="utf-8")) if host.is_file() else {}
+        except (OSError, ValueError):
+            return ""
+        current = (data.get("config") or {}).get("defaultModelSelection") if isinstance(data, dict) else None
+        return str(current.get("providerId") or "") if isinstance(current, dict) else ""
+
+    def _catalog_model_ids(self) -> list[str]:
+        """Model ids zcode knows, for canonical casing: the bundled catalog
+        under the zcode home when it is readable, plus the 0.16.9 list."""
+        ids: list[str] = []
+        root = self._zcode_home() / "runtime" / "provider"
+        try:
+            for path in sorted(root.rglob("zcode-builtin.json")):
+                ids.extend(_KNOWN_ID.findall(path.read_text(encoding="utf-8")))
+        except OSError:
+            pass
+        return [*ids, *_KNOWN_MODEL_IDS]
+
+    def canonical_model_id(self, model: str) -> str:
+        """zcode matches a configured model id case-SENSITIVELY, while our
+        model assertion is case-insensitive: a request such as
+        ``glm-5.3-flash`` must be written as the catalog spells it or the CLI
+        selects nothing and falls back. Unknown ids pass through unchanged
+        (the served-model assertion then reports the mismatch)."""
+        wanted = model.strip().casefold()
+        for known in self._catalog_model_ids():
+            if known.casefold() == wanted:
+                return known
+        return model.strip()
+
+    def _write_model_config(self, session: Path, model: str) -> Path:
+        """The session's personal provider config: ONLY a configured default
+        (provider id, canonical model id, ``zcode_reasoning_level``) on the
+        empty rule sets. Nothing from the host's file besides its provider id
+        is copied — the session dir is a read root of the zcode session, so
+        a provider rule carrying an API key must never land in it. Without
+        the level the CLI treats the entry as unselectable and falls back
+        silently — the mismatch assertion then catches it."""
+        level = str(getattr(self.settings, "zcode_reasoning_level", "") or "max")
+        if level not in _REASONING_LEVELS:
+            raise ValueError(f"zcode_reasoning_level must be one of {_REASONING_LEVELS}, got {level!r}")
+        config = {
+            "providerConfigRules": {"providerRules": []},
+            "modelConfigRules": {"providerModelRules": [], "manualProviderModelRules": []},
+            "defaultModelSelection": {"providerId": self._selected_provider_id, "modelId": self.canonical_model_id(model),
+                                      "options": {"reasoningLevel": level}},
+        }
+        path = session / _PERSONAL_CONFIG_NAME
+        path.write_text(json.dumps({"schemaVersion": 1, "config": config}, indent=2), encoding="utf-8")
+        return path
+
     def _run(self, text: str, *, session: Path, timeout_s: float,
-             tool_less: bool = False) -> tuple[list[dict], bool]:
+             tool_less: bool = False, model: str = "", native_event_sink=None) -> tuple[list[dict], bool]:
         """One CLI invocation → (parsed events, timed_out). A timeout kills
         the process but keeps the partial stream as salvage material.
         `tool_less` also removes the native reads unless an oversized prompt
-        needs `Read` to reach its attachment."""
+        needs `Read` to reach its attachment. `model` pins the served model
+        for this run (empty: the host's configured default)."""
         cmd = [self.require_cli()]
         disallowed = list(_DISALLOWED)
         oversized = len(text.encode("utf-8")) > _ARG_BUDGET
@@ -157,6 +280,10 @@ class ZCodeTransport(HarnessTransport):
         env = sanitized_env()
         env.update({k: os.environ[k] for k in _ZCODE_ENV_KEEP
                     if k in os.environ})
+        if model:
+            env[_PERSONAL_CONFIG_ENV] = str(self._write_model_config(session, model))
+        if native_event_sink is not None:
+            return self._stream_run(cmd, session, env, timeout_s, native_event_sink)
         timed_out = False
         returncode, stderr = 0, ""
         try:
@@ -193,6 +320,84 @@ class ZCodeTransport(HarnessTransport):
         return events, timed_out
 
     @staticmethod
+    def _stream_run(cmd, session, env, timeout_s, sink):
+        """Drain both native pipes while journaling, including failed runs."""
+        proc = subprocess.Popen(cmd, cwd=str(session), env=env, stdin=subprocess.DEVNULL,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+        events, stderr, buffers = [], [], {"stdout": b"", "stderr": b""}
+        deadline = time.monotonic() + timeout_s
+        timed_out = False
+
+        def line(channel, raw):
+            text = raw.decode("utf-8", "replace")
+            if channel == "stdout":
+                try:
+                    event = json.loads(text)
+                except ValueError:
+                    event = None
+                if isinstance(event, dict):
+                    events.append(event)
+                    sink(event)
+                    return
+            if channel == "stderr":
+                stderr.append(text)
+            sink({"type": "native." + channel, "text": text})
+
+        def kill():
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+        try:
+            with selectors.DefaultSelector() as selector:
+                selector.register(proc.stdout, selectors.EVENT_READ, "stdout")
+                selector.register(proc.stderr, selectors.EVENT_READ, "stderr")
+                while selector.get_map():
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0 and not timed_out:
+                        timed_out = True
+                        kill()
+                    for key, _ in selector.select(0.25 if timed_out else min(1, max(0, remaining))):
+                        chunk = os.read(key.fileobj.fileno(), 65536)
+                        channel = key.data
+                        if not chunk:
+                            if buffers[channel]:
+                                line(channel, buffers[channel])
+                            buffers[channel] = b""
+                            selector.unregister(key.fileobj)
+                            continue
+                        buffers[channel] += chunk
+                        while b"\n" in buffers[channel]:
+                            raw, buffers[channel] = buffers[channel].split(b"\n", 1)
+                            line(channel, raw)
+            proc.wait()
+        except BaseException:
+            # A stream interruption can arrive between a pipe read and its
+            # next newline. Preserve every tail we already received, while
+            # retaining the original exception if the journal itself failed.
+            for channel, raw in buffers.items():
+                for tail in raw.splitlines():
+                    try:
+                        line(channel, tail)
+                    except BaseException:
+                        pass
+                buffers[channel] = b""
+            raise
+        finally:
+            # This group belongs only to this invocation, including children
+            # left after its CLI leader exits or our event writer is interrupted.
+            kill()
+            proc.wait()
+            proc.stdout.close()
+            proc.stderr.close()
+        if not timed_out and (proc.returncode != 0 or not any(e.get("type") == "result" for e in events)):
+            detail = " ".join(stderr[-3:])[:400]
+            raise RuntimeError(f"zcode exited {proc.returncode} without a result event"
+                               + (f": {detail}" if detail else ""))
+        return events, timed_out
+
+    @staticmethod
     def _final_text(events: list[dict]) -> str:
         for event in reversed(events):
             if event.get("type") == "result":
@@ -213,6 +418,24 @@ class ZCodeTransport(HarnessTransport):
                 usage.input_tokens = int(raw.get("inputTokens") or 0)
                 usage.output_tokens = int(raw.get("outputTokens") or 0)
         return usage
+
+    @classmethod
+    def native_snapshot(cls, events: list[dict]) -> dict:
+        """Reported native facts; omitted counters and invoice cost are unknown."""
+        usage, served_model = {}, ""
+        keys = {"inputTokens": "input_tokens", "outputTokens": "output_tokens",
+                "cacheReadInputTokens": "cache_read_input_tokens",
+                "cacheCreationInputTokens": "cache_creation_input_tokens", "costUsd": "cost_usd"}
+        for event in events:
+            payload = event.get("payload")
+            if event.get("type") == "session.updated" and isinstance(payload, dict) and payload.get("modelId"):
+                served_model = str(payload["modelId"])
+            if event.get("type") == "result" and isinstance(event.get("usage"), dict):
+                raw = event["usage"]
+                usage = {target: raw[source] for source, target in keys.items()
+                         if isinstance(raw.get(source), (int, float)) and not isinstance(raw[source], bool)}
+        return {"served_model": served_model, "usage": usage,
+                "text": cls._final_text(events)}
 
     @staticmethod
     def _tool_calls(events: list[dict]) -> list[tuple[str, dict]]:
@@ -297,7 +520,8 @@ class ZCodeTransport(HarnessTransport):
                           "that checkout.\n\n")
             events, timed_out = self._run(
                 f"{header}{req.system}\n\n{req.prompt}", session=session,
-                timeout_s=req.timeout_s)
+                timeout_s=req.timeout_s,
+                model=req.model or self.settings.strict_backend_model)
         finally:
             shutil.rmtree(session, ignore_errors=True)
         usage = self._usage(events)
@@ -329,17 +553,20 @@ class ZCodeTransport(HarnessTransport):
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
-                 role: str = "", effort: str = "") -> Reply:
+                 role: str = "", effort: str = "",
+                 max_budget_usd: float | None = None, native_event_sink=None) -> Reply:
         """Tool-less one-shot in an empty scratch cwd with no bridge. Every
         native read is removed, except `Read` when the prompt is too big for
         argv and rides an attachment — then any read outside the scratch dir
         (the input here can be untrusted text) fails the call."""
         session = Path(tempfile.mkdtemp(prefix="imc-zcode-oneshot-"))
         try:
+            self._write_oneshot_config(session)
             events, timed_out = self._run(
                 flatten_messages(system, messages), session=session,
                 timeout_s=self.settings.strict_backend_timeout_s,
-                tool_less=True)
+                tool_less=True, model=model or self.settings.strict_backend_model,
+                **({"native_event_sink": native_event_sink} if native_event_sink is not None else {}))
         finally:
             shutil.rmtree(session, ignore_errors=True)
         violations = self._audit(self._tool_calls(events),
@@ -354,8 +581,5 @@ class ZCodeTransport(HarnessTransport):
         return Reply(
             blocks=[Block(type="text", text=text)] if text else [],
             stop_reason="max_tokens" if timed_out else "end_turn",
-            usage={"input_tokens": usage.input_tokens,
-                   "output_tokens": usage.output_tokens,
-                   "cache_read_input_tokens": 0,
-                   "cache_creation_input_tokens": 0},
+            usage=self.native_snapshot(events)["usage"],
             model=usage.served_model)

@@ -49,7 +49,7 @@ trace 词汇。**用 `api` 时行为逐字节不变**（平价棘轮）。
 | `claude-code` | harness | 订阅（`claude` CLI） | `mcp_tools` `builtin_tools_off` `max_turns` `system_prompt` `usage_reporting` `cost_reporting` | 订阅认证下实测 |
 | `codex` | harness | 订阅（`codex` CLI） | `mcp_tools` `sandbox_read_only` `usage_reporting` | **仅离线测试**（开发机无 ChatGPT 登录，readiness 会报出登录缺口） |
 | `deepseek`（dsh） | harness | **API Key** | `sandbox_read_only` `system_prompt` `api_keyed`——**注意没有 `mcp_tools`**，见下 | 已实测 |
-| `zcode` | harness | 订阅（`zcode` CLI，Z.AI OAuth） | `mcp_tools` `builtin_tools_off` `usage_reporting`——**模型不能按次指定**，见下 | 2026-09-30 实测（zcode 0.16.9） |
+| `zcode` | harness | 订阅（`zcode` CLI，Z.AI OAuth） | `mcp_tools` `builtin_tools_off` `usage_reporting`——**模型按次钉死并校验**，见下 | 2026-10-01 实测（zcode 0.16.9） |
 
 `claude-code` 的能力集最全；`codex` 与 `deepseek` 靠 OS 级只读沙箱而不是关闭
 内置工具；`cursor` 两者都做不到，因此额外配了事后审计（见 §5）。
@@ -72,10 +72,14 @@ trace 词汇。**用 `api` 时行为逐字节不变**（平价棘轮）。
 
 **`zcode` 也有两处要记住**：
 
-1. **它没有按次选模型的开关。** 没有 `--model`；实测 `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE`
-   也改不了实际服务的模型。它用宿主上 zcode 自己配置的缺省模型（在 zcode TUI 里用
-   `/model` 设）。所以对 `zcode` 而言 `STRICT_BACKEND_MODEL` 是一条**断言**：会话结束后
-   与流里 `session.updated` 报出的 `modelId` 比对（不区分大小写），不一致时按
+1. **模型按次钉死，再校验实际服务的模型。** 设置 `STRICT_BACKEND_MODEL=GLM-5.3-Flash`
+   即可选择模型，无需修改宿主的 `/model`。虽然 CLI 没有 `--model`，传输层会在每次会话的
+   临时目录写最小个人配置，并通过 `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` 交给子进程：
+   模型 id 按目录拼写规范化，且带上 CLI 选择模型所需的 `options.reasoningLevel`。
+   `ZCODE_REASONING_LEVEL=low|high|max`（缺省 `max`）；`ZCODE_PROVIDER_ID` 留空时使用宿主
+   配置的 provider id，再缺省为 Z.AI 个人 coding plan。宿主配置和凭据不改写，provider 规则
+   不复制进临时目录。模型留空时仍使用宿主缺省。会话结束后，请求模型与流里
+   `session.updated` 报出的 `modelId` 比对（不区分大小写），不一致时按
    `MODEL_MISMATCH_POLICY` 处理（缺省 `fail`，抛 `ModelMismatchError`）。
 2. **会话 cwd 是我们自己的临时目录，不是 PR worktree。** zcode 会从 cwd 加载 `.env`，
    并从 cwd 往上到 git 根发现 `zcode.json` / `.zcode/config.json`——项目配置能声明

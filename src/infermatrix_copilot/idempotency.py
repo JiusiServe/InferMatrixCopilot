@@ -247,6 +247,11 @@ def _reap_worktrees(cutoff: float, worktree_root: Path | None) -> int:
             except OSError:
                 continue  # a run holds it
             try:
+                # Re-read under the lock: a run may have reused (and touched)
+                # this tree after the unlocked check above, then released its
+                # materialize lock before taking its hold.
+                if dest.stat().st_mtime >= cutoff:
+                    continue
                 code, out = _git(dest, "rev-parse", "--git-common-dir",
                                  timeout=30)
                 owner = Path(out.strip()) if code == 0 else None

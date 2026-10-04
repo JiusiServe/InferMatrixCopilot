@@ -1,6 +1,6 @@
 # idempotency.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-09-30 -->
 
 `LOC ~293 · 持久 idempotency 索引：每键一个 run、一次执行 · refactor-status: ok`
 
@@ -34,6 +34,8 @@ sha256 —— 之后新增的字段自动纳入，绝不把两个不同请求静
   另一个、后果大得多的变更。`reap_stale` 只清索引条目、worktree、
   `refs/imx/<run_id>/*`。
 - reaper 绝不触碰活 run 的条目（`state not in TERMINAL` → 跳过）。
+- worktree 回收：拿到树的 `LOCK_EX` 后**重读 mtime**，期间被复用
+  （`worktrees.touch`）的树跳过 —— 无锁的年龄检查与加锁之间可能插入一次复用。
 - worktree 回收：存活以树**自己的**共享锁判定（绝不是注册表），移除走
   `git worktree remove`（绝不裸 `rmtree`），逐树限时（一棵慢树不拖垮
   整个扫描）。

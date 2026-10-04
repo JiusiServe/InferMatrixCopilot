@@ -19,6 +19,42 @@
 
 ## Frontmatter（沉淀层必填）
 
+知识不限于规则。稳定职责、边界、数据流与 API 契约使用 `type: architecture`；配置解释、
+设计取舍、功能关系和验证方法按最近 owner 使用 architecture 或 `type: guide`。只有明确
+必须执行的约束才进入 rule 页。源码与文档初始化可形成这些解释性知识；PR/review 学习
+继续遵循只提炼 owner 规则的摄取契约。
+
+`kb init --stage knowledge` 分别报告 architecture、api、configuration、tradeoffs、features、
+validation 六个维度。它生成的非规则段使用 `kb:knowledge` HTML 注释标明 owner、facet 和
+完整上游 pin；正文提供固定源码链接，页面 `sources:` 记录出处。注释只用于识别已生成的
+维度，不能把页面存在、路由命中或某条规则存在解释为全部行为已覆盖。设计推断在正文中
+明确标出，缺少证据的维度保留为缺口；已有另一 pin 的段落需人工更新，不追加一份矛盾正文。
+
+完整功能与生产文件覆盖由 adapter 的 `knowledge-coverage.yaml` 明确定义。`kb:file` 段包含
+路径、完整 pin 和源码文本哈希，正文是可复核的静态接口/依赖记录；它不是原始代码副本，
+不产生规则，也不承诺整文件行为或测试覆盖。功能页和源码记录按最近代码 owner 组织；
+达标报告属于 `eval/`，不能作为产品知识正文保存或通过新增索引增加覆盖率。
+
+`kb deepen`（`knowledge-deepen`）的 `kb:depth` 标记另绑定 feature、七维 facet、完整 pin
+与正文哈希，`kb:depth-proof` 保存精确证据区间及其内容哈希、调用 trace。只用于复核代表性
+实现知识；旧标记、静态接口卡、规则和索引不计入此深度。正文或证据改变、pin 不符或重复
+facet 均失效。页面仍使用既有 architecture/guide 类型，设计推断与未验证测试明确标出。
+
+深读 proof 的可选 `basis` 缺省为 `supported`，旧区块原文和哈希无需迁移。
+`verified_absent` 当前仅用于已核验的验证入口缺失：由版本化检查器按 feature policy
+推导完整范围，并绑定固定 pin、范围和文件内容摘要；读取、解析、动态关联或范围不完整
+均保留未知。缺失正文必须限定范围，不能把缺失说成测试通过。缺失区块同样要求三个
+独立认可维度均为 yes。认可指标合计 supported 与 verified_absent；原正向指标保留，
+分别列出正向知识、已核验缺失和 unknown，不删除分母。
+
+功能解释页可声明 `feature`（功能 ID）、`entry_points`（生产入口路径列表）和
+`source_globs`（所属源码 glob 列表）。`knowledge`/`knowledge-deepen` 从同一份已审阅
+coverage policy 生成这些匹配提示，刷新时保留正文、来源和深读证明。提示只选择审查背景，
+不增加文件或行为覆盖率；旧页仍可通过 `sources` 中的固定源码路径匹配。
+Direct 的 `related_knowledge` 与 Agent 的 `doc_related` 共用确定性检索，最多提供两页、
+共 6,000 字符，附来源 pin、已有/缺失 facet 和截断状态；它不把推断变成硬规则。
+检索另返回 facet basis、已核验缺失和未注入维度；可用知识不等于已注入全部正文。
+
 `check_wiki_lint.py` 强制的只有前五项（`title`、`created`、`updated`、`type`、
 非空 `tags`）；其余为约定字段，写了就必须合法（`confidence` 只能取三值）。
 
@@ -45,7 +81,7 @@ contradictions: [相对路径]         # 可选：与本页冲突的页面
 
 新标签必须先加入此表再使用（防止标签蔓延）：
 
-- 归属：`general`、`vllm-omni`、`afd-plugin`
+- 归属：`general`、`vllm-omni`、`afd-plugin`、`vllm-gr`、`jiuwenswarm`
 - 工作主题：`review`、`ci`、`docs`、`git`、`debug`、`bug`、`benchmark`、`environment`、
   `remote`、`agents`、`planning`、`dev`、`rebase`
 - 代码/模型轴：`components`、`models`、`diffusion`、`model-executor`、`serving`、

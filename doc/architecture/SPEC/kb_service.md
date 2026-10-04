@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-10-02 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -29,8 +29,11 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 
 ## 2026-09-28 intake 与质量门
 - `models`：生成与评审模型按 (provider, model, effort) 钉死（默认 `claude-code:claude-opus-5-5`
-  与 `codex:gpt-6-sol:medium`，评审必须与生成不同家族）；不可用/超时/无法解析 → `ModelUnavailable`，
-  调用方保持排队，绝不降级；每次调用经 recorder 记录输入、输出、用量。
+  与 `codex:gpt-6-sol:medium`，评审必须与主/备用生成器不同家族）；`KB_GENERATOR_FALLBACK`
+  可显式配置一个备用生成器（如 `zcode:GLM-5.3`），主模型不可用/超时/无法解析时尝试一次。
+  评审、schema 修复及带花费阈值的调用均不切换（预算只为主模型预留，Zcode 无阈值能力）。
+  两个生成器都失败时保持排队。每次尝试经 recorder 记录实际模型、输入、输出、用量，
+  备用调用带 `fallback_from`，intake/精炼/巡检变更集注明实际生成器，重建保留原归属。
 - `sources`：知识仓库克隆的只读读取（`knowledge_files`、`external_texts`）、只读 GitHub 客户端
   （合并 PR、PR 证据有界摘录、release/tag）、本机 Copilot 运行经验收件目录。
 - `intake`：每个事件由生成器起草类型化操作（只允许 add/edit_same_meaning/replace/retire），
@@ -291,3 +294,477 @@ diff 时保留原摘录（证据不会因此变得更"好过"）。只扩展带 
 `merged_pr` 事件的证据新增 `merge_commit_sha`（旧事件经 `pull()` 查询）。`run_gate(evidence_for=...)` 由 `gate_and_stage`
 与事实证明共用同一个观测者（一次镜像同步）。首个线上运行中"所给 diff 在…之前截断"是 L2 判 unsure/fail 的主要原因，
 而整批 10 个 PR 的证据（约 105 KB）对每条规则都重复发送；按规则取证据后约 11 KB + 所引 PR 的完整 diff。
+
+## 2026-09-30 adapter 生命周期开关检查（kb init）
+`lifecycle_flip.check_lifecycle_flip(base_yaml, head_yaml, allowed=)`：两版 manifest 解析后删去允许的键路径，
+其余必须完全相等（比较解析值，注释与格式可保留）；`FLIP_KEYS` = `knowledge_lifecycle.enabled/mode`，
+`CALIBRATION_KEYS` = `knowledge_lifecycle.calibration_set`。`check_flip_to_shadow` 另要求 head 为
+`enabled: true` 且 `mode` 为 shadow（缺省即 shadow）。知识 L1 的白名单只含 `knowledge/`，adapter 这一处改动由它单独校验；
+调用方还需在 head adapter 上跑 `config.parse_lifecycle`。测试：`test_kb_lifecycle_flip.py`。
+
+## 2026-09-30 模型回复解析
+`models.parse_json_object` 取裸 JSON 对象或最后一个 ```json 围栏块，用 `json.loads(strict=False)`：字符串里的原始控制字符（多行值里的换行、制表符，例如图示）按数据接受，不再把结构正确的回答判为 `ModelUnavailable`。测试：`test_kb_intake_gate.py`。
+
+## 2026-09-30 单次调用花费阈值（kb init 预算硬上限的一块积木）
+`ModelGateway.call_json(..., max_budget_usd=x)`：x 是**停止阈值**，不是硬上限 —— 花费达到 x 后不再发起新请求，但越过 x 的
+那个请求照样计费。硬上限由调用方负责：调用前预留 x + 单个请求的最坏情况。transport 的 `stops_at_spend` 为 False 时在发出调用
+**之前**抛 `ModelUnavailable("<provider> cannot stop a call at a spend threshold")`（fail-closed，绝不用 `max_tokens` 近似）；
+x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `ModelUnavailable`，并作为失败记录（不会成为训练样本）。
+`ModelReply.cost_usd` 取自 `usage["cost_usd"]`（未知为 None），trace 记录同时写入 `cost_usd` 与 `max_budget_usd`。
+不传上限的现有调用方行为不变：该参数根本不会发给 transport。
+`runtime.trace_recorder` 把阈值与花费持久化到 `model_call` 记录的 `result.max_budget_usd` / `result.cost_usd`
+（未设或未知为 null），包括 transport 抛错的失败记录。
+
+## 2026-09-30 `kb init` 的 adapter 配置
+`knowledge_lifecycle.init`（可选子映射，严格校验，未知键抛 `LifecycleConfigError`）解析为 `InitConfig`，挂在
+`RepoLifecycle.init`（缺省为 `None`）：`seeds`（知识库相对路径，只能是 `general/...` 或 `repos/<其他仓库>/...`，
+不得指向本仓库、不得为绝对路径或含空段/`.`/`..`，不得重复）、`doc_globs`（缺省 `DEFAULT_DOC_GLOBS` =
+`README*`、`docs/**/*.md`（与 `profiles/establish.build_doc_corpus` 一致）加 `CONTRIBUTING.md`、`AGENTS.md`）、
+`source_roots`（缺省取同一 manifest 的 `ut_coverage.source_roots`）、`exclude`、`module_depth`（≥1，缺省 2）、
+`min_module_loc`（≥0，缺省 300）、`pr_window: {count, max_age_days}`（>0，缺省 200 / 180）、`coverage_target`
+（(0, 1]，缺省 0.85）、`budget_usd`（>0，缺省 30）、`judge_call_usd`（≥0，缺省 0.50）。`validate_seeds(init,
+knowledge_root)` 是运行时检查：种子必须是知识树中已存在的文件或目录，解析后不得逃出知识根目录，逐条返回问题。
+解析只做静态校验，不读知识树。测试：`test_kb_init_config.py`。
+
+## 2026-09-30 kb init：覆盖率度量
+`init_coverage`（纯函数，stdlib + PyYAML，不调模型）：`load_owners(routes_yaml_text)` 读 `_routes.yaml` 的 `owners`
+（schema_version 1；`models` 按名称匹配，不参与覆盖率；格式错误抛 `ValueError`）；`routes_file(path, owners)` 按
+`scope_prefixes` 前缀匹配、保持路由顺序；`module_coverage(modules, owners)` —— 模块内**每个**源文件都被某个 owner 前缀
+覆盖才算覆盖；`make_include(source_roots, exclude, suffixes=())` 构造变更路径过滤器（测试/文档等一律由调用方的
+`exclude` glob 表达，不内置任何仓库字面量）；`pr_weighted_coverage(prs, owners, include=, rule_pages=)` —— 每个 PR
+改动的每个文件计一次，`routed` = 被某 owner 覆盖，`rule_bearing` = 它的**最具体** owner（`most_specific`）的页在
+`rule_pages`（含有效规则的页）中，`uncovered_hot` 按次数降序、路径升序；`churn_by_module(prs, modules)` 按最长模块前缀归属（已折叠目录归到折入的
+祖先），降序。空集合的比例记为 1.0（没有可漏的路由）。`ROOT_MODULE` 与 `profiles.establish.ROOT_MODULE` 相同，
+由测试钉住（本包不依赖 `profiles`）。源根与变更路径按与 `profiles.establish.normalize_root` 相同的规则规范化（`.`、`./` 表示仓库根，接纳一切路径）。测试：`test_kb_init_coverage.py`。
+`most_specific(path, owners)`：匹配前缀最长的 owner；前缀一样长时取页面在知识树里最深的（组件自己的页，而不是列出同一
+区域的聚合入口页）；两者都相同才并列返回。`shadowing(owners)`：列出每个是其他 owner 前缀的**严格祖先**的目录前缀
+（文件前缀不算祖先）。为什么：前缀会嵌套，兜底前缀（`pkg/`）能到达组件前缀（`pkg/sub/`）到达的每个文件；若任一匹配 owner
+的规则都算，兜底页上的一条规则就让整个包都“承载规则”，指标失去意义（kb init 试点 2026-09-30：一个模块的规则让承载率
+10% → 100%）。测试：`test_kb_init_owner_specificity.py`。
+
+
+## 2026-09-30 单次调用花费阈值（kb init 预算硬上限的一块积木）
+`ModelGateway.call_json(..., max_budget_usd=x)`：x 是**停止阈值**，不是硬上限 —— 花费达到 x 后不再发起新请求，但越过 x 的
+那个请求照样计费。硬上限由调用方负责：调用前预留 x + 单个请求的最坏情况。transport 的 `stops_at_spend` 为 False 时在发出调用
+**之前**抛 `ModelUnavailable("<provider> cannot stop a call at a spend threshold")`（fail-closed，绝不用 `max_tokens` 近似）；
+x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `ModelUnavailable`，并作为失败记录（不会成为训练样本）。
+`ModelReply.cost_usd` 取自 `usage["cost_usd"]`（未知为 None），trace 记录同时写入 `cost_usd` 与 `max_budget_usd`。
+不传上限的现有调用方行为不变：该参数根本不会发给 transport。
+`runtime.trace_recorder` 把阈值与花费持久化到 `model_call` 记录的 `result.max_budget_usd` / `result.cost_usd`
+（未设或未知为 null），包括 transport 抛错的失败记录。
+
+## 2026-09-30 kb init：阶段 1（skeleton）、运行时、预算与发布
+设计见 kb-init 设计 v3。`kb init REPO --stage S [--dry-run] [--pin SHA]` 经 playbook `kb-init`（单步
+`knowledge.init`）运行；`kb init REPO --suggest-seeds` 只打印候选种子（不调模型）。CLI 在打开任何账本**之前**分派
+`init`：kb init 从不碰服务的 `kb.db`、outbox、`kb serve`/`kb publish`。
+
+- `init_budget`：`Budget(limit)` 的 `reserve(amount)` 在调用**之前**预留，放不下抛 `BudgetExhausted`；块内
+  `charge(cost)` 记实际花费，未知/非法花费或块内异常按整笔预留计。生成调用预留 = 阈值 `generator_call_usd` +
+  单个请求最坏值 `input_bytes × 1.25 × in_price + max_output_tokens × out_price`（claude 的 `--max-budget-usd`
+  只拦下一个请求）。价格表 `DEFAULT_PRICES`（claude-opus-5-5 = $4/$20 每百万 token、128000 输出上限，2026-09-25
+  标价）可由 `KB_INIT_PRICES` JSON 覆盖；没有价格的生成模型在任何调用之前被拒（`PriceError`）。判定调用按
+  `judge_call_usd` 固定记账 —— 这是记账约定，不是花费上限。
+- `config.InitConfig` 增加 `generator_call_usd`（>0，缺省 2.0）与 `harness_overhead_bytes`（≥0，缺省 200000）。
+- `init_support`：`InitRuntime`（自己的运行时：registry、`ModelGateway`（trace 写到 `<state>/init/traces`）、
+  知识库克隆 `KB_INIT_KNOWLEDGE_CLONE` 或 `<state>/init/knowledge-repo`、价格表、环境）；`InitRecord`（每阶段一个
+  `<state>/init/<repo>/<stage>.json`：钉点、知识库基点、输入摘要、花费（渲染 PR 正文之前写入，正文报告的就是记录值）、种子来源、逐规则证据、判定、丢弃原因、清单、
+  问题、未完成项、PR）；`UpstreamPin`（上游 bare 镜像、`resolve`、只读 `export`（拒绝链接与越界成员）、
+  `PinnedObserver`）；`collect_docs`；`generate`/`judge`（先预留）；`claim_problems`（设计 §9.1）；
+  `other_path_problems`（`knowledge/` 之外的路径必须在 `INIT_PATHS` 内且有专门检查）；`run_knowledge_validators`
+  （在基点树叠加改动后跑 CI 同款的 `check_knowledge_tree.py` 与 `check_wiki_lint.py`）；`InitPublisher`
+  （临时索引在确切基点上构建一个确定性提交，推到**必须不存在**的分支 —— `--force-with-lease=<ref>:`，经 `gh`
+  开 PR 并确认 head；dry run 把树与 PR 正文写到本地）。只在 `ALLOW_PUSH=1` 且 `ALLOW_POST=1` 时发布；私有上游
+  永远 dry run。与 kb 发布器一样不经 `push.guard_push`：它推的是全新分支、从不强推、只写 `INIT_PATHS`。
+- `init_stages`（唯一允许调用 `check_changeset(bootstrap=True)` 的模块，由 L1 测试钉住）：`run_stage` 与
+  `validate_change`（设计 §9.3：L1 changeset（bootstrap）、`check_tree`、`check_index_links`、钉点声明与证据、
+  `knowledge/` 之外的路径）。skeleton：文档语料 → 地图调用（入口页、架构页、owner 路由、general 链接）→ 文档不变量
+  调用 → 每个 `repos/<other>/` 种子内容页（任意类型，`_index.md` 除外）一次改写调用；种子没有内容页记入清单、改写后没有规则记入 notes、预算用尽时本页及其后所有种子记入 unfinished，从不静默跳过 → 逐条筛查：D5 去掉与文档重复的行、证据在钉点可取且哈希入记录、
+  钉点声明成立、在一棵逐条累积的树上落位（页满则转到兄弟页 `rules-doc-invariants.md` / `<stem>-<n>.md`，**先落位再
+  判定**，判定看到的就是规则最终所在的页）→ 咨询性判定（fail 剔除，unsure/unjudged 标出）→ 经 `ops.apply_operations`
+  写入（新规则页先建壳并登记到目录索引；已有规则只追加，从不修改）→ 新目录建 `_index.md`、已有目录只追加链接、
+  仓库未登记时登记到 `repos/_index.md`（`INIT_PATHS` 允许这一个共享文件）；`_routes.yaml` 只在不存在时生成：先由
+  已有子目录入口页**确定性**地得出 owner（页中反引号里、在钉点存在、落在 `source_roots` 内的代码路径；`pkg/**` 即目录
+  `pkg/`），再补模型提出的 owner（scope 前缀须在钉点存在）→ 已有页面的问题进清单（钉点下不成立的声明、与文档重复的行、
+  没有路由到达的页、表格索引的样式；某 owner 的目录前缀是其他 owner 前缀的祖先时提示收窄——这些文件只算给更具体的
+  owner）→ 检查 → dry run 或 PR。钉点缺省取上游镜像的 `HEAD`（远端默认分支，不假设
+  `main`；每次同步都按 `ls-remote --symref` 刷新镜像的 `HEAD`，默认分支改名或删除后也跟得上）。没有可用 owner 时的
+  兜底路由用规范化后的 `source_roots`（`./pkg/` → `pkg/`），源根是仓库本身或未设置时用钉点下的全部顶层目录。发布时 `KB_INIT_GIT_AUTHOR` 缺失在任何模型调用之前拒绝。推送之前先把这次发布（基点、分支、文件、标题、
+  正文、作者、时间）写成 `<stage>-publish.json`（`save_prepared`），记录状态为 `publishing`；推送/开 PR 失败记为
+  `blocked` 并保留它，重跑时直接完成**同一个**发布（同输入重建出同一提交，已推送的分支与已开的 PR 都复用，不再调模型）。
+  dry run 每次整体替换输出目录，不残留上一次的页面；有待完成的发布时拒绝 dry run（不覆盖它）。init 写的非规则页
+  （入口页简介、架构页、目录标题）经 `neutral_headings`：代码之外的 ATX 标题改为粗体段落，其余以 `#` 开头的行转义为
+  `\#`，代码块里的此类行缩进一个空格 —— 没有任何行以 `#` 开头，`RULE_HEADING`/`ANY_RULE_HEADING` 永远匹配不到，
+  模型写的 `## Overview` 或 `## SERV-1 — x` 不会变成规则 ID。模型提出的 owner 页必须
+  是本仓库目录下已有或本阶段创建的页面，指向其他仓库的页面一律丢弃并记入 notes。仓库标签不在 `doc/knowledge/SCHEMA.md` 分类法里、种子不存在、生成模型不可用或无价格 → 记录为 `blocked`，
+  不产生 PR。同输入摘要重跑直接返回记录；已发布记录的输入变了则拒绝。测试：`test_kb_init_skeleton.py`、`test_kb_init_config.py`。
+
+## 2026-09-30 kb init：阶段共用流程与阶段 2（modules）
+- `init_stages._Stage`：各阶段共用的流程——钉点、记录、前序阶段链、规则筛查与落位、确定性检查（`_conclude`）、发布；
+  子类只设 `STAGE` 并实现 `_build`。**阶段链**（设计 §9）：前序每个阶段都必须已合并（记录为 `published` 且
+  `gh pr view` 为 `MERGED`，此时 main 已含它），或者（仅当本阶段是 dry run 时）是 dry run——其快照（`<stage>-dryrun/tree`）
+  叠加在 main 上作为本阶段的基底，并随本阶段的变更一起交给知识树校验器；`empty`（没有可改的）直接放行。未合并、只 dry
+  run 却要发布、未运行或处于 blocked/publishing 的前序阶段 → `blocked`，不调模型。后续阶段缺省沿用前序阶段的钉点
+  （`--pin` 可改，改了记入 notes）；链的状态进入输入摘要。阶段没有任何改动时记为 `empty`（不是错误）。
+  `InitRecord.coverage` 是阶段的覆盖率报告，PR 正文渲染成 before/after 表。适配器 manifest 从前序 dry run 的改动或知识
+  仓库基点读取（`adapters/<adapter 目录名>/manifest.yaml`）；`repo.language` 决定模块扫描的语言。**每个阶段**（含 skeleton）开始时先要求这个 manifest 在知识仓库基点存在，否则用同一条消息（`adapter_missing`）`blocked`，不调模型：adapter 在自己的 PR 里先合入，缺失绝不退化成"未声明语言"（jiuwenswarm 试点回归）。
+- `init_modules`（阶段 2）：在钉点树上 `scan_modules_at_depth`（`source_roots`、`module_depth`、`min_module_loc`、
+  `exclude`；adapter 未声明语言或语言未知 → 不扫描，进清单）。按当前 `_routes.yaml` 算模块覆盖率。未覆盖的模块由深到浅：
+  已被某个 owner 部分覆盖的，**吸收**进以**最具体**方式覆盖其文件最多的 owner（路由顺序打平）：只在该 owner 的
+  `scope_prefixes` 末尾追加覆盖本模块**尚无路由的自有文件**的前缀（`cover_prefixes`）——安全时用模块目录，否则每个文件取
+  模块与它之间最高的安全目录，再不行用文件本身；目录**安全**指其下每个已扫描文件都属于本模块、其下没有别的模块、也没有
+  **其他** owner 的前缀，所以新前缀永远不会是吞掉别的模块或 owner 的祖先（有子模块的模块，如包根目录或仓库根，从不以自身
+  目录路由）。需要超过 `MAX_ABSORB_PREFIXES`（20）个前缀的模块不吸收，改写地图卡片；卡片的新 owner 前缀同样由
+  `cover_prefixes` 得出；完全无人覆盖的，每个模块一次有界的生成调用（文件名、符号签名、文件开头的 docstring
+  或注释块，字节上限；从不给函数体：签名正则匹配整行，`declaration` 截掉函数体——
+  花括号语言（JavaScript、Go、Rust）在整行**最早**的 `{`/`=>`/`;`/单独的 `=` 处截断，不去词法分析字符串、注释或正则字面量
+  （函数体不可能出现在它们之前，默认值可能被截短，这是失败即关闭的取舍）；Python 在括号、字符串与行尾 `#` 注释之外的
+  第一个 `:` 处截断；单行函数也只留声明）写一张**地图卡片**：prose 页（`type: architecture`），目的、入口、关键文件（只保留该
+  模块真实存在的文件）、要读的文档（只保留文档集里的文件）、路由前缀；分节用加粗标签而非标题（知识格式把任何
+  `## <Word> …` 标题当作规则 ID）。卡片进入组：已有的 `components/<group>/`（入口页只追加链接，已有 owner 只追加前缀），
+  或新组（新目录、自己的 `_index.md` 与新的路由 owner），新组由上级入口页链接；`components/` 不存在时新建其入口页并由
+  仓库入口页链接；`components/` 已存在却没有入口页时组直接放在仓库目录下。`_routes.yaml` 只追加（保留开头注释块，
+  `routes_append_only` 校验不重排、不改名、不删除）。预算用完或超过卡片上限时，已写的卡片照常成 PR，剩下的模块进
+  `unfinished`；报告里列出仍无路由的模块。测试：`test_kb_init_modules.py`。
+
+## 2026-09-30 kb init：阶段 3（deepen）与 shadow 开关
+- `init_support.UpstreamPin.first_parent_changes(pin, count=, max_age_days=)`：钉点 first-parent 历史里最近 `count` 个
+  提交各自改动的文件（合并提交对其第一父提交），且不早于**钉点提交时间**之前 `max_age_days` 天——窗口只由钉点决定，
+  与时钟无关（沿 first-parent 的提交时间不一定递减：过期的提交跳过而不是就此停止；路径用 `-z` 读取，非 ASCII 文件名不被
+  引号转义）；合并/squash 式默认分支上每个 first-parent 提交就是一个合入的 PR。这就是设计 §7.3 的 PR 窗口，从镜像离线
+  读取（不走 GitHub API，没有速率限制）。
+- `init_deepen`（阶段 3）：工作单位是**组**——一个模块里最具体 owner（`most_specific`，并列时取路由顺序第一个）相同的
+  文件（`_groups`）。所以一个模块的文件分属多个 owner 时，每个 owner 各深化一次，热文件不会因为它所在模块的多数 owner
+  已有规则而被漏掉（afd-plugin 试点：`attention_model_runner.py` 等热文件的最具体 owner 与模块多数 owner 不同，按模块
+  循环永远到不了它们）。组按窗口内这些文件的改动数（`make_include`：源根、`exclude`、语言后缀）降序（同数按模块、owner）：
+  没有路由的热文件记入 notes（前 5 个）；owner 已承载规则的组跳过（对指标无增益，计数记入 notes）——owner **承载规则**指
+  owner 页本身有生效规则，或（仅当 owner 是入口页/prose 页时）**同一目录**下有含生效规则的页（不看子目录，否则任何组件
+  有了规则仓库入口就算承载；owner 本身是规则页却没有生效规则时不承载，不看兄弟页）。其余组每个一次生成调用：只给**该组**
+  的文件（带行号、字节上限；这是深度阶段，读代码本身），产出带行范围证据的规则 → 证据必须在本组文件内 → 共用筛查（D5、
+  钉点证据与声明、落位、咨询性判定）→ 经 `ops.apply_operations` 追加到 owner 的规则页（owner 页本身是规则页时用它，否则用
+  旁边的 `rules.md`；已有规则只追加、不修改，满页转兄弟页）。每写完一组重算承载规则的 PR 加权覆盖率，达到
+  `coverage_target`、预算用完或热组用尽即停，并**总是**在 notes（因而在 PR 正文）里写一条 `deepen stopped: …`：达到目标；
+  预算用完（剩余组进 `unfinished`，标 `module <m> (owner <o>)`）；或“每个热组都已访问；未达目标（X% < Y%）”——低于目标时
+  附上仍无规则的最热文件（前 5 个）。低于目标从不静默结束。报告：路由/承载规则两种覆盖率的 before/after、窗口 PR 数、仍无
+  规则的热路径（`uncovered_hot`：最具体 owner 不承载规则的源文件，包括已路由但 owner 无规则的；`unrouted_hot` 另列完全
+  无路由的）。
+- 同一 PR 打开 shadow：`flip_to_shadow` 对 adapter manifest 做**文本**编辑，只改 `knowledge_lifecycle` 块里同缩进的
+  `enabled`（→ `true`，缺失则插在块头下）与 `mode`（→ `shadow`）两行，注释、顺序与其他行逐字保留；没有该块 → 在任何模型调用
+  之前 `blocked`。`_check_flip` 校验：只能改这一个 manifest，`check_flip_to_shadow`（除这两个键外解析值不变、head 开启且为
+  shadow），并在 head manifest 上跑 `config.parse_lifecycle`（开启、shadow、仍服务同一个知识目录）。已开启且为 shadow 时不改，
+  记入 notes。测试：`test_kb_init_deepen.py`。
+
+## kb init：解释性知识（knowledge）
+
+`kb init REPO --stage knowledge --dry-run` 在 skeleton 和 modules 之后提炼解释性知识。
+`init_knowledge._Knowledge` 从固定源码与相关文档分别生成架构、API、配置、设计取舍、
+功能关系和验证六个维度。源码 owner 按最具体的路由边界确定，按改动频率排序；已有
+规则的 owner 仍参与。停止条件是 owner 用尽或预算用尽，不使用 rule-bearing 的 85% 阈值。
+
+上游已有 README、架构/设计、API 与配置文档由 adapter 的 `init.doc_globs` 选入。
+owner 文档先在完整匹配清单中按源码邻接、路径引用与主题相关度排序，再应用六文件与
+字节上限，避免 skeleton 的全局文档截断漏掉后面的专题；没有专题匹配时使用仓库 README。
+相同相关度下优先 owner 的 README/architecture/design 概览与较浅路径；文档索引在本阶段内复用。
+维护者的 partial/inferred/stale 笔记也可由这些 globs 引入，其审计标签不能代替当前源码证据。
+功能页另使用覆盖清单显式声明的文档。生成器须交叉核对已展示源码，注明文档与实现差异，
+设计蓝图不能直接证明功能已可运行；文档是证据数据，不是执行指令。
+
+每个段必须引用生成器实际看到的完整行区间；区间绑定 pin 和内容哈希，再经过路径/符号
+检查。提示中的源码、文档和既有知识采用 JSON 行数组，保留原行号；避免 CLI 附件读取器把
+100KB 的转义字符串作为一整行截断，实际提供的证据内容与字节额度不减少。
+每段随后经过 prose advisory judge。仅 pass 段写入知识页；fail 剔除，unsure/unjudged 的
+草稿保留在本地模型 trace，verdict 与待复核维度保留在阶段记录，不阻塞已通过段的发布。
+推断明确标出。非规则知识写 owner 的
+architecture 页并更新最近索引，已有正文保留。阶段不切换生命周期，不把 PR 原始材料
+存成架构或故事页。源文件/文档读取均有限额，报告缺少的维度、未读取文件与预算中断。
+聚合入口路由对应的 owner 会同时读取其 `components/<owner>/` 已有页面；语义页优先于大量源码接口目录。
+
+覆盖报告逐 owner、逐维度记录，有引证段只说明存在该维度知识，不证明所有行为或源码
+都已检查。无 required 覆盖清单的旧 init 链允许缺省 knowledge；一旦该阶段开始，后续阶段须等待它完成并合并。
+新接入流程包含该阶段；解释性 prose 判定不进入规则校准集，旧 rule 与 calibration 的契约保持适用。
+
+`adapters/<repo>/knowledge-coverage.yaml` 另行声明完整功能清单、每项功能的固定代码入口与
+文档，以及第一方生产文件的 roots/exclude/suffixes/filenames（包含 Dockerfile、Dockerfile.*、Makefile 与 gradlew 这类构建代码；第一方维护的类型声明也计入）。功能目标为清单的 100%，core 目标默认
+85%；两者都是独立的、不按 PR 热度加权的知识指标。清单需要随产品能力变化复核，不把
+“所有已路由 owner”当成完整功能目录。无此清单的旧仓库只报告 owner/facet，不能声称达标。
+存在清单时，owner 语义提炼也使用其完整生产文件 inventory，而非旧 init 的语言和源码根子集。
+旧路由未覆盖的文件可由清单的显式 feature owner 接管；只有唯一 owner 才补齐本次提炼输入，
+冲突或没有归属的文件继续单列为 unrouted，不改写持久路由。
+
+`--from-existing` 适用于 knowledge 与 knowledge-deepen：没有本地 skeleton/modules record 时，显式从已合并的仓库
+索引和 owner 路由开始增补；每个路由页须存在且属于本仓库。已有 record 的 review/merge 门禁保持生效。
+不创建或伪造前置阶段记录，输入摘要绑定该模式和 main 的固定 SHA。
+
+`--subscription-generator` 显式允许已认证并声明 subscription billing 的生成器不请求 API 花费阈值；
+目前只接受 Zcode 已知的 OAuth coding-plan provider，自定义 API provider 仍被拒绝。
+检查通过的 transport 绑定下一次调用，Zcode 在同一 transport 内固定 provider ID，避免
+宿主设置在记账检查和派发之间变化后把无预留调用发到 API provider。
+此模式不需要模型单价表，生成器的 USD 留为 unreported，订阅费用不纳入阶段 USD accounting；
+token、served model 和调用结果照常记录，judge 的固定记账与预算门禁继续执行。
+默认模式仍要求支持 spend stop 的传输及完整价格预留，绝不自动切换订阅模式或模型。
+单个 owner 或 feature 的生成器不可用、JSON/schema 失败仅将该项记为 unfinished，继续处理
+其余组件并保留已通过检查的草稿；未生成的维度保持 missing，不能增加覆盖。
+
+`knowledge_coverage.audit_coverage` 从固定版本的完整生产文件清单建立分母；解析失败的
+代码仍在分母中，测试、依赖、构建产物与无实现的包标记按显式规则排除。只计有相邻解释
+的有效固定行引用，或源文件哈希与静态抽取正文均匹配的 `kb:file` 记录。列表、路由、规则、
+提供给生成器的文件与过期/被篡改的记录都不能增加覆盖。源码记录说明类型、入口参数与
+集成依赖，按稳定源码区域整理；它们是结构性知识，不代表全面行为分析或测试覆盖。
+
+功能条目须同时具备六维基本知识、当前 pin 的文档引用和明确的生产代码入口引证。
+预算或证据不足时可交付部分草稿，但 `targets.met` 为 false；required 清单下的后续阶段
+被 `_Stage._chain` 挡住，即使该部分草稿已合并也不能冒充完成。required 清单也不允许跳过 knowledge 阶段；阶段结果绑定清单内容哈希，清单改变后必须重新验证。source-contract 抽取不调用
+模型，不修改规则或生命周期开关；语义提炼仍使用原预算与 advisory judge。
+
+`PYTHONPATH=src python tools/audit_knowledge_coverage.py --repo REPO --upstream PATH --pin FULL_SHA`
+可独立复核；上游必须是干净的固定 HEAD。`--write-contracts` 只追加缺少的结构性记录，
+保留过期记录供人工刷新；`--report` 把逐功能/逐文件结果写入 eval 或本地临时文件。
+
+## kb widen / kb deepen：功能广度与实现深度
+
+`kb widen REPO` 经同一 playbook 指定 `knowledge --from-existing`；`kb deepen REPO`
+指定 `knowledge-deepen --from-existing`。支持 `--dry-run`、`--pin`、`--subscription-generator`。
+旧 `--stage deepen` 继续提炼规则和处理 shadow 开关；新知识深读不生成规则、不修改生命周期或旧阶段链。
+
+knowledge-deepen 需要显式 feature/production coverage policy，逐项访问全部功能，包含已有规则的 owner。
+每项提炼 flow、api、configuration、dependencies、failure_modes、tradeoffs、validation 七维，
+只保存有证据的内容到最近 owner 的 `feature-depth-<id>.md`，链接功能概览与 owner 索引。
+只追加索引链接，保留已有 Direct quick map；最终仍检查地图存在且未被截断。
+源码按定义切片，可检索文件前缀之外的实现，并补充可静态解析的第一方被调函数与相关测试。
+默认 strict 模式的 flow 至少包含两个不同定义的直接调用；Python 校验限定符号、词法 owner 和导入目标，其它
+语言检查去除注释/字符串后的声明和调用。动态对象分派不能靠同名猜测，语义仍由模型裁判复核。
+
+每维用 `kb:depth` 绑定 feature、facet、完整 pin 与正文哈希，`kb:depth-proof` 绑定精确证据
+区间及其哈希、flow trace。区间必须完整展示给生成器，不允许跨缺口。页面必须是无规则的
+architecture/guide；同一调用独立判定各新增维度的 faithful/non_contradictory/does_not_weaken，
+三项均 yes 的维度才写入。每项 verdict 绑定原段哈希，拒绝或证据不足的草稿保留在本地 checkpoint/trace。
+机器枚举始终用固定英文标识，正文遵循知识语言。单个无证据或无效维度被剔除并记录原因，
+其它有效维度仍须分别通过裁判才保存；flow 不允许用测试调用链替代生产实现。
+来源引用、符号、L1 与知识树校验仍需通过。
+
+`coverage.semantic_depth` 单列完整功能数、七维槽位数和有语义证据的生产文件；
+`coverage.breadth` 保留原功能/文件指标。静态接口卡、旧 owner/facet 标记、规则和路由不能
+增加新深度。七维齐全只说明各有代表性实现知识，不声称全行为或执行测试覆盖。
+`tools/audit_knowledge_depth.py` 在干净的固定上游 HEAD 上独立重算两组指标。
+
+先遍历全部功能，再修复缺口；恢复与显式重试同样优先处理尚无已接受维度的功能。
+默认有预算模式每项每批最多两次尝试；显式订阅无限模式改为按缺失维度定向修复。
+重复维度整项剔除，其它有界候选维度继续独立核验。逐项保存预算预留、生成草稿、裁判
+结果与已接受正文；包括第二次尝试在内，中断裁判均可复用完成的生成。恢复固定 KB baseline 与 upstream pin，
+输入变化则拒绝串用。`--budget-usd N` 可提高同批累计 ceiling；`--retry-unfinished` 显式
+重试缺口并保留花费。已发布批次不再修改，合并后用新 state directory。missing facets
+保持明确；订阅生成器 USD 为 unreported，judge 固定记账不等于账单实付。
+
+### 定向深化、认可覆盖与订阅无限模式
+
+`DepthContext.build` 接收 requested facets、previous review 与 evidence round；按入口、
+调用方/被调函数、配置 use site、异常分支和具体断言选择完整范围内的有界切片。
+生产证据依次优先声明入口、功能实现、直接依赖和调用方，分别保留功能与关联代码预算，
+并分配文件预算避免大型通用调用方挤占入口。可证明的小型调用链两端先完整提供；文件数不设四个的上限。
+测试索引包含嵌套第一方 SDK/前端套件，优先直接入口引用与实际调用；无关包标记不作为
+验证入口。固定前四文件、两个测试及前 180 行不再构成检索上限。动态关联只作为未知。
+保存生成前的完整 payload 与规范化 prompt 摘要，中断裁判复用完成的草稿；每个缺口
+保留明确原因及按调用事件去重的历史，绑定证据和上下文摘要，恢复不覆盖旧拒绝原因。
+同一证据三次未成功修复时保留阻塞原因，不盲重试；显式 retry 可补证继续。
+非 Python 调用见证绑定模块级声明、目标完整定义与调用方自己的执行范围；同名方法、
+未执行的嵌套函数和回调中的调用不能直接归属外层函数，无法证明的关系保持未知。
+
+proof `basis` 缺省 supported，旧区块不改写。verified_absent 当前只允许完整、可重放
+检查证明的验证入口缺失，绑定固定 pin、政策推导范围、版本化检测器及内容摘要；读取、
+解析和动态映射不完整均不能发证。正文明确保留测试缺口，不声称执行或通过测试。
+已关联到功能、但测试入口或断言因别名等原因未被识别的候选也保持未知；不能仅凭
+字面 test/assert 匹配为空签发缺失证明。
+两种 basis 都须独立三个维度全 yes。covered_facets/facet_ratio/complete_features 保留
+正向语义；recognized_facets/recognized_facet_ratio/recognized_complete_features 另计
+认可知识，各维分列 supported/verified_absent/unknown。
+
+可选政策 `semantic_depth: {per_facet_gt: 0.90}` 对每个维度严格执行大于目标，并要求
+每个功能至少一个认可区块；79 功能时每维至少 72，553 分母不缩减。target_met 与
+批次遍历完成分别记录。提取前复核结构覆盖；结构门槛不足先阻断，不消耗模型调用。
+结构覆盖与深度门槛均须满足才能发布。深度未达标 dry run 为 partial，保存预览但步骤不成功；发布阻断。
+执行 API 的 feature_ids 只限定调度范围；审计仍包含完整政策中的所有功能和维度。
+显式列表保留执行顺序并纳入输入摘要；零深度功能仍优先，之后按列表顺序开展首轮。
+并行批次各自保留检查点，合并认可页面后须重新通过全量验收，不能发布分组的部分结果。
+独立 source audit 使用相同门槛。原生认可审计读取实际 archived model_call 输入输出，
+核对最终区块与源码 pin、三个 yes 和不同模型家族；不能信任只有 receipt 字段的报告。
+判定时的编号源码正文须完整覆盖每个区块证明并匹配内容哈希，缺失区块还须绑定相同的
+重放证书；显式报告非 Codex 裁判身份则拒绝，未报告身份仍保留未知。
+
+`--unlimited-subscription` 仅用于 knowledge-deepen/deepen，显式要求生成和裁判两角色
+分别使用 Zcode GLM-5.3 与独立 Codex 的已认证订阅，拒绝其他模型协议、budget_usd 冲突
+及 configured fallback。预算上限 None 表示
+该模式，不使用无穷或零价格伪装；累计固定记账和原生调用用量仍记录，实际费用未报告
+保持未知。每次调用重新绑定已经检查的订阅传输，不启用 API 付费回退。
+
+### 2026-10-02 轻量认可、13 功能任务与轨迹留存
+
+政策可指定 `semantic_depth.acceptance_mode: lightweight`，CLI 可显式选择
+`--acceptance-mode lightweight`；缺省仍为 strict。轻量区块绑定固定源码 pin、真实展示的
+源码或项目文档引用、区间及正文哈希，允许代表性流程及明确标注的设计推断，不要求形式化
+调用链，也不生成缺失证明。每个功能的一次 Codex 调用同时判定全部新增维度，三个维度
+均 yes 才认可。保留旧 strict 区块的原文及哈希，按功能/维度去重统计 strict/lightweight
+与 supported/verified_absent/unknown；旧原生记录默认 strict。源码、原生记录、检索和
+发布使用相同政策门槛，未知项不计认可，分母不减少。
+
+轻量 validation 必须分类为 automated_runtime、automated_source_text、helper_unit 或
+documented_manual；人工步骤须来自已有文档并标明本轮未执行。测试文件名、未找到测试及
+源码字面匹配均不能冒充运行断言或核实缺失。检索分别展示已有和实际注入的模式、维度状态
+与验证类型，仍受两页和 6,000 字符预算约束。
+
+共享的源码/测试/文档索引绑定 pin、政策、完整生产范围、版本与摘要；只建立一次。
+轻量组包保持完整小片段，修正优先补读评审指出的符号和范围。每个缺口至多首轮加三次
+自动修正，计数在派发前落盘，恢复或显式 retry 不清零；通过的维度冻结，失败只留在该项。
+未派发评审的草稿可在原轮恢复。逐批核对格式、引用、哈希与计数，完整验收集中在交付前。
+
+`eval/knowledge-depth/run_depth_campaign.py` 默认及最大 13 个隔离功能 worker，共享
+Zcode 调度文件。默认启动间隔 15 秒、原生 429/account-1302 退避 90 秒，后续间隔可增至
+60 秒并逐步恢复；仍保留 13 个任务，供应商限流仅延迟派发，不新增内部重试或重置修正计数。
+调度等待、开始、冷却与停止事件与原生输入输出一起脱敏保存于每个 worker 的
+`init/traces/attempts/`，最终关联唯一 model_call；未完成调用及未报告账单费用保持未知。
+监控读取错误记录诊断、沿用最后安全快照，不停止其它任务。
+新增轻量区块的原生审计还须绑定实际 GLM-5.3 草稿的对应维度、正文和已展示引用，以及
+Zcode 身份和无 fallback 记录；附近的无关生成调用不能证明该区块的提取归属。
+
+新授权的缺口修复批次可使用 campaign 的 `--repair-guidance`（stage 环境变量
+`KB_DEPTH_REPAIR_GUIDANCE`）。定位文件绑定固定 pin、政策和知识基线，按功能/维度保存
+准确源码或文档行段及上轮拒绝原因；其摘要进入 campaign 与检查点身份。仅从共享索引读取
+真实行段，源码/测试 24 KB、文档 8 KB，重叠合并；超限、范围无效或遗漏维度在派发前报错，
+不截断断言或用相邻功能替换。建议正文仍是非可信提示，不是证明，GLM 提取与 Codex 独立评审
+均保留；裁判同时核对功能归属。新批次保留前批完整历史，不改写旧轮次，恢复本批也不清零。
+
+交付顺序为：复核结构覆盖 → 定向深化 → 源码与原生认可记录审计 → 检索验收 → 独立审查
+→ CI → 合并。完整批次未达到政策门槛时保存真实缺口和检查点，不发布为已完成。
+
+## 2026-09-30 kb init：校准集收割（harvest-calibration）
+- 各阶段的 `InitRecord.verdicts[rule_id]` 除 verdict/reasons/model/text_sha/page 外还保存**判定时的规则全文**
+  （`section`）与钉点证据（`evidence`），被判 fail 剥离或被 owner 删除的规则也能复原成用例；缺这两项的旧记录使收割
+  `blocked`（重跑该阶段的 dry run 即可）。
+- `init_harvest._Harvest`（设计 §11）：要求 skeleton、modules、deepen 都已合并（dry run 链在它们的 dry-run 快照上）。
+  逐条比对判定文本与 main（或 dry-run 链）上的规则：`kept`（同 ID 规则去掉 footer 后与判定文本一致）/`changed`/`absent`，
+  按 `label_for` 打标：pass+kept、unsure+kept、unjudged+kept → good（`source: owner`）；fail（已剥离）→ bad
+  （`source: judge`）；pass 被删改 → bad（`source: owner`、`override: true`）；unsure/unjudged 被删改 → bad
+  （`source: owner`）；fail 被 owner 手工加回 → 不打标。**被改写**的规则，用例用的是判定时的文本。
+- 用例是 `calibration.load_cases` 的形状，自包含：`base` = 该规则所在页（main 上持有它的页，否则判定时的页）去掉该规则，
+  连同同目录 `_index.md`；`head` = 经 `ops.apply_operations` 加回判定文本；只保留变动的文件；单独过不了 L1（非 bootstrap）
+  的用例不收并记入 notes。证据从对应记录钉点的镜像**重新读取**行范围原文（`upstream_text`）。用例 ID 带阶段
+  （`init-<good|bad>-<stage>-<rule>`）：一个阶段剥离的规则 ID 可能在后面的阶段被重新分配。
+- 变异（`synthetic: true`、`source: synthetic`、`mutation`）：bad 少于 good、或 owner 的 bad 不足 `MIN_TRUSTED_BAD`（5）时，
+  对 good 规则按规则 ID 种子的确定顺序补齐：`broken_path`（第一个反引号路径换成 `removed-<name>`，钉点上确实不存在才算）、
+  `shifted_range`（证据范围整体移开；移开后仍显示同样原文的不算）、`negated`（强制↔禁止、MUST NOT↔MUST、must not↔must、never↔always）、
+  `sibling_evidence`（换成另一模块规则的证据）；每个（规则, 变异）至多一个。owner 或变异来的 bad 少于 5 → `blocked`
+  （裁判自己的 fail 不能校准它自己）；一个 good 用例都没有（owner 删改了所有规则）→ `blocked`（`kb calibrate` 没有 good 用例
+  永远不通过）。
+- 只写 `adapters/<adapter>/kb-calibration/cases/*.json`（新文件，永不覆盖已有用例；`load_cases` 能读）与 manifest 的
+  `knowledge_lifecycle.calibration_set: kb-calibration`（`set_calibration_set` 文本编辑一行，已有同值不改，已命名别的集合 →
+  `blocked`；`check_lifecycle_flip(allowed=CALIBRATION_KEYS)` + head 上 `parse_lifecycle` 且其 `calibration_set` 为
+  `kb-calibration`）。分支 `kb/init-<repo>-harvest-calibration`。`auto_merge` 仍需 `kb calibrate` 与 shadow 观察期。
+  测试：`test_kb_init_harvest.py`。
+
+## 2026-09-30 新索引每页只登记一次（kb init）
+`init_stages.unlink_listed(text, listed)`：新建 `_index.md` 时，生成的导语里指向目录清单已列出页面的行内链接改成纯文本标签（支持尖括号目标与标题；锚点、`./` 忽略；图片与其他目标不动）。改写后再用 `l1.link_targets`（CommonMark 解析器）核验：若仍有指向清单页面的链接（改写不认识的写法，如引用式链接），整段可选导语丢弃并记入清单，绝不登记两次。目录清单是每个页面唯一的登记，知识树校验拒绝同一页面登记两次。回归来自 jiuwenswarm 试点。测试：`test_kb_init_skeleton.py`。
+
+## 2026-10-01 kb init：由 adapter manifest 路由的仓库（回归：afd-plugin 首次真实运行，PR #265）
+Direct 的路由优先级是：知识侧 `repos/<repo>/_routes.yaml` 存在则用它，否则回退到 adapter manifest 的
+`review_routes`（`{prefix, owner, doc}`）。kb init 不得改变这一优先级下的路由结果，也不得把规则写进 briefing 文档：
+- `init_coverage.owners_from_review_routes(manifest)`：把 `review_routes` 按 (owner, doc) 归组成 `Owner`（path = doc，
+  前缀按声明顺序；同名 owner 的第二个 doc 以 doc 的 stem 作后缀）；`owner_table(routes_text, manifest)` →
+  `("routes_file" | "manifest" | "none", owners)`，与 Direct 同一优先级：routes 文件有 owner 才算 `routes_file`；文件存在但 `owners: []` 时和 Direct 一样退回 manifest（且该文件保持不动——填入 owner 会覆盖 manifest 路由），只有 manifest 也没有路由时空文件才是 init 填写的知识侧表（损坏的 routes 文件抛错，绝不静默换成 manifest）。
+  每个阶段在 `_inputs` 里算出 `route_source` / `owners`，覆盖率、吸收、deepen 分组一律用它。
+- **manifest 路由的仓库**：任何阶段都不写 `_routes.yaml`（写了会覆盖 manifest，把 `ready` 变成 `scope_fallback`、
+  改变金样路由）。skeleton 把生成器的 owner 提案里 manifest 尚未路由的前缀、modules 阶段本要追加的前缀 / 新 owner，
+  一律变成清单项 `review_routes (adapter PR): {prefix, owner, doc}`（`review_route_line`；adapter 是人工把关的，
+  由 adapter PR 落地）；modules 阶段仍写地图卡与分组页，覆盖率的 after 按"这些建议已合入"计算并在 PR 正文说明来源；
+  deepen 阶段把规则写到 manifest 所指的 owner 页（`_rule_page_for`：owner 页是规则页则就地追加，manifest 指向尚不存在的
+  `rules*.md` 则创建它，否则旁边的 `rules.md` / `rules-code.md`）。文档不变量规则的落点：由 `_paths_named`（证据行 +
+  规则正文里反引号命名的路径，`facts.claims_in`）经 `most_specific` 找到最具体覆盖最多路径的 owner（`_owner_for`），
+  无 owner 覆盖的留在规则页。三个阶段都在记录里标 `coverage.routes_source`。
+- **briefing 文档只读**：`briefing_docs(manifest)` = `knowledge.briefing_docs` ∪ `briefing_docs_extra` ∪
+  `performance_briefing_docs`；`adapters.base` 按硬上限渲染它们、超出部分静默截断（afd-plugin 的 16 条规则把索引挤出了
+  briefing）。init 永不向这些页面追加规则或正文（`_writable_page` 改写到同目录的 `rules-init.md` 并记入清单；仓库规则页是
+  briefing 文档时 skeleton 的规则页就是 `rules-init.md`）；索引登记行不在此限（知识树校验要求新页面登记）。
+- 没有 routes 文件也没有 `review_routes` 的仓库：modules / deepen `blocked`（消息指明两种来源都没有）。
+测试：`test_kb_init_manifest_routed.py`（manifest 路由的 toy：三阶段 dry run 不写 `_routes.yaml`、规则落在 owner 页、
+briefing 文档不动、清单含建议项、覆盖率来源；知识侧路由的 toy 行为不变）。
+
+## 2026-10-01 路由到的页面必须带 Direct 快速入口（kb init）
+Direct 的产品就是内嵌地图：知识侧 `_routes.yaml` 路由到的每个 owner 页都要有 `## … Direct …` 段
+（`direct_routing._direct_quick_map_text`：第一个这样的标题到下一个 `## `，正文非空、≤3500 字符），
+`test_every_routed_page_yields_a_quick_map` 逐页把关；#265 路由到的页面没有。`init_quick_maps`：
+- `render_quick_map(page_text, signals=, prefixes=, key_files=)`：确定性渲染 `## 代码快速入口（Direct）`（标题以格式的 ID
+  扫描器 `ANY_RULE_HEADING` 读不成 ID 的词开头——`## Direct …` 会被读成 ID `Direct`、两页即 `duplicate_rule_id`；Direct 只要求标题行含 Direct）
+  （第二行是标记 `<!-- kb-init:quick-map -->`）：页面上每条 active 规则一行（触发行或标题 | 规则 ID |
+  规则里反引号命名的路径，否则 owner 前缀），没有规则的页面（地图卡、入口页）一行（触发词 | 入口 | 关键文件或前缀）；
+  ≤3000 字符，超出从末尾丢行并补一行 `| … | … | … |`，绝不超过 3500。
+- `with_quick_map(page_text, section)`：就地替换 init 自己写的段（带标记），没有则插到标题后第一个 `## ` 段之前；
+  没有标记的 Direct 段是人写的地图，原样保留。该标题不含 ` — `，永远不是规则标题
+  （`RULE_HEADING` / `_TOP_RULE`），L1 把它当 prose 块，页面上的规则不受影响。
+- `_Stage._refresh_quick_maps()`（`_conclude` 开头，三阶段共用）：head 里 routes 文件的每个 owner 页，本阶段改动过的
+  重新渲染（deepen 追加规则后行数随之更新；init 段之后页面新增的内容——如追加到入口页的索引行——保留在段尾），
+  还没有地图的补上，未改动且已有地图的不动（路由前缀漂移不制造改动）；`mapped()` 只在加上地图仍在页面容量内时
+  返回结果，否则该页不写并作为阻断问题上报（不能留下少一行的旧地图）；briefing 文档不写（记入清单，随后被检查挡下）；skeleton 从既有 `_index.md`
+  推导 owner 时跳过 briefing 文档（清单），`_owners_with_room` 把没有容量放地图的既有 owner 页改指到本阶段承接了
+  它溢出规则的页（`_place` 记录的 `_spilled_from`；同目录的其他新页——比如种子页——装的是别的知识，不算），没有这样的页就
+  丢弃该 owner 并记入清单。
+- 容量：`_apply` 在 `apply_operations` 之后把每个写入的规则页连同渲染出的地图（按 routes 文件里该页 owner 的真实触发词与前缀，`_map_inputs`）一起过 `page_over_capacity`（`_check_capacity_with_map`），超出即报 page full，由 `_place` 溢出到同级页——地图每条规则一行，只量规则会让页面
+  在加地图后越界；manifest 路由的仓库不写地图，也就不按地图量（否则装得下的规则会被溢出到 manifest 不路由的页面，
+  Direct 看不到它）。
+- 阻断检查：`validate_change(..., quick_map_pages=owner_pages(routes_text))` → `quick_map_problems`
+  用生产提取器逐页检查，缺页或 `unavailable` 即 blocked 并点名页面；本次写入或改动的页面被服务端截断（`truncated`，CI 拒绝新增的截断）也 blocked。manifest 路由的仓库没有 routes 文件、
+  不检查（Direct 的 manifest 回退对其页面报 `read_required`）。
+测试：`test_kb_init_quick_maps.py`。
+
+## 2026-10-01 历史 PR 学习阶段（pr-history）
+
+阶段顺序：skeleton → modules → knowledge → deepen → pr-history → harvest-calibration。
+`InitConfig.pr_history_count` 为正整数，缺省 1000；CLI `--pr-count N` 可覆盖。
+历史模块按当前 pin 的提交时间选最近已合并上游 PR，按合并时间从旧到新重放。
+GitHub REST closed-pull 分页排除未合并与 pin 时间之后的 PR，以 update/merge 边界证明窗口完整；
+不受 Search 的 1000 条限制，扫描上限仍不足以证明完整则阻塞。非 pin 祖先的 merge 明确跳过。
+PR body、完整 diff、reviews、inline 回复关系与 issue 回复只在内存中暂存；文件和讨论分页，
+完整 diff 独立读取以避免文件 patch 截断；超出 500KB 或文件列表不完整即拒绝提炼。
+
+每 PR 一次 `ModelGateway` 生成调用，使用配置的 `KB_GENERATOR`，沿用价格/花费阈值检查；
+raw payload 不写 trace，保留模型身份、耗时、用量和成本。模型输出 trigger/must/forbid/acceptance、
+最近 owner 与当前源码行范围。只有当前源码支持的可执行规则可追加到 owner rule page；
+同义合并交给提炼与整 PR 审阅，完全相同的正文只在同一 owner 的规则页/拆分页内确定性去重；
+独立 owner 可保留相同合同。模型路由从 `_routes.yaml.models` 的现有 rule pages 读取，按名字和
+当前源码路径提供 `model:<name>` owner；单模型合同不得落到组件页，具体变体不继承短模型名。
+维护必要索引和快速入口。
+每个非空升级通过 pin claims、L1、知识树与 wiki 校验后形成一个 commit 计划；无升级的 PR 不造空 commit。
+本阶段不逐规则调用 advisory judge，现有阶段仍使用原 judge；最终整 PR 审阅单独记录，不冒充逐条评分。
+
+`InitRecord.history` 保存不可变窗口、已完成 PR、pending 提炼结果及逐 PR commit delta；
+每次预留费用在派发前写 checkpoint，进程中断把未知费用按整次 reservation 计入；
+重跑不重复已完成 PR，完整提炼结果可复用。`--budget-usd N` 提高累计预算继续同一窗口，
+不重置既有花费；首次启动时固定 knowledge base，后续 main 合并不改变同一批次的 baseline；
+pin/window/backend 或目标仓库变化阻塞并保留 checkpoint（包括已准备发布的重试），
+换 baseline 需新的 state directory。旧阶段的 inputs digest
+保持兼容，新增 history 配置不影响其缓存。旧三阶段 init 没有 history record 时仍可 harvest；
+一旦 history 开始，harvest 要等它完成并合并。已完成旧 init 也可单独添加此阶段。
+
+已合并依赖、base、pin 与 backend 均相同时，history dry run 可提升为实际发布而不重复提炼；
+提交作者变化会产生新 head，因此再次完整审阅该 head。去重保留源码 token 的大小写和内部空白。
+history 的存在/状态加入后续 harvest 的 cache identity，chain 阻塞时缓存不能越过依赖检查。
+
+`InitPublisher.build_series` 用 scratch index 在固定 base 上按顺序建非空 commit，作者/日期确定，
+不 checkout 主人的工作树。出版前 journal 固定整个串；push 后 create 失败可重建同一 head 并复用分支/PR。
+只开一个 draft PR。`KB_INIT_REVIEWER=codex:model[:effort]`（缺省 `DEFAULT_JUDGE`）经同一 gateway
+审阅完整 base..head diff、逐 PR 来源和当前 pin 的源码证据；provider 必须为 codex，无 fallback。
+完整 packet 还包含升级页所在 owner 的原有 rule pages 和组件/模型路由，以检查与未改规则的重复、冲突。
+PR 描述只展示前 20 个升级及总数，完整来源留在 commit trailers/本地 checkpoint；描述限制 60KB，
+避免默认 1000 条历史超过 GitHub body 限制。旧 journal 仅重建超长描述，不改已推 head。
+完整审阅上下文超过 1MB 阻塞，禁止截断冒充全量；按 judge_call_usd 约定费用预留。
+`InitRecord.review` 钉住 base、head、diff SHA256、请求/实际模型、verdict、findings 与 summary。
+只有该身份的 approve 可复用；发布 review summary 后重新核对远程 OPEN/head，才 `gh pr ready`。
+模型失败、findings 或远程 head 变化均保持阻塞；人仍负责合并。
+dry run 为旧快照建本地临时 baseline，再生成相同升级串与全量 Codex 审阅，落盘预览和 `COMMITS.json`，不写 GitHub。
+全程不打开服务账本。测试：`test_kb_init_history.py`、`test_kb_init_config.py`、`test_imkbinit_skill.py`。
+
+
+## 2026-10-02 初始化与检索验收
+
+`knowledge` 与有 accepted depth 的 `knowledge-deepen` 从 coverage policy 更新现存功能解释页
+的 `feature`、`entry_points`、`source_globs`；同一 writer 保留正文和来源。深读 checkpoint
+仍绑定 accepted 原文哈希，恢复后再生成提示，不改已接受证明。全部被拒绝时不写 metadata-only
+变更，保持 empty 阶段语义。提示不会增加 coverage、创建规则或改 owner 路由。
+完成合并后的完整 checkout 用 `tools/audit_review_retrieval.py` 验收 Direct 上下文交付，
+同时报告描述+路径与仅路径结果。报告在 eval/本地状态，与 breadth/depth 审计分开；不是 RQS 或缺陷召回率。

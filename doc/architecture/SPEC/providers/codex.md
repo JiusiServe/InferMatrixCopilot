@@ -1,6 +1,6 @@
 # providers/codex.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-10-02 -->
 
 `LOC ~197 · harness transport（ChatGPT 订阅） · refactor-status: ok`
 
@@ -12,7 +12,12 @@
 沙箱作为容纳控制。
 
 ## 公开契约
-`CodexTransport`（`auth_gap`、`run_session`、`complete`）、`spec = PROVIDERS["codex"]`。
+`CodexTransport`（`auth_gap`、`subscription_billing`、`run_session`、`complete`）、`spec = PROVIDERS["codex"]`。
+subscription_billing 只认可当前 CLI 明确报告 ChatGPT 登录、默认 openai provider 且无
+活动 profile 或 provider/base-url 覆盖的环境。API-key 登录、配置或检查失败均不能用于订阅无限模式；
+布尔状态不代表已测得零费用。
+配置读取、登录探测和实际执行使用同一 `sanitized_env()` 与有效 HOME；被过滤的
+`CODEX_HOME` 不得使检查与执行落在不同认证目录。
 
 ## 不变量（**C1**、**C2**）
 - **控制手段是沙箱，不是工具列表。** Codex 无法关闭自己的原生 shell，所以容纳靠 OS 级的
@@ -42,3 +47,6 @@ OS 级控制可用的后端；把两者混同，会模糊掉"当前实际生效�
 
 ## 2026-09-28
 `complete()` 接受 `effort`（推理强度）：codex 以 `-c model_reasoning_effort="<effort>"` 生效并校验取值；其他 transport 接受并忽略（模型 id 已决定推理预算）。
+
+## 2026-09-30
+`complete()` 接受并忽略 `max_budget_usd`；`stops_at_spend` 为 False（CLI 无花费阈值）。

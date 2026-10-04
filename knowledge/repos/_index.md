@@ -1,9 +1,9 @@
 ---
 title: "仓库经验入口"
 created: 2026-07-10
-updated: 2026-08-06
+updated: 2026-09-30
 type: index
-tags: [vllm-omni, afd-plugin]
+tags: [vllm-omni, afd-plugin, vllm-gr]
 sources: []
 ---
 
@@ -26,3 +26,5 @@ sources: []
 | vLLM-Omni | `vllm-project/vllm-omni` | [vllm-omni](vllm-omni/_index.md) |
 | afd-plugin | `vllm-project/afd-plugin` | [afd-plugin](afd-plugin/_index.md) |
 | Jianghan roleplay data pipeline | 私有项目 | [jianghan-roleplay-data-pipeline](jianghan-roleplay-data-pipeline/_index.md) |
+| vLLM-GR | `JiusiServe/vllm-gr` | [vllm-gr](vllm-gr/_index.md) |
+| jiuwenswarm | `openJiuwen-ai/jiuwenswarm` | [jiuwenswarm](jiuwenswarm/_index.md) |
