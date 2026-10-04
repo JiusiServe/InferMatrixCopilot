@@ -1,6 +1,6 @@
 # knowledge_service/ — provider curation components
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-04 -->
 
 The provider owns knowledge curation beneath the public SDK v1 facade.
 `KnowledgeCurator` composes four domain components over one explicit work

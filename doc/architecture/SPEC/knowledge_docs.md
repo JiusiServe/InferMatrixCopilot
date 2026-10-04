@@ -1,6 +1,6 @@
 # knowledge_docs.py —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~280 · 供 Direct 与 Agent 共用的只读知识检索 · refactor-status: ok`
 

@@ -1,6 +1,6 @@
 # tool_bridge.py —— 规范
 
-<!-- verified-against: 2026-09-19 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~308 · 面向 harness 会话的 scoped 工具 MCP server · refactor-status: ok`
 
@@ -55,3 +55,7 @@ bridge 把 run 的 20 工具面 + `doc_search`/`doc_read` 暴露给 harness 会�
 生成的 MCP 工具函数必须是 **keyword-only**（schema 会交错 required/optional），
 零属性工具不能带裸 `*`，且必须**丢掉**未设置的 optional——传 None 会打断
 每一次 `read_file`。失败的 bridged 调用记录失败**原因**。
+
+## 自进化接入（2026-10-04）
+
+bridge spec 序列化 `read_roots`、`deny_prefixes`、`strict_extras`、`executables`，并携带父进程 store 路径和单元上下文。`traced_call` 在每次工具调用时绑定上下文，使跨进程 trace 连续；不传递凭据。

@@ -1,6 +1,6 @@
 # intent.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~379 · 任务层 · refactor-status: ok`
 
@@ -57,3 +57,7 @@ LLM 把命令（kind / pr / issue / flags）分类成 `TaskSpec`；低于置信�
 —— 没有离线快路径（这是"仅 LLM"的刻意代价）。如果将来 LLM 也要负责复合切分，
 `parse_intents` 可以直接返回列表，`_COMPOUND_SPLIT` 与延续逻辑一并消失 ——
 那是更大的改动，目前不需要。
+
+## 自进化接入（2026-10-04）
+
+LLM 意图分类允许 `workflow_improve`，表示 trace 工作流的改进周期；权限仍由 TaskSpec 的 kind 推导。

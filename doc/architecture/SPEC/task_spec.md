@@ -1,6 +1,6 @@
 # task_spec.py —— 规范
 
-<!-- verified-against: 2026-08-31 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~104 · 任务层，纯数据 · refactor-status: ok`
 
@@ -14,7 +14,7 @@
 ## 公开契约
 `TaskSpec(kind, repo, pr?, issue?, report_only, post, params,
 expected_head_sha?, repo_path?)`；property `tier`、`read_only`、
-`confirm_required`；`describe()`。常量：`TaskKind`（8 种 kind，含只读的
+`confirm_required`；`describe()`。常量：`TaskKind`（9 种 kind，含只读的
 `pr_quality`）、
 `READ_ONLY_KINDS`、`KIND_TIER`、`FULL_SHA_RE`（40 位十六进制全长 SHA 的
 唯一真相正则，`mcp_policy.py` 复用它校验）。
@@ -48,3 +48,7 @@ expected_head_sha?, repo_path?)`；property `tier`、`read_only`、
 ## 重构备注
 干净、极简 —— "单一职责"的范例。**不要**在这里加行为；保持它是"数据 + 推导"模块。
 它是 C1 的唯一真相来源，所以任何**别处**出现的权限逻辑都是坏味道。
+
+## 自进化接入（2026-10-04）
+
+新增 `workflow_improve`，属于 L2 和 READ_ONLY_KINDS；本地账本与候选制品写入不代表获得产线修改权限，对外发布仍要求 post 门。

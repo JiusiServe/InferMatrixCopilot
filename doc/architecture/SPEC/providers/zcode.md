@@ -1,6 +1,6 @@
 # providers/zcode.py —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~400 · harness transport（Z.AI / GLM 订阅） · refactor-status: ok`
 

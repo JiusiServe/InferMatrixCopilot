@@ -1,6 +1,6 @@
 # scopes.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~94 · 引擎（权限） · refactor-status: ok`
 
@@ -45,3 +45,7 @@ primary)`；`Decision`；`read_only_scope`、`pre_plan_scope`、`post_plan_scope
 - `shadow_scope(shadow_dir, tools=…, extra_read_roots=…, executables=…)`：内建读工具 + 声明的影子工具、只读、
   读根 = 影子 checkout + 只读的知识/适配器根、拒绝 `.git/`、严格 extra。
 - 未设置这些字段时行为与之前逐字节相同（`test_improve_p0b.py` 的"普通 scope 行为不变"断言）。
+
+## 自进化接入（2026-10-04）
+
+严格影子边界及默认关闭字段见本页影子章节；执行层通过这些字段限制读根、额外工具和内部知识写入。

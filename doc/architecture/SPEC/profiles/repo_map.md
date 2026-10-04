@@ -1,6 +1,6 @@
 # profiles/repo_map.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~138 · profile（按需结构） · refactor-status: ok`
 
@@ -36,3 +36,7 @@ stdlib 的 `re`/`json`/`subprocess`。
 `review._sweep_targets`、`profiles/establish`）。改为消费共享的
 `profiles/languages.py`（K2）。必须保留：未知语言时 `supported` 为 false + 诚实的
 "use grep"。
+
+## 自进化接入（2026-10-04）
+
+`build_index` 和 `RepoMap` 支持 `accept(resolved_path)` 读围栏，符号链接按实际路径检查。受围栏的索引使用独立 `-fenced` 缓存键；影子运行将缓存放在 run 目录，不写共享仓库缓存。

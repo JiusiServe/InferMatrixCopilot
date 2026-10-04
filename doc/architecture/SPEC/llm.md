@@ -1,6 +1,6 @@
 # llm.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~452 · 引擎底座（传输层） · refactor-status: ok`
 
@@ -45,3 +45,7 @@ provider 选择与 OpenAI 工具翻译有单元测试；step/agent 测试使用 
 
 ## 重构备注
 **把 `Reply`/`Block` 契约当作接缝守住** —— 调用方绝不能看见 provider 专属类型。
+
+## 自进化接入（2026-10-04）
+
+绑定改进预算 governor 时，每次 API 请求先按最坏用量预留预算，再派发并结算；拒绝不会发出模型请求。成功、失败、模型不匹配均采集 trace/1，输入输出以脱敏 blob 引用保存；未绑定 store 或 governor 时保留原调用行为。

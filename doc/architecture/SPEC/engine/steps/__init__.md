@@ -1,6 +1,6 @@
 # engine/steps/__init__.py —— 规范
 
-<!-- verified-against: 2026-09-28 -->
+<!-- verified-against: 2026-10-04 -->
 
 `LOC ~34 · step 库聚合 · refactor-status: ok`
 
@@ -41,3 +41,7 @@ import `_common` 而不加载领域模块。调用 `register_builtin_steps` 时�
 
 ## 2026-09-28
 `_BUILTIN_MODULES` 增加 `knowledge`（知识服务步骤）。
+
+## 自进化接入（2026-10-04）
+
+内置步骤注册表包含 `improve` 模块；其步骤契约见 [improve 步骤规范](improve.md)。
