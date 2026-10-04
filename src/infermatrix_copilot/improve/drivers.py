@@ -12,6 +12,14 @@ from types import SimpleNamespace
 
 from .artifacts import ArtifactError, digest, safe_path
 
+def input_path(raw):
+    """Read-only replay files can include .github; never overwrite Git metadata."""
+    from pathlib import PurePosixPath
+    p = PurePosixPath(raw)
+    if not raw or p.is_absolute() or ".." in p.parts or ".git" in p.parts or "\\" in raw or any(ord(c) < 32 for c in raw):
+        raise ArtifactError("unsafe replay path")
+    return p.as_posix()
+
 def dataset(settings, workflow: str) -> list[dict]:
     root = Path(settings.improve_evolve_data_dir).expanduser() if settings.improve_evolve_data_dir else None
     if root is None:
@@ -231,13 +239,14 @@ def worker_run(payload, settings, llm):
             for p in repo.rglob("*"):
                 if p.is_file() and ".git" not in p.parts: p.unlink()
             for name, content in files.items():
-                p = repo / safe_path(name); p.parent.mkdir(parents=True, exist_ok=True); p.write_text(content)
+                p = repo / input_path(name); p.parent.mkdir(parents=True, exist_ok=True); p.write_text(content)
             git("add", "-A"); git("commit", "--allow-empty", "-qm", "frozen input")
             revisions.append(subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip())
         state = {"playbook": "pr-review", "repo_path": str(repo), "diff_text": data["diff"],
                  "pr_base_sha": revisions[0], "pr_head_sha": revisions[1],
                  "pr_context": data.get("context_text", ""), "gate_report": data.get("gate_report", ""),
-                 "task_spec": {"kind": "pr_review", "repo": data["repo"], "pr": data["pr"]}}
+                 "pr_state": data.get("pr_state", ""),
+                 "task_spec": {"kind": "pr_review", "repo": data["repo"], "pr": data["pr"], "params": data.get("task_params", {})}}
         settings = settings.model_copy(update={"improve_shadow": True, "run_root": Path("/tmp/runs"),
                     "knowledge_dir": Path("/tmp/knowledge"), "skills_dir": Path("/candidate/skills"),
                     "playbooks_dir": Path("/candidate/playbooks"), "adapters_dir": Path("/candidate/adapters"), "memory_db": Path("/tmp/memory.db")})
@@ -248,5 +257,6 @@ def worker_run(payload, settings, llm):
         result = asyncio.run(_review_diff(ctx))
         if not result.ok: raise ArtifactError(result.summary)
         return {"review_text": result.outputs.get("review_text") or state.get("review_text", ""),
-                "review_comments": result.outputs.get("review_comments", [])}
+                "review_comments": result.outputs.get("review_comments", []),
+                **{k: state.get(k) for k in ("review_summary", "review_verdict", "review_finding_dispositions", "review_carried_findings", "review_finding_rechecks", "review_recheck_missing")}}
     raise ArtifactError(f"worker has no driver {driver}")

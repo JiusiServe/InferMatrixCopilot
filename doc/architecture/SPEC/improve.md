@@ -5,10 +5,18 @@
 `设计：/data/zhoutaichang/copilot/meta-improvement-engine-design.md v1（GPT-6 sol 批准 2026-09-29） · refactor-status: building (P0–P4 已落地)`
 
 ## 职责
-面向任意 trace/1 工作流的"取证—候选—实验—人审 PR—上线观察"循环。使用入口和数据契约见 [自进化使用指南](../../guide/self-evolution.md)。引擎的写权限限于追加自己的 trace/1 记录、
-写自己的账本和源码制品目录、在 OS 隔离环境跑候选；产线变更一律走人审 PR。
+面向任意 trace/1 工作流的"取证—候选—可信目标实验—自动采用—上线观察／自动回滚"循环。使用入口和数据契约见 [自进化使用指南](../../guide/self-evolution.md)。引擎的写权限限于追加自己的 trace/1 记录、
+写自己的账本和源码制品目录、在 OS 隔离环境跑候选；自主模式仅采用已评估制品，并在无凭据沙箱执行；生产写权限仍归宿主。PR 是可选审计，旧金标／人审模式保留。
 
 新增 `artifacts.py`（不可变源码及补丁）、`isolation.py/worker.py`（无凭据沙箱与可信预算代理）、`drivers.py`（PR/知识/元基准驱动及父进程评分）、`evolution.py`（周度候选状态机）、`coordinator.py`（统一续跑周期）、`annotations.py`（历史 trace 导出与人工标签导入）、`evolution_publish.py`（独立 `evolve-outbox/1` 与部署跟踪）。`IMPROVE_EVOLVE_ENABLED` 默认关闭，`IMPROVE_ENABLED` 保留总停止作用。
+
+## 自主目标与制品运行时
+
+`objectives.py` 是受保护的父进程目标控制器（`objective/1`）：自动导入可信 replay 输入、生成有因果见证的故障／负例、固定一个 API 模型、预注册三次配对及 item 聚类功效、核验实际源码与输入、独立计算分数及护栏。见证不传生成器或候选；候选数值分数无效。PR 与知识指标仅证明结构契约、产物保留与资源收益，`semantic_quality_claim=false`。引擎候选每次只修改归因或 lint；lint 既有正例及负例受保护。功效不足会存档并等待新鲜样本，不重放完成的付费调用。
+
+`runtime.py` 重新应用补丁核验实际评估树，原子采用本地不可变 release，原生 PR 评审、知识草稿、lint 和归因在活动制品的沙箱中运行。宿主记录运行指纹才更新部署基线。首次八个不同 item 与上一版比较，七日缺证据自动恢复；保留后每周最多八个新 item 持续比较。契约、凭据／隔离／预算、指纹失败或资源显著退化自动恢复上一版；恢复制品不可验证则禁用执行。执行／切换锁及持久化激活、回滚意图支持重启恢复。
+
+默认 `IMPROVE_EVALUATION_MODE=objective`、`IMPROVE_PROMOTION_MODE=automatic`，不要求人工标签、判官或 performance 模型。总开关仍关闭，固定模型取 `IMPROVE_EVOLVE_MODEL` 或 eco；每周一个候选、一次修复及共享 20 美元预算不变。`gold/pr` 模式保留原有双家族取证及人工流程。无隔离生产驱动的机械工作流仍可 lint，但不自动采用。当前主机命名空间关闭，代码候选实际执行延期。
 
 ## 模块
 | 文件 | 阶段 | 作用 |
@@ -56,4 +64,4 @@
 - lint 只读 trace，不调模型；无证据形态的 lint 不猜。
 
 ## 测试
-`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`、`test_improve_p3.py`、`test_improve_p4.py`、`test_improve_kb_intake_adapter.py`、`test_evolution.py`。
+`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`、`test_improve_p3.py`、`test_improve_p4.py`、`test_improve_kb_intake_adapter.py`、`test_evolution.py`、`test_autonomous_evolution.py`。

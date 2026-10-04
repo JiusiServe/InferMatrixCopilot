@@ -278,7 +278,13 @@ class Executor:
             try:
                 with tracing.span("step", step=spec.name, attempt=attempt, **ident), \
                         trace_context(attempt=attempt, **unit):
-                    last = await spec.handler(ctx)
+                    from ..improve import objectives
+                    last = None
+                    if spec.name == "agent.review_diff" and objectives.enabled(ctx.settings) and ctx.settings.improve_enabled and ctx.settings.improve_evolve_enabled:
+                        from ..improve.runtime import review_step
+                        last = await review_step(ctx)
+                    if last is None:
+                        last = await spec.handler(ctx)
             except Exception as exc:  # handler bug != typed failure
                 last = StepResult(False, FailureKind.BLOCKED,
                                   f"unhandled error: {type(exc).__name__}: {exc}")

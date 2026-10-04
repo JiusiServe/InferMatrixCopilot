@@ -89,7 +89,7 @@ def bench(tmp_path):
                          "sha256": artifacts.digest((data / f"{n}.json").read_bytes()), "labels": {"g": "S2"},
                          "label_source": "human", "gold": {"entries": [{"gold_id": "g", "path": "a.py", "concern": "concern"}]}})
         artifacts.atomic_json(data / "dataset.json", {"workflow": workflow, "items": rows})
-        st = Settings(_env_file=None, improve_enabled=True, improve_evolve_enabled=True,
+        st = Settings(_env_file=None, improve_enabled=True, improve_evolve_enabled=True, improve_evaluation_mode="gold",
                       improve_evolve_source_dir=str(source), improve_evolve_data_dir=str(data.parent),
                       improve_workflows_dirs=str(defs), improve_ledger_dir=str(tmp_path / driver / "ledger"),
                       improve_budget_usd_week=20, improve_judge="api:claude-sonnet-5", eco_model="claude-sonnet-5",

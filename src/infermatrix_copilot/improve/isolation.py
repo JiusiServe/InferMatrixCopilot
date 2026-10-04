@@ -131,6 +131,8 @@ class Sandbox:
             if result.get("source_sha") != artifact["tree_sha"] or not result.get("package_path", "").startswith("/candidate/src/"):
                 raise SandboxUnavailable("worker source fingerprint/import mismatch")
             verify(source)
+            # Counted by the parent; a worker cannot forge resource accounting.
+            result["_broker_calls"] = calls
             if payload.get("mode") == "tests": result["report"] = "".join(stderr_tail)[-12000:]
             return result
         finally:

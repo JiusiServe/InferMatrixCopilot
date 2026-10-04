@@ -108,7 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="infermatrix-copilot improve",
                                      description="operate the meta-improvement engine's trace index")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name, choices in (("workflows", ["list", "check", "import-meta"]), ("evolve", ["run", "list", "show"])):
+    for name, choices in (("workflows", ["list", "check", "prepare", "import-meta"]), ("evolve", ["run", "list", "show"])):
         p = sub.add_parser(name)
         p.add_argument("action", choices=choices)
         p.add_argument("id", nargs="?", default="")
@@ -193,6 +193,9 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "workflows":
                 if args.action == "list": result = evolution.list_workflows(settings, store)
                 elif args.action == "check": result = evolution.check(settings, store, args.workflow, repo=args.repo)
+                elif args.action == "prepare":
+                    from .objectives import prepare
+                    result = prepare(settings, store, workflow=args.workflow, repo=args.repo)
                 else:
                     from .drivers import export_meta
                     if not settings.improve_evolve_data_dir: raise ValueError("import-meta needs --data-dir or IMPROVE_EVOLVE_DATA_DIR")

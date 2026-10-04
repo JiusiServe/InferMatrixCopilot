@@ -47,7 +47,34 @@ def run(settings, store, *, workflow="all", repo="", post=False, now=None, llm=N
             state["stages"]["experiments"] = completed
             atomic_json(path, state)
         forensic_key = "forensics" if workflow == "all" and not repo else f"forensics:{workflow}:{repo}"
-        if forensic_key not in state["stages"]:
+        from . import objectives
+        if objectives.enabled(settings):
+            # No semantic gold matrix, cross-family investigator, or judge.
+            # Controller scenarios and trace replay supply falsifiable goals.
+            # Input collection is free and must refresh while a candidate waits.
+            state["stages"]["objective_inputs"] = objectives.prepare(settings, store, workflow=workflow, repo=repo)
+            from .ledger import Ledger
+            ledger = Ledger(root, store)
+            completed_candidates = evolution.candidates(settings)
+            attempted_proposals = {c.get("proposal") for c in completed_candidates}
+            for completed in completed_candidates:
+                if completed["state"] in evolution.TERMINAL:
+                    for proposal in ledger.load(completed["workflow"]).proposals:
+                        if proposal.id == completed.get("proposal") and proposal.state in ("open", "experiment-registered", "neutral", "underpowered"):
+                            ledger.transition(completed["workflow"], proposal.id, "closed", candidate=completed["id"], outcome=completed["state"])
+            for name in state["stages"]["objective_inputs"]:
+                if not any(p.state == "open" and p.id not in attempted_proposals for p in ledger.load(name).proposals):
+                    records = store.query(workflow=name, limit=3)
+                    if records:
+                        ledger.open_proposal(name, tier=1, stage="efficiency", claim="Reduce resource use while preserving executable contracts and existing outputs", evidence=[r["id"] for r in records], loss=1)
+            atomic_json(path, state)
+            if forensic_key not in state["stages"]:
+                from .runtime import diagnose
+                state["stages"][forensic_key] = {"ok": False, "summary": "diagnosis-interrupted; no paid-call replay"}
+                atomic_json(path, state)
+                state["stages"][forensic_key] = {"ok": True, "summary": "program-verified hypotheses; no human labels or evaluator model", "outputs": diagnose(settings, store, llm)}
+                atomic_json(path, state)
+        elif forensic_key not in state["stages"]:
             # Reuse the actual playbook handler; expose the original lint window.
             from ..engine.step import StepContext
             from ..engine.steps.improve import _forensics

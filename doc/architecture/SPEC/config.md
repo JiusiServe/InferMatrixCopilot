@@ -95,3 +95,7 @@ provider 的缺省模型必须在**这一处**解析，否则 `ResolvedTarget.mo
 ## 自进化接入（2026-10-04）
 
 `TRACE_STORE_ROOT` 控制 trace/1 全量采集。`IMPROVE_ENABLED=false` 是总停止开关，`IMPROVE_EVOLVE_ENABLED=false` 控制代码进化；源码、数据和发布 outbox 各有独立目录。周预算默认 20 美元，周度槽位默认周一 05:00 UTC。`PR_CONTEXT_SOURCE=snapshot` 与 `IMPROVE_SHADOW` 由可信实验控制器设置；`KB_DRAFT_MAX_OPERATIONS` 默认 6。
+
+## 自主进化接入
+
+自主进化新增 `improve_evaluation_mode=objective`、`improve_promotion_mode=automatic`、`improve_evolve_model`；固定单模型，无需判官。总开关与周预算默认不变。

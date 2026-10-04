@@ -250,11 +250,30 @@ def _run_intake_locked(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: i
             from ..improve.artifacts import runtime_settings
             draft_settings = runtime_settings(getattr(rt, "settings", None) or Settings(), "kb-intake.draft")
             with trace_context(draft_key=key, _accepted=holder, step="draft"):
-                drafts.append(draft_changes(
-                    repo=lifecycle.repo, repo_dir=lifecycle.knowledge_dir, event_id=event["id"],
-                    evidence=event["payload"], files=base, gateway=rt.gateway,
-                    generator=rt.generator, release=release, today=today,
-                    max_operations=max(1, min(6, draft_settings.kb_draft_max_operations))))
+                from ..improve import objectives
+                prediction = None
+                if objectives.enabled(draft_settings) and draft_settings.improve_enabled and draft_settings.improve_evolve_enabled and rt.traces is not None:
+                    from ..improve.runtime import execute
+                    payload = {"repo": lifecycle.repo, "repo_dir": lifecycle.knowledge_dir, "event_id": event["id"],
+                               "evidence": event["payload"], "files": base, "release": release, "today": today,
+                               "external_texts": external, "generator_model": rt.generator.model}
+                    objectives.capture(rt.traces, "kb-intake.draft", f"{lifecycle.repo}#{event['id']}", payload)
+                    from ..llm import LLM
+                    try:
+                        prediction = execute(draft_settings, rt.traces, "kb-intake.draft", payload, LLM(draft_settings))
+                    except Exception as exc:
+                        raise ModelUnavailable("autonomous draft rolled back: " + str(exc)) from exc
+                if prediction is not None:
+                    from .intake import Draft
+                    from ..knowledge_service.ops import KnowledgeOperation
+                    drafts.append(Draft(event_ids=[event["id"]], operations=[KnowledgeOperation.from_dict(o) for o in prediction["operations"]],
+                                        result=None, rationale=prediction.get("rationale", ""), rejected=prediction.get("rejected", False)))
+                else:
+                    drafts.append(draft_changes(
+                        repo=lifecycle.repo, repo_dir=lifecycle.knowledge_dir, event_id=event["id"],
+                        evidence=event["payload"], files=base, gateway=rt.gateway,
+                        generator=rt.generator, release=release, today=today,
+                        max_operations=max(1, min(6, draft_settings.kb_draft_max_operations))))
             if accepted_key(key, holder):
                 accepted[event["id"]] = accepted_key(key, holder)
         except ModelUnavailable as exc:
