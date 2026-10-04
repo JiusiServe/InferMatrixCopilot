@@ -3,8 +3,8 @@
 # unit with the knowledge quality gate (L1 + the pinned L2 judge on every
 # block) and, when gold is registered for the item, with a gold-match judge
 # over the incumbent's gate-passing rules. Repo-neutral: the fingerprint
-# covers the drafting code, the generator and the strategy, never a target
-# repository.
+# covers the drafting code, the generator, the strategy and the judge
+# routing, never a target repository.
 workflow: kb-intake.draft
 kind: static
 unit: step_call
@@ -13,11 +13,13 @@ fingerprint:
   covers:
     - settings: [kb_draft_max_operations, agent_model, eco_model, performance_model, llm_max_tokens]
     - resolved_models
-    - prompts: ["kb_service/intake.py"]
+    - prompts: ["kb_service/intake.py", "kb_service/judge_tuning.py"]
     # routing knobs read from the environment, then the same-named setting
     # when the tree has it (zcode's reasoning level is a Settings field only
-    # where the per-run model pin exists): a cover that never goes missing
-    - routing: [KB_GENERATOR, KB_DRAFT_STRATEGY, ZCODE_REASONING_LEVEL]
+    # where the per-run model pin exists): a cover that never goes missing.
+    # KB_JUDGE and the family waiver are covers, never mutation targets:
+    # the judge label is FORBIDDEN_SETTINGS for candidates.
+    - routing: [KB_GENERATOR, KB_DRAFT_STRATEGY, ZCODE_REASONING_LEVEL, KB_JUDGE, KB_JUDGE_FAMILY_WAIVER]
     - copilot_sha
 capture: full
 outcome_adapter: infermatrix_copilot.improve.adapters.kb_intake:KbIntakeAdapter
@@ -26,8 +28,9 @@ shadow_tools: []
 shadow_executables: [python3, git, grep]
 experiment_driver: kb-intake
 evolution:
-  paths: [src/infermatrix_copilot/kb_service/intake.py]
-  settings: [KB_DRAFT_MAX_OPERATIONS]
+  paths: [src/infermatrix_copilot/kb_service/intake.py,
+          src/infermatrix_copilot/kb_service/judge_tuning.py]
+  settings: [KB_DRAFT_MAX_OPERATIONS, ZCODE_REASONING_LEVEL]
   tests: [test/test_improve_kb_intake_adapter.py, test/test_kb_intake_gate.py]
   metric: net_pass_review
   direction: higher

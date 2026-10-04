@@ -42,7 +42,7 @@ def gateway(primary, fallback, *, recorder=None):
 
 @pytest.fixture(autouse=True)
 def clean_model_env(monkeypatch):
-    for key in ("KB_GENERATOR", "KB_JUDGE", "KB_GENERATOR_FALLBACK"):
+    for key in ("KB_GENERATOR", "KB_JUDGE", "KB_GENERATOR_FALLBACK", "KB_JUDGE_FAMILY_WAIVER"):
         monkeypatch.delenv(key, raising=False)
 
 
@@ -63,6 +63,36 @@ def test_invalid_or_same_family_fallback_is_refused(monkeypatch, spec, judge):
     monkeypatch.setenv("KB_GENERATOR_FALLBACK", spec)
     monkeypatch.setenv("KB_JUDGE", judge)
     with pytest.raises(ValueError):
+        roles_from_env()
+
+
+GLM_JUDGE = ModelRole("judge", "zcode", "GLM-5.3")
+
+
+def test_same_family_judge_needs_the_explicit_waiver(monkeypatch, caplog):
+    monkeypatch.setenv("KB_GENERATOR_FALLBACK", FALLBACK.label())
+    monkeypatch.setenv("KB_JUDGE", GLM_JUDGE.label())
+    with pytest.raises(ValueError, match="different model family"):
+        roles_from_env()
+    monkeypatch.setenv("KB_JUDGE_FAMILY_WAIVER", "1")
+    with caplog.at_level("WARNING", logger="infermatrix_copilot.kb_service.models"):
+        generator, judge = roles_from_env()
+    assert generator == PRIMARY and judge == GLM_JUDGE
+    assert any("KB_JUDGE_FAMILY_WAIVER" in r.message for r in caplog.records)
+
+
+@pytest.mark.parametrize("value", ["1", "true", "YES"])
+def test_waiver_truthy_values(monkeypatch, value):
+    monkeypatch.setenv("KB_GENERATOR_FALLBACK", FALLBACK.label())
+    monkeypatch.setenv("KB_JUDGE", GLM_JUDGE.label())
+    monkeypatch.setenv("KB_JUDGE_FAMILY_WAIVER", value)
+    assert roles_from_env()[1] == GLM_JUDGE
+
+
+def test_waiver_does_not_relax_the_other_invariants(monkeypatch):
+    monkeypatch.setenv("KB_JUDGE_FAMILY_WAIVER", "1")
+    monkeypatch.setenv("KB_GENERATOR_FALLBACK", GEN.label())
+    with pytest.raises(ValueError, match="must differ"):
         roles_from_env()
 
 

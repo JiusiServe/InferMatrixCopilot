@@ -142,6 +142,97 @@ def test_gateway_records_every_call_and_fails_closed():
     assert records and records[0]["requested"] == "codex:gpt-6-sol:medium"
 
 
+GLM_JUDGE = ModelRole("judge", "zcode", "GLM-5.3")
+
+
+def test_zcode_judge_backend_round_trips_and_is_recorded():
+    """zcode:GLM-5.3 is a first-class judge backend: the label survives the
+    gateway unchanged, the reply is parsed, and every call is recorded."""
+    records = []
+
+    class Transport:
+        stops_at_spend = False
+
+        def __init__(self):
+            self.kwargs = []
+
+        def complete(self, **kw):
+            self.kwargs.append(kw)
+            body = json.dumps({"dimensions": {"faithful": "yes"}, "reasons": {}})
+            return SimpleNamespace(blocks=[SimpleNamespace(text=body)], stop_reason="end_turn",
+                                   usage={}, model=kw.get("model", "GLM-5.3"))
+
+    transport = Transport()
+    gateway = ModelGateway(None, transport_factory=lambda p: transport, recorder=records.append)
+    reply = gateway.call_json(GLM_JUDGE, system="s", prompt="p")
+    assert reply.role.label() == "zcode:GLM-5.3" and reply.data["dimensions"]["faithful"] == "yes"
+    assert transport.kwargs[0]["model"] == "GLM-5.3"
+    assert records[0]["requested"] == "zcode:GLM-5.3"
+    assert records[0]["provider"] == "zcode"
+
+
+def test_gate_with_a_zcode_judge_uses_the_same_instrument():
+    add = [Op("add", PAGE, "DEMO-2a", _rule("DEMO-2a", "PR #11"))]
+    decision = _gate(add, _judge_all("yes"))
+    assert decision.status == "pass"
+    assert all(b.verdict == "pass" for b in decision.blocks)
+
+
+# -- judge tuning surface -------------------------------------------------------------
+
+def test_judge_tuning_is_the_single_source_the_gate_uses():
+    """judge_tuning is the evolvable surface; gate.py must delegate to it and
+    stay byte-identical to the pre-extraction baseline (evolution starts
+    from the production behaviour, never from a silent rewording)."""
+    import subprocess
+
+    from infermatrix_copilot.kb_service import gate, judge_tuning
+
+    assert gate.JUDGE_SYSTEM is judge_tuning.JUDGE_SYSTEM
+    assert gate.CONSISTENCY_SYSTEM is judge_tuning.CONSISTENCY_SYSTEM
+    assert gate.NEIGHBOUR_LIMIT is judge_tuning.NEIGHBOUR_LIMIT == 30
+
+    old = subprocess.run(["git", "show", "HEAD:src/infermatrix_copilot/kb_service/gate.py"],
+                         capture_output=True, text=True, check=True,
+                         cwd=Path(__file__).resolve().parents[1]).stdout
+    import re
+
+    def extract(name):
+        m = re.search(rf'^{name} = (""".*?""")$', old, re.M | re.S)
+        return eval(m.group(1))  # noqa: S307 - test fixture over our own constant
+    assert judge_tuning.JUDGE_SYSTEM == extract("JUDGE_SYSTEM")
+    assert judge_tuning.CONSISTENCY_SYSTEM == extract("CONSISTENCY_SYSTEM")
+
+
+def test_verdict_aggregation_keeps_the_fail_closed_ordering():
+    from infermatrix_copilot.kb_service.judge_tuning import verdict_from_answers
+
+    assert verdict_from_answers({"faithful": "yes", "actionable": "yes"}) == "pass"
+    assert verdict_from_answers({"faithful": "no", "actionable": "yes"}) == "fail"
+    assert verdict_from_answers({"faithful": "no", "actionable": "unsure"}) == "fail"
+    assert verdict_from_answers({"faithful": "unsure", "actionable": "yes"}) == "human"
+    assert verdict_from_answers({}) == "pass"  # the empty dimension set (no applicable L2)
+
+
+def test_a_tuned_stricter_rubric_flows_through_the_gate(monkeypatch):
+    """The delegation is real: editing judge_tuning changes gate behaviour —
+    the hook evolution candidates use (a stricter aggregation fails blocks
+    the baseline sent to people). Candidates edit the judge_tuning source in
+    the arm tree; here the same edit is simulated on the imported symbol."""
+    from infermatrix_copilot.kb_service import gate
+
+    add = [Op("add", PAGE, "DEMO-2a", _rule("DEMO-2a", "PR #11"))]
+    original = gate.verdict_from_answers
+
+    def strict(answers):
+        return "fail" if "unsure" in answers.values() else original(answers)
+
+    monkeypatch.setattr(gate, "verdict_from_answers", strict)
+    assert _gate(add, _judge_all("unsure")).status == "fail"
+    monkeypatch.undo()
+    assert _gate(add, _judge_all("unsure")).status == "human"
+
+
 # -- drafting and gate --------------------------------------------------------------
 
 def test_draft_repairs_on_lifecycle_error():

@@ -6,6 +6,12 @@ recorded on every call. ``KB_GENERATOR_FALLBACK`` may name one pinned model
 to try when generation is unavailable. Judges never fall back, and schema
 repair and spend limits retain their existing behavior. If both generators
 are unavailable, the caller leaves the work queued.
+
+``KB_JUDGE_FAMILY_WAIVER`` (a truthy value) is the explicit operator opt-in
+that lets the judge share a model family with a generator — a deployment
+where the same backend both drafts and grades (e.g. zcode GLM on both
+sides). The waiver is logged on every start; the calibration set is the
+compensating control, so it must be re-run for the waivered judge.
 """
 
 from __future__ import annotations
@@ -21,6 +27,7 @@ from typing import Any, Callable
 GENERATOR_ENV = "KB_GENERATOR"   # "provider:model[:effort]"
 GENERATOR_FALLBACK_ENV = "KB_GENERATOR_FALLBACK"
 JUDGE_ENV = "KB_JUDGE"
+JUDGE_FAMILY_WAIVER_ENV = "KB_JUDGE_FAMILY_WAIVER"
 DEFAULT_GENERATOR = "claude-code:claude-opus-5-5"
 DEFAULT_JUDGE = "codex:gpt-6-sol:medium"
 _JSON_FENCE = re.compile(r"```(?:json)?\s*(\{.*\})\s*```", re.DOTALL)
@@ -63,9 +70,16 @@ def roles_from_env() -> tuple[ModelRole, ModelRole]:
         if fallback.label().casefold() == generator.label().casefold():
             raise ValueError("the generator fallback must differ from the primary generator")
         generator = replace(generator, fallback=fallback)
+    waived = os.environ.get(JUDGE_FAMILY_WAIVER_ENV, "").strip().lower() in ("1", "true", "yes")
     for candidate in (generator, generator.fallback):
         if candidate is not None and candidate.provider == judge.provider \
                 and candidate.model.casefold().split("-")[0] == judge.model.casefold().split("-")[0]:
+            if waived:
+                logger.warning(
+                    "KB_JUDGE_FAMILY_WAIVER is set: judge %s grades drafts from the same "
+                    "model family as %s; keep the calibration set current",
+                    judge.label(), candidate.label())
+                break
             raise ValueError("the judge must come from a different model family than every generator")
     return generator, judge
 
