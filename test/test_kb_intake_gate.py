@@ -183,8 +183,10 @@ def test_gate_with_a_zcode_judge_uses_the_same_instrument():
 def test_judge_tuning_is_the_single_source_the_gate_uses():
     """judge_tuning is the evolvable surface; gate.py must delegate to it and
     stay byte-identical to the pre-extraction baseline (evolution starts
-    from the production behaviour, never from a silent rewording)."""
-    import subprocess
+    from the production behaviour, never from a silent rewording). The
+    digests pin the shipped baseline — recorded when the module was
+    extracted from gate.py (7aa922dd9^)."""
+    import hashlib
 
     from infermatrix_copilot.kb_service import gate, judge_tuning
 
@@ -192,16 +194,16 @@ def test_judge_tuning_is_the_single_source_the_gate_uses():
     assert gate.CONSISTENCY_SYSTEM is judge_tuning.CONSISTENCY_SYSTEM
     assert gate.NEIGHBOUR_LIMIT is judge_tuning.NEIGHBOUR_LIMIT == 30
 
-    old = subprocess.run(["git", "show", "HEAD:src/infermatrix_copilot/kb_service/gate.py"],
-                         capture_output=True, text=True, check=True,
-                         cwd=Path(__file__).resolve().parents[1]).stdout
-    import re
-
-    def extract(name):
-        m = re.search(rf'^{name} = (""".*?""")$', old, re.M | re.S)
-        return eval(m.group(1))  # noqa: S307 - test fixture over our own constant
-    assert judge_tuning.JUDGE_SYSTEM == extract("JUDGE_SYSTEM")
-    assert judge_tuning.CONSISTENCY_SYSTEM == extract("CONSISTENCY_SYSTEM")
+    baseline = {
+        "JUDGE_SYSTEM": "2d120ade58b9ac32c0af4b0ad8854205f80fbfcad4e89ff2204b47028ec0781d",
+        "CONSISTENCY_SYSTEM": "db4fd2396f0400f9d45311f0c1460d181d83f8b64489c142c398bd1eca3f0b97",
+    }
+    for name, expected in baseline.items():
+        actual = hashlib.sha256(getattr(judge_tuning, name).encode()).hexdigest()
+        assert actual == expected, (
+            f"{name} drifted from the production baseline the evolution "
+            "engine starts from; rewording must arrive as an engine candidate, "
+            "not as part of another change")
 
 
 def test_verdict_aggregation_keeps_the_fail_closed_ordering():

@@ -1,7 +1,7 @@
 """Judge calls, all under the engine's ledger (design §10).
 
 The engine never starts a judge subprocess directly; every judge call goes
-through `run_judge`, which has two paths:
+through `run_judge`, which has three paths:
 
 * **API judges** through `LLM.create` — captured as `model_call` records by
   the choke point and priced against the dollar envelope (P3 governor);
@@ -9,10 +9,17 @@ through `run_judge`, which has two paths:
   `governed_subprocess` — one call reserved against the judge-call envelope,
   tool-less by construction (fresh empty workspace, `--mode ask`, any tool
   call in the stream fails the verdict), recorded as a `model_call` with
-  ``usd=0``.
+  ``usd=0``;
+* **zcode judges** (``cli:zcode:<model>``) through the production
+  `ZCodeTransport.complete` one-shot — the same tool-less instrument the
+  knowledge gate's `ModelGateway` uses (empty scratch cwd, every native
+  tool removed, containment audit, served-model assertion; the reasoning
+  level is the ambient `ZCODE_REASONING_LEVEL`). Reserved and settled
+  against the judge-call envelope like any CLI judge; subscription billing,
+  so ``usd=0`` and only the call count is governed.
 
-A `Governor` (P3) gates both; without one the calls are unmetered but still
-recorded. `parse_verdict` extracts the first JSON object of a reply.
+A `Governor` (P3) gates all of them; without one the calls are unmetered but
+still recorded. `parse_verdict` extracts the first JSON object of a reply.
 """
 
 from __future__ import annotations
@@ -38,7 +45,7 @@ class JudgeError(RuntimeError):
 class JudgeSpec:
     kind: str                 # "api" | "cli"
     model: str
-    provider: str = ""        # cli: cursor | codex | claude ; api: the LLM's provider
+    provider: str = ""        # cli: cursor | codex | claude | zcode ; api: the LLM's provider
     max_tokens: int = 2000
 
 
@@ -153,10 +160,38 @@ def governed_subprocess(argv: list[str], *, governor: Any = None, timeout: int =
             governor.settle_judge_call(token)
 
 
+def _run_zcode(spec: JudgeSpec, *, system: str, prompt: str, role: str,
+               governor: Any) -> tuple[str, dict, str, str]:
+    """One governed zcode judge call through the production transport: the
+    same tool-less one-shot the kb gate's ``ModelGateway`` uses (empty
+    scratch cwd, every native tool removed, containment audit, served-model
+    assertion), so an experiment's gate judge IS the production instrument,
+    not an API proxy of it. Subscription billing: ``usd`` stays 0 and only
+    the call count draws on the judge-call envelope."""
+    from ..config import Settings
+    from ..providers.registry import transport_for_id
+
+    token = governor.reserve_judge_call() if governor is not None else None
+    try:
+        transport = transport_for_id(Settings(), "zcode")
+        reply = transport.complete(system=system,
+                                   messages=[{"role": "user", "content": prompt}],
+                                   model=spec.model, role=role)
+        text = "".join(b.text for b in reply.blocks if b.type == "text")
+        usage = dict(getattr(reply, "usage", None) or {})
+        return text, usage, "" if text else "empty zcode judge reply", \
+            str(getattr(reply, "model", "") or "")
+    except Exception as exc:  # noqa: BLE001 — the verdict records the reason
+        return "", {}, f"zcode judge unavailable: {type(exc).__name__}: {exc}", ""
+    finally:
+        if governor is not None:
+            governor.settle_judge_call(token)
+
+
 def run_judge(spec: JudgeSpec, *, system: str, prompt: str, llm: Any = None, governor: Any = None,
               role: str = "judge", runner: Callable[..., Any] | None = None) -> dict:
     """Run one judge call and return its parsed JSON verdict (raises
-    JudgeError on an unusable reply). Both paths are recorded as
+    JudgeError on an unusable reply). All paths are recorded as
     ``model_call`` records under the current trace context."""
     if spec.kind == "api":
         if llm is None:
@@ -167,25 +202,31 @@ def run_judge(spec: JudgeSpec, *, system: str, prompt: str, llm: Any = None, gov
         return parse_verdict(text)
     if spec.kind != "cli":
         raise JudgeError(f"unknown judge kind {spec.kind!r}")
-    workspace = Path(tempfile.mkdtemp(prefix="judge-ws-"))
-    workspace.chmod(0o700)
     started = time.monotonic()
-    try:
-        full = prompt if not system else f"{system}\n\n{prompt}"
-        proc = governed_subprocess(_cli_argv(spec, full, workspace), governor=governor, cwd=str(workspace),
-                                   runner=runner, input=full if spec.provider == "codex" else None)
-        text, usage = _cli_result(spec, getattr(proc, "stdout", "") or "")
-        error = "" if text else f"empty judge reply (rc={getattr(proc, 'returncode', '?')})"
-    except JudgeError as exc:
-        text, usage, error = "", {}, str(exc)
-    finally:
-        shutil.rmtree(workspace, ignore_errors=True)
+    if spec.provider == "zcode":
+        text, usage, error, served = _run_zcode(spec, system=system, prompt=prompt,
+                                                role=role, governor=governor)
+    else:
+        workspace = Path(tempfile.mkdtemp(prefix="judge-ws-"))
+        workspace.chmod(0o700)
+        try:
+            full = prompt if not system else f"{system}\n\n{prompt}"
+            proc = governed_subprocess(_cli_argv(spec, full, workspace), governor=governor, cwd=str(workspace),
+                                       runner=runner, input=full if spec.provider == "codex" else None)
+            text, usage = _cli_result(spec, getattr(proc, "stdout", "") or "")
+            error = "" if text else f"empty judge reply (rc={getattr(proc, 'returncode', '?')})"
+        except JudgeError as exc:
+            text, usage, error = "", {}, str(exc)
+        finally:
+            shutil.rmtree(workspace, ignore_errors=True)
+        served = ""
     store = current_store()
     if store is not None:
         try:
             store.append("model_call", inputs={"system": system, "prompt": prompt},
                          outputs={"reply": text} if text else {},
-                         model={"role": role, "provider": spec.provider, "model": spec.model, "served_model": ""},
+                         model={"role": role, "provider": spec.provider, "model": spec.model,
+                                "served_model": served},
                          usage=usage, seconds=round(time.monotonic() - started, 3),
                          result={"format": "prompt/1", "usd": 0.0, "subscription": True}, error=error)
         except Exception:  # noqa: BLE001 - recording never changes a verdict
@@ -197,8 +238,8 @@ def run_judge(spec: JudgeSpec, *, system: str, prompt: str, llm: Any = None, gov
 
 def judge_spec_from(settings: Any, override: str = "") -> JudgeSpec | None:
     """The gold_match / paired judge from ``settings.improve_judge`` (or an
-    explicit override): ``api:<model>`` or ``cli:<provider>:<model>``; None
-    when unset."""
+    explicit override): ``api:<model>`` or ``cli:<provider>:<model>`` where
+    the provider is cursor | codex | claude | zcode; None when unset."""
     raw = str(override or getattr(settings, "improve_judge", "") or "")
     if not raw:
         return None
@@ -206,5 +247,7 @@ def judge_spec_from(settings: Any, override: str = "") -> JudgeSpec | None:
     if parts[0] == "api" and len(parts) == 2:
         return JudgeSpec("api", parts[1])
     if parts[0] == "cli" and len(parts) == 3:
+        if parts[1] not in ("cursor", "codex", "claude", "zcode"):
+            raise JudgeError(f"unknown CLI judge provider {parts[1]!r}")
         return JudgeSpec("cli", parts[2], provider=parts[1])
     raise JudgeError(f"improve_judge must be api:<model> or cli:<provider>:<model>, got {raw!r}")

@@ -136,6 +136,138 @@ def test_judge_runner_paths_and_verdict_parsing(tmp_path):
         run_judge(JudgeSpec("api", "m"), system="s", prompt="p")
 
 
+def test_zcode_judge_spec_parsing():
+    from infermatrix_copilot.improve.judges import judge_spec_from
+
+    spec = judge_spec_from(SimpleNamespace(improve_judge="cli:zcode:GLM-5.3"))
+    assert spec == JudgeSpec("cli", "GLM-5.3", provider="zcode")
+    assert judge_spec_from(SimpleNamespace(improve_judge="")) is None
+    with pytest.raises(JudgeError, match="unknown CLI judge provider"):
+        judge_spec_from(SimpleNamespace(improve_judge="cli:cursor-agent:m"))
+    with pytest.raises(JudgeError, match="improve_judge must be"):
+        judge_spec_from(SimpleNamespace(improve_judge="zcode:GLM-5.3"))
+
+
+def test_zcode_judge_delegates_to_the_production_transport(tmp_path, monkeypatch):
+    """cli:zcode judging goes through ZCodeTransport.complete — the same
+    tool-less one-shot the production kb gate uses — governed by the
+    judge-call envelope and recorded like any CLI judge."""
+    from infermatrix_copilot.improve.judges import _run_zcode
+    from infermatrix_copilot.providers import registry
+
+    calls = []
+
+    class Gov:
+        def reserve_judge_call(self):
+            calls.append("reserve")
+            return "2027-W03|judge|z"
+
+        def settle_judge_call(self, token=None):
+            calls.append(("settle", token))
+
+    class Transport:
+        def __init__(self, reply):
+            self.reply = reply
+            self.kwargs = None
+
+        def complete(self, **kw):
+            self.kwargs = kw
+            if isinstance(self.reply, Exception):
+                raise self.reply
+            return self.reply
+
+    ok = SimpleNamespace(blocks=[SimpleNamespace(type="text", text='{"status": "hit", "quote": "q"}')],
+                         usage={"input_tokens": 7, "output_tokens": 3}, model="GLM-5.3")
+    transport = Transport(ok)
+    monkeypatch.setattr(registry, "transport_for_id", lambda settings, pid: transport)
+
+    store = TraceStore(tmp_path / "t", environ={})
+    with bind_store(store), trace_context(run_id="jz", unit_id="uz"):
+        verdict = run_judge(JudgeSpec("cli", "GLM-5.3", provider="zcode"), system="s", prompt="p",
+                            governor=Gov())
+    assert verdict["status"] == "hit"
+    assert transport.kwargs == {"system": "s", "messages": [{"role": "user", "content": "p"}],
+                                "model": "GLM-5.3", "role": "judge"}
+    assert calls == ["reserve", ("settle", "2027-W03|judge|z")]
+    rec = store.query(kind="model_call", unit_id="uz")[0]
+    assert rec["model"]["provider"] == "zcode" and rec["model"]["served_model"] == "GLM-5.3"
+    assert rec["result"]["usd"] == 0.0 and rec["result"]["subscription"] is True
+    assert rec["usage"]["input_tokens"] == 7 and not rec["error"]
+
+    down = Transport(RuntimeError("zcode CLI is not installed"))
+    monkeypatch.setattr(registry, "transport_for_id", lambda settings, pid: down)
+    with pytest.raises(JudgeError, match="zcode judge unavailable"):
+        run_judge(JudgeSpec("cli", "GLM-5.3", provider="zcode"), system="s", prompt="p", governor=Gov())
+    assert calls[-1] == ("settle", "2027-W03|judge|z")   # a failed call still settles
+
+    empty = Transport(SimpleNamespace(blocks=[], usage={}, model="GLM-5.3"))
+    monkeypatch.setattr(registry, "transport_for_id", lambda settings, pid: empty)
+    with pytest.raises(JudgeError, match="empty zcode judge reply"):
+        run_judge(JudgeSpec("cli", "GLM-5.3", provider="zcode"), system="s", prompt="p", governor=None)
+
+
+def test_zcode_run_helper_returns_the_parsed_triple(monkeypatch):
+    """The helper's contract: (text, usage, error, served) — the reply's
+    text from text blocks only, non-text blocks ignored."""
+    from infermatrix_copilot.improve.judges import _run_zcode
+    from infermatrix_copilot.providers import registry
+
+    class Transport:
+        def complete(self, **kw):
+            return SimpleNamespace(blocks=[SimpleNamespace(type="reasoning", text="thinking"),
+                                           SimpleNamespace(type="text", text='{"verdict": "consistent"}')],
+                                   usage={"input_tokens": 1}, model="GLM-5.3")
+
+    monkeypatch.setattr(registry, "transport_for_id", lambda settings, pid: Transport())
+    text, usage, error, served = _run_zcode(JudgeSpec("cli", "GLM-5.3", provider="zcode"),
+                                            system="s", prompt="p", role="judge", governor=None)
+    assert text == '{"verdict": "consistent"}' and not error and served == "GLM-5.3"
+    assert usage == {"input_tokens": 1}
+
+
+def test_zcode_judge_serves_the_trusted_kb_gate(monkeypatch, tmp_path):
+    """End to end: the trusted driver's Gateway over a cli:zcode judge spec
+    drives the production gate (judge_block + consistency) — the
+    experiment-internal gate judge is the production instrument, with the
+    ModelRole the gate records naming the zcode backend."""
+    import json as _json
+
+    from infermatrix_copilot.improve.drivers import Gateway
+    from infermatrix_copilot.improve.judges import judge_spec_from
+    from infermatrix_copilot.kb_service import gate as kb_gate
+    from infermatrix_copilot.kb_service.models import ModelRole
+    from infermatrix_copilot.providers import registry
+    from test_kb_intake_gate import PAGE, Op, _rule, _tree
+
+    class Transport:
+        def complete(self, *, system, messages, model, role, **kw):
+            prompt = messages[0]["content"]
+            if '"directory"' in prompt:                      # the consistency call
+                return SimpleNamespace(blocks=[SimpleNamespace(type="text", text='{"verdict": "consistent", "conflicts": []}')],
+                                       usage={}, model=model)
+            payload = _json.loads(prompt.split("<untrusted_data>\n", 1)[1].rsplit("\n</untrusted_data>", 1)[0])
+            dims = {d: "yes" for d in payload["dimensions_to_answer"]}
+            return SimpleNamespace(blocks=[SimpleNamespace(type="text", text=_json.dumps(
+                {"dimensions": dims, "reasons": {}}))], usage={}, model=model)
+
+    monkeypatch.setattr(registry, "transport_for_id", lambda settings, pid: Transport())
+    spec = judge_spec_from(SimpleNamespace(improve_judge="cli:zcode:GLM-5.3"))
+    gateway = Gateway(None, spec, None)
+    judge = ModelRole("judge", spec.provider, spec.model)
+
+    from infermatrix_copilot.kb_service.gate import changes_between
+    from infermatrix_copilot.knowledge_service.ops import apply_operations
+
+    base = _tree()
+    add = [Op("add", PAGE, "DEMO-2a", _rule("DEMO-2a", "PR #11"))]
+    head = {**base, **apply_operations(base, add, release="v1", today="2026-09-28").files}
+    decision = kb_gate.run_gate(base=base, head=head, changes=changes_between(base, head),
+                                external_texts={}, evidence=[{"source_reference": "PR #11"}],
+                                gateway=gateway, judge=judge, release="v1", repo_dir="repos/demo")
+    assert decision.status == "pass"
+    assert all(b.model == "GLM-5.3" for b in decision.blocks)
+
+
 def test_paired_statistics_labels_power_and_kappa():
     r = stats.paired({f"i{k}": [0.1, 0.12] for k in range(10)}, "recall")
     assert r.n_items == 10 and r.n_verdicts == 20 and abs(r.mean - 0.11) < 1e-9 and r.lo > 0
