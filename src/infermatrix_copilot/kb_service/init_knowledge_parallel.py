@@ -45,6 +45,16 @@ def offered_ranges(items):
     return ranges
 
 
+def local_privacy_reason(text):
+    """Match the knowledge-tree IPv4 rule without echoing its matched value."""
+    if any(not match.group().startswith("127.") for match in
+           re.finditer(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])", text)):
+        return ("local publication exclusion: literal IPv4; use <REMOTE_HOST> or describe "
+                "wildcard binding in words while preserving the source contract. "
+                "The original native approval is unchanged.")
+    return ""
+
+
 def related_test_sources(stage, paths, limit=20_000):
     """Shared-index localization only: direct imports, symbols and real assertions.
 
@@ -389,6 +399,12 @@ def _apply(stage, result):
     stage.record.unfinished.extend(result["unfinished"])
     accepted = []
     for artifact in result["artifacts"]:
+        reason = local_privacy_reason(artifact["text"]) if stage.rt.unlimited_subscription else ""
+        if reason:
+            stage.record.dropped.append({"rule_id": artifact["key"], "page": artifact["page"],
+                                         "why": reason, "local_publication_exclusion": True})
+            stage.record.unfinished.append(f"{artifact['key']}: {reason}")
+            continue  # Original body, result hash and native pass remain immutable.
         item = stage._append_approved(Owner(artifact["owner"], artifact["page"], ()),
             artifact["page"], artifact["title"], artifact["facet"], artifact["text"],
             [Evidence.from_dict(e) for e in artifact["evidence"]])
@@ -516,6 +532,13 @@ def _with_review_feedback(stage, jobs, saved):
                     "last_error": latest.get("error", ""),
                     "last_dropped_reasons": [p["why"] for p in latest.get("dropped", [])
                                              if p.get("rule_id") == key and p.get("page") == original["page"]]}
+                for artifact in latest.get("artifacts", []):
+                    if (artifact.get("key") == key and artifact.get("owner") == original["owner"].owner
+                            and artifact.get("page") == original["page"] and artifact.get("facet") == facet):
+                        reason = local_privacy_reason(artifact["text"])
+                        if reason:
+                            feedback[facet]["last_local_publication_reasons"] = [reason]
+                            feedback[facet]["prior_artifact_text_sha256"] = artifact["text_sha256"]
         if not requested:
             continue
         if not feedback and requested == original["requested"]:
