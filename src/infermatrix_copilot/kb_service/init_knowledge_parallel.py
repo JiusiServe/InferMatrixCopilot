@@ -70,12 +70,13 @@ def related_test_sources(stage, paths, limit=20_000):
         return []
     symbols = re.compile(r"\b(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\b")
     checks = re.compile(r"\bassert\b|\braises\s*\(|\bexpect\s*\(|\bassert\w*\s*\(")
-    out, used = [], 0
+    out, used, candidates = [], 0, []
+    basenames = {posixpath.basename(stem) for stem in stems}
     for path in sorted(index.tests):
         entry = index.entries[path]
         if entry.get("status") != "ready" or not entry.get("lines"):
             continue
-        imports = []
+        imports, matched_modules = [], set()
         for imported in entry.get("imports", []):
             text = imported["text"]
             tokens = re.findall(r"[A-Za-z_]\w*(?:\.\w+)*", text)
@@ -87,6 +88,8 @@ def related_test_sources(stage, paths, limit=20_000):
                         if spec.startswith(".") else spec.rsplit(".", 1)[0] for spec in quoted}
             if targets & modules or resolved & stems:
                 imports.append(imported["start"])
+                matched_modules.update(targets & modules)
+                matched_modules.update(stem.replace("/", ".") for stem in resolved & stems)
         if not imports:
             continue
         lines = entry["lines"]
@@ -110,6 +113,17 @@ def related_test_sources(stage, paths, limit=20_000):
                 merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
             else:
                 merged.append((start, end))
+        test_name = posixpath.basename(path).rsplit(".", 1)[0]
+        test_name = re.sub(r"^test_|(?:_test|\.test|\.spec)$", "", test_name)
+        # Broad entry modules can match many unrelated tests. Rank before the
+        # cap so an exact capability test cannot lose its budget to path order.
+        exact = test_name in basenames
+        related_name = any(len(name) >= 5 and (name in test_name or test_name in name)
+                           for name in basenames if len(test_name) >= 5)
+        specificity = max((len(module.split(".")) for module in matched_modules), default=0)
+        candidates.append(((exact, related_name, specificity), path, entry, merged))
+    for _, path, entry, merged in sorted(candidates, key=lambda row: (tuple(-int(n) for n in row[0]), row[1])):
+        lines = entry["lines"]
         for start, end in merged:
             text = "\n".join(f"{n}: {lines[n - 1]}" for n in range(start, end + 1))
             size = len(text.encode())

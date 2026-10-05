@@ -53,3 +53,24 @@ def test_test_cap_keeps_complete_intervals_and_read_failures_are_not_absence(tmp
     stage.record.pin = "b" * 40
     with pytest.raises(InitError, match="test index source pin"):
         related_test_sources(stage, ["src/tool.py"])
+
+
+def test_specific_capability_test_survives_earlier_shared_entry_test_budget(tmp_path):
+    files = {
+        "src/app.py": "def shared_entry():\n    return 1\n",
+        "src/share_image_export.py": "class ShareImageExportManager:\n    def export(self):\n        return 'png'\n",
+        "tests/a_shared.py": "from src.app import shared_entry\n\ndef test_shared_entry():\n" +
+            "    assert shared_entry() == 1\n" * 150,
+        "tests/test_share_image_export.py": "from src.share_image_export import ShareImageExportManager\n\n" +
+            "def test_png_export():\n    assert ShareImageExportManager().export() == 'png'\n",
+    }
+    for path, text in files.items():
+        target = tmp_path / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text)
+    index = build_discovery_index(tmp_path, pin="a" * 40, scope={"roots": ["."], "exclude": []})
+    stage = SimpleNamespace(source_index=index, record=InitRecord("knowledge", "toy", pin="a" * 40))
+    excerpts = related_test_sources(stage, ["src/app.py", "src/share_image_export.py"], limit=600)
+    assert excerpts[0]["path"] == "tests/test_share_image_export.py"
+    assert any("assert ShareImageExportManager().export()" in item["text"] for item in excerpts)
+    assert sum(len(item["text"].encode()) for item in excerpts) <= 600
