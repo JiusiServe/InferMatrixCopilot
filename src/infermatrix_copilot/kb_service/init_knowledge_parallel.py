@@ -43,6 +43,24 @@ def offered_ranges(items):
     return ranges
 
 
+def range_is_offered(ranges, start, end):
+    """Adjacent chunks are continuous evidence; a missing line stays a gap.
+
+    Keep stored intervals unchanged so historical native input hashes replay.
+    """
+    if isinstance(ranges, int):
+        ranges = [(1, ranges)]
+    cursor = start
+    for left, right in sorted(ranges):
+        if left > cursor:
+            return False
+        if right >= cursor:
+            cursor = right + 1
+        if cursor > end:
+            return True
+    return False
+
+
 def preferred_sources(stage, tree, feature_id, paths, limit):
     """New catalog entries use complete, verified discovery ranges before prefixes."""
     from .feature_discovery_index import language_for, validate_evidence
@@ -114,7 +132,8 @@ class _CaptureGateway:
 
 
 def _worker(stage, job):
-    from .init_knowledge import SYSTEM_KNOWLEDGE, knowledge_prompt, validate_sections
+    from .init_knowledge import knowledge_prompt, validate_sections
+    from .init_knowledge_inputs import foundation_evidence, knowledge_system
     from .init_support import generate
     from .init_stages import _one_line
     worker = copy.copy(stage)
@@ -122,10 +141,13 @@ def _worker(stage, job):
     worker.rt = copy.copy(stage.rt)
     worker.rt.gateway = _CaptureGateway(stage.rt.gateway)
     worker.record = InitRecord(stage=stage.STAGE, repo=stage.record.repo, pin=stage.record.pin)
+    worker._foundation_payload = job["payload"]
     artifacts = []
     error = ""
     try:
-        data = generate(worker.rt, worker.budget, worker.lifecycle.init, system=SYSTEM_KNOWLEDGE,
+        if job["payload"].get("foundation_prompt_version") == 4:
+            foundation_evidence(worker, job["payload"])
+        data = generate(worker.rt, worker.budget, worker.lifecycle.init, system=knowledge_system(job["payload"]),
                         prompt=knowledge_prompt(job["payload"]), validate=validate_sections).data
         for section in data["sections"]:
             if section["facet"] not in job["requested"]:
@@ -168,6 +190,12 @@ def _validate_result(stage, result):
     if (result["requested"] != result["payload"]["facets"]
             or _hash(result["offered"]) != _hash(offered_ranges(result["payload"]["files"] + result["payload"]["docs"]))):
         raise InitError("foundation shown input or requested facets differ from generator payload")
+    from .init_knowledge_inputs import foundation_evidence, knowledge_system
+    knowledge_system(result["payload"])
+    if result["payload"].get("foundation_prompt_version") == 4:
+        if not stage.rt.unlimited_subscription:
+            raise InitError("foundation full packet requires unlimited subscription")
+        foundation_evidence(stage, result["payload"])
     for artifact in result["artifacts"]:
         facet, owner = artifact["facet"], result["owner"]
         if (artifact["owner"] != owner or result["payload"]["owner"] != owner
@@ -190,8 +218,7 @@ def _validate_result(stage, result):
         if stage._render_section(artifact["section"], entries) != artifact["text"]:
             raise InitError("foundation generated section reconstruction mismatch")
         for entry in artifact["section"]["evidence"]:
-            if not any(start <= entry["start"] <= entry["end"] <= end
-                       for start, end in result["offered"].get(entry["path"], [])):
+            if not range_is_offered(result["offered"].get(entry["path"], []), entry["start"], entry["end"]):
                 raise InitError("foundation cached citation outside shown interval")
         if [(e.path, e.start, e.end) for e in entries] != [
                 (e["path"], e["start"], e["end"]) for e in artifact["section"]["evidence"]]:
@@ -205,8 +232,9 @@ def _validate_result(stage, result):
 def _validate_native(stage, artifact, result):
     from ..trace_store import TraceStore
     from .judge_tuning import JUDGE_SYSTEM
-    from .init_knowledge import SYSTEM_KNOWLEDGE, knowledge_prompt
-    from .init_stages import _one_line, _page_frontmatter
+    from .init_knowledge import knowledge_prompt
+    from .init_knowledge_inputs import foundation_evidence, knowledge_system
+    from .init_stages import _Stage, _one_line, _page_frontmatter
     from .models import parse_json_object
     store = TraceStore(stage.rt.state_dir / "init" / "traces")
     receipt = artifact["judge_receipt"]
@@ -234,7 +262,7 @@ def _validate_native(stage, artifact, result):
                            and artifact["section"] in generated["sections"]
                            and artifact["generator_title"] == generated.get("title")
                            and artifact["title"] == (_one_line(generated.get("title")) or f"{artifact['owner']} knowledge")
-                           and store.blob(generator["inputs"]["system"]) == SYSTEM_KNOWLEDGE
+                           and store.blob(generator["inputs"]["system"]) == knowledge_system(result["payload"])
                            and not generator.get("error") and generator["model"]["role"] == "generator"
                            and generator["model"]["provider"] == stage.rt.generator.provider
                            and generator["model"]["model"] == stage.rt.generator.model
@@ -249,7 +277,9 @@ def _validate_native(stage, artifact, result):
                  and payload["change"]["page"] == artifact["page"]
                  and payload["change"]["after"] == _page_frontmatter(artifact["title"], kind="architecture",
                        today=artifact["approved_today"], tags=stage.tags) + "\n" + artifact["text"]
-                 and payload["evidence"] == stage._judge_evidence([Evidence.from_dict(e) for e in artifact["evidence"]])
+                 and payload["evidence"] == (foundation_evidence(stage, result["payload"])
+                     if result["payload"].get("foundation_prompt_version") == 4 else
+                     _Stage._judge_evidence(stage, [Evidence.from_dict(e) for e in artifact["evidence"]]))
                  and all(reply["dimensions"].get(d) == "yes" for d in
                          ("faithful", "does_not_weaken", "non_contradictory")))
     except (KeyError, ValueError, OSError, TypeError) as exc:

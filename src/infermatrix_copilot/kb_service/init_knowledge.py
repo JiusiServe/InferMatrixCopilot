@@ -28,9 +28,9 @@ from .init_budget import BudgetExhausted
 from .init_coverage import Owner
 from .init_stages import _Chain, _Stage, _numbered, _one_line, _page_frontmatter, neutral_headings
 from .init_support import InitRecord, classify_verdict, generate, judge
-from .init_knowledge_inputs import SYSTEM_KNOWLEDGE, knowledge_prompt, source_owner, source_owners
+from .init_knowledge_inputs import SYSTEM_KNOWLEDGE, knowledge_prompt, source_owner, source_owners, foundation_evidence
 from .models import ModelUnavailable
-from .init_knowledge_parallel import offered_ranges, parallelism, run_jobs, restore_jobs, preferred_sources, start_interval
+from .init_knowledge_parallel import offered_ranges, parallelism, run_jobs, restore_jobs, preferred_sources, start_interval, range_is_offered
 
 FACETS = ("architecture", "api", "configuration", "tradeoffs", "features", "validation")
 MAX_SOURCE_BYTES = 100_000
@@ -120,7 +120,8 @@ class _Knowledge(_Stage):
         path = self._coverage_policy_path()
         text = self.overlay.get(path) or self.rt.knowledge.show(self._base_sha, path) or ""
         options = {"knowledge_policy": hashlib.sha256(text.encode()).hexdigest(),
-                   "from_existing": self.from_existing, "knowledge_prompt_version": 3}
+                   "from_existing": self.from_existing,
+                   "knowledge_prompt_version": 4 if self.rt.unlimited_subscription else 3}
         if self.rt.unlimited_subscription:
             options["foundation_parallel"] = {"version": 1, "workers": parallelism(self.rt),
                                                "zcode_start_interval_s": start_interval(self.rt)}
@@ -247,6 +248,7 @@ class _Knowledge(_Stage):
                        "related_owners": [{"owner": o.owner, "scope_prefixes": list(o.prefixes)}
                                           for o in self.owners]}
             if self.rt.unlimited_subscription:
+                payload["foundation_prompt_version"] = 4
                 owner_jobs.append({"owner": owner, "page": page, "payload": payload,
                                    "offered": offered, "requested": requested})
                 continue
@@ -330,6 +332,7 @@ class _Knowledge(_Stage):
                            "existing_knowledge": self._bounded_context({feature.page: self.head.get(feature.page, "")}),
                            "language_sample": self._language_sample()}
                 if self.rt.unlimited_subscription:
+                    payload["foundation_prompt_version"] = 4
                     feature_jobs.append({"owner": Owner("feature-" + feature.id, feature.page, ()),
                                          "page": feature.page, "payload": payload,
                                          "offered": offered, "requested": missing_facets})
@@ -480,9 +483,7 @@ class _Knowledge(_Stage):
         entries = []
         for entry in section["evidence"]:
             ranges = offered.get(entry["path"], [])
-            if isinstance(ranges, int):  # legacy callers offer an uninterrupted prefix
-                ranges = [(1, ranges)]
-            if not any(start <= entry["start"] <= entry["end"] <= end for start, end in ranges):
+            if not range_is_offered(ranges, entry["start"], entry["end"]):
                 self.record.dropped.append({"rule_id": key, "page": page, "why": "evidence outside shown input"})
                 return None
             try:
@@ -509,6 +510,12 @@ class _Knowledge(_Stage):
                 self.record.unfinished.append(f"{owner.owner}/{facet}: {label}; draft retained in model traces for review")
             return None
         return self._append_approved(owner, page, title, facet, text, entries, label)
+
+    def _judge_evidence(self, entries):
+        payload = getattr(self, "_foundation_payload", {})
+        if self.rt.unlimited_subscription and payload.get("foundation_prompt_version") == 4:
+            return foundation_evidence(self, payload)
+        return super()._judge_evidence(entries)
 
     def _render_section(self, section, entries):
         facet = section["facet"]
