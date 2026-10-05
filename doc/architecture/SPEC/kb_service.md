@@ -422,7 +422,7 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   **其他** owner 的前缀，所以新前缀永远不会是吞掉别的模块或 owner 的祖先（有子模块的模块，如包根目录或仓库根，从不以自身
   目录路由）。需要超过 `MAX_ABSORB_PREFIXES`（20）个前缀的模块不吸收，改写地图卡片；卡片的新 owner 前缀同样由
   `cover_prefixes` 得出；完全无人覆盖的，每个模块一次有界的生成调用（文件名、符号签名、文件开头的 docstring
-  或注释块，字节上限；从不给函数体：签名正则匹配整行，`declaration` 截掉函数体——
+  或注释块，字节上限；旧的有限预算模式不给函数体：签名正则匹配整行，`declaration` 截掉函数体——
   花括号语言（JavaScript、Go、Rust）在整行**最早**的 `{`/`=>`/`;`/单独的 `=` 处截断，不去词法分析字符串、注释或正则字面量
   （函数体不可能出现在它们之前，默认值可能被截短，这是失败即关闭的取舍）；Python 在括号、字符串与行尾 `#` 注释之外的
   第一个 `:` 处截断；单行函数也只留声明）写一张**地图卡片**：prose 页（`type: architecture`），目的、入口、关键文件（只保留该
@@ -432,6 +432,14 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   仓库入口页链接；`components/` 已存在却没有入口页时组直接放在仓库目录下。`_routes.yaml` 只追加（保留开头注释块，
   `routes_append_only` 校验不重排、不改名、不删除）。预算用完或超过卡片上限时，已写的卡片照常成 PR，剩下的模块进
   `unfinished`；报告里列出仍无路由的模块。测试：`test_kb_init_modules.py`。
+  显式 `--unlimited-subscription` 使用 `module_prompt_version: 2` 与独立的
+  `SYSTEM_CARD_IMPL`，从固定 SHA 的共享索引提供带文件哈希、行号与完整性状态的实现片段；
+  整个卡片输入仍受 40,000 UTF-8 字节限制，按剩余文件分配预算，能放下时提供全文，否则提供
+  明确的首尾行段，未展示的行为保持未知。读取失败不使用替换字符补造源码；元数据本身超限时
+  本模块保持未完成，不发起生成。卡片不能从目录名推断开发／运行时职责，也不能在未展示配置
+  与分支时断言默认副作用；打印的手工操作须与实际执行区分。此模式仅保留每文件前四个签名，
+  以留出实现片段预算；旧模式仍保留最多四十个签名，提示词和身份不变。
+  测试：`test_kb_module_source_evidence.py`。
 
 ## 2026-09-30 kb init：阶段 3（deepen）与 shadow 开关
 - `init_support.UpstreamPin.first_parent_changes(pin, count=, max_age_days=)`：钉点 first-parent 历史里最近 `count` 个
