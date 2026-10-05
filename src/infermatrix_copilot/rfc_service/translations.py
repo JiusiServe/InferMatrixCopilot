@@ -63,6 +63,8 @@ def source_strings(view, all_suggestions=False):
     add(view.get("title"))
     for feature in view.get("features", []):
         add(feature.get("title")); add(feature.get("track"))
+    for group in view.get("node_groups", []):
+        add(group.get("title"))
     for criterion in view.get("criteria", []):
         add(criterion.get("title")); add(criterion.get("reason"))
         for evidence in criterion.get("evidence", []):

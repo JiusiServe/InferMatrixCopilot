@@ -1,6 +1,6 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-05 -->
 
 `LOC ~490 · 默认 MCP：Direct 门面 + Strict 入口 · refactor-status: ok`
 
@@ -19,6 +19,9 @@
 上述十个工具；`build_mcp(...)`；`main()`。
 RFC 工具签名为 `rfc_request(action, payload=None)`、`rfc_capabilities()`、
 `rfc_status(rfc_id)`；后者调用 `rfcs.status`，返回不含源正文和候选列表的紧凑视图。
+`rfc_request` 同样转发 `chat.*`、`rfcs.work` 的人工实现记录，以及 `rfcs.graph` 的
+可逆节点分组。聊天调用先返回任务 ID，完整候选需通过 preview/apply 明确确认；
+本门面不执行模型工具循环，也不能自行通过验收或修改授权。
 
 ## 不变量（**C1**、**C2**、**D1**）
 - **Direct 在这个 server 里不跑任何模型。** 它返回知识路由和一份治理契约；阅读由

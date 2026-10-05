@@ -83,8 +83,11 @@ def parse(body: str, previous: dict | None = None) -> dict[str, Any]:
             if key in seen:
                 continue
             seen.add(key)
-            features.append({"id": key, "title": text, "track": "工作", "depends_on": [], "links": [],
-                             "owner": "", "state": "planned", "source_quote": text, "dropped": False})
+            prior = old.get(key, {})
+            features.append({**prior, "id": key, "title": text, "track": "工作", "depends_on": [],
+                             "links": prior.get("links", []), "owner": prior.get("owner", ""),
+                             "state": prior.get("state", "planned"), "source_quote": text,
+                             "dropped": prior.get("dropped", False)})
     # Resolve bare PR references through canonical links elsewhere in the RFC,
     # including live-status tables. An issue or documentation URL is no PR fact.
     pr_links = {number: url for url, number in re.findall(
@@ -155,7 +158,10 @@ def project(model: dict) -> dict:
     for feature in features:
         states = [observations.get(link, {}).get("state", "unknown") for link in feature.get("links", [])
                   if observations.get(link, {}).get("kind") in ("pr", "pull", "pull_request")]
-        if states:
+        manual = feature.get("implementation_override", {})
+        if manual.get("state") in ("planned", "in_progress", "implemented"):
+            feature["implementation"] = manual["state"]
+        elif states:
             feature["implementation"] = ("implemented" if all(s == "merged" for s in states)
                                           else "partial" if "merged" in states else "in_progress")
         else:

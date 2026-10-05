@@ -173,6 +173,16 @@ class RFCService:
                                  if visible(item.get("source"))}
         model["suggestions"] = [s for s in model.get("suggestions", []) if visible(s.get("evidence", {}).get("source"))]
         model["features"] = [dict(f) for f in model.get("features", []) if visible(f.get("auto_source"))]
+        visible_features = {f["id"] for f in model["features"] if not f.get("dropped")}
+        # Group titles can describe every member. Hide the whole view group if
+        # one member is inaccessible, absent or dropped. Permission changes do
+        # not mutate the shared saved view.
+        model["node_groups"] = [copy.deepcopy(group) for group in model.get("node_groups", [])
+                                if len(group.get("feature_ids", [])) >= 2
+                                and set(group["feature_ids"]).issubset(visible_features)]
+        if "node_group_history" in model:
+            model["node_group_history"] = [copy.deepcopy(group) for group in model["node_group_history"]
+                                           if set(group.get("feature_ids", [])).issubset(visible_features)]
         for name in ("criteria", "criteria_history", "archived_criteria"):
             if name in model:
                 model[name] = [{**criterion, "evidence": [copy.deepcopy(evidence) for evidence in criterion.get("evidence", [])
@@ -233,7 +243,7 @@ class RFCService:
                   "operation_id", "operation", "proposal_id"}
         if mode == "detail":
             fields |= {"body", "features", "criteria", "scope", "auto_add", "max_auto_additions",
-                       "grants", "historical_claims", "historical_priorities", "ambiguities"}
+                       "grants", "historical_claims", "historical_priorities", "ambiguities", "node_groups"}
         return {**{key: value for key, value in view.items() if key in fields},
                 "suggestion_counts": counts, "suggestions_total": sum(counts.values()),
                 "feature_count": len(view.get("features", [])), "criterion_count": len(view.get("criteria", []))}
@@ -241,6 +251,7 @@ class RFCService:
     def _save(self, con, principal, row, model, body=None, title=None):
         body = row["body"] if body is None else body
         title = row["title"] if title is None else title
+        self._clean_node_groups(model, principal, self.clock())
         serialized = encode(model)
         # Same canonical revision, without encoding the large model twice.
         revision = digest('{"body":' + encode(body) + ',"model":' + serialized + ',"title":' + encode(title) + '}')
@@ -492,7 +503,9 @@ class RFCService:
                     model[key] = data[key]
             if "features" in data:
                 model["features"] = self._features(data["features"])
+                prior_features = {f["id"]: f for f in old.get("features", [])}
                 for f in model["features"]:
+                    self._preserve_implementation(f, prior_features.get(f["id"], {}))
                     f["sidecar"] = True
                     f["overrides"] = {k: f[k] for k in ("title", "track", "depends_on", "owner")}
             if "criteria" in data:
@@ -520,10 +533,13 @@ class RFCService:
             return {"rfc_id": row["id"], "restricted": bool(data.get("restricted", True))}
         if action == "rfcs.work":
             row = self._rfc(con, p, data.get("rfc_id", ""), "contributor")
+            self._check_revision(row, data)
             model = json.loads(row["model"])
             op, feature = data.get("op", "update"), dict(data.get("feature", {}))
             fid = data.get("feature_id", feature.get("id", ""))
             existing = next((f for f in model["features"] if f["id"] == fid), None)
+            if existing and not self._visible_source(con, p, row["repo_id"], existing.get("auto_source")):
+                raise RFCError("Feature not found or access denied", 403, "forbidden")
             if op == "add":
                 self._require(con, p, row["repo_id"], "maintainer", row["id"])
                 if existing or fid in model["tombstones"]:
@@ -543,7 +559,22 @@ class RFCService:
                 self._text(data.get("reason"), "Claim reason")
                 existing.update(owner=p.name, owner_user_id=p.user_id)
                 existing.setdefault("overrides", {})["owner"] = p.name
+            elif op in ("mark_done", "clear_done") and existing and not existing.get("dropped"):
+                reason = self._text(data.get("reason"), "Manual implementation reason")
+                if op == "mark_done":
+                    self._manual_implementation(existing, "implemented", p, now, reason)
+                else:
+                    prior_override = existing.get("implementation_override")
+                    if not prior_override:
+                        raise RFCError("Feature has no manual implementation override", 409, "conflict")
+                    existing["state"] = prior_override.get("previous_state", "planned")
+                    existing.pop("implementation_override", None)
+                    existing.setdefault("implementation_history", []).append({"op": "clear_done", "actor": p.user_id,
+                        "at": now, "reason": reason, "previous_override": copy.deepcopy(prior_override)})
             elif op == "update" and existing:
+                previous_state = existing.get("state", "planned")
+                if "state" in feature and existing.get("dropped") and feature["state"] != previous_state:
+                    raise RFCError("Restore removed work before setting its implementation state", 409, "conflict")
                 if any(k in feature and feature[k] != existing.get(k) for k in ("title", "track", "depends_on", "owner")):
                     self._require(con, p, row["repo_id"], "maintainer", row["id"])
                     self._text(data.get("reason"), "Explicit decision reason")
@@ -554,11 +585,64 @@ class RFCService:
                             existing.setdefault("overrides", {})[key] = feature[key]
                 if existing.get("state") not in ("planned", "in_progress", "implemented", "dropped"):
                     raise RFCError("Invalid work state")
+                if "state" in feature and (feature["state"] != previous_state or data.get("reason")):
+                    if feature["state"] == "dropped":
+                        raise RFCError("Use the explicit drop operation to remove work")
+                    self._manual_implementation(existing, feature["state"], p, now,
+                                                self._text(data.get("reason"), "Manual implementation reason"),
+                                                previous_state=previous_state)
             else:
                 raise RFCError("Feature or operation not found", 404, "not_found")
             validate_features(model["features"])
-            self._invalidate(model, "Work plan changed")
+            if op not in ("mark_done", "clear_done") and not (op == "update" and set(feature).issubset({"id", "state", "priority"})):
+                self._invalidate(model, "Work plan changed")
             self.store.audit(con, p.user_id, action, now, row["repo_id"], row["id"], {"op": op, "feature_id": fid, "reason": data.get("reason", "")})
+            return self._save(con, p, row, model)
+        if action == "rfcs.graph":
+            row = self._rfc(con, p, data.get("rfc_id", ""), "contributor")
+            self._check_revision(row, data)
+            model = json.loads(row["model"])
+            self._clean_node_groups(model, p, now)
+            visible = self._view_visibility(con, p, row["repo_id"])
+            active = {f["id"] for f in model.get("features", []) if not f.get("dropped") and visible(f.get("auto_source"))}
+            groups = model.setdefault("node_groups", [])
+            op = data.get("op", "merge")
+            group = next((g for g in groups if g["id"] == data.get("group_id")), None)
+            if op == "merge":
+                members = data.get("feature_ids")
+                if (not isinstance(members, list) or not 2 <= len(members) <= 200
+                        or any(not isinstance(fid, str) or fid not in active for fid in members)
+                        or len(set(members)) != len(members)):
+                    raise RFCError("A group requires at least two distinct active, accessible feature identifiers")
+                if any(set(members) & set(g["feature_ids"]) for g in groups):
+                    raise RFCError("A feature already belongs to a group; unmerge it first", 409, "conflict")
+                title = self._text(data.get("title"), "Group title")
+                if len(title) > 256 or "\n" in title or "\r" in title:
+                    raise RFCError("Group title must be a single line of at most 256 characters")
+                gid = identifier("group")
+                while gid in {f["id"] for f in model.get("features", [])}:
+                    gid = identifier("group")
+                group = {"id": gid, "title": title, "feature_ids": members, "created_by": p.user_id,
+                         "created_at": now, "updated_by": p.user_id, "updated_at": now}
+                groups.append(group)
+            elif op in ("unmerge", "rename"):
+                if not group or not set(group["feature_ids"]).issubset(active):
+                    raise RFCError("Group not found or access denied", 403, "forbidden")
+                if op == "unmerge":
+                    model.setdefault("node_group_history", []).append({**copy.deepcopy(group), "ended_by": p.user_id,
+                        "ended_at": now, "end_reason": "unmerge"})
+                    model["node_groups"] = [g for g in groups if g["id"] != group["id"]]
+                else:
+                    title = self._text(data.get("title"), "Group title")
+                    if len(title) > 256 or "\n" in title or "\r" in title:
+                        raise RFCError("Group title must be a single line of at most 256 characters")
+                    model.setdefault("node_group_history", []).append({**copy.deepcopy(group), "ended_by": p.user_id,
+                        "ended_at": now, "end_reason": "rename"})
+                    group.update(title=title, updated_by=p.user_id, updated_at=now)
+            else:
+                raise RFCError("Unknown graph operation")
+            self.store.audit(con, p.user_id, action, now, row["repo_id"], row["id"],
+                             {"op": op, "group_id": group["id"], "member_count": len(group["feature_ids"])})
             return self._save(con, p, row, model)
         if action == "rfcs.decision":
             row = self._rfc(con, p, data.get("rfc_id", ""), "contributor")
@@ -870,6 +954,45 @@ class RFCService:
         return visible
 
     @staticmethod
+    def _clean_node_groups(model, principal, now):
+        """Retire groups with removed tasks instead of trapping surviving members."""
+        active = {f["id"] for f in model.get("features", []) if not f.get("dropped")}
+        kept = []
+        for group in model.get("node_groups", []):
+            if not set(group.get("feature_ids", [])).issubset(active):
+                model.setdefault("node_group_history", []).append({**copy.deepcopy(group), "ended_by": principal.user_id,
+                    "ended_at": now, "end_reason": "member_removed"})
+            else:
+                kept.append(group)
+        if "node_groups" in model:
+            model["node_groups"] = kept
+
+    @staticmethod
+    def _check_revision(row, data):
+        if "expected_revision" in data and data["expected_revision"] != row["revision"]:
+            raise RFCError("RFC changed; refresh and review before saving", 409, "conflict")
+
+    @staticmethod
+    def _manual_implementation(feature, state, principal, now, reason, previous_state=None):
+        prior = feature.get("implementation_override", {})
+        override = {"state": state, "actor": principal.user_id, "at": now, "reason": reason,
+                    "previous_state": prior.get("previous_state", previous_state or feature.get("state", "planned"))}
+        feature["state"] = state
+        feature["implementation_override"] = override
+        feature.setdefault("implementation_history", []).append({"op": "mark_done" if state == "implemented" else "set_state",
+                                                                  **copy.deepcopy(override)})
+
+    @staticmethod
+    def _preserve_implementation(feature, previous):
+        for name in ("implementation_override", "implementation_history", "implementation_claim"):
+            if name in previous:
+                feature[name] = copy.deepcopy(previous[name])
+            else:
+                feature.pop(name, None)
+        if previous.get("implementation_override"):
+            feature["state"] = previous.get("state", "planned")
+
+    @staticmethod
     def _features(features, validate=True):
         if not isinstance(features, list):
             raise RFCError("Features must be a list")
@@ -879,7 +1002,13 @@ class RFCService:
                 raise RFCError("Each feature needs an identifier and title")
             if not isinstance(f.get("links", []), list) or any(not isinstance(link, str) for link in f.get("links", [])):
                 raise RFCError("Feature links must be URL strings")
-            result.append({"track": "实现", "depends_on": [], "links": [], "owner": "", "state": "planned", "dropped": False, **f})
+            clean = {k: v for k, v in f.items() if k not in ("implementation_override", "implementation_history", "implementation_claim")}
+            if "overrides" in clean:
+                overrides = clean["overrides"]
+                if not isinstance(overrides, dict):
+                    raise RFCError("Feature overrides must be an object")
+                clean["overrides"] = {k: v for k, v in overrides.items() if k in ("title", "track", "depends_on", "owner")}
+            result.append({"track": "实现", "depends_on": [], "links": [], "owner": "", "state": "planned", "dropped": False, **clean})
         if validate:
             validate_features(result)
         return result

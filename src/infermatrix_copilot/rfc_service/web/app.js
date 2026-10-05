@@ -66,7 +66,7 @@ function closeRFCEditor(discard = false) {
 }
 function rememberGraphViewport() {
   if (!activeGraphs?.wrapper.isConnected) return;
-  activeGraphs.viewport = [...activeGraphs.wrapper.querySelectorAll(".roadmap-canvas")].map(canvas => [canvas.scrollLeft, canvas.scrollTop]);
+  activeGraphs.viewport = [...activeGraphs.wrapper.querySelectorAll(".roadmap-canvas")].map(canvas => ({left: canvas.scrollLeft, top: canvas.scrollTop, scale: Number(canvas.dataset.graphScale || 1)}));
 }
 function restoreGraphViewport() {
   const graphs = activeGraphs;
@@ -75,7 +75,12 @@ function restoreGraphViewport() {
     if (graphs !== activeGraphs || !graphs.wrapper.isConnected) return;
     graphs.wrapper.querySelectorAll(".roadmap-canvas").forEach((canvas, index) => {
       const position = graphs.viewport[index];
-      if (position) { canvas.scrollLeft = position[0]; canvas.scrollTop = position[1]; }
+      if (position) {
+        canvas.dataset.graphScale = String(position.scale);
+        const drawing = canvas.querySelector("svg");
+        if (drawing?.dataset.baseWidth) drawing.setAttribute("width", String(Number(drawing.dataset.baseWidth) * position.scale));
+        canvas.scrollLeft = position.left; canvas.scrollTop = position.top;
+      }
     });
   };
   restore(); requestAnimationFrame(restore);
@@ -86,9 +91,18 @@ function openGraphTarget(graphs) {
   const target = new URLSearchParams(location.hash.split("?")[1] || "").get("feature");
   if (!target) return;
   for (const model of graphs.models) {
-    const node = model.nodes.find(node => node.id === target && node.feature);
+    const node = graphTargetNode(model, target);
     if (node) { graphDetails(graphs.rfc, node, model); return; }
   }
+}
+
+function graphTargetNode(model, target) {
+  for (const node of model.nodes) {
+    if (node.id === target && node.feature) return node;
+    const member = node.members?.find(feature => feature.id === target);
+    if (member) return {id: member.id, title: member.title, feature: member};
+  }
+  return null;
 }
 
 function graphDetails(rfc, node, model) {
@@ -97,9 +111,26 @@ function graphDetails(rfc, node, model) {
   featureDialog = dialog;
   const close = button("关闭", () => closeFeatureDialog());
   dialog.append(element("div", {class: "panel-title"}, element("h2", {}, node.title), element("div", {class: "actions"}, button("讨论这个节点", () => {
-    closeFeatureDialog(); discussRFC(rfc, graphSelection(rfc, node, model));
+    closeFeatureDialog(); discussRFC(rfc, node.group ? null : graphSelection(rfc, node, model));
   }), close)));
-  if (node.feature) {
+  if (node.group) {
+    const counts = node.counts || node.feature.counts;
+    dialog.append(element("p", {class: "group-summary"}, `${counts.implemented} / ${counts.total} 实现已落地 · ${counts.accepted} / ${counts.total} 已验收`),
+      element("p", {class: "small muted"}, "这是合并显示的节点；成员任务、依赖、证据和历史分别保留。"));
+    if (canWrite(rfc)) dialog.append(element("div", {class: "actions group-actions"}, button("重命名合并节点", async () => {
+      const title = prompt(localizeText("合并节点名称"), node.group.title);
+      if (!title?.trim()) return;
+      await applyRFCResult(await action("rfcs.graph", {rfc_id: rfc.id, op: "rename", group_id: node.group.id, title: title.trim(), expected_revision: rfc.revision}));
+    }), button("拆分节点", async () => {
+      await applyRFCResult(await action("rfcs.graph", {rfc_id: rfc.id, op: "unmerge", group_id: node.group.id, expected_revision: rfc.revision}));
+    })));
+    const memberIDs = new Set(node.members.map(feature => feature.id));
+    const criteria = (rfc.criteria || []).filter(criterion => {
+      const related = criterion.feature_ids || criterion.features || (criterion.feature_id ? [criterion.feature_id] : []);
+      return !related.length || related.some(id => memberIDs.has(id));
+    });
+    dialog.append(workPanel({...rfc, features: node.members}, false), criteriaPanel({...rfc, criteria}));
+  } else if (node.feature) {
     const criteria = (rfc.criteria || []).filter(criterion => {
       const related = criterion.feature_ids || criterion.features || (criterion.feature_id ? [criterion.feature_id] : []);
       return !related.length || related.includes(node.id);
@@ -119,6 +150,50 @@ function graphDetails(rfc, node, model) {
   document.body.append(dialog);
   dialog.showModal();
   close.focus();
+}
+
+function mergeGraphNodes(rfc) {
+  closeFeatureDialog();
+  const grouped = new Set((rfc.node_groups || []).flatMap(group => group.feature_ids));
+  const candidates = (rfc.features || []).filter(feature => !feature.dropped && !grouped.has(feature.id));
+  if (candidates.length < 2) { notice("至少需要两个未合并的工作节点。"); return; }
+  const dialog = element("dialog", {class: "graph-details graph-merge", "aria-label": "合并路线图节点"});
+  featureDialog = dialog;
+  dialog.append(element("div", {class: "panel-title"}, element("h2", {}, "合并路线图节点"), button("关闭", closeFeatureDialog)),
+    element("p", {class: "small muted"}, "选择工作节点，将它们合并显示。任务和依赖保持独立，可随时拆分。"));
+  const form = element("form", {class: "graph-merge-form"});
+  const title = input("title", "例如：核心引擎集成", "", "text", true);
+  const search = input("search", "按编号、标题或工作轨道筛选");
+  const options = element("div", {class: "graph-merge-options"});
+  const count = element("p", {class: "small muted", role: "status"}, "已选择 0 项");
+  const submit = element("button", {type: "submit", class: "primary", disabled: true}, "合并选中节点");
+  const selected = () => [...options.querySelectorAll("input:checked")].map(control => control.value);
+  for (const feature of candidates) {
+    const control = element("input", {type: "checkbox", name: "feature_id", value: feature.id});
+    control.addEventListener("change", () => {
+      const ids = selected(); count.textContent = localizeText(`已选择 ${ids.length} 项`); submit.disabled = ids.length < 2;
+    });
+    const option = element("label", {class: "graph-merge-option"}, control,
+      element("span", {"data-no-translate": ""}, feature.id), element("span", {}, feature.title), element("small", {class: "muted"}, feature.track || "工作"));
+    option.dataset.search = `${feature.id} ${feature.title} ${feature.track || ""}`.toLocaleLowerCase();
+    options.append(option);
+  }
+  search.addEventListener("input", () => {
+    const query = search.value.trim().toLocaleLowerCase();
+    for (const option of options.children) option.hidden = query && !option.dataset.search.includes(query);
+  });
+  form.append(field("合并节点名称", title), field("筛选工作节点", search), options, count, element("div", {class: "actions"}, submit));
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    const feature_ids = selected();
+    if (feature_ids.length < 2) return;
+    busy(submit, async () => {
+      await applyRFCResult(await action("rfcs.graph", {rfc_id: rfc.id, op: "merge", title: title.value.trim(), feature_ids, expected_revision: rfc.revision}));
+    });
+  });
+  dialog.append(form);
+  dialog.addEventListener("close", () => { dialog.remove(); if (featureDialog === dialog) featureDialog = null; });
+  document.body.append(dialog); dialog.showModal(); title.focus();
 }
 const labels = {
   draft: "草稿", proposed: "待评审", discussion: "讨论中", accepted: "已接受", rejected: "已拒绝",
@@ -155,7 +230,7 @@ function statusValue(value) {
 function translated(value) { const state = statusValue(value); return labels[state] || String(state); }
 function badge(value) {
   const state = statusValue(value);
-  const color = ["valid_token", "passing", "passed", "accepted", "applied", "succeeded", "fresh", "current", "merged"].includes(state) ? "green"
+  const color = ["valid_token", "passing", "passed", "accepted", "applied", "succeeded", "fresh", "current", "merged", "implemented"].includes(state) ? "green"
     : ["failed", "failing", "rejected", "error"].includes(state) ? "red"
     : ["blocked", "partial", "validating", "stale", "outcome_unknown", "unverified"].includes(state) ? "amber"
     : ["active", "in_progress", "running", "discussion", "review"].includes(state) ? "blue" : "";
@@ -214,7 +289,7 @@ async function api(path, options = {}) {
   }
   return value;
 }
-const compactActions = new Set(["rfcs.draft", "rfcs.import", "rfcs.update", "rfcs.work", "rfcs.decision", "rfcs.acl", "chat.proposals.apply"]);
+const compactActions = new Set(["rfcs.draft", "rfcs.import", "rfcs.update", "rfcs.work", "rfcs.graph", "rfcs.decision", "rfcs.acl", "chat.proposals.apply"]);
 const action = (name, payload = {}) => api(`/api/v1/actions/${encodeURIComponent(name)}`, {method: "POST", body: JSON.stringify({...payload, ...((compactActions.has(name) || name === "rfcs.suggestions") ? {language: currentLanguage()} : {}), ...(compactActions.has(name) ? {view: "detail"} : {})})});
 const getRFC = (id) => api(`/api/v1/rfcs/${encodeURIComponent(id)}?view=detail&language=${currentLanguage()}`);
 function editorDraft(id) {
@@ -232,12 +307,16 @@ function graphSelection(rfc, node, model) {
   const selection = featureSelection(rfc, node.id, node.title);
   if (selection.start_line) return selection;
   const diagrams = [...String(rfc.body || "").matchAll(/```mermaid\s*\n([\s\S]*?)```/g)].filter(match => /^\s*(?:flowchart|graph)\s+(?:LR|RL|TD|TB|BT)\b/.test(match[1]));
-  const diagramIndex = activeGraphs?.models.indexOf(model), match = diagrams[diagramIndex] || diagrams.find(match => match[1].includes(node.id));
+  const matches = diagrams.filter(diagram => diagramHasNode(diagram, node.id));
+  const match = matches.length === 1 ? matches[0] : null;
   if (match) {
     const start = rfc.body.slice(0, match.index).split(/\r?\n/).length;
     Object.assign(selection, {start_line: start, end_line: start + match[0].split(/\r?\n/).length - 1, graph_node_id: node.id, diagram_index: diagrams.indexOf(match)});
   }
   return selection;
+}
+function diagramHasNode(diagram, id) {
+  return graphModels({body: diagram[0], features: []}).some(model => model.nodes.some(node => node.id === id));
 }
 function draftSelection(rfc, selection, draft) {
   if (!selection) return null;
@@ -248,10 +327,11 @@ function draftSelection(rfc, selection, draft) {
   delete resolved.start_line; delete resolved.end_line; delete resolved.section_id;
   if (selection.graph_node_id) {
     const diagrams = [...body.matchAll(/```mermaid\s*\n([\s\S]*?)```/g)].filter(match => /^\s*(?:flowchart|graph)\s+(?:LR|RL|TD|TB|BT)\b/.test(match[1]));
-    const match = diagrams[selection.diagram_index];
-    if (match?.[1].includes(selection.graph_node_id)) {
+    const matches = diagrams.filter(diagram => diagramHasNode(diagram, selection.graph_node_id));
+    const match = matches.length === 1 ? matches[0] : null;
+    if (match) {
       const start = body.slice(0, match.index).split(/\r?\n/).length;
-      Object.assign(resolved, {start_line: start, end_line: Math.min(start + match[0].split(/\r?\n/).length - 1, lines)});
+      Object.assign(resolved, {start_line: start, end_line: Math.min(start + match[0].split(/\r?\n/).length - 1, lines), diagram_index: diagrams.indexOf(match)});
     }
     return resolved;
   }
@@ -573,7 +653,9 @@ async function operationNotice(result) {
   notice(`操作已进入队列：${id}。可在操作记录中查看结果。`);
 }
 function graphTooltip(feature) {
-  return `${localizeText(feature.title)}\n${localizeText("实现")}：${localizeText(translated(feature.implementation || feature.state))}\n${localizeText("验收")}：${localizeText(translated(feature.acceptance))}\n${localizeText("负责人")}：${feature.owner || localizeText("待认领")}`;
+  const manual = feature.implementation_override ? `\n${localizeText("人工记录")}：${feature.implementation_override.reason}` : "";
+  const counts = feature.counts ? `\n${feature.counts.implemented} / ${feature.counts.total} ${localizeText("实现已落地")}` : "";
+  return `${localizeText(feature.title)}\n${localizeText("实现")}：${localizeText(translated(feature.implementation || feature.state))}\n${localizeText("验收")}：${localizeText(translated(feature.acceptance))}\n${localizeText("负责人")}：${feature.owner || localizeText("待认领")}${manual}${counts}`;
 }
 function updateGraphNodes(graphs) {
   for (const entry of graphs.entries) {
@@ -583,7 +665,7 @@ function updateGraphNodes(graphs) {
       if (!group || !node.feature) return;
       const feature = node.feature;
       const state = feature.complete ? "accepted" : feature.implementation || feature.state || "planned";
-      const signature = JSON.stringify([currentLanguage(), feature.title, state, feature.acceptance, feature.owner]);
+      const signature = JSON.stringify([currentLanguage(), feature.title, state, feature.acceptance, feature.owner, feature.implementation_override, feature.counts]);
       if (group.getAttribute("data-live-view") === signature) return;
       group.setAttribute("data-live-view", signature);
       group.classList.remove("planned", "accepted", "implemented", "partial", "in_progress", "blocked");
@@ -591,7 +673,9 @@ function updateGraphNodes(graphs) {
       for (const span of group.querySelectorAll("text .text-outer-tspan")) {
         if (span.textContent.includes("实现进度待更新")) span.setAttribute("data-graph-meta", "state");
         if (span.textContent.includes("负责人：等待工作认领")) span.setAttribute("data-graph-meta", "owner");
-        if (span.getAttribute("data-graph-meta") === "state") span.textContent = `${localizeText(state === "accepted" ? "已验收" : translated(state))} · ${localizeText("验收")}：${localizeText(translated(feature.acceptance || "pending"))}`;
+        if (span.getAttribute("data-graph-meta") === "state") span.textContent = node.group
+          ? `${feature.counts.implemented} / ${feature.counts.total} ${localizeText("实现已落地")} · ${localizeText("验收")}：${localizeText(translated(feature.acceptance || "pending"))}`
+          : `${localizeText(state === "accepted" ? "已验收" : translated(state))} · ${localizeText("验收")}：${localizeText(translated(feature.acceptance || "pending"))}`;
         if (span.getAttribute("data-graph-meta") === "owner") {
           const owner = feature.owner || "待认领";
           span.textContent = `${localizeText("负责人")}：${feature.owner || localizeText("待认领")}`;
@@ -630,7 +714,7 @@ function dependencyGraph(rfc) {
   const models = graphModels(rfc);
   for (const model of models) {
     model.title = localizeText(model.title);
-    for (const node of model.nodes) node.title = localizeText(node.title);
+    for (const node of model.nodes) node.title = node.group ? `${localizeText(node.group.title)} (${node.members.length})` : localizeText(node.title);
     for (const edge of model.edges) edge.label = localizeText(edge.label || "");
   }
   const sources = models.map(model => graphSource(model, translated, true));
@@ -643,7 +727,8 @@ function dependencyGraph(rfc) {
   }
   if (!models.length) return empty("没有依赖关系", "添加工作项后，依赖图会自动生成。");
   const wrapper = element("div", {class: "roadmap-graphs"});
-  const graphs = {rfc, models, signature, wrapper, entries: []};
+  const previous = activeGraphs?.rfc.id === rfc.id ? activeGraphs : null;
+  const graphs = {rfc, models, signature, wrapper, entries: [], viewport: previous?.viewport};
   activeGraphs = graphs;
   for (const [modelIndex, model] of models.entries()) {
     const canvas = element("div", {class: "graph roadmap-canvas"}, element("p", {class: "muted"}, "正在绘制路线图…"));
@@ -651,6 +736,7 @@ function dependencyGraph(rfc) {
     canvas.setAttribute("aria-label", `${model.title}：拖动空白区域平移，点击节点查看详情`);
     enableGraphPanning(canvas);
     const controls = element("div", {class: "actions"});
+    if (canWrite(rfc)) controls.append(button("合并节点", () => mergeGraphNodes(graphs.rfc)));
     const legend = element("div", {class: "graph-legend"}, ...["planned", "in_progress", "partial", "implemented", "accepted"].map(state => element("span", {class: `graph-key ${state}`}, state === "accepted" ? "已验收" : translated(state))));
     const section = element("section", {class: "roadmap-track"}, element("div", {class: "panel-title"}, element("h3", {}, model.title), controls), legend, canvas);
     wrapper.append(section);
@@ -675,8 +761,9 @@ function dependencyGraph(rfc) {
       drawing.setAttribute("role", "group");
       drawing.setAttribute("aria-label", `${model.title}：点击工作节点查看详情和操作`);
       const width = drawing.viewBox.baseVal.width;
-      let scale = 1;
-      drawing.setAttribute("width", String(width));
+      drawing.dataset.baseWidth = String(width);
+      canvas.dataset.graphScale ||= "1";
+      drawing.setAttribute("width", String(width * Number(canvas.dataset.graphScale)));
       drawing.removeAttribute("height");
       canvas.replaceChildren(drawing);
       const groups = [];
@@ -686,7 +773,8 @@ function dependencyGraph(rfc) {
         groups[index] = group;
         group.setAttribute("role", "button");
         group.setAttribute("tabindex", "0");
-        group.setAttribute("data-feature-id", node.feature ? node.id : "");
+        group.setAttribute("data-feature-id", node.feature && !node.group ? node.id : "");
+        group.setAttribute("data-group-id", node.group?.id || "");
         group.setAttribute("aria-label", `${node.title}：${localizeText("查看")}${localizeText(node.feature ? "工作详情、关联 PR 和可用操作" : "关联工作")}`);
         group.classList.add("roadmap-actionable");
         const open = event => { event.preventDefault(); const current = graphs.models[modelIndex]; graphDetails(graphs.rfc, current.nodes[index], current); };
@@ -698,17 +786,18 @@ function dependencyGraph(rfc) {
       });
       graphs.entries.push({index: modelIndex, groups});
       updateGraphNodes(graphs);
-      const zoom = delta => { scale = Math.max(.4, Math.min(2.5, scale + delta)); drawing.setAttribute("width", String(width * scale)); };
+      restoreGraphViewport();
+      const zoom = delta => { const scale = Math.max(.4, Math.min(2.5, Number(canvas.dataset.graphScale || 1) + delta)); canvas.dataset.graphScale = String(scale); drawing.setAttribute("width", String(width * scale)); };
       const minus = button("−", () => zoom(-.2)); minus.setAttribute("aria-label", `${model.title} 缩小`);
       const plus = button("＋", () => zoom(.2)); plus.setAttribute("aria-label", `${model.title} 放大`);
-      controls.append(minus, plus, button("重置", () => { scale = 1; drawing.setAttribute("width", String(width)); canvas.scrollLeft = canvas.scrollTop = 0; }), button("下载 SVG", () => {
+      controls.append(minus, plus, button("重置", () => { canvas.dataset.graphScale = "1"; drawing.setAttribute("width", String(width)); canvas.scrollLeft = canvas.scrollTop = 0; }), button("下载 SVG", () => {
         const exported = drawing.cloneNode(true);
         const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
         style.textContent = roadmapSVGStyles;
         exported.prepend(style);
         // The downloaded artifact links to authorized tasks instead of inert callbacks.
         for (const group of exported.querySelectorAll("[data-feature-id]")) {
-          const id = group.getAttribute("data-feature-id");
+          const id = group.getAttribute("data-feature-id") || group.getAttribute("data-group-id");
           group.removeAttribute("tabindex");
           if (!id) continue;
           const anchor = document.createElementNS("http://www.w3.org/2000/svg", "a");
@@ -720,11 +809,6 @@ function dependencyGraph(rfc) {
         const anchor = element("a", {href: url, download: `${rfc.namespace || rfc.id}-${serial}.svg`});
         anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
       }));
-      const target = new URLSearchParams(location.hash.split("?")[1] || "").get("feature");
-      if (target && !featureDialog) {
-        const node = model.nodes.find(node => node.id === target && node.feature);
-        if (node) graphDetails(rfc, node, model);
-      }
     }).catch(error => {
       if (!canvas.isConnected) return;
       canvas.replaceChildren(element("p", {class: "error-panel"}, `图表暂时无法绘制：${error.message}。下方工作列表仍可操作。`));
@@ -958,7 +1042,11 @@ function workPanel(rfc, allowAdd = true) {
     const discuss = button("讨论这项工作", () => {
       closeFeatureDialog(); discussRFC(activeRFC?.id === rfc.id ? activeRFC : rfc, featureSelection(rfc, feature.id, feature.title));
     }, "quiet");
-    const update = async (values) => { await applyRFCResult(await action("rfcs.work", {rfc_id: rfc.id, op: "update", feature_id: feature.id, feature: values})); };
+    const update = async (values) => {
+      const reason = prompt(localizeText("工作状态调整的依据"), localizeText("人工更新实现状态"));
+      if (!reason?.trim()) return;
+      await applyRFCResult(await action("rfcs.work", {rfc_id: rfc.id, op: "update", feature_id: feature.id, feature: values, reason: reason.trim(), expected_revision: rfc.revision}));
+    };
     if (!feature.dropped && !feature.owner) operations.append(button("认领", async () => {
       await applyRFCResult(await action("rfcs.work", {rfc_id: rfc.id, op: "claim", feature_id: feature.id, reason: "工作台自主认领"}));
     }));
@@ -971,6 +1059,16 @@ function workPanel(rfc, allowAdd = true) {
       }
     }));
     if (!feature.dropped) {
+      if (feature.implementation_override?.state !== "implemented") operations.append(button("标记实现完成", async () => {
+        const reason = prompt(localizeText("实现完成的依据（验收仍单独记录）"), localizeText("人工确认实现已完成"));
+        if (!reason?.trim()) return;
+        await applyRFCResult(await action("rfcs.work", {rfc_id: rfc.id, op: "mark_done", feature_id: feature.id, reason: reason.trim(), expected_revision: rfc.revision}));
+      }, "mark-done"));
+      if (feature.implementation_override) operations.append(button("清除人工状态", async () => {
+        const reason = prompt(localizeText("清除人工状态的依据"), localizeText("恢复来源追踪状态"));
+        if (!reason?.trim()) return;
+        await applyRFCResult(await action("rfcs.work", {rfc_id: rfc.id, op: "clear_done", feature_id: feature.id, reason: reason.trim(), expected_revision: rfc.revision}));
+      }, "quiet"));
       const state = select("work_state", ["planned", "in_progress", "implemented"], feature.state || "planned");
       state.setAttribute("aria-label", `${feature.title || feature.id} 的工作状态`);
       operations.append(state, button("记录工作状态", () => update({state: state.value})));
@@ -992,8 +1090,10 @@ function workPanel(rfc, allowAdd = true) {
       });
       cache.nodes.set(descriptionKey, description);
     }
+    const manual = feature.implementation_override ? element("p", {class: "manual-work-state small"}, element("strong", {}, "人工记录"), " · ", element("span", {"data-no-translate": ""}, feature.implementation_override.reason)) : null;
     (allowAdd ? tracks.get(track) : list).append(element("article", {class: "work-item", "data-feature-id": feature.id}, element("div", {class: "item-heading"}, element("h4", {}, feature.title || feature.id), badge(feature.dropped ? "dropped" : feature.implementation || feature.state || "planned")),
       element("div", {class: "item-detail"}, `${feature.id} · 负责人：${feature.owner || "待认领"}`, element("br"), `依赖：${(feature.depends_on || []).join("、") || "无"}`), historical, links, description, discuss, canWrite(rfc) ? operations : null));
+    if (manual) (allowAdd ? tracks.get(track) : list).lastElementChild.append(manual);
   }
   if (!(rfc.features || []).length) list.append(empty("还没有工作项", "把方案拆分成有负责人和依赖的工作。"));
   const form = element("form", {class: "inline-form"});

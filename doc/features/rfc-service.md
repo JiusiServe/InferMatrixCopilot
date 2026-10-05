@@ -102,6 +102,41 @@ zoom, reset, and SVG download controls; downloaded work nodes link back to the
 authorized RFC task view. Green implementation nodes still show pending
 acceptance until evidence or an explicit waiver satisfies its criteria.
 
+Contributors can use **Mark implementation done** in a node's details or work
+item, with a reason. This records the authenticated user and turns the node
+green even when linked PRs are still open. It records implementation only;
+acceptance and evidence keep their independent verdicts. **Clear manual status**
+restores source-derived tracking. The work-state selector also records a manual
+override, so source refreshes do not silently replace the user's chosen state.
+The reason and previous records remain in task history and audit; Agent prose
+edits cannot invent or erase these manual facts.
+
+Use **Merge nodes** on a roadmap to choose at least two tasks by stable ID and
+give the merged node a name. Groups are saved per RFC and shared with its
+authorized users. They can span tracks; boundary dependencies stay visible and
+internal edges are omitted. Tasks, evidence, acceptance and the original source
+remain separate. Clicking the group opens its member tasks, with **Rename merged
+node** and **Split nodes** controls. A group is green only when all its members
+are implemented; acceptance is still separate. Individual task links and SVG
+group links continue to open their authorized details.
+
+The same operations are available through SDK, CLI and MCP:
+
+```json
+{"rfc_id":"RFC_ID","op":"mark_done","feature_id":"F1","reason":"Implementation verified by the owner","expected_revision":"CURRENT_REVISION"}
+```
+
+Send this to `rfcs.work`. Use `clear_done` to remove the manual override. A supplied
+`expected_revision` rejects a stale preview instead of overwriting another update.
+
+```json
+{"rfc_id":"RFC_ID","op":"merge","feature_ids":["F1","F2"],"title":"Core integration","expected_revision":"CURRENT_REVISION"}
+```
+
+Send this to `rfcs.graph`. Use `rename` with `group_id` and `title`, or `unmerge`
+with `group_id`. `RFCClient.work()` and `RFCClient.graph()` reuse these actions.
+These are tracking and view changes, so they do not publish changes upstream.
+
 The same-origin Mermaid 11.12.0 bundle is shipped with licenses and its pinned
 dependency lockfile. It is built with esbuild from `mermaid/dist/mermaid.core.mjs`
 using `--bundle --format=esm --minify --target=es2020 --legal-comments=linked`.

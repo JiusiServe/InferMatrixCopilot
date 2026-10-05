@@ -199,6 +199,14 @@ class RFCClient:
     def decision(self, rfc_id: str, **decision: Any) -> dict[str, Any]:
         return self.dispatch("rfcs.decision", {**decision, "rfc_id": rfc_id})
 
+    def work(self, rfc_id: str, **work: Any) -> dict[str, Any]:
+        """Manage stable tasks, including explicit manual implementation marks."""
+        return self.dispatch("rfcs.work", {**work, "rfc_id": rfc_id})
+
+    def graph(self, rfc_id: str, **group: Any) -> dict[str, Any]:
+        """Merge, rename or unmerge saved view groups without replacing tasks."""
+        return self.dispatch("rfcs.graph", {**group, "rfc_id": rfc_id})
+
     def operation(self, operation_id: str) -> dict[str, Any]:
         return self.dispatch("operations.get", {"operation_id": operation_id})
 

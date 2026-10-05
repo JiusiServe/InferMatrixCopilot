@@ -78,24 +78,104 @@ export function graphModels(rfc) {
     }
     if (!existing) models.push(model);
   }
-  return models;
+  return collapseGroups(models, active, rfc.node_groups || []);
+}
+
+function aggregateGroup(group, members, groupByFeature) {
+  const counts = {total: members.length, implemented: 0, accepted: 0, partial: 0,
+    in_progress: 0, blocked: 0, planned: 0};
+  for (const feature of members) {
+    const state = feature.complete ? "implemented" : feature.implementation || feature.state || "planned";
+    if (Object.hasOwn(counts, state) && state !== "total" && state !== "accepted") counts[state]++;
+    else counts.planned++;
+    if (feature.complete === true) counts.accepted++;
+  }
+  const complete = counts.accepted === counts.total;
+  const implementation = counts.implemented === counts.total ? "implemented"
+    : counts.implemented || counts.partial ? "partial"
+    : counts.blocked ? "blocked" : counts.in_progress ? "in_progress" : "planned";
+  const acceptance = complete ? "accepted"
+    : members.some(feature => feature.acceptance === "failing") ? "failing" : "pending";
+  const memberIds = new Set(members.map(feature => feature.id));
+  const externalIds = key => [...new Set(members.flatMap(feature => feature[key] || [])
+    .filter(id => !memberIds.has(id)).map(id => groupByFeature.get(id)?.id || id))];
+  const shared = key => members.every(feature => feature[key] === members[0][key]) ? members[0][key] || "" : "";
+  const feature = {id: group.id, title: group.title, implementation, acceptance, complete,
+    counts, owner: shared("owner"), track: shared("track"), depends_on: externalIds("depends_on"),
+    blockers: externalIds("blockers"), links: [...new Set(members.flatMap(feature => feature.links || []))]};
+  return {id: group.id, title: `${group.title} (${members.length})`, group, members, counts, feature};
+}
+
+function collapseGroups(models, active, requested) {
+  if (!Array.isArray(requested) || !requested.length) return models;
+  const groupByFeature = new Map(), groups = new Map();
+  const existingIds = new Set(models.flatMap(model => model.nodes.map(node => node.id)));
+  for (const value of requested) {
+    if (!value || typeof value.id !== "string" || !value.id || !Array.isArray(value.feature_ids)
+        || groups.has(value.id) || existingIds.has(value.id)) continue;
+    const ids = [...new Set(value.feature_ids)].filter(id => active.has(id));
+    // Missing/deleted members cannot conceal active work. A single remaining
+    // feature keeps its original node and operations; overlapping malformed
+    // groups are ignored rather than arbitrarily hiding somebody's tasks.
+    if (ids.length < 2 || ids.some(id => groupByFeature.has(id))) continue;
+    const group = {...value, title: String(value.title || value.id), feature_ids: [...value.feature_ids]};
+    groups.set(group.id, group);
+    for (const id of ids) groupByFeature.set(id, group);
+  }
+  if (!groups.size) return models;
+  // A group may cross several source diagrams and tracks. Join every affected
+  // graph before replacing members, retaining each diagram's context/edges.
+  const parents = models.map((_, index) => index);
+  const root = index => parents[index] === index ? index : (parents[index] = root(parents[index]));
+  for (const group of groups.values()) {
+    const indices = models.flatMap((model, index) => model.nodes.some(node => groupByFeature.get(node.id)?.id === group.id) ? [index] : []);
+    for (const index of indices.slice(1)) parents[root(index)] = root(indices[0]);
+  }
+  const components = new Map();
+  models.forEach((model, index) => {
+    const key = root(index);
+    if (!components.has(key)) components.set(key, []);
+    components.get(key).push(model);
+  });
+  const aggregate = new Map([...groups].map(([id, group]) => [id,
+    aggregateGroup(group, [...active.values()].filter(feature => groupByFeature.get(feature.id)?.id === id), groupByFeature)]));
+  return [...components.values()].map(component => {
+    const nodes = new Map(), edges = [], seenEdges = new Set();
+    for (const model of component) for (const node of model.nodes) {
+      const group = groupByFeature.get(node.id);
+      const replacement = group ? aggregate.get(group.id) : node;
+      if (!nodes.has(replacement.id)) nodes.set(replacement.id, replacement);
+    }
+    for (const model of component) for (const edge of model.edges) {
+      const from = groupByFeature.get(edge.from)?.id || edge.from;
+      const to = groupByFeature.get(edge.to)?.id || edge.to;
+      const key = JSON.stringify([from, to]);
+      if (from === to || !nodes.has(from) || !nodes.has(to) || seenEdges.has(key)) continue;
+      seenEdges.add(key); edges.push({...edge, from, to});
+    }
+    return {title: [...new Set(component.map(model => model.title))].join(" / "), nodes: [...nodes.values()], edges};
+  });
 }
 
 export function graphSource(model, label, layoutOnly = false) {
   const ids = new Map(model.nodes.map((node, index) => [node.id, `N${index}`]));
-  const escape = text => String(text).replace(/&/g, "#amp;").replace(/"/g, "#quot;").replace(/</g, "#lt;").replace(/>/g, "#gt;").replace(/[\r\n]/g, " ");
+  const entities = {"&": "#amp;", '"': "#quot;", "<": "#lt;", ">": "#gt;", "\\": "#92;", "#": "#35;"};
+  const escape = text => String(text).replace(/[&"<>\\#]/g, char => entities[char])
+    .replace(/[\x00-\x1f\x7f\u2028\u2029]/g, " ");
   const lines = ["flowchart LR"];
   for (const node of model.nodes) {
     const feature = node.feature;
     const state = feature?.complete ? "accepted" : (feature?.implementation || feature?.state || "context");
     const style = ["accepted", "implemented", "partial", "in_progress", "blocked"].includes(state) ? state : feature ? "planned" : "context";
-    const detail = feature ? (layoutOnly ? "<br/>实现进度待更新 · 验收结果待确认<br/>负责人：等待工作认领" : `<br/>${escape(label(state))} · 验收：${escape(label(feature.acceptance || "pending"))}${feature.owner ? `<br/>负责人：${escape(feature.owner)}` : ""}`) : "";
+    const counts = node.group && feature?.counts;
+    const summary = counts ? `<br/>实现 ${counts.implemented}/${counts.total} · 验收 ${counts.accepted}/${counts.total}` : "";
+    const detail = feature ? (layoutOnly ? "<br/>实现进度待更新 · 验收结果待确认<br/>负责人：等待工作认领" : `<br/>${escape(label(state))} · 验收：${escape(label(feature.acceptance || "pending"))}${summary}${feature.owner ? `<br/>负责人：${escape(feature.owner)}` : ""}`) : "";
     lines.push(`${ids.get(node.id)}["${escape(node.title)}${detail}"]:::${layoutOnly && feature ? "planned" : style}`);
   }
   const seen = new Set();
   for (const edge of model.edges) {
     if (!ids.has(edge.from) || !ids.has(edge.to)) continue;
-    const key = `${edge.from}\0${edge.to}`;
+    const key = JSON.stringify([edge.from, edge.to]);
     if (seen.has(key)) continue;
     seen.add(key);
     lines.push(`${ids.get(edge.from)} ${edge.dotted ? "-.->" : "-->"}${edge.label ? `|"${escape(edge.label)}"|` : ""} ${ids.get(edge.to)}`);

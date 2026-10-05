@@ -148,12 +148,14 @@ def apply_plan_changes(model, changes, previous=None):
     for feature in result.get("features", []):
         prior = old_features.get(feature["id"])
         if prior:
-            for name in ("state", "implementation_claim", "owner_user_id"):
+            for name in ("state", "implementation_claim", "implementation_override", "implementation_history", "owner_user_id"):
                 if name in prior: feature[name] = copy.deepcopy(prior[name])
                 else: feature.pop(name, None)
         else:
             feature["state"] = "planned"
             feature.pop("implementation_claim", None)
+            feature.pop("implementation_override", None)
+            feature.pop("implementation_history", None)
     tombstones = set(result.get("tombstones", []))
     for change in changes:
         op, fields = change["op"], change.get("fields", {})

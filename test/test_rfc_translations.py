@@ -61,6 +61,28 @@ def test_code_urls_and_internal_metadata_do_not_enter_translation():
     assert all("private_code" not in text and "PRIVATE_AUTHOR" not in text and "https://example.com/private" not in text for text in strings)
 
 
+def test_group_titles_follow_rfc_permissions_and_stay_out_of_public_catalog(workspace):
+    service, owner, repo, rfc, translator = workspace
+    service.dispatch(owner, "rfcs.work", {"rfc_id": rfc["id"], "op": "add", "feature": {"id": "F2", "title": "Second work"}})
+    service.dispatch(owner, "rfcs.graph", {"rfc_id": rfc["id"], "op": "merge", "feature_ids": ["F1", "F2"], "title": "Private merged delivery"})
+    service.translations.reconcile(); process_all(service)
+    assert "Private merged delivery" in get(service, owner, rfc)["translations"]["strings"]
+    assert "Private merged delivery" not in service.translations.public_ui("zh")["strings"]
+    private = service.dispatch(owner, "rfcs.draft", {"repo_id": repo["id"], "title": "Private source", "body": "Source",
+        "source": {"provider": "github", "repository": "owner/repo", "kind": "issue", "identifier": "90"}})
+    service.dispatch(owner, "rfcs.acl", {"rfc_id": private["id"], "restricted": True, "grants": {}})
+    with service.store.transaction() as con:
+        row = con.execute("SELECT model FROM rfcs WHERE id=?", (rfc["id"],)).fetchone(); model = json.loads(row["model"])
+        next(f for f in model["features"] if f["id"] == "F2")["auto_source"] = private["source"]
+        con.execute("UPDATE rfcs SET model=? WHERE id=?", (json.dumps(model), rfc["id"]))
+    reader = service.dispatch(owner, "users.create", {"name": "Group reader"})
+    issued = service.dispatch(owner, "tokens.create", {"user_id": reader["id"]})
+    service.dispatch(owner, "grants.set", {"repo_id": repo["id"], "user_id": reader["id"], "role": "reader"})
+    visible = get(service, service.authenticate(issued["token"]), rfc)
+    assert visible["node_groups"] == []
+    assert "Private merged delivery" not in visible["translations"]["strings"]
+
+
 def test_numbers_are_validated_and_failure_does_not_replace_source(workspace):
     service, p, repo, rfc, translator = workspace
     service.translations.ui = []; translator.invalid = True

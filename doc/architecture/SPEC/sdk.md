@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-05 -->
 
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
@@ -17,6 +17,11 @@
 
 ## 公开契约
 
+- RFC：`RFCClient` 选择显式本地或托管工作区，统一通过 `dispatch(action, payload)`
+  调用 RFC 服务并校验 API 版本。`work()` 支持人工实现记录和清除，`graph()` 支持
+  可逆节点分组；`chat_*` 提供私有会话、异步任务、分页事件和完整候选差异确认。
+  Bearer 身份来自宿主配置，权限、版本与事实校验由共享应用执行；远端故障不改写
+  另一套本地状态。验证见 `test_rfc_work_controls.py`、`test_rfc_chat_integration.py`。
 - `get_capabilities()` / `DirectClient.capabilities()` 返回 typed
   `Capabilities`：distribution/SDK/Direct/Strict/Quality/Knowledge 版本、resource revision、支持仓库、
   expected-head/structured-result/post-false/file-lock/idempotency 能力与 worker 上限。
