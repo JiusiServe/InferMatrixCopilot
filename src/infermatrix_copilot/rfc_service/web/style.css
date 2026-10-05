@@ -26,3 +26,5 @@
 
 svg[id^="rfc-graph-"] text{font-family:system-ui,sans-serif;font-size:15px}
 @media(max-width:600px){.roadmap-track>.panel-title{align-items:flex-start;flex-direction:column}.graph-details{padding:16px}.graph-details>.panel-title{top:-16px}}
+
+.rfc-prose-panel{content-visibility:auto;contain-intrinsic-size:auto 900px}.rfc-workspace{content-visibility:auto;contain-intrinsic-size:auto 1200px}@media print{.rfc-prose-panel,.rfc-workspace{content-visibility:visible;contain-intrinsic-size:none}}

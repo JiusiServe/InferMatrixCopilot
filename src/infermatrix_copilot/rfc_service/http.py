@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import gzip
+import hashlib
+from functools import lru_cache
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
@@ -39,6 +42,27 @@ _CSP = (
     "connect-src 'self'; img-src 'self' data:; object-src 'none'; "
     "base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 )
+
+
+@lru_cache(maxsize=16)
+def _asset(name):
+    body = files(__package__).joinpath("web", name).read_bytes()
+    return body, gzip.compress(body, compresslevel=5, mtime=0), 'W/"' + hashlib.sha256(body).hexdigest() + '"'
+
+
+def _accepts_gzip(value):
+    preferences = {}
+    for part in value.lower().split(","):
+        name, *parameters = part.strip().split(";")
+        quality = 1.0
+        for parameter in parameters:
+            if parameter.strip().startswith("q="):
+                try:
+                    quality = float(parameter.strip()[2:])
+                except ValueError:
+                    quality = 0.0
+        preferences[name] = quality
+    return preferences.get("gzip", preferences.get("*", 0.0)) > 0
 
 
 def _loopback(host: str) -> bool:
@@ -82,10 +106,16 @@ class RFCRequestHandler(BaseHTTPRequestHandler):
 
     def _send(self, status: int, body: bytes = b"", *, content_type: str = "application/json; charset=utf-8",
               headers: dict[str, str] | None = None) -> None:
+        headers = dict(headers or {})
+        if status == 200 and len(body) >= 1024 and "Content-Encoding" not in headers and _accepts_gzip(self.headers.get("Accept-Encoding", "")):
+            body = gzip.compress(body, compresslevel=5, mtime=0)
+            headers["Content-Encoding"] = "gzip"
+        headers.setdefault("Vary", "Accept-Encoding")
         self.send_response(status)
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        if status not in (204, 304):
+            self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", headers.pop("Cache-Control", "no-store"))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("X-Frame-Options", "DENY")
@@ -197,8 +227,17 @@ class RFCRequestHandler(BaseHTTPRequestHandler):
         path, query = self._path()
         if path in _STATIC:
             name, mime = _STATIC[path]
-            body = files(__package__).joinpath("web", name).read_bytes()
-            self._send(200, body, content_type=mime)
+            body, compressed, etag = _asset(name)
+            headers = {}
+            if name != "index.html":
+                headers = {"ETag": etag, "Cache-Control": "public, max-age=0, must-revalidate"}
+                if etag in [value.strip() for value in self.headers.get("If-None-Match", "").split(",")]:
+                    self._send(304, content_type=mime, headers=headers)
+                    return
+            if _accepts_gzip(self.headers.get("Accept-Encoding", "")):
+                body = compressed
+                headers["Content-Encoding"] = "gzip"
+            self._send(200, body, content_type=mime, headers=headers)
             return
         # Authenticate before selecting a data route, including legacy aliases.
         principal = self._principal()

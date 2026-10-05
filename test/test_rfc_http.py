@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import gzip
 import threading
 from contextlib import contextmanager
 from http.client import HTTPConnection
@@ -127,6 +128,26 @@ def test_login_shell_contains_no_rfc_data_and_assets_are_allowlisted():
         assert request(server, "GET", "/roadmap-mermaid.js")[0] == 200
         assert request(server, "GET", "/style.css")[0] == 200
         assert request(server, "GET", "/models.py")[0] == 401
+
+
+def test_static_assets_compress_and_revalidate_without_caching_private_data():
+    with running() as (server, _):
+        status, headers, raw = request(server, "GET", "/roadmap-mermaid.js", headers={"Accept-Encoding": "gzip"})
+        assert status == 200 and headers["content-encoding"] == "gzip"
+        assert len(raw) < len(gzip.decompress(raw)) // 2
+        assert b"export" in gzip.decompress(raw)
+        assert headers["cache-control"] == "public, max-age=0, must-revalidate"
+        assert headers["vary"] == "Accept-Encoding"
+        status, _, body = request(server, "GET", "/roadmap-mermaid.js", headers={"If-None-Match": headers["etag"]})
+        assert status == 304 and not body
+        _, identity_headers, _ = request(server, "GET", "/app.js", headers={"Accept-Encoding": "gzip;q=0, *;q=1"})
+        assert "content-encoding" not in identity_headers
+        _, shell_headers, _ = request(server, "GET", "/roadmap")
+        assert shell_headers["cache-control"] == "no-store" and "etag" not in shell_headers
+        status, private_headers, _ = request(server, "GET", "/api/v1/rfcs", headers={
+            "Authorization": "Bearer personal-test-token", "If-None-Match": headers["etag"]})
+        assert status == 200 and private_headers["cache-control"] == "no-store"
+        assert "etag" not in private_headers
 
 
 @pytest.mark.parametrize("path", ["/roadmap.html", "/roadmap-500ms-cn.html"])

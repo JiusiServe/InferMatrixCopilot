@@ -47,6 +47,14 @@ assert(!source.includes('\nclick')); assert(source.includes('#quot;'));
 assert(source.startsWith('flowchart LR\nN0['));
 assert(!source.includes(':::accepted'));
 """,
+    r"""
+const rfc={features:[{id:'F1',title:'Stable layout',track:'Engine',depends_on:[],implementation:'planned',acceptance:'pending',owner:''}]};
+const initial=graphSource(graphModels(rfc)[0],x=>x,true);
+rfc.features[0].implementation='implemented'; rfc.features[0].owner='New owner'; rfc.features[0].acceptance='accepted';
+assert.equal(graphSource(graphModels(rfc)[0],x=>x,true),initial);
+rfc.features[0].title='Changed work';
+assert.notEqual(graphSource(graphModels(rfc)[0],x=>x,true),initial);
+""",
 ])
 def test_graph_tracking_contract(check):
     program = "import assert from 'node:assert/strict';\n" + f"import {{graphModels,graphSource}} from {MODULE.as_uri()!r};\n" + check

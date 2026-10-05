@@ -70,6 +70,21 @@ Source diagrams contribute only limited flowchart topology, never executable
 callbacks, settings, or styles. Application event handlers supply node actions.
 SVG styles come from the existing same-origin stylesheet, preserving the CSP.
 
+The browser requests `view=summary` for RFC lists and `view=detail` for details
+and mutation results. These are additive compact projections; the default SDK
+responses and full exports remain unchanged. Suggestions are fetched from the
+authorized `rfcs.suggestions` endpoint in pages of 50 instead of downloading the
+whole discovery history. Permission filtering and counting use a transaction-local
+source index, rebuilt on every request so revoked grants take effect immediately.
+
+Generic static assets support gzip and ETag revalidation. Authenticated data and
+the login shell remain `no-store`. Saves reuse the returned RFC projection,
+preserve scroll, zoom, and unsaved prose edits, and update SVG labels and colors
+without recomputing unchanged layouts. Unchanged Markdown DOM is reused; offscreen
+prose and task sections defer layout. Background refresh skips unchanged content
+and pauses during editing or an open task dialog. No private data is persisted in
+browser storage, and signing out clears the in-memory view state.
+
 Use `request ACTION --data FILE` for all versioned actions; `--data -` reads a
 JSON object from stdin. It supports user administration, grants, tokens, RFCs,
 operations and audit history without placing credentials in arguments.

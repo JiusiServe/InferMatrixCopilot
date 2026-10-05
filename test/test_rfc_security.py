@@ -137,6 +137,41 @@ def restricted_pair(tmp_path):
     return service, admin, repo, provider, actor, hidden, visible
 
 
+def test_compact_views_scale_without_caching_revoked_source_permissions(tmp_path):
+    service, admin, repo, provider, actor, hidden, visible = restricted_pair(tmp_path)
+    from infermatrix_copilot.rfc_service.store import encode
+    row = service.store.one("SELECT * FROM rfcs WHERE id=?", (visible["id"],))
+    model = json.loads(row["model"])
+    model["suggestions"] = [{"id": str(i), "status": "proposed", "feature": {"title": SECRET if i % 2 else "Allowed"},
+                             "evidence": {"source": hidden["source"] if i % 2 else visible["source"]}}
+                            for i in range(1000)]
+    with service.store.transaction() as con:
+        con.execute("UPDATE rfcs SET model=? WHERE id=?", (encode(model), visible["id"]))
+    statements = []
+    connect = service.store.connect
+    def traced_connect():
+        con = connect()
+        con.set_trace_callback(statements.append)
+        return con
+    service.store.connect = traced_connect
+    compact = service.dispatch(actor, "rfcs.get", {"rfc_id": visible["id"], "view": "detail"})
+    assert compact["suggestions_total"] == 500 and "suggestions" not in compact
+    assert compact["body"] == visible["body"] and compact["features"]
+    assert SECRET not in json.dumps(compact)
+    assert sum(statement.startswith("SELECT") for statement in statements) < 40
+    summary = service.dispatch(actor, "rfcs.list", {"view": "summary"})["rfcs"]
+    assert len(summary) == 1 and "body" not in summary[0] and "features" not in summary[0]
+    assert summary[0]["feature_count"] == len(compact["features"])
+    service.dispatch(admin, "rfcs.acl", {"rfc_id": hidden["id"], "restricted": True,
+                                            "grants": {actor.user_id: "reader"}})
+    assert service.dispatch(actor, "rfcs.get", {"rfc_id": visible["id"], "view": "detail"})["suggestions_total"] == 1000
+    service.dispatch(admin, "rfcs.acl", {"rfc_id": hidden["id"], "restricted": True, "grants": {}})
+    assert service.dispatch(actor, "rfcs.get", {"rfc_id": visible["id"], "view": "detail"})["suggestions_total"] == 500
+    result = service.dispatch(actor, "rfcs.work", {"rfc_id": visible["id"], "op": "claim", "feature_id": "F1", "reason": "Self claim", "view": "detail"})
+    assert next(feature for feature in result["features"] if feature["id"] == "F1")["owner"] == actor.name
+    assert "suggestions" not in result and SECRET not in json.dumps(result)
+
+
 @pytest.mark.parametrize("minimal", [False, True])
 def test_source_preview_cannot_bypass_registered_restricted_rfc(tmp_path, minimal):
     service, admin, repo, provider, actor, hidden, visible = restricted_pair(tmp_path)

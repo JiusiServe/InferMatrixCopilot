@@ -161,14 +161,13 @@ class RFCService:
         self._require(con, principal, row["repo_id"], role, rfc_id)
         return dict(row)
 
-    def _view(self, con, principal, row):
-        model = json.loads(row["model"])
+    def _view(self, con, principal, row, parsed_model=None):
+        model = dict(parsed_model) if parsed_model is not None else json.loads(row["model"])
+        visible = self._view_visibility(con, principal, row["repo_id"])
         model["observations"] = {link: item for link, item in model.get("observations", {}).items()
-                                 if self._visible_source(con, principal, row["repo_id"], item.get("source"))}
-        model["suggestions"] = [s for s in model.get("suggestions", []) if self._visible_source(
-            con, principal, row["repo_id"], s.get("evidence", {}).get("source"))]
-        model["features"] = [f for f in model.get("features", []) if self._visible_source(
-            con, principal, row["repo_id"], f.get("auto_source"))]
+                                 if visible(item.get("source"))}
+        model["suggestions"] = [s for s in model.get("suggestions", []) if visible(s.get("evidence", {}).get("source"))]
+        model["features"] = [dict(f) for f in model.get("features", []) if visible(f.get("auto_source"))]
         if "last_discovery" in model:
             model["last_discovery"] = {"proposed": sum(s.get("status") == "proposed" for s in model["suggestions"]),
                                        "applied": sum(s.get("status") == "applied" for s in model["suggestions"])}
@@ -198,13 +197,36 @@ class RFCService:
                 "updated": row["updated"], "role": role, "can_write": ROLES.get(role, 0) >= 2,
                 "can_publish": ROLES.get(role, 0) >= 3}
 
+    @staticmethod
+    def _compact_view(view, mode):
+        if mode not in ("detail", "summary"):
+            return view
+        counts = {}
+        for suggestion in view.get("suggestions", []):
+            state = suggestion.get("status", "proposed")
+            counts[state] = counts.get(state, 0) + 1
+        fields = {"id", "repo_id", "title", "revision", "content_digest", "source", "state",
+                  "enrolled", "restricted", "updated", "role", "can_write", "can_publish",
+                  "implementation", "acceptance", "complete", "sync_status", "freshness",
+                  "next_actions", "last_discovery", "legacy_namespace", "namespace"}
+        if mode == "detail":
+            fields |= {"body", "features", "criteria", "scope", "auto_add", "max_auto_additions",
+                       "grants", "historical_claims", "historical_priorities", "ambiguities"}
+        return {**{key: value for key, value in view.items() if key in fields},
+                "suggestion_counts": counts, "suggestions_total": sum(counts.values()),
+                "feature_count": len(view.get("features", [])), "criterion_count": len(view.get("criteria", []))}
+
     def _save(self, con, principal, row, model, body=None, title=None):
         body = row["body"] if body is None else body
         title = row["title"] if title is None else title
-        revision = digest(encode({"body": body, "title": title, "model": model}))
+        serialized = encode(model)
+        # Same canonical revision, without encoding the large model twice.
+        revision = digest('{"body":' + encode(body) + ',"model":' + serialized + ',"title":' + encode(title) + '}')
+        updated = self.clock()
         con.execute("UPDATE rfcs SET title=?,body=?,model=?,revision=?,updated=? WHERE id=?",
-                    (title, body, encode(model), revision, self.clock(), row["id"]))
-        return self._view(con, principal, dict(con.execute("SELECT * FROM rfcs WHERE id=?", (row["id"],)).fetchone()))
+                    (title, body, serialized, revision, updated, row["id"]))
+        current = {**row, "title": title, "body": body, "model": serialized, "revision": revision, "updated": updated}
+        return self._view(con, principal, current, parsed_model=model)
 
     def dispatch(self, principal, action, payload=None):
         payload = payload or {}
@@ -226,7 +248,10 @@ class RFCService:
             return {"source": ref.to_dict(), "title": fetched.get("title", "Imported RFC"), "body": fetched["body"], "revision": fetched.get("revision", ""), "content_digest": content_digest(fetched.get("title", "Imported RFC"), fetched["body"])}
         with self.store.transaction() as con:
             principal = self._current(con, principal)
-            return self._dispatch(con, principal, action, payload)
+            result = self._dispatch(con, principal, action, payload)
+            if isinstance(result, dict) and "repo_id" in result and "features" in result:
+                result = self._compact_view(result, payload.get("view"))
+            return result
 
     def _dispatch(self, con, p, action, data):
         now = self.clock()
@@ -361,7 +386,7 @@ class RFCService:
                     view = self._view(con, p, dict(row))
                     if data.get("query") and data["query"].casefold() not in (view["title"] + view["body"]).casefold():
                         continue
-                    result.append(view)
+                    result.append(self._compact_view(view, data.get("view")))
             return {"rfcs": result}
         if action == "rfcs.draft":
             rid = data.get("repo_id", "")
@@ -649,6 +674,36 @@ class RFCService:
             return True
         except RFCError:
             return False
+
+    def _view_visibility(self, con, principal, repo_id):
+        """Build an ACL index for this transaction only; never cache user authority."""
+        roots = {r["id"]: r["root"] for r in con.execute("SELECT id,root FROM repositories")}
+        blocked, blocked_paths = set(), set()
+        aliases = {"pull_request": "pr", "pull": "pr"}
+
+        def identity(ref):
+            repository = ref.repository.casefold() if ref.provider == "github" else ref.repository
+            return ref.provider, repository, aliases.get(ref.kind, ref.kind), ref.identifier or ref.path
+
+        for row in con.execute("SELECT id,repo_id,source FROM rfcs WHERE source!='{}'"):
+            if ROLES.get(self._role(con, principal, row["repo_id"], row["id"]), 0) >= 1:
+                continue
+            ref = SourceRef.from_dict(json.loads(row["source"]))
+            blocked.add(identity(ref))
+            if ref.provider == "local":
+                blocked_paths.add((Path(roots[row["repo_id"]]) / (ref.path or ref.identifier)).resolve())
+
+        def visible(source):
+            if not source:
+                return True
+            try:
+                ref = SourceRef.from_dict(source)
+                if ref.provider == "local" and repo_id in roots:
+                    return (Path(roots[repo_id]) / (ref.path or ref.identifier)).resolve() not in blocked_paths
+                return identity(ref) not in blocked
+            except RFCError:
+                return False
+        return visible
 
     @staticmethod
     def _features(features, validate=True):

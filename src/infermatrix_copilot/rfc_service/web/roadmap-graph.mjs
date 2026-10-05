@@ -81,7 +81,7 @@ export function graphModels(rfc) {
   return models;
 }
 
-export function graphSource(model, label) {
+export function graphSource(model, label, layoutOnly = false) {
   const ids = new Map(model.nodes.map((node, index) => [node.id, `N${index}`]));
   const escape = text => String(text).replace(/&/g, "#amp;").replace(/"/g, "#quot;").replace(/</g, "#lt;").replace(/>/g, "#gt;").replace(/[\r\n]/g, " ");
   const lines = ["flowchart LR"];
@@ -89,8 +89,8 @@ export function graphSource(model, label) {
     const feature = node.feature;
     const state = feature?.complete ? "accepted" : (feature?.implementation || feature?.state || "context");
     const style = ["accepted", "implemented", "partial", "in_progress", "blocked"].includes(state) ? state : feature ? "planned" : "context";
-    const detail = feature ? `<br/>${escape(label(state))} · 验收：${escape(label(feature.acceptance || "pending"))}${feature.owner ? `<br/>负责人：${escape(feature.owner)}` : ""}` : "";
-    lines.push(`${ids.get(node.id)}["${escape(node.title)}${detail}"]:::${style}`);
+    const detail = feature ? (layoutOnly ? "<br/>实现进度待更新 · 验收结果待确认<br/>负责人：等待工作认领" : `<br/>${escape(label(state))} · 验收：${escape(label(feature.acceptance || "pending"))}${feature.owner ? `<br/>负责人：${escape(feature.owner)}` : ""}`) : "";
+    lines.push(`${ids.get(node.id)}["${escape(node.title)}${detail}"]:::${layoutOnly && feature ? "planned" : style}`);
   }
   const seen = new Set();
   for (const edge of model.edges) {
