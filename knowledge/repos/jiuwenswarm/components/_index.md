@@ -32,3 +32,4 @@ sources: []
 - [sandbox-runtime](sandbox-runtime/_index.md)
 - [subpackages](subpackages/_index.md)
 - [config-resources](config-resources/_index.md)
+- [ide-vscode](ide-vscode/_index.md)

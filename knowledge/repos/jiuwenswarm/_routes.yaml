@@ -344,6 +344,7 @@ owners:
   - jiuwenswarm/common/acp/
   - jiuwenswarm/common/config_panel/
   - jiuwenswarm/common/schema/
+  - jiuwenswarm/scripts/
 - owner: login-auth
   path: repos/jiuwenswarm/components/login-auth/_index.md
   signals:
@@ -399,6 +400,7 @@ owners:
   - jiuwenswarm/extensions/yuanrong_frontend_client.py
   - jiuwenswarm/extensions/agentos/
   - jiuwenswarm/extensions/video_duplex/
+  - jiuwenswarm/extensions/__init__.py
 - owner: observability
   path: repos/jiuwenswarm/components/observability/_index.md
   signals:
@@ -459,6 +461,7 @@ owners:
   - jiuwenswarm/runtime/session_lifecycle.py
   - jiuwenswarm/runtime/session_provisioner.py
   - jiuwenswarm/runtime/session/
+  - jiuwenswarm/runtime/__init__.py
 - owner: cron-scheduling
   path: repos/jiuwenswarm/components/cron-scheduling/_index.md
   signals:
@@ -511,3 +514,109 @@ owners:
   - jiuwenswarm/symphony/skill_retrieval/
   - jiuwenswarm/symphony/evolution/
   - jiuwenswarm/symphony/shared/
+- owner: browser-client
+  path: repos/jiuwenswarm/components/browser-client/_index.md
+  signals:
+  - browser client
+  scope_prefixes:
+  - jiuwenswarm/channels/browser/frontend/src/background/index.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts
+  - jiuwenswarm/channels/browser/
+- owner: ide-clients
+  path: repos/jiuwenswarm/components/ide-clients/_index.md
+  signals:
+  - ide clients
+  scope_prefixes:
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/JiuwenSwarmService.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/ChatToolWindow.kt
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/editor/DiffApplier.ts
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/
+  - jiuwenswarm/channels/ide/packages/shared-webview/
+  - jiuwenswarm/channels/ide/packages/vscode-extension/esbuild.js
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/client/
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/codeActions/
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/context/
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/editor/
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/swarm/
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/StatusBar.ts
+- owner: ide-vscode
+  path: repos/jiuwenswarm/components/ide-vscode/_index.md
+  signals:
+  - ide vscode
+  scope_prefixes:
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/terminal/TerminalManager.ts
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/ChatPanel.ts
+- owner: sandbox-runtime
+  path: repos/jiuwenswarm/components/sandbox-runtime/_index.md
+  signals:
+  - sandbox runtime
+  scope_prefixes:
+  - jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy.py
+  - jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy_manager.py
+  - jiuwenbox/src/jiuwenbox/server/app.py
+- owner: sdk-clients
+  path: repos/jiuwenswarm/components/sdk-clients/_index.md
+  signals:
+  - sdk clients
+  scope_prefixes:
+  - sdks/python/src/jiuwenswarm_sdk/client.py
+- owner: tui-client
+  path: repos/jiuwenswarm/components/tui-client/_index.md
+  signals:
+  - tui client
+  scope_prefixes:
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.watch.ts
+  - jiuwenswarm/channels/tui/frontend/src/index.ts
+  - jiuwenswarm/channels/tui/
+- owner: packaging-deploy-2
+  path: repos/jiuwenswarm/components/packaging-deploy/_index.md
+  signals:
+  - 打包
+  - build
+  - electron
+  - inno
+  - hap
+  - harmony
+  - pyinstaller
+  - wheel
+  - tui
+  - 签名
+  - notarize
+  - playwright mcp runtime
+  - nfs
+  - setup_nfs
+  - teardown_nfs
+  - 共享存储挂载
+  - 多实例部署脚本
+  scope_prefixes:
+  - scripts/build-electron-exe.ps1
+  - scripts/build-electron-exe.sh
+  - scripts/build-exe.bat
+  - scripts/build-exe.ps1
+  - scripts/build-harmony-hap.sh
+  - scripts/build-harmony.sh
+  - scripts/build-macos.sh
+  - scripts/build-runtimes.psm1
+  - scripts/build-runtimes.sh
+  - scripts/build.ps1
+  - scripts/build.sh
+  - scripts/build_config.py
+  - scripts/build_python_packages.py
+  - scripts/build_tui.py
+  - scripts/harmony_entry.py
+  - scripts/installer-electron.iss
+  - scripts/installer.iss
+  - scripts/jiuwenswarm.iss
+  - scripts/jiuwenswarm.spec
+  - scripts/jiuwenswarm_exe_entry.py
+  - scripts/openjiuwen_team_mcp_exe_entry.py
+  - scripts/reset_trajectory_data.py
+  - scripts/update_playwright_mcp_runtime.py
+  - scripts/verify_a2ui_bundle.py
+  - scripts/verify_gitcode_cli_bundle.py
+  - scripts/verify_playwright_mcp_bundle.py
+  - scripts/verify_playwright_mcp_offline.py
+  - scripts/verify_rsi_bundle.py
+  - scripts/nfs/

@@ -21,7 +21,8 @@ sources: []
 
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
-| common、config、配置、模型选择、model catalog、mode、工作区、cron、updater、doctor、hooks、kv cache… | 入口 | `jiuwenswarm/common/config.py`、`jiuwenswarm/common/model_catalog.py`、`jiuwenswarm/common/mcp_config.py`、`jiuwenswarm/common/_build_config.py` |
+| common、config、配置、模型选择、model catalog、mode、工作区、cron、updater、doctor、hooks、kv cache… | 入口 | `jiuwenswarm/common/config.py`、`jiuwenswarm/common/model_catalog.py`、`jiuwenswarm/common/mcp_config.py` |
+
 
 - [jiuwenswarm/common 审查规则：配置读写事务、跨仓契约与持久化键稳定性](rules.md)
 
@@ -46,3 +47,4 @@ sources: []
 - [模型平台与 API 配置：实现深读](feature-depth-models.md)
 - [MCP 配置、凭据与资源：实现深读](feature-depth-mcp.md)
 - [外部 Claude 与 Codex CLI 智能体：实现深读](feature-depth-external-cli-agents.md)
+- [开发辅助脚本（scripts/）](jiuwenswarm-scripts.md)

@@ -16,3 +16,14 @@ sources: []
 - [scripts](scripts/_index.md)
 - [scripts-nfs](scripts-nfs/_index.md)
 - [打包与部署：实现深读](feature-depth-deployment.md)
+- [scripts/ — 打包与构建脚本](scripts.md)
+- [NFS 部署脚本（scripts/nfs）](scripts-nfs.md)
+
+## 代码快速入口（Direct）
+<!-- kb-init:quick-map -->
+
+触发词：打包、build、electron、inno、hap、harmony、pyinstaller、wheel、tui、签名、notarize、playwright mcp runtime。PR 描述或改动命中下表一行时，先读该行的规则，再读页面其余部分。
+
+| PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
+|---|---|---|
+| 打包、build、electron、inno、hap、harmony、pyinstaller、wheel、tui、签名、notarize、playwright… | 入口 | `scripts/build-electron-exe.ps1`、`scripts/build-electron-exe.sh`、`scripts/build-exe.bat` |
