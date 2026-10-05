@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
+SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
+
 
 class RFCError(Exception):
     def __init__(self, message: str, status: int = 400, code: str = "invalid_request"):

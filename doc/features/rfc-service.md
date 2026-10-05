@@ -33,7 +33,12 @@ separate worker owns reconciliation. Run `sync --once` for one local cycle or
 SSH. Package deployment wrappers around the foreground process when needed.
 
 A non-loopback deployment requires `--public-url https://your-host.example` and
-a TLS reverse proxy. Browser sessions stay on the configured origin. Bind the
+a TLS reverse proxy. Browser sessions stay on the configured origin and remember
+the signed-in user for 30 days, including after closing the browser or restarting
+the service. The persistent HttpOnly cookie contains only an opaque session
+secret; personal tokens are not stored in browser storage. Logout, token
+revocation, token expiration, or disabling the user invalidates access immediately.
+Bind the
 HTTP listener to an interface reachable by that proxy; the default listener is
 loopback. Public URLs and provider endpoints belong in operator configuration,
 not in user action payloads.

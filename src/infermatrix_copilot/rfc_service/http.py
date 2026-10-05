@@ -13,7 +13,7 @@ from importlib.resources import files
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from .models import RFCError
+from .models import SESSION_TTL_SECONDS, RFCError
 
 COOKIE_NAME = "imrfc_session"
 MAX_BODY_BYTES = 1024 * 1024
@@ -187,8 +187,7 @@ class RFCRequestHandler(BaseHTTPRequestHandler):
         morsel["samesite"] = "Strict"
         if self.server.public_origin.startswith("https://"):
             morsel["secure"] = True
-        if revoke:
-            morsel["max-age"] = "0"
+        morsel["max-age"] = "0" if revoke else str(SESSION_TTL_SECONDS)
         return morsel.OutputString()
 
     def _get(self) -> None:

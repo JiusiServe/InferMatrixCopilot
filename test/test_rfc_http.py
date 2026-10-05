@@ -176,6 +176,7 @@ def test_session_is_http_only_and_neither_credential_is_in_json():
         cookie, headers, value = login(server)
         assert "HttpOnly" in headers["set-cookie"]
         assert "SameSite=Strict" in headers["set-cookie"]
+        assert "Max-Age=2592000" in headers["set-cookie"]
         assert "Secure" not in headers["set-cookie"]
         assert value["principal"]["user_id"] == "alice"
         assert "personal-test-token" not in json.dumps(value)

@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 
 from . import RFC_API_VERSION
 from .drafts import digest, draft, parse, project, validate_features
-from .models import Principal, ProviderError, RFCError, SourceRef
+from .models import SESSION_TTL_SECONDS, Principal, ProviderError, RFCError, SourceRef
 from .store import Store, encode
 
 ROLES = {"reader": 1, "contributor": 2, "maintainer": 3}
@@ -100,7 +100,7 @@ class RFCService:
         secret = secrets.token_urlsafe(40)
         with self.store.transaction() as con:
             self._current(con, principal)
-            con.execute("INSERT INTO sessions VALUES (?,?,?)", (digest(secret), principal.credential_id, self.clock() + 43200))
+            con.execute("INSERT INTO sessions VALUES (?,?,?)", (digest(secret), principal.credential_id, self.clock() + SESSION_TTL_SECONDS))
         return secret, principal
 
     def authenticate_session(self, cookie):

@@ -11,6 +11,34 @@ from infermatrix_copilot.rfc_service.models import Principal, ProviderError, RFC
 
 
 SECRET = "confidential-rfc-detail-do-not-export"
+
+
+def test_remembered_session_survives_restart_but_expires_and_can_be_revoked(tmp_path):
+    now = [1000.0]
+    state = tmp_path / "remembered-session"
+    service = RFCService(state, clock=lambda: now[0])
+    token = service.bootstrap_admin("Remembered user")
+    administrator = service.authenticate(token["token"])
+    token = service.dispatch(administrator, "tokens.create", {"expires_days": 365})
+    cookie, principal = service.create_session(token["token"])
+    restarted = RFCService(state, clock=lambda: now[0])
+    now[0] += 29 * 86400
+    assert restarted.authenticate_session(cookie).user_id == principal.user_id
+    now[0] += 86400
+    with pytest.raises(RFCError) as expired:
+        restarted.authenticate_session(cookie)
+    assert expired.value.status == 401
+
+    # A fresh session still obeys explicit logout and token revocation.
+    cookie, principal = restarted.create_session(token["token"])
+    restarted.revoke_session(cookie)
+    with pytest.raises(RFCError):
+        restarted.authenticate_session(cookie)
+    cookie, principal = restarted.create_session(token["token"])
+    restarted.dispatch(principal, "tokens.revoke", {"token_id": token["token_id"]})
+    with pytest.raises(RFCError):
+        restarted.authenticate_session(cookie)
+
 PUBLIC = "# Public RFC\n\n### Engine\n\n#### F1. Public implementation\n\n## Acceptance criteria\n\n- Validate the public output.\n"
 
 
