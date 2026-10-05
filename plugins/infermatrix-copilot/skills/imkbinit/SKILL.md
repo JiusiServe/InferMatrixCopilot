@@ -87,10 +87,21 @@ The next stage is the first one that isn't done. If an earlier stage's PR is
 open, stop and say it's waiting for the owner's review. If a record says
 `blocked`, report its `problems` and stop.
 
-For an explicit knowledge rerun of an already merged KB with no local
-skeleton/modules records, use `--stage knowledge --from-existing`. The CLI
+For an explicit breadth rerun of an already merged KB with no local skeleton
+record, use `--stage modules --from-existing`. Merge its PR before running
+`--stage knowledge --from-existing`; no skeleton record is manufactured.
+For a knowledge-only rerun with no local skeleton/modules records, use
+`--stage knowledge --from-existing`. The CLI
 checks the merged index and every owner route. Existing stage records still
 keep their review and merge gates; never manufacture records to skip them.
+An enabled or started feature-discovery batch must still finish and its
+catalog PR must merge before publishing modules or knowledge.
+When using `eval/knowledge-depth/run_depth_campaign.py` after discovery,
+pass `--discovery-record` with the original completed record. Its byte hash,
+merged catalog and report are checked before any worker dispatch; each worker
+receives the exact original JSON, retaining external archive paths. A baseline
+with a discovery report requires this handoff even for older adapters. Never
+rewrite a prior status or create a substitute record to satisfy the gate.
 
 For implementation knowledge in an existing KB, use the independent stage
 `knowledge-deepen` (`kb deepen <repo>` is its `--from-existing` alias).
@@ -98,6 +109,12 @@ It is distinct from the ordinary `deepen` stage that generates hot-module rules.
 `kb widen <repo>` similarly selects `knowledge --from-existing`.
 Use a new state directory when the knowledge baseline or source pin changes;
 retain prior native records and accepted blocks as audit evidence.
+If a previous merged batch's publication branch still exists, set
+`KB_INIT_BRANCH_SUFFIX=<batch-slug>` before starting the new batch. It appends
+the slug to the default stage branch without replacing old branches. Use
+1–40 lowercase letters, digits or hyphens, with no leading or trailing hyphen.
+The suffix is part of the checkpoint identity; retain it when resuming or
+publishing that batch, including a publication waiting for PR confirmation.
 
 ## 3. Run it
 
@@ -114,11 +131,12 @@ this mode; default API spend-cap checks remain in place. Report generator USD
 as unreported and subscription fees outside stage USD accounting, alongside
 token usage and the judge's accounted spend. Never claim a measured zero cost.
 
-When the user explicitly selects uncapped subscription extraction, the independent
-`knowledge-deepen` stage and `kb deepen` accept `--unlimited-subscription`:
+When the user explicitly selects uncapped subscription extraction,
+`feature-discovery`, `modules`, `knowledge`, `knowledge-deepen`, `kb widen`
+and `kb deepen` accept `--unlimited-subscription`:
 
 ```text
-KB_GENERATOR=zcode:GLM-5.3:low KB_JUDGE=codex:gpt-6-sol:medium <imc> kb deepen <repo> --pin <source-sha> --subscription-generator --unlimited-subscription --dry-run
+ZCODE_REASONING_LEVEL=low KB_GENERATOR=zcode:GLM-5.3 KB_JUDGE=codex:gpt-6.1-sol:medium <imc> kb deepen <repo> --pin <source-sha> --subscription-generator --unlimited-subscription --dry-run
 ```
 
 The generator must be Zcode GLM-5.3 and the independent judge must be Codex;
@@ -128,6 +146,11 @@ accounting ceiling, and preserves call, served-model and token receipts. It does
 not authorize API spending or fallback to another provider; unavailable
 subscription roles stop with their reason. Actual USD remains unknown when the
 provider does not report it. Keep the requested source pin and reviewed policy.
+For breadth reruns, explicitly set the same `KB_GENERATOR` and `KB_JUDGE`
+roles and pass this flag to both `modules --from-existing` and
+`knowledge --from-existing`; `--subscription-generator` alone preserves the
+normal stage ceiling for judge accounting. The unlimited mode has a distinct
+checkpoint identity; old runs with no flag keep their existing identity.
 
 Only publish when the user explicitly asks (`--publish`, "open the PR").
 Publishing needs `ALLOW_PUSH=1`, `ALLOW_POST=1` and
@@ -143,6 +166,25 @@ What each stage opens:
   Zcode GLM-5.3 extracts and independent Codex reviews with shared concurrency 13.
   `KB_DISCOVERY_GENERATOR`, `KB_DISCOVERY_JUDGE` and `KB_DISCOVERY_CONCURRENCY`
   override the stage configuration; discovery rejects same-family review.
+  `KB_DISCOVERY_PACKET_CHARS` groups complete indexed chunks (24000–192000,
+  default 24000); `KB_DISCOVERY_START_INTERVAL_S` sets the initial Zcode spacing
+  (1–60 seconds, default 15) while native rate-limit cooldown stays enabled.
+  `ZCODE_REASONING_LEVEL=low|high|max` controls the effective native reasoning;
+  a Zcode role's effort suffix does not. These settings are frozen in the batch
+  and report, with reasoning also recorded in both trace and attempt archives.
+  Changed settings or old checkpoints without them require a fresh state
+  directory; retain the previous archive. Larger packets do not prove all
+  features were found.
+  Before promoting implemented new IDs, run the supplemental independent
+  catalog boundary audit against every formal feature's ID, title and owner.
+  Keep primary reviews and native receipts; unsupported or unresolved duplicate
+  titles/aliases stay unknown without another generator repair loop. Unpublished
+  old previews reuse their scan and primary reviews to acquire this audit.
+  Before publication, jointly consolidate the actually admitted new proposals
+  against one another with counterpart implementation and consumer excerpts.
+  Retain original extraction and boundary proofs; unresolved duplicates stay
+  unknown. This is part of aggregation and independent review in phase 1.
+  Exhausted content repairs remain exhausted on `--retry-unfinished`.
   `--from-existing` checks merged skeleton routes, while `--retry-unfinished`
   resumes supported work. `--budget-usd` controls cumulative accounting;
   `--unlimited-subscription` authenticates both roles and removes that ceiling.
@@ -288,3 +330,22 @@ a dry run, otherwise the opened PR). Summarise:
 
 Without explicit authorization for a broader batch or merge, stop after one stage. The owner reviews and merges its PR before the next
 stage can run. Never run two stages in one invocation, and never merge a PR.
+
+### Foundation concurrency (2026-10-06)
+
+Explicit `--stage knowledge --unlimited-subscription` shares at most 13 worker
+slots across extraction and all existing independent section judgments. Set
+`KB_KNOWLEDGE_CONCURRENCY` to 1–13 before starting; it is frozen in the input
+identity. Native Zcode starts share a default 5-second pacing interval;
+`KB_KNOWLEDGE_START_INTERVAL_S` may override it with a finite positive value
+up to 60 seconds and is also bound to the stage identity. The CLI coordinator alone saves real worker checkpoints and appends
+approved sections in deterministic order. Resume the same command/state to reuse
+completed native approvals; keep their external trace archives. Finite-budget
+runs retain the previous serial flow. New discovery features preferentially read
+the frozen report’s exact complete source spans; unread gaps cannot be cited.
+
+Completed unpublished caches and prepared-publication resumes also replay the
+original native proofs before any write or model call. Missing or changed
+archives reject reuse without changing the genuine record; restore the original
+archive to continue. Changed frozen inputs require a new batch. Published
+historical records remain unchanged.

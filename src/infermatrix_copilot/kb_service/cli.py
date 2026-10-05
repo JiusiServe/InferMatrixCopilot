@@ -118,8 +118,8 @@ def _init_command(args, state_dir: Path) -> int:
     if args.suggest_seeds == bool(args.stage):
         print("kb init: pass exactly one of --stage or --suggest-seeds", file=sys.stderr)
         return 2
-    if args.unlimited_subscription and (args.stage not in ("feature-discovery", "knowledge-deepen") or args.budget_usd is not None):
-        print("--unlimited-subscription is for feature-discovery or knowledge-deepen only and conflicts with --budget-usd", file=sys.stderr)
+    if args.unlimited_subscription and (args.stage not in ("feature-discovery", "modules", "knowledge", "knowledge-deepen") or args.budget_usd is not None):
+        print("--unlimited-subscription is for feature-discovery, modules, knowledge or knowledge-deepen only and conflicts with --budget-usd", file=sys.stderr)
         return 2
     if args.suggest_seeds:
         from .init_stages import suggest_seeds
@@ -146,8 +146,8 @@ def _init_command(args, state_dir: Path) -> int:
             return 2
         params["acceptance_mode"] = args.acceptance_mode
     if args.from_existing:
-        if args.stage not in ("feature-discovery", "knowledge", "knowledge-deepen"):
-            print("--from-existing is for feature-discovery, knowledge or knowledge-deepen only", file=sys.stderr)
+        if args.stage not in ("feature-discovery", "modules", "knowledge", "knowledge-deepen"):
+            print("--from-existing is for feature-discovery, modules, knowledge or knowledge-deepen only", file=sys.stderr)
             return 2
         params["from_existing"] = "true"
     if args.subscription_generator:
@@ -227,11 +227,11 @@ def main(argv: list[str] | None = None) -> int:
     init.add_argument("--pin", help="upstream commit to pin (default: the default branch head)")
     init.add_argument("--suggest-seeds", action="store_true")
     init.add_argument("--from-existing", action="store_true",
-                      help="enrich a merged KB without local skeleton/modules records (discovery and knowledge stages)")
+                      help="enrich a merged KB without local skeleton records (discovery, modules and knowledge stages)")
     init.add_argument("--subscription-generator", action="store_true",
                       help="explicit subscription generator; unreported fees outside stage USD accounting")
     init.add_argument("--unlimited-subscription", action="store_true",
-                      help="uncapped discovery/depth with authenticated subscription generator and judge; no fallback")
+                      help="uncapped discovery/modules/knowledge/depth with authenticated subscription generator and judge; no fallback")
     init.add_argument("--retry-unfinished", action="store_true", help="retry unfinished discovery/depth work, preserving prior spend")
     init.add_argument("--acceptance-mode", choices=("strict", "lightweight"), default="strict",
                       help="depth recognition standard; lightweight uses pinned citations and one independent feature review")
@@ -241,13 +241,13 @@ def main(argv: list[str] | None = None) -> int:
         cmd.add_argument("--dry-run", action="store_true")
         cmd.add_argument("--pin")
         cmd.add_argument("--subscription-generator", action="store_true")
+        cmd.add_argument("--unlimited-subscription", action="store_true")
         if name == "deepen":
             cmd.add_argument("--budget-usd", type=float)
             cmd.add_argument("--retry-unfinished", action="store_true")
-            cmd.add_argument("--unlimited-subscription", action="store_true")
             cmd.add_argument("--acceptance-mode", choices=("strict", "lightweight"), default="strict")
         cmd.set_defaults(stage=stage, from_existing=True, suggest_seeds=False, pr_count=None,
-                         **({"budget_usd": None, "retry_unfinished": False, "unlimited_subscription": False}
+                         **({"budget_usd": None, "retry_unfinished": False}
                             if name == "widen" else {}))
     publish = sub.add_parser("publish")
     where = publish.add_mutually_exclusive_group(required=True)

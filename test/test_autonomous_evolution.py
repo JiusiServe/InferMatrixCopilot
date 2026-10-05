@@ -403,6 +403,15 @@ def test_objective_coordinator_never_calls_legacy_dual_model_forensics(autonomou
     from infermatrix_copilot.improve import coordinator
     from infermatrix_copilot.engine.steps import improve
     st, store, model, worker = autonomous
+    # Keep this large-effect routing test's positive cohort above the
+    # coordinator's replenishment floor, including after its eight holdouts
+    # are consumed. Negative controls are independently asserted above.
+    objectives.prepare(st, store, workflow=objectives.ENGINE)
+    path = objectives.data_root(st) / objectives.ENGINE / 'dataset.json'
+    manifest = json.loads(path.read_text())
+    manifest['items'] = [r for r in manifest['items'] if not r['objective'].get('negative')]
+    artifacts.atomic_json(path, manifest)
+    assert sum(r['split'] == 'holdout' for r in manifest['items']) >= 88
     def forbidden(*args, **kwargs): raise AssertionError('legacy model or human benchmark requested')
     monkeypatch.setattr(improve, '_forensics', forbidden)
     result = coordinator.run(st, store, workflow=objectives.ENGINE, llm=model, sandbox=worker)

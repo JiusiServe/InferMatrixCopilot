@@ -13,6 +13,42 @@ from infermatrix_copilot.kb_service.models import ModelReply, ModelRole, ModelUn
 PIN = 'a' * 40
 
 
+@pytest.mark.parametrize('packet_chars', [24000, 96000, 160000, 192000])
+def test_configured_packets_offer_every_complete_chunk_once(tmp_path, packet_chars):
+    idx = index(tmp_path)
+    # Multiple files and chunks exercise boundaries without reducing the index.
+    for n in range(9):
+        (tmp_path / f'src/library_{n}.py').write_text('value = "observable contract"\n' * 1500)
+    idx = build_discovery_index(tmp_path, pin=PIN, scope={'roots': ['src/'], 'exclude': []}, doc_globs=['docs/*.md'])
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=None, save=lambda: None,
+                             packet_chars=packet_chars)
+    offered = [c for kind in ('doc', 'source') for packet in engine._packets(kind) for c in packet]
+    assert sorted(map(_hash, offered)) == sorted(map(_hash, idx.chunks))
+    assert len(offered) == len(idx.chunks)
+    assert all(sum(len(c.get('text', '')) + 150 for c in packet) <= packet_chars
+               for kind in ('doc', 'source') for packet in engine._packets(kind))
+
+
+@pytest.mark.parametrize('packet_chars', [True, 0, 23999, 192001, 96000.5])
+def test_invalid_engine_packet_size_is_rejected(tmp_path, packet_chars):
+    with pytest.raises(ValueError, match='packet size'):
+        DiscoveryEngine(index(tmp_path), seeds=[], owners=[], state={}, call=None,
+                        save=lambda: None, packet_chars=packet_chars)
+
+
+def test_packet_candidate_cap_is_an_explicit_omission_lead(tmp_path):
+    idx = index(tmp_path, docs=False)
+    def call(role, system, prompt, validate):
+        return reply(role, {'candidates': [candidate(key=f'capability-{n}') for n in range(24)]})
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=call, save=lambda: None,
+                             packet_chars=96000)
+    assert engine.scan()
+    assert len(engine.state['tasks']) == 1
+    task = next(iter(engine.state['tasks'].values()))
+    assert task['candidate_limit_reached']
+    assert len(task['candidates']) == 24
+
+
 def reply(role, data, archived=True):
     text = json.dumps(data)
     return ModelReply(ModelRole(role, 'zcode' if role == 'generator' else 'codex', 'GLM-5.3' if role == 'generator' else 'gpt-6-sol'),
@@ -107,17 +143,19 @@ def test_invalid_citation_remains_unknown_despite_positive_review(tmp_path):
     assert not features and outcomes[0]['status'] == 'unknown'
 
 
-def test_seed_id_and_owner_are_preserved_during_supplement(tmp_path):
+@pytest.mark.parametrize('relation', ['implementation_supplement', 'alias', 'subcapability', 'shared_component'])
+def test_seed_id_owner_and_entry_points_are_preserved_during_relation_merge(tmp_path, relation):
     idx = index(tmp_path, docs=False)
     seed = {'id': 'session', 'title': 'Existing session', 'owner': 'original', 'source_globs': ['src/original.py'],
             'entry_points': ['src/original.py'], 'docs': [], 'page': 'repos/demo/components/original/feature-session.md'}
     row = candidate(); row['generator_receipts'] = [{'trace_id': 'native-generator'}]
-    state = {'candidates': {'session': row}, 'reviews': {'session': {'supported': 'yes', 'relation': 'implementation_supplement',
+    state = {'candidates': {'session': row}, 'reviews': {'session': {'supported': 'yes', 'relation': relation,
              'related_id': 'session', 'reason': 'Same lifecycle', 'candidate_sha256': _hash(row), 'judge_receipt': {'trace_id': 'native-judge'}}}}
     engine = DiscoveryEngine(idx, seeds=[seed], owners=[], state=state, call=None, save=lambda: None)
     features, _ = engine.catalog('repos/demo')
     assert features[0]['owner'] == 'original' and features[0]['title'] == 'Existing session'
     assert features[0]['source_globs'] == ['src/original.py', 'src/session.py']
+    assert features[0]['entry_points'] == ['src/original.py']
     assert seed['source_globs'] == ['src/original.py']
 
 
@@ -357,3 +395,192 @@ def test_repair_review_channel_failure_retains_draft_for_explicit_retry(tmp_path
     resumed=DiscoveryEngine(idx,seeds=[],owners=[],state=state,call=call,save=lambda:None)
     assert resumed.scan() and resumed.review()
     assert calls.count('generator')==2 and len(resumed.catalog('repos/demo')[0])==1
+
+
+def rejected_repair_state(count):
+    rows = [candidate(f'capability-{n}', title=f'Capability {n}') for n in range(count)]
+    for row in rows:
+        row.update(generator_receipts=[{'trace_id': 'original'}], origin_rounds=['source'])
+    return {'candidates': {r['id']: r for r in rows}, 'reviews': {
+        r['id']: {'supported': 'no', 'relation': 'unknown', 'related_id': '',
+                  'reason': 'Needs a narrower claim.', 'attempts': 1} for r in rows}}
+
+
+def test_repairs_share_thirteen_slots_and_checkpoint_before_judge(tmp_path):
+    import threading
+    import time
+    idx = index(tmp_path, docs=False)
+    state = rejected_repair_state(13)
+    coordinator = threading.get_ident()
+    barrier = threading.Barrier(13)
+    lock = threading.Lock()
+    active = peak = 0
+    durable = {}
+    def save():
+        assert threading.get_ident() == coordinator
+        with lock:
+            durable.clear()
+            durable.update(deepcopy(state))
+    def call(role, system, prompt, validate):
+        nonlocal active, peak
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0])
+        with lock:
+            active += 1
+            peak = max(peak, active)
+        try:
+            if role == 'generator':
+                barrier.wait(timeout=5)
+                row = deepcopy(payload['candidate'])
+                row['description'] = 'Only return the supplied identity.'
+                return reply(role, {'candidates': [row]})
+            row = payload['candidates'][0]
+            with lock:
+                assert _hash(durable['repair_drafts'][row['id']]['candidate']) == _hash(row)
+            time.sleep(.01)
+            return reply(role, approve([row]))
+        finally:
+            with lock:
+                active -= 1
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state=state, call=call, save=save, concurrency=13)
+    assert engine.review()
+    assert peak == 13
+    assert all(r['supported'] == 'yes' and r['attempts'] == 2 for r in state['reviews'].values())
+    assert not state['repair_drafts']
+
+
+def test_parallel_repairs_keep_three_corrections_and_deterministic_content(tmp_path):
+    from collections import Counter
+    idx = index(tmp_path, docs=False)
+    results = []
+    for concurrency in (1, 3):
+        state = rejected_repair_state(7)
+        calls = Counter()
+        def call(role, system, prompt, validate):
+            payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0])
+            row = deepcopy(payload['candidate'] if role == 'generator' else payload['candidates'][0])
+            calls[(role, row['id'])] += 1
+            if role == 'generator':
+                row['description'] += ' Corrected.'
+                return reply(role, {'candidates': [row]})
+            return reply(role, approve([row], supported='no'))
+        engine = DiscoveryEngine(idx, seeds=[], owners=[], state=state, call=call, save=lambda: None,
+                                 concurrency=concurrency)
+        assert engine.review()
+        assert all(r['attempts'] == 4 for r in state['reviews'].values())
+        assert all(calls[(role, key)] == 3 for role in ('generator', 'judge') for key in state['candidates'])
+        previous_calls = calls.copy()
+        assert engine.review() and calls == previous_calls
+        results.append(state)
+    assert results[0] == results[1]
+
+
+def test_parallel_repair_budget_stop_drains_and_resumes_durable_drafts(tmp_path, monkeypatch):
+    import threading
+    from collections import Counter
+    from concurrent.futures import wait
+    import infermatrix_copilot.kb_service.init_feature_discovery as discovery
+    idx = index(tmp_path, docs=False)
+    state = rejected_repair_state(4)
+    barrier = threading.Barrier(3)
+    save_seen = threading.Event()
+    calls = Counter()
+    def save():
+        if any(r['supported'] == 'yes' for r in state['reviews'].values()):
+            save_seen.set()
+    def budget_first(futures):
+        wait(futures)
+        return iter(sorted(futures, key=lambda f: not isinstance(f.exception(), BudgetExhausted)))
+    # Deterministically observe the budget failure before in-flight successes.
+    monkeypatch.setattr(discovery, 'as_completed', budget_first)
+    # Three already-durable drafts start independent reviews. One budget stop
+    # must preserve its draft, drain the other approvals and never dispatch #4.
+    for key, row in list(state['candidates'].items())[:3]:
+        revised = deepcopy(row); revised['description'] += ' Corrected.'
+        state.setdefault('repair_drafts', {})[key] = {'base_sha256': _hash(row), 'attempt': 2, 'candidate': revised}
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0])
+        row = payload['candidates'][0]
+        calls[(role, row['id'])] += 1
+        barrier.wait(timeout=5)
+        if row['id'] == 'capability-0':
+            raise BudgetExhausted('stop new dispatch')
+        return reply(role, approve([row]))
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state=state, call=call, save=save, concurrency=3)
+    assert not engine.review()
+    assert save_seen.is_set()
+    assert state['reviews']['capability-1']['supported'] == 'yes'
+    assert state['reviews']['capability-2']['supported'] == 'yes'
+    assert state['repair_drafts']['capability-0']['attempt'] == 2
+    assert state['reviews']['capability-0']['attempts'] == 1
+    assert not any(key == 'capability-3' for role, key in calls)
+    def resumed_call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0])
+        row = payload['candidate'] if role == 'generator' else payload['candidates'][0]
+        calls[(role, row['id'])] += 1
+        return reply(role, {'candidates': [row]} if role == 'generator' else approve([row]))
+    resumed = DiscoveryEngine(idx, seeds=[], owners=[], state=json.loads(json.dumps(state)), call=resumed_call,
+                              save=lambda: None, concurrency=3)
+    assert resumed.review()
+    assert calls[('generator', 'capability-0')] == 0
+    assert calls[('judge', 'capability-1')] == calls[('judge', 'capability-2')] == 1
+    assert all(r['supported'] == 'yes' for r in resumed.state['reviews'].values())
+
+
+def test_parallel_extraction_budget_stop_saves_other_drafts_without_judging(tmp_path, monkeypatch):
+    import threading
+    from concurrent.futures import wait
+    import infermatrix_copilot.kb_service.init_feature_discovery as discovery
+    idx = index(tmp_path, docs=False)
+    state = rejected_repair_state(4)
+    barrier = threading.Barrier(3)
+    called = []
+    def budget_first(futures):
+        wait(futures)
+        return iter(sorted(futures, key=lambda f: not isinstance(f.exception(), BudgetExhausted)))
+    monkeypatch.setattr(discovery, 'as_completed', budget_first)
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0])
+        assert role == 'generator'
+        row = payload['candidate']; called.append(row['id'])
+        barrier.wait(timeout=5)
+        if row['id'] == 'capability-0':
+            raise BudgetExhausted('stop new dispatch')
+        row['description'] += ' Corrected.'
+        return reply(role, {'candidates': [row]})
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state=state, call=call, save=lambda: None, concurrency=3)
+    assert not engine.review()
+    assert sorted(called) == ['capability-0', 'capability-1', 'capability-2']
+    assert set(state['repair_drafts']) == {'capability-1', 'capability-2'}
+    assert all(r['attempts'] == 1 for r in state['reviews'].values())
+    assert all(d['attempt'] == 2 for d in state['repair_drafts'].values())
+
+
+@pytest.mark.parametrize('failure_phase', ['generator', 'judge'])
+def test_parallel_repair_single_channel_or_content_failure_stays_local(tmp_path, failure_phase):
+    from collections import Counter
+    idx = index(tmp_path)
+    state = rejected_repair_state(5)
+    state['candidates']['capability-3']['evidence'] = [{'path': 'docs/session.md', 'start': 1, 'end': 2}]
+    state['reviews']['capability-4']['attempts'] = 4
+    calls = Counter()
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0])
+        row = payload['candidate'] if role == 'generator' else payload['candidates'][0]
+        calls[(role, row['id'])] += 1
+        if row['id'] == 'capability-0' and role == failure_phase:
+            raise ModelUnavailable('one native channel failed')
+        if role == 'generator':
+            row = deepcopy(row)
+            if row['id'] == 'capability-2':
+                row['id'] = 'wrong-id'
+            return reply(role, {'candidates': [row]})
+        return reply(role, approve([row]))
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state=state, call=call, save=lambda: None, concurrency=3)
+    assert engine.review()
+    assert state['reviews']['capability-0']['repair_blocked']
+    assert state['reviews']['capability-0']['attempts'] == 1
+    assert ('capability-0' in state.get('repair_drafts', {})) == (failure_phase == 'judge')
+    assert state['reviews']['capability-1']['supported'] == 'yes'
+    assert state['reviews']['capability-2']['attempts'] == 4
+    assert calls[('generator', 'capability-2')] == 3
+    assert not any(key in ('capability-3', 'capability-4') for role, key in calls)

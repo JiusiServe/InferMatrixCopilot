@@ -423,7 +423,7 @@ class _PrHistory(_Stage):
             return record
         prepared = save_prepared(
             InitRecord.path(rt.state_dir, record.repo, self.STAGE).with_name("pr-history-publish.json"),
-            base_sha=record.kb_base_sha, branch=f"kb/init-{record.repo}-pr-history", files=changed,
+            base_sha=record.kb_base_sha, branch=self._publication_branch(), files=changed,
             commits=commits, draft=True, title=title, body=self._body(), author=author, when=record.started_at)
         record.pr = {"prepared": str(prepared)}
         record.status = "publishing"

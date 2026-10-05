@@ -63,6 +63,8 @@ success, steps[]`。
 pr-history → harvest-calibration），每阶段一个由人合并的 PR。只由 `kb init REPO --stage S` 运行，不经 `kb serve`，不写服务账本。
 `feature-discovery` 先提取文档功能基线，再遍历固定源码与测试库存；独立评审后的目录 PR
 合并后冻结，下游核对目录哈希与源码版本。新初始化模板启用发现；旧仓库保持兼容。
+`from_existing` 可用于发现、modules 与解释性知识：缺少本地 skeleton 记录时
+核验已合并入口与 owner 页面；已有阶段记录及发现目录仍保留完成和合并门禁。
 默认 GLM‑5.3 提取、Codex 独立评审，共享并发 13；支持 `from_existing`、
 `retry_unfinished`、`budget_usd` 或 `unlimited_subscription`。未知项不增加正式功能计数，
 原生追踪归档在 Git 外。详细契约见 [`../kb_service.md`](../kb_service.md)。
