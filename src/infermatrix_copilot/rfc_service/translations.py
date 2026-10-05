@@ -8,6 +8,7 @@ import threading
 import uuid
 from collections import Counter
 from importlib.resources import files
+from functools import lru_cache
 from types import SimpleNamespace
 
 from .models import RFCError
@@ -34,13 +35,14 @@ def eligible(text):
     return isinstance(text, str) and 1 < len(text.strip()) <= 18000 and bool(re.search(r"[A-Za-z\u3400-\u9fff]", text)) and not re.fullmatch(r"https?://\S+|[A-Z_-]*\d+", text.strip())
 
 
-def source_strings(view, all_suggestions=False):
+@lru_cache(maxsize=64)
+def _body_strings(body):
+    if not body: return ()
     from markdown_it import MarkdownIt
     result = set()
     def add(text):
         if eligible(text): result.add(text.strip())
-    add(view.get("title"))
-    body = re.sub(r"<!--[\s\S]*?-->", "", view.get("body", ""))
+    body = re.sub(r"<!--[\s\S]*?-->", "", body)
     for token in MarkdownIt("commonmark", {"html": False}).enable("table").parse(body):
         if token.type == "inline":
             add("".join(child.content for child in token.children or [] if child.type in ("text", "code_inline", "image")))
@@ -49,6 +51,16 @@ def source_strings(view, all_suggestions=False):
         if token.type == "fence" and token.info.strip() == "mermaid":
             for label in re.findall(r"\b[A-Za-z_][\w-]*\[([^\]\n]*)\]", token.content): add(label.strip('"'))
             for label in re.findall(r"(?:-->|-\.->|==>)\|([^|\n]*)\|", token.content): add(label)
+    return tuple(sorted(result))
+
+
+def source_strings(view, all_suggestions=False):
+    # Cache only already-authorized Markdown text. Dynamic work/ACL fields are
+    # collected again on every read and both sides of every provider call.
+    result = set(_body_strings(view.get("body", "")))
+    def add(text):
+        if eligible(text): result.add(text.strip())
+    add(view.get("title"))
     for feature in view.get("features", []):
         add(feature.get("title")); add(feature.get("track"))
     for criterion in view.get("criteria", []):
