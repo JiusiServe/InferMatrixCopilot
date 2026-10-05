@@ -62,6 +62,14 @@ export KB_GENERATOR_FALLBACK=zcode:GLM-5.3
 因为预算只为主模型预留且 Zcode 无法执行阈值。
 调用记录位于 `$KB_STATE_DIR/traces/records/`。
 
+`KB_JUDGE` 可把评审切到其他后端（如 `zcode:GLM-5.3`，与 GPT-6 Sol 并列的受支持后端）。
+zcode 评审的 `:effort` 后缀无效——推理档位由全局 `ZCODE_REASONING_LEVEL`（默认 `max`）决定；
+zcode 无花费阈值能力，评审超时或不可解析按既有 fail-closed 语义记 `human`，绝不自动合并。
+同一后端既起草又评审（GLM 生成 + GLM 评审）时，必须显式设置 `KB_JUDGE_FAMILY_WAIVER=1`：
+每次启动记录警告，且该评审标签的校准记录必须重跑（`kb calibrate`），否则 auto_merge 保持
+`calibration_required`。评审侧的可进化面在 `kb_service/judge_tuning.py`（提示词、rubric 措辞、
+聚合策略、上下文预算）；`gate.py` 是受保护文件，只经人审 PR 变更。
+
 运行经验（来源②）：`pr_debug` 的已验证修复记录经 `KB_BUGFIX_DIR`（同机，与运行侧 `KNOWLEDGE_INTAKE_DIR`
 配为同一目录）与 `KB_BUGFIX_MAILBOX`（异机，`owner/repo#N`，只接受 `KB_BUGFIX_AUTHORS` 列出的作者）进入 intake。
 

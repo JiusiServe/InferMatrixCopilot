@@ -29,11 +29,18 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 
 ## 2026-09-28 intake 与质量门
 - `models`：生成与评审模型按 (provider, model, effort) 钉死（默认 `claude-code:claude-opus-5-5`
-  与 `codex:gpt-6-sol:medium`，评审必须与主/备用生成器不同家族）；`KB_GENERATOR_FALLBACK`
+  与 `codex:gpt-6-sol:medium`，评审必须与主/备用生成器不同家族；`KB_JUDGE_FAMILY_WAIVER=1`
+  是同后端起草+评审部署的显式操作员豁免——启动告警，且该评审标签必须重跑校准）；
+  `KB_GENERATOR_FALLBACK`
   可显式配置一个备用生成器（如 `zcode:GLM-5.3`），主模型不可用/超时/无法解析时尝试一次。
   评审、schema 修复及带花费阈值的调用均不切换（预算只为主模型预留，Zcode 无阈值能力）。
+  `KB_JUDGE=zcode:GLM-5.3` 是受支持的评审后端：zcode 的 `:effort` 后缀无效（推理档位走全局
+  `ZCODE_REASONING_LEVEL`），超时/不可解析按 fail-closed 记 `human`。
   两个生成器都失败时保持排队。每次尝试经 recorder 记录实际模型、输入、输出、用量，
   备用调用带 `fallback_from`，intake/精炼/巡检变更集注明实际生成器，重建保留原归属。
+- `judge_tuning`（2026-10-04）：评审侧唯一可进化面——两段系统提示词（含 rubric 措辞）、
+  答案→判定聚合、邻域上下文预算；`gate.py`（受保护）仅委托引用，初始值与拆出前逐字节一致，
+  候选改动经 improve 引擎配对实验 + 生产校准集双重把关。
 - `sources`：知识仓库克隆的只读读取（`knowledge_files`、`external_texts`）、只读 GitHub 客户端
   （合并 PR、PR 证据有界摘录、release/tag）、本机 Copilot 运行经验收件目录。
 - `intake`：每个事件由生成器起草类型化操作（只允许 add/edit_same_meaning/replace/retire），

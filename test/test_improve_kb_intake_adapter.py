@@ -47,8 +47,9 @@ def test_declaration_is_tier2_and_repo_neutral():
     decl = load_declarations()["kb-intake.draft"]
     assert decl.tier2 and decl.kind == "static" and decl.unit == "step_call"
     assert decl.item_key == "{repo}#{pr}"
-    assert {"prompts": ["kb_service/intake.py"]} in decl.fingerprint_covers
-    assert {"routing": ["KB_GENERATOR", "KB_DRAFT_STRATEGY", "ZCODE_REASONING_LEVEL"]} in decl.fingerprint_covers
+    assert {"prompts": ["kb_service/intake.py", "kb_service/judge_tuning.py"]} in decl.fingerprint_covers
+    assert {"routing": ["KB_GENERATOR", "KB_DRAFT_STRATEGY", "ZCODE_REASONING_LEVEL",
+                        "KB_JUDGE", "KB_JUDGE_FAMILY_WAIVER"]} in decl.fingerprint_covers
     adapter = load_adapter(decl.outcome_adapter)
     assert isinstance(adapter, KbIntakeAdapter) and not adapter.descriptive_only
 
@@ -65,7 +66,8 @@ def test_fingerprint_is_complete_on_default_settings_and_moves_with_the_knobs():
     assert manifest["covers"]["routing"]["KB_GENERATOR"] == "claude-code:claude-opus-5-5"
     fp2, _ = compute(decl, settings, environ={**base_env, "KB_DRAFT_STRATEGY": "v2"})
     fp3, _ = compute(decl, settings, environ={**base_env, "ZCODE_REASONING_LEVEL": "high"})
-    assert len({fp1, fp2, fp3}) == 3
+    fp4, _ = compute(decl, settings, environ={**base_env, "KB_JUDGE": "zcode:GLM-5.3"})
+    assert len({fp1, fp2, fp3, fp4}) == 4
 
 
 def test_gold_roundtrip_versioning_and_refusals(tmp_path):

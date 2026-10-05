@@ -22,6 +22,11 @@ export TRACE_STORE_ROOT=/srv/copilot/traces
 export ECO_MODEL=YOUR_PINNED_API_MODEL
 # 可选：明确指定同一个进化模型。
 # export IMPROVE_EVOLVE_MODEL=YOUR_PINNED_API_MODEL
+# 仅 gold 评估模式（improve_evaluation_mode=gold）需要另钉判官；objective 模式不用判官。
+# gold 模式判官可为 api:<model> 或 cli:<cursor|codex|claude|zcode>:<model>；cli:zcode 经生产
+# ZCodeTransport 的 tool-less 一次性调用执行（与 kb 质量门同一工具：空 scratch 目录、
+# 移除全部原生工具、容器审计、served-model 断言），订阅计费只计判官调用次数，USD 记 0。
+# export IMPROVE_JUDGE=cli:zcode:GLM-5.3
 
 infermatrix-copilot improve workflows list
 infermatrix-copilot improve workflows prepare --workflow all
