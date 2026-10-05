@@ -24,9 +24,8 @@ from ..knowledge_service.l1 import Block
 from ..knowledge_service.lifecycle import Page
 from ..knowledge_service.ops import page_over_capacity
 from ..knowledge_service.pinned_claims import check_rules, evidence_for
-from ..profiles.languages import suffixes
 from .init_budget import BudgetExhausted
-from .init_coverage import Owner, make_include
+from .init_coverage import Owner
 from .init_stages import _Chain, _Stage, _numbered, _one_line, _page_frontmatter, neutral_headings
 from .init_support import InitRecord, classify_verdict, generate, judge
 from .init_knowledge_inputs import SYSTEM_KNOWLEDGE, knowledge_prompt, source_owner, source_owners
@@ -98,9 +97,10 @@ class _Knowledge(_Stage):
         return _Chain(key=f"existing:{self._base_sha}", problems=problems)
 
     def _precheck(self) -> list[str]:
-        from .knowledge_coverage import load_policy, policy_path
+        from .knowledge_coverage import load_policy
 
-        text = self.rt.knowledge.show(self._base_sha, policy_path(self.lifecycle.repo))
+        path = self._coverage_policy_path()
+        text = self.overlay.get(path) or self.rt.knowledge.show(self._base_sha, path)
         if text:
             try:
                 policy = load_policy(text, self.repo_dir)
@@ -116,9 +116,8 @@ class _Knowledge(_Stage):
         return []
 
     def _input_options(self) -> dict:
-        from .knowledge_coverage import policy_path
-
-        text = self.rt.knowledge.show(self._base_sha, policy_path(self.lifecycle.repo)) or ""
+        path = self._coverage_policy_path()
+        text = self.overlay.get(path) or self.rt.knowledge.show(self._base_sha, path) or ""
         return {"knowledge_policy": hashlib.sha256(text.encode()).hexdigest(),
                 "from_existing": self.from_existing, "knowledge_prompt_version": 3}
 
@@ -127,20 +126,15 @@ class _Knowledge(_Stage):
             return self._blocked(["knowledge needs owner routes: run and merge skeleton and modules first"])
         if any(not o.path.startswith(self.repo_dir + "/") for o in self.owners):
             return self._blocked(["knowledge owner pages must belong to this repository"])
-        if not suffixes(self._language()):
-            return self._blocked(["knowledge needs a supported adapter repo.language"])
-        include = make_include(self.lifecycle.init.source_roots, self.lifecycle.init.exclude,
-                               tuple(s for lang in ("python", "rust", "go", "javascript") for s in suffixes(lang)))
+        from .feature_discovery_index import build_for_stage
+
+        self.source_index = build_for_stage(tree, self)
         files: dict[str, list[str]] = {}
         unrouted = []
         policy = getattr(self, "coverage_policy", None)
-        if policy is not None:
-            from .knowledge_coverage import inventory
-
-            paths = inventory(tree, policy)
-        else:
-            paths = [file.relative_to(tree).as_posix() for file in sorted(tree.rglob("*"))
-                     if file.is_file() and include(file.relative_to(tree).as_posix())]
+        paths = list(self.source_index.production)
+        for failure in self.source_index.failures:
+            self.record.checklist.append(f"source index {failure['path']}: {failure['operation']} failed; retained as unknown")
         routes = self.owners
         owners = source_owners(paths, routes, policy)
         self.owners = list(owners.values())
@@ -236,9 +230,10 @@ class _Knowledge(_Stage):
         if not any(n.startswith("knowledge stopped:") for n in self.record.notes):
             self.record.notes.append(f"knowledge stopped: all {len(order)} source owners visited; "
                                      f"{len(missing)} facets remain unsupported or stale")
-        from .knowledge_coverage import add_contract_pages, audit_coverage, load_policy, matches, policy_path
+        from .knowledge_coverage import add_contract_pages, audit_coverage, load_policy, matches
 
-        policy_text = self.rt.knowledge.show(self._base_sha, policy_path(self.lifecycle.repo))
+        policy_path_ = self._coverage_policy_path()
+        policy_text = self.overlay.get(policy_path_) or self.rt.knowledge.show(self._base_sha, policy_path_)
         if policy_text:
             try:
                 policy = load_policy(policy_text, self.repo_dir)
@@ -255,8 +250,8 @@ class _Knowledge(_Stage):
                          if p.is_file() and matches(p.relative_to(tree).as_posix(), feature.source_globs)]
                 source = self._sources(tree, list(dict.fromkeys(list(feature.entry_points) + sorted(paths))), MAX_SOURCE_BYTES)
                 docs = self._sources(tree, list(feature.docs), MAX_DOC_BYTES)
-                if not source or not docs:
-                    self.record.unfinished.append(f"feature {feature.id}: missing source or documentation")
+                if not source:
+                    self.record.unfinished.append(f"feature {feature.id}: missing readable source")
                     continue
                 offered = {f["path"]: f["end"] for f in source + docs}
                 missing_facets = targets["features"]["items"][feature.id]["missing_facets"] or list(FACETS)
@@ -312,7 +307,10 @@ class _Knowledge(_Stage):
             source = tree / path
             if not source.is_file() or source.is_symlink():
                 continue  # a feature policy may still name an entry removed at this pin
-            raw = source.read_text(encoding="utf-8", errors="replace")
+            try:
+                raw = source.read_text(encoding="utf-8")
+            except (OSError, UnicodeError):
+                continue  # shared inventory records unreadable inputs explicitly
             if not raw.strip():
                 continue
             text = _numbered(raw, max(0, limit - used))
@@ -327,7 +325,9 @@ class _Knowledge(_Stage):
                 break
             text = "\n".join(numbered)
             end = len(numbered)
-            out.append({"path": path, "text": text, "end": end, "total_lines": len(original)})
+            from .feature_discovery_index import language_for
+            out.append({"path": path, "text": text, "end": end, "total_lines": len(original),
+                        "language": language_for(path)})
             used += len(text.encode("utf-8"))
         return out
 
@@ -340,11 +340,19 @@ class _Knowledge(_Stage):
         # the shared skeleton excerpt can end before this component's guide.
         if not hasattr(self, "_doc_index"):
             self._doc_index = []
-            for file in doc_files(tree, self.lifecycle.init.doc_globs):
+            shared = getattr(self, "source_index", None)
+            candidates = [tree / path for path in shared.docs] if shared else doc_files(tree, self.lifecycle.init.doc_globs)
+            for file in candidates:
                 if file.is_symlink():
                     continue
-                with file.open("rb") as stream:
-                    excerpt = stream.read(MAX_DOC_BYTES).decode("utf-8", "replace").lower()
+                if shared:
+                    entry = shared.entries[file.relative_to(tree).as_posix()]
+                    if entry["status"] != "ready":
+                        continue
+                    excerpt = entry["text"].lower()
+                else:
+                    with file.open("rb") as stream:
+                        excerpt = stream.read(MAX_DOC_BYTES).decode("utf-8", "replace").lower()
                 self._doc_index.append((file.relative_to(tree).as_posix(), file.stem.lower(), excerpt))
         for path, stem, excerpt in self._doc_index:
             adjacent = any(path.startswith(prefix) for prefix in owner.prefixes)

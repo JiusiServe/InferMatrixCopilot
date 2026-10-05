@@ -313,7 +313,7 @@ def test_policy_run_generates_contracts_and_reports_partial_feature_knowledge(wo
     lambda p: p["core"].update(target=0),
     lambda p: p["core"].update(target=True),
     lambda p: p["core"].update(roots=["../private"]),
-    lambda p: p["core"].update(suffixes=[".unknown"]),
+    lambda p: p["core"].update(suffixes=[".unsafe/extension"]),
     lambda p: p["core"].update(filenames=["../LICENSE"]),
     lambda p: p.update(catalog_sources=["../catalog.md"]),
     lambda p: p["features"].append(p["features"][0]),
@@ -324,3 +324,36 @@ def test_bad_denominators_and_cross_repository_features_are_rejected(mutation):
     mutation(data)
     with pytest.raises(ValueError):
         load_policy(yaml.safe_dump(data), "repos/demo")
+
+
+def test_source_only_feature_can_be_extracted_and_covered_without_documentation(world):
+    import json
+    from infermatrix_copilot.kb_service.init_knowledge import SYSTEM_KNOWLEDGE
+
+    gateway = KnowledgeGateway()
+    _chain(world, gateway)
+    data = _policy_data()
+    data["core"]["roots"] = ["pkg/", "tools/"]
+    data["features"][0].update(owner="tooling", source_globs=["tools/lint/y.py"], docs=[],
+                               page="repos/toy/components/tooling/feature-demo.md")
+    _commit(world["origin"], {policy_path("toy"): yaml.safe_dump(data)}, "source-only feature policy")
+    gateway.calls.clear()
+    record = run_stage(_runtime(world, gateway), _modules_lifecycle(), "knowledge", dry_run=True)
+    assert record.status == "dry_run", record.problems
+    payloads = [json.loads(c["prompt"].split("\n", 1)[1].rsplit("</untrusted_data>", 1)[0])
+                for c in gateway.calls if c["system"] == SYSTEM_KNOWLEDGE]
+    feature = next(payload for payload in payloads if payload["owner"] == "feature-demo")
+    assert feature["docs"] == [] and feature["files"][0]["path"] == "tools/lint/y.py"
+    target = record.coverage["knowledge"]["targets"]["features"]["items"]["demo"]
+    assert not target["documentation_required"] and target["doc_requirement_met"]
+    assert not target["doc_evidence"]  # optional documentation does not become claimed evidence
+
+
+def test_source_only_feature_coverage_does_not_require_a_document_citation(coverage_world):
+    from dataclasses import replace
+    tree, original = coverage_world
+    policy = replace(original, features=(replace(original.features[0], docs=()),))
+    source_only = _feature_page().replace(f", [usage](https://github.com/o/demo/blob/{PIN}/docs/usage.md#L1-L3)", "")
+    report = audit_coverage({PAGE: source_only}, tree, policy, full_name="o/demo", pin=PIN)
+    target = report["features"]["items"]["demo"]
+    assert target["covered"] and target["doc_requirement_met"] and not target["doc_evidence"]

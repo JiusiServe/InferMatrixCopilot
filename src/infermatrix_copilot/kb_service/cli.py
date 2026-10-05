@@ -16,8 +16,9 @@
     kb export --out FILE [--role judge|generator]                   dataset (calibration-safe)
     kb init REPO --stage STAGE [--dry-run] [--pin SHA]
                                       bootstrap a repository's knowledge base, one
-                                      human-merged stage at a time (skeleton, modules,
-                                      knowledge, deepen, pr-history, harvest-calibration);
+                                      human-merged stage at a time (skeleton,
+                                      feature-discovery, modules, knowledge, deepen,
+                                      pr-history, harvest-calibration);
                                       never touches kb.db
     kb init REPO --suggest-seeds      rank existing knowledge pages worth seeding from (no model call)
     kb widen REPO [--dry-run]         enrich existing feature and file knowledge
@@ -117,8 +118,8 @@ def _init_command(args, state_dir: Path) -> int:
     if args.suggest_seeds == bool(args.stage):
         print("kb init: pass exactly one of --stage or --suggest-seeds", file=sys.stderr)
         return 2
-    if args.unlimited_subscription and (args.stage != "knowledge-deepen" or args.budget_usd is not None):
-        print("--unlimited-subscription is for knowledge-deepen only and conflicts with --budget-usd", file=sys.stderr)
+    if args.unlimited_subscription and (args.stage not in ("feature-discovery", "knowledge-deepen") or args.budget_usd is not None):
+        print("--unlimited-subscription is for feature-discovery or knowledge-deepen only and conflicts with --budget-usd", file=sys.stderr)
         return 2
     if args.suggest_seeds:
         from .init_stages import suggest_seeds
@@ -145,8 +146,8 @@ def _init_command(args, state_dir: Path) -> int:
             return 2
         params["acceptance_mode"] = args.acceptance_mode
     if args.from_existing:
-        if args.stage not in ("knowledge", "knowledge-deepen"):
-            print("--from-existing is for --stage knowledge or knowledge-deepen only", file=sys.stderr)
+        if args.stage not in ("feature-discovery", "knowledge", "knowledge-deepen"):
+            print("--from-existing is for feature-discovery, knowledge or knowledge-deepen only", file=sys.stderr)
             return 2
         params["from_existing"] = "true"
     if args.subscription_generator:
@@ -154,8 +155,8 @@ def _init_command(args, state_dir: Path) -> int:
     if args.unlimited_subscription:
         params["unlimited_subscription"] = "true"
     if args.retry_unfinished:
-        if args.stage != "knowledge-deepen":
-            print("--retry-unfinished is for knowledge-deepen only", file=sys.stderr)
+        if args.stage not in ("feature-discovery", "knowledge-deepen"):
+            print("--retry-unfinished is for feature-discovery or knowledge-deepen only", file=sys.stderr)
             return 2
         params["retry_unfinished"] = "true"
     if args.pr_count is not None:
@@ -166,8 +167,8 @@ def _init_command(args, state_dir: Path) -> int:
     if args.budget_usd is not None:
         import math
 
-        if args.stage not in ("pr-history", "knowledge-deepen") or not math.isfinite(args.budget_usd) or args.budget_usd <= 0:
-            print("--budget-usd is a finite positive ceiling for pr-history or knowledge-deepen", file=sys.stderr)
+        if args.stage not in ("feature-discovery", "pr-history", "knowledge-deepen") or not math.isfinite(args.budget_usd) or args.budget_usd <= 0:
+            print("--budget-usd is a finite positive ceiling for feature-discovery, pr-history or knowledge-deepen", file=sys.stderr)
             return 2
         params["budget_usd"] = str(args.budget_usd)
     outcome, run_dir = run_playbook(Settings(), "kb-init", args.repo, state_dir=state_dir, params=params)
@@ -220,18 +221,18 @@ def main(argv: list[str] | None = None) -> int:
 
     init.add_argument("--stage", choices=STAGES + INDEPENDENT_STAGES)
     init.add_argument("--pr-count", type=int, help="PR-history window (default: adapter pr_history_count or 1000)")
-    init.add_argument("--budget-usd", type=float, help="incremental history/depth cumulative ceiling; may be raised to resume")
+    init.add_argument("--budget-usd", type=float, help="incremental discovery/history/depth cumulative ceiling; may be raised to resume")
     init.add_argument("--dry-run", action="store_true",
                       help="write the tree and PR body under the state directory instead of opening a PR")
     init.add_argument("--pin", help="upstream commit to pin (default: the default branch head)")
     init.add_argument("--suggest-seeds", action="store_true")
     init.add_argument("--from-existing", action="store_true",
-                      help="enrich a merged KB without local skeleton/modules records (knowledge stages)")
+                      help="enrich a merged KB without local skeleton/modules records (discovery and knowledge stages)")
     init.add_argument("--subscription-generator", action="store_true",
                       help="explicit subscription generator; unreported fees outside stage USD accounting")
     init.add_argument("--unlimited-subscription", action="store_true",
-                      help="uncapped knowledge-deepen with authenticated subscription generator and judge; no fallback")
-    init.add_argument("--retry-unfinished", action="store_true", help="retry missing depth facets, preserving prior spend")
+                      help="uncapped discovery/depth with authenticated subscription generator and judge; no fallback")
+    init.add_argument("--retry-unfinished", action="store_true", help="retry unfinished discovery/depth work, preserving prior spend")
     init.add_argument("--acceptance-mode", choices=("strict", "lightweight"), default="strict",
                       help="depth recognition standard; lightweight uses pinned citations and one independent feature review")
     for name, stage in (("widen", "knowledge"), ("deepen", "knowledge-deepen")):

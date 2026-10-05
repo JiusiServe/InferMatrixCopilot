@@ -1,6 +1,6 @@
 # providers/codex.py —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-05 -->
 
 `LOC ~197 · harness transport（ChatGPT 订阅） · refactor-status: ok`
 
@@ -18,6 +18,9 @@ subscription_billing 只认可当前 CLI 明确报告 ChatGPT 登录、默认 op
 布尔状态不代表已测得零费用。
 配置读取、登录探测和实际执行使用同一 `sanitized_env()` 与有效 HOME；被过滤的
 `CODEX_HOME` 不得使检查与执行落在不同认证目录。
+`supports_native_events = True`；`complete(native_event_sink=...)` 将 `_run` 解析的全部
+JSONL 事件按原顺序封装为 `{"type": "native.codex.event", "payload": 原事件}` 后交给归档器。
+事件在进程退出或超时后批量转发，属于缓冲归档，不是运行期间的实时流；最终文本和用量解析保持一致。
 
 ## 不变量（**C1**、**C2**）
 - **控制手段是沙箱，不是工具列表。** Codex 无法关闭自己的原生 shell，所以容纳靠 OS 级的
@@ -27,8 +30,7 @@ subscription_billing 只认可当前 CLI 明确报告 ChatGPT 登录、默认 op
 - `_tool_activity` 是尽力而为的活动日志，**明确不是审计** —— 强制点是沙箱。
   不要让调用方把它当审计用。
 - `complete()` 在一个空的临时 cwd 里无工具运行，所以一次性调用**根本够不到仓库**。
-- `auth_gap()` 会报出 ChatGPT 登录缺口：这个后端**仅经离线测试**（开发机没有登录），
-  readiness 必须如实说出来，而不是暗示它已被验证。
+- `auth_gap()` 如实报告当前认证缺口；离线测试不代表调用环境已经通过原生预检。
 
 ## 边界 —— 不属于这里
 不发明沙箱策略（CLI 的 flag 就是契约）；不编造用量。
@@ -37,8 +39,8 @@ subscription_billing 只认可当前 CLI 明确报告 ChatGPT 登录、默认 op
 stdlib + `.base` + `..agent_loop.AgentOutcome` + `..llm` 的类型。
 
 ## 测试
-`test_provider_codex.py`（离线；实网路径**按设计未经验证** —— 见
-`doc/features/provider-registry.md` 里的状态说明）。
+`test_provider_codex.py` 使用离线假 CLI，覆盖完整事件归档、工具事件、最终回复及用量。
+实际环境的原生预检与运行结果由各批次报告记录。
 
 ## 重构备注
 **不要**把 `_tool_activity` "改进"成审计：`providers/audit.py` 的存在正是为了那些没有

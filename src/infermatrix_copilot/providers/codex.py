@@ -45,6 +45,7 @@ class CodexTransport(HarnessTransport):
     """codex CLI (exec mode) as a Strict backend."""
 
     spec = PROVIDERS["codex"]
+    supports_native_events = True
 
     @property
     def subscription_billing(self) -> bool:
@@ -212,9 +213,11 @@ class CodexTransport(HarnessTransport):
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
                  role: str = "", effort: str = "",
-                 max_budget_usd: float | None = None) -> Reply:
+                 max_budget_usd: float | None = None, native_event_sink=None) -> Reply:
         """Tool-less one-shot in an empty scratch cwd (read-only sandbox +
-        nothing to read = contained)."""
+        nothing to read = contained). Native events are buffered by ``_run``
+        and forwarded in order after the process exits, rather than streamed
+        live during execution."""
         import tempfile
 
         with tempfile.TemporaryDirectory(prefix="imc-codex-oneshot-") as td:
@@ -222,6 +225,9 @@ class CodexTransport(HarnessTransport):
                 flatten_messages(system, messages), cwd=td,
                 timeout_s=self.settings.strict_backend_timeout_s, model=model,
                 effort=effort)
+        if native_event_sink is not None:
+            for event in events:
+                native_event_sink({"type": "native.codex.event", "payload": event})
         usage = self._usage(events)
         text = self._final_text(events)
         return Reply(

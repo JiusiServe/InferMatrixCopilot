@@ -146,19 +146,58 @@ def declaration(line: str, language: str) -> str:
     return text
 
 
-def scan_modules(tree: Path, init, language: str, record: InitRecord) -> dict[str, dict]:
-    """The modules of the pinned tree (design §7.1); a missing or unknown
-    language scans nothing and says so on the record's checklist."""
-    from ..profiles.establish import scan_modules_at_depth
+def modules_from_index(index, init) -> dict[str, dict]:
+    """Group the shared inventory by directory, independent of repo.language."""
+    from ..profiles.establish import normalize_root
 
-    if not language:
-        record.checklist.append("the adapter declares no repo.language: modules were not scanned")
-        return {}
-    modules = scan_modules_at_depth(tree, language, source_roots=init.source_roots,
-                                    depth=init.module_depth, min_loc=init.min_module_loc, exclude=init.exclude)
+    roots = sorted({normalize_root(r) for r in index.identity["scope"]["roots"]}, key=lambda r: (-len(r), r))
+    if "" in roots:
+        roots = [""]
+    modules, root_keys = {}, set()
+    for path in index.production:
+        root = next((r for r in roots if not r or path == r or path.startswith(r + "/")), "")
+        # Source scopes can name a single build/entry file as well as a directory.
+        if path == root:
+            root = PurePosixPath(path).parent.as_posix()
+            root = "" if root == "." else root
+        root_key = root + "/" if root else ROOT_MODULE
+        root_keys.add(root_key)
+        relative = path[len(root) + 1:] if root else path
+        parts = PurePosixPath(relative).parts[:-1]
+        key = (root + "/" if root else "") + "".join(p + "/" for p in parts[:init.module_depth])
+        entry = modules.setdefault(key or ROOT_MODULE, {"files": [], "loc": 0})
+        entry["files"].append(path)
+        entry["loc"] += sum(bool(line.strip()) for line in index.entries[path]["lines"])
+    folding = True
+    while folding:
+        folding = False
+        for key in sorted(modules, key=lambda k: (-k.count("/"), k)):
+            parent = PurePosixPath(key.rstrip("/")).parent.as_posix()
+            parent = ROOT_MODULE if parent == "." else parent + "/"
+            if key in root_keys or parent == key or modules[key]["loc"] >= init.min_module_loc:
+                continue
+            entry = modules.pop(key)
+            target = modules.setdefault(parent, {"files": [], "loc": 0})
+            target["files"].extend(entry["files"])
+            target["loc"] += entry["loc"]
+            folding = True
+            break
+    return {key: {"files": sorted(entry["files"]), "loc": entry["loc"]} for key, entry in sorted(modules.items())}
+
+
+def scan_modules(tree: Path, init, language: str, record: InitRecord) -> dict[str, dict]:
+    """Scan every declared source file; language is a compatibility hint only."""
+    from .feature_discovery_index import build_discovery_index, discovery_scope
+    import subprocess
+
+    pin = record.pin
+    if (tree / ".git").exists():
+        pin = subprocess.check_output(["git", "-C", str(tree), "rev-parse", "HEAD"], text=True).strip()
+    index = build_discovery_index(tree, pin=pin or "0" * 40, scope=discovery_scope(init),
+                                  doc_globs=init.doc_globs)
+    modules = modules_from_index(index, init)
     if not modules:
-        roots = ", ".join(init.source_roots) or "the repository root"
-        record.checklist.append(f"no {language} source files under {roots}: no module to map")
+        record.checklist.append("no production source files under the declared roots: no module to map")
     return modules
 
 
@@ -272,10 +311,11 @@ class _Modules(_Stage):
             self.routes["owners"] = []    # "owners:" left empty (null) is an empty table
         language = self._language()
         modules = self._scan(tree, language)
-        before = module_coverage(modules, _owners(self.routes))
         self.all_files = sorted({f for m in modules.values() for f in m["files"]})
-        leftovers = self._absorb(modules, before.uncovered)
         self.root, self.groups = self._groups()
+        self._discovery_owners()
+        before = module_coverage(modules, _owners(self.routes))
+        leftovers = self._absorb(modules, before.uncovered)
         cards: list[_Card] = []
         for index, key in enumerate(leftovers):
             if index >= MAX_CARDS:
@@ -308,7 +348,43 @@ class _Modules(_Stage):
 
     # -- modules -----------------------------------------------------------------
     def _scan(self, tree: Path, language: str) -> dict[str, dict]:
-        return scan_modules(tree, self.lifecycle.init, language, self.record)
+        from .feature_discovery_index import build_for_stage
+
+        self.source_index = build_for_stage(tree, self)
+        for failure in self.source_index.failures:
+            self.record.checklist.append(f"source index {failure['path']}: {failure['operation']} failed; retained as unknown")
+        return modules_from_index(self.source_index, self.lifecycle.init)
+
+    def _discovery_owners(self) -> None:
+        """Materialize reviewed new owner IDs without letting a card rename them."""
+        report = self._discovery_catalog() if hasattr(self, "_discovery_catalog") else {}
+        new_groups = []
+        for request in report.get("owner_requests", []):
+            name = request.get("owner", "")
+            if not isinstance(name, str) or not _SLUG.fullmatch(name):
+                raise InitError("discovery owner request needs a stable safe owner ID")
+            if any(o.get("owner") == name for o in self.routes["owners"]):
+                continue
+            index = f"{self.repo_dir}/components/{name}/{INDEX_NAME}"
+            if self.root != f"{self.repo_dir}/components":
+                raise InitError("discovery owner creation needs a components entry page; restore the navigation first")
+            from .knowledge_coverage import matches
+            paths = [p for p in self.all_files if matches(p, request.get("source_paths", []))]
+            if not paths:
+                self.record.unfinished.append(f"discovery owner {name}: no indexed source files")
+                continue
+            title = _one_line(request.get("title") or name)
+            if index not in self.head:
+                text = _page_frontmatter(title, kind="index", today=self.today, tags=self.tags)
+                features = [f for f in report.get("features", []) if f.get("owner") == name]
+                text += "\n".join(f"- {_one_line(f.get('title') or f['id'])} (`{f['id']}`)" for f in features) + "\n"
+                self.head[index] = text
+                new_groups.append((title, f"{name}/{INDEX_NAME}"))
+            self.groups[name] = {"index": index, "title": title, "new": False}
+            self.routes["owners"].append({"owner": name, "path": index, "signals": [name.replace("-", " ")],
+                                           "scope_prefixes": list(dict.fromkeys(paths))})
+        if new_groups:
+            self._link_groups(new_groups)
 
     def _cover(self, key: str, modules: dict[str, dict], owner: str | None = None) -> list[str]:
         """Prefixes for the module's own files no owner routes yet, to be added
@@ -378,15 +454,17 @@ class _Modules(_Stage):
         from ..profiles.languages import symbol_re
 
         files = list(module["files"])
-        pattern = symbol_re(language)
         listed, used = [], 0
         for rel in files[:MAX_CARD_FILES]:
             try:
                 text = (tree / rel).read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            entry = {"path": rel,
-                     "signatures": [declaration(m.group(0), language)[:160]
+            from .feature_discovery_index import language_for
+            file_language = language_for(rel)
+            pattern = symbol_re(file_language)
+            entry = {"path": rel, "language": file_language,
+                     "signatures": [declaration(m.group(0), file_language)[:160]
                                     for m in pattern.finditer(text)][:MAX_SIGNATURES_PER_FILE] if pattern else [],
                      "doc": _leading_doc(text)}
             size = len(json.dumps(entry, ensure_ascii=False).encode("utf-8"))

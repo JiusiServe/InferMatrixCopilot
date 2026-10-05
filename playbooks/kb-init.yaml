@@ -1,4 +1,4 @@
-# kb init for ONE repository: one stage per run (skeleton, then modules, optional knowledge, then
+# kb init for ONE repository: one stage per run (skeleton, optional feature-discovery, then modules, optional knowledge, then
 # deepen + lifecycle flip, then pr-history, then harvest-calibration), each opened as a
 # human-merged PR (design kb-init v3). Runs outside the knowledge service: it
 # never writes the service ledger. Candidate.
@@ -13,15 +13,15 @@ repos: []
 requires: []
 params:
   repo: "knowledge repository name"
-  stage: "skeleton | modules | knowledge | deepen | pr-history | harvest-calibration | knowledge-deepen (independent)"
+  stage: "skeleton | feature-discovery | modules | knowledge | deepen | pr-history | harvest-calibration | knowledge-deepen (independent)"
   dry_run: "true (default): write the tree and PR body locally; false needs ALLOW_PUSH=1 and ALLOW_POST=1"
   pin: "upstream commit to pin (default: the default branch head)"
   pr_count: "pr-history only: merged upstream PRs to replay (default: adapter pr_history_count or 1000)"
-  budget_usd: "pr-history/depth: cumulative spend ceiling; increasing it resumes the same pinned batch"
-  from_existing: "explanatory knowledge: enrich a merged index and owner routes without local earlier-stage records"
-  retry_unfinished: "knowledge-deepen only: retry unsupported facets while retaining accepted work and cumulative spend"
+  budget_usd: "discovery/pr-history/depth: cumulative spend ceiling; increasing it resumes the same pinned batch"
+  from_existing: "discovery/explanatory knowledge: enrich a merged index and owner routes without local earlier-stage records"
+  retry_unfinished: "feature-discovery/knowledge-deepen: retry unfinished work while retaining accepted work and cumulative spend"
   subscription_generator: "explicit subscription backend; generator USD unreported, fees outside stage USD accounting"
-  unlimited_subscription: "knowledge-deepen only: authenticated Zcode GLM-5.3 generator and independent Codex subscription judge without fixed accounting ceiling; incompatible with budget_usd"
+  unlimited_subscription: "feature-discovery/knowledge-deepen: authenticated Zcode GLM-5.3 generator and independent Codex subscription judge without fixed accounting ceiling; incompatible with budget_usd"
 steps:
   - {id: init, step: knowledge.init}
 success: the stage's PR is open or its complete dry run is written; an unmet required semantic target returns partial or blocked
@@ -35,3 +35,11 @@ retrieval_acceptance:
   command: "PYTHONPATH=src python tools/audit_review_retrieval.py --repo <repo> --report <eval-report.json>"
   checks: "catalog description+path probes receive bounded feature prose; paths-only ambiguity is reported separately"
   meaning: "context delivery only; report breadth, checked depth, missing facets and real PR quality separately"
+feature_discovery:
+  after: skeleton
+  before: modules
+  opt_in: knowledge_lifecycle.init.feature_discovery_required
+  rounds: "documentation baseline -> source expansion -> independent review -> catalog PR -> merged catalog freeze"
+  models: "default Zcode GLM-5.3 extraction / Codex independent review; shared concurrency 13"
+  compatibility: "legacy explicit catalogs remain usable until discovery is enabled or started"
+  reporting: "processed declared inventory does not prove all features were found; unknown does not count as implemented"

@@ -217,16 +217,16 @@ def test_an_adapter_missing_at_the_base_blocks_the_modules_stage(world):
     assert not [c for c in gateway.calls if c["system"] == SYSTEM_CARD]
 
 
-def test_no_language_means_no_scan_and_an_empty_stage(world):
+def test_no_language_still_scans_per_file_and_routes_modules(world):
     _commit(world["upstream"], TOOLS, "tools")        # the adapter still declares no language
     _skeleton(world)
     gateway = CardGateway()
     record = run_stage(_runtime(world, gateway), _modules_lifecycle(), "modules", dry_run=True)
-    assert record.status == "empty"
-    assert any("no repo.language" in item for item in record.checklist)
-    assert not [c for c in gateway.calls if c["system"] == SYSTEM_CARD]
-    # a later dry run still chains through an empty stage
-    assert InitRecord.load(_runtime(world).state_dir, "toy", "modules").status == "empty"
+    assert record.status == "dry_run", record.problems
+    assert not any("no repo.language" in item for item in record.checklist)
+    assert [c for c in gateway.calls if c["system"] == SYSTEM_CARD]
+    assert record.coverage["modules"]["after"] == 1
+    assert InitRecord.load(_runtime(world).state_dir, "toy", "modules").status == "dry_run"
 
 
 def test_routes_append_only_catches_rewrites():

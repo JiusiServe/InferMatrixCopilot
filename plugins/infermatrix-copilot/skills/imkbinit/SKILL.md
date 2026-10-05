@@ -1,6 +1,6 @@
 ---
 name: imkbinit
-description: Bootstrap a repository's InferMatrixCopilot knowledge base with `kb init`, one reviewed stage at a time (skeleton, modules, knowledge, deepen, pr-history, harvest-calibration). Use when the user invokes /imkbinit or $imkbinit, asks to initialise or onboard a repository's knowledge base, or wants the next kb init stage or an existing knowledge base widened or deepened.
+description: Bootstrap a repository's InferMatrixCopilot knowledge base with `kb init`, one reviewed stage at a time (skeleton, feature-discovery, modules, knowledge, deepen, pr-history, harvest-calibration). Use when the user invokes /imkbinit or $imkbinit, asks to initialise or onboard a repository's knowledge base, or wants the next kb init stage or an existing knowledge base widened or deepened.
 ---
 
 # InferMatrix knowledge-base init
@@ -56,10 +56,20 @@ prints them, and makes no model call).
 
 ## 2. Find the next stage
 
-Stages run in this order: `skeleton` → `modules` → `knowledge` → `deepen` →
+Stages run in this order: `skeleton` → `feature-discovery` → `modules` → `knowledge` → `deepen` →
 `pr-history` → `harvest-calibration`. The record of each stage is
 `<state-dir>/init/<repo>/<stage>.json`, where the state dir is `--state-dir`,
 else `$KB_STATE_DIR`, else `~/.infermatrix-copilot/kb`.
+
+The [new-repository template](../../../../doc/architecture/templates/kb-init-new-repository.yaml)
+sets `init.feature_discovery_required: true`; configure its scope and documentation
+paths for the repository, retaining the adapter's existing publication permissions.
+Existing adapters keep discovery optional until explicitly enabled or started.
+When the flag is false and no discovery record exists, omit `feature-discovery`
+from next-stage selection. Once a discovery batch starts, finish it before
+later stages. Its preview must have `discovery.done: true`; publishing requires
+the catalog PR to be merged. Existing batches must not silently change their
+frozen feature denominator.
 
 Which stages count as done depends on the mode of this invocation:
 
@@ -128,6 +138,18 @@ these are missing instead of setting them. Then run the command without
 What each stage opens:
 
 - `skeleton`: the map, the doc invariants and the seeds.
+- `feature-discovery`: derive a feature baseline from existing document bodies,
+  then inspect all declared source/test regions for additional capabilities.
+  Zcode GLM-5.3 extracts and independent Codex reviews with shared concurrency 13.
+  `KB_DISCOVERY_GENERATOR`, `KB_DISCOVERY_JUDGE` and `KB_DISCOVERY_CONCURRENCY`
+  override the stage configuration; discovery rejects same-family review.
+  `--from-existing` checks merged skeleton routes, while `--retry-unfinished`
+  resumes supported work. `--budget-usd` controls cumulative accounting;
+  `--unlimited-subscription` authenticates both roles and removes that ceiling.
+  Publish only the adapter's feature catalog and compact report under `eval/`.
+  Unknown candidates and failed reads remain visible; a completed scan is not
+  proof that every repository capability was found. Full native traces remain
+  outside Git. Merge the catalog PR before breadth or deepen uses its frozen IDs.
 - `modules`: one map card for every unrouted module.
 - `knowledge`: evidence-backed architecture, API contracts, configuration,
   design tradeoffs, feature relationships and validation for each source owner.

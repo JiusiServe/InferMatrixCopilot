@@ -30,6 +30,7 @@ _INIT_KEYS = {
     "seeds", "doc_globs", "source_roots", "exclude", "module_depth", "min_module_loc",
     "pr_window", "coverage_target", "budget_usd", "judge_call_usd",
     "generator_call_usd", "harness_overhead_bytes", "pr_history_count",
+    "feature_discovery_required",
 }
 # README* + docs/**/*.md is what profiles/establish.build_doc_corpus reads;
 # the contribution and agent guides carry most cross-doc invariants.
@@ -74,6 +75,8 @@ class InitConfig:
     # bytes its own harness adds to the prompt (for the one-request overshoot bound)
     generator_call_usd: float = 2.0
     harness_overhead_bytes: int = 200_000
+    # Additive opt-in: existing adapters and stage records retain their chain.
+    feature_discovery_required: bool = False
 
 
 @dataclass(frozen=True)
@@ -203,6 +206,8 @@ def parse_init(section: object, where: str, *, repo: str, manifest: dict) -> Ini
         generator_call_usd=generator_call,
         harness_overhead_bytes=_int(data.get("harness_overhead_bytes", 200_000),
                                     f"{where}.harness_overhead_bytes", minimum=0),
+        feature_discovery_required=_bool(data.get("feature_discovery_required", False),
+                                         f"{where}.feature_discovery_required"),
     )
 
 
