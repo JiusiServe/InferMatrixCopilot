@@ -204,3 +204,43 @@ class RFCClient:
 
     def export(self, rfc_id: str, format: str = "json") -> dict[str, Any]:
         return self.dispatch("rfcs.export", {"rfc_id": rfc_id, "format": format})
+
+    def chat_create(self, rfc_id: str, *, title: str = "") -> dict[str, Any]:
+        return self.dispatch("chat.create", {"rfc_id": rfc_id, "title": title})
+
+    def chat_list(self, rfc_id: str, *, offset: int = 0, limit: int = 50) -> dict[str, Any]:
+        return self.dispatch("chat.list", {"rfc_id": rfc_id, "offset": offset, "limit": limit})
+
+    def chat_get(self, thread_id: str, *, before: int = 0, limit: int = 50) -> dict[str, Any]:
+        return self.dispatch("chat.get", {"thread_id": thread_id, "before": before, "limit": limit})
+
+    def chat_send(self, thread_id: str, message: str, *, idempotency_key: str,
+                  language: str = "en", **context: Any) -> dict[str, Any]:
+        """Queue a round immediately; read its normalized events and final proposal."""
+        return self.dispatch("chat.send", {**context, "thread_id": thread_id,
+            "message": message, "language": language, "idempotency_key": idempotency_key})
+
+    def chat_events(self, thread_id: str, *, cursor: int = 0, limit: int = 50) -> dict[str, Any]:
+        return self.dispatch("chat.events", {"thread_id": thread_id, "cursor": cursor, "limit": limit})
+
+    def chat_cancel(self, job_id: str) -> dict[str, Any]:
+        return self.dispatch("chat.cancel", {"job_id": job_id})
+
+    def chat_retry(self, job_id: str) -> dict[str, Any]:
+        return self.dispatch("chat.retry", {"job_id": job_id})
+
+    def chat_preview(self, proposal_id: str) -> dict[str, Any]:
+        return self.dispatch("chat.proposals.preview", {"proposal_id": proposal_id})
+
+    def chat_apply(self, proposal_id: str, *, candidate_digest: str,
+                   reason: str = "", draft_digest: str | None = None) -> dict[str, Any]:
+        payload = {"proposal_id": proposal_id, "candidate_digest": candidate_digest, "reason": reason}
+        if draft_digest is not None:
+            payload["draft_digest"] = draft_digest
+        return self.dispatch("chat.proposals.apply", payload)
+
+    def chat_reject(self, proposal_id: str) -> dict[str, Any]:
+        return self.dispatch("chat.proposals.reject", {"proposal_id": proposal_id})
+
+    def chat_delete(self, thread_id: str) -> dict[str, Any]:
+        return self.dispatch("chat.delete", {"thread_id": thread_id})

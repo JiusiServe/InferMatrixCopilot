@@ -502,6 +502,12 @@ def build_mcp(
         does not establish publication: read operations.get to its terminal state.
         Use rfcs.status next_actions for actionable implementation and acceptance
         work; a merged PR alone does not establish feature acceptance.
+        Private RFC conversations use chat.create/list/get/send/events/cancel/retry.
+        chat.send returns a durable job immediately; poll events or get for the
+        validated answer. Review chat.proposals.preview, then explicitly confirm
+        chat.proposals.apply with its exact candidate_digest. Existing sources
+        are synchronized by a separate operation; unsourced drafts stay local.
+        Chat cannot pass acceptance or waive criteria.
         """
         return rfc_call(action, payload)
 

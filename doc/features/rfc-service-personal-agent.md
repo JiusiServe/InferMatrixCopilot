@@ -34,10 +34,19 @@ HttpOnly、Secure、SameSite 会话，API/MCP 使用个人 Bearer 令牌。
 纳管用户的有效凭据与当前权限；凭据过期、撤销或角色被收回时，状态为
 `requires_reauthorization`，维护者须重新纳管。普通用户不需要部署端平台令牌。
 
+聊天通过独立 Zcode GLM-5.3-Flash 队列运行，服务最多两轮并发；对话按用户、仓库和
+RFC 隔离。确认提案后先保存候选，再为已有来源排队 `rfcs.update_source`；来源冲突
+或失败不会丢弃候选，重新审阅同时显示当前来源与候选版本的差异。来源更新未确认时
+普通核验保留候选正文，关联 PR 的状态仍可刷新。`wm-7074` 上线回归只读取页面，
+真实模型和来源写回使用专用测试 RFC。
+
 ## 回滚
 
-先停止 `infermatrix-rfc.service`，通过 SQLite backup API 恢复迁移输出的
-`backup_path`，再启动服务。不要直接覆盖仍有写入进程的 SQLite/WAL 文件。
+先停止 `infermatrix-rfc.service` 和其他前台 worker，检查 pending/running/uncertain
+来源操作是否已经对外写入。用 SQLite backup API 保存当前数据库，再回滚程序和配置；
+新增聊天表、会话、提案和已保存候选应保留。出现来源写回后不能盲目恢复较早数据库，
+需要先核对远端结果和本地操作记录。仅无后续写入的初次迁移可直接恢复迁移生成的
+`backup_path`。不要直接覆盖仍有写入进程的 SQLite/WAL 文件。
 机器迁移或从备份恢复时，先停止旧写入方；数据库的 workspace ID 会保留，
 复制数据库并同时启动两个独立部署不属于允许的写入拓扑。
 

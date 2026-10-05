@@ -125,6 +125,7 @@ def test_login_shell_contains_no_rfc_data_and_assets_are_allowlisted():
         assert b"markdown-it 15.0.2" in parser
         assert b'/roadmap-markdown.js' in raw
         assert request(server, "GET", "/roadmap-graph.mjs")[0] == 200
+        assert request(server, "GET", "/roadmap-chat.mjs")[0] == 200
         assert request(server, "GET", "/roadmap-mermaid.js")[0] == 200
         assert request(server, "GET", "/style.css")[0] == 200
         assert request(server, "GET", "/models.py")[0] == 401

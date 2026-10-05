@@ -2,7 +2,7 @@
 
 <!-- verified-against: 2026-10-05 -->
 
-`LOC ~2890（8 个实现模块） · 可移植 RFC 应用与接口 · refactor-status: ok`
+`可移植 RFC 应用、授权工作台与受限 Agent · refactor-status: ok`
 
 ## 职责
 
@@ -28,14 +28,17 @@
 | `http` | 固定资源列表、会话、同源 HTTP 传输及受保护的旧 roadmap 路由 |
 | `cli` | 独立服务命令、用户请求、文件交换、前台 worker 与显式迁移入口 |
 | `migration` | 旧 Personal-Agent 跟踪状态的只读比较、备份和幂等 sidecar 导入 |
+| `chat` | 私有会话、独立任务租约、受限模型工具、完整候选提案与校验 |
+| `translations` | 受权限过滤的双语缓存、独立队列与隔离 GLM 调用 |
 
 ## 公开契约
 
 - `RFCService(state_dir, providers=None, roots=None, clock=...)`；
   `bootstrap_admin`、`authenticate`、`dispatch`、`process_pending`、`sync_due`；
-  `build_service(state_dir, config_path=None)` 从执行主机配置构建提供方。
+  `build_service(state_dir, config_path=None)` 从执行主机配置构建提供方及可选模型适配器；
+  `ChatService.dispatch/process` 管理独立聊天能力，服务可注入 `chat_agent`。
 - `dispatch(principal, action, payload)` 是所有业务入口的共享授权点。动作族包含
-  `users.*`、`tokens.*`、`grants.set`、`repositories.*`、`sources.preview`、
+  `users.*`、`tokens.*`、`grants.set`、`repositories.*`、`sources.preview`、`chat.*`、
   `rfcs.*`、`operations.*`、`audit.list`、`service.settings/configure`。
 - `rfcs.get` / JSON export 返回完整的可见记录；`rfcs.status` 返回去掉源正文和候选
   列表的紧凑进度；`rfcs.suggestions` 按可见候选分页，limit 为 1–100。
@@ -48,6 +51,29 @@
   只有显式 apply 才备份并导入；返回的绝对备份路径属于本地 operator 结果。
 
 ## 不变量
+
+- **私有聊天与明确编辑。** 会话绑定用户、仓库和 RFC；历史、事件、工具上下文及
+  提案读取重查当前所有权、RFC 和来源权限。独立 SQLite 队列在服务内最多运行两轮，
+  每个会话一轮，模型 I/O 在事务外执行。Zcode GLM-5.3-Flash 通过隔离 complete
+  调用受应用控制的查询/提案工具，每轮最多四次调用和 180 秒；取消、撤权、过期租约
+  和重启均不能提交迟到结果。历史按最近 20 条及字符预算裁剪，明确告知裁剪。
+  审计和通用操作结果不包含聊天正文或原始模型事件。
+
+- **提案版本绑定。** 原文替换锚点、来源行范围和稳定任务 ID 组成候选；服务校验
+  依赖、角色、RFC revision、手工草稿摘要和完整候选摘要。人工编辑也进入预览与确认，
+  用户确认后一次事务保存并为已有来源创建 `rfcs.update_source` 操作。无来源草稿
+  不自动发布。未涉及的正文、内部注释、人工删除、证据和决策历史保留；模型不能
+  宣布实现完成、验收通过或豁免。设计与条件修改使相关验证失效。
+
+- **持久来源写回。** 等待、失败或结果不确定的写回保护已保存正文，后台仍可更新
+  关联实现观察。写前重查身份、来源版本和候选摘要，写后读回；重试先核对远端结果，
+  避免重复写入。已知冲突保留候选并要求重新审阅，不自动覆盖远端。页面分开显示
+  已保存、等待同步、已同步和来源冲突；任务 sidecar 不写进上游正文。
+
+- **持久聊天界面。** 侧栏在页面内容容器之外，编辑弹窗复用同一面板，移动端全屏。
+  导航、局部刷新和语言切换保留输入、历史、滚动及任务；来源上下文使用未清理原文。
+  发送语言决定回答语言，记录与差异不自动翻译；章节/节点/任务/条件有讨论入口。
+  聊天更新不得重建现有 SVG 或丢失未提交草稿。
 
 - **轻量交互。** `view=summary/detail` 为可选投影；默认 SDK 与导出契约保持完整。
   建议由授权分页接口读取。来源权限索引只存活于当前事务，撤销后重新计算。
@@ -138,7 +164,8 @@
 ## 依赖（允许）
 
 应用、状态、提供方、HTTP 与迁移使用 stdlib 和包内模块。CLI 用户动作通过 RFC SDK；
-SDK 自身的惰性导入、版本校验和本地/HTTP 选择属于 SDK 契约。HTTP 资源通过
+SDK 自身的惰性导入、版本校验和本地/HTTP 选择属于 SDK 契约。可选聊天与翻译适配器
+在启用时惰性导入现有 ZCodeTransport，默认应用不加载模型依赖。HTTP 资源通过
 `importlib.resources` 从同一 wheel 读取。核心不反向依赖 MCP、模型配置或顶层 CLI。
 
 ## 扩展点
@@ -150,7 +177,8 @@ SDK 自身的惰性导入、版本校验和本地/HTTP 选择属于 SDK 契约�
 ## 测试
 
 `test_rfc_application.py`、`test_rfc_providers.py`、`test_rfc_http.py`、
-`test_rfc_integration.py`、`test_rfc_security.py`、`test_rfc_migration.py`。
+`test_rfc_integration.py`、`test_rfc_security.py`、`test_rfc_migration.py`、
+`test_rfc_chat.py`、`test_rfc_chat_integration.py`、`test_rfc_source_updates.py`。
 提供方测试使用注入 transport；多页 GET 预算、恢复不完整、opaque ID、角色区分、
 本地路径与原子文件更新均有护栏。迁移测试验证原文、历史身份、重复 apply、备份恢复
 和失败回滚；接口测试覆盖失效凭据、ACL、紧凑状态和行尾交换。

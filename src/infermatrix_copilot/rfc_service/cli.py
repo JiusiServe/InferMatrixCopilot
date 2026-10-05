@@ -80,6 +80,12 @@ def _parser() -> argparse.ArgumentParser:
     mode.add_argument("--watch", action="store_true")
     sync.add_argument("--interval", type=float, default=30)
     sync.add_argument("--limit", type=int, default=10)
+    chat_worker = commands.add_parser("chat-worker", help="Execute authorized chat jobs in the local workspace")
+    chat_mode = chat_worker.add_mutually_exclusive_group()
+    chat_mode.add_argument("--once", action="store_true")
+    chat_mode.add_argument("--watch", action="store_true")
+    chat_worker.add_argument("--interval", type=float, default=1)
+    chat_worker.add_argument("--limit", type=int, default=1)
     operation = commands.add_parser("operation")
     operation.add_argument("operation_id")
     operations = commands.add_parser("operations")
@@ -104,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     state = Path(args.state_dir).expanduser() if args.state_dir else Path.home() / ".infermatrix-copilot" / "rfc"
     try:
         command = args.command
-        if command in {"bootstrap-admin", "serve"} or (command == "sync" and not args.rfc_id):
+        if command in {"bootstrap-admin", "serve", "chat-worker"} or (command == "sync" and not args.rfc_id):
             if service_url:
                 raise RFCClientError("This command requires local state; use --local explicitly")
             from .application import build_service
@@ -117,6 +123,16 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             if args.interval <= 0:
                 raise ValueError("interval must be positive")
+            if command == "chat-worker":
+                if args.limit < 1:
+                    raise ValueError("limit must be positive")
+                if not service.chat.enabled:
+                    raise RFCClientError("Chat is not enabled in this execution workspace", code="chat_disabled")
+                while True:
+                    _print({"chat": [service.chat.process() for _ in range(args.limit)]})
+                    if not args.watch:
+                        return 0
+                    time.sleep(args.interval)
             if command == "sync":
                 if args.limit < 1:
                     raise ValueError("limit must be positive")
@@ -138,6 +154,7 @@ def main(argv: list[str] | None = None) -> int:
                     stop.wait(args.interval)
             thread = None
             translation_thread = None
+            chat_threads = []
             if not args.no_worker:
                 thread = threading.Thread(target=worker, daemon=True)
                 thread.start()
@@ -153,6 +170,18 @@ def main(argv: list[str] | None = None) -> int:
                             stop.wait(1 if result["processed"] else 5)
                     translation_thread = threading.Thread(target=translate_worker, daemon=True)
                     translation_thread.start()
+                if service.chat.enabled:
+                    def chat_worker_loop():
+                        while not stop.is_set():
+                            try:
+                                service.chat.process()
+                            except Exception:
+                                print("RFC chat unavailable; inspect the authenticated conversation status", file=sys.stderr)
+                            stop.wait(1)
+                    for index in range(2):
+                        chat_thread = threading.Thread(target=chat_worker_loop, name=f"rfc-chat-{index}", daemon=True)
+                        chat_thread.start()
+                        chat_threads.append(chat_thread)
             print(f"RFC service: {server.public_url}", flush=True)
             try:
                 server.serve_forever()
@@ -163,6 +192,8 @@ def main(argv: list[str] | None = None) -> int:
                     thread.join(timeout=2)
                 if translation_thread:
                     translation_thread.join(timeout=2)
+                for chat_thread in chat_threads:
+                    chat_thread.join(timeout=2)
             return 0
         client = RFCClient(state_dir=state, service_url=service_url,
                            token=os.environ.get(args.token_env, ""), config_path=args.config)

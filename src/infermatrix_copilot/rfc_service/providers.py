@@ -344,24 +344,31 @@ class _HTTPProvider:
             raise ProviderError("Multiple publications carry the operation marker", uncertain=True)
         return found[0] if found else None
 
-    def update_source(self, ref: SourceRef, body: str, expected_revision: str) -> dict[str, Any]:
-        if ref.kind != "issue":
-            raise RFCError("Managed RFC updates require an issue source")
+    def update_source(self, ref: SourceRef, body: str, expected_revision: str, *, title: str | None = None) -> dict[str, Any]:
+        if ref.kind not in ("issue", "pr", "pull_request"):
+            raise RFCError("Managed RFC updates require an issue or pull request source")
         current = self.get_source(ref)
         if current["revision"] != expected_revision:
             raise RFCError("RFC changed before the update", 409, "source_conflict")
         if not isinstance(body, str) or len(body.encode("utf-8")) > MAX_DOCUMENT_BYTES:
             raise RFCError("RFC body exceeds the document size limit")
         owner, repo = self._repo(ref.repository)
-        route = f"/repos/{quote(owner)}/{quote(repo)}/issues/{self._number(ref.identifier, ref.kind)}"
+        desired_title = current["title"] if title is None else _title(title)
+        resource = "pulls" if ref.kind in ("pr", "pull_request") else "issues"
+        route = f"/repos/{quote(owner)}/{quote(repo)}/{resource}/{self._number(ref.identifier, ref.kind)}"
         payload = {"body": body}
-        if self.name == "atomgit":
+        if title is not None:
+            payload["title"] = desired_title
+        if self.name == "atomgit" and ref.kind == "issue":
             route = f"/repos/{quote(owner)}/issues/{self._number(ref.identifier, ref.kind)}"
-            payload.update(repo=repo, title=current["title"])
+            payload.update(repo=repo, title=desired_title)
         # This is a read/check/write guard, not a claim of provider-side atomic CAS.
         self._json("PATCH", route, payload=payload)
-        result = self.get_source(ref)
-        if result["body"] != body or result["title"] != current["title"]:
+        try:
+            result = self.get_source(ref)
+        except RFCError:
+            raise ProviderError("RFC update readback could not confirm the source", uncertain=True) from None
+        if result["body"] != body or result["title"] != desired_title:
             raise RFCError("RFC update readback differs; reconcile the source", 409, "source_conflict")
         return result
 
@@ -609,7 +616,7 @@ class LocalProvider:
             raise ProviderError("Multiple local publications carry the operation marker", uncertain=True)
         return found[0] if found else None
 
-    def update_source(self, ref: SourceRef, body: str, expected_revision: str) -> dict[str, Any]:
+    def update_source(self, ref: SourceRef, body: str, expected_revision: str, *, title: str | None = None) -> dict[str, Any]:
         current = self.get_source(ref)
         if ref.kind in ("commit", "git_commit"):
             raise RFCError("Git commits cannot be rewritten by the RFC provider")
@@ -618,6 +625,11 @@ class LocalProvider:
         if not isinstance(body, str) or len(body.encode("utf-8")) > MAX_DOCUMENT_BYTES:
             raise RFCError("RFC body exceeds the document size limit")
         path = ref.path or ref.identifier
+        if title is not None:
+            heading = re.search(r"^#\s+(.+)$", body, re.M)
+            body_title = heading[1] if heading else PurePosixPath(path).stem
+            if body_title != _title(title):
+                raise RFCError("The reviewed local RFC title must match its Markdown heading", 409, "preview_mismatch")
         with self._parent(ref.repository, path) as (parent, leaf, target):
             temporary = ".imrfc-" + secrets.token_hex(16) + ".tmp"
             kwargs = {"dir_fd": parent} if parent is not None else {}
@@ -639,8 +651,11 @@ class LocalProvider:
                     os.unlink(temp_path, **kwargs)
                 except FileNotFoundError:
                     pass
-        result = self.get_source(ref)
-        if result["body"] != body:
+        try:
+            result = self.get_source(ref)
+        except RFCError:
+            raise ProviderError("Local RFC update readback could not confirm the source", uncertain=True) from None
+        if result["body"] != body or (title is not None and result["title"] != title):
             raise RFCError("Local RFC update readback differs", 409, "source_conflict")
         return result
 

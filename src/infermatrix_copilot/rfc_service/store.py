@@ -16,12 +16,20 @@ CREATE TABLE IF NOT EXISTS repositories(id TEXT PRIMARY KEY, name TEXT NOT NULL,
 CREATE TABLE IF NOT EXISTS repository_grants(repo_id TEXT NOT NULL REFERENCES repositories(id), user_id TEXT NOT NULL REFERENCES users(id), role TEXT NOT NULL, PRIMARY KEY(repo_id,user_id));
 CREATE TABLE IF NOT EXISTS rfcs(id TEXT PRIMARY KEY, repo_id TEXT NOT NULL REFERENCES repositories(id), title TEXT NOT NULL, body TEXT NOT NULL, revision TEXT NOT NULL, source TEXT NOT NULL DEFAULT '{}', model TEXT NOT NULL, enrolled INTEGER NOT NULL DEFAULT 0, restricted INTEGER NOT NULL DEFAULT 0, created_by TEXT NOT NULL REFERENCES users(id), updated REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS rfc_grants(rfc_id TEXT NOT NULL REFERENCES rfcs(id), user_id TEXT NOT NULL REFERENCES users(id), role TEXT NOT NULL, PRIMARY KEY(rfc_id,user_id));
-CREATE TABLE IF NOT EXISTS source_snapshots(id INTEGER PRIMARY KEY, rfc_id TEXT NOT NULL REFERENCES rfcs(id), revision TEXT NOT NULL, body TEXT NOT NULL, created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS source_snapshots(id INTEGER PRIMARY KEY, rfc_id TEXT NOT NULL REFERENCES rfcs(id), revision TEXT NOT NULL, body TEXT NOT NULL, created REAL NOT NULL, title TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, actor TEXT NOT NULL REFERENCES users(id), credential_id TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL, repo_id TEXT NOT NULL, rfc_id TEXT NOT NULL DEFAULT '', payload TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_digest TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', result TEXT NOT NULL DEFAULT '{}', error TEXT NOT NULL DEFAULT '', created REAL NOT NULL, updated REAL NOT NULL, worker TEXT NOT NULL DEFAULT '', lease_until REAL NOT NULL DEFAULT 0, UNIQUE(actor,idempotency_key));
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, actor TEXT NOT NULL, action TEXT NOT NULL, repo_id TEXT NOT NULL DEFAULT '', rfc_id TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '{}', created REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS operations_pending ON operations(status,lease_until,created);
 CREATE TABLE IF NOT EXISTS translations(scope TEXT NOT NULL, segment TEXT NOT NULL, language TEXT NOT NULL, source TEXT NOT NULL, translated TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', credential_id TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', attempts INTEGER NOT NULL DEFAULT 0, retry_at REAL NOT NULL DEFAULT 0, lease_until REAL NOT NULL DEFAULT 0, worker TEXT NOT NULL DEFAULT '', updated REAL NOT NULL, PRIMARY KEY(scope,segment,language));
 CREATE INDEX IF NOT EXISTS translations_pending ON translations(status,retry_at,lease_until,updated);
+CREATE TABLE IF NOT EXISTS chat_threads(id TEXT PRIMARY KEY, actor TEXT NOT NULL REFERENCES users(id), repo_id TEXT NOT NULL REFERENCES repositories(id), rfc_id TEXT NOT NULL REFERENCES rfcs(id), title TEXT NOT NULL DEFAULT '', visibility TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS chat_messages(id INTEGER PRIMARY KEY, thread_id TEXT NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE, job_id TEXT NOT NULL DEFAULT '', role TEXT NOT NULL, content TEXT NOT NULL, created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS chat_jobs(id TEXT PRIMARY KEY, thread_id TEXT NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE, credential_id TEXT NOT NULL REFERENCES tokens(id), payload TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_digest TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', result TEXT NOT NULL DEFAULT '{}', error TEXT NOT NULL DEFAULT '', worker TEXT NOT NULL DEFAULT '', lease_until REAL NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0, created REAL NOT NULL, updated REAL NOT NULL, UNIQUE(thread_id,idempotency_key));
+CREATE INDEX IF NOT EXISTS chat_jobs_pending ON chat_jobs(status,lease_until,created);
+CREATE TABLE IF NOT EXISTS chat_leases(worker TEXT PRIMARY KEY, job_id TEXT NOT NULL, thread_id TEXT NOT NULL, lease_until REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS chat_events(id INTEGER PRIMARY KEY, thread_id TEXT NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE, job_id TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL, data TEXT NOT NULL DEFAULT '{}', created REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS chat_events_thread ON chat_events(thread_id,id);
+CREATE TABLE IF NOT EXISTS chat_proposals(id TEXT PRIMARY KEY, thread_id TEXT NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE, job_id TEXT NOT NULL REFERENCES chat_jobs(id) ON DELETE CASCADE, status TEXT NOT NULL DEFAULT 'proposed', proposal TEXT NOT NULL, candidate TEXT NOT NULL, candidate_digest TEXT NOT NULL, reason TEXT NOT NULL, result TEXT NOT NULL DEFAULT '{}', created REAL NOT NULL, updated REAL NOT NULL);
 """
 
 
@@ -38,7 +46,11 @@ class Store:
         try:
             con.execute("PRAGMA journal_mode=WAL")
             con.executescript(SCHEMA)
+            con.execute("BEGIN IMMEDIATE")
+            if "title" not in {row[1] for row in con.execute("PRAGMA table_info(source_snapshots)")}:
+                con.execute("ALTER TABLE source_snapshots ADD COLUMN title TEXT NOT NULL DEFAULT ''")
             con.execute("INSERT OR IGNORE INTO metadata VALUES ('schema_version','1')")
+            con.commit()
         finally:
             con.close()
         try:
@@ -93,7 +105,10 @@ class Store:
                 WHERE (o.status='pending' OR (o.status='running' AND o.lease_until<?))
                 AND NOT EXISTS (SELECT 1 FROM operations x WHERE x.id!=o.id
                     AND x.status='running' AND x.lease_until>=?
-                    AND ((o.rfc_id!='' AND x.rfc_id=o.rfc_id) OR (o.rfc_id='' AND x.repo_id=o.repo_id)))
+                    AND ((o.rfc_id!='' AND x.rfc_id=o.rfc_id) OR (o.rfc_id='' AND x.repo_id=o.repo_id)
+                        OR (o.kind='rfcs.update_source' AND x.kind='rfcs.update_source'
+                            AND (o.repo_id=x.repo_id OR (COALESCE(json_extract(o.payload,'$.source_lock'),'')!=''
+                                AND json_extract(o.payload,'$.source_lock')=json_extract(x.payload,'$.source_lock'))))))
                 ORDER BY o.created,o.id LIMIT 1""", (now, now)).fetchone()
             if not row:
                 return None

@@ -304,6 +304,85 @@ policy. Changing source refresh frequency does not change the worker tick.
 Provider credentials, filesystem roots and public endpoints remain operator
 configuration.
 
+## Private RFC chat and reviewed edits
+
+The RFC workbench includes a collapsible right-hand Zcode Agent panel, with a
+full-screen panel on phones. Sections, roadmap nodes, tasks and criteria provide
+discussion entries using stable identifiers and original source line ranges.
+The same panel moves into the source editor; unsaved manual edits are included
+in its context and in the complete candidate reviewed before saving. Page refresh,
+task updates and language changes preserve the conversation and editor input.
+Conversations are private to the authenticated user, repository and RFC, survive
+sign-out and restart, and can be deleted by their owner. Readers may discuss;
+editing uses the existing contributor/maintainer rules.
+
+Enable the isolated GLM adapter on a host with a logged-in Zcode CLI:
+
+```json
+{"chat":{"enabled":true,"backend":"zcode","model":"GLM-5.3-Flash","reasoning":"low","cli":"/path/to/zcode","timeout_seconds":180}}
+```
+
+`serve` runs two independent chat workers, separate from source reconciliation
+and translation. Each conversation runs one round at a time. A round makes at
+most four model calls within 180 seconds; model I/O never holds a database
+transaction. With `serve --no-worker`, use `chat-worker --watch` in a separate
+process, or `chat-worker --once` for a single cycle. Worker claims, execution
+leases, cancellation and authorization checks fence late or revoked results.
+The UI polls normalized job status once a second and displays the final reply
+only after validation. Recent context is bounded to 20 messages and a character
+budget; a truncation notice is included when history is shortened. Platform
+credentials and unrestricted repository tools are never given to the model.
+
+The edit flow is **chat → proposal → source and plan diff → confirm once**.
+The service validates raw-text replacement anchors, stable task IDs, dependencies,
+current permissions and source/editor versions. A proposal cannot invent merged
+implementation, passing evidence, acceptance or waivers. Diff text, conversation
+history and source Markdown are not passed through page translation. Answers use
+the send-time language; source edits preserve its language unless translation is
+explicitly requested. A changed editor or RFC requires a new proposal/review.
+
+Confirmation saves the exact complete candidate, including manual edits, and
+creates a durable `rfcs.update_source` operation for an existing source. Drafts
+without a source remain unpublished. Task/acceptance metadata stays in the
+workspace; only source title/body is written upstream. The source indicator
+separates saved, waiting to synchronize, synchronized and source conflict.
+Pending or failed writeback protects the saved body from background refresh,
+while linked PR observations can still update. Execution rechecks permission and
+source version, then reads back the write; uncertain results are reconciled before
+retry. Provider APIs do not supply an atomic compare-and-swap guarantee. Known
+conflicts preserve the candidate and require a fresh review.
+
+All transports use the same actions under `/api/v1/actions/`: `chat.create`,
+`chat.list`, `chat.get`, `chat.send`, `chat.events`, `chat.cancel`, `chat.retry`,
+`chat.delete`, and `chat.proposals.preview/apply/reject`. Sending returns a job ID
+immediately. Messages and events are paginated; every read rechecks thread
+ownership and current RFC/source access. Audit records contain operation identity
+and status, never private transcript or raw model events.
+
+```python
+from infermatrix_copilot.sdk.v1 import RFCClient
+
+client = RFCClient.from_env()
+thread = client.chat_create("RFC_ID")["thread"]
+queued = client.chat_send(thread["id"], "Explain the remaining work",
+                          idempotency_key="discuss-once", language="en")
+print(client.chat_events(thread["id"]))
+# After a validated proposal exists, review it before explicit confirmation:
+# preview = client.chat_preview("PROPOSAL_ID")
+# client.chat_apply("PROPOSAL_ID", candidate_digest=preview["candidate_digest"],
+#                   reason=preview["proposal"]["reason"])
+```
+
+CLI and Copilot MCP use `request chat.send --data FILE` and
+`rfc_request("chat.send", payload)` with the host's configured user credential.
+They do not bypass review, authorize model tools independently, or choose another
+workspace when the configured remote is unavailable.
+
+Before deployment, back up the installed program, operator configuration and
+SQLite with its backup API. Before rollback, stop all workers and inspect in-flight
+source operations; preserve the new chat tables and candidate bodies. Never
+restore an older database blindly after an upstream write.
+
 ## SDK, MCP and remote workspaces
 
 ```python

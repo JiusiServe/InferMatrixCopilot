@@ -25,4 +25,4 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install -e '.[dev]'
-      - run: python -m pytest test/test_rfc_application.py test/test_rfc_providers.py test/test_rfc_http.py test/test_rfc_integration.py test/test_rfc_security.py test/test_rfc_migration.py test/test_rfc_graph.py test/test_rfc_markdown.py test/test_rfc_components.py test/test_rfc_translations.py
+      - run: python -m pytest test/test_rfc_application.py test/test_rfc_providers.py test/test_rfc_http.py test/test_rfc_integration.py test/test_rfc_security.py test/test_rfc_migration.py test/test_rfc_graph.py test/test_rfc_markdown.py test/test_rfc_components.py test/test_rfc_translations.py test/test_rfc_chat.py test/test_rfc_chat_web.py test/test_rfc_chat_integration.py test/test_rfc_source_updates.py

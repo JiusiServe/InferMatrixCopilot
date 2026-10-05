@@ -3,6 +3,7 @@ import {graphModels, graphSource, roadmapSVGStyles} from "/roadmap-graph.mjs";
 import {displayMarkdown} from "/roadmap-markdown-display.mjs";
 import {projectRFC, outcomeModel} from "/roadmap-components.mjs";
 import {currentLanguage, localizeText, setTranslations, applyLocale, initializeLocale, changeLanguage} from "/roadmap-locale.mjs";
+import {createChat, draftDigest} from "/roadmap-chat.mjs";
 const markdown = window.markdownit({html: false, linkify: true});
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 
@@ -50,15 +51,18 @@ let activeGraphs = null;
 let activeRFC = null;
 let activeContent = null;
 let activeEditor = null;
+const editorDrafts = new Map();
 let busyOperations = 0;
+let chat;
 
 function closeFeatureDialog() {
   if (featureDialog) { featureDialog.close(); featureDialog.remove(); featureDialog = null; }
 }
 function closeRFCEditor(discard = false) {
   if (!activeEditor) return;
+  chat?.mount();
   if (activeEditor.dialog.open) activeEditor.dialog.close();
-  if (discard) { activeEditor.dialog.remove(); activeEditor = null; }
+  if (discard) { editorDrafts.delete(activeEditor.id); activeEditor.dialog.remove(); activeEditor = null; }
 }
 function rememberGraphViewport() {
   if (!activeGraphs?.wrapper.isConnected) return;
@@ -92,7 +96,9 @@ function graphDetails(rfc, node, model) {
   const dialog = element("dialog", {class: "graph-details", "aria-label": `${node.title} 的工作详情`});
   featureDialog = dialog;
   const close = button("关闭", () => closeFeatureDialog());
-  dialog.append(element("div", {class: "panel-title"}, element("h2", {}, node.title), close));
+  dialog.append(element("div", {class: "panel-title"}, element("h2", {}, node.title), element("div", {class: "actions"}, button("讨论这个节点", () => {
+    closeFeatureDialog(); discussRFC(rfc, graphSelection(rfc, node, model));
+  }), close)));
   if (node.feature) {
     const criteria = (rfc.criteria || []).filter(criterion => {
       const related = criterion.feature_ids || criterion.features || (criterion.feature_id ? [criterion.feature_id] : []);
@@ -174,6 +180,9 @@ function notice(message, error = false) {
 function signedOut() {
   closeFeatureDialog();
   closeRFCEditor(true);
+  for (const editor of editorDrafts.values()) editor.dialog.remove();
+  editorDrafts.clear();
+  chat?.reset();
   activeGraphs = null;
   activeRFC = null;
   activeContent = null;
@@ -205,9 +214,73 @@ async function api(path, options = {}) {
   }
   return value;
 }
-const compactActions = new Set(["rfcs.draft", "rfcs.import", "rfcs.update", "rfcs.work", "rfcs.decision", "rfcs.acl"]);
+const compactActions = new Set(["rfcs.draft", "rfcs.import", "rfcs.update", "rfcs.work", "rfcs.decision", "rfcs.acl", "chat.proposals.apply"]);
 const action = (name, payload = {}) => api(`/api/v1/actions/${encodeURIComponent(name)}`, {method: "POST", body: JSON.stringify({...payload, ...((compactActions.has(name) || name === "rfcs.suggestions") ? {language: currentLanguage()} : {}), ...(compactActions.has(name) ? {view: "detail"} : {})})});
 const getRFC = (id) => api(`/api/v1/rfcs/${encodeURIComponent(id)}?view=detail&language=${currentLanguage()}`);
+function editorDraft(id) {
+  const editor = editorDrafts.get(id);
+  if (!editor?.dirty) return null;
+  const form = editor.dialog.querySelector("form");
+  return {title: form.elements.title.value, body: form.elements.body.value};
+}
+function featureSelection(rfc, id, title) {
+  const sections = rfcContent(rfc).projection.featureSections[id] || [];
+  return {feature_id: rfc.features?.some(feature => feature.id === id) ? id : undefined, title,
+    ...(sections.length ? {start_line: sections[0].startLine, end_line: sections.at(-1).subtreeEndLine || sections.at(-1).endLine, section_id: sections[0].id} : {})};
+}
+function graphSelection(rfc, node, model) {
+  const selection = featureSelection(rfc, node.id, node.title);
+  if (selection.start_line) return selection;
+  const diagrams = [...String(rfc.body || "").matchAll(/```mermaid\s*\n([\s\S]*?)```/g)].filter(match => /^\s*(?:flowchart|graph)\s+(?:LR|RL|TD|TB|BT)\b/.test(match[1]));
+  const diagramIndex = activeGraphs?.models.indexOf(model), match = diagrams[diagramIndex] || diagrams.find(match => match[1].includes(node.id));
+  if (match) {
+    const start = rfc.body.slice(0, match.index).split(/\r?\n/).length;
+    Object.assign(selection, {start_line: start, end_line: start + match[0].split(/\r?\n/).length - 1, graph_node_id: node.id, diagram_index: diagrams.indexOf(match)});
+  }
+  return selection;
+}
+function draftSelection(rfc, selection, draft) {
+  if (!selection) return null;
+  const resolved = {...selection}, body = draft?.body ?? rfc.body ?? "";
+  const lines = body.split(/\r?\n/).length - (body.endsWith("\n") ? 1 : 0);
+  if (resolved.end_line) resolved.end_line = Math.min(resolved.end_line, lines);
+  if (!selection.start_line) return resolved;
+  delete resolved.start_line; delete resolved.end_line; delete resolved.section_id;
+  if (selection.graph_node_id) {
+    const diagrams = [...body.matchAll(/```mermaid\s*\n([\s\S]*?)```/g)].filter(match => /^\s*(?:flowchart|graph)\s+(?:LR|RL|TD|TB|BT)\b/.test(match[1]));
+    const match = diagrams[selection.diagram_index];
+    if (match?.[1].includes(selection.graph_node_id)) {
+      const start = body.slice(0, match.index).split(/\r?\n/).length;
+      Object.assign(resolved, {start_line: start, end_line: Math.min(start + match[0].split(/\r?\n/).length - 1, lines)});
+    }
+    return resolved;
+  }
+  const projection = draft ? projectRFC(body, markdown) : rfcContent(rfc).projection, sections = [];
+  const visit = nodes => { for (const node of nodes) { sections.push(node); visit(node.children || []); } };
+  visit(projection.tree);
+  const matches = sections.filter(section => selection.feature_id ? section.featureId === selection.feature_id : section.title === selection.title);
+  if (matches.length === 1 || (selection.feature_id && matches.length)) Object.assign(resolved, {start_line: matches[0].startLine, end_line: Math.min(matches.at(-1).subtreeEndLine || matches.at(-1).endLine, lines), section_id: matches[0].id});
+  return resolved;
+}
+function discussRFC(rfc, selection = null) { closeFeatureDialog(); chat.select(rfc, selection); }
+chat = createChat({action, markdownBody, mount: $("chat-mount"), launcher: $("chat-launcher"), getDraft: editorDraft, resolveSelection: draftSelection,
+  canEdit: rfc => canWrite(rfc) && ((!rfc.enrolled && !Object.keys(rfc.source || {}).length) || canPublish(rfc)) && rfc.sync_status !== "different_writer", onNotice: notice,
+  refreshRFC: getRFC, onSourceUpdate: latest => {
+    if (!principal || activeRFC?.id !== latest.id || !location.hash.startsWith(`#rfc/${encodeURIComponent(latest.id)}`)) return;
+    content.querySelector("#rfc-source-update")?.replaceWith(sourceUpdateStatus(latest));
+    if (activeRFC.body === latest.body && activeRFC.title === latest.title) {
+      activeRFC = latest;
+      if (activeGraphs?.rfc.id === latest.id) activeGraphs.rfc = latest;
+    }
+  },
+  onApply: async (result, reviewed) => {
+    const editor = editorDrafts.get(result.id), draft = editorDraft(result.id);
+    if (editor && (!draft || draftDigest(draft.title, draft.body) === reviewed.draftDigest)) {
+      if (activeEditor === editor) closeRFCEditor(true);
+      else { editorDrafts.delete(editor.id); editor.dialog.remove(); }
+    } else if (draft) notice("新版本已保存；生成期间输入的未提交编辑仍保留在编辑器中。", false);
+    await applyRFCResult(result);
+  }});
 async function applyRFCResult(result) {
   if (!principal || !result?.id || !result.features || !location.hash.startsWith(`#rfc/${encodeURIComponent(result.id)}`)) return route();
   closeFeatureDialog();
@@ -215,6 +288,7 @@ async function applyRFCResult(result) {
   const scroll = window.scrollY;
   rememberGraphViewport();
   content.replaceChildren(detailView(result));
+  chat.context(result);
   viewDirty = Boolean(activeEditor?.dirty);
   window.scrollTo(0, scroll);
   restoreGraphViewport();
@@ -276,6 +350,7 @@ function trackingLabel(rfc) {
 
 async function signedIn(identity) {
   principal = identity;
+  chat.session(identity);
   $("login").hidden = true;
   $("app").hidden = false;
   $("identity-name").textContent = identity.name || identity.user_id;
@@ -322,22 +397,24 @@ async function route() {
   refreshCurrent = null;
   const hash = (location.hash.slice(1) || "dashboard").split("?")[0];
   const [page, id] = hash.split("/");
+  chat.context(null);
   const active = page === "rfc" ? "dashboard" : page === "import" ? "draft" : page;
   for (const link of document.querySelectorAll("[data-nav]")) link.classList.toggle("active", link.dataset.nav === active);
   $("breadcrumb").textContent = `${localizeText("工作空间")} / ${localizeText({dashboard: "进展总览", draft: "创建 RFC", import: "纳管已有 RFC", rfc: "RFC 详情", operations: "操作记录", account: "个人令牌", admin: "团队与权限"}[page] || "进展总览")}`;
   rememberGraphViewport();
   content.replaceChildren(element("div", {class: "loading"}, "正在读取工作空间…"));
   try {
-    let view;
+    let view, renderedRFC = null;
     if (page === "draft") view = draftView();
     else if (page === "import") view = importView();
-    else if (page === "rfc" && id) view = detailView(await getRFC(decodeURIComponent(id)));
+    else if (page === "rfc" && id) { renderedRFC = await getRFC(decodeURIComponent(id)); view = detailView(renderedRFC); }
     else if (page === "operations") view = operationsView(await api("/api/v1/operations"));
     else if (page === "account") view = await accountView();
     else if (page === "admin" && principal.admin) view = await adminView();
     else view = dashboardView(await api(`/api/v1/rfcs?view=summary&language=${currentLanguage()}`));
     if (sequence === routeSequence && principal) {
       content.replaceChildren(view);
+      chat.context(renderedRFC);
       applyLocale(content);
       if (page === "rfc") { restoreGraphViewport(); openGraphTarget(activeGraphs); }
     }
@@ -676,6 +753,7 @@ function sourceSection(rfc, section, lazy = false, namespace = "page") {
   const holder = element(lazy ? "details" : "section", {class: "source-section", "data-source-section": section.id, "data-source-start": section.startLine, "data-source-end": section.endLine});
   const parent = cache.sections.get(section.parentId);
   holder.append(element(lazy ? "summary" : "h3", {}, section.title || "说明", note ? element("span", {class: "badge amber"}, note) : null));
+  holder.append(button("讨论这一节", () => discussRFC(activeRFC?.id === rfc.id ? activeRFC : rfc, {section_id: section.id, title: section.title, start_line: section.startLine, end_line: section.endLine, ...(section.featureId ? {feature_id: section.featureId} : {})}), "quiet source-chat-action"));
   if (parent && parent.level > 1) holder.append(element("span", {class: "source-context small muted"}, parent.title));
   const draw = () => {
     if (holder.querySelector(".rfc-component-body")) return;
@@ -737,7 +815,8 @@ function outcomePanel(rfc, projection) {
 
 function openRFCEditor(rfc) {
   if (!canWrite(rfc) || (rfc.enrolled && !canPublish(rfc))) return;
-  if (activeEditor && (activeEditor.id !== rfc.id || (!activeEditor.dirty && (activeEditor.body !== rfc.body || activeEditor.title !== rfc.title)))) closeRFCEditor(true);
+  if (activeEditor?.id !== rfc.id) { closeRFCEditor(); activeEditor = editorDrafts.get(rfc.id) || null; }
+  if (activeEditor && !activeEditor.dirty && (activeEditor.body !== rfc.body || activeEditor.title !== rfc.title)) closeRFCEditor(true);
   if (!activeEditor) {
     const dialog = element("dialog", {class: "rfc-editor", "aria-label": "编辑 RFC"});
     const form = element("form", {class: "stack"});
@@ -746,8 +825,12 @@ function openRFCEditor(rfc) {
       field("修改原因", input("reason", "说明方案变更及需要重新验证的部分", "", "text", rfc.enrolled)), saveError, element("button", {type: "submit", class: "primary"}, "保存新版本"));
     const state = {id: rfc.id, body: rfc.body, title: rfc.title, revision: rfc.revision, dirty: false, dialog};
     activeEditor = state;
-    dialog.append(element("div", {class: "panel-title"}, element("h2", {}, "编辑 RFC"), button("关闭编辑器", () => dialog.close())), element("p", {class: "small muted"}, "编辑保留完整源文档；页面展示由其内容组件生成。关闭窗口会保留未提交输入。"), form);
-    const markDirty = () => { state.dirty = true; viewDirty = true; };
+    editorDrafts.set(rfc.id, state);
+    const chatHolder = element("div", {class: "chat-editor-mount"});
+    state.chatHolder = chatHolder;
+    dialog.append(element("div", {class: "panel-title"}, element("h2", {}, "编辑 RFC"), element("div", {class: "actions"}, button("与助手讨论", () => chat.open()), button("关闭编辑器", () => closeRFCEditor()))), element("p", {class: "small muted"}, "编辑保留完整源文档；页面展示由其内容组件生成。关闭窗口会保留未提交输入。"), element("div", {class: "editor-chat-layout"}, form, chatHolder));
+    dialog.addEventListener("close", () => { if (chat.root.closest("dialog") === dialog) chat.mount(); });
+    const markDirty = () => { state.dirty = true; viewDirty = true; chat.refresh(); };
     form.addEventListener("input", markDirty); form.addEventListener("change", markDirty);
     form.addEventListener("submit", event => {
       event.preventDefault();
@@ -763,8 +846,22 @@ function openRFCEditor(rfc) {
     });
     document.body.append(dialog);
   }
+  chat.context(rfc);
+  chat.mount(activeEditor.chatHolder);
   activeEditor.dialog.showModal();
   activeEditor.dialog.querySelector("input")?.focus();
+}
+
+function sourceUpdateStatus(rfc) {
+  const update = rfc.source_update;
+  const holder = element("div", {id: "rfc-source-update", role: "status", hidden: !update});
+  if (!update) return holder;
+  const message = {pending: "来源更新已排队；当前页面显示已保存的 RFC 新版本。", synced: "RFC 新版本已同步到来源。", conflict: "来源内容已变化；自动更新已停止，请核对来源与当前 RFC。", failed: "来源更新失败；当前 RFC 新版本已保留。", uncertain: "来源更新结果待核对；当前 RFC 新版本已保留。"}[update.status] || "来源更新状态待核对。";
+  holder.className = update.status === "synced" ? "source-update-status small muted" : "warning";
+  holder.append(element("span", {}, message));
+  if (update.error) holder.append(element("span", {"data-no-translate": ""}, ` ${update.error}`));
+  if (update.can_retry) holder.append(button("核对来源更新", () => { location.hash = "#operations"; }));
+  return holder;
 }
 
 function detailView(rfc) {
@@ -775,7 +872,7 @@ function detailView(rfc) {
   const fresh = rfc.freshness || {};
   const projection = rfcContent(rfc).projection;
   if (activeEditor?.id === rfc.id && (!canWrite(rfc) || (rfc.enrolled && !canPublish(rfc)))) closeRFCEditor(true);
-  const actions = element("div", {class: "actions"}, button("刷新", route));
+  const actions = element("div", {class: "actions"}, button("刷新", route), button("讨论 RFC", () => discussRFC(activeRFC)));
   const sourceLink = safeLink(source.url);
   if (sourceLink) actions.append(sourceLink);
   if (canWrite(rfc) && (!rfc.enrolled || canPublish(rfc))) actions.append(button("编辑 RFC", () => openRFCEditor(activeRFC)));
@@ -818,6 +915,7 @@ function detailView(rfc) {
     await operationNotice(await action("rfcs.enroll", {rfc_id: rfc.id, content_digest: rfc.content_digest, expected_revision: rfc.revision})); await route();
   }));
   const metadata = element("div", {class: "status-row"}, safeLink(source.url), element("span", {}, `版本 ${String(rfc.revision || 1).slice(0, 10)}`), element("span", {}, `最后核验：${dateText(fresh.verification || fresh.last_verified_at || fresh.last_verified || fresh.checked_at)}`));
+  wrapper.append(sourceUpdateStatus(rfc));
   const goals = panel("目标与范围", element("div", {class: "stack"}, metadata,
     componentSections(rfc, [...projection.overview, ...projection.goals, ...projection.scope], "尚未声明问题、目标和范围。"), publish));
   goals.id = "rfc-goals";
@@ -857,6 +955,9 @@ function workPanel(rfc, allowAdd = true) {
       links.append(anchor || element("span", {}, readable(link)), element("br"));
     }
     const operations = element("div", {class: "item-actions"});
+    const discuss = button("讨论这项工作", () => {
+      closeFeatureDialog(); discussRFC(activeRFC?.id === rfc.id ? activeRFC : rfc, featureSelection(rfc, feature.id, feature.title));
+    }, "quiet");
     const update = async (values) => { await applyRFCResult(await action("rfcs.work", {rfc_id: rfc.id, op: "update", feature_id: feature.id, feature: values})); };
     if (!feature.dropped && !feature.owner) operations.append(button("认领", async () => {
       await applyRFCResult(await action("rfcs.work", {rfc_id: rfc.id, op: "claim", feature_id: feature.id, reason: "工作台自主认领"}));
@@ -892,7 +993,7 @@ function workPanel(rfc, allowAdd = true) {
       cache.nodes.set(descriptionKey, description);
     }
     (allowAdd ? tracks.get(track) : list).append(element("article", {class: "work-item", "data-feature-id": feature.id}, element("div", {class: "item-heading"}, element("h4", {}, feature.title || feature.id), badge(feature.dropped ? "dropped" : feature.implementation || feature.state || "planned")),
-      element("div", {class: "item-detail"}, `${feature.id} · 负责人：${feature.owner || "待认领"}`, element("br"), `依赖：${(feature.depends_on || []).join("、") || "无"}`), historical, links, description, canWrite(rfc) ? operations : null));
+      element("div", {class: "item-detail"}, `${feature.id} · 负责人：${feature.owner || "待认领"}`, element("br"), `依赖：${(feature.depends_on || []).join("、") || "无"}`), historical, links, description, discuss, canWrite(rfc) ? operations : null));
   }
   if (!(rfc.features || []).length) list.append(empty("还没有工作项", "把方案拆分成有负责人和依赖的工作。"));
   const form = element("form", {class: "inline-form"});
@@ -958,7 +1059,7 @@ function criteriaPanel(rfc) {
     });
     const details = element("details", {}, element("summary", {}, "更新验收"), form);
     list.append(element("article", {class: "criterion", "data-criterion-id": criterion.id}, element("div", {class: "item-heading"}, element("h4", {}, criterion.title || criterion.id), badge(criterion.verdict || "pending")),
-      evidenceLines(criterion.evidence), canPublish(rfc) ? details : null));
+      evidenceLines(criterion.evidence), button("讨论验收条件", () => { closeFeatureDialog(); discussRFC(activeRFC?.id === rfc.id ? activeRFC : rfc, {criterion_id: criterion.id, title: criterion.title}); }, "quiet"), canPublish(rfc) ? details : null));
   }
   if (!(rfc.criteria || []).length) list.append(empty("验收条件待补充", "编辑 RFC 时明确可验证的条件与证据。"));
   return panel("验收条件", list, "PR 合并不会自动通过验收。");

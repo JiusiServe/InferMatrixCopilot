@@ -79,7 +79,7 @@ def source_strings(view, all_suggestions=False):
 def ui_strings():
     """Only shipped interface literals enter the public catalog, never user data."""
     result = set()
-    for name in ("app.js", "roadmap-graph.mjs", "roadmap-components.mjs"):
+    for name in ("app.js", "roadmap-graph.mjs", "roadmap-components.mjs", "roadmap-chat.mjs"):
         source = files(__package__).joinpath("web", name).read_text(encoding="utf-8")
         # Read JS literal tokens, including dynamic UI templates, without evaluating code.
         matches = list(re.finditer(r'''(["'`])((?:\\.|(?!\1)[\s\S])*?)\1''', source))

@@ -32,6 +32,7 @@ _STATIC = {
     "/roadmap-markdown-display.mjs": ("roadmap-markdown-display.mjs", "text/javascript; charset=utf-8"),
     "/roadmap-components.mjs": ("roadmap-components.mjs", "text/javascript; charset=utf-8"),
     "/roadmap-locale.mjs": ("roadmap-locale.mjs", "text/javascript; charset=utf-8"),
+    "/roadmap-chat.mjs": ("roadmap-chat.mjs", "text/javascript; charset=utf-8"),
     "/roadmap-mermaid.js": ("roadmap-mermaid.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
