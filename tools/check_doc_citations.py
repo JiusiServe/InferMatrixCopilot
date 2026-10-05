@@ -32,6 +32,8 @@ EXCLUDE_PARTS = {".venv", "__pycache__", ".pytest_cache", ".git"}
 # A repo-root-relative doc path under `doc/` (singular), ending in a real
 # extension. Trailing punctuation is excluded from the match so
 # a trailing sentence period does not become part of the filename.
+# A path or word prefix means this is an embedded upstream path, not a
+# repo-root citation (for example, an upstream component ending in `-doc/`).
 #
 # Deliberately NOT `docs?/`: plural `docs/` is ambiguous — it is the TARGET
 # repo's documentation tree, which knowledge pages, adapters and MCP tests
@@ -39,7 +41,7 @@ EXCLUDE_PARTS = {".venv", "__pycache__", ".pytest_cache", ".git"}
 # which `test/` also fabricates as tmp_path fixtures. Matching it produced only
 # false positives. This repo's own `docs/` directory was dissolved by the doc
 # refactor, after which `doc/` is the sole owned prefix.
-CITATION = re.compile(r"\b(doc/[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:md|toml|json|yaml|yml|tsv|txt|py))")
+CITATION = re.compile(r"(?<![\w./\\-])(doc/[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:md|toml|json|yaml|yml|tsv|txt|py))")
 
 # Paths built from pathlib SEGMENTS rather than written as one string:
 #     (ROOT / "docs" / "codex" / "README.md").read_text()   # doc-citation-exempt
