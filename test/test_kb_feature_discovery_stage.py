@@ -97,6 +97,16 @@ def _report(record):
     return files, json.loads(files[path]), path
 
 
+def _full_report(record):
+    _, report, _ = _report(record)
+    artifact = report['full_artifact']
+    data = Path(artifact['path']).read_bytes()
+    assert artifact == record.discovery['full_artifact']
+    assert len(data) == artifact['size_bytes']
+    assert hashlib.sha256(data).hexdigest() == artifact['sha256']
+    return json.loads(data)
+
+
 def _policy():
     return {"schema_version": 1, "required": False, "semantic_depth": {"per_facet_gt": 0.92},
             "core": {"roots": ["pkg/"], "exclude": ["*/tests/*"], "target": 0.97, "suffixes": [".py"]},
@@ -190,7 +200,7 @@ def test_effective_native_reasoning_is_bound_to_report_and_both_archives(world, 
     _, report, _ = _report(record)
     assert report['run_config'] == record.discovery['run_config'] == {
         'packet_chars': 96000, 'zcode_start_interval_s': 10.0, 'zcode_reasoning_level': 'low'}
-    for candidate in report['candidates']:
+    for candidate in _full_report(record)['candidates']:
         for proof in candidate['generator_receipts']:
             archived = store.get(proof['trace_id'])
             assert archived['model']['effort'] == ''
@@ -215,7 +225,7 @@ def test_zcode_role_effort_does_not_mislabel_effective_native_configuration(worl
     assert record.status == 'dry_run', record.problems
     _, report, _ = _report(record)
     assert report['run_config']['zcode_reasoning_level'] == 'max'
-    for candidate in report['candidates']:
+    for candidate in _full_report(record)['candidates']:
         for proof in candidate['generator_receipts']:
             model = store.get(proof['trace_id'])['model']
             assert model['effort'] == 'low'
@@ -256,7 +266,7 @@ def test_first_source_only_catalog_has_native_review_and_no_knowledge_rewrite(wo
     assert report["complete"] and report["done"] and report["feature_ids"] == ["engine-step"]
     assert report["historical_denominator"] == 0 and report["facet_denominator"] == 7
     assert report["catalog_sha256"] == hashlib.sha256(files["adapters/toy/knowledge-coverage.yaml"].encode()).hexdigest()
-    candidate = report["candidates"][0]
+    candidate = _full_report(record)["candidates"][0]
     assert candidate["status"] == "accepted"
     receipts = candidate["generator_receipts"] + [candidate["judge_receipt"]]
     for receipt in receipts:
@@ -438,7 +448,7 @@ def test_completed_empty_shard_requires_native_archive_before_cache_reuse(world)
     (store.root/'blobs'/digest[:2]/f'{digest}.gz').unlink()
     with pytest.raises(InitError,match='archives'):
         stage._cache_reusable(record)
-    assert task['status']=='unknown'
+    assert task['status']=='complete'  # Cache refusal never rewrites retained proofs.
 
 
 @pytest.mark.parametrize('tamper',['decision','candidate'])
@@ -460,3 +470,104 @@ def test_restored_approval_binds_native_verdict_and_input_candidate(world,tamper
     assert 'engine-step' in failures and checked['judge_receipt']
     assert state['reviews']['engine-step']['supported']=='unsure'
     assert 'native approval binding' in row['invalid_reason']
+
+
+@pytest.mark.parametrize('damage', ['missing', 'tampered'])
+def test_cached_compact_report_requires_original_external_artifact(world, damage):
+    from infermatrix_copilot.kb_service.init_support import InitRecord
+    rt, lifecycle, script, _ = _setup(world, policy=_policy(), script=NativeScript(candidates=False))
+    first = _run(rt, lifecycle)
+    assert first.status == 'dry_run', first.problems
+    files, compact, _ = _report(first)
+    assert 'adapters/toy/knowledge-coverage.yaml' not in files  # Unchanged catalog comes from base.
+    path = Path(compact['full_artifact']['path']); original = path.read_bytes()
+    checkpoint = InitRecord.path(rt.state_dir, lifecycle.repo, 'feature-discovery')
+    checkpoint_bytes = checkpoint.read_bytes(); calls = len(script.calls)
+    if damage == 'missing': path.unlink()
+    else: path.write_bytes(original + b'corruption')
+    with pytest.raises(InitError, match='full report artifact'):
+        _run(rt, lifecycle)
+    assert checkpoint.read_bytes() == checkpoint_bytes and len(script.calls) == calls
+    path.write_bytes(original)
+    restored = _run(rt, lifecycle)
+    assert restored == first and len(script.calls) == calls
+
+
+@pytest.mark.parametrize('damage', ['missing', 'tampered'])
+def test_prepared_compact_artifact_blocks_publication_until_exact_restore(world, damage):
+    from infermatrix_copilot.kb_service.init_support import load_prepared
+    rt, lifecycle, script, _ = _setup(world)
+    rt.environ.update(ALLOW_PUSH='1', ALLOW_POST='1', KB_INIT_GIT_AUTHOR='t <t@example.com>')
+    gh = FakeGh(fail_create=1); rt.gh_run = gh
+    def publish():
+        return run_stage(rt, lifecycle, 'feature-discovery', dry_run=False, from_existing=True,
+                         unlimited_subscription=True)
+    first = publish()
+    assert first.status == 'blocked' and first.pr.get('prepared'), first.problems
+    artifact = Path(first.discovery['full_artifact']['path']); original = artifact.read_bytes()
+    prepared = Path(first.pr['prepared']); prepared_bytes = prepared.read_bytes()
+    calls, pushes = len(script.calls), list(gh.pushed)
+    if damage == 'missing': artifact.unlink()
+    else: artifact.write_bytes(original + b'corruption')
+    blocked = publish()
+    assert blocked.status == 'blocked' and any('full report artifact' in p for p in blocked.problems)
+    assert prepared.read_bytes() == prepared_bytes and len(script.calls) == calls and gh.pushed == pushes
+    artifact.write_bytes(original)
+    restored = publish()
+    assert restored.status == 'published', restored.problems
+    assert prepared.read_bytes() == prepared_bytes and len(script.calls) == calls and gh.pushed == pushes
+    compact = json.loads(load_prepared(prepared)['files'][restored.discovery['report_path']])
+    assert compact['full_artifact'] == restored.discovery['full_artifact']
+
+
+def test_completed_legacy_preview_rerenders_without_new_native_calls(world, monkeypatch):
+    from infermatrix_copilot.kb_service.init_support import InitRecord
+    rt, lifecycle, script, _ = _setup(world)
+    first = _run(rt, lifecycle)
+    assert first.status == 'dry_run'
+    _, compact, path = _report(first)
+    full = _full_report(first)
+    # Represent a genuine old-format completed preview, retaining all native
+    # scan, primary and boundary receipts; this is not a prepared publication.
+    old_text = json.dumps(full, ensure_ascii=False, indent=2) + '\n'
+    (Path(first.pr['dry_run_dir']) / 'tree' / path).write_text(old_text)
+    first.discovery.pop('report_format'); first.discovery.pop('full_artifact')
+    first.discovery['report_sha256'] = hashlib.sha256(old_text.encode()).hexdigest()
+    first.save(rt.state_dir)
+    receipts = json.dumps(first.discovery['reviews'], sort_keys=True)
+    calls = len(script.calls)
+    monkeypatch.setattr(script, 'complete', lambda **kwargs: pytest.fail('legacy report rerender called a model'))
+    restored = _run(rt, lifecycle)
+    assert restored.status == 'dry_run', restored.problems
+    assert len(script.calls) == calls
+    assert json.dumps(restored.discovery['reviews'], sort_keys=True) == receipts
+    assert _report(restored)[1] == compact
+    assert _full_report(restored) == full
+    assert InitRecord.load(rt.state_dir, lifecycle.repo, 'feature-discovery').discovery['full_artifact'] == compact['full_artifact']
+
+
+def test_legacy_published_report_is_immutable_without_compact_marker(world, monkeypatch):
+    rt, lifecycle, script, _ = _setup(world)
+    first = _run(rt, lifecycle)
+    first.status = 'published'
+    first.discovery.pop('report_format'); first.discovery.pop('full_artifact')
+    first.save(rt.state_dir)
+    calls = len(script.calls)
+    monkeypatch.setattr(script, 'complete', lambda **kwargs: pytest.fail('published history called a model'))
+    assert _run(rt, lifecycle) == first and len(script.calls) == calls
+
+
+def test_cached_missing_boundary_archive_preserves_proofs_and_blocks_resampling(world):
+    from infermatrix_copilot.kb_service.init_support import InitRecord
+    rt, lifecycle, script, store = _setup(world)
+    first = _run(rt, lifecycle)
+    checked = first.discovery['boundary_reviews']['engine-step']
+    archive = store.get(checked['judge_receipt']['trace_id'])
+    # Responses may share a blob with the primary review; remove only the
+    # distinct boundary attempt so primary validation still succeeds.
+    (store.root / 'attempts' / archive['result']['native_attempt_id'] / 'attempt.json').unlink()
+    path = InitRecord.path(rt.state_dir, lifecycle.repo, 'feature-discovery')
+    original = path.read_bytes(); calls = len(script.calls)
+    with pytest.raises(InitError, match='archives'):
+        _run(rt, lifecycle)
+    assert path.read_bytes() == original and len(script.calls) == calls
