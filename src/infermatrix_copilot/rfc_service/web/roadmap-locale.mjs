@@ -37,14 +37,19 @@ export function localizeText(value) {
   return answer;
 }
 
+const sameStrings = (left, right) => Object.keys(left).length === Object.keys(right).length && Object.entries(right).every(([key, value]) => left[key] === value);
 export function setTranslations(snapshot, replace = true) {
-  if (replace) privateStrings = {};
-  if (snapshot?.language === language) Object.assign(privateStrings, snapshot.strings || {});
+  const next = replace ? {} : {...privateStrings};
+  if (snapshot?.language === language) Object.assign(next, snapshot.strings || {});
+  if (sameStrings(privateStrings, next)) return;
+  privateStrings = next;
   reset(); applyLocale(document.body);
 }
 
 export function applyLocale(root) {
   if (!root) return;
+  const untouched = "svg,code,pre,[data-no-translate],#identity-name,#issued-secret";
+  if ((root.nodeType === Node.ELEMENT_NODE ? root : root.parentElement)?.closest(untouched)) return;
   const visit = node => {
     if (node.nodeType === Node.TEXT_NODE) {
       if (node.parentElement?.closest("svg,code,pre,textarea,input,[data-no-translate],#identity-name,#issued-secret")) return;
@@ -66,21 +71,24 @@ export function applyLocale(root) {
     }
   };
   visit(root);
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {acceptNode: node => node.nodeType === Node.ELEMENT_NODE && node.matches(untouched) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT});
   while (walker.nextNode()) visit(walker.currentNode);
 }
 
 export async function initializeLocale() {
   document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
   const response = await fetch(`/roadmap-languages.json?language=${language}`, {cache: "no-store"});
-  if (response.ok) interfaceStrings = (await response.json()).strings || {};
-  reset(); applyLocale(document.body);
+  if (response.ok) {
+    const next = (await response.json()).strings || {};
+    if (!sameStrings(interfaceStrings, next)) { interfaceStrings = next; reset(); }
+  }
+  applyLocale(document.body);
   document.querySelectorAll("[data-language]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.language === language)));
 }
 
 export async function changeLanguage(next) {
   language = next === "en" ? "en" : "zh";
-  privateStrings = {};
+  privateStrings = {}; reset();
   try { localStorage.setItem("imrfc.language", language); } catch {}
   const url = new URL(location.href); url.searchParams.set("lang", language); history.replaceState(null, "", url);
   await initializeLocale();
