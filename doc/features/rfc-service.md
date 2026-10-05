@@ -51,6 +51,25 @@ bundled markdown-it 15.0.2 parser (MIT, shipped with its license), with raw HTML
 disabled and external image fetching disabled. Original Markdown remains intact
 for editing, publication, and export.
 
+Roadmaps retain the original left-to-right Mermaid flowchart format, track
+headings, contextual milestones, and source relationships. Current tracking data
+supplies work states, additional prerequisites, owners, and acceptance; explicit
+dependency decisions override source relationships. Intentionally removed work stays removed,
+and new tasks appear even when source diagrams have not been edited. Any number
+of tracks is supported, including RFCs without source diagrams. Click or press
+Enter/Space on a node to view PRs and evidence, claim work, update its state, or
+record acceptance as permitted by the signed-in user's role. Each diagram has
+zoom, reset, and SVG download controls; downloaded work nodes link back to the
+authorized RFC task view. Green implementation nodes still show pending
+acceptance until evidence or an explicit waiver satisfies its criteria.
+
+The same-origin Mermaid 11.12.0 bundle is shipped with licenses and its pinned
+dependency lockfile. It is built with esbuild from `mermaid/dist/mermaid.core.mjs`
+using `--bundle --format=esm --minify --target=es2020 --legal-comments=linked`.
+Source diagrams contribute only limited flowchart topology, never executable
+callbacks, settings, or styles. Application event handlers supply node actions.
+SVG styles come from the existing same-origin stylesheet, preserving the CSP.
+
 Use `request ACTION --data FILE` for all versioned actions; `--data -` reads a
 JSON object from stdin. It supports user administration, grants, tokens, RFCs,
 operations and audit history without placing credentials in arguments.

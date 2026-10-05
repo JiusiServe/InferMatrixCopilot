@@ -1,4 +1,5 @@
 /* Same-origin RFC client. Markdown uses a bundled parser with raw HTML disabled. */
+import {graphModels, graphSource, roadmapSVGStyles} from "/roadmap-graph.mjs";
 const markdown = window.markdownit({html: false, linkify: true});
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 
@@ -39,6 +40,41 @@ let noticeTimer;
 let refreshCurrent = null;
 const suggestionPages = new Map();
 const SUGGESTIONS_PER_PAGE = 50;
+let graphSerial = 0;
+let mermaidPromise;
+let featureDialog = null;
+
+function closeFeatureDialog() {
+  if (featureDialog) { featureDialog.close(); featureDialog.remove(); featureDialog = null; }
+}
+
+function graphDetails(rfc, node, model) {
+  closeFeatureDialog();
+  const dialog = element("dialog", {class: "graph-details", "aria-label": `${node.title} 的工作详情`});
+  featureDialog = dialog;
+  const close = button("关闭", () => closeFeatureDialog());
+  dialog.append(element("div", {class: "panel-title"}, element("h2", {}, node.title), close));
+  if (node.feature) {
+    const criteria = (rfc.criteria || []).filter(criterion => {
+      const related = criterion.feature_ids || criterion.features || (criterion.feature_id ? [criterion.feature_id] : []);
+      return !related.length || related.includes(node.id);
+    });
+    dialog.append(workPanel({...rfc, features: [node.feature]}, false), criteriaPanel({...rfc, criteria}));
+  } else {
+    dialog.append(element("p", {class: "muted"}, "这是路线图中的目标或上下文节点。选择关联工作以查看 PR、负责人和验收，或推进下一步。"));
+    const neighbors = new Set(model.edges.filter(edge => edge.from === node.id || edge.to === node.id).flatMap(edge => [edge.from, edge.to]));
+    const related = model.nodes.filter(candidate => candidate.feature && neighbors.has(candidate.id));
+    for (const candidate of related) dialog.append(button(`${candidate.id} · ${candidate.feature.title}`, () => graphDetails(rfc, candidate, model)));
+    if (!related.length) dialog.append(button("查看全部工作", () => {
+      closeFeatureDialog();
+      content.querySelector(".work-item")?.scrollIntoView({behavior: "smooth", block: "center"});
+    }));
+  }
+  dialog.addEventListener("close", () => { dialog.remove(); if (featureDialog === dialog) featureDialog = null; });
+  document.body.append(dialog);
+  dialog.showModal();
+  close.focus();
+}
 const labels = {
   draft: "草稿", proposed: "待评审", discussion: "讨论中", accepted: "已接受", rejected: "已拒绝",
   superseded: "已取代", planned: "待开始", ready: "就绪", active: "进行中", in_progress: "进行中",
@@ -97,6 +133,7 @@ function notice(message, error = false) {
   noticeTimer = setTimeout(() => { $("notice").hidden = true; }, error ? 9000 : 5000);
 }
 function signedOut() {
+  closeFeatureDialog();
   principal = null;
   repositories = [];
   selectedTokenUser = "";
@@ -219,11 +256,12 @@ content.addEventListener("change", () => { viewDirty = true; });
 window.addEventListener("hashchange", () => route());
 
 async function route() {
+  closeFeatureDialog();
   if (!principal) return;
   const sequence = ++routeSequence;
   viewDirty = false;
   refreshCurrent = null;
-  const hash = location.hash.slice(1) || "dashboard";
+  const hash = (location.hash.slice(1) || "dashboard").split("?")[0];
   const [page, id] = hash.split("/");
   const active = page === "rfc" ? "dashboard" : page === "import" ? "draft" : page;
   for (const link of document.querySelectorAll("[data-nav]")) link.classList.toggle("active", link.dataset.nav === active);
@@ -391,58 +429,89 @@ async function operationNotice(result) {
   if (!id) { notice("操作已完成。"); return; }
   notice(`操作已进入队列：${id}。可在操作记录中查看结果。`);
 }
-function dependencyGraph(features) {
-  if (!features.length) return empty("没有依赖关系", "添加工作项后，依赖图会自动生成。");
-  const NS = "http://www.w3.org/2000/svg";
-  const svgNode = (tag, attributes = {}, text = "") => {
-    const node = document.createElementNS(NS, tag);
-    for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
-    if (text) node.textContent = text;
-    return node;
-  };
-  const map = new Map(features.map((feature) => [feature.id, feature]));
-  const depths = new Map();
-  function depth(id, visiting = new Set()) {
-    if (depths.has(id)) return depths.get(id);
-    if (visiting.has(id)) return 0;
-    const next = new Set(visiting).add(id);
-    const dependencies = map.get(id)?.depends_on || [];
-    const result = dependencies.filter((dependency) => map.has(dependency)).reduce((max, dependency) => Math.max(max, depth(dependency, next) + 1), 0);
-    depths.set(id, Math.min(result, 12));
-    return depths.get(id);
+function dependencyGraph(rfc) {
+  const models = graphModels(rfc);
+  if (!models.length) return empty("没有依赖关系", "添加工作项后，依赖图会自动生成。");
+  const wrapper = element("div", {class: "roadmap-graphs"});
+  for (const model of models) {
+    const canvas = element("div", {class: "graph roadmap-canvas"}, element("p", {class: "muted"}, "正在绘制路线图…"));
+    const controls = element("div", {class: "actions"});
+    const legend = element("div", {class: "graph-legend"}, ...["planned", "in_progress", "partial", "implemented", "accepted"].map(state => element("span", {class: `graph-key ${state}`}, state === "accepted" ? "已验收" : translated(state))));
+    const section = element("section", {class: "roadmap-track"}, element("div", {class: "panel-title"}, element("h3", {}, model.title), controls), legend, canvas);
+    wrapper.append(section);
+    if (!mermaidPromise) mermaidPromise = import("/roadmap-mermaid.js").then(({default: mermaid}) => {
+      mermaid.initialize({startOnLoad: false, securityLevel: "strict", theme: "base", htmlLabels: false, suppressErrorRendering: true,
+        flowchart: {htmlLabels: false, useMaxWidth: false}, themeVariables: {fontFamily: "system-ui,sans-serif", fontSize: "15px", lineColor: "#94a3b8"}});
+      return mermaid;
+    }).catch(error => { mermaidPromise = null; throw error; });
+    const serial = ++graphSerial;
+    mermaidPromise.then(async mermaid => {
+      if (!canvas.isConnected) return;
+      const {svg} = await mermaid.render(`rfc-graph-${serial}`, graphSource(model, state => state === "accepted" ? "已验收" : translated(state)));
+      if (!canvas.isConnected) return;
+      const parsed = new DOMParser().parseFromString(svg, "text/html");
+      const drawing = document.importNode(parsed.querySelector("svg"), true);
+      // All styling is in our same-origin stylesheet, preserving the strict CSP.
+      drawing.querySelectorAll("style,script,foreignObject").forEach(node => node.remove());
+      for (const node of [drawing, ...drawing.querySelectorAll("*")]) {
+        node.removeAttribute("style");
+        for (const attribute of [...node.attributes]) if (attribute.name.toLowerCase().startsWith("on")) node.removeAttribute(attribute.name);
+      }
+      drawing.setAttribute("role", "group");
+      drawing.setAttribute("aria-label", `${model.title}：点击工作节点查看详情和操作`);
+      const width = drawing.viewBox.baseVal.width;
+      let scale = 1;
+      drawing.setAttribute("width", String(width));
+      drawing.removeAttribute("height");
+      canvas.replaceChildren(drawing);
+      model.nodes.forEach((node, index) => {
+        const group = [...drawing.querySelectorAll("g.node")].find(candidate => candidate.id.startsWith(`flowchart-N${index}-`));
+        if (!group) return;
+        group.setAttribute("role", "button");
+        group.setAttribute("tabindex", "0");
+        group.setAttribute("data-feature-id", node.feature ? node.id : "");
+        group.setAttribute("aria-label", `${node.title}：查看${node.feature ? "工作详情、关联 PR 和可用操作" : "关联工作"}`);
+        group.classList.add("roadmap-actionable");
+        const open = event => { event.preventDefault(); graphDetails(rfc, node, model); };
+        group.addEventListener("click", open);
+        group.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") open(event); });
+        const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+        title.textContent = node.feature ? `${node.feature.title}\n实现：${translated(node.feature.implementation || node.feature.state)}\n验收：${translated(node.feature.acceptance)}\n负责人：${node.feature.owner || "待认领"}` : node.title;
+        group.prepend(title);
+      });
+      const zoom = delta => { scale = Math.max(.4, Math.min(2.5, scale + delta)); drawing.setAttribute("width", String(width * scale)); };
+      const minus = button("−", () => zoom(-.2)); minus.setAttribute("aria-label", `${model.title} 缩小`);
+      const plus = button("＋", () => zoom(.2)); plus.setAttribute("aria-label", `${model.title} 放大`);
+      controls.append(minus, plus, button("重置", () => { scale = 1; drawing.setAttribute("width", String(width)); }), button("下载 SVG", () => {
+        const exported = drawing.cloneNode(true);
+        const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+        style.textContent = roadmapSVGStyles;
+        exported.prepend(style);
+        // The downloaded artifact links to authorized tasks instead of inert callbacks.
+        for (const group of exported.querySelectorAll("[data-feature-id]")) {
+          const id = group.getAttribute("data-feature-id");
+          group.removeAttribute("tabindex");
+          if (!id) continue;
+          const anchor = document.createElementNS("http://www.w3.org/2000/svg", "a");
+          anchor.setAttribute("href", `${location.origin}/roadmap#rfc/${encodeURIComponent(rfc.id)}?feature=${encodeURIComponent(id)}`);
+          anchor.setAttribute("target", "_blank");
+          group.replaceWith(anchor); anchor.append(group);
+        }
+        const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(exported)], {type: "image/svg+xml"}));
+        const anchor = element("a", {href: url, download: `${rfc.namespace || rfc.id}-${serial}.svg`});
+        anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }));
+      const target = new URLSearchParams(location.hash.split("?")[1] || "").get("feature");
+      if (target && !featureDialog) {
+        const node = model.nodes.find(node => node.id === target && node.feature);
+        if (node) graphDetails(rfc, node, model);
+      }
+    }).catch(error => {
+      if (!canvas.isConnected) return;
+      canvas.replaceChildren(element("p", {class: "error-panel"}, `图表暂时无法绘制：${error.message}。下方工作列表仍可操作。`));
+    });
   }
-  features.forEach((feature) => depth(feature.id));
-  const columns = new Map();
-  const positions = new Map();
-  for (const feature of features) {
-    const column = depths.get(feature.id);
-    const row = columns.get(column) || 0;
-    positions.set(feature.id, {x: 25 + column * 225, y: 25 + row * 100});
-    columns.set(column, row + 1);
-  }
-  const width = Math.max(420, (Math.max(...columns.keys()) + 1) * 225 + 25);
-  const height = Math.max(130, Math.max(...columns.values()) * 100 + 25);
-  const svg = svgNode("svg", {viewBox: `0 0 ${width} ${height}`, width, height, role: "img", "aria-label": "工作项依赖图：箭头由前置工作指向依赖它的工作"});
-  const defs = svgNode("defs");
-  const marker = svgNode("marker", {id: "dependency-arrow", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse"});
-  marker.append(svgNode("path", {d: "M 0 0 L 10 5 L 0 10 z", class: "graph-arrow"}));
-  defs.append(marker); svg.append(defs);
-  for (const feature of features) for (const dependency of feature.depends_on || []) {
-    const from = positions.get(dependency), to = positions.get(feature.id);
-    if (!from || !to) continue;
-    const x1 = from.x + 190, y1 = from.y + 31, x2 = to.x, y2 = to.y + 31;
-    svg.append(svgNode("path", {d: `M ${x1} ${y1} C ${x1 + 22} ${y1}, ${x2 - 22} ${y2}, ${x2} ${y2}`, class: "graph-edge", "marker-end": "url(#dependency-arrow)"}));
-  }
-  for (const feature of features) {
-    const {x, y} = positions.get(feature.id);
-    const group = svgNode("g");
-    const state = feature.implementation || feature.state || "planned";
-    group.append(svgNode("title", {}, `${feature.id}: ${feature.title}`), svgNode("rect", {x, y, width: 190, height: 64, rx: 8, class: `graph-node ${["accepted", "blocked", "active"].includes(state) ? state : ""}`}),
-      svgNode("text", {x: x + 13, y: y + 24, class: "graph-text"}, String(feature.title || feature.id).slice(0, 15)),
-      svgNode("text", {x: x + 13, y: y + 46, class: "graph-subtext"}, `${feature.id} · ${translated(state)}`));
-    svg.append(group);
-  }
-  return element("div", {class: "graph"}, svg);
+  return wrapper;
 }
 
 function detailView(rfc) {
@@ -497,9 +566,15 @@ function detailView(rfc) {
     });
   });
   editing.append(editForm);
+  const graphs = dependencyGraph(rfc);
+  wrapper.append(panel("依赖关系", graphs, "点击节点查看 PR、负责人和可用操作。箭头从前置工作指向依赖它的工作；实现与验收分别显示。"));
+  body.querySelectorAll("pre code.language-mermaid").forEach((code, index) => {
+    code.parentElement.replaceWith(button("查看交互路线图 ↑", () => {
+      const track = graphs.querySelectorAll(".roadmap-track")[index] || graphs;
+      track.scrollIntoView({behavior: "smooth", block: "start"});
+    }));
+  });
   wrapper.append(panel("方案与范围", element("div", {class: "stack"}, metadata, body, publish, canWrite(rfc) && (!rfc.enrolled || canPublish(rfc)) ? editing : null)));
-  const features = rfc.features || [];
-  wrapper.append(panel("依赖关系", dependencyGraph(features.filter((feature) => !feature.dropped)), "箭头从前置工作指向依赖它的工作。验收状态在下方独立记录。"));
   const left = element("div");
   left.append(workPanel(rfc));
   const right = element("div");
@@ -514,7 +589,7 @@ function detailView(rfc) {
   return wrapper;
 }
 
-function workPanel(rfc) {
+function workPanel(rfc, allowAdd = true) {
   const list = element("div", {class: "item-list"});
   for (const feature of rfc.features || []) {
     const links = element("div", {class: "item-detail"});
@@ -565,7 +640,7 @@ function workPanel(rfc) {
       await action("rfcs.work", {rfc_id: rfc.id, op: "add", feature}); await route();
     });
   });
-  return panel("工作项与负责人", element("div", {}, list, canPublish(rfc) ? form : null));
+  return panel("工作项与负责人", element("div", {}, list, canPublish(rfc) && allowAdd ? form : null));
 }
 
 function historicalClaims(rfc, feature) {
