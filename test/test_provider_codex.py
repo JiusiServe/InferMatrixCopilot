@@ -232,3 +232,24 @@ def test_complete_runs_in_scratch(tmp_path):
         (tmp_path / "bin" / "capture.json").read_text(encoding="utf-8"))
     assert "imc-codex-oneshot-" in capture["cwd"]
     assert "CLASSIFY" in capture["stdin"] and "[USER]\nhi" in capture["stdin"]
+
+
+def test_complete_archives_all_buffered_native_events_without_changing_reply(tmp_path):
+    transport = _transport(tmp_path)
+    events = []
+
+    reply = transport.complete(
+        system="CLASSIFY", messages=[{"role": "user", "content": "hi"}],
+        native_event_sink=events.append)
+
+    assert transport.supports_native_events
+    assert [event["type"] for event in events] == ["native.codex.event"] * 5
+    assert [event["payload"]["type"] for event in events] == [
+        "thread.started", "item.completed", "item.completed",
+        "item.completed", "turn.completed"]
+    assert events[1]["payload"]["item"] == {
+        "item_type": "command_execution", "command": "ls"}
+    assert events[3]["payload"]["item"]["text"] == reply.text == "REVIEW"
+    assert reply.stop_reason == "end_turn"
+    assert reply.usage["input_tokens"] == 50
+    assert reply.usage["output_tokens"] == 9

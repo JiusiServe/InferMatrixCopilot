@@ -83,14 +83,18 @@ class CoveragePolicy:
     semantic_depth_acceptance_mode: str = "strict"
 
 
-def policy_path(repo: str) -> str:
-    return f"adapters/{repo}/knowledge-coverage.yaml"
+def policy_path(repo: str, adapter_dir: str | Path | None = None) -> str:
+    """Use the adapter's actual directory; keep canonical callers compatible."""
+    name = Path(adapter_dir).name if adapter_dir is not None else repo
+    return f"adapters/{name}/knowledge-coverage.yaml"
 
 
-def _paths(value: object, name: str) -> tuple[str, ...]:
-    if not isinstance(value, list) or not value or any(not isinstance(x, str) or not x for x in value):
+def _paths(value: object, name: str, *, allow_empty: bool = False, allow_root: bool = False) -> tuple[str, ...]:
+    if not isinstance(value, list) or (not value and not allow_empty) or any(not isinstance(x, str) or not x for x in value):
         raise ValueError(f"{name} must be a non-empty path list")
     for path in value:
+        if allow_root and path in (".", "./"):
+            continue
         if path.startswith("/") or "\\" in path or any(p in ("", ".", "..") for p in path.rstrip("/").split("/")):
             raise ValueError(f"{name} needs safe repository-relative paths")
     return tuple(value)
@@ -127,11 +131,13 @@ def load_policy(text: str, repo_dir: str) -> CoveragePolicy:
             raise ValueError("semantic_depth per_facet_gt must be finite and in [0, 1)")
         semantic_target = float(semantic_target)
     extensions = tuple(core.get("suffixes", SUFFIXES))
-    if not extensions or any(s not in SUFFIXES for s in extensions):
-        raise ValueError("unsupported production-code suffix")
+    if not extensions or any(not isinstance(s, str) or not re.fullmatch(r"\.[A-Za-z0-9][A-Za-z0-9._+-]*", s)
+                             for s in extensions):
+        raise ValueError("production-code suffixes must be safe literal extensions")
     filenames = core.get("filenames", list(FILENAMES))
-    if not isinstance(filenames, list) or any(name not in FILENAMES for name in filenames):
-        raise ValueError("unsupported production-code filename pattern")
+    if not isinstance(filenames, list) or any(not isinstance(name, str) or not name or "/" in name
+                                              or "\\" in name or name in (".", "..") for name in filenames):
+        raise ValueError("production-code filename patterns must be safe basenames")
     features, seen = [], set()
     if not isinstance(data.get("features"), list) or not data["features"]:
         raise ValueError("a non-empty explicit feature inventory is required")
@@ -150,11 +156,11 @@ def load_policy(text: str, repo_dir: str) -> CoveragePolicy:
             raise ValueError("feature page must belong to its declared owner")
         features.append(Feature(item["id"], item["title"], item["owner"],
                                 _paths(item["source_globs"], "source_globs"),
-                                _paths(item["docs"], "docs"), page,
+                                _paths(item["docs"], "docs", allow_empty=True), page,
                                 _paths(item["entry_points"], "entry_points") if "entry_points" in item else ()))
         seen.add(item["id"])
-    return CoveragePolicy(_paths(core.get("roots"), "core roots"),
-                          _paths(core.get("exclude"), "core exclude"), extensions,
+    return CoveragePolicy(_paths(core.get("roots"), "core roots", allow_root=True),
+                          _paths(core.get("exclude", []), "core exclude", allow_empty=True), extensions,
                           tuple(features), float(target), required, tuple(filenames),
                           _paths(data["catalog_sources"], "catalog_sources") if "catalog_sources" in data else (),
                           semantic_target, semantic_mode)
@@ -176,7 +182,7 @@ def inventory(tree: Path, policy: CoveragePolicy) -> list[str]:
         if not file.is_file() or file.is_symlink():
             continue
         path = file.relative_to(tree).as_posix()
-        if not any(path.startswith(root.rstrip("/") + "/") or path == root for root in policy.roots):
+        if not any(root in (".", "./") or path.startswith(root.rstrip("/") + "/") or path == root for root in policy.roots):
             continue
         if (file.suffix not in policy.suffixes and not matches(file.name, policy.filenames)) or matches(path, policy.exclude):
             continue
@@ -375,10 +381,12 @@ def audit_coverage(head: dict[str, str], tree: Path, policy: CoveragePolicy,
         has_source = (bool(feature.entry_points) and set(feature.entry_points) <= refs.intersection(production)) \
             if feature.entry_points else any(matches(p, feature.source_globs) for p in refs.intersection(production))
         has_docs = all((tree / p).is_file() for p in feature.docs) and bool(refs.intersection(feature.docs))
-        complete = bool(implemented) and has_source and has_docs and len(text.strip()) >= 500 and set(FACETS) <= facets
+        doc_requirement_met = not feature.docs or has_docs
+        complete = bool(implemented) and has_source and doc_requirement_met and len(text.strip()) >= 500 and set(FACETS) <= facets
         features[feature.id] = {"title": feature.title, "page": feature.page,
                                 "covered": complete, "missing_facets": sorted(set(FACETS) - facets),
                                 "source_evidence": has_source, "doc_evidence": has_docs,
+                                "documentation_required": bool(feature.docs), "doc_requirement_met": doc_requirement_met,
                                 "implemented": bool(implemented)}
     covered.intersection_update(files)
     core_ratio = len(covered) / len(files) if files else 0.0
@@ -386,7 +394,7 @@ def audit_coverage(head: dict[str, str], tree: Path, policy: CoveragePolicy,
     missing_catalogs = [p for p in policy.catalog_sources if not (tree / p).is_file() or (tree / p).is_symlink()]
     return {"pin": pin, "full_name": full_name, "required": policy.required,
             "definitions": {
-                "feature": "Every declared feature has six cited facets, documentation and production entry points. "
+                "feature": "Every declared feature has six cited facets, production entry points and any documentation required by its policy. "
                            "This is inventory coverage, not proof of exhaustive feature discovery or runtime correctness.",
                 "core_file": "A production file has a cited explanation or a hash-verified static interface/dependency record. "
                              "This is structural knowledge coverage, not exhaustive behavior analysis or test coverage."},

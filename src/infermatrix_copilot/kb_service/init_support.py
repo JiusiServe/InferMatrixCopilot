@@ -41,7 +41,7 @@ from .init_budget import Budget, Price, generator_reservation, load_prices, pric
 from .models import ModelGateway, ModelReply, ModelRole, ModelUnavailable
 
 INIT_DIR = "init"
-STAGES = ("skeleton", "modules", "knowledge", "deepen", "pr-history", "harvest-calibration")
+STAGES = ("skeleton", "feature-discovery", "modules", "knowledge", "deepen", "pr-history", "harvest-calibration")
 INDEPENDENT_STAGES = ("knowledge-deepen",)
 KNOWLEDGE_PREFIX = "knowledge/"
 ALLOW_PUSH_ENV = "ALLOW_PUSH"
@@ -56,6 +56,11 @@ INIT_PATHS = (
     re.compile(r"knowledge/repos/_index\.md"),   # the shared list a new repository is added to
     re.compile(r"adapters/[A-Za-z0-9_-]+/manifest\.yaml"),
     re.compile(r"adapters/[A-Za-z0-9_-]+/kb-calibration/cases/[A-Za-z0-9._-]+\.json"),
+)
+# These paths need an exact publication scope, never a generic init permission.
+DISCOVERY_PATHS = (
+    re.compile(r"adapters/[A-Za-z0-9_-]+/knowledge-coverage\.yaml"),
+    re.compile(r"eval/feature-discovery/[A-Za-z0-9._-]+-[0-9a-f]{12}\.json"),
 )
 MAX_DOC_FILES = 40
 MAX_DOC_BYTES = 200_000
@@ -93,6 +98,7 @@ class InitRecord:
     history: dict = field(default_factory=dict)           # pr-history selection, checkpoints and commit plan
     review: dict = field(default_factory=dict)            # aggregate review, bound to the exact base/head
     depth: dict = field(default_factory=dict)             # independent semantic-depth checkpoints
+    discovery: dict = field(default_factory=dict)         # feature discovery checkpoints and frozen catalog
 
     @staticmethod
     def path(state_dir: Path, repo: str, stage: str) -> Path:
@@ -264,6 +270,7 @@ class InitRuntime:
     pull: Callable[[str, int], dict] | None = None        # PR lookup for pinned claims (tests)
     subscription_generator: bool = False
     unlimited_subscription: bool = False
+    discovery_concurrency: int = 13
 
     @property
     def init_dir(self) -> Path:
@@ -393,7 +400,7 @@ def other_path_problems(other: Mapping[str, tuple[str | None, str | None]],
     init may write, and each gets its own check (design §9.3)."""
     problems: list[str] = []
     for path, (before, after) in sorted(other.items()):
-        if path.startswith(KNOWLEDGE_PREFIX) or not any(p.fullmatch(path) for p in INIT_PATHS):
+        if path.startswith(KNOWLEDGE_PREFIX) or not any(p.fullmatch(path) for p in INIT_PATHS + DISCOVERY_PATHS):
             problems.append(f"init may not write {path}")
         elif check_other is None:
             problems.append(f"no check for {path}")
@@ -467,6 +474,8 @@ class InitPublisher:
     clone: Path                      # the knowledge repository clone (KnowledgeRepo.path)
     repository: str                  # owner/name of the knowledge repository
     run: Callable[..., subprocess.CompletedProcess] = subprocess.run
+    # A discovery publication may write only these two exact repo-relative files.
+    allowed_paths: tuple[str, ...] = ()
 
     def _git(self, *args: str, env: Mapping[str, str] | None = None, input: bytes | None = None,
              auth: bool = False) -> str:
@@ -511,7 +520,8 @@ class InitPublisher:
         """The change as ONE commit on ``base_sha`` (scratch index; dates from
         ``when`` so a retry rebuilds the same SHA)."""
         for path in files:
-            if not any(p.fullmatch(path) for p in INIT_PATHS) or ".." in path.split("/"):
+            allowed = path in self.allowed_paths if self.allowed_paths else any(p.fullmatch(path) for p in INIT_PATHS)
+            if not allowed or ".." in path.split("/"):
                 raise InitError(f"refusing to write {path}")
         if self._git("cat-file", "-t", base_sha) != "commit":
             raise InitError(f"base {base_sha[:12]} is not a commit")

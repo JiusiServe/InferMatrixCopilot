@@ -12,7 +12,7 @@ def test_imkbinit_skill_drives_one_stage_through_the_cli() -> None:
     assert "/imkbinit <repository>" in text and "$imkbinit <repository>" in text
     assert "{{INFERMATRIX_COPILOT_ROOT}}" in text
     # the stage order and where their records live
-    assert "`skeleton` → `modules` → `knowledge` → `deepen` →\n`pr-history` → `harvest-calibration`" in text
+    assert "`skeleton` → `feature-discovery` → `modules` → `knowledge` → `deepen` →\n`pr-history` → `harvest-calibration`" in text
     assert "<state-dir>/init/<repo>/<stage>.json" in text
     assert "`$KB_STATE_DIR`" in text
     # publishing counts only merged PRs; a dry run also counts dry-run records
@@ -43,7 +43,7 @@ def test_imkbinit_matches_the_cli_contract() -> None:
 
     text = SKILL.read_text(encoding="utf-8")
     cli = (ROOT / "src" / "infermatrix_copilot" / "kb_service" / "cli.py").read_text(encoding="utf-8")
-    assert STAGES == ("skeleton", "modules", "knowledge", "deepen", "pr-history", "harvest-calibration")
+    assert STAGES == ("skeleton", "feature-discovery", "modules", "knowledge", "deepen", "pr-history", "harvest-calibration")
     for stage in STAGES:
         assert f"`{stage}`" in text
     for flag in ("--stage", "--dry-run", "--suggest-seeds"):

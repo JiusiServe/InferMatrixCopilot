@@ -264,7 +264,7 @@ def test_existing_knowledge_is_preserved_and_only_missing_facets_are_requested(w
 def test_sources_do_not_offer_or_attest_a_partially_cut_line(tmp_path):
     (tmp_path / "a.py").write_text("abc\n" + "x" * 100 + "\n")
     offered = _Knowledge._sources(tmp_path, ["a.py"], 12)
-    assert offered == [{"path": "a.py", "text": "1: abc", "end": 1, "total_lines": 2}]
+    assert offered == [{"path": "a.py", "text": "1: abc", "end": 1, "total_lines": 2, "language": "python"}]
 
 
 def test_removed_and_symlinked_entry_points_are_not_offered(tmp_path):

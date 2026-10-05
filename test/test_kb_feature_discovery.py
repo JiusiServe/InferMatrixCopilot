@@ -1,0 +1,359 @@
+from copy import deepcopy
+import hashlib
+import json
+from types import SimpleNamespace
+
+import pytest
+
+from infermatrix_copilot.kb_service.feature_discovery_index import build_discovery_index
+from infermatrix_copilot.kb_service.init_feature_discovery import DiscoveryEngine, receipt, _hash
+from infermatrix_copilot.kb_service.init_budget import BudgetExhausted
+from infermatrix_copilot.kb_service.models import ModelReply, ModelRole, ModelUnavailable
+
+PIN = 'a' * 40
+
+
+def reply(role, data, archived=True):
+    text = json.dumps(data)
+    return ModelReply(ModelRole(role, 'zcode' if role == 'generator' else 'codex', 'GLM-5.3' if role == 'generator' else 'gpt-6-sol'),
+                      data, text, 'GLM-5.3' if role == 'generator' else 'gpt-6-sol', {}, 0.1, None,
+                      'test-receipt' if archived else '', hashlib.sha256(text.encode()).hexdigest() if archived else '')
+
+
+def candidate(key='session', path='src/session.py', title='Session lifecycle'):
+    return {'id': key, 'title': title, 'description': 'Create and close a session with an explicit identity.',
+            'owner': 'runtime', 'relation': 'new', 'related_id': '', 'aliases': [],
+            'evidence': [{'path': path, 'start': 1, 'end': 2}]}
+
+
+def index(tmp_path, docs=True):
+    (tmp_path / 'src').mkdir()
+    (tmp_path / 'src/session.py').write_text('def open_session(identity):\n    return {"identity": identity}\n')
+    if docs:
+        (tmp_path / 'docs').mkdir()
+        (tmp_path / 'docs/session.md').write_text('# Session\nCreate a session with an identity.\n')
+    return build_discovery_index(tmp_path, pin=PIN, scope={'roots': ['src/'], 'exclude': []}, doc_globs=['docs/*.md'])
+
+
+def approve(rows, **overrides):
+    return {'decisions': {r['id']: {'supported': 'yes', 'relation': r['relation'],
+                                 'related_id': r.get('related_id', ''), 'reason': 'Implementation returns the identity.', **overrides} for r in rows}}
+
+
+def test_document_round_precedes_source_expansion_and_shared_catalog(tmp_path):
+    idx = index(tmp_path)
+    calls = []
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0]); calls.append((role, payload))
+        if role == 'generator':
+            row = candidate(path='docs/session.md' if payload['round'] == 'doc' else 'src/session.py')
+            if payload['round'] == 'source':
+                assert payload['baseline'][0]['id'] == 'session'
+            data = {'candidates': [row]}
+        else:
+            data = approve(payload['candidates'])
+        validate(data)
+        return reply(role, data)
+    engine = DiscoveryEngine(idx, seeds=[], owners=['runtime'], state={}, call=call, save=lambda: None, concurrency=13)
+    assert engine.scan() and engine.review()
+    features, outcomes = engine.catalog('repos/demo')
+    assert len(features) == 1
+    assert features[0]['docs'] == ['docs/session.md']
+    assert features[0]['source_globs'] == ['src/session.py']
+    assert outcomes[0]['origin_rounds'] == ['doc', 'source']
+    assert [p['round'] for role, p in calls if role == 'generator'] == ['doc', 'source']
+
+
+def test_source_only_feature_is_discovered_without_documentation(tmp_path):
+    idx = index(tmp_path, docs=False)
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0])
+        data = {'candidates': [candidate()]} if role == 'generator' else approve(payload['candidates'])
+        return reply(role, data)
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=call, save=lambda: None)
+    assert engine.scan() and engine.review()
+    features, _ = engine.catalog('repos/demo')
+    assert features[0]['docs'] == []
+
+
+def test_document_only_claim_does_not_enter_implemented_catalog(tmp_path):
+    idx = index(tmp_path)
+    row = candidate(path='docs/session.md'); row['generator_receipts'] = [{'trace_id': 'g'}]
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={'candidates': {'session': row},
+        'reviews': {'session': {'supported': 'yes', 'relation': 'new', 'reason': 'documented', 'candidate_sha256': _hash(row), 'judge_receipt': {'trace_id': 'judge'}}}},
+        call=None, save=lambda: None)
+    features, outcomes = engine.catalog('repos/demo')
+    assert not features
+    assert outcomes[0]['implementation_status'] == 'documented_unconfirmed'
+
+
+def test_missing_native_receipt_never_accepts_candidate():
+    with pytest.raises(ModelUnavailable, match='archive'):
+        receipt(reply('generator', {'candidates': []}, archived=False))
+    changed = reply('generator', {'candidates': []})
+    object.__setattr__(changed, 'text', changed.text + ' changed')
+    with pytest.raises(ModelUnavailable): receipt(changed)
+
+
+def test_invalid_citation_remains_unknown_despite_positive_review(tmp_path):
+    idx = index(tmp_path, docs=False)
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0])
+        row = candidate(); row['evidence'][0]['end'] = 900
+        return reply(role, {'candidates': [row]} if role == 'generator' else approve(payload['candidates']))
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=call, save=lambda: None)
+    assert engine.scan() and engine.review()
+    features, outcomes = engine.catalog('repos/demo')
+    assert not features and outcomes[0]['status'] == 'unknown'
+
+
+def test_seed_id_and_owner_are_preserved_during_supplement(tmp_path):
+    idx = index(tmp_path, docs=False)
+    seed = {'id': 'session', 'title': 'Existing session', 'owner': 'original', 'source_globs': ['src/original.py'],
+            'entry_points': ['src/original.py'], 'docs': [], 'page': 'repos/demo/components/original/feature-session.md'}
+    row = candidate(); row['generator_receipts'] = [{'trace_id': 'native-generator'}]
+    state = {'candidates': {'session': row}, 'reviews': {'session': {'supported': 'yes', 'relation': 'implementation_supplement',
+             'related_id': 'session', 'reason': 'Same lifecycle', 'candidate_sha256': _hash(row), 'judge_receipt': {'trace_id': 'native-judge'}}}}
+    engine = DiscoveryEngine(idx, seeds=[seed], owners=[], state=state, call=None, save=lambda: None)
+    features, _ = engine.catalog('repos/demo')
+    assert features[0]['owner'] == 'original' and features[0]['title'] == 'Existing session'
+    assert features[0]['source_globs'] == ['src/original.py', 'src/session.py']
+    assert seed['source_globs'] == ['src/original.py']
+
+
+def test_alias_uses_accepted_target_and_does_not_inflate_denominator(tmp_path):
+    idx = index(tmp_path, docs=False)
+    first = candidate(); second = candidate('conversation', title='Conversation session')
+    for row in (first,second): row['generator_receipts'] = [{'trace_id': 'g'}]
+    state = {'candidates': {'session': first, 'conversation': second}, 'reviews': {
+        'session': {'supported': 'yes', 'relation': 'new', 'reason': 'Implemented', 'candidate_sha256': _hash(first), 'judge_receipt': {'trace_id': 'j'}},
+        'conversation': {'supported': 'yes', 'relation': 'alias', 'related_id': 'session', 'reason': 'Same behavior', 'candidate_sha256': _hash(second), 'judge_receipt': {'trace_id': 'j'}}}}
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state=state, call=None, save=lambda: None)
+    features, outcomes = engine.catalog('repos/demo')
+    assert len(features) == 1 and all(r['status'] == 'accepted' for r in outcomes)
+
+
+def test_rejected_candidate_gets_at_most_three_corrections(tmp_path):
+    idx = index(tmp_path, docs=False)
+    calls = []
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0]); calls.append(role)
+        return reply(role, {'candidates': [candidate()]} if role == 'generator' else approve(payload['candidates'], supported='unsure'))
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=call, save=lambda: None)
+    assert engine.scan() and engine.review()
+    assert calls.count('generator') == 4 and calls.count('judge') == 4
+    assert engine.state['reviews']['session']['attempts'] == 4
+    assert not engine.catalog('repos/demo')[0]
+
+
+def test_budget_interruption_keeps_pending_and_resumes_without_repeating_success(tmp_path):
+    idx = index(tmp_path)
+    state, calls = {}, []
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0]); calls.append(payload['round'])
+        if payload['round'] == 'source': raise BudgetExhausted('stop')
+        return reply(role, {'candidates': [candidate(path='docs/session.md')]})
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state=state, call=call, save=lambda: None, concurrency=1)
+    assert not engine.scan() and state['scan_complete'] is False
+    def resumed(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0]); calls.append(payload['round'])
+        return reply(role, {'candidates': [candidate()]})
+    second = DiscoveryEngine(idx, seeds=[], owners=[], state=state, call=resumed, save=lambda: None)
+    assert second.scan()
+    assert calls.count('doc') == 1
+
+
+def test_unknown_related_feature_does_not_silently_create_a_feature(tmp_path):
+    idx = index(tmp_path, docs=False)
+    state = {'candidates': {'session': candidate()}, 'reviews': {'session': {'supported': 'yes', 'relation': 'alias',
+             'related_id': 'missing', 'reason': 'alias', 'judge_receipt': {'trace_id': 'j'}}}}
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state=state, call=None, save=lambda: None)
+    features, outcomes = engine.catalog('repos/demo')
+    assert not features and outcomes[0]['status'] == 'unknown'
+
+
+def test_successful_repair_survives_checkpoint_resume_without_calls(tmp_path):
+    idx = index(tmp_path, docs=False)
+    calls = []
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0]); calls.append(role)
+        if role == 'generator':
+            row = candidate()
+            if payload.get('round') == 'repair': row['description'] = 'Return the supplied session identity; no cleanup guarantee.'
+            return reply(role, {'candidates': [row]})
+        supported = 'yes' if 'no cleanup guarantee' in payload['candidates'][0]['description'] else 'no'
+        return reply(role, approve(payload['candidates'], supported=supported))
+    state = {}
+    first = DiscoveryEngine(idx, seeds=[], owners=[], state=state, call=call, save=lambda: None)
+    assert first.scan() and first.review()
+    assert len(first.catalog('repos/demo')[0]) == 1
+    count = len(calls)
+    resumed = DiscoveryEngine(idx, seeds=[], owners=[], state=json.loads(json.dumps(state)), call=call, save=lambda: None)
+    assert resumed.scan() and resumed.review()
+    assert len(resumed.catalog('repos/demo')[0]) == 1 and len(calls) == count
+
+
+def test_inflight_budget_reservations_are_journaled(tmp_path):
+    from infermatrix_copilot.kb_service.init_feature_discovery import _ConcurrentBudget
+    from infermatrix_copilot.kb_service.init_budget import Budget
+    journal = tmp_path / 'reservation.json'
+    wrapper = _ConcurrentBudget(Budget(1), journal, 'batch')
+    with wrapper.reserve(.5) as reservation:
+        saved = json.loads(journal.read_text())
+        assert saved == {'identity': 'batch', 'reserved_usd': .5, 'spent_usd': 0}
+        reservation.charge(.2)
+    saved = json.loads(journal.read_text())
+    assert saved['reserved_usd'] == 0 and saved['spent_usd'] == .2
+
+
+def test_malformed_candidate_does_not_discard_valid_sibling(tmp_path):
+    idx = index(tmp_path, docs=False)
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0])
+        data = {'candidates': [{'id': '../bad'}, candidate()]} if role == 'generator' else approve(payload['candidates'])
+        validate(data)
+        return reply(role, data)
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=call, save=lambda: None)
+    assert engine.scan() and engine.review()
+    assert len(engine.catalog('repos/demo')[0]) == 1
+    task = next(iter(engine.state['tasks'].values()))
+    assert task['invalid_candidates'][0]['status'] == 'unknown'
+
+
+def test_successful_repair_extraction_is_reused_after_review_budget_stop(tmp_path):
+    idx = index(tmp_path, docs=False)
+    calls, state = [], {}
+    stopped = False
+    def call(role, system, prompt, validate):
+        nonlocal stopped
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0])
+        calls.append((role, payload.get('round')))
+        if role == 'generator':
+            row = candidate()
+            if payload.get('round') == 'repair': row['description'] = 'Only return the session identity.'
+            return reply(role, {'candidates': [row]})
+        if payload['candidates'][0]['description'].startswith('Only'):
+            if not stopped:
+                stopped = True
+                raise BudgetExhausted('review budget unavailable')
+            return reply(role, approve(payload['candidates']))
+        return reply(role, approve(payload['candidates'], supported='no'))
+    first = DiscoveryEngine(idx, seeds=[], owners=[], state=state, call=call, save=lambda: None)
+    assert first.scan() and not first.review()
+    assert state['repair_drafts']['session']['attempt'] == 2
+    resumed = DiscoveryEngine(idx, seeds=[], owners=[], state=json.loads(json.dumps(state)), call=call, save=lambda: None)
+    assert resumed.scan() and resumed.review()
+    assert len(resumed.catalog('repos/demo')[0]) == 1
+    assert calls.count(('generator', 'repair')) == 1
+
+
+def test_long_line_packets_have_distinct_resume_keys(tmp_path, monkeypatch):
+    import infermatrix_copilot.kb_service.init_feature_discovery as discovery
+    monkeypatch.setattr(discovery, 'MAX_PACKET_CHARS', 12500)
+    (tmp_path / 'src').mkdir()
+    (tmp_path / 'src/large.custom').write_text('x' * 50000)
+    idx = build_discovery_index(tmp_path, pin=PIN, scope={'roots': ['src/'], 'exclude': []})
+    calls = []
+    def call(role, system, prompt, validate):
+        calls.append(prompt)
+        return reply(role, {'candidates': []})
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=call, save=lambda: None)
+    assert engine.scan()
+    assert len(calls) == len(engine.state['tasks']) == 5
+    assert engine.scan() and len(calls) == 5
+
+
+def test_document_only_unknown_does_not_repeat_same_evidence_for_repairs(tmp_path):
+    idx = index(tmp_path)
+    calls = []
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0]); calls.append(role)
+        if role == 'generator':
+            return reply(role, {'candidates': [candidate(path='docs/session.md')]} if payload['round'] == 'doc' else {'candidates': []})
+        return reply(role, approve(payload['candidates'], supported='unsure'))
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=call, save=lambda: None)
+    assert engine.scan() and engine.review()
+    assert calls == ['generator', 'generator', 'judge']
+    assert engine.state['reviews']['session']['attempts'] == 1
+    assert engine.catalog('repos/demo')[1][0]['implementation_status'] == 'documented_unconfirmed'
+
+
+@pytest.mark.parametrize('malformed', [[], None, 'yes'])
+def test_malformed_judge_container_stays_unknown_without_crashing_batch(tmp_path, malformed):
+    idx = index(tmp_path, docs=False)
+    def call(role, system, prompt, validate):
+        return reply(role, {'candidates': [candidate()]} if role == 'generator' else {'decisions': malformed})
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=call, save=lambda: None)
+    assert engine.scan() and engine.review()
+    assert engine.state['reviews']['session']['supported'] == 'unsure'
+    assert not engine.catalog('repos/demo')[0]
+
+
+def test_review_channel_failure_does_not_regenerate_successful_extraction(tmp_path):
+    idx = index(tmp_path, docs=False)
+    calls = []
+    def call(role, system, prompt, validate):
+        calls.append(role)
+        if role == 'judge': raise ModelUnavailable('subscription channel unavailable')
+        return reply(role, {'candidates': [candidate()]})
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=call, save=lambda: None)
+    assert engine.scan() and engine.review()
+    assert calls == ['generator', 'judge']
+    assert engine.state['reviews']['session']['repair_blocked']
+
+
+@pytest.mark.parametrize('field,value', [('id',123),('relation',[])])
+def test_bad_candidate_scalar_remains_unknown_without_discarding_sibling(tmp_path, field, value):
+    idx = index(tmp_path, docs=False)
+    def call(role, system, prompt, validate):
+        payload = json.loads(prompt.split('\n', 1)[1].rsplit('\n', 1)[0])
+        bad = candidate('bad');bad[field]=value
+        return reply(role, {'candidates':[bad,candidate()]} if role=='generator' else approve(payload['candidates']))
+    engine=DiscoveryEngine(idx,seeds=[],owners=[],state={},call=call,save=lambda:None)
+    assert engine.scan() and engine.review()
+    assert len(engine.catalog('repos/demo')[0])==1
+
+
+def test_proposal_self_supplement_is_repaired_using_formal_baseline(tmp_path):
+    idx=index(tmp_path,docs=False)
+    seed={'id':'runtime','title':'Runtime','owner':'runtime','source_globs':['src/*'],'docs':[],
+          'page':'repos/demo/components/runtime/feature-runtime.md'}
+    calls=[]
+    def call(role,system,prompt,validate):
+        payload=json.loads(prompt.split('\n',1)[1].rsplit('\n',1)[0]);calls.append(role)
+        assert next(r for r in payload['baseline'] if r['id']=='runtime')['catalog_status']=='existing_feature'
+        if role=='generator':
+            row=candidate()
+            if payload.get('round')=='repair':row.update(relation='implementation_supplement',related_id='runtime')
+            return reply(role,{'candidates':[row]})
+        row=payload['candidates'][0]
+        assert next(r for r in payload['baseline'] if r['id']=='session')['catalog_status']=='unreviewed_candidate'
+        return reply(role,approve([row],relation='implementation_supplement',related_id=row.get('related_id') or 'session'))
+    engine=DiscoveryEngine(idx,seeds=[seed],owners=['runtime'],state={},call=call,save=lambda:None)
+    assert engine.scan() and engine.review()
+    features,outcomes=engine.catalog('repos/demo')
+    assert len(features)==1 and outcomes[0]['status']=='accepted'
+    assert calls==['generator','judge','generator','judge']
+
+
+def test_repair_review_channel_failure_retains_draft_for_explicit_retry(tmp_path):
+    idx=index(tmp_path,docs=False);calls=[];stopped=False;state={}
+    def call(role,system,prompt,validate):
+        nonlocal stopped
+        payload=json.loads(prompt.split('\n',1)[1].rsplit('\n',1)[0]);calls.append(role)
+        if role=='generator':
+            row=candidate()
+            if payload.get('round')=='repair':row['description']='Only return the supplied identity.'
+            return reply(role,{'candidates':[row]})
+        revised=payload['candidates'][0]['description'].startswith('Only')
+        if revised and not stopped:
+            stopped=True;raise ModelUnavailable('review channel unavailable')
+        return reply(role,approve(payload['candidates'],supported='yes' if revised else 'no'))
+    first=DiscoveryEngine(idx,seeds=[],owners=[],state=state,call=call,save=lambda:None)
+    assert first.scan() and first.review()
+    assert state['reviews']['session']['repair_blocked']
+    assert 'session' in state['repair_drafts'] and calls.count('generator')==2
+    state['reviews']['session'].pop('repair_blocked')  # Explicit retry-unfinished transition.
+    resumed=DiscoveryEngine(idx,seeds=[],owners=[],state=state,call=call,save=lambda:None)
+    assert resumed.scan() and resumed.review()
+    assert calls.count('generator')==2 and len(resumed.catalog('repos/demo')[0])==1

@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-05 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -783,3 +783,64 @@ dry run 为旧快照建本地临时 baseline，再生成相同升级串与全量
 ## 自主进化接入
 
 自主进化开启时起草前捕获事件与知识快照；已采用制品通过隔离代理起草 typed operations，宿主沿用已有知识发布权限与门禁。进化实验只在内存应用，不写产品知识库。
+
+## 2026-10-05 通用功能发现：文档基线与源码扩展
+
+初始化保留三个大阶段：Skeleton 建骨架，Modules/Knowledge 铺广度，
+Deepen/Acceptance 做深度并验收。新的 `feature-discovery` 位于 skeleton 与 modules
+之间；它先依据项目文档发现能力，再遍历固定源码范围寻找文档未说明的能力。
+
+```mermaid
+flowchart TD
+  P[仓库配置：SHA、范围、语言、owner、预算与目标] --> S[Skeleton]
+  S --> D[文档功能发现]
+  D --> C[源码扩展发现]
+  P --> D
+  P --> C
+  C --> R[聚合与独立评审]
+  R --> F[目录 PR：审查合并后冻结]
+  F --> B[Modules / Knowledge]
+  P --> B
+  B --> A[Deepen / Acceptance]
+  P --> A
+```
+
+新初始化配置启用 `knowledge_lifecycle.init.feature_discovery_required: true`。
+使用[通用新仓库配置模板](../templates/kb-init-new-repository.yaml)，按实际仓库调整源码范围、
+排除规则与文档入口；模板不修改既有适配器，也不改变其发布权限。
+旧适配器不配置该字段时仍使用既有显式目录；一旦开始发现批次，后续阶段不能绕过
+尚未完成或未合并的目录 PR。已有仓库可运行：
+
+```bash
+infermatrix-copilot kb init REPO --stage feature-discovery --from-existing \
+  --pin FULL_SHA --dry-run --unlimited-subscription
+```
+
+`--dry-run` 保存目录和 PR 正文供审查；省略它时沿用 init 的发布权限与 PR 流程。
+订阅模式明确使用 Zcode GLM‑5.3 提取、Codex 独立评审，不使用 Claude Code。
+默认并发上限为 13，两轮按顺序运行，轮内共享线程池；Zcode 请求沿用共享排期。
+`KB_DISCOVERY_GENERATOR`、`KB_DISCOVERY_JUDGE`、`KB_DISCOVERY_CONCURRENCY`
+覆盖发现阶段配置；提取与评审必须属于不同模型家族。`--budget-usd` 与
+`--unlimited-subscription` 互斥。未报告实际费用时保持未知，记账值不当作发票费用。
+
+发现使用完整文件库存和分片，不把前 N 个文件、前 N 行当作全仓库。范围、排除规则、
+文档入口与功能分母按仓库配置；未知语言使用文本和入口线索，并保留未解析关系。
+没有文档不阻断源码轮，正式功能允许 `docs: []`。目录以外的疑似第一方代码列为
+范围扩展建议，不静默改变本轮覆盖分母。源码与测试只有文本证据，本流程不执行
+上游测试，也不因未找到测试而声称没有测试。
+
+现有功能 ID 与 owner 保留。候选可成为新增功能、实现补充、别名、子能力、共享组件、
+过期声明或未知；文档声明必须找到实现证据才能成为新增正式功能。每项最多三次
+自动修正，未知不影响其他项继续。新 owner 由 modules 建立导航，目录发现不生成
+占位知识页，也不调整验收门槛或发布权限。
+
+冻结结果继续使用适配器目录下的 `knowledge-coverage.yaml`。紧凑记录保存于
+`eval/feature-discovery/REPO-PIN12.json`，绑定源码 SHA、目录哈希、发现来源、独立评审
+和未知项。完整输入、流式输出、工具调用、配置和用量保存到 init 外部状态目录的
+原生追踪档案；Git 内只保留引用与摘要。后续阶段核对目录/报告哈希及源码版本。
+已完成的分片和评审可恢复；预算耗尽留下未处理任务时保存检查点，不能标为完成。
+
+报告分开呈现文档候选、源码新增、实现补充、重复/过期/未知、失败分片和未关联范围。
+只能称“声明库存已处理”，不能证明所有功能均已发现。新目录的深度分母为 `N × 7`；
+历史目录的认可率独立保留，不能直接混用。功能发现、知识认可、生产文件结构覆盖、
+测试覆盖和真实 PR 评审效果是不同指标。

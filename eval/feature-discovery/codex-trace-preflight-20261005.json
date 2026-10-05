@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "kind": "codex-native-event-preflight",
+  "trace_id": "1791194128700-30fad72a4018",
+  "reply_sha256": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+  "requested": "codex:gpt-6.1-sol:medium",
+  "served_model": null,
+  "usage": {
+    "input_tokens": 14549,
+    "output_tokens": 9,
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0
+  },
+  "seconds": 9.591010093688965,
+  "actual_cost_usd": null,
+  "native_event_count": 4,
+  "native_events_sha256": "sha256:b9b03b5895d68812487bf71fb5b0414b9ea671b4ea519b08be7e5ebaf772bbb0",
+  "archive": "/data/zhoutaichang/copilot/.feature-discovery-codex-trace-preflight-20261005"
+}

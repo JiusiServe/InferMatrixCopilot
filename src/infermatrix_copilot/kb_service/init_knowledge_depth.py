@@ -62,7 +62,10 @@ class _KnowledgeDepth(_Knowledge):
         return False  # promote a checked preview without repeating extraction
 
     def _init_identity(self) -> str:
-        return repr(replace(self.lifecycle.init, budget_usd=0.0)) + (
+        identity = repr(replace(self.lifecycle.init, budget_usd=0.0))
+        if not self.lifecycle.init.feature_discovery_required:
+            identity = identity.replace(", feature_discovery_required=False", "")
+        return identity + (
             ":subscription-generator" if self.rt.subscription_generator else "") + (
             ":unlimited-subscription" if getattr(self.rt, "unlimited_subscription", False) else "")
 
@@ -166,8 +169,8 @@ class _KnowledgeDepth(_Knowledge):
             state["done"] = False
             return self._blocked(["structural coverage target is unmet; restore feature and production-file coverage before depth extraction"])
         if self.acceptance_mode == "lightweight":
-            from .knowledge_coverage import policy_path
-            policy_text = self.rt.knowledge.show(self._base_sha, policy_path(self.lifecycle.repo))
+            policy_path = self._coverage_policy_path()
+            policy_text = self.overlay.get(policy_path) or self.rt.knowledge.show(self._base_sha, policy_path)
             context = DepthContext(tree, inventory(tree, policy), mode="lightweight",
                                    cache_path=self.depth_index_path, pin=self.record.pin,
                                    policy_sha256=digest(policy_text))

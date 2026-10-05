@@ -1,0 +1,31 @@
+# Merge this snippet into a NEW repository adapter's manifest.yaml.
+# Retain the adapter's own knowledge_lifecycle mode, permissions and release policy.
+# Existing adapters opt in explicitly; this template does not migrate them.
+knowledge_lifecycle:
+  init:
+    feature_discovery_required: true
+    # Replace these roots with the repository's first-party production scope.
+    # "." includes root-level libraries, CLIs and multi-language monorepos.
+    source_roots: ["."]
+    exclude:
+      - "vendor/*"
+      - "third_party/*"
+      - "node_modules/*"
+      - "dist/*"
+      - "build/*"
+    # Add owner-maintained material wherever this repository stores it.
+    # An empty or unmatched documentation inventory still proceeds to source discovery.
+    doc_globs:
+      - "README*"
+      - "**/README*"
+      - "docs/**"
+      - "doc/**"
+      - "CONTRIBUTING*"
+    seeds: []
+    coverage_target: 0.85
+    budget_usd: 30.0
+
+# Discovery defaults: Zcode GLM-5.3 generation, independent Codex review, concurrency 13.
+# Override with KB_DISCOVERY_GENERATOR, KB_DISCOVERY_JUDGE, KB_DISCOVERY_CONCURRENCY.
+# --unlimited-subscription requires both subscription backends and replaces this
+# run's USD ceiling. Unreported invoice costs remain unknown.

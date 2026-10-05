@@ -1,0 +1,560 @@
+{
+  "schema_version": 1,
+  "kind": "bounded-native-pilot",
+  "repo": "openJiuwen-ai/jiuwenswarm",
+  "pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "scope": {
+    "source_roots": [
+      "jiuwenswarm/instance_manager/status.py"
+    ],
+    "doc_globs": [
+      "docs/zh/单机多实例运行.md"
+    ],
+    "test_globs": []
+  },
+  "pilot_complete": true,
+  "full_repository_discovery": false,
+  "formal_catalog_modified": false,
+  "inventory": {
+    "production": 1,
+    "docs": 1,
+    "tests": 0
+  },
+  "seed_features": 79,
+  "proposed_features": 79,
+  "candidates": [
+    {
+      "id": "instance-lifecycle-cli",
+      "title": "实例生命周期管理命令 jiuwenswarm-start",
+      "description": "jiuwenswarm-start 提供命名实例的运维控制面：--list 以表格输出各实例 INSTANCE/STATUS/PID/WORKSPACE/PORTS；--status <name> 查看单实例详情并自动检测、报告端口占用冲突；--name <name> 启动指定实例，可追加 app 仅启动后端或 web 仅启动 Web 服务；--stop 停止、--restart 重启（可 --mode app）。状态查询与进程控制依赖工作区内 .instance.pid 文件（进程 ID + 启动时间戳）。属 instances 的子能力，同时也是 baseline bootstrap 服务启动命令在实例维度的扩展；doc 轮证据，未附源码验证。",
+      "relation": "implementation_supplement",
+      "related_id": "instance-lifecycle-cli",
+      "status": "unknown",
+      "evidence": [
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 95,
+          "end": 122
+        },
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 45,
+          "end": 139
+        },
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 162,
+          "end": 170
+        },
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 180,
+          "end": 184
+        },
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 142,
+          "end": 203
+        },
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 206,
+          "end": 258
+        }
+      ],
+      "origin_rounds": [
+        "doc",
+        "source"
+      ],
+      "reason": "related feature is not accepted in the frozen catalog",
+      "generator_receipts": [
+        {
+          "trace_id": "1791193668310-f5c7481aee17",
+          "reply_sha256": "20179d451490849a626c2f2982edf57bcd5a7d6d4e2b75651139baa7ac657e3e",
+          "requested": "zcode:GLM-5.3",
+          "served_model": "GLM-5.3",
+          "usage": {
+            "input_tokens": 13854,
+            "output_tokens": 19451
+          },
+          "seconds": 220.27993440628052,
+          "cost_usd": null
+        },
+        {
+          "trace_id": "1791193914800-60f95906e4f0",
+          "reply_sha256": "b9527bd80b9c5c049fad81f65c258aba80431b6ca4bb1bd4eeb20aa035d8c3fb",
+          "requested": "zcode:GLM-5.3",
+          "served_model": "GLM-5.3",
+          "usage": {
+            "input_tokens": 17881,
+            "output_tokens": 23583
+          },
+          "seconds": 245.16804099082947,
+          "cost_usd": null
+        }
+      ],
+      "judge_receipt": {
+        "trace_id": "1791193965524-32026d79d24c",
+        "reply_sha256": "382bf0285aafca97947346837726b30d58d0b6ad16b4fcb0a585b16d7701e90a",
+        "requested": "codex:gpt-6.1-sol:medium",
+        "served_model": null,
+        "usage": {
+          "input_tokens": 34794,
+          "output_tokens": 1055,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        },
+        "seconds": 49.48852515220642,
+        "cost_usd": null
+      },
+      "candidate_sha256": "1afe55cf205be7c9ddbc1cd84b60c9834ef9998491c896edbceb23298a720f49"
+    },
+    {
+      "id": "instance-safe-stop",
+      "title": "实例安全停止与进程所有权验证",
+      "description": "instances 的新子能力，同时构成 instance-lifecycle-cli --stop 的实现核心，契约是『绝不向无法证明归属的进程发信号』：PID 记录为 schema v2 且进程存活时，必须通过 psutil create_time 与记录 started_at 偏差小于 3 秒的 PID 复用校验，否则拒绝停止并告警；POSIX 按进程组终止（SIGTERM→超时轮询→SIGKILL，再给 3 秒有界收尸窗口，pgid<=1 拒绝）仅在启动元数据证明专用会话（pgid==sid==launcher.pid 且 launcher.create_time==started_at）且当前 pgid/sid 一致时执行；外部 setsid 启动器已退出时，需启动时记录的 witness 子进程存活且 cmdline 含 ['-m', module] token 对、--dotenv 后继实参 realpath 精确匹配、create_time 偏差小于 3 秒、pgid/sid 等于启动器 pid，才授权对旧专用组按组停止；否则仅逐个停止 cmdline 同时包含 'jiuwenswarm' 与该实例 bootstrap env 路径（可再校验 pgid）的端口监听进程，陌生进程一律不动；旧格式存活记录保持历史单 PID 行为（Unix SIGTERM→2 秒→SIGKILL，Windows taskkill /PID /T /F，带截止期等待）；停止成功标准为全部配置端口确认释放。",
+      "relation": "implementation_supplement",
+      "related_id": "instance-safe-stop",
+      "status": "unknown",
+      "evidence": [
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 345,
+          "end": 397
+        },
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 400,
+          "end": 478
+        },
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 481,
+          "end": 536
+        },
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 539,
+          "end": 588
+        },
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 591,
+          "end": 690
+        }
+      ],
+      "origin_rounds": [
+        "source"
+      ],
+      "reason": "related feature is not accepted in the frozen catalog",
+      "generator_receipts": [
+        {
+          "trace_id": "1791193914800-60f95906e4f0",
+          "reply_sha256": "b9527bd80b9c5c049fad81f65c258aba80431b6ca4bb1bd4eeb20aa035d8c3fb",
+          "requested": "zcode:GLM-5.3",
+          "served_model": "GLM-5.3",
+          "usage": {
+            "input_tokens": 17881,
+            "output_tokens": 23583
+          },
+          "seconds": 245.16804099082947,
+          "cost_usd": null
+        }
+      ],
+      "judge_receipt": {
+        "trace_id": "1791193965524-32026d79d24c",
+        "reply_sha256": "382bf0285aafca97947346837726b30d58d0b6ad16b4fcb0a585b16d7701e90a",
+        "requested": "codex:gpt-6.1-sol:medium",
+        "served_model": null,
+        "usage": {
+          "input_tokens": 34794,
+          "output_tokens": 1055,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        },
+        "seconds": 49.48852515220642,
+        "cost_usd": null
+      },
+      "candidate_sha256": "92ab5f334e23793f974af8ef815d438a68c1bb182c3b6b5486c8b49f4a1731fc"
+    },
+    {
+      "id": "instance-startup-lock",
+      "title": "实例启动文件锁",
+      "description": "防止同一实例被多个终端同时启动的并发保护，instances 的子能力。文档口径（未经源码验证的启动期细节）：锁文件 <workspace>/.instance.lock，陈旧锁超时 30 秒（STALE_LOCK_TIMEOUT），Unix 用 fcntl.flock、Windows 用独占文件创建，锁冲突时启动失败并输出 [start_services] ERROR: Instance 'dev' startup in progress by another process；所附源码行未出现锁文件路径、30 秒常量、flock/独占创建或启动时获取逻辑，这些仍属文档断言。源码（status.py）实际验证的是该锁的生命周期语义：launcher 在整个实例生命周期持有 InstanceLock（并非仅启动期），因此 stop_instance_process 停止健康实例时不得获取该锁，否则实例将永远无法停止；仅在确认停止（全部配置端口释放、旧进程组退出释放生命周期锁）之后，才以 5 秒获取超时短暂加锁作为 final lifecycle lock，调用 delete_pid_file(expected_data=pid_data) 以等值校验原子退役 PID 记录，防止并发新启动写入的更新记录被本次停止误删；锁获取失败或 PID 记录在停止期间发生变化时输出告警并判定停止失败。",
+      "relation": "implementation_supplement",
+      "related_id": "instance-startup-lock",
+      "status": "unknown",
+      "evidence": [
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 126,
+          "end": 141
+        },
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 591,
+          "end": 609
+        },
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 670,
+          "end": 690
+        }
+      ],
+      "origin_rounds": [
+        "doc",
+        "source"
+      ],
+      "reason": "related feature is not accepted in the frozen catalog",
+      "generator_receipts": [
+        {
+          "trace_id": "1791193668310-f5c7481aee17",
+          "reply_sha256": "20179d451490849a626c2f2982edf57bcd5a7d6d4e2b75651139baa7ac657e3e",
+          "requested": "zcode:GLM-5.3",
+          "served_model": "GLM-5.3",
+          "usage": {
+            "input_tokens": 13854,
+            "output_tokens": 19451
+          },
+          "seconds": 220.27993440628052,
+          "cost_usd": null
+        },
+        {
+          "trace_id": "1791193914800-60f95906e4f0",
+          "reply_sha256": "b9527bd80b9c5c049fad81f65c258aba80431b6ca4bb1bd4eeb20aa035d8c3fb",
+          "requested": "zcode:GLM-5.3",
+          "served_model": "GLM-5.3",
+          "usage": {
+            "input_tokens": 17881,
+            "output_tokens": 23583
+          },
+          "seconds": 245.16804099082947,
+          "cost_usd": null
+        },
+        {
+          "trace_id": "1791194007448-8c837aa68159",
+          "reply_sha256": "aed76772ca356be16c4fcbcf7f1662304ab1111b13155d830cc93534a19cd172",
+          "requested": "zcode:GLM-5.3",
+          "served_model": "GLM-5.3",
+          "usage": {
+            "input_tokens": 13627,
+            "output_tokens": 3155
+          },
+          "seconds": 41.81596374511719,
+          "cost_usd": null
+        }
+      ],
+      "judge_receipt": {
+        "trace_id": "1791194031012-d6100c788823",
+        "reply_sha256": "566ee6a3478c43e6c0f795b440f0ca28219d6f8625e85a7f459fd30d3f2009ef",
+        "requested": "codex:gpt-6.1-sol:medium",
+        "served_model": null,
+        "usage": {
+          "input_tokens": 23048,
+          "output_tokens": 284,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        },
+        "seconds": 23.30922818183899,
+        "cost_usd": null
+      },
+      "candidate_sha256": "6b0118545c9f228ab46f046661325243a1990b6581ce036fa5a264c442fbe6bb"
+    },
+    {
+      "id": "instances",
+      "title": "单机多实例运行与实例隔离",
+      "description": "在同一台机器上运行多个独立 JiuwenSwarm 实例：每个实例拥有独立 workspace/ 目录（SOUL.md、skills、memory、session）、独立 .env、agent_server/web/gateway/frontend 四类端口与独立进程组。命名实例登记于 ~/.jiuwenswarm/instances.yaml（或仓库根目录），条目含 workspace 与 ports 字段；实例名规则为 1-64 字符、仅字母数字下划线连字符、禁止以 . 开头、保留名 default/config/tmp/jiuwenswarm/all；端口自动分配为基准端口+实例索引×1000（agent_server 18092、web 19000、gateway 19001、frontend 5173）。JIUWENSWARM_DATA_DIR/JIUWENSWARM_CONFIG_DIR 可覆盖数据/配置根目录；启动命名实例时自动加载实例专属 .env（等价 --dotenv）。适用开发/生产隔离、多租户、多模式并行；与同一 Gateway 上的多窗口 TUI 明确区分。本轮为 doc 证据，实现按 baseline 位于 instance_manager/*.py，本包未附源码验证。",
+      "relation": "implementation_supplement",
+      "related_id": "instances",
+      "status": "accepted",
+      "evidence": [
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 95,
+          "end": 104
+        },
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 145,
+          "end": 158
+        },
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 1,
+          "end": 3
+        },
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 17,
+          "end": 34
+        },
+        {
+          "path": "jiuwenswarm/instance_manager/status.py",
+          "start": 261,
+          "end": 342
+        },
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 38,
+          "end": 71
+        }
+      ],
+      "origin_rounds": [
+        "doc",
+        "source"
+      ],
+      "reason": "status.py:261-342 loads named entries, resolves separate workspace paths and explicit or index-derived ports into InstanceConfig objects; 95-104 constructs default-instance workspace and ports. This is concrete implementation evidence supplementing existing instances, with lifecycle, stop, lock and creation candidates belonging to the same capability family. Supplied source does not verify naming validation, exact port arithmetic, environment-root overrides, automatic dotenv loading, or universal dedicated-process-group isolation.",
+      "generator_receipts": [
+        {
+          "trace_id": "1791193668310-f5c7481aee17",
+          "reply_sha256": "20179d451490849a626c2f2982edf57bcd5a7d6d4e2b75651139baa7ac657e3e",
+          "requested": "zcode:GLM-5.3",
+          "served_model": "GLM-5.3",
+          "usage": {
+            "input_tokens": 13854,
+            "output_tokens": 19451
+          },
+          "seconds": 220.27993440628052,
+          "cost_usd": null
+        },
+        {
+          "trace_id": "1791193914800-60f95906e4f0",
+          "reply_sha256": "b9527bd80b9c5c049fad81f65c258aba80431b6ca4bb1bd4eeb20aa035d8c3fb",
+          "requested": "zcode:GLM-5.3",
+          "served_model": "GLM-5.3",
+          "usage": {
+            "input_tokens": 17881,
+            "output_tokens": 23583
+          },
+          "seconds": 245.16804099082947,
+          "cost_usd": null
+        }
+      ],
+      "judge_receipt": {
+        "trace_id": "1791193965524-32026d79d24c",
+        "reply_sha256": "382bf0285aafca97947346837726b30d58d0b6ad16b4fcb0a585b16d7701e90a",
+        "requested": "codex:gpt-6.1-sol:medium",
+        "served_model": null,
+        "usage": {
+          "input_tokens": 34794,
+          "output_tokens": 1055,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        },
+        "seconds": 49.48852515220642,
+        "cost_usd": null
+      },
+      "candidate_sha256": "6951cf1c3c9a85fab02aa8660d3aa2d20f50cbda1dd5edf5c2c2a0e08e36e8cb"
+    },
+    {
+      "id": "named-instance-init",
+      "title": "命名实例创建 jiuwenswarm-init --name",
+      "description": "jiuwenswarm-init --name <name> [--workspace <path>] 创建命名实例，执行后完成四步：创建工作区目录、生成实例专属 .env、更新 instances.yaml、分配端口（自动或手动指定）。不带 --name 的默认实例使用 ~/.jiuwenswarm 工作区，命名实例使用独立工作区与端口；删除实例无专用命令，需手动删除工作区目录并编辑 instances.yaml 移除条目。这是 baseline bootstrap（init_workspace.py 初始化与服务启动）在实例维度的扩展，同时是 instances 能力的创建入口；doc 轮证据，未附源码验证。",
+      "relation": "implementation_supplement",
+      "related_id": "named-instance-init",
+      "status": "unknown",
+      "evidence": [
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 77,
+          "end": 93
+        },
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 221,
+          "end": 228
+        },
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 230,
+          "end": 233
+        }
+      ],
+      "origin_rounds": [
+        "doc"
+      ],
+      "reason": "docs/zh/单机多实例运行.md:77-93 documents the command and four creation effects; 221-233 describes manual removal and default/named distinctions. No supplied implementation parses --name or creates the workspace, dotenv file, registry entry and ports. status.py:261-342 reads existing configurations but does not demonstrate their creation. This is an unverified supplement to the existing ID, overlapping instances and bootstrap rather than a supported new capability.",
+      "generator_receipts": [
+        {
+          "trace_id": "1791193668310-f5c7481aee17",
+          "reply_sha256": "20179d451490849a626c2f2982edf57bcd5a7d6d4e2b75651139baa7ac657e3e",
+          "requested": "zcode:GLM-5.3",
+          "served_model": "GLM-5.3",
+          "usage": {
+            "input_tokens": 13854,
+            "output_tokens": 19451
+          },
+          "seconds": 220.27993440628052,
+          "cost_usd": null
+        }
+      ],
+      "judge_receipt": {
+        "trace_id": "1791193965524-32026d79d24c",
+        "reply_sha256": "382bf0285aafca97947346837726b30d58d0b6ad16b4fcb0a585b16d7701e90a",
+        "requested": "codex:gpt-6.1-sol:medium",
+        "served_model": null,
+        "usage": {
+          "input_tokens": 34794,
+          "output_tokens": 1055,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        },
+        "seconds": 49.48852515220642,
+        "cost_usd": null
+      },
+      "candidate_sha256": "348a2acdd25d6056324c1fa7afbd0e6e707495639002d901eba65fccbd0453e2",
+      "implementation_status": "documented_unconfirmed"
+    },
+    {
+      "id": "tui",
+      "title": "TUI 对话与命令（多窗口补充）",
+      "description": "文档在区分多实例时明确：在同一 Gateway 上可以开启多个 TUI 终端窗口（多窗口 TUI），无需创建额外后端实例；详细行为以 TUI使用指南.md 为准。作为 baseline tui 能力的单行交叉引用补充证据，不构成独立新能力。",
+      "relation": "implementation_supplement",
+      "related_id": "tui",
+      "status": "unknown",
+      "evidence": [
+        {
+          "path": "docs/zh/单机多实例运行.md",
+          "start": 11,
+          "end": 11
+        }
+      ],
+      "origin_rounds": [
+        "doc"
+      ],
+      "reason": "docs/zh/单机多实例运行.md:11 is only a documentary cross-reference distinguishing multiple TUI windows on one Gateway from independent backend instances. No supplied TUI or Gateway implementation establishes concurrent-window behavior. Preserve existing tui; this reference neither verifies the implementation nor establishes a distinct new capability.",
+      "generator_receipts": [
+        {
+          "trace_id": "1791193668310-f5c7481aee17",
+          "reply_sha256": "20179d451490849a626c2f2982edf57bcd5a7d6d4e2b75651139baa7ac657e3e",
+          "requested": "zcode:GLM-5.3",
+          "served_model": "GLM-5.3",
+          "usage": {
+            "input_tokens": 13854,
+            "output_tokens": 19451
+          },
+          "seconds": 220.27993440628052,
+          "cost_usd": null
+        }
+      ],
+      "judge_receipt": {
+        "trace_id": "1791193965524-32026d79d24c",
+        "reply_sha256": "382bf0285aafca97947346837726b30d58d0b6ad16b4fcb0a585b16d7701e90a",
+        "requested": "codex:gpt-6.1-sol:medium",
+        "served_model": null,
+        "usage": {
+          "input_tokens": 34794,
+          "output_tokens": 1055,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        },
+        "seconds": 49.48852515220642,
+        "cost_usd": null
+      },
+      "candidate_sha256": "ff104e7af5cc829a159c70be9ab037374e248553b985ce469c19955db4041343",
+      "implementation_status": "documented_unconfirmed"
+    }
+  ],
+  "unknown_tasks": 0,
+  "native_calls": [
+    {
+      "id": "1791193668310-f5c7481aee17",
+      "model": {
+        "effort": "",
+        "model": "GLM-5.3",
+        "provider": "zcode",
+        "role": "generator",
+        "served_model": "GLM-5.3"
+      },
+      "seconds": 220.28,
+      "usage": {
+        "input_tokens": 13854,
+        "output_tokens": 19451
+      },
+      "error": ""
+    },
+    {
+      "id": "1791193914800-60f95906e4f0",
+      "model": {
+        "effort": "",
+        "model": "GLM-5.3",
+        "provider": "zcode",
+        "role": "generator",
+        "served_model": "GLM-5.3"
+      },
+      "seconds": 245.168,
+      "usage": {
+        "input_tokens": 17881,
+        "output_tokens": 23583
+      },
+      "error": ""
+    },
+    {
+      "id": "1791193965524-32026d79d24c",
+      "model": {
+        "effort": "medium",
+        "model": "gpt-6.1-sol",
+        "provider": "codex",
+        "role": "judge",
+        "served_model": ""
+      },
+      "seconds": 49.489,
+      "usage": {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 34794,
+        "output_tokens": 1055
+      },
+      "error": ""
+    },
+    {
+      "id": "1791194007448-8c837aa68159",
+      "model": {
+        "effort": "",
+        "model": "GLM-5.3",
+        "provider": "zcode",
+        "role": "generator",
+        "served_model": "GLM-5.3"
+      },
+      "seconds": 41.816,
+      "usage": {
+        "input_tokens": 13627,
+        "output_tokens": 3155
+      },
+      "error": ""
+    },
+    {
+      "id": "1791194031012-d6100c788823",
+      "model": {
+        "effort": "medium",
+        "model": "gpt-6.1-sol",
+        "provider": "codex",
+        "role": "judge",
+        "served_model": ""
+      },
+      "seconds": 23.309,
+      "usage": {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 23048,
+        "output_tokens": 284
+      },
+      "error": ""
+    }
+  ],
+  "actual_cost_usd": null,
+  "state_archive": "/data/zhoutaichang/copilot/.feature-discovery-pilot-v3-20261005",
+  "index_sha256": "49969c6336fb5b3262fd00ceaa8e695665d6e4d470a9ce47c47737cad7ac5bba",
+  "checkpoint_sha256": "f8ea3300d1e8af7de8c1643168c37367005c448b3088e18bbe052f996ed9afc0",
+  "runtime_sha256": {
+    "eval/feature-discovery/run_pilot.py": "8ea557618ec1e6634e894ad837ad17551068cb67cb274445b97c85b18aab00f2",
+    "src/infermatrix_copilot/kb_service/init_feature_discovery.py": "81e2bdc247b082c8ec68ab1a374496db03e7db3de3bf11079ad12ed068e7a972",
+    "src/infermatrix_copilot/kb_service/feature_discovery_index.py": "796ab396fff83266f9b890dbb64504a7e999bda7ab619fd855d4eca16a2a8a5d",
+    "src/infermatrix_copilot/kb_service/models.py": "18a1170c74c01e9c512f6a99792eabe68c80bbc58ab23df00e81331d8499fc49",
+    "src/infermatrix_copilot/kb_service/runtime.py": "3ec10d65e14f51a3d1f020b07ec5f5f8513bf74535ae7ab384b189540c6b77ba"
+  },
+  "concurrency": 13,
+  "index_version": "feature-discovery-index-v2",
+  "manifest_sha256": "8471db70f85be648cb00ca493a05f5c45d50f0a71931b9a4e1624f1c29e0c26f",
+  "limitations": "Explicit pilot scope only; no claim of complete discovery or upstream test execution."
+}
