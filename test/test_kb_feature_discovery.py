@@ -13,6 +13,42 @@ from infermatrix_copilot.kb_service.models import ModelReply, ModelRole, ModelUn
 PIN = 'a' * 40
 
 
+@pytest.mark.parametrize('packet_chars', [24000, 96000, 160000, 192000])
+def test_configured_packets_offer_every_complete_chunk_once(tmp_path, packet_chars):
+    idx = index(tmp_path)
+    # Multiple files and chunks exercise boundaries without reducing the index.
+    for n in range(9):
+        (tmp_path / f'src/library_{n}.py').write_text('value = "observable contract"\n' * 1500)
+    idx = build_discovery_index(tmp_path, pin=PIN, scope={'roots': ['src/'], 'exclude': []}, doc_globs=['docs/*.md'])
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=None, save=lambda: None,
+                             packet_chars=packet_chars)
+    offered = [c for kind in ('doc', 'source') for packet in engine._packets(kind) for c in packet]
+    assert sorted(map(_hash, offered)) == sorted(map(_hash, idx.chunks))
+    assert len(offered) == len(idx.chunks)
+    assert all(sum(len(c.get('text', '')) + 150 for c in packet) <= packet_chars
+               for kind in ('doc', 'source') for packet in engine._packets(kind))
+
+
+@pytest.mark.parametrize('packet_chars', [True, 0, 23999, 192001, 96000.5])
+def test_invalid_engine_packet_size_is_rejected(tmp_path, packet_chars):
+    with pytest.raises(ValueError, match='packet size'):
+        DiscoveryEngine(index(tmp_path), seeds=[], owners=[], state={}, call=None,
+                        save=lambda: None, packet_chars=packet_chars)
+
+
+def test_packet_candidate_cap_is_an_explicit_omission_lead(tmp_path):
+    idx = index(tmp_path, docs=False)
+    def call(role, system, prompt, validate):
+        return reply(role, {'candidates': [candidate(key=f'capability-{n}') for n in range(24)]})
+    engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=call, save=lambda: None,
+                             packet_chars=96000)
+    assert engine.scan()
+    assert len(engine.state['tasks']) == 1
+    task = next(iter(engine.state['tasks'].values()))
+    assert task['candidate_limit_reached']
+    assert len(task['candidates']) == 24
+
+
 def reply(role, data, archived=True):
     text = json.dumps(data)
     return ModelReply(ModelRole(role, 'zcode' if role == 'generator' else 'codex', 'GLM-5.3' if role == 'generator' else 'gpt-6-sol'),

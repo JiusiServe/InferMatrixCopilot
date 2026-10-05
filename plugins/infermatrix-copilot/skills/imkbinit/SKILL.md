@@ -87,10 +87,15 @@ The next stage is the first one that isn't done. If an earlier stage's PR is
 open, stop and say it's waiting for the owner's review. If a record says
 `blocked`, report its `problems` and stop.
 
-For an explicit knowledge rerun of an already merged KB with no local
-skeleton/modules records, use `--stage knowledge --from-existing`. The CLI
+For an explicit breadth rerun of an already merged KB with no local skeleton
+record, use `--stage modules --from-existing`. Merge its PR before running
+`--stage knowledge --from-existing`; no skeleton record is manufactured.
+For a knowledge-only rerun with no local skeleton/modules records, use
+`--stage knowledge --from-existing`. The CLI
 checks the merged index and every owner route. Existing stage records still
 keep their review and merge gates; never manufacture records to skip them.
+An enabled or started feature-discovery batch must still finish and its
+catalog PR must merge before publishing modules or knowledge.
 
 For implementation knowledge in an existing KB, use the independent stage
 `knowledge-deepen` (`kb deepen <repo>` is its `--from-existing` alias).
@@ -98,6 +103,12 @@ It is distinct from the ordinary `deepen` stage that generates hot-module rules.
 `kb widen <repo>` similarly selects `knowledge --from-existing`.
 Use a new state directory when the knowledge baseline or source pin changes;
 retain prior native records and accepted blocks as audit evidence.
+If a previous merged batch's publication branch still exists, set
+`KB_INIT_BRANCH_SUFFIX=<batch-slug>` before starting the new batch. It appends
+the slug to the default stage branch without replacing old branches. Use
+1–40 lowercase letters, digits or hyphens, with no leading or trailing hyphen.
+The suffix is part of the checkpoint identity; retain it when resuming or
+publishing that batch, including a publication waiting for PR confirmation.
 
 ## 3. Run it
 
@@ -143,6 +154,15 @@ What each stage opens:
   Zcode GLM-5.3 extracts and independent Codex reviews with shared concurrency 13.
   `KB_DISCOVERY_GENERATOR`, `KB_DISCOVERY_JUDGE` and `KB_DISCOVERY_CONCURRENCY`
   override the stage configuration; discovery rejects same-family review.
+  `KB_DISCOVERY_PACKET_CHARS` groups complete indexed chunks (24000–192000,
+  default 24000); `KB_DISCOVERY_START_INTERVAL_S` sets the initial Zcode spacing
+  (1–60 seconds, default 15) while native rate-limit cooldown stays enabled.
+  `ZCODE_REASONING_LEVEL=low|high|max` controls the effective native reasoning;
+  a Zcode role's effort suffix does not. These settings are frozen in the batch
+  and report, with reasoning also recorded in both trace and attempt archives.
+  Changed settings or old checkpoints without them require a fresh state
+  directory; retain the previous archive. Larger packets do not prove all
+  features were found.
   `--from-existing` checks merged skeleton routes, while `--retry-unfinished`
   resumes supported work. `--budget-usd` controls cumulative accounting;
   `--unlimited-subscription` authenticates both roles and removes that ceiling.

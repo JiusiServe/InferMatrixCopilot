@@ -3,18 +3,20 @@ from dataclasses import replace
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
 
-from infermatrix_copilot.kb_service.init_feature_discovery import SYSTEM_DISCOVER, SYSTEM_REVIEW
+from infermatrix_copilot.kb_service.init_feature_discovery import SYSTEM_DISCOVER, SYSTEM_REVIEW, discovery_run_config
+from infermatrix_copilot.kb_service.init_support import InitError
 from infermatrix_copilot.kb_service.init_stages import run_stage
 from infermatrix_copilot.kb_service.models import ModelGateway
 from infermatrix_copilot.kb_service.runtime import trace_recorder
 from infermatrix_copilot.llm import Block, Reply
 from infermatrix_copilot.trace_store import TraceStore
 
-from test_kb_init_skeleton import _commit, _index, _lifecycle, _runtime, _tree, world  # noqa: F401
+from test_kb_init_skeleton import FakeGh, _commit, _index, _lifecycle, _runtime, _tree, world  # noqa: F401
 
 
 class NativeScript:
@@ -101,6 +103,146 @@ def _policy():
             "features": [{"id": "existing-step", "title": "Existing step", "owner": "core",
                           "source_globs": ["pkg/core.py"], "entry_points": ["pkg/core.py"], "docs": [],
                           "page": "repos/toy/components/core/feature-existing-step.md"}]}
+
+
+def test_discovery_runtime_configuration_and_effective_reasoning():
+    rt = SimpleNamespace(generator=SimpleNamespace(provider='zcode'),
+                         gateway=ModelGateway(SimpleNamespace(zcode_reasoning_level='low')))
+    assert discovery_run_config(rt, {}) == {'packet_chars': 24000,
+        'zcode_start_interval_s': 15.0, 'zcode_reasoning_level': 'low'}
+    assert discovery_run_config(rt, {'KB_DISCOVERY_PACKET_CHARS': '96000',
+        'KB_DISCOVERY_START_INTERVAL_S': '2.5'}) == {'packet_chars': 96000,
+        'zcode_start_interval_s': 2.5, 'zcode_reasoning_level': 'low'}
+
+
+@pytest.mark.parametrize('key,value', [('KB_DISCOVERY_PACKET_CHARS', '23999'),
+    ('KB_DISCOVERY_PACKET_CHARS', '192001'), ('KB_DISCOVERY_PACKET_CHARS', '96000.5'),
+    ('KB_DISCOVERY_PACKET_CHARS', 'garbage'), ('KB_DISCOVERY_START_INTERVAL_S', '0'),
+    ('KB_DISCOVERY_START_INTERVAL_S', 'nan'), ('KB_DISCOVERY_START_INTERVAL_S', 'inf'),
+    ('KB_DISCOVERY_START_INTERVAL_S', '61')])
+def test_invalid_discovery_configuration_refuses_before_model_dispatch(key, value):
+    rt = SimpleNamespace(generator=SimpleNamespace(provider='zcode'), gateway=ModelGateway(None))
+    with pytest.raises(InitError, match=key):
+        discovery_run_config(rt, {key: value})
+
+
+@pytest.mark.parametrize('changed', ['packet', 'pacing', 'reasoning'])
+def test_completed_discovery_cannot_resume_under_changed_configuration(world, monkeypatch, changed):
+    rt, lifecycle, script, store = _setup(world)
+    first = _run(rt, lifecycle)
+    assert first.status == 'dry_run', first.problems
+    calls = len(script.calls)
+    if changed == 'packet':
+        rt.environ['KB_DISCOVERY_PACKET_CHARS'] = '96000'
+    elif changed == 'pacing':
+        rt.environ['KB_DISCOVERY_START_INTERVAL_S'] = '10'
+    else:
+        rt.gateway._settings = SimpleNamespace(zcode_reasoning_level='low')
+    second = _run(rt, lifecycle)
+    assert second.status == 'blocked'
+    assert any('inputs changed' in p for p in second.problems)
+    assert len(script.calls) == calls
+
+
+@pytest.mark.parametrize('changed', ['packet', 'pacing', 'reasoning'])
+def test_prepared_discovery_rejects_changed_config_and_restores_exact_publication(world, changed):
+    from infermatrix_copilot.kb_service.init_support import load_prepared
+    rt, lifecycle, script, _ = _setup(world)
+    rt.environ.update(ALLOW_PUSH='1', ALLOW_POST='1', KB_INIT_GIT_AUTHOR='t <t@example.com>')
+    gh = FakeGh(fail_create=1)
+    rt.gh_run = gh
+
+    def publish():
+        return run_stage(rt, lifecycle, 'feature-discovery', dry_run=False, from_existing=True,
+                         unlimited_subscription=True)
+
+    pending = publish()
+    assert pending.status == 'blocked' and pending.pr.get('prepared'), pending.problems
+    prepared = load_prepared(pending.pr['prepared'])
+    prepared_bytes = Path(pending.pr['prepared']).read_bytes()
+    calls, pushes = len(script.calls), list(gh.pushed)
+    if changed == 'packet':
+        rt.environ['KB_DISCOVERY_PACKET_CHARS'] = '96000'
+    elif changed == 'pacing':
+        rt.environ['KB_DISCOVERY_START_INTERVAL_S'] = '10'
+    else:
+        rt.gateway._settings = SimpleNamespace(zcode_reasoning_level='low')
+    rejected = publish()
+    assert rejected.status == 'blocked'
+    assert any('discovery inputs changed' in p for p in rejected.problems)
+    assert len(script.calls) == calls and gh.pushed == pushes
+    assert Path(pending.pr['prepared']).read_bytes() == prepared_bytes
+    rt.environ.pop('KB_DISCOVERY_PACKET_CHARS', None)
+    rt.environ.pop('KB_DISCOVERY_START_INTERVAL_S', None)
+    rt.gateway._settings = None
+    restored = publish()
+    assert restored.status == 'published', restored.problems
+    assert len(script.calls) == calls and gh.pushed == pushes
+    assert load_prepared(restored.pr['prepared']) == prepared
+
+
+def test_effective_native_reasoning_is_bound_to_report_and_both_archives(world, monkeypatch):
+    rt, lifecycle, script, store = _setup(world)
+    rt.environ.update(KB_DISCOVERY_PACKET_CHARS='96000', KB_DISCOVERY_START_INTERVAL_S='10')
+    rt.gateway._settings = SimpleNamespace(zcode_reasoning_level='low')
+    record = _run(rt, lifecycle)
+    assert record.status == 'dry_run', record.problems
+    _, report, _ = _report(record)
+    assert report['run_config'] == record.discovery['run_config'] == {
+        'packet_chars': 96000, 'zcode_start_interval_s': 10.0, 'zcode_reasoning_level': 'low'}
+    for candidate in report['candidates']:
+        for proof in candidate['generator_receipts']:
+            archived = store.get(proof['trace_id'])
+            assert archived['model']['effort'] == ''
+            assert archived['model']['native_reasoning_level'] == 'low'
+            attempt = json.loads((store.root / 'attempts' / archived['result']['native_attempt_id'] / 'attempt.json').read_text())
+            assert attempt['model']['native_reasoning_level'] == 'low'
+
+
+def test_discovery_uses_runtime_environment_instead_of_ambient_environment(world, monkeypatch):
+    monkeypatch.setenv('KB_DISCOVERY_PACKET_CHARS', 'invalid-ambient-value')
+    rt, lifecycle, _, _ = _setup(world)
+    record = _run(rt, lifecycle)
+    assert record.status == 'dry_run', record.problems
+    assert record.discovery['run_config']['packet_chars'] == 24000
+
+
+def test_zcode_role_effort_does_not_mislabel_effective_native_configuration(world):
+    rt, lifecycle, _, store = _setup(world)
+    rt.environ['KB_DISCOVERY_GENERATOR'] = 'zcode:GLM-5.3:low'
+    rt.gateway._settings = SimpleNamespace(zcode_reasoning_level='max')
+    record = _run(rt, lifecycle)
+    assert record.status == 'dry_run', record.problems
+    _, report, _ = _report(record)
+    assert report['run_config']['zcode_reasoning_level'] == 'max'
+    for candidate in report['candidates']:
+        for proof in candidate['generator_receipts']:
+            model = store.get(proof['trace_id'])['model']
+            assert model['effort'] == 'low'
+            assert model['native_reasoning_level'] == 'max'
+
+
+def test_configured_reasoning_environment_is_loaded_by_settings(monkeypatch):
+    from infermatrix_copilot.config import Settings
+    monkeypatch.setenv('ZCODE_REASONING_LEVEL', 'low')
+    assert ModelGateway(Settings(_env_file=None)).zcode_reasoning_level == 'low'
+
+
+def test_native_archive_reasoning_metadata_mismatch_is_rejected(world):
+    from infermatrix_copilot.kb_service.init_feature_discovery import _FeatureDiscovery, _prompt, validate_candidates
+    from infermatrix_copilot.kb_service.models import ModelRole, ModelUnavailable
+    rt, lifecycle, _, store = _setup(world)
+    role = ModelRole('generator', 'zcode', 'GLM-5.3')
+    reply = rt.gateway.call_json(role, system=SYSTEM_DISCOVER,
+        prompt=_prompt({'round': 'source', 'files': []}), validate=validate_candidates)
+    archived = store.get(reply.trace_id)
+    path = store.root / 'attempts' / archived['result']['native_attempt_id'] / 'attempt.json'
+    attempt = json.loads(path.read_text())
+    attempt['model']['native_reasoning_level'] = 'low'
+    path.write_text(json.dumps(attempt))
+    stage = _FeatureDiscovery(rt, lifecycle, dry_run=True, pin=None)
+    with pytest.raises(ModelUnavailable, match='reasoning level'):
+        stage._verify_native_receipt(reply)
 
 
 def test_first_source_only_catalog_has_native_review_and_no_knowledge_rewrite(world):

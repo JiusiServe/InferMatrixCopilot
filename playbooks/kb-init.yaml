@@ -18,7 +18,7 @@ params:
   pin: "upstream commit to pin (default: the default branch head)"
   pr_count: "pr-history only: merged upstream PRs to replay (default: adapter pr_history_count or 1000)"
   budget_usd: "discovery/pr-history/depth: cumulative spend ceiling; increasing it resumes the same pinned batch"
-  from_existing: "discovery/explanatory knowledge: enrich a merged index and owner routes without local earlier-stage records"
+  from_existing: "discovery/modules/explanatory knowledge: enrich a merged index and owner routes without local skeleton records; existing stage merge gates remain required"
   retry_unfinished: "feature-discovery/knowledge-deepen: retry unfinished work while retaining accepted work and cumulative spend"
   subscription_generator: "explicit subscription backend; generator USD unreported, fees outside stage USD accounting"
   unlimited_subscription: "feature-discovery/knowledge-deepen: authenticated Zcode GLM-5.3 generator and independent Codex subscription judge without fixed accounting ceiling; incompatible with budget_usd"

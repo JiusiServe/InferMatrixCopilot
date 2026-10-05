@@ -817,11 +817,34 @@ infermatrix-copilot kb init REPO --stage feature-discovery --from-existing \
 ```
 
 `--dry-run` 保存目录和 PR 正文供审查；省略它时沿用 init 的发布权限与 PR 流程。
+已有知识库没有本地 skeleton 记录时，目录 PR 合并后可运行
+`kb init REPO --stage modules --from-existing --pin FULL_SHA`，从已合并的仓库
+入口、owner 路由及页面复核结构，再补充导航。随后使用
+`--stage knowledge --from-existing`；已有 modules 记录仍须完成并合并，
+已有 skeleton 记录的状态与合并门禁同样保留。该模式不生成历史阶段记录，
+不绕过发现目录的源码及哈希绑定；省略 `--from-existing` 时保留原阶段顺序。
+重复初始化若遇到已合并旧批次仍保留的发布分支，可在新批次启动前设置
+`KB_INIT_BRANCH_SUFFIX=<batch-slug>`，使用 `kb/init-REPO-STAGE-SUFFIX`；未设置时
+沿用旧分支名及检查点身份。后缀仅允许 1–40 位小写字母、数字和连字符，
+首尾不能为连字符；非法值在模型调用前拒绝。配置的后缀绑定输入身份及
+已准备发布的分支，恢复发布时不能更换；不会删除或覆盖旧批次分支。
 订阅模式明确使用 Zcode GLM‑5.3 提取、Codex 独立评审，不使用 Claude Code。
 默认并发上限为 13，两轮按顺序运行，轮内共享线程池；Zcode 请求沿用共享排期。
 `KB_DISCOVERY_GENERATOR`、`KB_DISCOVERY_JUDGE`、`KB_DISCOVERY_CONCURRENCY`
 覆盖发现阶段配置；提取与评审必须属于不同模型家族。`--budget-usd` 与
 `--unlimited-subscription` 互斥。未报告实际费用时保持未知，记账值不当作发票费用。
+
+`KB_DISCOVERY_PACKET_CHARS` 设置每次提取组合的正文字符预算（整数 24000–192000，
+默认 24000）；仅组合已有完整分片，不删除或截断输入。`KB_DISCOVERY_START_INTERVAL_S`
+设置 Zcode 初始启动间隔（有限数值 1–60 秒，默认 15 秒）；原生 429/1302 仍触发共享
+冷却和自适应限速。较大的包可能仍有候选遗漏，不能据此声称所有功能已发现。
+`ZCODE_REASONING_LEVEL=low|high|max` 设置实际写入 Zcode 会话配置的推理强度，默认 max；
+Zcode 模型角色中的 `effort` 被 transport 忽略，不能代替该设置。网关追踪和原生 attempt
+均记录 `native_reasoning_level`；发现的输入身份、检查点及紧凑报告 `run_config` 同时绑定
+包大小、启动间隔和实际配置的推理强度。改变任何一项需新批次；旧检查点未记录这些
+配置时不能安全恢复，须保留旧档案并使用新的状态目录。
+返回恰好 24 个候选的分片记录 `candidate_limit_reached`，报告列出数量及任务 ID，
+作为候选可能遗漏的线索；本轮不自动拆分重采样，也不把饱和结果称为穷尽。
 
 发现使用完整文件库存和分片，不把前 N 个文件、前 N 行当作全仓库。范围、排除规则、
 文档入口与功能分母按仓库配置；未知语言使用文本和入口线索，并保留未解析关系。

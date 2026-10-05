@@ -712,7 +712,8 @@ class NativeCallArchive:
         self.session_ids: set[str] = set()
         self.meta = {"schema": "native-attempt/1", "id": self.id, "status": "inflight",
                      "at": store._clock(), "context": current_context(),
-                     "model": {k: entry.get(k, "") for k in ("role", "provider", "model", "effort")},
+                     "model": {**{k: entry.get(k, "") for k in ("role", "provider", "model", "effort")},
+                               **({"native_reasoning_level": entry["native_reasoning_level"]} if "native_reasoning_level" in entry else {})},
                      "inputs": {k: store.put_blob(str(entry.get(k, ""))) for k in ("system", "prompt")},
                      "usage": {}, "cost_usd": None, "served_model": "", "seconds": None,
                      "native_session_ids": [], "env": environment_fingerprint()}

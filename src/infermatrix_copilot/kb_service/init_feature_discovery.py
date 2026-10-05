@@ -12,6 +12,8 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 import hashlib
 import json
+import math
+import os
 from pathlib import Path
 import re
 import threading
@@ -26,12 +28,44 @@ from .models import ModelUnavailable
 
 VERSION = "feature-discovery-v1"
 MAX_PACKET_CHARS = 24000
+MAX_CONFIGURED_PACKET_CHARS = 192000
+DEFAULT_START_INTERVAL_S = 15.0
 MAX_CANDIDATES = 24
 MAX_ATTEMPTS = 4
 MAX_BASELINE_CHARS = 16000
 RELATIONS = {"new", "implementation_supplement", "alias", "subcapability",
              "shared_component", "outdated", "unknown"}
 _SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,39}\Z")
+
+
+def discovery_run_config(rt, environ=None):
+    """Freeze bounded scheduling and effective native reasoning before dispatch.
+
+    Increasing packets groups the same complete index chunks; it never narrows
+    scope. Old checkpoints without this configuration need a new batch because
+    their effective native reasoning setting was not recorded.
+    """
+    env = os.environ if environ is None else environ
+    raw_packet = env.get("KB_DISCOVERY_PACKET_CHARS", str(MAX_PACKET_CHARS))
+    try:
+        if not re.fullmatch(r"[0-9]+", str(raw_packet)):
+            raise ValueError
+        packet_chars = int(raw_packet)
+        if not MAX_PACKET_CHARS <= packet_chars <= MAX_CONFIGURED_PACKET_CHARS:
+            raise ValueError
+    except (ValueError, TypeError):
+        raise InitError(f"KB_DISCOVERY_PACKET_CHARS must be an integer from {MAX_PACKET_CHARS} to {MAX_CONFIGURED_PACKET_CHARS}") from None
+    try:
+        start_interval = float(env.get("KB_DISCOVERY_START_INTERVAL_S", DEFAULT_START_INTERVAL_S))
+        if not math.isfinite(start_interval) or not 1.0 <= start_interval <= 60.0:
+            raise ValueError
+    except (ValueError, TypeError):
+        raise InitError("KB_DISCOVERY_START_INTERVAL_S must be finite and between 1 and 60 seconds") from None
+    level = getattr(rt.gateway, "zcode_reasoning_level", "max") if rt.generator.provider == "zcode" else None
+    if level is not None and level not in ("low", "high", "max"):
+        raise InitError("effective Zcode reasoning level must be low, high or max")
+    return {"packet_chars": packet_chars, "zcode_start_interval_s": start_interval,
+            "zcode_reasoning_level": level}
 SYSTEM_DISCOVER = """Discover distinct software capabilities from the supplied pinned evidence.
 First documentation establishes a baseline; source/test packets expand it.
 Read actual bodies, not just headings, filenames or scan lists. A capability
@@ -195,10 +229,16 @@ class DiscoveryEngine:
     Only the coordinator mutates checkpoint state. Workers return immutable
     results and use a shared generator/judge concurrency ceiling.
     """
-    def __init__(self, index, *, seeds, owners, state, call, save, concurrency=13, repository="", pin=""):
+    def __init__(self, index, *, seeds, owners, state, call, save, concurrency=13, repository="", pin="",
+                 packet_chars=None):
+        packet_chars = MAX_PACKET_CHARS if packet_chars is None else packet_chars
+        if isinstance(packet_chars, bool) or not isinstance(packet_chars, int) \
+                or not MAX_PACKET_CHARS <= packet_chars <= MAX_CONFIGURED_PACKET_CHARS:
+            raise ValueError("discovery packet size outside supported bounds")
         self.index, self.seeds, self.owners, self.state = index, seeds, owners, state
         self.call, self.save, self.concurrency = call, save, concurrency
         self.repository, self.pin = repository, pin
+        self.packet_chars = packet_chars
         self.state.setdefault("tasks", {})
         self.state.setdefault("candidates", {})
         self.state.setdefault("reviews", {})
@@ -218,7 +258,7 @@ class DiscoveryEngine:
         packet, used = [], 0
         for chunk in chunks:
             size = len(chunk.get("text", "")) + 150
-            if packet and used + size > MAX_PACKET_CHARS:
+            if packet and used + size > self.packet_chars:
                 yield packet
                 packet, used = [], 0
             packet.append(chunk)
@@ -253,7 +293,8 @@ class DiscoveryEngine:
                     row["generator_receipts"] = [proof]
                     row["origin_rounds"] = [payload["round"]]
                     checked.append(row)
-                return {"status": "complete", "attempts": attempt + 1, "candidates": checked, "invalid_candidates": invalid, "receipt": proof}
+                return {"status": "complete", "attempts": attempt + 1, "candidates": checked, "invalid_candidates": invalid, "receipt": proof,
+                        "candidate_limit_reached": len(reply.data["candidates"]) == MAX_CANDIDATES}
             except BudgetExhausted:
                 raise
             except ModelUnavailable as exc:
@@ -534,6 +575,11 @@ class _FeatureDiscovery(_Stage):
     def _mode_identity(self):
         return False
 
+    def _resume_input_problems(self, previous, digest):
+        return [] if previous.inputs_digest == digest else [
+            "discovery inputs changed; restore the original configuration to resume this prepared publication, "
+            "or preserve its checkpoint and use a new state directory"]
+
     def _init_identity(self):
         return repr(replace(self.lifecycle.init, budget_usd=0.0)) + (
             ":subscription-generator" if self.rt.subscription_generator else "") + (
@@ -553,8 +599,10 @@ class _FeatureDiscovery(_Stage):
 
     def _input_options(self):
         policy = self.rt.knowledge.show(self._base_sha, self._coverage_policy_path()) or ""
+        self.discovery_run_config = discovery_run_config(self.rt, self.rt.environ)
         return {"discovery_version": VERSION, "prompt_sha256": _hash([SYSTEM_DISCOVER, SYSTEM_REVIEW]), "catalog_seed_sha256": hashlib.sha256(policy.encode()).hexdigest(),
-                "discovery_concurrency": getattr(self.rt, "discovery_concurrency", 13)}
+                "discovery_concurrency": getattr(self.rt, "discovery_concurrency", 13),
+                "discovery_run_config": self.discovery_run_config}
 
     def _restore_progress(self, previous):
         if previous and previous.discovery:
@@ -602,6 +650,11 @@ class _FeatureDiscovery(_Stage):
             if model.get("model") != expected_role.model or model.get("provider") != expected_role.provider \
                     or model.get("effort", "") != expected_role.effort:
                 raise ValueError("archive model differs from requested discovery role")
+            if expected_role.provider == "zcode":
+                configured_level = getattr(self.rt.gateway, "zcode_reasoning_level", "max")
+                if model.get("native_reasoning_level") != configured_level \
+                        or attempt.get("model", {}).get("native_reasoning_level") != configured_level:
+                    raise ValueError("archive effective Zcode reasoning level differs or is unrecorded")
             served = model.get("served_model")
             if expected_role.provider == "zcode" and expected_role.model.casefold() == "glm-5.3" and served \
                     and re.sub(r"[^a-z0-9]", "", served.casefold()) != "glm53":
@@ -690,10 +743,12 @@ class _FeatureDiscovery(_Stage):
         seeds = raw["features"]
         state = self.record.discovery
         identity = inputs_digest(version=VERSION, prompts=_hash([SYSTEM_DISCOVER, SYSTEM_REVIEW]), index=index.sha256, seeds=seeds,
-                                 generator=self.rt.generator.label(), judge=self.rt.judge.label())
+                                 generator=self.rt.generator.label(), judge=self.rt.judge.label(),
+                                 run_config=self.discovery_run_config)
         if state.get("identity") and state["identity"] != identity:
             return self._blocked(["discovery index or catalog identity changed; create a new batch"])
         state["identity"] = identity
+        state["run_config"] = self.discovery_run_config
         if self.retry_unfinished:
             for task in state.get("tasks", {}).values():
                 if task.get("status") == "unknown":
@@ -709,7 +764,8 @@ class _FeatureDiscovery(_Stage):
         budget = _ConcurrentBudget(self.budget, Path(self.rt.state_dir) / "init" / self.lifecycle.repo / "discovery-budget.json", identity)
         if hasattr(self.rt.gateway, "configure_zcode_pacing") and self.rt.generator.provider == "zcode":
             from .depth_pacing import SharedZcodePacer
-            pacer = SharedZcodePacer(Path(self.rt.state_dir) / "init" / "discovery-zcode-pacing.json")
+            pacer = SharedZcodePacer(Path(self.rt.state_dir) / "init" / "discovery-zcode-pacing.json",
+                                     start_interval=self.discovery_run_config["zcode_start_interval_s"])
             pacer.prepare()
             self.rt.gateway.configure_zcode_pacing(pacer)
 
@@ -732,7 +788,8 @@ class _FeatureDiscovery(_Stage):
 
         engine = DiscoveryEngine(index, seeds=seeds, owners=[o.owner for o in self.owners], state=state,
                                  call=call, save=save, concurrency=getattr(self.rt, "discovery_concurrency", 13),
-                                 repository=self.lifecycle.full_name, pin=self.record.pin)
+                                 repository=self.lifecycle.full_name, pin=self.record.pin,
+                                 packet_chars=self.discovery_run_config["packet_chars"])
         scanned = engine.scan()
         self._validate_saved_archives(state)
         save()
@@ -785,8 +842,10 @@ class _FeatureDiscovery(_Stage):
             "implementation_supplements": counts.get("implementation_supplement", 0),
             "aliases": counts.get("alias", 0), "outdated": counts.get("outdated", 0),
             "unknown": counts.get("unknown", 0),
+            "candidate_limit_tasks": sum(t.get("candidate_limit_reached", False) for t in state["tasks"].values()),
             "invalid_candidates": sum(len(t.get("invalid_candidates", [])) for t in state["tasks"].values())}
         report = {"schema_version": 1, "repo": self.lifecycle.repo, "pin": self.record.pin,
+                  "run_config": self.discovery_run_config,
                   "complete": True, "done": True, "catalog_sha256": catalog_sha,
                   "feature_ids": [f["id"] for f in features],
                   "features": [{"id": f["id"], "owner": f["owner"], "title": f["title"]} for f in features],
@@ -798,6 +857,7 @@ class _FeatureDiscovery(_Stage):
                                    "tests": len(index.tests), "tasks": len(state["tasks"]),
                                    "unknown_tasks": sum(t["status"] == "unknown" for t in state["tasks"].values())},
                   "failures": index.failures, "scope_suggestions": index.scope_suggestions,
+                  "candidate_limit_task_ids": [key for key, task in sorted(state["tasks"].items()) if task.get("candidate_limit_reached")],
                   "invalid_candidates": [{"task": key, **item} for key, task in sorted(state["tasks"].items())
                                            for item in task.get("invalid_candidates", [])],
                   "index_sha256": index.sha256,
