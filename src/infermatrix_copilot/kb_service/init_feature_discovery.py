@@ -37,6 +37,7 @@ MAX_BASELINE_CHARS = 16000
 CATALOG_BOUNDARY_VERSION = "catalog-boundary-v1"
 COMPACT_REPORT_VERSION = "feature-discovery-compact-v1"
 CATALOG_CONSOLIDATION_VERSION = "catalog-consolidation-v1"
+CATALOG_RENDERER_VERSION = "catalog-renderer-v2"
 RELATIONS = {"new", "implementation_supplement", "alias", "subcapability",
              "shared_component", "outdated", "unknown"}
 _SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,39}\Z")
@@ -162,7 +163,7 @@ def write_full_discovery_report(state_dir, report):
 
 
 def compact_discovery_report(report, artifact):
-    keys = ("schema_version", "repo", "pin", "run_config", "complete", "done", "catalog_sha256",
+    keys = ("schema_version", "repo", "pin", "run_config", "complete", "done", "catalog_sha256", "catalog_renderer_version",
             "feature_ids", "features", "owner_requests", "counts", "statistics", "scan_summary",
             "index_sha256", "limits", "historical_denominator", "facet_denominator", "pacing")
     compact = {key: deepcopy(report[key]) for key in keys if key in report}
@@ -206,7 +207,7 @@ def verify_full_discovery_report(state_dir, report, state):
         full = json.loads(data)
         if compact_discovery_report(full, artifact) != report:
             raise ValueError("compact report differs from its full artifact")
-        for key in ("pin", "catalog_sha256", "index_sha256", "run_config"):
+        for key in ("pin", "catalog_sha256", "index_sha256", "run_config", "catalog_renderer_version"):
             if full.get(key) != state.get(key):
                 raise ValueError("full report and checkpoint identity differ")
         if full.get("catalog_consolidation_audit") is not None:
@@ -343,6 +344,32 @@ def _consolidation_current(row, boundary, checked):
     return bool(checked) and _decision_valid(checked) and checked.get("candidate_sha256") == _hash(row) \
         and checked.get("boundary_review_sha256") == _hash(boundary) \
         and (checked.get("supported") != "yes" or bool(checked.get("judge_receipt")))
+
+
+def _mutual_canonical_conflicts(decisions):
+    """Quarantine contradictory provisional claims without choosing a winner.
+
+    Only two affirmative NEW decisions with mutual exact-ID canonical claims
+    qualify. Mere mentions and one-way parent claims are not conflicts.
+    Native decisions remain untouched; this is a derived publication guard.
+    """
+    new = {key: row for key, row in decisions.items()
+           if row.get("supported") == "yes" and row.get("relation") == "new"}
+
+    def claims(reason, target):
+        exact = re.compile(r"(?<![A-Za-z0-9_-])" + re.escape(target) + r"(?![A-Za-z0-9_-])")
+        for sentence in re.split(r"(?<=[.!?。])\s+|\n", reason):
+            canonical = re.search(r"\bcanonical(?:\s+\S+){0,8}\s+(?:capability|feature|boundary|entry|implementation)\b|"
+                                  r"\bthis\s+id\s+(?:is|as|remains)(?:\s+the)?\s+canonical\b", sentence, re.I)
+            if exact.search(sentence) and canonical and not re.search(
+                    r"\b(?:not|never|non)[ -]+(?:the[ ]+)?canonical\b", sentence, re.I):
+                return True
+        return False
+
+    references = {key: {other for other in new if other != key and claims(row.get("reason", ""), other)}
+                  for key, row in new.items()}
+    return {key: sorted(other for other in others if key in references[other])
+            for key, others in references.items() if any(key in references[other] for other in others)}
 
 
 def _consolidation_ready(seeds, state, features, *, repository, pin):
@@ -985,6 +1012,9 @@ class DiscoveryEngine:
         consolidation = consolidation_features is not None
         consolidation_valid = consolidation and _consolidation_ready(self.seeds, self.state, consolidation_features,
             repository=self.repository, pin=self.pin)
+        conflicts = _mutual_canonical_conflicts({key: self.state["consolidation_reviews"][key]
+            for key in self.state.get("catalog_consolidation_audit", {}).get("candidate_ids", [])
+            if key not in by_id}) if consolidation_valid else {}
         proposed_names = Counter()
         formal_names = {name for seed in seeds for name in _catalog_names(seed)}
         for key, row in self.state["candidates"].items():
@@ -1026,6 +1056,10 @@ class DiscoveryEngine:
                 if consolidation and key in self.state.get("consolidation_reviews", {}):
                     result["consolidation_review"] = deepcopy(judgment)
             names = _catalog_names(row)
+            if accepted and key in conflicts:
+                accepted = False
+                result.update(status="unknown", reason="mutual provisional canonical claims remain unresolved: " +
+                              ", ".join([key, *conflicts[key]]))
             if accepted and require_boundary and relation == "new" and any(
                     name in formal_names or proposed_names[name] > 1 for name in names):
                 accepted = False
@@ -1123,7 +1157,9 @@ class _FeatureDiscovery(_Stage):
             return False  # Re-render saved unpublished results through the official stage.
         # Published historical catalogs remain immutable. Unpublished previews
         # must acquire the additive audit before publication, reusing their scan.
-        return previous.status == "published" or self._boundary_record_ready(audited)
+        return previous.status == "published" or (
+            previous.discovery.get("catalog_renderer_version") == CATALOG_RENDERER_VERSION
+            and self._boundary_record_ready(audited))
 
     def _verify_report_record(self, record, files=None):
         from .init_stages import _dry_run_files
@@ -1154,6 +1190,8 @@ class _FeatureDiscovery(_Stage):
     def _publish(self, changed):
         try:
             self._verify_report_record(self.record, changed)
+            if self.record.discovery.get("catalog_renderer_version") != CATALOG_RENDERER_VERSION:
+                raise InitError("discovery catalog requires the current renderer before publication")
         except InitError as exc:
             return self._blocked([str(exc)])
         return super()._publish(changed)
@@ -1202,6 +1240,9 @@ class _FeatureDiscovery(_Stage):
         if previous.inputs_digest != digest:
             return ["discovery inputs changed; restore the original configuration to resume this prepared publication, "
                     "or preserve its checkpoint and use a new state directory"]
+        if previous.discovery.get("catalog_renderer_version") != CATALOG_RENDERER_VERSION:
+            return ["prepared discovery catalog uses an earlier renderer; preserve the immutable publication "
+                    "and rerender a separate checkpoint before creating a new publication"]
         # Prepared publication resumes before the normal cache/archive gate.
         # Audit an isolated record so a missing receipt blocks publication
         # without rewriting the immutable prepared change or retained proofs.
@@ -1555,6 +1596,7 @@ class _FeatureDiscovery(_Stage):
             "candidate_limit_tasks": sum(t.get("candidate_limit_reached", False) for t in state["tasks"].values()),
             "invalid_candidates": sum(len(t.get("invalid_candidates", [])) for t in state["tasks"].values())}
         report = {"schema_version": 1, "repo": self.lifecycle.repo, "pin": self.record.pin,
+                  "catalog_renderer_version": CATALOG_RENDERER_VERSION,
                   "run_config": self.discovery_run_config,
                   "catalog_boundary_audit": {**state["catalog_boundary_audit"],
                       "counts": dict(Counter(r["supported"] for r in state.get("boundary_reviews", {}).values()))},
@@ -1586,6 +1628,7 @@ class _FeatureDiscovery(_Stage):
             return self._blocked([str(exc)])
         report_text = json.dumps(compact_discovery_report(report, artifact), ensure_ascii=False, indent=2) + "\n"
         state.update(done=True, pin=self.record.pin, catalog_sha256=catalog_sha, report_path=report_path,
+                     catalog_renderer_version=CATALOG_RENDERER_VERSION,
                      report_format=COMPACT_REPORT_VERSION, full_artifact=artifact,
                      report_sha256=hashlib.sha256(report_text.encode()).hexdigest())
         other = {path: (original_text, rendered), report_path: (self.rt.knowledge.show(self._base_sha, report_path), report_text)}

@@ -13,6 +13,7 @@ from infermatrix_copilot.kb_service.feature_discovery_index import build_discove
 from infermatrix_copilot.kb_service.init_feature_discovery import (
     SYSTEM_CONSOLIDATE, _consolidation_ready, _FeatureDiscovery, _hash,
     compact_discovery_report, write_full_discovery_report,
+    _mutual_canonical_conflicts, CATALOG_RENDERER_VERSION,
 )
 from infermatrix_copilot.kb_service.init_budget import BudgetExhausted
 from infermatrix_copilot.kb_service.models import ModelUnavailable, ModelRole
@@ -259,3 +260,91 @@ def test_cached_consolidation_receipt_damage_preserves_checkpoint_without_resamp
     blob.write_bytes(saved)
     assert _run(rt, lifecycle).discovery == first.discovery
     assert len(script.calls) == count
+
+
+def test_mutual_canonical_claims_are_derived_unknown_without_changing_native_records(tmp_path):
+    e = audited(tmp_path, [candidate(key='backend', title='Structured ask tool'),
+                           candidate(key='web', title='Structured ask presentation')])
+    provisional, _ = e.catalog('repos/library', require_boundary=True)
+    reasons = {'backend': 'Retain this ID as the canonical structured capability encompassing web presentation.',
+               'web': 'Connect it to backend as one capability; this ID is canonical.'}
+    def call(role, system, prompt, validate):
+        _, data = decisions(prompt)
+        for key, row in data['decisions'].items():
+            row['reason'] = reasons[key]
+        return reply(role, data)
+    e.call = call
+    assert e.audit_catalog_consolidation(provisional)
+    saved = deepcopy(e.state)
+    # The original pre-consolidation input set remains stable for receipt reuse.
+    assert e.catalog('repos/library', require_boundary=True)[0] == provisional
+    features, outcomes = e.catalog('repos/library', require_boundary=True, consolidation_features=provisional)
+    assert features == []
+    assert all(r['status'] == 'unknown' and 'mutual provisional canonical' in r['reason'] for r in outcomes)
+    assert e.state == saved
+    assert all(r['consolidation_review']['supported'] == 'yes' for r in outcomes)
+
+
+@pytest.mark.parametrize('other_relation,other_reason', [
+    ('new', 'Distinct capability; backend is a related implementation.'),
+    ('new', 'This ID is canonical for its own capability.'),
+    ('new', 'Uses canonical JSON formatting mentioning backend.'),
+    ('new', 'This ID is canonical. An unrelated backend is mentioned separately.'),
+    ('new', 'Connect it to backend-extra as one capability; this ID is canonical.'),
+    ('new', 'This ID is not canonical relative to backend.'),
+    ('implementation_supplement', 'backend is the canonical capability.'),
+])
+def test_one_way_unrelated_inexact_and_supplement_mentions_are_not_conflicts(other_relation, other_reason):
+    rows = {'backend': {'supported': 'yes', 'relation': 'new',
+                        'reason': 'Retain this ID as the canonical capability encompassing web.'},
+            'web': {'supported': 'yes', 'relation': other_relation, 'reason': other_reason}}
+    assert _mutual_canonical_conflicts(rows) == {}
+
+
+def test_canonical_conflicts_cannot_remove_original_formal_ids(tmp_path):
+    seed = {'id': 'backend', 'title': 'Original backend', 'owner': 'runtime',
+            'source_globs': ['src/session.py'], 'docs': [], 'entry_points': ['src/session.py']}
+    e = audited(tmp_path, [candidate(key='web', title='New web capability')], [seed])
+    provisional, _ = e.catalog('repos/library', require_boundary=True)
+    def call(role, system, prompt, validate):
+        _, data = decisions(prompt)
+        data['decisions']['web']['reason'] = 'Connect it to backend as one capability; this ID is canonical.'
+        return reply(role, data)
+    e.call = call
+    assert e.audit_catalog_consolidation(provisional)
+    e.state['consolidation_reviews']['backend'] = {'supported': 'yes', 'relation': 'new',
+        'reason': 'Retain this ID as the canonical capability encompassing web.'}
+    features, _ = e.catalog('repos/library', require_boundary=True, consolidation_features=provisional)
+    assert features[0] == seed
+    assert {f['id'] for f in features} == {'backend', 'web'}
+
+
+@pytest.mark.parametrize('published', [False, True])
+def test_earlier_renderer_rerenders_unpublished_without_any_native_calls(world, published):
+    rt, lifecycle, script, _ = _setup(world)
+    first = _run(rt, lifecycle)
+    assert first.status == 'dry_run', first.problems
+    saved = deepcopy({k: first.discovery[k] for k in ('tasks', 'reviews', 'boundary_reviews',
+                        'consolidation_reviews', 'catalog_consolidation_audit')})
+    full = json.loads(Path(first.discovery['full_artifact']['path']).read_text())
+    full.pop('catalog_renderer_version')
+    artifact = write_full_discovery_report(rt.state_dir, full)
+    text = json.dumps(compact_discovery_report(full, artifact), ensure_ascii=False, indent=2) + '\n'
+    (Path(first.pr['dry_run_dir']) / 'tree' / first.discovery['report_path']).write_text(text)
+    first.discovery.pop('catalog_renderer_version')
+    first.discovery.update(full_artifact=artifact, report_sha256=hashlib.sha256(text.encode()).hexdigest())
+    if published:
+        first.status = 'published'
+    first.save(rt.state_dir)
+    calls = len(script.calls)
+    current = _run(rt, lifecycle)
+    assert current.status == ('published' if published else 'dry_run'), current.problems
+    assert {k: current.discovery[k] for k in saved} == saved
+    assert len(script.calls) == calls
+    if published:
+        assert 'catalog_renderer_version' not in current.discovery
+    else:
+        assert current.discovery['catalog_renderer_version'] == CATALOG_RENDERER_VERSION
+        assert _report(current)[1]['catalog_renderer_version'] == CATALOG_RENDERER_VERSION
+        assert _run(rt, lifecycle).discovery == current.discovery
+        assert len(script.calls) == calls
