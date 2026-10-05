@@ -48,6 +48,8 @@ let graphSerial = 0;
 let mermaidPromise;
 let featureDialog = null;
 let activeGraphs = null;
+let graphSelectionRFC = "";
+const selectedGraphIDs = new Set();
 let activeRFC = null;
 let activeContent = null;
 let activeEditor = null;
@@ -152,10 +154,12 @@ function graphDetails(rfc, node, model) {
   close.focus();
 }
 
-function mergeGraphNodes(rfc) {
+function mergeGraphNodes(rfc, initialIDs = []) {
+  if (!canWrite(rfc)) return;
   closeFeatureDialog();
   const grouped = new Set((rfc.node_groups || []).flatMap(group => group.feature_ids));
   const candidates = (rfc.features || []).filter(feature => !feature.dropped && !grouped.has(feature.id));
+  const initial = new Set(initialIDs);
   if (candidates.length < 2) { notice("至少需要两个未合并的工作节点。"); return; }
   const dialog = element("dialog", {class: "graph-details graph-merge", "aria-label": "合并路线图节点"});
   featureDialog = dialog;
@@ -170,14 +174,17 @@ function mergeGraphNodes(rfc) {
   const selected = () => [...options.querySelectorAll("input:checked")].map(control => control.value);
   for (const feature of candidates) {
     const control = element("input", {type: "checkbox", name: "feature_id", value: feature.id});
+    control.checked = initial.has(feature.id);
     control.addEventListener("change", () => {
-      const ids = selected(); count.textContent = localizeText(`已选择 ${ids.length} 项`); submit.disabled = ids.length < 2;
+      const ids = selected(); count.textContent = localizeText(`已选择 ${ids.length} 项`); submit.disabled = ids.length < 2 || ids.length > 200;
     });
     const option = element("label", {class: "graph-merge-option"}, control,
       element("span", {"data-no-translate": ""}, feature.id), element("span", {}, feature.title), element("small", {class: "muted"}, feature.track || "工作"));
     option.dataset.search = `${feature.id} ${feature.title} ${feature.track || ""}`.toLocaleLowerCase();
     options.append(option);
   }
+  count.textContent = localizeText(`已选择 ${selected().length} 项`);
+  submit.disabled = selected().length < 2 || selected().length > 200;
   search.addEventListener("input", () => {
     const query = search.value.trim().toLocaleLowerCase();
     for (const option of options.children) option.hidden = query && !option.dataset.search.includes(query);
@@ -186,9 +193,11 @@ function mergeGraphNodes(rfc) {
   form.addEventListener("submit", event => {
     event.preventDefault();
     const feature_ids = selected();
-    if (feature_ids.length < 2) return;
+    if (feature_ids.length < 2 || feature_ids.length > 200) return;
     busy(submit, async () => {
-      await applyRFCResult(await action("rfcs.graph", {rfc_id: rfc.id, op: "merge", title: title.value.trim(), feature_ids, expected_revision: rfc.revision}));
+      const result = await action("rfcs.graph", {rfc_id: rfc.id, op: "merge", title: title.value.trim(), feature_ids, expected_revision: rfc.revision});
+      selectedGraphIDs.clear();
+      await applyRFCResult(result);
     });
   });
   dialog.append(form);
@@ -253,6 +262,7 @@ function notice(message, error = false) {
   noticeTimer = setTimeout(() => { $("notice").hidden = true; }, error ? 9000 : 5000);
 }
 function signedOut() {
+  selectedGraphIDs.clear(); graphSelectionRFC = "";
   closeFeatureDialog();
   closeRFCEditor(true);
   for (const editor of editorDrafts.values()) editor.dialog.remove();
@@ -477,6 +487,7 @@ async function route() {
   refreshCurrent = null;
   const hash = (location.hash.slice(1) || "dashboard").split("?")[0];
   const [page, id] = hash.split("/");
+  if (page !== "rfc" || (graphSelectionRFC && id !== encodeURIComponent(graphSelectionRFC))) selectedGraphIDs.clear();
   chat.context(null);
   const active = page === "rfc" ? "dashboard" : page === "import" ? "draft" : page;
   for (const link of document.querySelectorAll("[data-nav]")) link.classList.toggle("active", link.dataset.nav === active);
@@ -686,7 +697,42 @@ function updateGraphNodes(graphs) {
       group.querySelector("title").textContent = graphTooltip(feature);
     });
   }
+  updateGraphSelection(graphs);
 }
+function updateGraphSelection(graphs) {
+  if (graphSelectionRFC !== graphs.rfc.id) { selectedGraphIDs.clear(); graphSelectionRFC = graphs.rfc.id; }
+  const writable = canWrite(graphs.rfc);
+  const eligible = new Set(graphs.models.flatMap(model => model.nodes.filter(node => node.feature && !node.group).map(node => node.id)));
+  for (const id of selectedGraphIDs) if (!writable || !eligible.has(id)) selectedGraphIDs.delete(id);
+  for (const entry of graphs.entries) for (const group of entry.groups.filter(Boolean)) {
+    const id = group.getAttribute("data-feature-id"), selectable = writable && eligible.has(id);
+    group.classList.toggle("roadmap-selected", selectable && selectedGraphIDs.has(id));
+    if (selectable) group.setAttribute("aria-pressed", String(selectedGraphIDs.has(id)));
+    else group.removeAttribute("aria-pressed");
+  }
+  for (const control of graphs.mergeControls) {
+    control.merge.hidden = !writable;
+    control.merge.textContent = localizeText(selectedGraphIDs.size ? "合并选中节点" : "合并节点");
+    control.merge.disabled = selectedGraphIDs.size === 1;
+    control.count.hidden = !writable || !selectedGraphIDs.size;
+    control.count.textContent = localizeText(`已选择 ${selectedGraphIDs.size} 项`);
+    control.clear.hidden = !writable || !selectedGraphIDs.size;
+  }
+}
+function toggleGraphSelection(graphs, node) {
+  if (graphs !== activeGraphs || !graphs.wrapper.isConnected) return;
+  if (selectedGraphIDs.has(node.id)) selectedGraphIDs.delete(node.id);
+  else {
+    if (selectedGraphIDs.size >= 200) { notice("每次最多选择 200 个工作节点。"); return; }
+    selectedGraphIDs.add(node.id);
+  }
+  updateGraphSelection(graphs);
+}
+window.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !featureDialog && !activeEditor?.dialog.open && activeGraphs?.wrapper.isConnected && selectedGraphIDs.size) {
+    selectedGraphIDs.clear(); updateGraphSelection(activeGraphs); event.preventDefault();
+  }
+});
 function enableGraphPanning(canvas) {
   let drag = null;
   canvas.addEventListener("pointerdown", event => {
@@ -725,10 +771,10 @@ function dependencyGraph(rfc) {
     updateGraphNodes(activeGraphs);
     return activeGraphs.wrapper;
   }
-  if (!models.length) return empty("没有依赖关系", "添加工作项后，依赖图会自动生成。");
+  if (!models.length) { selectedGraphIDs.clear(); return empty("没有依赖关系", "添加工作项后，依赖图会自动生成。"); }
   const wrapper = element("div", {class: "roadmap-graphs"});
   const previous = activeGraphs?.rfc.id === rfc.id ? activeGraphs : null;
-  const graphs = {rfc, models, signature, wrapper, entries: [], viewport: previous?.viewport};
+  const graphs = {rfc, models, signature, wrapper, entries: [], mergeControls: [], viewport: previous?.viewport};
   activeGraphs = graphs;
   for (const [modelIndex, model] of models.entries()) {
     const canvas = element("div", {class: "graph roadmap-canvas"}, element("p", {class: "muted"}, "正在绘制路线图…"));
@@ -736,7 +782,12 @@ function dependencyGraph(rfc) {
     canvas.setAttribute("aria-label", `${model.title}：拖动空白区域平移，点击节点查看详情`);
     enableGraphPanning(canvas);
     const controls = element("div", {class: "actions"});
-    if (canWrite(rfc)) controls.append(button("合并节点", () => mergeGraphNodes(graphs.rfc)));
+    const merge = button("合并节点", () => mergeGraphNodes(graphs.rfc, [...selectedGraphIDs]));
+    const count = element("span", {class: "graph-selection-count small", role: "status", hidden: true});
+    const clear = element("button", {type: "button", class: "quiet", hidden: true, onclick: () => { selectedGraphIDs.clear(); updateGraphSelection(graphs); }}, "清除选择");
+    graphs.mergeControls.push({merge, count, clear});
+    controls.append(merge, count, clear);
+    updateGraphSelection(graphs);
     const legend = element("div", {class: "graph-legend"}, ...["planned", "in_progress", "partial", "implemented", "accepted"].map(state => element("span", {class: `graph-key ${state}`}, state === "accepted" ? "已验收" : translated(state))));
     const section = element("section", {class: "roadmap-track"}, element("div", {class: "panel-title"}, element("h3", {}, model.title), controls), legend, canvas);
     wrapper.append(section);
@@ -777,7 +828,15 @@ function dependencyGraph(rfc) {
         group.setAttribute("data-group-id", node.group?.id || "");
         group.setAttribute("aria-label", `${node.title}：${localizeText("查看")}${localizeText(node.feature ? "工作详情、关联 PR 和可用操作" : "关联工作")}`);
         group.classList.add("roadmap-actionable");
-        const open = event => { event.preventDefault(); const current = graphs.models[modelIndex]; graphDetails(graphs.rfc, current.nodes[index], current); };
+        const open = event => {
+          event.preventDefault();
+          if (event.repeat) return;
+          const current = graphs.models[modelIndex], target = current.nodes[index];
+          if ((event.ctrlKey || event.metaKey) && canWrite(graphs.rfc) && target.feature && !target.group) {
+            event.stopPropagation(); toggleGraphSelection(graphs, target); return;
+          }
+          graphDetails(graphs.rfc, target, current);
+        };
         group.addEventListener("click", open);
         group.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") open(event); });
         const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
@@ -799,6 +858,8 @@ function dependencyGraph(rfc) {
         for (const group of exported.querySelectorAll("[data-feature-id]")) {
           const id = group.getAttribute("data-feature-id") || group.getAttribute("data-group-id");
           group.removeAttribute("tabindex");
+          group.removeAttribute("aria-pressed");
+          group.classList.remove("roadmap-selected");
           if (!id) continue;
           const anchor = document.createElementNS("http://www.w3.org/2000/svg", "a");
           anchor.setAttribute("href", `${location.origin}/roadmap#rfc/${encodeURIComponent(graphs.rfc.id)}?feature=${encodeURIComponent(id)}`);
@@ -1003,7 +1064,7 @@ function detailView(rfc) {
   const goals = panel("目标与范围", element("div", {class: "stack"}, metadata,
     componentSections(rfc, [...projection.overview, ...projection.goals, ...projection.scope], "尚未声明问题、目标和范围。"), publish));
   goals.id = "rfc-goals";
-  const work = element("section", {id: "rfc-work", class: "rfc-workspace"}, panel("交互路线图", dependencyGraph(rfc), "拖动空白区域平移；点击节点查看工作与证据。实现与验收分别显示。"), workPanel(rfc));
+  const work = element("section", {id: "rfc-work", class: "rfc-workspace"}, panel("交互路线图", dependencyGraph(rfc), "拖动空白区域平移；点击节点查看工作与证据。Ctrl/⌘ + 点击可多选工作节点后合并。实现与验收分别显示。"), workPanel(rfc));
   const design = panel("方案与设计", componentSections(rfc, projection.design, "尚未补充方案与设计。", true));
   design.id = "rfc-design";
   const acceptance = element("section", {id: "rfc-acceptance", class: "rfc-workspace"}, element("div", {class: "split"}, criteriaPanel(rfc), element("div", {}, suggestionsPanel(rfc), canPublish(rfc) ? decisionPanel(rfc) : null)));

@@ -23,6 +23,7 @@
 .roadmap-canvas svg .roadmap-actionable{cursor:pointer}
 .roadmap-canvas svg .roadmap-actionable:hover rect,.roadmap-canvas svg .roadmap-actionable:focus rect{stroke-width:4px}
 .roadmap-canvas svg .roadmap-actionable:focus{outline:2px solid #2563eb;outline-offset:4px}
+.roadmap-canvas svg .node.roadmap-selected rect,.roadmap-canvas svg .node.roadmap-selected polygon,.roadmap-canvas svg .node.roadmap-selected circle{stroke:#2563eb;stroke-width:4px;stroke-dasharray:6 3}.graph-selection-count{color:var(--blue);white-space:nowrap}
 
 svg[id^="rfc-graph-"] text{font-family:system-ui,sans-serif;font-size:15px}
 .roadmap-canvas{cursor:grab;touch-action:none;user-select:none}.roadmap-canvas.is-panning{cursor:grabbing}

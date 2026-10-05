@@ -119,6 +119,13 @@ remain separate. Clicking the group opens its member tasks, with **Rename merged
 node** and **Split nodes** controls. A group is green only when all its members
 are implemented; acceptance is still separate. Individual task links and SVG
 group links continue to open their authorized details.
+On desktop, hold **Ctrl** (or **⌘ Command** on macOS) and click work nodes to
+toggle multiple selections directly on the SVG, then choose **Merge selected
+nodes**. Repeated appearances of the same task count once. Modified Enter/Space
+also toggles a focused work node. Selection survives refresh and language changes;
+**Clear selection** or Escape clears it. Normal clicks open details, and the
+checkbox picker remains available on mobile. Selection is temporary, limited to
+the current authorized RFC, and omitted from downloaded SVGs.
 
 The same operations are available through SDK, CLI and MCP:
 
