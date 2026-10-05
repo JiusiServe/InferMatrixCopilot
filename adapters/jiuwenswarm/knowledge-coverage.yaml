@@ -1,7 +1,7 @@
 schema_version: 1
 required: true
 semantic_depth:
-  per_facet_gt: 0.90
+  per_facet_gt: 0.9
   acceptance_mode: lightweight
 catalog_sources:
 - README_CN.md
@@ -91,6 +91,20 @@ features:
   owner: launch
   source_globs:
   - jiuwenswarm/init_workspace.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/app.py
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/common/utils.py
+  - jiuwenswarm/debug_launcher.py
+  - jiuwenswarm/resources/agent/workspace/skills/delayed-restart-app/launch_delayed_restart.py
+  - jiuwenswarm/server/lifecycle.py
+  - jiuwenswarm/gateway/app_gateway.py
+  - jiuwenswarm/gateway/__init__.py
+  - jiuwenswarm/gateway/channel_manager/channel_manager.py
+  - scripts/harmony_entry.py
+  - jiuwenswarm/common/process_supervision.py
+  - jiuwenswarm/runtime/service.py
+  - jiuwenswarm/start_services.py
   docs:
   - docs/zh/安装指南.md
   page: repos/jiuwenswarm/components/launch/feature-bootstrap.md
@@ -102,6 +116,14 @@ features:
   source_globs:
   - jiuwenswarm/instance_manager/bootstrap.py
   - jiuwenswarm/instance_manager/*.py
+  - jiuwenswarm/dotenv_early.py
+  - jiuwenswarm/gateway/app_gateway.py
+  - jiuwenswarm/instance_manager/__init__.py
+  - jiuwenswarm/instance_manager/config.py
+  - jiuwenswarm/instance_manager/lock.py
+  - jiuwenswarm/start_services.py
+  - jiuwenswarm/instance_manager/status.py
+  - jiuwenswarm/instance_manager/yaml.py
   docs:
   - docs/zh/单机多实例运行.md
   page: repos/jiuwenswarm/components/launch/feature-instances.md
@@ -113,8 +135,40 @@ features:
   source_globs:
   - jiuwenswarm/channels/desktop/desktop_app.py
   - jiuwenswarm/channels/desktop/*
+  - jiuwenswarm/channels/web/frontend/src/utils/desktopSave.ts
+  - jiuwenswarm/channels/web/frontend/src/components/DesktopBrowserPane/DesktopBrowserPane.css
+  - jiuwenswarm/channels/web/frontend/src/components/DesktopBrowserPane/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/general/GeneralSettings.tsx
+  - scripts/build-electron-exe.ps1
+  - scripts/build-electron-exe.sh
+  - jiuwenswarm/channels/desktop/electron/main.cjs
+  - jiuwenswarm/channels/desktop/electron/preload.cjs
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/index.tsx
+  - jiuwenswarm/common/updater.py
+  - jiuwenswarm/channels/web/frontend/src/features/workspace/localFilePicker.ts
+  - jiuwenswarm/channels/web/frontend/src/hooks/useDesktopLocalFilePickerReady.ts
+  - scripts/build-exe.bat
+  - scripts/build-exe.ps1
+  - jiuwenswarm/channels/web/frontend/src/utils/textEditCommands.ts
+  - jiuwenswarm/channels/web/frontend/src/components/DesktopTextEditContextMenu/DesktopTextEditContextMenu.css
+  - jiuwenswarm/channels/web/frontend/src/components/DesktopTextEditContextMenu/index.tsx
+  - scripts/installer-electron.iss
+  - jiuwenswarm/channels/desktop/electron/launch.cjs
+  - scripts/build-macos.sh
+  - jiuwenswarm/common/upgrade_executor.py
+  - jiuwenswarm/channels/desktop/electron/target_mcp_wrapper.cjs
+  - scripts/jiuwenswarm.spec
+  - scripts/installer.iss
+  - jiuwenswarm/common/version_source.py
+  - jiuwenswarm/common/updater_restart_helper.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/channels/web/app_web.py
+  - jiuwenswarm/channels/web/frontend/src/components/UpdatePanel/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
   docs:
   - docs/zh/windows自动更新设计.md
+  - docs/zh/desktop-electron-packaging.md
+  - docs/zh/打包exe指南.md
   page: repos/jiuwenswarm/components/launch/feature-desktop.md
   entry_points:
   - jiuwenswarm/channels/desktop/desktop_app.py
@@ -128,6 +182,45 @@ features:
   - docker/Dockerfile.claw
   - docker/Dockerfile.claw.base
   - docker/Dockerfile.yr.rt.mgr
+  - jiuwenswarm/channels/browser/frontend/eslint.config.js
+  - jiuwenswarm/channels/browser/frontend/scripts/pack.js
+  - jiuwenswarm/channels/browser/frontend/vite.config.ts
+  - jiuwenswarm/channels/browser/frontend/vite.content.config.ts
+  - jiuwenswarm/common/_build_config.py
+  - scripts/build_config.py
+  - scripts/verify_a2ui_bundle.py
+  - scripts/verify_gitcode_cli_bundle.py
+  - scripts/verify_playwright_mcp_bundle.py
+  - scripts/build-electron-exe.ps1
+  - scripts/build-exe.ps1
+  - scripts/jiuwenswarm_exe_entry.py
+  - deploy/yuanrong/gateway_handler.sh
+  - scripts/build-harmony.sh
+  - scripts/build-harmony-hap.sh
+  - scripts/nfs/setup_nfs_client.sh
+  - scripts/nfs/setup_nfs_server.sh
+  - scripts/nfs/teardown_nfs_client.sh
+  - scripts/nfs/teardown_nfs_server.sh
+  - scripts/verify_rsi_bundle.py
+  - scripts/build-runtimes.psm1
+  - scripts/build-runtimes.sh
+  - scripts/openjiuwen_team_mcp_exe_entry.py
+  - scripts/build_python_packages.py
+  - scripts/build_tui.py
+  - packages/jiuwenswarm-tui/setup.py
+  - packages/jiuwenswarm-tui/jiuwenswarm_tui/app.py
+  - deploy/yuanrong/web_handler.sh
+  - scripts/installer.iss
+  - scripts/jiuwenswarm.iss
+  - deploy/yuanrong/args_handler.sh
+  - deploy/yuanrong/check_handler.sh
+  - deploy/yuanrong/deploy.sh
+  - deploy/yuanrong/global_vars.sh
+  - deploy/yuanrong/jiuwenswarm_handler.sh
+  - deploy/yuanrong/envfile_handler.sh
+  - deploy/yuanrong/template_handler.sh
+  - deploy/yuanrong/cmd_handler.sh
+  - deploy/yuanrong/common.sh
   docs:
   - docs/zh/desktop-electron-packaging.md
   page: repos/jiuwenswarm/components/packaging-deploy/feature-deployment.md
@@ -143,6 +236,31 @@ features:
   source_globs:
   - jiuwenswarm/channels/process_cli/app.py
   - jiuwenswarm/channels/process_cli/*.py
+  - jiuwenswarm/channels/process_cli/machine_signals.py
+  - jiuwenswarm/channels/process_cli/control_commands.py
+  - jiuwenswarm/channels/process_cli/display_context.py
+  - jiuwenswarm/channels/process_cli/duplex_control.py
+  - jiuwenswarm/channels/process_cli/duplex_protocol.py
+  - jiuwenswarm/channels/process_cli/duplex_input.py
+  - jiuwenswarm/channels/process_cli/main.py
+  - jiuwenswarm/channels/process_cli/render.py
+  - jiuwenswarm/channels/process_cli/client.py
+  - jiuwenswarm/channels/process_cli/live_input.py
+  - jiuwenswarm/channels/process_cli/live_layout.py
+  - jiuwenswarm/channels/process_cli/machine.py
+  - jiuwenswarm/channels/process_cli/protocol/model.py
+  - jiuwenswarm/channels/process_cli/protocol/version.py
+  - jiuwenswarm/channels/process_cli/protocol/__init__.py
+  - jiuwenswarm/channels/process_cli/protocol/jsonl.py
+  - jiuwenswarm/channels/process_cli/protocol/query.py
+  - jiuwenswarm/channels/process_cli/query.py
+  - jiuwenswarm/channels/process_cli/query_entry.py
+  - jiuwenswarm/channels/process_cli/repl.py
+  - jiuwenswarm/channels/process_cli/ui.py
+  - jiuwenswarm/channels/process_cli/machine_result.py
+  - jiuwenswarm/channels/process_cli/session_guard.py
+  - jiuwenswarm/channels/process_cli/commands.py
+  - jiuwenswarm/channels/process_cli/prompt.py
   docs:
   - docs/zh/命令行指令.md
   page: repos/jiuwenswarm/components/gateway-channels/feature-process-cli.md
@@ -154,6 +272,15 @@ features:
   source_globs:
   - jiuwenswarm/cli/main.py
   - jiuwenswarm/cli/*.py
+  - jiuwenswarm/channels/cli/chat.py
+  - jiuwenswarm/channels/cli/main.py
+  - jiuwenswarm/cli/_terminal.py
+  - jiuwenswarm/cli/chat.py
+  - jiuwenswarm/cli/gateway_client.py
+  - jiuwenswarm/channels/cli/events.py
+  - jiuwenswarm/channels/cli/gateway_client.py
+  - jiuwenswarm/gateway/message_handler/prompts/__init__.py
+  - jiuwenswarm/gateway/message_handler/prompts/review_prompt.py
   docs:
   - docs/zh/命令行指令.md
   page: repos/jiuwenswarm/components/gateway-channels/feature-cli.md
@@ -165,8 +292,118 @@ features:
   source_globs:
   - jiuwenswarm/channels/tui/frontend/src/index.ts
   - jiuwenswarm/channels/tui/*
+  - jiuwenswarm/gateway/routing/agent_request_timeout.py
+  - jiuwenswarm/server/runtime/gateway_adapter/harmonyos_adapter.py
+  - jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts
+  - jiuwenswarm/server/runtime/gateway_adapter/memory_adapter.py
+  - jiuwenswarm/agents/harness/common/memory_rpc.py
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/memory.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/memory-view.ts
+  - jiuwenswarm/server/runtime/agent_adapter/statusline_setup_agent.py
+  - jiuwenswarm/gateway/channel_manager/tui/tui_connect.py
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/chrome.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/collapse.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/color.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/attachments.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/auto-harness-issue-fix.ts
+  - jiuwenswarm/channels/tui/frontend/src/app-state.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/messages/content-components.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/checkbox-list.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/auto-harness.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/modes.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/clipboard.ts
+  - jiuwenswarm/server/runtime/session/project_store.py
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/helpers.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/config.ts
+  - jiuwenswarm/common/config_panel/tui_models_handlers.py
+  - jiuwenswarm/channels/tui/frontend/src/core/tui-config-store.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/compression-formatters.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/event-handlers.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/context.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/copy.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/debug.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/diff.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/messages/diff-component.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/evolve.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/export.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/utils/editor.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/final-content.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/history-parser.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/messages/history-entry.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/messages/presentation-rules.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/messages/render-compact-entry.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/messages/render-detailed-entry.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/hooks.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/messages/meta-components.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/init.prompts.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/init.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/keymap.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/keybindings/actions.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/keybindings/defaultBindings.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/keybindings/reserved.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/keybindings/resolver.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/keybindings/store.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/keybindings/template.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/keybindings/types.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/keybindings.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/mcp.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/messages/shared.ts
+  - jiuwenswarm/gateway/channel_manager/tui/tui_channel.py
+  - jiuwenswarm/channels/tui/frontend/src/core/pasted-text.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/persist.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/plan.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/plugin.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/recap.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/reload-plugins.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/review.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/sandbox.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/screen-layout.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/security-review.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/session-state.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/branch.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/cancel.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/clear.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/compact.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/session.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/simplify.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/skills.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/types.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/CommandService.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/_placeholder.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/registry.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/status.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/statusline.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/statusline-runner.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/swarmflow.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/theme.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/theme.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/tools/search-tool-renderers.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/tools/tool-group-message.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/tools/tool-kind-utils.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/tools/tool-line-renderers.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/tools/tool-render-shared.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/app-state-helpers.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/tools/collapsed-tool-group-message.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/tools/compact-tool-renderers.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/tools/command-tool-renderers.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/tools/detailed-tool-renderers.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/tools/file-tool-renderers.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/tools/tool-structured-data.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/expand.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/fold.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/transcript-entry-selection.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/transcript-renderer.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/transcript-timeline.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/tui-trusted-dirs-store.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/usage.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/view.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/welcome.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/workspace-dir.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/ws-client.ts
   docs:
   - docs/zh/TUI使用指南.md
+  - docs/zh/自动记忆.md
+  - docs/zh/Slash命令表.md
   page: repos/jiuwenswarm/components/tui-client/feature-tui.md
   entry_points:
   - jiuwenswarm/channels/tui/frontend/src/index.ts
@@ -176,6 +413,109 @@ features:
   source_globs:
   - jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts
   - jiuwenswarm/channels/web/frontend/src/*
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/index.tsx
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/gateway/channel_manager/base.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/BeamSearchTree.css
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/BeamSearchTree.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ChatPanel.css
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/MediaRenderer.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/MessageItem.tsx
+  - jiuwenswarm/common/chat_final.py
+  - jiuwenswarm/channels/web/frontend/src/utils/chatFinalProtocol.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/finalContent.ts
+  - jiuwenswarm/channels/web/frontend/src/types/message.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/chatTimelineClock.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/MessageList.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/clipboardImagePaste.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/diagrams/DiagramViewer.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/diagrams/diagramExport.ts
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/diagrams/useDiagramExportActions.ts
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/codeBlocks/fencedCode.ts
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/codeBlocks/registry.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/codeBlocks/types.ts
+  - jiuwenswarm/gateway/message_handler/command_parser/slash_command.py
+  - jiuwenswarm/gateway/message_handler/message_handler.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/imeComposition.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InlineQuestionCard.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/InteractionSlot/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/InteractionSlot/promptRouting.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/markdown/katex.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/index.ts
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/markdownTransforms.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/markdown/render.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/MarkdownRenderer.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/markdownPlugins.ts
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/diagrams/MermaidDiagram.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/diagrams/mermaidLayout.ts
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/diagrams/mermaidRuntime.ts
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/PickerPanel.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/PickerSearchInput.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/InteractionSlot/QaSummaryCard.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/InteractionSlot/qaSummary.ts
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/math/remarkLatexDelimiters.ts
+  - jiuwenswarm/channels/web/frontend/src/hooks/useResponsive.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/enabledExtensions.ts
+  - jiuwenswarm/channels/web/frontend/src/services/sessionEventGate.ts
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/channels/web/frontend/src/features/sessionOutput.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/markdown/highlight.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/SkillTreePath.tsx
+  - jiuwenswarm/channels/web/frontend/src/types/skillTree.ts
+  - jiuwenswarm/gateway/channel_manager/web/ws_connection_adapter.py
+  - jiuwenswarm/channels/web/frontend/src/services/streamDeltaBatcher.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/svgDimensions.ts
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/diagrams/SvgDiagram.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/diagrams/svgPreview.ts
+  - jiuwenswarm/channels/web/frontend/src/components/MarkdownRenderer/isolatedPreview.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/symphonyCommandDisplay.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/TeamEventGroupDisplay.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/ExpandedPanel.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/ExpandedPanelTabs.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/timelineRowState.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/useProcessTreeCollapse.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ToolCallDisplay.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ToolGroupDisplay.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/unsentImageDiscard.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/documentMessage.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/VirtualTimeline.tsx
+  - jiuwenswarm/channels/web/frontend/src/stores/sessionStore.ts
+  - jiuwenswarm/gateway/channel_manager/web/web_connect.py
+  - jiuwenswarm/gateway/channel_manager/web/web_channel_app.py
+  - jiuwenswarm/channels/web/frontend/src/stores/chatStore.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/writeClipboard.ts
+  - jiuwenswarm/channels/web/frontend/src/features/contextUsage/contextUsageCategories.ts
+  - jiuwenswarm/channels/web/frontend/src/features/contextUsage/contextUsageModel.ts
+  - jiuwenswarm/channels/web/frontend/tailwind.config.js
+  - jiuwenswarm/channels/web/app_web.py
+  - jiuwenswarm/channels/web/frontend/src/features/chatTimeline/buildTurnTimeline.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/markdown/MarkdownText.tsx
+  - jiuwenswarm/channels/web/file_picker.py
+  - jiuwenswarm/channels/web/frontend/src/stores/pendingQuestionQueue.ts
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/SingleAgentSurface.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/slashCommands/semantics.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/slashCommands/registry.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/teamEventUtils.ts
+  - jiuwenswarm/channels/web/frontend/src/features/teamLeaderMessages.ts
+  - jiuwenswarm/channels/web/frontend/src/features/chatTimeline/projectTimelineItems.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/timestamp.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/toolCategory.ts
+  - jiuwenswarm/channels/web/frontend/src/features/tool-events/toolEventNormalizer.ts
+  - jiuwenswarm/channels/web/frontend/src/stores/toolResultLifecycle.ts
+  - jiuwenswarm/channels/web/frontend/src/features/tool-events/reviewerMetadata.ts
+  - jiuwenswarm/channels/web/frontend/src/features/chatTimeline/index.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/userId.ts
+  - jiuwenswarm/channels/web/frontend/src/features/UserQuestionModal/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/utils/uuid.ts
+  - jiuwenswarm/channels/web/frontend/src/services/webClient.ts
+  - jiuwenswarm/channels/browser/frontend/src/webview/chat.html
+  - jiuwenswarm/server/runtime/gateway_adapter/workspace_file_adapter.py
+  - jiuwenswarm/gateway/routing/base_ws_channel.py
+  - jiuwenswarm/channels/web/frontend/src/utils/wsEventDedup.ts
+  - jiuwenswarm/channels/web/frontend/src/types/websocket.ts
   docs:
   - docs/zh/对话.md
   page: repos/jiuwenswarm/components/web-frontend/feature-web-chat.md
@@ -187,6 +527,61 @@ features:
   source_globs:
   - jiuwenswarm/channels/web/frontend/src/App.tsx
   - jiuwenswarm/channels/web/frontend/src/*
+  - jiuwenswarm/channels/web/frontend/src/hooks/useAdaptiveTooltip.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/ChannelsModule.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/SettingsChannelsPanel.css
+  - jiuwenswarm/channels/web/frontend/src/components/ui/FormDrawer/FormDrawer.css
+  - jiuwenswarm/channels/web/frontend/src/components/ui/FormDrawer/FormDrawer.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ui/Input/Input.css
+  - jiuwenswarm/channels/web/frontend/src/components/ui/Input/Input.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ui/Textarea/Textarea.css
+  - jiuwenswarm/channels/web/frontend/src/components/ui/Textarea/Textarea.tsx
+  - jiuwenswarm/channels/web/frontend/index.html
+  - jiuwenswarm/channels/web/frontend/src/hooks/useFullscreenPanel.ts
+  - jiuwenswarm/channels/web/frontend/src/hooks/useHorizontalScrollEdges.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ui/Toast/Toast.css
+  - jiuwenswarm/channels/web/frontend/src/components/ui/Toast/Toast.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/registry/accessPolicy.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/registry/openSourceDefinition.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ui/InfoCard/InfoCard.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ui/PageCard/PageCard.css
+  - jiuwenswarm/channels/web/frontend/src/components/ui/PageCard/PageCard.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ui/PageToolbarSearch/PageToolbarSearch.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/PersonalContext/Intro.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/PersonalContext/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ui/Select/Select.css
+  - jiuwenswarm/channels/web/frontend/src/components/ui/Select/Select.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/components/SettingItemRenderer.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/components/SettingRow.css
+  - jiuwenswarm/channels/web/frontend/src/features/settings/components/SettingRow.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/components/SettingsConfirmDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/components/SettingsSection.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/settingsNavigation.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/services/createSettingsRequestRouter.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/services/SettingsSaveQueue.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/services/SettingsServicesProvider.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/services/SettingsSourceProvider.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/services/SettingsUnsavedChangesRegistry.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/services/useSettingsFormDialogClose.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/services/useUnsavedChanges.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ToolPanel/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/main.tsx
+  - jiuwenswarm/channels/web/frontend/src/multi-session/routing/route.ts
+  - jiuwenswarm/channels/web/frontend/src/multi-session/routing/useChatRoute.ts
+  - jiuwenswarm/channels/web/frontend/src/components/SessionSidebar/SessionSidebar.css
+  - jiuwenswarm/channels/web/frontend/src/components/SessionSidebar/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/channelAdapters.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/components/ChannelConfigDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/components/ChannelListSection.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/useSettingsChannelsController.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/SettingsPage.css
+  - jiuwenswarm/channels/web/frontend/src/features/settings/SettingsPage.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/SettingsPageLayout.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/singleAgentPanelState.ts
+  - jiuwenswarm/channels/web/frontend/src/features/teamPanelState.ts
+  - jiuwenswarm/channels/web/frontend/src/features/teamPanelStateNormalize.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ui/Toast/toastStore.ts
+  - jiuwenswarm/channels/web/frontend/src/index.css
   docs:
   - docs/zh/页面概览.md
   page: repos/jiuwenswarm/components/web-frontend/feature-web-navigation.md
@@ -199,8 +594,127 @@ features:
   - jiuwenswarm/runtime/session_catalog.py
   - jiuwenswarm/runtime/session_lifecycle.py
   - jiuwenswarm/runtime/session*.py
+  - jiuwenswarm/server/utils/diff_service.py
+  - jiuwenswarm/server/runtime/session/session_archive.py
+  - jiuwenswarm/channels/web/frontend/src/features/workspace/archivedTaskGrouping.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/archivedTasks/useArchivedTaskLists.ts
+  - jiuwenswarm/common/cleanup.py
+  - jiuwenswarm/channels/browser/frontend/src/background/SessionManager.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/sidepanel.html
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/channels/web/frontend/src/multi-session/state/createConversationSession.ts
+  - jiuwenswarm/channels/web/frontend/src/multi-session/sidebar/ConversationSidebar.css
+  - jiuwenswarm/channels/web/frontend/src/multi-session/sidebar/ConversationSidebar.tsx
+  - jiuwenswarm/server/runtime/agent_adapter/session_message_input.py
+  - jiuwenswarm/server/control/history_service.py
+  - jiuwenswarm/server/control/health_service.py
+  - jiuwenswarm/server/control/methods.py
+  - jiuwenswarm/server/control/responses.py
+  - jiuwenswarm/server/control/project_service.py
+  - jiuwenswarm/server/control/repositories/project_repository.py
+  - jiuwenswarm/server/control/repositories/session_repository.py
+  - jiuwenswarm/server/control/session_service.py
+  - jiuwenswarm/channels/web/frontend/src/features/code-mode/gitClient.ts
+  - jiuwenswarm/gateway/app_gateway.py
+  - jiuwenswarm/common/utils.py
+  - jiuwenswarm/common/git_safe_directory.py
+  - jiuwenswarm/server/runtime/session/session_history.py
+  - jiuwenswarm/channels/web/frontend/src/components/AgentPanel/FileViewer.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/historyRestore.ts
+  - jiuwenswarm/server/runtime/session/history_io.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/MessageList.tsx
+  - jiuwenswarm/server/front/router.py
+  - jiuwenswarm/server/wire_truncate.py
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/ChatPanel.ts
+  - jiuwenswarm/gateway/im_pipeline/im_session_input.py
+  - jiuwenswarm/server/runtime/session/session_metadata.py
+  - jiuwenswarm/agents/harness/common/session_ops_service.py
+  - jiuwenswarm/channels/web/frontend/src/multi-session/state/newConversationLifecycle.ts
+  - jiuwenswarm/channels/web/frontend/src/multi-session/state/newConversationPreviousSession.ts
+  - jiuwenswarm/channels/web/frontend/src/multi-session/state/newConversationProject.ts
+  - jiuwenswarm/server/runtime/offline_session_cleanup.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/channels/process_cli/app.py
+  - jiuwenswarm/channels/web/frontend/src/features/workspace/projectDirectoryPicker.ts
+  - jiuwenswarm/server/runtime/gateway_adapter/project_adapter.py
+  - jiuwenswarm/server/runtime/session/project_queries.py
+  - jiuwenswarm/channels/web/frontend/src/features/workspace/projectRegistryClient.ts
+  - jiuwenswarm/channels/web/frontend/src/features/workspace/projectTypes.ts
+  - jiuwenswarm/server/control/store/project_queries.py
+  - jiuwenswarm/server/runtime/session/project_store.py
+  - jiuwenswarm/common/projectless_workspace.py
+  - jiuwenswarm/runtime/session_provisioner.py
+  - jiuwenswarm/runtime/service.py
+  - jiuwenswarm/runtime/request.py
+  - jiuwenswarm/common/runtime_workspace.py
+  - jiuwenswarm/server/runtime/agent_adapter/sensitive_answers.py
+  - jiuwenswarm/channels/web/frontend/src/features/workspace/archivedTaskClient.ts
+  - jiuwenswarm/runtime/session/coordinator.py
+  - jiuwenswarm/runtime/session_delete.py
+  - jiuwenswarm/runtime/session/model.py
+  - jiuwenswarm/runtime/session/execution_registry.py
+  - jiuwenswarm/server/runtime/session/git_diff_status.py
+  - jiuwenswarm/server/runtime/gateway_adapter/session_adapter.py
+  - jiuwenswarm/channels/web/frontend/src/components/SessionsPanel/index.tsx
+  - jiuwenswarm/server/runtime/session/session_info.py
+  - jiuwenswarm/server/runtime/session/lifecycle.py
+  - jiuwenswarm/gateway/routing/session_map.py
+  - jiuwenswarm/server/runtime/session/model_selection_store.py
+  - jiuwenswarm/server/runtime/session/session_rename.py
+  - jiuwenswarm/server/runtime/agent_manager.py
+  - jiuwenswarm/channels/web/frontend/src/multi-session/sidebar/ProjectArchiveDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/multi-session/sidebar/projectArchiveModel.ts
+  - jiuwenswarm/channels/web/frontend/src/multi-session/sidebar/useSidebarMenu.tsx
+  - jiuwenswarm/channels/web/frontend/src/multi-session/sidebar/ProjectCreateMenu.tsx
+  - jiuwenswarm/channels/web/frontend/src/multi-session/sidebar/projectCreateErrors.ts
+  - jiuwenswarm/channels/web/frontend/src/multi-session/sidebar/SidebarActionMenu.tsx
+  - jiuwenswarm/channels/web/frontend/src/multi-session/sidebar/SidebarMenu.tsx
+  - jiuwenswarm/channels/web/frontend/src/multi-session/sidebar/sidebarMenuSchema.ts
+  - jiuwenswarm/channels/web/frontend/src/multi-session/sidebar/sidebarModel.ts
+  - jiuwenswarm/server/runtime/agent_adapter/team_helpers.py
+  - jiuwenswarm/agents/harness/team/team_manager.py
+  - jiuwenswarm/channels/tui/frontend/src/app-state.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/new.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/rename.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/resume.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/rewind.ts
+  - jiuwenswarm/gateway/channel_manager/tui/tui_connect.py
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/sessions.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/archivedTasks/ArchivedTasksSettings.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/archivedTasks/definition.ts
+  - jiuwenswarm/channels/web/frontend/src/features/historyPagination.ts
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/historyRecordReassembler.ts
+  - jiuwenswarm/gateway/channel_manager/web/lifecycle_handlers.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/multi-session/dialogs/Dialogs.tsx
+  - jiuwenswarm/channels/web/frontend/src/multi-session/dialogs/dialogs.css
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/projectSelection.ts
+  - jiuwenswarm/channels/web/frontend/src/types/index.ts
+  - jiuwenswarm/channels/web/frontend/src/features/teamHistoryPanelRestore.ts
+  - jiuwenswarm/channels/web/frontend/src/stores/workspaceStore.ts
+  - jiuwenswarm/channels/browser/frontend/src/webview/chat.html
+  - jiuwenswarm/channels/web/frontend/src/features/workspace/workModeStorage.ts
+  - jiuwenswarm/common/work_mode.py
   docs:
   - docs/zh/项目与会话管理.md
+  - .doc_project_maintainer/project/flows/agentserver-history-stream.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_session_delete/actual-behavior.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_session_delete/risks.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_session_list/actual-behavior.md
+  - .doc_project_maintainer/modules/agentserver-runtime/changes.md
+  - .doc_project_maintainer/modules/gateway-and-channels/README.md
+  - .doc_project_maintainer/project/flows/session-prewarm-allocation.md
+  - .doc_project_maintainer/modules/runtime-session/README.md
+  - .doc_project_maintainer/project/flows/agentserver-session-lifecycle.md
+  - docs/zh/Slash命令表.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._resolve_rewind_agent.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._send_error_response.md
   page: repos/jiuwenswarm/components/agent-runtime/feature-projects-sessions.md
   entry_points:
   - jiuwenswarm/runtime/session_catalog.py
@@ -212,8 +726,27 @@ features:
   - jiuwenswarm/runtime/mode_catalog.py
   - jiuwenswarm/common/mode_matrix.py
   - jiuwenswarm/server/runtime/agent_adapter/*.py
+  - jiuwenswarm/server/runtime/agent_manager.py
+  - jiuwenswarm/runtime/request.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/agents/harness/code/rails/code_confirm_interrupt_rail.py
+  - jiuwenswarm/channels/web/frontend/src/features/code-mode/gitPublishState.ts
+  - jiuwenswarm/channels/web/frontend/src/features/planMode/wireMode.ts
+  - jiuwenswarm/server/runtime/tenant_agent_pool.py
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/mode.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/event-handlers.ts
+  - jiuwenswarm/server/runtime/agent_adapter/user_turn.py
+  - jiuwenswarm/channels/web/frontend/src/config/chatConfig.tsx
+  - jiuwenswarm/channels/web/frontend/src/config/permissionProfiles.ts
+  - jiuwenswarm/server/runtime/session/work_mode.py
   docs:
   - docs/zh/模式系统.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._prepare_code_mode_chat_turn.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._session_mode_sync_lock.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._should_sync_code_mode_state.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/resolve_agent_request_mode.md
+  - .doc_project_maintainer/modules/agentserver-runtime/README.md
   page: repos/jiuwenswarm/components/agent-server-runtime/feature-modes.md
   entry_points:
   - jiuwenswarm/runtime/mode_catalog.py
@@ -224,6 +757,52 @@ features:
   source_globs:
   - jiuwenswarm/agents/harness/team/team_manager.py
   - jiuwenswarm/agents/harness/team/*.py
+  - jiuwenswarm/agents/swarm/agent_group.py
+  - jiuwenswarm/server/runtime/extension_package_manager.py
+  - jiuwenswarm/agents/harness/team/bootstrap.py
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/swarm/SwarmMapPanel.ts
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/swarm/SwarmState.ts
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/swarm/SwarmStateManager.ts
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/swarm/SwarmState.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/swarm/SwarmStateManager.kt
+  - jiuwenswarm/agents/swarm/providers/tools.py
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/ChatToolWindow.kt
+  - jiuwenswarm/channels/ide/packages/shared-webview/swarm_map.html
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/SwarmMapPanel.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/SwarmMapToolWindowFactory.kt
+  - jiuwenswarm/agents/swarm/__init__.py
+  - jiuwenswarm/agents/swarm/assembly.py
+  - jiuwenswarm/server/runtime/agent_adapter/team_helpers.py
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/shared.tsx
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/server/runtime/team_binding_store.py
+  - jiuwenswarm/agents/harness/team/config_loader.py
+  - jiuwenswarm/agents/harness/common/tools/send_file_to_user.py
+  - jiuwenswarm/agents/harness/team/event_types.py
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/TeamMembersPanel.tsx
+  - jiuwenswarm/channels/web/frontend/src/utils/teamMemberAvatar.ts
+  - jiuwenswarm/channels/web/frontend/src/components/TeamMemberAvatar/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/MemberListItem.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/MemberOverviewCard.tsx
+  - jiuwenswarm/agents/harness/team/__init__.py
+  - jiuwenswarm/agents/harness/team/handlers/team_monitor_handler.py
+  - jiuwenswarm/agents/harness/team/handlers/base_monitor_handler.py
+  - jiuwenswarm/agents/harness/team/rails/team_workspace_report_path_rail.py
+  - jiuwenswarm/agents/harness/team/team_name_generator.py
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/team-panel.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/team-shared.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/team-status-pill.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/event-handlers.ts
+  - jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts
+  - jiuwenswarm/channels/web/frontend/src/features/teamConnectionPresentation.ts
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/teamLeaderIdentity.ts
+  - jiuwenswarm/channels/web/frontend/src/stores/sessionStore.ts
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/ProcessListCard.tsx
+  - jiuwenswarm/channels/web/frontend/src/stores/teamTaskNormalize.ts
+  - jiuwenswarm/channels/web/frontend/src/features/teamTaskProgressBaseline.ts
   docs:
   - docs/zh/AgentTeam.md
   page: repos/jiuwenswarm/components/agents-team/feature-team.md
@@ -234,6 +813,9 @@ features:
   owner: agents-team
   source_globs:
   - jiuwenswarm/agents/harness/team/distributed_runtime.py
+  - jiuwenswarm/agents/harness/team/a2x/a2x_registry_runtime.py
+  - jiuwenswarm/agents/harness/team/team_manager.py
+  - jiuwenswarm/agents/harness/team/remote_member_bootstrap.py
   docs:
   - docs/zh/分布式Team.md
   page: repos/jiuwenswarm/components/agents-team/feature-distributed-team.md
@@ -245,6 +827,10 @@ features:
   source_globs:
   - jiuwenswarm/agents/harness/team/team_manager.py
   - jiuwenswarm/agents/harness/team/*
+  - jiuwenswarm/gateway/routing/session_sharing.py
+  - jiuwenswarm/server/runtime/agent_adapter/team_helpers.py
+  - jiuwenswarm/gateway/message_handler/join_exit_handlers.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/index.tsx
   docs:
   - docs/zh/AgentTeam人类成员联机协作.md
   page: repos/jiuwenswarm/components/agents-team/feature-human-team.md
@@ -256,6 +842,25 @@ features:
   source_globs:
   - jiuwenswarm/agents/harness/team/handlers/workflow_state.py
   - jiuwenswarm/agents/harness/team/handlers/*
+  - jiuwenswarm/server/runtime/agent_adapter/team_helpers.py
+  - jiuwenswarm/channels/web/frontend/src/utils/swarmflowAdvisory.ts
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/AgentDetailModal.tsx
+  - jiuwenswarm/agents/harness/team/team_manager.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx
+  - jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/SwarmflowTreeView.tsx
+  - jiuwenswarm/channels/tui/frontend/src/core/workflows.ts
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/workflowTypes.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/swarmflows.ts
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/SwarmflowGraphView.tsx
+  - jiuwenswarm/channels/web/frontend/src/stores/sessionStore.ts
+  - jiuwenswarm/channels/web/frontend/src/services/webClient.ts
+  - jiuwenswarm/agents/harness/team/handlers/workflow_monitor_handler.py
+  - jiuwenswarm/server/wire_truncate.py
   docs:
   - docs/zh/TUI使用SwarmFlow指南.md
   page: repos/jiuwenswarm/components/agents-team/feature-swarmflow.md
@@ -267,8 +872,61 @@ features:
   source_globs:
   - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
   - jiuwenswarm/agents/harness/common/rails/*
+  - jiuwenswarm/agents/harness/common/rails/avatar_rail.py
+  - jiuwenswarm/runtime/service.py
+  - jiuwenswarm/agents/harness/common/rails/execution_guard/circuit_breaker_rail.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_code.py
+  - jiuwenswarm/agents/harness/code/rails/__init__.py
+  - jiuwenswarm/agents/harness/code/rails/code_agent_mode_rail.py
+  - jiuwenswarm/agents/harness/code/prompt/__init__.py
+  - jiuwenswarm/agents/harness/code/prompt/code_prompt_builder.py
+  - jiuwenswarm/agents/harness/code/spec.py
+  - jiuwenswarm/agents/harness/common/rails/runtime_prompt_rail.py
+  - jiuwenswarm/agents/harness/common/prompt/prompt_builder.py
+  - jiuwenswarm/agents/harness/common/tools/__init__.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/agents/harness/common/rails/interrupt/interrupt_helpers.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/permission_interrupt_rail.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/agents/harness/common/tools/mcp_toolkits.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/network_scope.py
+  - jiuwenswarm/server/runtime/agent_adapter/output_handoff.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/permission_interaction.py
+  - jiuwenswarm/server/runtime/agent_adapter/permission_rail_group.py
+  - jiuwenswarm/common/permission_tools.py
+  - jiuwenswarm/agents/harness/common/rails/__init__.py
+  - jiuwenswarm/agents/harness/common/plugins/rail_manager.py
+  - jiuwenswarm/agents/harness/common/rails/response_prompt_rail.py
+  - jiuwenswarm/runtime/events.py
+  - jiuwenswarm/runtime/context.py
+  - jiuwenswarm/runtime/host_services.py
+  - jiuwenswarm/runtime/interaction.py
+  - jiuwenswarm/runtime/session/coordinator.py
+  - jiuwenswarm/server/runtime/session/session_manager.py
+  - jiuwenswarm/runtime/session/work_scheduler.py
+  - jiuwenswarm/agents/harness/common/prompt/shell_environment.py
+  - jiuwenswarm/agents/harness/common/rails/stream_event_rail.py
+  - jiuwenswarm/agents/swarm/providers/builtin_rails.py
+  - jiuwenswarm/agents/swarm/providers/code_rails.py
+  - jiuwenswarm/agents/harness/team/team_manager.py
+  - jiuwenswarm/agents/swarm/providers/member_rails.py
+  - jiuwenswarm/agents/swarm/registry.py
+  - jiuwenswarm/agents/swarm/providers/runtime_tools.py
+  - jiuwenswarm/agents/swarm/config_specs.py
+  - jiuwenswarm/agents/swarm/providers/code_subagents.py
+  - jiuwenswarm/agents/harness/common/rails/symphony/retrieval_context_processor.py
+  - jiuwenswarm/agents/harness/common/rails/symphony/tool_stream_events.py
+  - jiuwenswarm/agents/harness/common/prompt/priority_registry.py
+  - jiuwenswarm/agents/harness/team/team_runtime_inheritance.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/tool_binding.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/invocation_context.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/tool_permission_context.py
+  - jiuwenswarm/agents/harness/common/tool_progress_context.py
+  - jiuwenswarm/agents/harness/work/prompt/work_plan_prompts.py
   docs:
   - docs/zh/Harness.md
+  - docs/zh/性能优化.md
+  - jiuwenswarm/agents/swarm/DESIGN.md
   page: repos/jiuwenswarm/components/agent-server-runtime/feature-harness.md
   entry_points:
   - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
@@ -278,6 +936,28 @@ features:
   source_globs:
   - jiuwenswarm/agents/harness/code/rails/code_task_planning_rail.py
   - jiuwenswarm/agents/harness/common/*
+  - jiuwenswarm/agents/harness/code/prompt/code_todo_tool_prompts.py
+  - jiuwenswarm/agents/harness/code/tools/__init__.py
+  - jiuwenswarm/agents/harness/code/tools/code_todo_tools.py
+  - jiuwenswarm/channels/web/frontend/src/components/MemberTaskDrawer/index.tsx
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/channels/web/frontend/src/components/TodoList/TodoItem.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/TodoList/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/CompactTaskList.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/MemberTaskList.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/TaskPlanningPanel.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/TeamMembersPanel.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/UnassignedTeamAvatar.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/TeamTaskEvents.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/taskProgress.ts
+  - jiuwenswarm/channels/web/frontend/src/components/AgentPanel/FileViewer.tsx
+  - jiuwenswarm/channels/web/frontend/src/types/todo.ts
+  - jiuwenswarm/agents/harness/common/tools/todo_toolkits.py
+  - jiuwenswarm/agents/harness/common/tools/todo_compat.py
+  - jiuwenswarm/channels/tui/frontend/src/ui/components/todo-list.ts
+  - jiuwenswarm/channels/tui/frontend/src/app-state.ts
+  - jiuwenswarm/channels/web/frontend/src/components/teamArea/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/stores/todoStore.ts
   docs:
   - docs/zh/任务规划.md
   page: repos/jiuwenswarm/components/agents-team/feature-planning.md
@@ -290,6 +970,25 @@ features:
   - jiuwenswarm/agents/swarm/providers/code_subagents.py
   - jiuwenswarm/agents/harness/common/tools/subagent_compat.py
   - jiuwenswarm/agents/harness/common/rails/*
+  - jiuwenswarm/server/runtime/agent_config_service.py
+  - jiuwenswarm/agents/harness/common/prompt/browser_task_prompt.py
+  - jiuwenswarm/agents/harness/common/rails/browser_task_prompt_rail.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/agents/harness/common/tools/multi_session_toolkits.py
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/channels/web/frontend/src/types/subagent.ts
+  - jiuwenswarm/channels/web/frontend/src/components/subagent/Subagent.css
+  - jiuwenswarm/channels/web/frontend/src/components/subagent/SubagentCompactPanel.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/subagent/SubagentExpandedPanel.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/subagent/SubagentStatusIcon.tsx
+  - jiuwenswarm/agents/swarm/providers/code_rails.py
+  - jiuwenswarm/server/runtime/agent_adapter/task_tool_events.py
+  - jiuwenswarm/channels/web/frontend/src/features/subagent/subagentActivityPresentation.ts
+  - jiuwenswarm/channels/web/frontend/src/features/subagent/subagentStatusPresentation.ts
+  - jiuwenswarm/channels/web/frontend/src/features/historyRestore.ts
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/subagent/subagentNormalizer.ts
+  - jiuwenswarm/channels/web/frontend/src/stores/subagentStore.ts
   docs:
   - docs/zh/Harness.md
   page: repos/jiuwenswarm/components/agents-team/feature-subagents.md
@@ -302,8 +1001,38 @@ features:
   source_globs:
   - jiuwenswarm/server/runtime/skill/skill_manager.py
   - jiuwenswarm/server/runtime/skill/*
+  - jiuwenswarm/agents/harness/common/tools/skill_toolkits.py
+  - jiuwenswarm/server/runtime/skill/skills_multipart_http.py
+  - jiuwenswarm/server/runtime/skill/skillpack.py
+  - jiuwenswarm/common/utils.py
+  - jiuwenswarm/resources/agent/workspace/skills/docx-pro/scripts/md_parser.py
+  - jiuwenswarm/channels/web/frontend/src/utils/skillNetUrl.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/mySkills.ts
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/sync-runtime-skill.js
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/server/runtime/skill/archive_store.py
+  - jiuwenswarm/server/runtime/skill/skill_content_images.py
+  - jiuwenswarm/channels/web/frontend/src/components/SkillPanel/skillPanelUtils.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/skillPackageFile.ts
+  - jiuwenswarm/agents/harness/common/tools/send_file_to_user.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/SkillPickerPanel.tsx
+  - jiuwenswarm/server/runtime/skill/skilldev/state_utils.py
+  - jiuwenswarm/server/runtime/skill/skill_type.py
+  - jiuwenswarm/channels/web/frontend/src/components/SkillPanel/skillVersionOptions.ts
+  - jiuwenswarm/server/runtime/skill/skill_files.py
+  - jiuwenswarm/channels/web/frontend/src/features/SkillNetSearchModal/index.tsx
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/agents/swarm/providers/member_rails.py
+  - jiuwenswarm/agents/harness/team/rails/team_member_skill_toolkit_rail.py
+  - jiuwenswarm/agents/harness/team/rails/team_skill_library_reload_rail.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/url_ingest/url_safety.py
+  - jiuwenswarm/channels/web/frontend/src/components/SkillPanel/index.tsx
+  - jiuwenswarm/channels/web/app_web.py
+  - jiuwenswarm/channels/browser/frontend/src/webview/chat.html
   docs:
   - docs/zh/技能.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._get_stateless_agent.md
   page: repos/jiuwenswarm/components/agents-team/feature-skills.md
   entry_points:
   - jiuwenswarm/server/runtime/skill/skill_manager.py
@@ -314,6 +1043,11 @@ features:
   - jiuwenswarm/agents/swarm/assembly.py
   - jiuwenswarm/agents/swarm/providers/skills.py
   - jiuwenswarm/agents/swarm/*
+  - jiuwenswarm/agents/swarm/config_specs.py
+  - jiuwenswarm/agents/swarm/providers/tools.py
+  - jiuwenswarm/resources/agent/workspace/skills/swarmskill-creator/scripts/validate_swarmskill.py
+  - jiuwenswarm/server/runtime/agent_adapter/team_helpers.py
+  - jiuwenswarm/agents/harness/team/rails/team_skill_storage_policy_rail.py
   docs:
   - docs/zh/SwarmSkills.md
   page: repos/jiuwenswarm/components/agents-team/feature-swarm-skills.md
@@ -326,8 +1060,41 @@ features:
   source_globs:
   - jiuwenswarm/server/runtime/marketplace/hub_client.py
   - jiuwenswarm/server/runtime/marketplace/*
+  - jiuwenswarm/channels/web/frontend/src/hooks/useAssetPublication.ts
+  - jiuwenswarm/channels/web/frontend/src/components/AssetPublishDrawer/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AssetPublishDrawer/style.css
+  - jiuwenswarm/channels/web/frontend/src/services/assetPublishApi.ts
+  - jiuwenswarm/server/runtime/skill/skill_manager.py
+  - jiuwenswarm/channels/web/frontend/src/features/ClawHubSearchModal/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/SourceManagerModal/index.tsx
+  - jiuwenswarm/server/runtime/marketplace/hub_asset_installer.py
+  - jiuwenswarm/server/runtime/marketplace/hub_asset_port.py
+  - jiuwenswarm/server/runtime/marketplace/asset_publish_api.py
+  - jiuwenswarm/server/runtime/marketplace/asset_publish_models.py
+  - jiuwenswarm/server/runtime/marketplace/asset_publish_service.py
+  - jiuwenswarm/server/runtime/marketplace/asset_publish_store.py
+  - jiuwenswarm/server/runtime/marketplace/hub_asset_type_adapter.py
+  - jiuwenswarm/server/runtime/marketplace/hub_avatar_cache.py
+  - jiuwenswarm/server/runtime/marketplace/hub_catalog_cache.py
+  - jiuwenswarm/server/runtime/marketplace/hub_install_state.py
+  - jiuwenswarm/server/runtime/marketplace/hub_package_downloader.py
+  - jiuwenswarm/server/runtime/marketplace/hub_publish_client.py
+  - jiuwenswarm/server/runtime/marketplace/hub_publish_port.py
+  - jiuwenswarm/channels/web/frontend/src/components/marketplace/CatalogCacheNotice.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/marketplace/InstallationFilterSelect.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/marketplace/MarketplaceSurface.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/marketplace/PublicationDetailStatus.tsx
+  - jiuwenswarm/server/runtime/marketplace/asset_package_builder.py
+  - jiuwenswarm/channels/web/frontend/src/features/OnlineSkillSearchPanel/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/SkillPanel/useHubMarketplace.ts
+  - jiuwenswarm/channels/web/frontend/src/components/SkillPanel/MarketplaceView.tsx
+  - jiuwenswarm/channels/web/frontend/src/utils/gitcodeOAuth.ts
+  - jiuwenswarm/server/runtime/marketplace/asset_publish_adapters.py
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/teamskills.ts
+  - jiuwenswarm/channels/web/frontend/src/features/TeamSkillsHubModal/index.tsx
   docs:
   - docs/zh/技能.md
+  - docs/zh/Slash命令表.md
   page: repos/jiuwenswarm/components/agents-team/feature-skill-hub.md
   entry_points:
   - jiuwenswarm/server/runtime/marketplace/hub_client.py
@@ -337,6 +1104,18 @@ features:
   source_globs:
   - jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py
   - jiuwenswarm/agents/harness/common/rails/*
+  - jiuwenswarm/gateway/message_handler/evolution_approval.py
+  - jiuwenswarm/gateway/message_handler/message_handler.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/evolution-status.ts
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/runtime/evolution.py
+  - jiuwenswarm/server/runtime/skill/skill_manager.py
+  - jiuwenswarm/channels/web/frontend/src/components/SkillPanel/useEvolution.ts
+  - jiuwenswarm/channels/web/frontend/src/features/SkillEvolutionModal/index.tsx
+  - jiuwenswarm/agents/swarm/providers/evolution_rails.py
+  - jiuwenswarm/server/runtime/agent_adapter/team_helpers.py
+  - jiuwenswarm/agents/harness/team/team_manager.py
+  - jiuwenswarm/channels/tui/frontend/src/app-state.ts
   docs:
   - docs/zh/Skill自演进.md
   page: repos/jiuwenswarm/components/agent-server-runtime/feature-skill-evolution.md
@@ -348,6 +1127,35 @@ features:
   source_globs:
   - jiuwenswarm/symphony/service.py
   - jiuwenswarm/symphony/*.py
+  - jiuwenswarm/agents/harness/common/rails/skill_retrieval_prompt_rail.py
+  - jiuwenswarm/server/runtime/skill/skill_manager.py
+  - jiuwenswarm/channels/web/frontend/src/components/SkillGraphPanel/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/SkillGraphPanel/skillGraphLayout.ts
+  - jiuwenswarm/channels/web/frontend/src/components/SkillGraphPanel/SkillGraphPanel.css
+  - jiuwenswarm/channels/web/frontend/src/components/SkillPanel/symphonyGraphAction.ts
+  - jiuwenswarm/channels/web/frontend/src/components/SkillPanel/useSymphonyGraph.ts
+  - jiuwenswarm/agents/harness/common/tools/skill_retrieval_toolkits.py
+  - jiuwenswarm/channels/web/frontend/src/components/SkillPanel/skillRetrievalStatus.ts
+  - jiuwenswarm/channels/web/frontend/src/components/SkillPanel/useRetrievalIndexBuild.ts
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/agents/swarm/providers/evolution_rails.py
+  - jiuwenswarm/symphony/build.py
+  - jiuwenswarm/symphony/adapter.py
+  - jiuwenswarm/symphony/experience.py
+  - jiuwenswarm/agents/harness/common/rails/symphony/orchestration_rail.py
+  - jiuwenswarm/symphony/graph_state.py
+  - jiuwenswarm/symphony/graph_storage.py
+  - jiuwenswarm/symphony/llm.py
+  - jiuwenswarm/symphony/shared/llm_payload.py
+  - jiuwenswarm/agents/harness/common/rails/symphony/__init__.py
+  - jiuwenswarm/symphony/shared/rich_compat.py
+  - jiuwenswarm/symphony/shared/__init__.py
+  - jiuwenswarm/symphony/shared/storage.py
+  - jiuwenswarm/agents/harness/common/tools/symphony_toolkits.py
+  - jiuwenswarm/symphony/skill_retrieval/__init__.py
+  - jiuwenswarm/symphony/skill_retrieval/runtime.py
+  - jiuwenswarm/symphony/shared/profiling.py
+  - jiuwenswarm/symphony/shared/tags.py
   docs:
   - docs/zh/Symphony-技能编排与分发.md
   page: repos/jiuwenswarm/components/symphony-orchestration/feature-symphony.md
@@ -359,8 +1167,54 @@ features:
   source_globs:
   - jiuwenswarm/agents/harness/common/auto_harness/service.py
   - jiuwenswarm/agents/harness/common/auto_harness/*
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/agents/harness/common/auto_harness/capabilities.py
+  - jiuwenswarm/agents/harness/common/auto_harness/issue_fix/__init__.py
+  - jiuwenswarm/common/config_panel/tui_models_handlers.py
+  - jiuwenswarm/agents/harness/common/auto_harness/config_validator.py
+  - jiuwenswarm/agents/harness/common/auto_harness/__init__.py
+  - jiuwenswarm/agents/harness/common/auto_harness/run_log_status.py
+  - jiuwenswarm/agents/harness/common/auto_harness/scheduler.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/auto-harness.ts
+  - jiuwenswarm/agents/harness/common/rsi/materializer.py
+  - jiuwenswarm/agents/harness/common/auto_harness/repo_auth/__init__.py
+  - jiuwenswarm/agents/harness/common/auto_harness/repo_auth/gitcode.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ChatPanel.css
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/HarnessProgressBar.tsx
+  - jiuwenswarm/agents/harness/common/auto_harness/issue_fix/run_progress.py
+  - jiuwenswarm/agents/harness/common/auto_harness/issue_fix/service.py
+  - jiuwenswarm/agents/harness/common/auto_harness/issue_fix/issue_matrix_store.py
+  - jiuwenswarm/channels/web/frontend/src/components/ToolPanel/ReadOnlyFileModal.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/components/RsiCanvasArea.tsx
+  - jiuwenswarm/agents/harness/common/rsi/models.py
+  - jiuwenswarm/agents/harness/common/rsi/adapter.py
+  - jiuwenswarm/agents/harness/common/rsi/event_consumer.py
+  - jiuwenswarm/agents/harness/common/rsi/events.py
+  - jiuwenswarm/agents/harness/common/rsi/errors.py
+  - jiuwenswarm/agents/harness/common/rsi/event_journal.py
+  - jiuwenswarm/agents/harness/common/rsi/harness_adapter.py
+  - jiuwenswarm/agents/harness/common/rsi/harness_provider.py
+  - jiuwenswarm/agents/harness/common/rsi/mock_harness_provider.py
+  - jiuwenswarm/agents/harness/common/rsi/provider_factory.py
+  - jiuwenswarm/agents/harness/common/rsi/services.py
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/components/RsiResultSummary.tsx
+  - jiuwenswarm/agents/harness/common/rsi/context.py
+  - jiuwenswarm/agents/harness/common/rsi/__init__.py
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/rsiPresentation.ts
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/rsiApi.ts
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/rsiTreeLayout.ts
+  - jiuwenswarm/agents/harness/common/rsi/paper_provider.py
+  - jiuwenswarm/agents/harness/common/rsi/usage_recorder.py
+  - jiuwenswarm/agents/harness/common/rsi/validation_dataset.py
+  - jiuwenswarm/agents/harness/common/rsi/worker.py
+  - jiuwenswarm/agents/harness/common/rsi/recovery.py
+  - jiuwenswarm/agents/harness/common/auto_harness/task_store.py
+  - jiuwenswarm/channels/web/frontend/src/stores/harnessStore.ts
   docs:
   - docs/zh/AutoHarness.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._stop_scheduler.md
+  - .doc_project_maintainer/project/flows/agentserver-schedule-auto-harness.md
   page: repos/jiuwenswarm/components/auto-harness/feature-auto-harness.md
   entry_points:
   - jiuwenswarm/agents/harness/common/auto_harness/service.py
@@ -370,6 +1224,10 @@ features:
   source_globs:
   - jiuwenswarm/agents/harness/common/rsi/harness_activation.py
   - jiuwenswarm/agents/harness/common/rsi/*
+  - jiuwenswarm/agents/harness/common/auto_harness/service.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/agents/harness/common/rsi/plugin_catalog.py
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/rsiApi.ts
   docs:
   - docs/zh/AutoHarness.md
   page: repos/jiuwenswarm/components/auto-harness/feature-rsi-packages.md
@@ -392,6 +1250,27 @@ features:
   source_globs:
   - jiuwenswarm/agents/harness/common/memory/manager.py
   - jiuwenswarm/agents/harness/common/memory/*
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/agents/harness/common/memory/dreaming/__init__.py
+  - jiuwenswarm/agents/harness/common/memory/dreaming/sweeper.py
+  - jiuwenswarm/agents/harness/common/memory/external_memory_config.py
+  - jiuwenswarm/agents/harness/common/memory/external_memory_builder.py
+  - jiuwenswarm/agents/harness/common/memory/forbidden.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/collectors/memory_collector.py
+  - jiuwenswarm/agents/harness/common/memory/embeddings.py
+  - jiuwenswarm/agents/harness/common/tools/memory_tools.py
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/agents/harness/common/rails/memory_forbidden_rail.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/agents/harness/common/memory/internal.py
+  - jiuwenswarm/agents/harness/common/memory/config.py
+  - jiuwenswarm/agents/harness/common/memory/__init__.py
+  - jiuwenswarm/agents/harness/common/memory/types.py
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/memory.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/memory-path-utils.ts
+  - jiuwenswarm/channels/tui/frontend/src/app-state.ts
   docs:
   - docs/zh/记忆.md
   page: repos/jiuwenswarm/components/agents-team/feature-memory.md
@@ -403,6 +1282,10 @@ features:
   source_globs:
   - jiuwenswarm/agents/harness/common/auto_memory/extraction_runner.py
   - jiuwenswarm/agents/harness/common/auto_memory/*
+  - jiuwenswarm/agents/harness/common/auto_memory/__init__.py
+  - jiuwenswarm/agents/harness/common/auto_memory/extract_memories.py
+  - jiuwenswarm/agents/harness/common/auto_memory/prompts.py
+  - jiuwenswarm/agents/harness/common/auto_memory/tool_restriction_rail.py
   docs:
   - docs/zh/自动记忆.md
   page: repos/jiuwenswarm/components/agents-team/feature-auto-memory.md
@@ -414,6 +1297,11 @@ features:
   source_globs:
   - jiuwenswarm/server/runtime/agent_adapter/interface_code.py
   - jiuwenswarm/agents/harness/code/*
+  - jiuwenswarm/common/coding_memory_paths.py
+  - jiuwenswarm/agents/harness/common/rails/project_memory/__init__.py
+  - jiuwenswarm/agents/harness/common/rails/project_memory/files.py
+  - jiuwenswarm/agents/harness/common/rails/project_memory_rail.py
+  - jiuwenswarm/agents/harness/common/rails/project_memory/section.py
   docs:
   - docs/zh/编码记忆.md
   page: repos/jiuwenswarm/components/agent-server-runtime/feature-coding-memory.md
@@ -437,6 +1325,11 @@ features:
   - jiuwenswarm/server/runtime/agent_adapter/compact_partial_prompts.py
   - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
   - jiuwenswarm/agents/harness/common/*
+  - jiuwenswarm/channels/ide/packages/shared-webview/chat.html
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/server/runtime/tokenizer_service.py
+  - jiuwenswarm/channels/web/frontend/src/components/SessionSidebar/OffloadFilesWidget.tsx
   docs:
   - docs/zh/上下文压缩.md
   page: repos/jiuwenswarm/components/agent-server-runtime/feature-context.md
@@ -450,8 +1343,82 @@ features:
   - jiuwenswarm/agents/harness/common/rails/permissions/permission_interrupt_rail.py
   - jiuwenswarm/agents/harness/common/rails/permissions/policy_eval.py
   - jiuwenswarm/server/*
+  - jiuwenswarm/channels/web/frontend/src/components/InteractionSlot/promptRouting.ts
+  - jiuwenswarm/agents/harness/common/rails/permissions/audit.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/before_tool.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/auto_config.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/auto_decision.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/deny_response.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/deterministic.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/domain_grant_audit.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/models.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/persistent_audit.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/auto_permission_rail.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/lifecycle.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/reviewer_execution.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/AutoReviewerStatus.tsx
+  - jiuwenswarm/channels/cli/_terminal.py
+  - jiuwenswarm/channels/cli/chat.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/agents/harness/common/tools/file_delivery_policy.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/domain_manual.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/manual_authorization.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/invocation_context.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/native_path_context.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/__init__.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/openjiuwen_contract.py
+  - jiuwenswarm/server/runtime/extension_package_manager.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/permission_compose.py
+  - jiuwenswarm/server/runtime/agent_adapter/permission_continuation.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/execution_provider_contract.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/PermissionWarningDialog.tsx
+  - jiuwenswarm/agents/harness/common/rails/permissions/permissions_layers.py
+  - jiuwenswarm/agents/harness/common/rails/interrupt/permission_options.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/owner_scopes.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/permissions_config_rpc.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/permissions_persist.py
+  - jiuwenswarm/server/runtime/agent_manager.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/protected_paths.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/readonly_tool_bindings.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/auto_reviewer.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/reviewer_audit.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/reviewer_override_consume.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/reviewer_override_gate.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/reviewer_redaction.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/reviewer_route.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/reviewer_stream_metadata.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/reviewer_metadata.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/root_ask_user.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/root_context_rail.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/root_context.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/root_permission_queue.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/root_permission_queue_rail.py
+  - jiuwenswarm/runtime/permission_catalog.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/send_file_approval_scope.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/send_file_path_guard.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/session_deny.py
+  - jiuwenswarm/server/runtime/agent_adapter/permission_runtime_state.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/agents/harness/common/tools/bash_tool_safety.py
+  - jiuwenswarm/agents/swarm/providers/member_rails.py
+  - jiuwenswarm/agents/harness/team/rails/team_permission_policy_rail.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/tool_capabilities.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/tool_decision_facts.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/tool_invocation_key.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/trusted_search_urls.py
+  - jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/permissions.ts
+  - jiuwenswarm/agents/harness/common/rails/permissions/url_safety.py
+  - jiuwenswarm/channels/web/frontend/src/components/InteractionSlot/AuthorizationPrompt.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/InteractionSlot/InteractionSlot.css
+  - jiuwenswarm/agents/harness/common/workspace_paths.py
+  - jiuwenswarm/server/front/connection.py
   docs:
   - docs/zh/工具权限与安全防护.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._process_request.md
   page: repos/jiuwenswarm/components/agent-server-runtime/feature-permissions.md
   entry_points:
   - jiuwenswarm/agents/harness/common/rails/permissions/permission_interrupt_rail.py
@@ -462,8 +1429,28 @@ features:
   source_globs:
   - jiuwenswarm/extensions/manager.py
   - jiuwenswarm/extensions/*.py
+  - jiuwenswarm/extensions/callback_compat.py
+  - jiuwenswarm/extensions/loader.py
+  - jiuwenswarm/extensions/registry.py
+  - jiuwenswarm/extensions/sdk/agent_server_client.py
+  - jiuwenswarm/extensions/sdk/base.py
+  - jiuwenswarm/extensions/sdk/crypto_utility.py
+  - jiuwenswarm/extensions/sdk/third_agent.py
+  - jiuwenswarm/extensions/types.py
+  - jiuwenswarm/extensions/sdk/__init__.py
+  - jiuwenswarm/extensions/__init__.py
+  - jiuwenswarm/gateway/message_handler/message_handler.py
+  - jiuwenswarm/extensions/hook_event.py
+  - jiuwenswarm/extensions/hooks_context.py
+  - jiuwenswarm/gateway/hooks/handler.py
+  - jiuwenswarm/server/hooks/executor.py
+  - jiuwenswarm/common/hooks_config.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/server/hooks/user_hook_rail.py
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
   docs:
   - docs/zh/Harness.md
+  - docs/zh/Slash命令表.md
   page: repos/jiuwenswarm/components/extensions-plugins/feature-hooks.md
   entry_points:
   - jiuwenswarm/extensions/manager.py
@@ -472,6 +1459,14 @@ features:
   owner: extensions-plugins
   source_globs:
   - jiuwenswarm/extensions/application_host.py
+  - jiuwenswarm/channels/web/frontend/src/applicationPlugins/manifest.ts
+  - jiuwenswarm/channels/web/frontend/src/applicationPlugins/types.ts
+  - jiuwenswarm/channels/web/frontend/src/applicationPlugins/useApplicationPlugins.ts
+  - jiuwenswarm/extensions/sdk/application_plugin.py
+  - jiuwenswarm/channels/web/frontend/src/applicationPlugins/ApplicationTaskControls.tsx
+  - jiuwenswarm/channels/web/frontend/src/applicationPlugins/taskProgressStore.ts
+  - jiuwenswarm/channels/web/frontend/src/applicationPlugins/ApplicationPluginOutlet.tsx
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
   docs:
   - docs/zh/application-plugins.md
   page: repos/jiuwenswarm/components/extensions-plugins/feature-applications.md
@@ -483,6 +1478,29 @@ features:
   source_globs:
   - jiuwenswarm/extensions/video_duplex/backend/tasks/rail.py
   - jiuwenswarm/extensions/video_duplex/*
+  - jiuwenswarm/extensions/video_duplex/backend/video_search.py
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/index.tsx
+  - jiuwenswarm/extensions/video_duplex/backend/video_live.py
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/joyaiPromptLifecycle.ts
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/joyaiProvider.ts
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/joyaiToolContext.ts
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/joyaiVoice.ts
+  - jiuwenswarm/extensions/video_duplex/backend/joyai_provider.py
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/qwenOmniProtocol.ts
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/qwenOmniSession.ts
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/qwenOmniTools.ts
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/videoSource.ts
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/searchPresentation.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/ExperimentalSettings.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/VideoDuplexModelSettings.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/definition.ts
+  - jiuwenswarm/extensions/video_duplex/frontend/index.tsx
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/types.ts
+  - jiuwenswarm/extensions/video_duplex/backend/video_files.py
+  - jiuwenswarm/extensions/video_duplex/backend/tasks/server_adapter.py
+  - jiuwenswarm/extensions/video_duplex/backend/tasks/store.py
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/replyLanguage.ts
+  - jiuwenswarm/extensions/video_duplex/frontend/VideoLivePanel/taskPrompts.ts
   docs:
   - docs/zh/application-plugins.md
   page: repos/jiuwenswarm/components/extensions-plugins/feature-video-duplex.md
@@ -494,8 +1512,46 @@ features:
   source_globs:
   - jiuwenswarm/common/e2a/models.py
   - jiuwenswarm/common/e2a/*.py
+  - jiuwenswarm/common/e2a/adapters.py
+  - jiuwenswarm/gateway/routing/agent_http_bridge.py
+  - jiuwenswarm/gateway/message_handler/message_handler.py
+  - jiuwenswarm/common/client/agent_client.py
+  - jiuwenswarm/gateway/routing/agent_client.py
+  - jiuwenswarm/server/gateway_push/__init__.py
+  - jiuwenswarm/server/gateway_push/transport.py
+  - jiuwenswarm/server/gateway_push/wire.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/server/utils/utils.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/common/e2a/agent_compat.py
+  - jiuwenswarm/common/e2a/gateway_normalize.py
+  - jiuwenswarm/gateway/channel_manager/tui/tui_connect.py
+  - jiuwenswarm/common/e2a/constants.py
+  - jiuwenswarm/gateway/channel_manager/protocol/acp/acp_connect.py
+  - jiuwenswarm/common/e2a/wire_codec.py
+  - jiuwenswarm/server/front/connection.py
+  - jiuwenswarm/server/front/event_forwarder.py
+  - jiuwenswarm/server/front/router.py
+  - jiuwenswarm/server/front/protocol.py
+  - jiuwenswarm/server/runtime/gateway_adapter/__init__.py
+  - jiuwenswarm/server/runtime/gateway_adapter/base.py
+  - jiuwenswarm/gateway/app_gateway.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/ChatPanel.ts
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/client/SessionManager.ts
+  - jiuwenswarm/server/utils/stream_utils.py
+  - jiuwenswarm/common/protocol_ids.py
+  - jiuwenswarm/server/runtime/session/session_metadata.py
+  - jiuwenswarm/common/ws_diagnostics.py
+  - jiuwenswarm/common/ws_limits.py
+  - jiuwenswarm/server/ws_send.py
   docs:
   - docs/zh/E2A-protocol.md
+  - .doc_project_maintainer/project/flows/agentserver-server-push.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_message.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_message/actual-behavior.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_message/risks.md
   page: repos/jiuwenswarm/components/protocols/feature-e2a.md
   entry_points:
   - jiuwenswarm/common/e2a/models.py
@@ -505,6 +1561,7 @@ features:
   source_globs:
   - jiuwenswarm/gateway/channel_manager/protocol/a2a/a2a_connect.py
   - jiuwenswarm/gateway/channel_manager/protocol/a2a/*.py
+  - jiuwenswarm/gateway/app_gateway.py
   docs:
   - docs/zh/A2A.md
   page: repos/jiuwenswarm/components/protocols/feature-a2a.md
@@ -516,8 +1573,27 @@ features:
   source_globs:
   - jiuwenswarm/acp/stdio_client.py
   - jiuwenswarm/acp/*.py
+  - jiuwenswarm/agents/harness/common/tools/acp_chat/__init__.py
+  - jiuwenswarm/agents/harness/common/tools/acp_chat/tool.py
+  - jiuwenswarm/channels/acp/app_acp.py
+  - jiuwenswarm/gateway/channel_manager/protocol/acp/acp_connect.py
+  - scripts/run_gateway_acp.cmd
+  - scripts/run_gateway_acp.sh
+  - jiuwenswarm/agents/harness/common/tools/acp_output_tools.py
+  - jiuwenswarm/gateway/message_handler/message_handler.py
+  - jiuwenswarm/common/e2a/acp/session_updates.py
+  - jiuwenswarm/acp/cli.py
+  - jiuwenswarm/common/acp/stdio_client.py
+  - jiuwenswarm/acp/__init__.py
+  - jiuwenswarm/acp/subprocess_env.py
+  - jiuwenswarm/common/acp/subprocess_env.py
+  - jiuwenswarm/common/e2a/acp/acp_tool_updates.py
+  - jiuwenswarm/common/e2a/adapters.py
+  - jiuwenswarm/server/agent_ws_server.py
   docs:
   - docs/zh/ACP插件使用.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._set_ws_acp_client_capabilities.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._ws_capabilities_key.md
   page: repos/jiuwenswarm/components/protocols/feature-acp.md
   entry_points:
   - jiuwenswarm/acp/stdio_client.py
@@ -527,6 +1603,17 @@ features:
   source_globs:
   - jiuwenswarm/gateway/channel_manager/protocol/ssh/ssh_connect.py
   - jiuwenswarm/gateway/channel_manager/protocol/ssh/*.py
+  - jiuwenswarm/extensions/agentos/auth/ssh_authenticator.py
+  - jiuwenswarm/extensions/agentos/auth/ssh_key_issuer.py
+  - jiuwenswarm/extensions/agentos/auth/ssh_key_registry.py
+  - jiuwenswarm/extensions/agentos/agentos_router/router_client.py
+  - jiuwenswarm/extensions/agentos/agentos_router/ssh_relay.py
+  - jiuwenswarm/extensions/agentos/auth/common.py
+  - jiuwenswarm/extensions/agentos/auth/credential_authenticator.py
+  - jiuwenswarm/gateway/app_gateway.py
+  - jiuwenswarm/gateway/channel_manager/protocol/ssh/__init__.py
+  - jiuwenswarm/gateway/channel_manager/protocol/ssh/config.py
+  - jiuwenswarm/gateway/channel_manager/protocol/ssh/server.py
   docs:
   - docs/zh/频道.md
   page: repos/jiuwenswarm/components/gateway-channels/feature-ssh.md
@@ -538,8 +1625,34 @@ features:
   source_globs:
   - jiuwenswarm/server/runtime/a2ui/runtime/finalizer.py
   - jiuwenswarm/server/runtime/a2ui/*
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/actionBridge.ts
+  - jiuwenswarm/server/runtime/a2ui/prompt_instructions.py
+  - jiuwenswarm/server/runtime/a2ui/protocol.py
+  - jiuwenswarm/server/control/a2ui_config.py
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/a2uiContent.ts
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/fieldBinding.ts
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/formDefaults.ts
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/A2UIErrorBoundary.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/A2UIMessageContent.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/CheckBoxWithDefaults.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/DateTimeInputWithDefaults.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/MultipleChoiceWithDefaults.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/SliderWithDefaults.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/TextFieldWithDefaults.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/TextWithDefaults.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ChatPanel.css
+  - jiuwenswarm/agents/harness/common/rails/response_prompt_rail.py
+  - jiuwenswarm/server/runtime/a2ui/protocols/__init__.py
+  - jiuwenswarm/channels/web/frontend/src/features/a2ui/rendererRegistry.tsx
+  - jiuwenswarm/server/runtime/a2ui/parser.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/server/runtime/a2ui/__init__.py
+  - jiuwenswarm/server/runtime/a2ui/config.py
+  - jiuwenswarm/server/runtime/a2ui/integration.py
   docs:
   - docs/zh/A2UI.md
+  - docs/zh/A2UI-IM-channel-analysis.md
+  - docs/zh/A2UI-web-only-pr-record.md
   page: repos/jiuwenswarm/components/a2ui/feature-a2ui.md
   entry_points:
   - jiuwenswarm/server/runtime/a2ui/runtime/finalizer.py
@@ -550,6 +1663,20 @@ features:
   - jiuwenswarm/agents/swarm/browser_runtime.py
   - jiuwenswarm/agents/harness/common/browser_config.py
   - jiuwenswarm/agents/harness/common/*
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/navigate.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/browser/definition.ts
+  - jiuwenswarm/agents/harness/common/tools/browser_timeout_policy.py
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/ensure_browser.py
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/lib/cdp_client.py
+  - scripts/verify_playwright_mcp_offline.py
+  - jiuwenswarm/common/playwright_mcp_runtime.py
+  - scripts/update_playwright_mcp_runtime.py
+  - jiuwenswarm/agents/swarm/config_specs.py
+  - jiuwenswarm/agents/swarm/providers/code_subagents.py
+  - jiuwenswarm/server/runtime/agent_adapter/trusted_web_search.py
+  - jiuwenswarm/channels/web/frontend/src/features/browserAgentActivity.ts
+  - jiuwenswarm/agents/harness/common/tools/web_fetch_tools.py
   docs:
   - docs/zh/浏览器.md
   page: repos/jiuwenswarm/components/agents-team/feature-browser-tools.md
@@ -563,6 +1690,45 @@ features:
   - jiuwenswarm/channels/browser/frontend/src/background/index.ts
   - jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts
   - jiuwenswarm/channels/browser/frontend/src/*
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/reader.ts
+  - jiuwenswarm/channels/browser/frontend/src/background/ToolDispatcher.ts
+  - jiuwenswarm/channels/browser/frontend/src/content/index.ts
+  - jiuwenswarm/channels/browser/frontend/src/content/Annotator.ts
+  - jiuwenswarm/channels/browser/frontend/src/content/FormAssist.ts
+  - jiuwenswarm/channels/browser/frontend/src/content/SelectionMonitor.ts
+  - jiuwenswarm/channels/browser/frontend/src/background/ContextMenu.ts
+  - jiuwenswarm/channels/browser/frontend/src/background/PanelManager.ts
+  - jiuwenswarm/channels/browser/frontend/src/shared/constants.ts
+  - jiuwenswarm/channels/browser/frontend/src/shared/types.ts
+  - jiuwenswarm/channels/browser/frontend/src/shared/url.ts
+  - jiuwenswarm/channels/browser/frontend/src/shared/i18n.ts
+  - jiuwenswarm/channels/browser/frontend/src/shared/logger.ts
+  - jiuwenswarm/channels/browser/frontend/src/background/WsClient.ts
+  - jiuwenswarm/channels/browser/frontend/src/shared/protocol.ts
+  - jiuwenswarm/channels/browser/frontend/src/shared/messages.ts
+  - jiuwenswarm/channels/browser/frontend/src/shared/storage.ts
+  - jiuwenswarm/channels/browser/frontend/src/options/index.ts
+  - jiuwenswarm/channels/browser/frontend/src/options/options.html
+  - jiuwenswarm/channels/browser/frontend/src/content/adapters/twitter.ts
+  - jiuwenswarm/channels/browser/frontend/src/content/adapters/wikipedia.ts
+  - jiuwenswarm/channels/browser/frontend/src/content/adapters/youtube.ts
+  - jiuwenswarm/channels/browser/frontend/src/background/ContextCache.ts
+  - jiuwenswarm/channels/browser/frontend/src/content/Extractor.ts
+  - jiuwenswarm/channels/browser/frontend/src/content/PageTypeDetector.ts
+  - jiuwenswarm/channels/browser/frontend/src/popup/index.ts
+  - jiuwenswarm/channels/browser/frontend/src/popup/popup.html
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/SessionExporter.ts
+  - jiuwenswarm/channels/browser/frontend/src/background/TabWatcher.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/search.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/ChatBridge.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/chat.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/ContextBar.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/tour.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/privacy.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/sidepanel.html
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/markdown.ts
+  - jiuwenswarm/channels/browser/frontend/src/sidepanel/SessionPicker.ts
+  - jiuwenswarm/channels/browser/frontend/src/webview/chat.html
   docs:
   - docs/zh/browser-extension/浏览器扩展.md
   page: repos/jiuwenswarm/components/browser-client/feature-browser-client.md
@@ -575,6 +1741,15 @@ features:
   source_globs:
   - jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts
   - jiuwenswarm/channels/ide/packages/vscode-extension/*
+  - jiuwenswarm/channels/ide/packages/shared-webview/chat.html
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/ChatPanel.ts
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/StatusBar.ts
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/client/protocol.ts
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/client/WsClient.ts
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/SwarmMapPanel.kt
+  - jiuwenswarm/channels/ide/packages/vscode-extension/esbuild.js
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/editor/DiffViewer.ts
+  - jiuwenswarm/channels/browser/frontend/src/webview/chat.html
   docs:
   - docs/zh/ide/vscode/VSCode插件.md
   page: repos/jiuwenswarm/components/ide-clients/feature-vscode.md
@@ -586,6 +1761,18 @@ features:
   source_globs:
   - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/JiuwenSwarmService.kt
   - jiuwenswarm/channels/ide/packages/jetbrains-plugin/*
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/context/ContextCollector.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/Actions.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/context/GitContextProvider.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/ChatToolWindow.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/FixWithAiIntention.kt
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/codeActions/FixWithAiCodeActionProvider.ts
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/build.gradle.kts
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/settings/JiuwenSwarmSettings.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/settings/SettingsConfigurable.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/client/SessionManager.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/StatusBarWidgetFactory.kt
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/client/WsClient.kt
   docs:
   - docs/zh/ide/jetbrains/JetBrains插件.md
   page: repos/jiuwenswarm/components/ide-clients/feature-jetbrains.md
@@ -597,6 +1784,13 @@ features:
   source_globs:
   - sdks/python/src/jiuwenswarm_sdk/client.py
   - sdks/*
+  - jiuwenswarm/channels/process_cli/protocol/version.py
+  - sdks/python/src/jiuwenswarm_sdk/protocol.py
+  - sdks/python/src/jiuwenswarm_sdk/types.py
+  - sdks/typescript/src/index.ts
+  - sdks/typescript/src/protocol.ts
+  - jiuwenswarm/runtime/service.py
+  - sdks/python/src/jiuwenswarm_sdk/__init__.py
   docs:
   - sdks/README.md
   page: repos/jiuwenswarm/components/sdk-clients/feature-sdk.md
@@ -608,8 +1802,45 @@ features:
   source_globs:
   - jiuwenbox/src/jiuwenbox/server/app.py
   - jiuwenbox/src/jiuwenbox/*
+  - jiuwenbox/src/jiuwenbox/supervisor/bwrap.py
+  - jiuwenbox/src/jiuwenbox/supervisor/cgroup.py
+  - jiuwenbox/src/jiuwenbox/server/runtime/process.py
+  - jiuwenbox/src/jiuwenbox/server/sandbox_manager.py
+  - jiuwenbox/src/jiuwenbox/supervisor/sandbox_daemon.py
+  - jiuwenbox/src/jiuwenbox/server/auth.py
+  - jiuwenbox/src/jiuwenbox/bundled_configs.py
+  - jiuwenbox/src/jiuwenbox/cli/jiuwenbox.py
+  - jiuwenbox/docker/Dockerfile
+  - jiuwenbox/scripts/build_docker.sh
+  - jiuwenbox/scripts/run_docker.sh
+  - jiuwenbox/src/jiuwenbox/models/policy.py
+  - jiuwenbox/src/jiuwenbox/server/routes/policy.py
+  - jiuwenbox/src/jiuwenbox/logging_config.py
+  - jiuwenbox/src/jiuwenbox/server/routes/mcp.py
+  - jiuwenbox/src/jiuwenbox/models/__init__.py
+  - jiuwenswarm/server/sandbox/jiuwenbox_runner.py
+  - jiuwenbox/src/jiuwenbox/server/launcher.py
+  - jiuwenbox/src/jiuwenbox/server/workspace.py
+  - jiuwenbox/src/jiuwenbox/supervisor/landlock_launcher.py
+  - jiuwenbox/src/jiuwenbox/supervisor/landlock.py
+  - jiuwenbox/src/jiuwenbox/supervisor/network.py
+  - jiuwenswarm/server/runtime/no_host_fallback_jiuwenbox.py
+  - jiuwenbox/src/jiuwenbox/server/policy_reader.py
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/agents/harness/common/tools/command_tools.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenbox/src/jiuwenbox/supervisor/daemon_ipc.py
+  - jiuwenswarm/server/runtime/agent_adapter/sysop_builder.py
+  - jiuwenswarm/server/sandbox/host_port.py
+  - jiuwenbox/src/jiuwenbox/models/sandbox.py
+  - jiuwenswarm/server/runtime/sandbox_no_host_fallback.py
+  - jiuwenbox/src/jiuwenbox/server/policy_engine.py
+  - jiuwenbox/src/jiuwenbox/server/routes/sandbox.py
+  - jiuwenbox/src/jiuwenbox/supervisor/seccomp.py
   docs:
   - jiuwenbox/README_CN.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_command_sandbox/actual-behavior.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_command_sandbox/risks.md
   page: repos/jiuwenswarm/components/sandbox-runtime/feature-sandbox.md
   entry_points:
   - jiuwenbox/src/jiuwenbox/server/app.py
@@ -620,6 +1851,80 @@ features:
   - jiuwenswarm/common/model_catalog.py
   - jiuwenswarm/common/model_config_validation.py
   - jiuwenswarm/common/model*.py
+  - jiuwenswarm/common/config_panel/config_set_handlers.py
+  - jiuwenswarm/common/config_panel/models_handlers.py
+  - jiuwenswarm/common/config_panel/tui_models_handlers.py
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/common/auth/apig.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ChatModelSelector.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ChatPanel.css
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/ContextWindowField.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/contextWindow.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/FreeModelsSettings.tsx
+  - jiuwenswarm/server/control/config_service.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/agent/generationModels.ts
+  - jiuwenswarm/llm_provider_compat_patch.py
+  - jiuwenswarm/llm_sse_patch.py
+  - jiuwenswarm/common/auth/model_catalog.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/FreeModelSettingsDialog.tsx
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/validate_config.py
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/config_writer.py
+  - jiuwenswarm/server/runtime/model_compiler_adapter.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/modelAdapters.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/modelValidation.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/modelListOperations.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ModelProviderIcon/index.css
+  - jiuwenswarm/channels/web/frontend/src/components/ModelProviderIcon/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/assets/providers/index.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/modelReasoning.ts
+  - jiuwenswarm/common/model_selection.py
+  - jiuwenswarm/common/model_errors.py
+  - jiuwenswarm/common/model_migration.py
+  - jiuwenswarm/server/runtime/model_routing_registry.py
+  - jiuwenswarm/channels/web/frontend/src/features/modelSetupGuide/ModelSetupGuide.css
+  - jiuwenswarm/channels/web/frontend/src/features/modelSetupGuide/ModelSetupGuide.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/modelSetupGuide/modelSetupGuideState.ts
+  - jiuwenswarm/common/model_vendor_registry.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/definition.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/index.ts
+  - jiuwenswarm/common/openrouter_attribution.py
+  - jiuwenswarm/common/reasoning_config.py
+  - jiuwenswarm/common/reasoning_injector.py
+  - jiuwenswarm/agents/harness/common/rsi/model_resolver.py
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/components/CreateExperimentDialog.tsx
+  - jiuwenswarm/runtime/model_catalog.py
+  - jiuwenswarm/runtime/service.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/services/settingsContract.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/services/useSettingsConfig.ts
+  - jiuwenswarm/channels/tui/frontend/src/app-state.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/model.ts
+  - jiuwenswarm/channels/web/frontend/src/stores/sessionStore.ts
+  - jiuwenswarm/channels/web/frontend/src/components/form/components/Form.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/form/components/FormDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/form/core/FormStore.ts
+  - jiuwenswarm/channels/web/frontend/src/components/form/hooks/useForm.ts
+  - jiuwenswarm/channels/web/frontend/src/components/form/hooks/useFormState.ts
+  - jiuwenswarm/channels/web/frontend/src/components/form/index.ts
+  - jiuwenswarm/channels/web/frontend/src/components/form/types.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/forms/FeishuChannelForm.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/forms/StandardChannelForm.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/useSettingsChannelsController.ts
+  - jiuwenswarm/channels/web/frontend/src/features/free-models/campaign.ts
+  - jiuwenswarm/channels/web/frontend/src/features/free-models/chatError.ts
+  - jiuwenswarm/channels/web/frontend/src/features/free-models/points.ts
+  - jiuwenswarm/channels/web/frontend/src/features/free-models/quotaReset.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/agent/GenerationModelConfigDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/ModelDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/ModelNameField.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ModelPicker/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/ModelProviderSelect.tsx
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/ModelsSettings.tsx
+  - jiuwenswarm/gateway/app_gateway.py
   docs:
   - docs/zh/配置信息.md
   page: repos/jiuwenswarm/components/common-core/feature-models.md
@@ -631,8 +1936,32 @@ features:
   owner: common-core
   source_globs:
   - jiuwenswarm/common/mcp_config.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/server/runtime/mcp/call_timeout_patch.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_code.py
+  - jiuwenswarm/server/runtime/mcp/cli_driver.py
+  - jiuwenswarm/server/runtime/mcp/state_store.py
+  - jiuwenswarm/server/runtime/mcp/credential.py
+  - jiuwenswarm/server/runtime/mcp/registry.py
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/server/runtime/mcp/exc_group.py
+  - jiuwenswarm/server/runtime/agent_manager.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/server/runtime/mcp/package_manifest.py
+  - jiuwenswarm/server/runtime/marketplace/asset_mcp_publish_converter.py
+  - jiuwenswarm/server/runtime/mcp/__init__.py
+  - jiuwenswarm/runtime/mcp_references.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/agents/swarm/assembly.py
   docs:
   - docs/zh/MCP配置.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._normalize_mcp_add_payload.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._normalize_mcp_payload.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._normalize_mcp_update_payload.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._pre_check_mcp_server.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._mask_sensitive_fields.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._fetch_mcp_tools_from_config.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_command_mcp/risks.md
   page: repos/jiuwenswarm/components/common-core/feature-mcp.md
   entry_points:
   - jiuwenswarm/common/mcp_config.py
@@ -642,6 +1971,29 @@ features:
   source_globs:
   - jiuwenswarm/common/auth/service.py
   - jiuwenswarm/common/auth/*.py
+  - jiuwenswarm/extensions/agentos/agentos_router/agentos_authenticator.py
+  - jiuwenswarm/channels/web/frontend/src/services/authClient.ts
+  - jiuwenswarm/common/auth/session_store.py
+  - jiuwenswarm/gateway/channel_manager/web/web_http_auth.py
+  - jiuwenswarm/gateway/app_gateway.py
+  - jiuwenswarm/gateway/message_handler/message_handler.py
+  - jiuwenswarm/common/auth/__init__.py
+  - jiuwenswarm/common/auth/account_kit.py
+  - jiuwenswarm/channels/web/hub_oauth.py
+  - jiuwenswarm/channels/web/frontend/src/components/AssetPublishDrawer/index.tsx
+  - jiuwenswarm/channels/web/app_web.py
+  - jiuwenswarm/common/auth/login_credentials.py
+  - jiuwenswarm/common/auth/passthrough.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/common/auth/net.py
+  - jiuwenswarm/common/auth/session_owners.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/OpenAIAccountField.tsx
+  - jiuwenswarm/common/auth/remote_config.py
+  - jiuwenswarm/channels/web/frontend/src/stores/authStore.ts
+  - jiuwenswarm/channels/web/frontend/src/components/LoginDialog/LoginDialog.css
+  - jiuwenswarm/channels/web/frontend/src/components/LoginDialog/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/OpenAIAccountField.css
   docs:
   - docs/zh/华为账号登录.md
   page: repos/jiuwenswarm/components/login-auth/feature-login.md
@@ -653,6 +2005,56 @@ features:
   source_globs:
   - jiuwenswarm/runtime/cron/factory.py
   - jiuwenswarm/runtime/cron/*.py
+  - jiuwenswarm/gateway/message_handler/message_handler.py
+  - jiuwenswarm/gateway/cron/controller.py
+  - jiuwenswarm/agents/harness/common/tools/cron/cron_tools.py
+  - jiuwenswarm/agents/harness/common/tools/cron/cron_runtime.py
+  - jiuwenswarm/gateway/channel_manager/channel_manager.py
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/cronExprValidation.ts
+  - jiuwenswarm/runtime/cron/cron_expr.py
+  - jiuwenswarm/runtime/cron/store.py
+  - jiuwenswarm/gateway/cron/scheduler.py
+  - jiuwenswarm/server/runtime/agent_adapter/team_helpers.py
+  - jiuwenswarm/runtime/cron/models.py
+  - jiuwenswarm/runtime/cron/cron_job_mutations.py
+  - jiuwenswarm/gateway/cron/cron_json_convert.py
+  - jiuwenswarm/gateway/cron/lifecycle_owners.py
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/ModeSelector.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/index.tsx
+  - jiuwenswarm/server/runtime/session/project_store.py
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/cronProjectDisplay.ts
+  - jiuwenswarm/gateway/cron/cron_expr.py
+  - jiuwenswarm/gateway/cron/dingtalk_routing.py
+  - jiuwenswarm/gateway/cron/factory.py
+  - jiuwenswarm/gateway/cron/models.py
+  - jiuwenswarm/runtime/cron/__init__.py
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/ScheduleEditor.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/ConfirmDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/DatePicker.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/SimpleSelect.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/TimePicker.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/scheduleConvert.ts
+  - jiuwenswarm/server/control/store/project_queries.py
+  - jiuwenswarm/common/cron_session.py
+  - jiuwenswarm/runtime/cron/etcd_store.py
+  - jiuwenswarm/runtime/cron/store_base.py
+  - jiuwenswarm/gateway/cron/store.py
+  - jiuwenswarm/gateway/cron/store_base.py
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/CronTaskDrawer.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/StatusBadge.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/cronMode.ts
+  - jiuwenswarm/common/cron_team_completion.py
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/cronWakeOffset.ts
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/cronWeekAlpha.ts
+  - jiuwenswarm/runtime/cron/dingtalk_routing.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/gateway/cron/proactive_cron_sync.py
+  - jiuwenswarm/agents/swarm/providers/runtime_tools.py
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/cron.ts
+  - jiuwenswarm/gateway/channel_manager/tui/tui_connect.py
+  - jiuwenswarm/channels/web/frontend/src/stores/cronStore.ts
+  - jiuwenswarm/channels/web/frontend/src/components/CronPanel/xiaoyiCronTarget.ts
   docs:
   - docs/zh/定时任务.md
   page: repos/jiuwenswarm/components/cron-scheduling/feature-cron.md
@@ -664,6 +2066,81 @@ features:
   source_globs:
   - jiuwenswarm/observability/sink.py
   - jiuwenswarm/observability/*.py
+  - jiuwenswarm/agents/harness/agent_observability.py
+  - jiuwenswarm/observability/store.py
+  - jiuwenswarm/channels/ide/packages/shared-webview/chat.html
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectory/compaction.ts
+  - jiuwenbox/src/jiuwenbox/server/app.py
+  - jiuwenbox/src/jiuwenbox/server/audit_logger.py
+  - jiuwenbox/src/jiuwenbox/models/common.py
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/markdown/cjkFriendlyStrong.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/markdown/mathCompatibility.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/markdown/parse.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/markdown/plain-text.ts
+  - jiuwenswarm/agents/harness/observability_runtime.py
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/shared/otlp.ts
+  - jiuwenswarm/observability/otlp_payload.py
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/semconv/attributes.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/pointer-grace.ts
+  - jiuwenswarm/common/runtime_log_filter.py
+  - jiuwenbox/src/jiuwenbox/server/sandbox_manager.py
+  - jiuwenswarm/agents/harness/team/team_manager.py
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/teamTrajectoryLanes.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectoryArchive.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/TrajectoryPanel.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/projector/otel-trajectory-projector.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/projector/attribute-resolver.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/index.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectory/preview.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectoryCheckpoints.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/markdown/CodeBlock.module.css
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/markdown/CodeBlock.tsx
+  - scripts/reset_trajectory_data.py
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/client/TrajectoryTable.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/Menu.module.css
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/Menu.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/client/TrajectoryExplorer.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/client/i18n.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/client/theme.css
+  - jiuwenswarm/observability/gateway_hints.py
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/icons/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/icons/props.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/JsonTree.module.css
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/JsonTree.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectory/virtual-rows.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectory/model.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectory/record.ts
+  - jiuwenswarm/observability/models.py
+  - jiuwenswarm/observability/retention.py
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectory/search-index.ts
+  - jiuwenswarm/observability/__init__.py
+  - jiuwenswarm/observability/config.py
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectoryFrames.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectorySubjects.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/theme/base.css
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/theme/context.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/theme/design-platform.css
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/theme/gradient-shadow-text.css
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/theme/scrollbar.css
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/theme/shiki.css
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/client/TrajectoryTimeline.module.css
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/client/TrajectoryTimeline.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectory/timeline.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/client/TrajectoryToolbar.module.css
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/client/TrajectoryToolbar.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/Tooltip.module.css
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/Tooltip.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectoryTurnGaps.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/featureConfig.ts
+  - jiuwenswarm/gateway/message_handler/message_handler.py
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/projector/trajectory-v2-reducer.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectoryLayout.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/trajectoryWindow.ts
+  - jiuwenswarm/channels/web/frontend/src/features/trajectory/TeamTrajectoryWorkspace.tsx
+  - jiuwenswarm/gateway/channel_manager/web/web_connect.py
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  - jiuwenswarm/channels/web/frontend/src/App.css
+  - jiuwenswarm/channels/browser/frontend/src/webview/chat.html
   docs:
   - docs/zh/日志.md
   page: repos/jiuwenswarm/components/observability/feature-observability.md
@@ -676,8 +2153,19 @@ features:
   - jiuwenswarm/server/runtime/debug_trace/config.py
   - jiuwenswarm/server/runtime/debug_trace/stream_logger.py
   - jiuwenswarm/server/runtime/debug_trace/*.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/common/debug_dump.py
+  - jiuwenswarm/server/runtime/debug_trace/paths.py
+  - jiuwenswarm/server/runtime/debug_trace/context.py
+  - jiuwenswarm/server/runtime/debug_trace/directives.py
+  - jiuwenswarm/server/runtime/debug_trace/subagent_capture.py
+  - jiuwenswarm/server/runtime/debug_trace/task_tool_patch.py
+  - jiuwenswarm/channels/web/frontend/vite.config.ts
+  - deploy/observability/upload_traces_to_langfuse.py
+  - jiuwenswarm/server/runtime/agent_adapter/team_helpers.py
   docs:
   - docs/zh/调试追踪.md
+  - docs/zh/性能优化.md
   page: repos/jiuwenswarm/components/observability/feature-debug-trace.md
   entry_points:
   - jiuwenswarm/server/runtime/debug_trace/config.py
@@ -689,6 +2177,22 @@ features:
   - jiuwenswarm/agents/harness/common/tools/multimodal_config.py
   - jiuwenswarm/agents/harness/common/tools/image_tools.py
   - jiuwenswarm/agents/harness/common/tools/*
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/agent/AgentSettings.css
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/agent/AgentSettings.tsx
+  - jiuwenswarm/agents/harness/common/tools/audio_tools.py
+  - jiuwenswarm/server/runtime/image_modality_warmup.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/agent/mediaCapabilities.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/agent/mediaModelConfig.ts
+  - jiuwenswarm/common/media_capability_config.py
+  - jiuwenswarm/agents/harness/common/rails/multimodal_image_rail.py
+  - jiuwenswarm/agents/harness/common/prompt/user_prompt_builder.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/agents/swarm/providers/tools.py
+  - jiuwenswarm/agents/harness/common/tools/video_tools.py
+  - jiuwenswarm/agents/harness/common/tools/visual_gen_tools.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/agent/MediaModelConfigDialog.tsx
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/image_reading_tool.py
   docs:
   - docs/zh/Harness.md
   page: repos/jiuwenswarm/components/agents-team/feature-multimodal.md
@@ -712,6 +2216,7 @@ features:
   source_globs:
   - jiuwenswarm/server/runtime/agent_adapter/interface_code.py
   - jiuwenswarm/agents/harness/common/rails/*
+  - jiuwenswarm/channels/tui/frontend/src/core/event-handlers.ts
   docs:
   - docs/zh/Harness.md
   page: repos/jiuwenswarm/components/agent-server-runtime/feature-worktree.md
@@ -722,6 +2227,10 @@ features:
   owner: tui-client
   source_globs:
   - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr*.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.prompts.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.status.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.watch.ts
   docs:
   - docs/zh/自动修复PR.md
   page: repos/jiuwenswarm/components/tui-client/feature-autofix.md
@@ -734,6 +2243,16 @@ features:
   source_globs:
   - jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_connect.py
   - jiuwenswarm/gateway/channel_manager/im_platforms/feishu/*
+  - jiuwenswarm/gateway/channel_manager/channel_manager.py
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_streaming_card.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_file_service.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/platform_adapter/message.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/channelFormItems.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/channelRequirements.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/useChannelForm.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/useSettingsChannelsController.ts
   docs:
   - docs/zh/国内频道.md
   page: repos/jiuwenswarm/components/gateway-channels/feature-im-feishu.md
@@ -745,6 +2264,7 @@ features:
   source_globs:
   - jiuwenswarm/gateway/channel_manager/im_platforms/wechat/wechat_connect.py
   - jiuwenswarm/gateway/channel_manager/im_platforms/wechat/*
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
   docs:
   - docs/zh/国内频道.md
   page: repos/jiuwenswarm/components/gateway-channels/feature-im-wechat.md
@@ -756,6 +2276,8 @@ features:
   source_globs:
   - jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_connect.py
   - jiuwenswarm/gateway/channel_manager/im_platforms/wecom/*
+  - jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_file_service.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_im_adapter.py
   docs:
   - docs/zh/国内频道.md
   page: repos/jiuwenswarm/components/gateway-channels/feature-im-wecom.md
@@ -778,6 +2300,9 @@ features:
   source_globs:
   - jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/xiaoyi_connect.py
   - jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/*
+  - jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/xiaoyi_utils/formatter.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/xiaoyi_utils/media.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/xiaoyi/xiaoyi_utils/push.py
   docs:
   - docs/zh/国内频道.md
   page: repos/jiuwenswarm/components/gateway-channels/feature-im-xiaoyi.md
@@ -822,6 +2347,7 @@ features:
   source_globs:
   - jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py
   - jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/*
+  - jiuwenswarm/scripts/whatsapp-bridge.js
   docs:
   - docs/zh/海外频道.md
   page: repos/jiuwenswarm/components/gateway-channels/feature-im-whatsapp.md
@@ -830,154 +2356,1431 @@ features:
 - id: agent-management
   title: 智能体资产管理与工作区浏览
   owner: web-frontend
-  source_globs: &id001
+  source_globs:
   - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/index.tsx
   - jiuwenswarm/channels/web/frontend/src/features/agentManagement/client.ts
   - jiuwenswarm/channels/web/frontend/src/components/AgentPanel/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentAvatar/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/MessageItem.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/CatalogPage.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/DefinitionCard.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/DefinitionDetailPage.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/DefinitionFilePreview.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/AgentGroupUploadDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/AgentUploadDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/AgentEditor.tsx
+  - jiuwenswarm/scripts/generate-agent-folders.js
+  - jiuwenswarm/scripts/watch-folders.js
+  - jiuwenswarm/server/runtime/extension_package_manager.py
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/GroupCard.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/GroupCatalogPage.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/AgentGroupDetailPage.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/AgentGroupEditor.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/AgentGroupMemberPicker.tsx
+  - jiuwenswarm/resources/agent/workspace/skills/agent-group-creator/scripts/register_group.py
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/SelectionPagination.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/AgentTagPicker.tsx
+  - jiuwenswarm/resources/agent/workspace/skills/agent-creator/scripts/init_template.py
+  - jiuwenswarm/resources/agent/workspace/skills/agent-creator/scripts/register_template.py
+  - jiuwenswarm/server/runtime/agent_config_service.py
+  - jiuwenswarm/channels/web/app_web.py
+  - jiuwenswarm/server/runtime/skill/skill_manager.py
+  - jiuwenswarm/channels/web/frontend/vite.config.ts
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/useDialogFocusTrap.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ui/FilePreviewPanel/FilePreviewPanel.css
+  - jiuwenswarm/channels/web/frontend/src/components/ui/FilePreviewPanel/FilePreviewPanel.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ui/FilePreviewPanel/filePreviewShared.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ui/FilePreviewPanel/FilePreviewTree.tsx
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/resources/agent/workspace/skills/plugin-creator/scripts/register_plugin.py
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/agents.ts
+  - jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts
+  - jiuwenswarm/channels/web/frontend/src/components/AgentPanel/FileViewer.tsx
+  - jiuwenswarm/channels/web/frontend/src/stores/agentCatalogStore.ts
+  - jiuwenswarm/channels/web/frontend/src/stores/agentGroupCatalogSeed.ts
+  - jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts
+  - jiuwenswarm/channels/web/frontend/src/features/agentManagement/groupClient.ts
+  - jiuwenswarm/channels/web/frontend/src/features/agentManagement/port.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/agentManagement/adapter.ts
+  - jiuwenswarm/channels/web/frontend/src/features/agentManagement/limits.ts
+  - jiuwenswarm/channels/web/frontend/src/features/agentManagement/tagOptions.ts
+  - jiuwenswarm/channels/web/frontend/src/features/agentManagement/pendingInstallQueue.ts
+  - jiuwenswarm/channels/web/frontend/src/features/agentManagement/upload.ts
+  - jiuwenswarm/channels/web/frontend/src/features/agentIdentity.ts
+  - jiuwenswarm/channels/web/frontend/src/features/catalogCache.ts
+  - jiuwenswarm/channels/web/frontend/src/features/equipmentListRequest.ts
+  - jiuwenswarm/channels/web/frontend/src/features/equipmentMarketplace.ts
+  - jiuwenswarm/channels/web/frontend/src/features/historyFilePreview.ts
+  - jiuwenswarm/channels/web/frontend/src/features/agentManagement/selection.ts
   docs:
   - docs/zh/智能体.md
   page: repos/jiuwenswarm/components/web-frontend/feature-agent-management.md
-  entry_points: *id001
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/agentManagement/client.ts
+  - jiuwenswarm/channels/web/frontend/src/components/AgentPanel/index.tsx
 - id: jiuwen-memory-sdk
   title: JiuwenMemory 进程内 SDK 接入
   owner: agents-team
-  source_globs: &id002
+  source_globs:
   - jiuwenswarm/agents/harness/common/memory/external_memory_builder.py
   - jiuwenswarm/agents/harness/common/memory/external_memory_config.py
   docs:
   - docs/zh/JiuwenMemory-SDK接入.md
   page: repos/jiuwenswarm/components/agents-team/feature-jiuwen-memory-sdk.md
-  entry_points: *id002
+  entry_points:
+  - jiuwenswarm/agents/harness/common/memory/external_memory_builder.py
+  - jiuwenswarm/agents/harness/common/memory/external_memory_config.py
 - id: image-generation
   title: 图片生成与产物落盘
   owner: agents-team
-  source_globs: &id003
+  source_globs:
   - jiuwenswarm/agents/harness/common/tools/image_tools.py
   - jiuwenswarm/agents/harness/common/tools/multimodal_config.py
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/build-batch.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/providers/agnes.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/providers/azure.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/main.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/providers/codex-cli.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/providers/dashscope.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/providers/google.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/providers/jimeng.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/providers/minimax.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/codex-imagegen/cache.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/codex-imagegen/main.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/codex-imagegen/types.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/types.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/providers/openrouter.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/providers/replicate.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/providers/seedream.ts
+  - jiuwenswarm/resources/agent/workspace/skills/baoyu-image-gen/scripts/providers/zai.ts
   docs:
   - docs/zh/配置信息.md
   page: repos/jiuwenswarm/components/agents-team/feature-image-generation.md
-  entry_points: *id003
+  entry_points:
+  - jiuwenswarm/agents/harness/common/tools/image_tools.py
+  - jiuwenswarm/agents/harness/common/tools/multimodal_config.py
 - id: sandbox-privacy-proxy
   title: JiuwenBox 推理隐私代理
   owner: sandbox-runtime
-  source_globs: &id004
+  source_globs:
   - jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy.py
   - jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy_manager.py
+  - jiuwenbox/src/jiuwenbox/proxy/__init__.py
+  - jiuwenbox/src/jiuwenbox/server/app.py
+  - jiuwenbox/src/jiuwenbox/server/policy_reader.py
+  - jiuwenbox/src/jiuwenbox/server/proxy_manager.py
+  - jiuwenbox/src/jiuwenbox/server/routes/proxy.py
   docs:
   - jiuwenbox/README_CN.md
   page: repos/jiuwenswarm/components/sandbox-runtime/feature-sandbox-privacy-proxy.md
-  entry_points: *id004
+  entry_points:
+  - jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy.py
+  - jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy_manager.py
 - id: digital-avatar
   title: 群聊数字分身与 owner 权限
   owner: agents-team
-  source_globs: &id005
+  source_globs:
   - jiuwenswarm/agents/harness/common/rails/avatar_rail.py
   - jiuwenswarm/agents/harness/common/rails/permissions/owner_scopes.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_connect.py
+  - jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_im_adapter.py
+  - jiuwenswarm/gateway/message_handler/message_handler.py
+  - jiuwenswarm/gateway/im_pipeline/im_inbound.py
+  - jiuwenswarm/gateway/im_pipeline/im_outbound.py
+  - jiuwenswarm/gateway/routing/interaction_context.py
   docs:
   - docs/zh/频道.md
   - docs/zh/国内频道.md
   page: repos/jiuwenswarm/components/agents-team/feature-digital-avatar.md
-  entry_points: *id005
+  entry_points:
+  - jiuwenswarm/agents/harness/common/rails/avatar_rail.py
+  - jiuwenswarm/agents/harness/common/rails/permissions/owner_scopes.py
 - id: connectors
   title: 连接器市场与 MCP 授权流程
   owner: web-frontend
-  source_globs: &id006
+  source_globs:
   - jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts
   - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ExtensionPickerPanel.tsx
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/CliAuthModal.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/ConfirmDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/EntityAvatar.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/FormPageLayout.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/MarketCard.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/MarketplacePage.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/PickerModal.tsx
+  - jiuwenswarm/server/runtime/extension_package_manager.py
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/Toast.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/ConnectTokenModal.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/RegisterMcpPage.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/mcpState.ts
+  - jiuwenswarm/server/runtime/mcp/registry.py
+  - jiuwenswarm/server/runtime/mcp/state_store.py
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/McpDetailPage.tsx
+  - jiuwenswarm/channels/web/frontend/src/types/connector.ts
+  - jiuwenswarm/server/runtime/mcp/marketplace.py
+  - jiuwenswarm/server/runtime/mcp/paths.py
+  - jiuwenswarm/server/runtime/mcp/skill_installer.py
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/MyMarketCard.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/usePendingConnectorFlow.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/AgentManagementPanel/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/PluginDetailPage.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/UploadFileCreateModal.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/CreatePluginPage.tsx
+  - jiuwenswarm/channels/web/frontend/src/stores/connectorStore.ts
   docs:
   - docs/zh/MCP配置.md
   - jiuwenswarm/channels/web/AGENTS.md
   page: repos/jiuwenswarm/components/web-frontend/feature-connectors.md
-  entry_points: *id006
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/services/connectorApi.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ConnectorMarket/index.tsx
 - id: external-cli-agents
   title: 外部 Claude 与 Codex CLI 智能体
   owner: common-core
-  source_globs: &id007
+  source_globs:
   - jiuwenswarm/common/external_cli_runtime.py
   - jiuwenswarm/common/external_cli_catalog.py
+  - jiuwenswarm/common/config_panel/config_set_handlers.py
+  - jiuwenswarm/common/config.py
+  - jiuwenswarm/extensions/agentos/agentos_router/router_client.py
+  - jiuwenswarm/channels/web/frontend/src/components/ExternalCliAgentsSection.tsx
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/channels/web/frontend/src/components/ExternalCliInstallDialog.css
+  - jiuwenswarm/channels/web/frontend/src/components/ExternalCliInstallDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/ExperimentalSettings.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/externalCliInstallState.ts
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/definition.ts
+  - jiuwenswarm/gateway/channel_manager/tui/tui_connect.py
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/switch.ts
+  - jiuwenswarm/channels/tui/frontend/src/core/commands/registry.ts
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
   docs:
   - docs/zh/设置与频道升级迁移指南.md
   page: repos/jiuwenswarm/components/common-core/feature-external-cli-agents.md
-  entry_points: *id007
+  entry_points:
+  - jiuwenswarm/common/external_cli_runtime.py
+  - jiuwenswarm/common/external_cli_catalog.py
 - id: goal-mode
   title: 持续目标与会话控制
   owner: web-frontend
-  source_globs: &id008
+  source_globs:
   - jiuwenswarm/channels/web/frontend/src/features/goalMode/goalModeGate.ts
   - jiuwenswarm/channels/web/frontend/src/stores/goalStore.ts
   - jiuwenswarm/channels/web/frontend/src/services/webClient.ts
   - jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/channels/web/frontend/src/components/GoalBar/GoalBar.css
+  - jiuwenswarm/channels/web/frontend/src/components/GoalBar/index.tsx
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/channels/web/frontend/src/components/GoalBar/GoalCompletedCard.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/GoalBar/goalCompletedMessage.ts
+  - jiuwenswarm/channels/web/frontend/src/components/GoalBar/EditGoalModal.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/GoalBar/OverwriteGoalConfirmModal.tsx
+  - jiuwenswarm/channels/web/frontend/src/types/goal.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/slashCommands/registry.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/slashCommands/semantics.ts
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/goalPendingObjectiveBubble.ts
+  - jiuwenswarm/channels/web/frontend/src/stores/chatStore.ts
   docs:
   - docs/zh/Harness.md
   - jiuwenswarm/channels/web/AGENTS.md
   page: repos/jiuwenswarm/components/web-frontend/feature-goal-mode.md
-  entry_points: *id008
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/features/goalMode/goalModeGate.ts
+  - jiuwenswarm/channels/web/frontend/src/stores/goalStore.ts
+  - jiuwenswarm/channels/web/frontend/src/services/webClient.ts
+  - jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts
 - id: plan-mode
   title: 计划模式与多入口切换限制
   owner: web-frontend
-  source_globs: &id009
+  source_globs:
   - jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts
   - jiuwenswarm/channels/web/frontend/src/stores/planStore.ts
+  - jiuwenswarm/agents/harness/code/prompt/plan_approval.py
+  - jiuwenswarm/agents/harness/code/rails/code_plan_approval_interrupt_rail.py
+  - jiuwenswarm/agents/harness/code/rails/code_plan_approval_rail.py
+  - jiuwenswarm/channels/web/frontend/src/features/planMode/planEntrySource.ts
+  - jiuwenswarm/runtime/plan.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx
+  - jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  - jiuwenswarm/channels/browser/frontend/src/webview/chat.html
+  - jiuwenswarm/agents/harness/work/rails/work_agent_mode_rail.py
   docs:
   - docs/zh/模式系统.md
   - docs/zh/Harness.md
+  - .doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._push_plan_mode_exited.md
   page: repos/jiuwenswarm/components/web-frontend/feature-plan-mode.md
-  entry_points: *id009
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts
+  - jiuwenswarm/channels/web/frontend/src/stores/planStore.ts
 - id: heartbeat
   title: 绑定会话的心跳续跑任务
   owner: agent-server-runtime
-  source_globs: &id010
+  source_globs:
   - jiuwenswarm/agents/harness/code/rails/heartbeat/models.py
   - jiuwenswarm/agents/harness/code/rails/heartbeat/controller.py
   - jiuwenswarm/gateway/heartbeat/proxy.py
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/tools.py
+  - jiuwenswarm/channels/web/frontend/src/utils/heartbeatAutomation.ts
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/cron_schedule.py
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/execution.py
+  - jiuwenswarm/channels/web/frontend/src/types/heartbeat.ts
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/__init__.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/store.py
+  - jiuwenswarm/channels/web/frontend/src/components/HeartbeatPanel/HeartbeatPagination.tsx
+  - jiuwenswarm/agents/harness/code/rails/heartbeat_rail.py
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/runtime.py
+  - jiuwenswarm/runtime/service.py
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/scheduler.py
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/session_resolver.py
+  - jiuwenswarm/channels/web/frontend/src/components/HeartbeatPanel/HeartbeatStatusBadge.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/HeartbeatPanel/heartbeatStatusText.ts
+  - jiuwenswarm/channels/web/frontend/src/components/HeartbeatPanel/index.tsx
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  - jiuwenswarm/channels/web/frontend/src/components/HeartbeatPanel/HeartbeatScheduleEditor.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/HeartbeatPanel/HeartbeatTaskDrawer.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/HeartbeatPanel/heartbeatCronValidation.ts
+  - jiuwenswarm/channels/web/frontend/src/components/HeartbeatPanel/heartbeatScheduleConvert.ts
+  - jiuwenswarm/gateway/channel_manager/tui/tui_connect.py
   docs:
   - docs/zh/项目与会话管理.md
   - jiuwenswarm/channels/web/AGENTS.md
   page: repos/jiuwenswarm/components/agent-server-runtime/feature-heartbeat.md
-  entry_points: *id010
+  entry_points:
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/models.py
+  - jiuwenswarm/agents/harness/code/rails/heartbeat/controller.py
+  - jiuwenswarm/gateway/heartbeat/proxy.py
 - id: artifacts
   title: 会话产物列表、预览与下载
   owner: web-frontend
-  source_globs: &id011
+  source_globs:
   - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx
   - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts
   - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/filePreviewModel.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/codeLanguageExtensions.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/codeLanguages.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/SpreadsheetPreview.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/MessageItem.tsx
+  - jiuwenswarm/gateway/channel_manager/web/container_file_http.py
+  - jiuwenswarm/channels/web/frontend/src/utils/fileDownloadDedup.ts
+  - jiuwenswarm/channels/web/frontend/vite.config.ts
+  - jiuwenswarm/channels/web/frontend/src/components/FileIcon/fileIconModel.ts
+  - jiuwenswarm/channels/web/frontend/src/components/FileIcon/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/officeFontStack.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/ooxmlArchiveLimits.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/pptxPresentationParser.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/pptxPreviewModel.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/pptxPreview.worker.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/spreadsheetWorkbookParser.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/spreadsheetPreviewModel.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/spreadsheetPreview.worker.ts
+  - jiuwenswarm/server/runtime/gateway_adapter/workspace_file_adapter.py
+  - jiuwenswarm/agents/harness/common/tools/verified_download_assets.py
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/CodePreview.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/DocxPreview.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/ArtifactExpandedPanel.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/PresentationPreview.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/FilePreview.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/desktopBrowserFile.ts
+  - jiuwenswarm/channels/web/app_web.py
+  - jiuwenswarm/agents/harness/common/tools/web_file_download.py
+  - jiuwenswarm/channels/web/frontend/src/components/ui/FilePreviewPanel/FilePreviewContent.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ui/FilePreviewPanel/FilePreviewIcon.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/chartGeometry.ts
   docs:
   - jiuwenswarm/channels/web/AGENTS.md
   page: repos/jiuwenswarm/components/web-frontend/feature-artifacts.md
-  entry_points: *id011
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/index.tsx
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/artifactCollection.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ArtifactsPanel/filePreviewModel.ts
 - id: speech-interaction
   title: 语音输入、回复朗读与停止
   owner: web-frontend
-  source_globs: &id012
+  source_globs:
   - jiuwenswarm/channels/web/frontend/src/features/taskAsr/useTaskAsr.ts
   - jiuwenswarm/channels/web/frontend/src/features/taskAsr/featureFlag.ts
   - jiuwenswarm/channels/web/frontend/src/utils/tts.ts
   - jiuwenswarm/channels/web/frontend/src/hooks/useSpeech.ts
+  - jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx
+  - jiuwenswarm/channels/web/frontend/src/utils/speechDetection/silero.worker.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/speechDetection/sileroVad.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/speechDetection/speechGate.ts
   docs:
   - jiuwenswarm/channels/web/frontend/README.md
   page: repos/jiuwenswarm/components/web-frontend/feature-speech-interaction.md
-  entry_points: *id012
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/features/taskAsr/useTaskAsr.ts
+  - jiuwenswarm/channels/web/frontend/src/features/taskAsr/featureFlag.ts
+  - jiuwenswarm/channels/web/frontend/src/utils/tts.ts
+  - jiuwenswarm/channels/web/frontend/src/hooks/useSpeech.ts
 - id: skill-development
   title: SkillDev 创建、评测与打包边界
   owner: agent-server-runtime
-  source_globs: &id013
+  source_globs:
   - jiuwenswarm/server/runtime/skill/skilldev/service.py
   - jiuwenswarm/server/runtime/skill/skilldev/pipeline.py
   - jiuwenswarm/server/runtime/skill/skilldev/deps.py
   - jiuwenswarm/server/runtime/skill/skilldev/context.py
+  - jiuwenswarm/channels/web/frontend/src/components/SkillPanel/DocToSkillModal.tsx
+  - jiuwenswarm/resources/agent/workspace/skills/skill-creator-normal/scripts/aggregate_benchmark.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-creator-normal/eval-viewer/viewer.html
+  - jiuwenswarm/server/runtime/skill/skill_manager.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-creator-normal/scripts/improve_description.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-creator-normal/scripts/run_loop.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-creator-normal/scripts/run_eval.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-creator-normal/eval-viewer/generate_review.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-creator-normal/assets/eval_review.html
+  - jiuwenswarm/resources/agent/workspace/skills/skill-creator-normal/scripts/quick_validate.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/download_images.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/prepare_images.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/image_review.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/save_images.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-creator-normal/scripts/utils.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-creator-normal/scripts/generate_report.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/validator.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-creator-normal/scripts/package_skill.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/finalize_scripts.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/common.py
+  - jiuwenswarm/server/runtime/skill/skilldev/store.py
+  - jiuwenswarm/server/runtime/skill/skilldev/workspace.py
+  - jiuwenswarm/server/runtime/skill/skilldev/schema.py
+  - jiuwenswarm/server/runtime/skill/skilldev/stages/desc_optimize_stage.py
+  - jiuwenswarm/server/runtime/skill/skilldev/stages/evaluate_stage.py
+  - jiuwenswarm/server/runtime/skill/skilldev/stages/generate_stage.py
+  - jiuwenswarm/server/runtime/skill/skilldev/stages/improve_stage.py
+  - jiuwenswarm/server/runtime/skill/skilldev/stages/init_stage.py
+  - jiuwenswarm/server/runtime/skill/skilldev/stages/package_stage.py
+  - jiuwenswarm/server/runtime/skill/skilldev/stages/plan_stage.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/server/runtime/skill/skilldev/stages/validate_stage.py
   docs:
   - jiuwenswarm/server/runtime/skill/skilldev/DESIGN.md
   page: repos/jiuwenswarm/components/agent-server-runtime/feature-skill-development.md
-  entry_points: *id013
+  entry_points:
+  - jiuwenswarm/server/runtime/skill/skilldev/service.py
+  - jiuwenswarm/server/runtime/skill/skilldev/pipeline.py
+  - jiuwenswarm/server/runtime/skill/skilldev/deps.py
+  - jiuwenswarm/server/runtime/skill/skilldev/context.py
 - id: proactive-recommendation
   title: 主动推荐、频率限制与主 Agent 交付
   owner: agent-server-runtime
-  source_globs: &id014
+  source_globs:
   - jiuwenswarm/agents/harness/common/recommendation/proactive_engine.py
   - jiuwenswarm/server/runtime/proactive_adapter.py
+  - jiuwenswarm/agents/harness/common/recommendation/calendar_source.py
+  - jiuwenswarm/agents/harness/common/recommendation/proactive_actions.py
+  - jiuwenswarm/agents/harness/common/recommendation/feedback_collector.py
+  - jiuwenswarm/server/agent_ws_server.py
+  - jiuwenswarm/agents/harness/common/recommendation/gradient_updater.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/ExperimentalSettings.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/definition.ts
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ProactiveRecommendationCard.tsx
+  - jiuwenswarm/agents/harness/common/recommendation/__init__.py
+  - jiuwenswarm/server/runtime/agent_adapter/interface.py
+  - jiuwenswarm/agents/harness/common/recommendation/proactive_prompts.py
+  - jiuwenswarm/agents/harness/common/recommendation/profile_extractor.py
+  - jiuwenswarm/agents/harness/common/recommendation/situation_report.py
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
   docs:
   - docs/zh/设置与频道升级迁移指南.md
   page: repos/jiuwenswarm/components/agent-server-runtime/feature-proactive-recommendation.md
+  entry_points:
+  - jiuwenswarm/agents/harness/common/recommendation/proactive_engine.py
+  - jiuwenswarm/server/runtime/proactive_adapter.py
+- id: a2x-registry-client-sdk
+  title: A2X Registry Client SDK — mirrored sync/async service registry client
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/team/a2x/client/__init__.py
+  - jiuwenswarm/agents/harness/team/a2x/client/async_client.py
+  - jiuwenswarm/agents/harness/team/a2x/client/client.py
+  - jiuwenswarm/agents/harness/team/a2x/client/_internal.py
+  - jiuwenswarm/agents/harness/team/a2x/client/errors.py
+  - jiuwenswarm/agents/harness/team/a2x/client/models.py
+  - jiuwenswarm/agents/harness/team/a2x/client/transport.py
+  - jiuwenswarm/agents/harness/team/a2x/client/ownership.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/agents/harness/team/a2x/client/__init__.py
+  - jiuwenswarm/agents/harness/team/a2x/client/async_client.py
+  - jiuwenswarm/agents/harness/team/a2x/client/client.py
+  page: repos/jiuwenswarm/components/agents-team/feature-a2x-registry-client-sdk.md
+- id: agent-template-layered-validation
+  title: Agent 模板分层校验器（L0 规范 / L1 静态 AST / L2 子进程编排）
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/agent-creator/scripts/validate_template.py
+  - jiuwenswarm/resources/agent/workspace/skills/agent-creator/scripts/validate_hot_load_worker.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/agent-creator/scripts/validate_template.py
+  page: repos/jiuwenswarm/components/config-resources/feature-agent-template-layered-validation.md
+- id: agentos-sandbox-create-lifecycle
+  title: AgentOS 沙箱创建与幂等对账
+  owner: extensions-plugins
+  source_globs:
+  - jiuwenswarm/extensions/agentos/agentos_router/router_client.py
+  - jiuwenswarm/extensions/agentos/agentos_router/agent_manager.py
+  - jiuwenswarm/extensions/agentos/agentos_router/config.py
+  - jiuwenswarm/extensions/agentos/agentos_router/stale_cleanup.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/extensions/agentos/agentos_router/router_client.py
+  page: repos/jiuwenswarm/components/extensions-plugins/feature-agentos-sandbox-create-lifecycle.md
+- id: arxiv-visual-extraction
+  title: arXiv 论文 Figure/Table 检测与高清导出（extract_arxiv_visuals）
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/extract_arxiv_visuals_v2_2.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/extract_arxiv_visuals_v2_2.py
+  page: repos/jiuwenswarm/components/config-resources/feature-arxiv-visual-extraction.md
+- id: ascend-chrome-trace-generator
+  title: Chrome Trace JSON 生成器（trace_collector）
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/trace_collector.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/trace_save.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/trace_utils.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/inspect_rank_pt.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/bootstrap_trace_toolchain.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/verify_trace_scaffold.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/trace_collector.py
+  page: repos/jiuwenswarm/components/config-resources/feature-ascend-chrome-trace-generator.md
+- id: ascend-trace-analysis-pipeline
+  title: ascend-moe-optimizer-trace-analyzer CLI 主流程
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-trace-analyzer/app.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-trace-analyzer/analyzers/phase_mapper.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-trace-analyzer/analyzers/diagnosis.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-trace-analyzer/analyzers/llm_analysis.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-trace-analyzer/analyzers/metrics.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-trace-analyzer/analyzers/parser.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-trace-analyzer/analyzers/plots.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-trace-analyzer/analyzers/reporter.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-trace-analyzer/app.py
+  page: repos/jiuwenswarm/components/config-resources/feature-ascend-trace-analysis-pipeline.md
+- id: ascend-trace-auto-instrumentation
+  title: TRACE_POINT 自动埋点改写（instrument_operator）
+  owner: config-resources
+  source_globs: &id001
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/instrument_operator.py
+  docs: []
+  entry_points: *id001
+  page: repos/jiuwenswarm/components/config-resources/feature-ascend-trace-auto-instrumentation.md
+- id: ascend-trace-compile-safety-checker
+  title: 插桩编译安全静态检查器
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/check_compile_safety.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/run_instrumentation_checks.sh
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/validate_trace_points.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/check_compile_safety.py
+  page: repos/jiuwenswarm/components/config-resources/feature-ascend-trace-compile-safety-checker.md
+- id: ascend-trace-instrumentation-planner
+  title: 插桩计划生成器（调用图深度受限展开）
+  owner: config-resources
+  source_globs: &id002
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/generate_instrumentation_plan.py
+  docs: []
+  entry_points: *id002
+  page: repos/jiuwenswarm/components/config-resources/feature-ascend-trace-instrumentation-planner.md
+- id: ascend-trace-preprocessor
+  title: TRACE_POINT 预处理器与 point_map 映射导出
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/trace_preprocessor.py
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/apply_trace_scaffold.sh
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/patch_build_pipeline.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/ascend-moe-optimizer-auto-trace/scripts/trace_preprocessor.py
+  page: repos/jiuwenswarm/components/config-resources/feature-ascend-trace-preprocessor.md
+- id: at-file-reference-inlining-b1a822e1
+  title: '@path 文件引用内联与 @agent 提及解析'
+  owner: gateway-channels
+  source_globs: &id003
+  - jiuwenswarm/gateway/message_handler/message_handler.py
+  docs: []
+  entry_points: *id003
+  page: repos/jiuwenswarm/components/gateway-channels/feature-at-file-reference-inlining-b1a822e1.md
+- id: audit-integrity-hmac-signing
+  title: 符号审计完整性 HMAC 签名与信任验证（audit_integrity.py）
+  owner: config-resources
+  source_globs: &id004
+  - jiuwenswarm/resources/agent/workspace/skills/project-maintainer/scripts/audit_integrity.py
+  docs: []
+  entry_points: *id004
+  page: repos/jiuwenswarm/components/config-resources/feature-audit-integrity-hmac-signing.md
+- id: audit-report-html-renderer
+  title: 自包含审计可视化 HTML 报告生成器
+  owner: config-resources
+  source_globs: &id005
+  - jiuwenswarm/resources/agent/workspace/skills/project-maintainer/scripts/render_audit_report.py
+  docs: []
+  entry_points: *id005
+  page: repos/jiuwenswarm/components/config-resources/feature-audit-report-html-renderer.md
+- id: channel-security-review-slash-command
+  title: /security-review 安全审查斜杠命令与 git 预执行
+  owner: gateway-channels
+  source_globs: &id006
+  - jiuwenswarm/gateway/message_handler/message_handler.py
+  - jiuwenswarm/gateway/message_handler/prompts/security_review_prompt.py
+  docs: []
+  entry_points: *id006
+  page: repos/jiuwenswarm/components/gateway-channels/feature-channel-security-review-slash-command.md
+- id: chat-session-stats-dashboard
+  title: Chat Session Stats Bar and Per-Turn Mini Charts
+  owner: web-frontend
+  source_globs: &id007
+  - jiuwenswarm/channels/ide/packages/shared-webview/chat.html
+  docs: []
+  entry_points: *id007
+  page: repos/jiuwenswarm/components/web-frontend/feature-chat-session-stats-dashboard.md
+- id: code-mode-branch-selector
+  title: 代码模式分支选择器（初始化/切换/创建分支）
+  owner: web-frontend
+  source_globs:
+  - jiuwenswarm/channels/web/frontend/src/features/code-mode/CodeBranchSelector.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/code-mode/CodeEnvironmentPanel.tsx
+  docs: []
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/features/code-mode/CodeBranchSelector.tsx
+  page: repos/jiuwenswarm/components/web-frontend/feature-code-mode-branch-selector.md
+- id: code-mode-commit-push
+  title: 提交/推送对话框（commit、push、commit_push）
+  owner: web-frontend
+  source_globs: &id008
+  - jiuwenswarm/channels/web/frontend/src/features/code-mode/CodeCommitPushControl.tsx
+  docs: []
+  entry_points: *id008
+  page: repos/jiuwenswarm/components/web-frontend/feature-code-mode-commit-push.md
+- id: command-execution-tool
+  title: mcp_exec_command 跨平台命令执行工具
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/common/tools/command_tools.py
+  - jiuwenswarm/agents/harness/common/tools/command_execution_context.py
+  - jiuwenswarm/agents/harness/common/tools/command_runtime.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/agents/harness/common/tools/command_tools.py
+  page: repos/jiuwenswarm/components/agents-team/feature-command-execution-tool.md
+- id: context-usage-indicator
+  title: 上下文占用指示器（环形/悬浮提示/明细弹层）
+  owner: web-frontend
+  source_globs:
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ContextUsageIndicator.css
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ContextUsageIndicator.tsx
+  - jiuwenswarm/server/runtime/agent_adapter/interface_deep.py
+  - jiuwenswarm/server/utils/stream_utils.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ContextUsageIndicator.css
+  - jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ContextUsageIndicator.tsx
+  page: repos/jiuwenswarm/components/web-frontend/feature-context-usage-indicator.md
+- id: cross-channel-history-search-skill
+  title: Cross-Channel Session History Search Skill
+  owner: config-resources
+  source_globs: &id009
+  - jiuwenswarm/resources/agent/workspace/skills/cross-channel-history-retrieval/scripts/search_history.py
+  docs: []
+  entry_points: *id009
+  page: repos/jiuwenswarm/components/config-resources/feature-cross-channel-history-search-skill.md
+- id: daily-report-skill
+  title: 进阶版日报/周报/月报生成器 Skill
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/generators/__init__.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/generators/report_generator.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/run_report.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/analyzers/ai_analyzer.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/collectors/email_collector.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/collectors/git_collector.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/collectors/__init__.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/collectors/aggregator.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/report_helper.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/collectors/todo_collector.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/analyzers/work_analyzer.py
+  docs:
+  - docs/zh/开发实践/JiuwenSwarm日报生成器开发实践.md
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/generators/__init__.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/generators/report_generator.py
+  - jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/run_report.py
+  page: repos/jiuwenswarm/components/config-resources/feature-daily-report-skill.md
+- id: deepsearch-research-pipeline
+  title: openJiuwen-DeepSearch 深度研究执行管线
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/openJiuwen-DeepSearch/scripts/main.py
+  - jiuwenswarm/resources/agent/workspace/skills/openJiuwen-DeepSearch/scripts/validate_environment.py
+  - jiuwenswarm/resources/agent/workspace/skills/openJiuwen-DeepSearch/scripts/convert_docx.py
+  - jiuwenswarm/resources/agent/workspace/skills/openJiuwen-DeepSearch/scripts/convert_html.py
+  - jiuwenswarm/resources/agent/workspace/skills/openJiuwen-DeepSearch/scripts/verify_skill_structure.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/openJiuwen-DeepSearch/scripts/main.py
+  page: repos/jiuwenswarm/components/config-resources/feature-deepsearch-research-pipeline.md
+- id: dev-ws-traffic-logger
+  title: Vite Dev WS Traffic Logger (/__dev/ws-log)
+  owner: web-frontend
+  source_globs:
+  - jiuwenswarm/channels/web/frontend/vite.config.ts
+  - jiuwenswarm/channels/web/frontend/src/components/LogsPanel/index.tsx
+  - jiuwenswarm/channels/web/app_web.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/vite.config.ts
+  page: repos/jiuwenswarm/components/web-frontend/feature-dev-ws-traffic-logger.md
+- id: docx-pro-cli
+  title: docx-pro Word 文档操作 CLI
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/docx-pro/scripts/docx_pro.py
+  - jiuwenswarm/resources/agent/workspace/skills/docx-pro/scripts/setup_check.py
+  - jiuwenswarm/resources/agent/workspace/skills/docx-pro/scripts/docx_replace.py
+  - jiuwenswarm/resources/agent/workspace/skills/docx-pro/scripts/renderer.py
+  - jiuwenswarm/resources/agent/workspace/skills/docx-pro/scripts/md_export.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/docx-pro/scripts/docx_pro.py
+  - jiuwenswarm/resources/agent/workspace/skills/docx-pro/scripts/setup_check.py
+  page: repos/jiuwenswarm/components/config-resources/feature-docx-pro-cli.md
+- id: dynamic-memory-cli
+  title: Dynamic Memory CLI（SQLite UT 记忆库与发布/构建流水线）
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/dynamic-memory-cli/scripts/dynamic_memory_cli.py
+  - jiuwenswarm/agents/harness/common/rails/eternal_conversation/memory_cli.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/dynamic-memory-cli/scripts/dynamic_memory_cli.py
+  page: repos/jiuwenswarm/components/agents-team/feature-dynamic-memory-cli.md
+- id: financial-document-parser
+  title: 财务文档解析 Skill（发票/收据/对账单解析与报告生成）
+  owner: config-resources
+  source_globs: &id010
+  - jiuwenswarm/resources/agent/workspace/skills/financial-document-parser/financial_parser.py
+  docs: []
+  entry_points: *id010
+  page: repos/jiuwenswarm/components/config-resources/feature-financial-document-parser.md
+- id: frontend-incremental-lint-gate
+  title: 增量 ESLint 门禁（相对基线只报新增诊断）
+  owner: web-frontend
+  source_globs: &id011
+  - jiuwenswarm/channels/web/frontend/scripts/lint-changed.mjs
+  docs: []
+  entry_points: *id011
+  page: repos/jiuwenswarm/components/web-frontend/feature-frontend-incremental-lint-gate.md
+- id: gateway-config-hot-reload
+  title: Gateway Config-Save Hot Reload (agent.reload_config retry, restart fallback,
+    browser/proactive side effects)
+  owner: gateway-channels
+  source_globs: &id012
+  - jiuwenswarm/gateway/app_gateway.py
+  docs: []
+  entry_points: *id012
+  page: repos/jiuwenswarm/components/gateway-channels/feature-gateway-config-hot-reload.md
+- id: gateway-health-check
+  title: Gateway HealthCheck 周期探活服务
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/health_check/__init__.py
+  - jiuwenswarm/gateway/health_check/health_check.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/gateway/health_check/__init__.py
+  - jiuwenswarm/gateway/health_check/health_check.py
+  page: repos/jiuwenswarm/components/gateway-channels/feature-gateway-health-check.md
+- id: gateway-server-multi-route-ws
+  title: GatewayServer 多路由 WebSocket 宿主与会话/请求路由表
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/app_gateway.py
+  - jiuwenswarm/gateway/channel_manager/channel_manager.py
+  - jiuwenswarm/gateway/routing/route_binding.py
+  - jiuwenswarm/gateway/channel_manager/base.py
+  - jiuwenswarm/gateway/routing/keys.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/gateway/app_gateway.py
+  page: repos/jiuwenswarm/components/gateway-channels/feature-gateway-server-multi-route-ws.md
+- id: github-issue-feedback-script
+  title: GitHub Issue 反馈创建脚本
+  owner: config-resources
+  source_globs: &id013
+  - jiuwenswarm/resources/agent/workspace/skills/gitcode-api/scripts/open_github_issue.py
+  docs: []
+  entry_points: *id013
+  page: repos/jiuwenswarm/components/config-resources/feature-github-issue-feedback-script.md
+- id: huawei-maas-apikey-creation
+  title: 华为云 MaaS API Key 自动创建与捕获（auto_create_apikey）
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/auto_create_apikey.py
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/lib/huawei_selectors.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/auto_create_apikey.py
+  page: repos/jiuwenswarm/components/config-resources/feature-huawei-maas-apikey-creation.md
+- id: huawei-maas-cdp-authorize
+  title: 华为云 MaaS 委托授权自动化（auto_authorize）
+  owner: config-resources
+  source_globs: &id014
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/auto_authorize.py
+  docs: []
   entry_points: *id014
+  page: repos/jiuwenswarm/components/config-resources/feature-huawei-maas-cdp-authorize.md
+- id: huawei-realname-account-check
+  title: 华为云账号实名认证状态检测（check_account）
+  owner: config-resources
+  source_globs: &id015
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/check_account.py
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/lib/huawei_selectors.py
+  docs: []
+  entry_points: *id015
+  page: repos/jiuwenswarm/components/config-resources/feature-huawei-realname-account-check.md
+- id: ide-file-edit-diff-apply
+  title: IDE 端代理文件编辑直接应用（DiffApplier）
+  owner: ide-clients
+  source_globs:
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/ChatToolWindow.kt
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/editor/DiffApplier.ts
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/editor/DiffApplier.kt
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/ChatPanel.ts
+  docs: []
+  entry_points:
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/ChatToolWindow.kt
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/editor/DiffApplier.ts
+  page: repos/jiuwenswarm/components/ide-clients/feature-ide-file-edit-diff-apply.md
+- id: ide-terminal-command-mirror
+  title: IDE 终端命令镜像执行
+  owner: ide-vscode
+  source_globs:
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/terminal/TerminalManager.ts
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/ChatPanel.ts
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/terminal/TerminalManager.kt
+  docs: []
+  entry_points:
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/terminal/TerminalManager.ts
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/ChatPanel.ts
+  page: repos/jiuwenswarm/components/ide-vscode/feature-ide-terminal-command-mirror.md
+- id: ide-turn-rewind-snapshot
+  title: IDE 单轮文件快照与回退（Rewind）
+  owner: ide-clients
+  source_globs:
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/ChatToolWindow.kt
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/editor/DiffApplier.ts
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/settings/JiuwenSwarmSettings.kt
+  docs: []
+  entry_points:
+  - jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/ChatToolWindow.kt
+  - jiuwenswarm/channels/ide/packages/vscode-extension/src/editor/DiffApplier.ts
+  page: repos/jiuwenswarm/components/ide-clients/feature-ide-turn-rewind-snapshot.md
+- id: im-attachment-persist-hook-969909e1
+  title: IM Attachment Persist Hook (E2A + HTTP Bridge)
+  owner: gateway-channels
+  source_globs: &id016
+  - jiuwenswarm/gateway/channel_manager/channel_manager.py
+  docs: []
+  entry_points: *id016
+  page: repos/jiuwenswarm/components/gateway-channels/feature-im-attachment-persist-hook-969909e1.md
+- id: im-channel-hot-reconfig
+  title: IM Channel Hot Reconfiguration (_apply_channel_config lifecycle across 11
+    channels)
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/gateway/app_gateway.py
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/gateway/app_gateway.py
+  page: repos/jiuwenswarm/components/gateway-channels/feature-im-channel-hot-reconfig.md
+- id: llm-wiki-knowledge-base
+  title: LLM Wiki 知识库（wiki_ingest/query/lint 子代理）
+  owner: agents-team
+  source_globs: &id017
+  - jiuwenswarm/agents/harness/common/tools/wiki_tools.py
+  docs: []
+  entry_points: *id017
+  page: repos/jiuwenswarm/components/agents-team/feature-llm-wiki-knowledge-base.md
+- id: local-doc-ocr-offline
+  title: 本地离线 OCR 管线（RapidOCR：PDF/图片 → Markdown）
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/local-doc-ocr/scripts/ocr_offline.py
+  - jiuwenswarm/resources/agent/workspace/skills/local-doc-ocr/scripts/write_ocr_md.py
+  - jiuwenswarm/resources/agent/workspace/skills/local-doc-ocr/scripts/preprocess_img.py
+  - jiuwenswarm/resources/agent/workspace/skills/local-doc-ocr/scripts/pdf_to_images.py
+  - jiuwenswarm/resources/agent/workspace/skills/local-doc-ocr/scripts/setup.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/local-doc-ocr/scripts/ocr_offline.py
+  page: repos/jiuwenswarm/components/config-resources/feature-local-doc-ocr-offline.md
+- id: locale-conf-rpc
+  title: 界面语言配置 RPC（preferred_language）
+  owner: gateway-channels
+  source_globs: &id018
+  - jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py
+  docs: []
+  entry_points: *id018
+  page: repos/jiuwenswarm/components/gateway-channels/feature-locale-conf-rpc.md
+- id: maas-auto-open-models
+  title: 华为云 MaaS 预置服务批量开通自动化（CDP）
+  owner: config-resources
+  source_globs: &id019
+  - jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/auto_open_model.py
+  docs: []
+  entry_points: *id019
+  page: repos/jiuwenswarm/components/config-resources/feature-maas-auto-open-models.md
+- id: opc-add-slide
+  title: 解包 PPTX 幻灯片添加工具（opc/add_slide.py）
+  owner: config-resources
+  source_globs: &id020
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/opc/add_slide.py
+  docs: []
+  entry_points: *id020
+  page: repos/jiuwenswarm/components/config-resources/feature-opc-add-slide.md
+- id: opc-pack-validate
+  title: OOXML 打包与 schema 校验（opc/pack.py）
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/opc/pack.py
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/opc/repair.py
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/opc/unpack.py
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/opc/validate.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/opc/pack.py
+  page: repos/jiuwenswarm/components/config-resources/feature-opc-pack-validate.md
+- id: pdf-reading-tool
+  title: 分页 PDF 文本读取工具（read_pdf）
+  owner: agents-team
+  source_globs: &id021
+  - jiuwenswarm/agents/harness/common/tools/pdf_tools.py
+  docs: []
+  entry_points: *id021
+  page: repos/jiuwenswarm/components/agents-team/feature-pdf-reading-tool.md
+- id: plugin-package-initializer
+  title: plugin-creator 插件包脚手架初始化
+  owner: config-resources
+  source_globs: &id022
+  - jiuwenswarm/resources/agent/workspace/skills/plugin-creator/scripts/init_plugin.py
+  docs: []
+  entry_points: *id022
+  page: repos/jiuwenswarm/components/config-resources/feature-plugin-package-initializer.md
+- id: plugin-package-layered-validator
+  title: plugin-creator 插件包分层校验器（L0/L1/L2）
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/plugin-creator/scripts/validate_plugin.py
+  - jiuwenswarm/resources/agent/workspace/skills/plugin-creator/scripts/validate_plugin_hot_load_worker.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/plugin-creator/scripts/validate_plugin.py
+  page: repos/jiuwenswarm/components/config-resources/feature-plugin-package-layered-validator.md
+- id: ppt-deck-finalize
+  title: 一键成片流水线与质量门禁（finalize_deck.py）
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/finalize_deck.py
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/make_blank_template.py
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/fill_cover.py
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/opc/prune.py
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/merge_slides.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/finalize_deck.py
+  page: repos/jiuwenswarm/components/config-resources/feature-ppt-deck-finalize.md
+- id: ppt-evidence-preparation
+  title: Evidence Plan Preparation and Review Lifecycle
+  owner: config-resources
+  source_globs: &id023
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/prepare_evidence.py
+  docs: []
+  entry_points: *id023
+  page: repos/jiuwenswarm/components/config-resources/feature-ppt-evidence-preparation.md
+- id: ppt-execution-lock-validator
+  title: PPT 执行锁（execution-lock.json）语义校验器
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/validate-execution-lock.js
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/validate-evidence-plan.js
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/validate-execution-lock.js
+  page: repos/jiuwenswarm/components/config-resources/feature-ppt-execution-lock-validator.md
+- id: ppt-figure-panel-layout
+  title: PPT 图表面板布局引擎（figure-panel.js）
+  owner: config-resources
+  source_globs: &id024
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js
+  docs: []
+  entry_points: *id024
+  page: repos/jiuwenswarm/components/config-resources/feature-ppt-figure-panel-layout.md
+- id: ppt-opc-thumbnail
+  title: Deck Thumbnail Contact-Sheet Renderer
+  owner: config-resources
+  source_globs: &id025
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/opc/thumbnail.py
+  docs: []
+  entry_points: *id025
+  page: repos/jiuwenswarm/components/config-resources/feature-ppt-opc-thumbnail.md
+- id: ppt-system-diagram-renderer
+  title: PPT 系统架构图原生形状渲染引擎
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/system-diagram.js
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/components.js
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/system-diagram.js
+  page: repos/jiuwenswarm/components/config-resources/feature-ppt-system-diagram-renderer.md
+- id: pptx-structural-audit
+  title: PPTX 结构与可读性审计脚本
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/audit_pptx.py
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/qa_density.py
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/qa_geometry.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/audit_pptx.py
+  page: repos/jiuwenswarm/components/config-resources/feature-pptx-structural-audit.md
+- id: rsi-dataset-folder-check
+  title: RSI 数据集任务文件夹完整性预检
+  owner: config-resources
+  source_globs: &id026
+  - jiuwenswarm/resources/agent/workspace/skills/rsi-program-dataset-creator/scripts/check_folder.py
+  docs: []
+  entry_points: *id026
+  page: repos/jiuwenswarm/components/config-resources/feature-rsi-dataset-folder-check.md
+- id: rsi-experiment-ui
+  title: RSI 自我改进实验页（创建/列表/配置回显）
+  owner: web-frontend
+  source_globs:
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/RsiPage.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/components/ConfigInfoDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/components/CreateExperimentDialog.tsx
+  - jiuwenswarm/agents/harness/common/rsi/artifact_adapter.py
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/components/RsiDetail.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/components/RsiRail.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/rsiStore.ts
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/featureConfig.ts
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/types.ts
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/styles/rsi.css
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/components/RsiIntroduction.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/mockData.ts
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/rsiPresentation.ts
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/components/RsiSelectedInfo.tsx
+  - jiuwenswarm/agents/harness/common/rsi/paper_provider.py
+  - jiuwenswarm/agents/harness/common/rsi/projector.py
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/useRsiEvents.ts
+  docs: []
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/RsiPage.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/components/ConfigInfoDialog.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/rsi/components/CreateExperimentDialog.tsx
+  page: repos/jiuwenswarm/components/web-frontend/feature-rsi-experiment-ui.md
+- id: runtime-agent-definition-execution
+  title: 声明式 root Agent 定义执行（invoke_agent/stream_agent）
+  owner: agent-runtime
+  source_globs:
+  - jiuwenswarm/runtime/service.py
+  - jiuwenswarm/runtime/agent_definition.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/runtime/service.py
+  page: repos/jiuwenswarm/components/agent-runtime/feature-runtime-agent-definition-execution.md
+- id: sdd-design-rail
+  title: DesignRail SDD 状态机（Spec-Driven Development）
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/code/rails/sdd/common/rail_state_machine.py
+  - jiuwenswarm/agents/harness/code/rails/sdd/design_rail/__init__.py
+  - jiuwenswarm/agents/harness/code/rails/sdd/design_rail/rail.py
+  - jiuwenswarm/agents/harness/code/rails/sdd/design_rail/skills/aet-req-analysis/scripts/assemble-checklist.mjs
+  - jiuwenswarm/agents/harness/code/rails/sdd/design_rail/skills/aet-req-analysis/scripts/assemble-template.mjs
+  - jiuwenswarm/agents/harness/code/rails/sdd/design_rail/skills/aet-req-design/scripts/assemble-checklist.mjs
+  - jiuwenswarm/agents/harness/code/rails/sdd/design_rail/skills/aet-req-design/scripts/assemble-template.mjs
+  - jiuwenswarm/agents/harness/code/rails/sdd/design_rail/config_loader.py
+  - jiuwenswarm/agents/harness/code/rails/sdd/__init__.py
+  - jiuwenswarm/agents/harness/code/rails/sdd/common/__init__.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/agents/harness/code/rails/sdd/common/rail_state_machine.py
+  - jiuwenswarm/agents/harness/code/rails/sdd/design_rail/__init__.py
+  - jiuwenswarm/agents/harness/code/rails/sdd/design_rail/rail.py
+  page: repos/jiuwenswarm/components/agents-team/feature-sdd-design-rail.md
+- id: session-input-steering
+  title: Session Input Lane (steer/follow_up) and Execution Binding
+  owner: agent-runtime
+  source_globs:
+  - jiuwenswarm/runtime/service.py
+  - jiuwenswarm/runtime/session_input.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/runtime/service.py
+  page: repos/jiuwenswarm/components/agent-runtime/feature-session-input-steering.md
+- id: session-messaging-toolkit
+  title: 跨会话消息 Agent 工具集（SessionMessagingToolkit 六工具）
+  owner: agents-team
+  source_globs: &id027
+  - jiuwenswarm/agents/harness/common/tools/session_messaging_toolkit.py
+  docs: []
+  entry_points: *id027
+  page: repos/jiuwenswarm/components/agents-team/feature-session-messaging-toolkit.md
+- id: share-image-export
+  title: Session Share-Image Export (Job Registry + Headless Renderer)
+  owner: web-frontend
+  source_globs:
+  - jiuwenswarm/channels/web/frontend/vite.config.ts
+  - jiuwenswarm/channels/web/share_image_export.py
+  - jiuwenswarm/channels/web/frontend/src/features/shareImageExport.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/shareImageArchive.ts
+  - jiuwenswarm/channels/web/frontend/src/features/shareImageExport.css
+  - jiuwenswarm/channels/web/app_web.py
+  - jiuwenswarm/channels/web/frontend/src/features/shareImageJob.ts
+  - jiuwenswarm/channels/web/frontend/src/features/shareImagePng.worker.ts
+  - jiuwenswarm/channels/web/frontend/src/features/shareImagePngEncoder.ts
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  - jiuwenswarm/channels/web/frontend/src/main.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/shareImageRaster.ts
+  docs: []
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/vite.config.ts
+  - jiuwenswarm/channels/web/share_image_export.py
+  page: repos/jiuwenswarm/components/web-frontend/feature-share-image-export.md
+- id: skill-generator-cli
+  title: skill-gen CLI（sop-text / url-fetch 子命令）
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_generator_cli.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/url_ingest/web_page.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/url_ingest/__init__.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/url_ingest/models.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/url_ingest/router.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/url_ingest/wechat_article.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_generator_cli.py
+  page: repos/jiuwenswarm/components/config-resources/feature-skill-generator-cli.md
+- id: skill-page-scrape-blocks
+  title: Web Page Scraping to Unified Stage01 Blocks
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/scrape_page.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/print_blocks.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/common.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/download_images.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/environment_gate.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/scrape_page.py
+  page: repos/jiuwenswarm/components/config-resources/feature-skill-page-scrape-blocks.md
+- id: sop-structure-extraction
+  title: SOP 结构化抽取（parse_sop_raw_text / parse_sop_file）
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/sop_parser.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/sop_chunk_merge.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/sop_fallback.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/__init__.py
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/models.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/skill-gen-4-enterprise-doc/scripts/skill_gen/sop_parser.py
+  page: repos/jiuwenswarm/components/config-resources/feature-sop-structure-extraction.md
+- id: thirdagent-list-switch
+  title: 3rdagent.list / 3rdagent.switch 第三方智能体切换
+  owner: gateway-channels
+  source_globs:
+  - jiuwenswarm/extensions/agentos/agentos_router/router_client.py
+  - jiuwenswarm/common/client/third_agent.py
+  - jiuwenswarm/gateway/routing/third_agent.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/extensions/agentos/agentos_router/router_client.py
+  page: repos/jiuwenswarm/components/gateway-channels/feature-thirdagent-list-switch.md
+- id: user-todos-tool
+  title: user_todos Personal Per-Channel Todo Tool
+  owner: agents-team
+  source_globs: &id028
+  - jiuwenswarm/agents/harness/common/tools/user_todo_tool.py
+  docs: []
+  entry_points: *id028
+  page: repos/jiuwenswarm/components/agents-team/feature-user-todos-tool.md
+- id: video-agent-managed-task-service
+  title: Voice/Video Duplex Managed Agent Task Service (Durable Queue, Concurrency,
+    Uncertainty Semantics)
+  owner: extensions-plugins
+  source_globs:
+  - jiuwenswarm/extensions/video_duplex/backend/tasks/service.py
+  - jiuwenswarm/extensions/video_duplex/backend/tasks/rail.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/extensions/video_duplex/backend/tasks/service.py
+  page: repos/jiuwenswarm/components/extensions-plugins/feature-video-agent-managed-task-service.md
+- id: video-coarse-scan-frame-extraction
+  title: 视频粗扫抽帧与审核批次门控（analyze_video.py）
+  owner: config-resources
+  source_globs: &id029
+  - jiuwenswarm/resources/agent/workspace/skills/skill-omni-creation/scripts/analyze_video.py
+  docs: []
+  entry_points: *id029
+  page: repos/jiuwenswarm/components/config-resources/feature-video-coarse-scan-frame-extraction.md
+- id: video-generation-tools
+  title: generate_video / check_video_status Submit-then-Poll Video Generation
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/common/tools/video_gen_tools.py
+  - jiuwenswarm/agents/harness/common/tools/gen_toolkits.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/agents/harness/common/tools/video_gen_tools.py
+  page: repos/jiuwenswarm/components/agents-team/feature-video-generation-tools.md
+- id: web-asset-publish-flow
+  title: Web 资产发布流程（prepare/commit/轮询/提交锁）
+  owner: web-frontend
+  source_globs:
+  - jiuwenswarm/channels/web/frontend/src/hooks/useAssetPublish.ts
+  - jiuwenswarm/channels/web/frontend/src/types/assetPublish.ts
+  - jiuwenswarm/channels/web/frontend/src/features/assetPublication.ts
+  - jiuwenswarm/channels/web/frontend/src/features/assetPublishErrors.ts
+  - jiuwenswarm/channels/web/frontend/src/features/assetPublishEvents.ts
+  - jiuwenswarm/channels/web/frontend/src/features/assetPublishState.ts
+  docs: []
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/hooks/useAssetPublish.ts
+  page: repos/jiuwenswarm/components/web-frontend/feature-web-asset-publish-flow.md
+- id: web-i18n-zh-en
+  title: Web 前端中英双语 i18n 初始化
+  owner: web-frontend
+  source_globs:
+  - jiuwenswarm/channels/web/frontend/src/i18n/index.ts
+  - jiuwenswarm/channels/web/frontend/src/App.tsx
+  docs: []
+  entry_points:
+  - jiuwenswarm/channels/web/frontend/src/i18n/index.ts
+  page: repos/jiuwenswarm/components/web-frontend/feature-web-i18n-zh-en.md
+- id: web-native-directory-picker
+  title: Web 通道本机目录/可执行文件选择器（跨平台后端链）
+  owner: web-frontend
+  source_globs: &id030
+  - jiuwenswarm/channels/web/directory_picker.py
+  docs: []
+  entry_points: *id030
+  page: repos/jiuwenswarm/components/web-frontend/feature-web-native-directory-picker.md
+- id: web-search-tools
+  title: MCP Free/Paid Search Tools with Trusted-Search Provenance Lease
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/common/tools/trusted_search_tool_adapter.py
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/agent/AgentSettings.tsx
+  - jiuwenswarm/channels/web/frontend/src/features/settings/modules/agent/definition.ts
+  - jiuwenswarm/agents/harness/common/tools/search_tools.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/agents/harness/common/tools/trusted_search_tool_adapter.py
+  page: repos/jiuwenswarm/components/agents-team/feature-web-search-tools.md
+- id: workspace-git-diff
+  title: Workspace Git Diff Aggregation (get_git_diff)
+  owner: agent-server-runtime
+  source_globs:
+  - jiuwenswarm/server/utils/diff_service.py
+  - jiuwenswarm/server/runtime/session/git_diff_watcher.py
+  - jiuwenswarm/server/runtime/session/git_diff_status.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/server/utils/diff_service.py
+  page: repos/jiuwenswarm/components/agent-server-runtime/feature-workspace-git-diff.md
+- id: xiaoyi-alarm-crud
+  title: 设备闹钟 CRUD 工具（create/search/modify/delete_alarm）
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/alarm_tools.py
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/utils.py
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/contact_tools.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/alarm_tools.py
+  page: repos/jiuwenswarm/components/agents-team/feature-xiaoyi-alarm-crud.md
+- id: xiaoyi-calendar-tools
+  title: 设备日历日程工具（create/search_calendar_event）
+  owner: agents-team
+  source_globs: &id031
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py
+  docs: []
+  entry_points: *id031
+  page: repos/jiuwenswarm/components/agents-team/feature-xiaoyi-calendar-tools.md
+- id: xiaoyi-call-phone-tool
+  title: 小艺拨打电话工具 (call_phone)
+  owner: agents-team
+  source_globs: &id032
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/phone_tools.py
+  docs: []
+  entry_points: *id032
+  page: repos/jiuwenswarm/components/agents-team/feature-xiaoyi-call-phone-tool.md
+- id: xiaoyi-collection-tools
+  title: 小艺收藏/个人知识库工具 (query/add/delete_collection)
+  owner: agents-team
+  source_globs: &id033
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/xiaoyi_collection_tool.py
+  docs: []
+  entry_points: *id033
+  page: repos/jiuwenswarm/components/agents-team/feature-xiaoyi-collection-tools.md
+- id: xiaoyi-contact-search
+  title: 设备联系人搜索工具（search_contact）
+  owner: agents-team
+  source_globs: &id034
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/contact_tools.py
+  docs: []
+  entry_points: *id034
+  page: repos/jiuwenswarm/components/agents-team/feature-xiaoyi-contact-search.md
+- id: xiaoyi-location-tool
+  title: 设备定位工具（get_user_location）
+  owner: agents-team
+  source_globs: &id035
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py
+  docs: []
+  entry_points: *id035
+  page: repos/jiuwenswarm/components/agents-team/feature-xiaoyi-location-tool.md
+- id: xiaoyi-note-tools
+  title: 小艺备忘录工具 (create_note / search_notes / modify_note)
+  owner: agents-team
+  source_globs: &id036
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/note_tools.py
+  docs: []
+  entry_points: *id036
+  page: repos/jiuwenswarm/components/agents-team/feature-xiaoyi-note-tools.md
+- id: xiaoyi-photo-gallery-tools
+  title: 小艺图库搜索与照片上传工具 (search_photo_gallery / upload_photo)
+  owner: agents-team
+  source_globs: &id037
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/photo_tools.py
+  docs: []
+  entry_points: *id037
+  page: repos/jiuwenswarm/components/agents-team/feature-xiaoyi-photo-gallery-tools.md
+- id: xiaoyi-pushdata-store-and-viewer
+  title: 推送记录持久化与查询 (pushdata_manager + view_push_result)
+  owner: agents-team
+  source_globs: &id038
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/push_result_tool.py
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/pushdata_manager.py
+  docs: []
+  entry_points: *id038
+  page: repos/jiuwenswarm/components/agents-team/feature-xiaoyi-pushdata-store-and-viewer.md
+- id: xiaoyi-save-to-phone-tools
+  title: 小艺保存到手机工具 (save_media_to_gallery / save_file_to_file_manager)
+  owner: agents-team
+  source_globs:
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/save_tools.py
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/file_upload_helpers.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/save_tools.py
+  page: repos/jiuwenswarm/components/agents-team/feature-xiaoyi-save-to-phone-tools.md
+- id: xiaoyi-timestamp-utc8-tool
+  title: 时间戳转北京时间工具 (convert_timestamp_to_utc8_time)
+  owner: agents-team
+  source_globs: &id039
+  - jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/timestamp_tool.py
+  docs: []
+  entry_points: *id039
+  page: repos/jiuwenswarm/components/agents-team/feature-xiaoyi-timestamp-utc8-tool.md
+- id: xlsx-add-computed-column
+  title: XLSX Computed Column Adder
+  owner: config-resources
+  source_globs: &id040
+  - jiuwenswarm/resources/agent/workspace/skills/xlsx/scripts/xlsx_add_column.py
+  docs: []
+  entry_points: *id040
+  page: repos/jiuwenswarm/components/config-resources/feature-xlsx-add-computed-column.md
+- id: xlsx-doctor-selfcheck
+  title: XLSX 技能环境自检（doctor.py）
+  owner: config-resources
+  source_globs: &id041
+  - jiuwenswarm/resources/agent/workspace/skills/xlsx/scripts/doctor.py
+  docs: []
+  entry_points: *id041
+  page: repos/jiuwenswarm/components/config-resources/feature-xlsx-doctor-selfcheck.md
+- id: xlsx-formula-check
+  title: XLSX 公式静态校验（formula_check.py）
+  owner: config-resources
+  source_globs: &id042
+  - jiuwenswarm/resources/agent/workspace/skills/xlsx/scripts/formula_check.py
+  docs: []
+  entry_points: *id042
+  page: repos/jiuwenswarm/components/config-resources/feature-xlsx-formula-check.md
+- id: xlsx-insert-row
+  title: XLSX Row Insert with Range Extension
+  owner: config-resources
+  source_globs:
+  - jiuwenswarm/resources/agent/workspace/skills/xlsx/scripts/xlsx_insert_row.py
+  - jiuwenswarm/resources/agent/workspace/skills/xlsx/scripts/xlsx_shift_rows.py
+  - jiuwenswarm/resources/agent/workspace/skills/xlsx/scripts/_xlsx_common.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/resources/agent/workspace/skills/xlsx/scripts/xlsx_insert_row.py
+  page: repos/jiuwenswarm/components/config-resources/feature-xlsx-insert-row.md
+- id: xlsx-reader-structural-diff
+  title: XLSX Read-Only Structure Reader and Edit-Damage Differ
+  owner: config-resources
+  source_globs: &id043
+  - jiuwenswarm/resources/agent/workspace/skills/xlsx/scripts/xlsx_reader.py
+  docs: []
+  entry_points: *id043
+  page: repos/jiuwenswarm/components/config-resources/feature-xlsx-reader-structural-diff.md
+- id: xlsx-workbook-unpack-repack
+  title: XLSX Skill Format-Preserving Unpack/Repack
+  owner: config-resources
+  source_globs: &id044
+  - jiuwenswarm/resources/agent/workspace/skills/xlsx/scripts/xlsx_pack.py
+  - jiuwenswarm/resources/agent/workspace/skills/xlsx/scripts/xlsx_unpack.py
+  docs: []
+  entry_points: *id044
+  page: repos/jiuwenswarm/components/config-resources/feature-xlsx-workbook-unpack-repack.md
+- id: yuanrong-agent-file-transfer
+  title: YuanRong Agent 容器文件上传/下载/列举/建目录
+  owner: extensions-plugins
+  source_globs:
+  - jiuwenswarm/extensions/yuanrong_frontend_client.py
+  - jiuwenswarm/gateway/channel_manager/web/container_file_http.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/extensions/yuanrong_frontend_client.py
+  page: repos/jiuwenswarm/components/extensions-plugins/feature-yuanrong-agent-file-transfer.md
+- id: yuanrong-faas-invocation
+  title: YuanRong FaaS 函数调用（非流式 + SSE 流式）
+  owner: extensions-plugins
+  source_globs:
+  - jiuwenswarm/extensions/yuanrong_frontend_client.py
+  - jiuwenswarm/extensions/clawee.py
+  - jiuwenswarm/extensions/agent_client/extension.py
+  docs: []
+  entry_points:
+  - jiuwenswarm/extensions/yuanrong_frontend_client.py
+  page: repos/jiuwenswarm/components/extensions-plugins/feature-yuanrong-faas-invocation.md

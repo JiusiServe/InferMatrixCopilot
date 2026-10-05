@@ -1,0 +1,1326 @@
+{
+  "schema_version": 1,
+  "repo": "jiuwenswarm",
+  "pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "run_config": {
+    "packet_chars": 96000,
+    "zcode_start_interval_s": 5.0,
+    "zcode_reasoning_level": "low"
+  },
+  "complete": true,
+  "done": true,
+  "catalog_sha256": "e6c37a346cccdaff5404c26a21b5a88f733150b1e0835c4a533a332d20df68ed",
+  "catalog_renderer_version": "catalog-renderer-v2",
+  "feature_ids": [
+    "bootstrap",
+    "instances",
+    "desktop",
+    "deployment",
+    "process-cli",
+    "cli",
+    "tui",
+    "web-chat",
+    "web-navigation",
+    "projects-sessions",
+    "modes",
+    "team",
+    "distributed-team",
+    "human-team",
+    "swarmflow",
+    "harness",
+    "planning",
+    "subagents",
+    "skills",
+    "swarm-skills",
+    "skill-hub",
+    "skill-evolution",
+    "symphony",
+    "auto-harness",
+    "rsi-packages",
+    "ttse",
+    "memory",
+    "auto-memory",
+    "coding-memory",
+    "task-memory",
+    "context",
+    "permissions",
+    "hooks",
+    "applications",
+    "video-duplex",
+    "e2a",
+    "a2a",
+    "acp",
+    "ssh",
+    "a2ui",
+    "browser-tools",
+    "browser-client",
+    "vscode",
+    "jetbrains",
+    "sdk",
+    "sandbox",
+    "models",
+    "mcp",
+    "login",
+    "cron",
+    "observability",
+    "debug-trace",
+    "multimodal",
+    "lsp",
+    "worktree",
+    "autofix",
+    "im-feishu",
+    "im-wechat",
+    "im-wecom",
+    "im-dingtalk",
+    "im-xiaoyi",
+    "im-slack",
+    "im-telegram",
+    "im-discord",
+    "im-whatsapp",
+    "agent-management",
+    "jiuwen-memory-sdk",
+    "image-generation",
+    "sandbox-privacy-proxy",
+    "digital-avatar",
+    "connectors",
+    "external-cli-agents",
+    "goal-mode",
+    "plan-mode",
+    "heartbeat",
+    "artifacts",
+    "speech-interaction",
+    "skill-development",
+    "proactive-recommendation",
+    "a2x-registry-client-sdk",
+    "agent-template-layered-validation",
+    "agentos-sandbox-create-lifecycle",
+    "arxiv-visual-extraction",
+    "ascend-chrome-trace-generator",
+    "ascend-trace-analysis-pipeline",
+    "ascend-trace-auto-instrumentation",
+    "ascend-trace-compile-safety-checker",
+    "ascend-trace-instrumentation-planner",
+    "ascend-trace-preprocessor",
+    "at-file-reference-inlining-b1a822e1",
+    "audit-integrity-hmac-signing",
+    "audit-report-html-renderer",
+    "channel-security-review-slash-command",
+    "chat-session-stats-dashboard",
+    "code-mode-branch-selector",
+    "code-mode-commit-push",
+    "command-execution-tool",
+    "context-usage-indicator",
+    "cross-channel-history-search-skill",
+    "daily-report-skill",
+    "deepsearch-research-pipeline",
+    "dev-ws-traffic-logger",
+    "docx-pro-cli",
+    "dynamic-memory-cli",
+    "financial-document-parser",
+    "frontend-incremental-lint-gate",
+    "gateway-config-hot-reload",
+    "gateway-health-check",
+    "gateway-server-multi-route-ws",
+    "github-issue-feedback-script",
+    "huawei-maas-apikey-creation",
+    "huawei-maas-cdp-authorize",
+    "huawei-realname-account-check",
+    "ide-file-edit-diff-apply",
+    "ide-terminal-command-mirror",
+    "ide-turn-rewind-snapshot",
+    "im-attachment-persist-hook-969909e1",
+    "im-channel-hot-reconfig",
+    "llm-wiki-knowledge-base",
+    "local-doc-ocr-offline",
+    "locale-conf-rpc",
+    "maas-auto-open-models",
+    "opc-add-slide",
+    "opc-pack-validate",
+    "pdf-reading-tool",
+    "plugin-package-initializer",
+    "plugin-package-layered-validator",
+    "ppt-deck-finalize",
+    "ppt-evidence-preparation",
+    "ppt-execution-lock-validator",
+    "ppt-figure-panel-layout",
+    "ppt-opc-thumbnail",
+    "ppt-system-diagram-renderer",
+    "pptx-structural-audit",
+    "rsi-dataset-folder-check",
+    "rsi-experiment-ui",
+    "runtime-agent-definition-execution",
+    "sdd-design-rail",
+    "session-input-steering",
+    "session-messaging-toolkit",
+    "share-image-export",
+    "skill-generator-cli",
+    "skill-page-scrape-blocks",
+    "sop-structure-extraction",
+    "thirdagent-list-switch",
+    "user-todos-tool",
+    "video-agent-managed-task-service",
+    "video-coarse-scan-frame-extraction",
+    "video-generation-tools",
+    "web-asset-publish-flow",
+    "web-i18n-zh-en",
+    "web-native-directory-picker",
+    "web-search-tools",
+    "workspace-git-diff",
+    "xiaoyi-alarm-crud",
+    "xiaoyi-calendar-tools",
+    "xiaoyi-call-phone-tool",
+    "xiaoyi-collection-tools",
+    "xiaoyi-contact-search",
+    "xiaoyi-location-tool",
+    "xiaoyi-note-tools",
+    "xiaoyi-photo-gallery-tools",
+    "xiaoyi-pushdata-store-and-viewer",
+    "xiaoyi-save-to-phone-tools",
+    "xiaoyi-timestamp-utc8-tool",
+    "xlsx-add-computed-column",
+    "xlsx-doctor-selfcheck",
+    "xlsx-formula-check",
+    "xlsx-insert-row",
+    "xlsx-reader-structural-diff",
+    "xlsx-workbook-unpack-repack",
+    "yuanrong-agent-file-transfer",
+    "yuanrong-faas-invocation"
+  ],
+  "features": [
+    {
+      "id": "bootstrap",
+      "owner": "launch",
+      "title": "初始化与服务启动"
+    },
+    {
+      "id": "instances",
+      "owner": "launch",
+      "title": "单机多实例"
+    },
+    {
+      "id": "desktop",
+      "owner": "launch",
+      "title": "桌面宿主与自动更新"
+    },
+    {
+      "id": "deployment",
+      "owner": "packaging-deploy",
+      "title": "打包与部署"
+    },
+    {
+      "id": "process-cli",
+      "owner": "gateway-channels",
+      "title": "机器执行与本地 CLI"
+    },
+    {
+      "id": "cli",
+      "owner": "gateway-channels",
+      "title": "交互式命令行"
+    },
+    {
+      "id": "tui",
+      "owner": "tui-client",
+      "title": "TUI 对话与命令"
+    },
+    {
+      "id": "web-chat",
+      "owner": "web-frontend",
+      "title": "Web 对话与流式状态"
+    },
+    {
+      "id": "web-navigation",
+      "owner": "web-frontend",
+      "title": "Web 页面与功能入口"
+    },
+    {
+      "id": "projects-sessions",
+      "owner": "agent-runtime",
+      "title": "项目、会话与历史管理"
+    },
+    {
+      "id": "modes",
+      "owner": "agent-server-runtime",
+      "title": "Agent、Code 与 Team 模式"
+    },
+    {
+      "id": "team",
+      "owner": "agents-team",
+      "title": "多智能体团队协作"
+    },
+    {
+      "id": "distributed-team",
+      "owner": "agents-team",
+      "title": "跨进程分布式 Team"
+    },
+    {
+      "id": "human-team",
+      "owner": "agents-team",
+      "title": "人类团队成员与人工协作"
+    },
+    {
+      "id": "swarmflow",
+      "owner": "agents-team",
+      "title": "SwarmFlow 工作流与 HITL"
+    },
+    {
+      "id": "harness",
+      "owner": "agent-server-runtime",
+      "title": "Agent Loop 与 Rail 装配"
+    },
+    {
+      "id": "planning",
+      "owner": "agents-team",
+      "title": "任务规划与 Todo"
+    },
+    {
+      "id": "subagents",
+      "owner": "agents-team",
+      "title": "子代理派发与验证"
+    },
+    {
+      "id": "skills",
+      "owner": "agents-team",
+      "title": "技能安装、挂载与发现"
+    },
+    {
+      "id": "swarm-skills",
+      "owner": "agents-team",
+      "title": "团队技能与能力复用"
+    },
+    {
+      "id": "skill-hub",
+      "owner": "agents-team",
+      "title": "Skill Hub 与市场流通"
+    },
+    {
+      "id": "skill-evolution",
+      "owner": "agent-server-runtime",
+      "title": "Skill 自演进"
+    },
+    {
+      "id": "symphony",
+      "owner": "symphony-orchestration",
+      "title": "Symphony 检索与图谱编排"
+    },
+    {
+      "id": "auto-harness",
+      "owner": "auto-harness",
+      "title": "Auto Harness 评测优化"
+    },
+    {
+      "id": "rsi-packages",
+      "owner": "auto-harness",
+      "title": "Harness Package 与热激活"
+    },
+    {
+      "id": "ttse",
+      "owner": "agent-server-runtime",
+      "title": "FACT/TIP 双轨经验"
+    },
+    {
+      "id": "memory",
+      "owner": "agents-team",
+      "title": "长期记忆"
+    },
+    {
+      "id": "auto-memory",
+      "owner": "agents-team",
+      "title": "对话后自动记忆"
+    },
+    {
+      "id": "coding-memory",
+      "owner": "agent-server-runtime",
+      "title": "Code 模式编码记忆"
+    },
+    {
+      "id": "task-memory",
+      "owner": "agents-team",
+      "title": "任务经验检索与沉淀"
+    },
+    {
+      "id": "context",
+      "owner": "agent-server-runtime",
+      "title": "上下文压缩与卸载"
+    },
+    {
+      "id": "permissions",
+      "owner": "agent-server-runtime",
+      "title": "工具权限与安全治理"
+    },
+    {
+      "id": "hooks",
+      "owner": "extensions-plugins",
+      "title": "生命周期 Hooks 与扩展"
+    },
+    {
+      "id": "applications",
+      "owner": "extensions-plugins",
+      "title": "Application Plugin 与前端贡献"
+    },
+    {
+      "id": "video-duplex",
+      "owner": "extensions-plugins",
+      "title": "音视频双工扩展"
+    },
+    {
+      "id": "e2a",
+      "owner": "protocols",
+      "title": "E2A 统一请求响应协议"
+    },
+    {
+      "id": "a2a",
+      "owner": "protocols",
+      "title": "A2A 接入与 AgentCard"
+    },
+    {
+      "id": "acp",
+      "owner": "protocols",
+      "title": "ACP 与 stdio 桥接"
+    },
+    {
+      "id": "ssh",
+      "owner": "gateway-channels",
+      "title": "SSH 频道与远程终端"
+    },
+    {
+      "id": "a2ui",
+      "owner": "a2ui",
+      "title": "A2UI 生成式界面"
+    },
+    {
+      "id": "browser-tools",
+      "owner": "agents-team",
+      "title": "浏览器服务与网页工具"
+    },
+    {
+      "id": "browser-client",
+      "owner": "browser-client",
+      "title": "Chromium 浏览器扩展"
+    },
+    {
+      "id": "vscode",
+      "owner": "ide-clients",
+      "title": "VS Code 客户端"
+    },
+    {
+      "id": "jetbrains",
+      "owner": "ide-clients",
+      "title": "JetBrains 客户端"
+    },
+    {
+      "id": "sdk",
+      "owner": "sdk-clients",
+      "title": "Python 与 TypeScript SDK"
+    },
+    {
+      "id": "sandbox",
+      "owner": "sandbox-runtime",
+      "title": "JiuwenBox 隔离执行"
+    },
+    {
+      "id": "models",
+      "owner": "common-core",
+      "title": "模型平台与 API 配置"
+    },
+    {
+      "id": "mcp",
+      "owner": "common-core",
+      "title": "MCP 配置、凭据与资源"
+    },
+    {
+      "id": "login",
+      "owner": "login-auth",
+      "title": "账号登录与凭据续期"
+    },
+    {
+      "id": "cron",
+      "owner": "cron-scheduling",
+      "title": "定时任务与调度存储"
+    },
+    {
+      "id": "observability",
+      "owner": "observability",
+      "title": "执行轨迹与保留"
+    },
+    {
+      "id": "debug-trace",
+      "owner": "observability",
+      "title": "Debug Dump 与 OTel"
+    },
+    {
+      "id": "multimodal",
+      "owner": "agents-team",
+      "title": "多模态理解与媒体配置"
+    },
+    {
+      "id": "lsp",
+      "owner": "agent-server-runtime",
+      "title": "LSP 代码智能"
+    },
+    {
+      "id": "worktree",
+      "owner": "agent-server-runtime",
+      "title": "Worktree 隔离工作"
+    },
+    {
+      "id": "autofix",
+      "owner": "tui-client",
+      "title": "已有 PR 自动修复"
+    },
+    {
+      "id": "im-feishu",
+      "owner": "gateway-channels",
+      "title": "飞书 频道"
+    },
+    {
+      "id": "im-wechat",
+      "owner": "gateway-channels",
+      "title": "微信 频道"
+    },
+    {
+      "id": "im-wecom",
+      "owner": "gateway-channels",
+      "title": "企业微信 频道"
+    },
+    {
+      "id": "im-dingtalk",
+      "owner": "gateway-channels",
+      "title": "钉钉 频道"
+    },
+    {
+      "id": "im-xiaoyi",
+      "owner": "gateway-channels",
+      "title": "小艺 频道"
+    },
+    {
+      "id": "im-slack",
+      "owner": "gateway-channels",
+      "title": "Slack 频道"
+    },
+    {
+      "id": "im-telegram",
+      "owner": "gateway-channels",
+      "title": "Telegram 频道"
+    },
+    {
+      "id": "im-discord",
+      "owner": "gateway-channels",
+      "title": "Discord 频道"
+    },
+    {
+      "id": "im-whatsapp",
+      "owner": "gateway-channels",
+      "title": "WhatsApp 频道"
+    },
+    {
+      "id": "agent-management",
+      "owner": "web-frontend",
+      "title": "智能体资产管理与工作区浏览"
+    },
+    {
+      "id": "jiuwen-memory-sdk",
+      "owner": "agents-team",
+      "title": "JiuwenMemory 进程内 SDK 接入"
+    },
+    {
+      "id": "image-generation",
+      "owner": "agents-team",
+      "title": "图片生成与产物落盘"
+    },
+    {
+      "id": "sandbox-privacy-proxy",
+      "owner": "sandbox-runtime",
+      "title": "JiuwenBox 推理隐私代理"
+    },
+    {
+      "id": "digital-avatar",
+      "owner": "agents-team",
+      "title": "群聊数字分身与 owner 权限"
+    },
+    {
+      "id": "connectors",
+      "owner": "web-frontend",
+      "title": "连接器市场与 MCP 授权流程"
+    },
+    {
+      "id": "external-cli-agents",
+      "owner": "common-core",
+      "title": "外部 Claude 与 Codex CLI 智能体"
+    },
+    {
+      "id": "goal-mode",
+      "owner": "web-frontend",
+      "title": "持续目标与会话控制"
+    },
+    {
+      "id": "plan-mode",
+      "owner": "web-frontend",
+      "title": "计划模式与多入口切换限制"
+    },
+    {
+      "id": "heartbeat",
+      "owner": "agent-server-runtime",
+      "title": "绑定会话的心跳续跑任务"
+    },
+    {
+      "id": "artifacts",
+      "owner": "web-frontend",
+      "title": "会话产物列表、预览与下载"
+    },
+    {
+      "id": "speech-interaction",
+      "owner": "web-frontend",
+      "title": "语音输入、回复朗读与停止"
+    },
+    {
+      "id": "skill-development",
+      "owner": "agent-server-runtime",
+      "title": "SkillDev 创建、评测与打包边界"
+    },
+    {
+      "id": "proactive-recommendation",
+      "owner": "agent-server-runtime",
+      "title": "主动推荐、频率限制与主 Agent 交付"
+    },
+    {
+      "id": "a2x-registry-client-sdk",
+      "owner": "agents-team",
+      "title": "A2X Registry Client SDK — mirrored sync/async service registry client"
+    },
+    {
+      "id": "agent-template-layered-validation",
+      "owner": "config-resources",
+      "title": "Agent 模板分层校验器（L0 规范 / L1 静态 AST / L2 子进程编排）"
+    },
+    {
+      "id": "agentos-sandbox-create-lifecycle",
+      "owner": "extensions-plugins",
+      "title": "AgentOS 沙箱创建与幂等对账"
+    },
+    {
+      "id": "arxiv-visual-extraction",
+      "owner": "config-resources",
+      "title": "arXiv 论文 Figure/Table 检测与高清导出（extract_arxiv_visuals）"
+    },
+    {
+      "id": "ascend-chrome-trace-generator",
+      "owner": "config-resources",
+      "title": "Chrome Trace JSON 生成器（trace_collector）"
+    },
+    {
+      "id": "ascend-trace-analysis-pipeline",
+      "owner": "config-resources",
+      "title": "ascend-moe-optimizer-trace-analyzer CLI 主流程"
+    },
+    {
+      "id": "ascend-trace-auto-instrumentation",
+      "owner": "config-resources",
+      "title": "TRACE_POINT 自动埋点改写（instrument_operator）"
+    },
+    {
+      "id": "ascend-trace-compile-safety-checker",
+      "owner": "config-resources",
+      "title": "插桩编译安全静态检查器"
+    },
+    {
+      "id": "ascend-trace-instrumentation-planner",
+      "owner": "config-resources",
+      "title": "插桩计划生成器（调用图深度受限展开）"
+    },
+    {
+      "id": "ascend-trace-preprocessor",
+      "owner": "config-resources",
+      "title": "TRACE_POINT 预处理器与 point_map 映射导出"
+    },
+    {
+      "id": "at-file-reference-inlining-b1a822e1",
+      "owner": "gateway-channels",
+      "title": "@path 文件引用内联与 @agent 提及解析"
+    },
+    {
+      "id": "audit-integrity-hmac-signing",
+      "owner": "config-resources",
+      "title": "符号审计完整性 HMAC 签名与信任验证（audit_integrity.py）"
+    },
+    {
+      "id": "audit-report-html-renderer",
+      "owner": "config-resources",
+      "title": "自包含审计可视化 HTML 报告生成器"
+    },
+    {
+      "id": "channel-security-review-slash-command",
+      "owner": "gateway-channels",
+      "title": "/security-review 安全审查斜杠命令与 git 预执行"
+    },
+    {
+      "id": "chat-session-stats-dashboard",
+      "owner": "web-frontend",
+      "title": "Chat Session Stats Bar and Per-Turn Mini Charts"
+    },
+    {
+      "id": "code-mode-branch-selector",
+      "owner": "web-frontend",
+      "title": "代码模式分支选择器（初始化/切换/创建分支）"
+    },
+    {
+      "id": "code-mode-commit-push",
+      "owner": "web-frontend",
+      "title": "提交/推送对话框（commit、push、commit_push）"
+    },
+    {
+      "id": "command-execution-tool",
+      "owner": "agents-team",
+      "title": "mcp_exec_command 跨平台命令执行工具"
+    },
+    {
+      "id": "context-usage-indicator",
+      "owner": "web-frontend",
+      "title": "上下文占用指示器（环形/悬浮提示/明细弹层）"
+    },
+    {
+      "id": "cross-channel-history-search-skill",
+      "owner": "config-resources",
+      "title": "Cross-Channel Session History Search Skill"
+    },
+    {
+      "id": "daily-report-skill",
+      "owner": "config-resources",
+      "title": "进阶版日报/周报/月报生成器 Skill"
+    },
+    {
+      "id": "deepsearch-research-pipeline",
+      "owner": "config-resources",
+      "title": "openJiuwen-DeepSearch 深度研究执行管线"
+    },
+    {
+      "id": "dev-ws-traffic-logger",
+      "owner": "web-frontend",
+      "title": "Vite Dev WS Traffic Logger (/__dev/ws-log)"
+    },
+    {
+      "id": "docx-pro-cli",
+      "owner": "config-resources",
+      "title": "docx-pro Word 文档操作 CLI"
+    },
+    {
+      "id": "dynamic-memory-cli",
+      "owner": "agents-team",
+      "title": "Dynamic Memory CLI（SQLite UT 记忆库与发布/构建流水线）"
+    },
+    {
+      "id": "financial-document-parser",
+      "owner": "config-resources",
+      "title": "财务文档解析 Skill（发票/收据/对账单解析与报告生成）"
+    },
+    {
+      "id": "frontend-incremental-lint-gate",
+      "owner": "web-frontend",
+      "title": "增量 ESLint 门禁（相对基线只报新增诊断）"
+    },
+    {
+      "id": "gateway-config-hot-reload",
+      "owner": "gateway-channels",
+      "title": "Gateway Config-Save Hot Reload (agent.reload_config retry, restart fallback, browser/proactive side effects)"
+    },
+    {
+      "id": "gateway-health-check",
+      "owner": "gateway-channels",
+      "title": "Gateway HealthCheck 周期探活服务"
+    },
+    {
+      "id": "gateway-server-multi-route-ws",
+      "owner": "gateway-channels",
+      "title": "GatewayServer 多路由 WebSocket 宿主与会话/请求路由表"
+    },
+    {
+      "id": "github-issue-feedback-script",
+      "owner": "config-resources",
+      "title": "GitHub Issue 反馈创建脚本"
+    },
+    {
+      "id": "huawei-maas-apikey-creation",
+      "owner": "config-resources",
+      "title": "华为云 MaaS API Key 自动创建与捕获（auto_create_apikey）"
+    },
+    {
+      "id": "huawei-maas-cdp-authorize",
+      "owner": "config-resources",
+      "title": "华为云 MaaS 委托授权自动化（auto_authorize）"
+    },
+    {
+      "id": "huawei-realname-account-check",
+      "owner": "config-resources",
+      "title": "华为云账号实名认证状态检测（check_account）"
+    },
+    {
+      "id": "ide-file-edit-diff-apply",
+      "owner": "ide-clients",
+      "title": "IDE 端代理文件编辑直接应用（DiffApplier）"
+    },
+    {
+      "id": "ide-terminal-command-mirror",
+      "owner": "ide-vscode",
+      "title": "IDE 终端命令镜像执行"
+    },
+    {
+      "id": "ide-turn-rewind-snapshot",
+      "owner": "ide-clients",
+      "title": "IDE 单轮文件快照与回退（Rewind）"
+    },
+    {
+      "id": "im-attachment-persist-hook-969909e1",
+      "owner": "gateway-channels",
+      "title": "IM Attachment Persist Hook (E2A + HTTP Bridge)"
+    },
+    {
+      "id": "im-channel-hot-reconfig",
+      "owner": "gateway-channels",
+      "title": "IM Channel Hot Reconfiguration (_apply_channel_config lifecycle across 11 channels)"
+    },
+    {
+      "id": "llm-wiki-knowledge-base",
+      "owner": "agents-team",
+      "title": "LLM Wiki 知识库（wiki_ingest/query/lint 子代理）"
+    },
+    {
+      "id": "local-doc-ocr-offline",
+      "owner": "config-resources",
+      "title": "本地离线 OCR 管线（RapidOCR：PDF/图片 → Markdown）"
+    },
+    {
+      "id": "locale-conf-rpc",
+      "owner": "gateway-channels",
+      "title": "界面语言配置 RPC（preferred_language）"
+    },
+    {
+      "id": "maas-auto-open-models",
+      "owner": "config-resources",
+      "title": "华为云 MaaS 预置服务批量开通自动化（CDP）"
+    },
+    {
+      "id": "opc-add-slide",
+      "owner": "config-resources",
+      "title": "解包 PPTX 幻灯片添加工具（opc/add_slide.py）"
+    },
+    {
+      "id": "opc-pack-validate",
+      "owner": "config-resources",
+      "title": "OOXML 打包与 schema 校验（opc/pack.py）"
+    },
+    {
+      "id": "pdf-reading-tool",
+      "owner": "agents-team",
+      "title": "分页 PDF 文本读取工具（read_pdf）"
+    },
+    {
+      "id": "plugin-package-initializer",
+      "owner": "config-resources",
+      "title": "plugin-creator 插件包脚手架初始化"
+    },
+    {
+      "id": "plugin-package-layered-validator",
+      "owner": "config-resources",
+      "title": "plugin-creator 插件包分层校验器（L0/L1/L2）"
+    },
+    {
+      "id": "ppt-deck-finalize",
+      "owner": "config-resources",
+      "title": "一键成片流水线与质量门禁（finalize_deck.py）"
+    },
+    {
+      "id": "ppt-evidence-preparation",
+      "owner": "config-resources",
+      "title": "Evidence Plan Preparation and Review Lifecycle"
+    },
+    {
+      "id": "ppt-execution-lock-validator",
+      "owner": "config-resources",
+      "title": "PPT 执行锁（execution-lock.json）语义校验器"
+    },
+    {
+      "id": "ppt-figure-panel-layout",
+      "owner": "config-resources",
+      "title": "PPT 图表面板布局引擎（figure-panel.js）"
+    },
+    {
+      "id": "ppt-opc-thumbnail",
+      "owner": "config-resources",
+      "title": "Deck Thumbnail Contact-Sheet Renderer"
+    },
+    {
+      "id": "ppt-system-diagram-renderer",
+      "owner": "config-resources",
+      "title": "PPT 系统架构图原生形状渲染引擎"
+    },
+    {
+      "id": "pptx-structural-audit",
+      "owner": "config-resources",
+      "title": "PPTX 结构与可读性审计脚本"
+    },
+    {
+      "id": "rsi-dataset-folder-check",
+      "owner": "config-resources",
+      "title": "RSI 数据集任务文件夹完整性预检"
+    },
+    {
+      "id": "rsi-experiment-ui",
+      "owner": "web-frontend",
+      "title": "RSI 自我改进实验页（创建/列表/配置回显）"
+    },
+    {
+      "id": "runtime-agent-definition-execution",
+      "owner": "agent-runtime",
+      "title": "声明式 root Agent 定义执行（invoke_agent/stream_agent）"
+    },
+    {
+      "id": "sdd-design-rail",
+      "owner": "agents-team",
+      "title": "DesignRail SDD 状态机（Spec-Driven Development）"
+    },
+    {
+      "id": "session-input-steering",
+      "owner": "agent-runtime",
+      "title": "Session Input Lane (steer/follow_up) and Execution Binding"
+    },
+    {
+      "id": "session-messaging-toolkit",
+      "owner": "agents-team",
+      "title": "跨会话消息 Agent 工具集（SessionMessagingToolkit 六工具）"
+    },
+    {
+      "id": "share-image-export",
+      "owner": "web-frontend",
+      "title": "Session Share-Image Export (Job Registry + Headless Renderer)"
+    },
+    {
+      "id": "skill-generator-cli",
+      "owner": "config-resources",
+      "title": "skill-gen CLI（sop-text / url-fetch 子命令）"
+    },
+    {
+      "id": "skill-page-scrape-blocks",
+      "owner": "config-resources",
+      "title": "Web Page Scraping to Unified Stage01 Blocks"
+    },
+    {
+      "id": "sop-structure-extraction",
+      "owner": "config-resources",
+      "title": "SOP 结构化抽取（parse_sop_raw_text / parse_sop_file）"
+    },
+    {
+      "id": "thirdagent-list-switch",
+      "owner": "gateway-channels",
+      "title": "3rdagent.list / 3rdagent.switch 第三方智能体切换"
+    },
+    {
+      "id": "user-todos-tool",
+      "owner": "agents-team",
+      "title": "user_todos Personal Per-Channel Todo Tool"
+    },
+    {
+      "id": "video-agent-managed-task-service",
+      "owner": "extensions-plugins",
+      "title": "Voice/Video Duplex Managed Agent Task Service (Durable Queue, Concurrency, Uncertainty Semantics)"
+    },
+    {
+      "id": "video-coarse-scan-frame-extraction",
+      "owner": "config-resources",
+      "title": "视频粗扫抽帧与审核批次门控（analyze_video.py）"
+    },
+    {
+      "id": "video-generation-tools",
+      "owner": "agents-team",
+      "title": "generate_video / check_video_status Submit-then-Poll Video Generation"
+    },
+    {
+      "id": "web-asset-publish-flow",
+      "owner": "web-frontend",
+      "title": "Web 资产发布流程（prepare/commit/轮询/提交锁）"
+    },
+    {
+      "id": "web-i18n-zh-en",
+      "owner": "web-frontend",
+      "title": "Web 前端中英双语 i18n 初始化"
+    },
+    {
+      "id": "web-native-directory-picker",
+      "owner": "web-frontend",
+      "title": "Web 通道本机目录/可执行文件选择器（跨平台后端链）"
+    },
+    {
+      "id": "web-search-tools",
+      "owner": "agents-team",
+      "title": "MCP Free/Paid Search Tools with Trusted-Search Provenance Lease"
+    },
+    {
+      "id": "workspace-git-diff",
+      "owner": "agent-server-runtime",
+      "title": "Workspace Git Diff Aggregation (get_git_diff)"
+    },
+    {
+      "id": "xiaoyi-alarm-crud",
+      "owner": "agents-team",
+      "title": "设备闹钟 CRUD 工具（create/search/modify/delete_alarm）"
+    },
+    {
+      "id": "xiaoyi-calendar-tools",
+      "owner": "agents-team",
+      "title": "设备日历日程工具（create/search_calendar_event）"
+    },
+    {
+      "id": "xiaoyi-call-phone-tool",
+      "owner": "agents-team",
+      "title": "小艺拨打电话工具 (call_phone)"
+    },
+    {
+      "id": "xiaoyi-collection-tools",
+      "owner": "agents-team",
+      "title": "小艺收藏/个人知识库工具 (query/add/delete_collection)"
+    },
+    {
+      "id": "xiaoyi-contact-search",
+      "owner": "agents-team",
+      "title": "设备联系人搜索工具（search_contact）"
+    },
+    {
+      "id": "xiaoyi-location-tool",
+      "owner": "agents-team",
+      "title": "设备定位工具（get_user_location）"
+    },
+    {
+      "id": "xiaoyi-note-tools",
+      "owner": "agents-team",
+      "title": "小艺备忘录工具 (create_note / search_notes / modify_note)"
+    },
+    {
+      "id": "xiaoyi-photo-gallery-tools",
+      "owner": "agents-team",
+      "title": "小艺图库搜索与照片上传工具 (search_photo_gallery / upload_photo)"
+    },
+    {
+      "id": "xiaoyi-pushdata-store-and-viewer",
+      "owner": "agents-team",
+      "title": "推送记录持久化与查询 (pushdata_manager + view_push_result)"
+    },
+    {
+      "id": "xiaoyi-save-to-phone-tools",
+      "owner": "agents-team",
+      "title": "小艺保存到手机工具 (save_media_to_gallery / save_file_to_file_manager)"
+    },
+    {
+      "id": "xiaoyi-timestamp-utc8-tool",
+      "owner": "agents-team",
+      "title": "时间戳转北京时间工具 (convert_timestamp_to_utc8_time)"
+    },
+    {
+      "id": "xlsx-add-computed-column",
+      "owner": "config-resources",
+      "title": "XLSX Computed Column Adder"
+    },
+    {
+      "id": "xlsx-doctor-selfcheck",
+      "owner": "config-resources",
+      "title": "XLSX 技能环境自检（doctor.py）"
+    },
+    {
+      "id": "xlsx-formula-check",
+      "owner": "config-resources",
+      "title": "XLSX 公式静态校验（formula_check.py）"
+    },
+    {
+      "id": "xlsx-insert-row",
+      "owner": "config-resources",
+      "title": "XLSX Row Insert with Range Extension"
+    },
+    {
+      "id": "xlsx-reader-structural-diff",
+      "owner": "config-resources",
+      "title": "XLSX Read-Only Structure Reader and Edit-Damage Differ"
+    },
+    {
+      "id": "xlsx-workbook-unpack-repack",
+      "owner": "config-resources",
+      "title": "XLSX Skill Format-Preserving Unpack/Repack"
+    },
+    {
+      "id": "yuanrong-agent-file-transfer",
+      "owner": "extensions-plugins",
+      "title": "YuanRong Agent 容器文件上传/下载/列举/建目录"
+    },
+    {
+      "id": "yuanrong-faas-invocation",
+      "owner": "extensions-plugins",
+      "title": "YuanRong FaaS 函数调用（非流式 + SSE 流式）"
+    }
+  ],
+  "owner_requests": [
+    {
+      "owner": "browser-client",
+      "title": "browser-client",
+      "feature_ids": [
+        "browser-client"
+      ],
+      "source_paths": [
+        "jiuwenswarm/channels/browser/frontend/src/background/index.ts",
+        "jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts"
+      ],
+      "page": "repos/jiuwenswarm/components/browser-client/_index.md"
+    },
+    {
+      "owner": "ide-clients",
+      "title": "ide-clients",
+      "feature_ids": [
+        "vscode",
+        "jetbrains",
+        "ide-file-edit-diff-apply",
+        "ide-turn-rewind-snapshot"
+      ],
+      "source_paths": [
+        "jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/JiuwenSwarmService.kt",
+        "jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/ChatToolWindow.kt",
+        "jiuwenswarm/channels/ide/packages/vscode-extension/src/editor/DiffApplier.ts",
+        "jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts"
+      ],
+      "page": "repos/jiuwenswarm/components/ide-clients/_index.md"
+    },
+    {
+      "owner": "ide-vscode",
+      "title": "ide-vscode",
+      "feature_ids": [
+        "ide-terminal-command-mirror"
+      ],
+      "source_paths": [
+        "jiuwenswarm/channels/ide/packages/vscode-extension/src/terminal/TerminalManager.ts",
+        "jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/ChatPanel.ts"
+      ],
+      "page": "repos/jiuwenswarm/components/ide-vscode/_index.md"
+    },
+    {
+      "owner": "sandbox-runtime",
+      "title": "sandbox-runtime",
+      "feature_ids": [
+        "sandbox",
+        "sandbox-privacy-proxy"
+      ],
+      "source_paths": [
+        "jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy.py",
+        "jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy_manager.py",
+        "jiuwenbox/src/jiuwenbox/server/app.py"
+      ],
+      "page": "repos/jiuwenswarm/components/sandbox-runtime/_index.md"
+    },
+    {
+      "owner": "sdk-clients",
+      "title": "sdk-clients",
+      "feature_ids": [
+        "sdk"
+      ],
+      "source_paths": [
+        "sdks/python/src/jiuwenswarm_sdk/client.py"
+      ],
+      "page": "repos/jiuwenswarm/components/sdk-clients/_index.md"
+    },
+    {
+      "owner": "tui-client",
+      "title": "tui-client",
+      "feature_ids": [
+        "tui",
+        "autofix"
+      ],
+      "source_paths": [
+        "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.ts",
+        "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.watch.ts",
+        "jiuwenswarm/channels/tui/frontend/src/index.ts"
+      ],
+      "page": "repos/jiuwenswarm/components/tui-client/_index.md"
+    }
+  ],
+  "counts": {
+    "implementation_supplement": 1264,
+    "unknown": 2235,
+    "subcapability": 878,
+    "shared_component": 345,
+    "new": 94,
+    "alias": 26,
+    "outdated": 17
+  },
+  "statistics": {
+    "document_candidates": 305,
+    "source_candidates": 4647,
+    "source_only_new": 93,
+    "confirmed_new": 94,
+    "implementation_supplements": 1264,
+    "aliases": 26,
+    "outdated": 17,
+    "unknown": 2235,
+    "candidate_limit_tasks": 5,
+    "invalid_candidates": 40
+  },
+  "scan_summary": {
+    "documents": 395,
+    "production_files": 2190,
+    "tests": 1105,
+    "tasks": 502,
+    "unknown_tasks": 22
+  },
+  "index_sha256": "b2b3c8cfe7dd9e9bd60f6bc99a80a1860cff111631e0dd6fdc59108af6b517a6",
+  "limits": "Declared inventory processed; not proof all repository capabilities were found. Tests not executed.",
+  "historical_denominator": 553,
+  "facet_denominator": 1211,
+  "catalog_boundary_audit": {
+    "identity": {
+      "version": "catalog-boundary-v1",
+      "repository": "openJiuwen-ai/jiuwenswarm",
+      "pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+      "scan_identity": "ea4f1d0835c031fc6c1507e513ab20fa3f9acfceb0fc64deddc5d8d1c7b6e902",
+      "seed_sha256": "4bf5c8da0cb08979e312048abbe526c0223bc2a179dcdfc9eee2b02ec932c945",
+      "index_sha256": "b2b3c8cfe7dd9e9bd60f6bc99a80a1860cff111631e0dd6fdc59108af6b517a6",
+      "formal_catalog_sha256": "96d51b5dedbbb80137dc822cf23ca67630ef6652b01e08d459158dd6a5551561",
+      "candidate_set_sha256": "f2b277edcab22092a593c18c31a1503c483d0bb1421edc9d26d734d6863253c6"
+    },
+    "done": true,
+    "counts": {
+      "yes": 1400,
+      "unsure": 31,
+      "no": 1
+    },
+    "candidate_count": 1432
+  },
+  "catalog_consolidation_audit": {
+    "identity": {
+      "version": "catalog-consolidation-v1",
+      "repository": "openJiuwen-ai/jiuwenswarm",
+      "pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+      "scan_identity": "ea4f1d0835c031fc6c1507e513ab20fa3f9acfceb0fc64deddc5d8d1c7b6e902",
+      "prompt_sha256": "12b6000edd8c06adbd4e592c55bd8db5df7287725d15b6bedcf28b90b71d1da5",
+      "provisional_catalog_sha256": "e8e0a7795bae84da134de4ecd86fe1291cecbeeec3976e9f37357f9b46305f1a",
+      "proposal_summaries_sha256": "35a51db858ad86088a0039de5a47832cb0c4d6c801d0856ecf4f0c6400af03ce",
+      "boundary_audit_sha256": "4c88ab6a8660a58bb2b5edea004ecf789c3f5bf06a298b0929a645262f86eec7",
+      "bindings_sha256": "b3520ca3a93b10ff38f91777e8e4cc39950d975ccdce1d56f7b5830b2a33514f"
+    },
+    "done": true,
+    "counts": {
+      "yes": 199,
+      "unsure": 2
+    },
+    "candidate_count": 201
+  },
+  "report_format": "feature-discovery-compact-v1",
+  "full_artifact": {
+    "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-v2-20261005/init/artifacts/feature-discovery/8383d04ce7421325544924495b5beaf1eb3e7c6a6200e51d34734d81410492b7.json",
+    "sha256": "8383d04ce7421325544924495b5beaf1eb3e7c6a6200e51d34734d81410492b7",
+    "size_bytes": 16020958
+  },
+  "candidate_count": 4859,
+  "unassociated_implementation_count": 214,
+  "unassociated_entry_lead_count": 214,
+  "failures": {
+    "count": 6,
+    "examples": [
+      {
+        "path": "docs/assets/images/config-model-test.png",
+        "kind": "test",
+        "operation": "read",
+        "error": "binary input is not readable source evidence"
+      },
+      {
+        "path": "docs/assets/images/config-vision-model-test.png",
+        "kind": "test",
+        "operation": "read",
+        "error": "binary input is not readable source evidence"
+      },
+      {
+        "path": "docs/assets/images/config_model_connect_test.png",
+        "kind": "test",
+        "operation": "read",
+        "error": "binary input is not readable source evidence"
+      },
+      {
+        "path": "jiuwenswarm/channels/web/frontend/tests/fixtures/trajectory-archive-subjects.trajectory.zip",
+        "kind": "test",
+        "operation": "read",
+        "error": "binary input is not readable source evidence"
+      },
+      {
+        "path": "tests/unit_tests/agentserver/test_build_config_entry_transport.py",
+        "kind": "test",
+        "operation": "parse",
+        "error": "invalid non-printable character U+FEFF (<unknown>, line 1)"
+      }
+    ],
+    "complete_list_in_full_artifact": true
+  },
+  "scope_suggestions": {
+    "count": 59,
+    "examples": [
+      {
+        "path": "deploy/yuanrong/.env.example",
+        "reason": "unsupported suffix outside declared suffix scope"
+      },
+      {
+        "path": "jiuwenswarm/agents/harness/team/a2x/client/py.typed",
+        "reason": "unsupported suffix outside declared suffix scope"
+      },
+      {
+        "path": "jiuwenswarm/channels/ide/packages/jetbrains-plugin/gradle/wrapper/gradle-wrapper.jar",
+        "reason": "unsupported suffix outside declared suffix scope"
+      },
+      {
+        "path": "jiuwenswarm/channels/ide/packages/jetbrains-plugin/gradle/wrapper/gradle-wrapper.properties",
+        "reason": "unsupported suffix outside declared suffix scope"
+      },
+      {
+        "path": "jiuwenswarm/channels/web/frontend/.env.example",
+        "reason": "unsupported suffix outside declared suffix scope"
+      }
+    ],
+    "complete_list_in_full_artifact": true
+  },
+  "candidate_limit_task_ids": {
+    "count": 5,
+    "examples": [
+      "doc:14102434685a25eb3e458fb00563ebcbf2209684e856ed1b24d754436533b52b",
+      "doc:8d0bca4092f9cb7631798a9ad967a35dbe1c3dfdda256b743c660a65cc6ad9dc",
+      "doc:bedf53e524bfd1c35fc33492a97351b5848e4c73e1541913b474461d59a3ab3a",
+      "source:6f907cb2a2419d5449c118e6666160aeeb2c7c2d245ad3534e0c9847286d45cd",
+      "source:eaacf85f3bd6d77d6962fc65bd5bbb4e8f3eaef0f0ca11db31ed89836b42cae6"
+    ],
+    "complete_list_in_full_artifact": true
+  },
+  "invalid_candidates": {
+    "count": 40,
+    "examples": [
+      {
+        "task": "doc:14102434685a25eb3e458fb00563ebcbf2209684e856ed1b24d754436533b52b",
+        "position": 4,
+        "reason": "candidate needs a safe stable id",
+        "status": "unknown"
+      },
+      {
+        "task": "doc:b9395da2bbb106607734e3e2683d01fdd7549ecf1276f8a62f11a43bae30294f",
+        "position": 4,
+        "reason": "candidate needs a safe stable id",
+        "status": "unknown"
+      },
+      {
+        "task": "doc:d20d40b20f0433007dca3db15a03d5fcaedd71787d145f7a07af0361ed7eb20b",
+        "position": 12,
+        "reason": "candidate needs a safe stable id",
+        "status": "unknown"
+      },
+      {
+        "task": "source:0c9aa0df804e550cd564ae7528b3c240b9ce039c1a3d525c4e3dca86f19d1445",
+        "position": 6,
+        "reason": "candidate needs a safe stable id",
+        "status": "unknown"
+      },
+      {
+        "task": "source:0cb049b7d6e747d08dab599791d52ad27341495ad7dc03efa114f994ad572d42",
+        "position": 12,
+        "reason": "candidate needs a safe stable id",
+        "status": "unknown"
+      }
+    ],
+    "complete_list_in_full_artifact": true
+  }
+}
