@@ -33,6 +33,7 @@ DEFAULT_START_INTERVAL_S = 15.0
 MAX_CANDIDATES = 24
 MAX_ATTEMPTS = 4
 MAX_BASELINE_CHARS = 16000
+CATALOG_BOUNDARY_VERSION = "catalog-boundary-v1"
 RELATIONS = {"new", "implementation_supplement", "alias", "subcapability",
              "shared_component", "outdated", "unknown"}
 _SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,39}\Z")
@@ -157,6 +158,58 @@ def _bounded_baseline(rows, text, preferred=()):
             continue
         chosen.append(row); used += size
     return chosen
+
+
+def _formal_catalog(seeds):
+    return [{"catalog_status": "existing_feature", **{k: row.get(k) for k in ("id", "title", "owner")}}
+            for row in seeds]
+
+
+def _catalog_names(row):
+    return {name for value in [row["id"], row["title"], *row.get("aliases", [])]
+            if (name := unicodedata.normalize("NFKC", str(value)).casefold().strip())}
+
+
+def _boundary_identity(seeds, state, *, repository, pin):
+    return {"version": CATALOG_BOUNDARY_VERSION, "repository": repository, "pin": pin,
+            "scan_identity": state.get("identity"), "seed_sha256": _hash(seeds),
+            "index_sha256": state.get("index_sha256"),
+            "formal_catalog_sha256": _hash(_formal_catalog(seeds)),
+            "candidate_set_sha256": _hash([{ "id": key, "candidate_sha256": _hash(row),
+                "primary_review_sha256": _hash(state.get("reviews", {}).get(key, {}))}
+                for key, row in sorted(state.get("candidates", {}).items())])}
+
+
+def _boundary_context(marker):
+    return {"identity": marker["identity"], "candidate_ids": marker["candidate_ids"]}
+
+
+def _boundary_current(row, primary, checked):
+    return bool(checked) and _decision_valid(checked) \
+        and checked.get("candidate_sha256") == _hash(row) \
+        and checked.get("primary_review_sha256") == _hash(primary) \
+        and (checked.get("supported") != "yes" or bool(checked.get("judge_receipt")))
+
+
+def _boundary_ready(seeds, state, *, repository, pin, production_paths=None):
+    marker = state.get("catalog_boundary_audit", {})
+    if marker.get("identity") != _boundary_identity(seeds, state, repository=repository, pin=pin) \
+            or marker.get("done") is not True:
+        return False
+    keys = marker.get("candidate_ids")
+    if not isinstance(keys, list) or any(not isinstance(k, str) for k in keys) or len(set(keys)) != len(keys):
+        return False
+    if production_paths is not None:
+        production = set(production_paths)
+        eligible = {key for key, row in state.get("candidates", {}).items()
+                    if not row.get("invalid_reason") and any(ref["path"] in production for ref in row["evidence"])
+                    and row.get("generator_receipts") and state.get("reviews", {}).get(key, {}).get("judge_receipt")
+                    and state["reviews"][key].get("supported") == "yes" and state["reviews"][key].get("relation") == "new"
+                    and state["reviews"][key].get("candidate_sha256") == _hash(row)}
+        if set(keys) != eligible:
+            return False
+    return all(k in state.get("candidates", {}) and _boundary_current(state["candidates"][k],
+        state.get("reviews", {}).get(k, {}), state.get("boundary_reviews", {}).get(k, {})) for k in keys)
 
 
 def _decision_valid(row):
@@ -385,11 +438,28 @@ class DiscoveryEngine:
         # Preserve complete supplied cited ranges, chunking review batches by caller.
         return [evidence_excerpt(self.index, ref) for ref in {_json(r): r for r in refs}.values()]
 
-    def _review(self, rows, baseline):
+    def _review(self, rows, baseline, *, audit=None):
+        if audit is not None:
+            formal = _formal_catalog(self.seeds)
+            # Formal IDs cannot compete with proposals for the baseline budget.
+            # Always include every formal entry, even for large repositories.
+            room = max(0, MAX_BASELINE_CHARS - sum(len(_json(r)) for r in formal))
+            neighbors = _bounded_baseline([r for r in baseline if r.get("catalog_status") != "existing_feature"],
+                _json(rows), [r["id"] for r in rows] + [r.get("related_id") for r in rows])
+            chosen = []
+            for neighbor in neighbors:
+                size = len(_json(neighbor))
+                if size <= room:
+                    chosen.append(neighbor); room -= size
+            offered_baseline = formal + chosen
+        else:
+            offered_baseline = _bounded_baseline(baseline, _json(rows),
+                [r["id"] for r in rows] + [r.get("related_id") for r in rows])
         payload = {"repository": self.repository, "pin": self.pin, "candidates": rows,
-                   "baseline": _bounded_baseline(baseline, _json(rows),
-                        [r["id"] for r in rows] + [r.get("related_id") for r in rows]),
+                   "baseline": offered_baseline,
                    "evidence": self._context(rows)}
+        if audit is not None:
+            payload["catalog_boundary_audit"] = audit
         reply = self.call("judge", SYSTEM_REVIEW, _prompt(payload), lambda d: None)
         proof = receipt(reply)
         decisions = reply.data.get("decisions", {})
@@ -488,14 +558,87 @@ class DiscoveryEngine:
                 self.save()
         return True
 
-    def catalog(self, repo_dir):
+    def _implemented_approval(self, row, judgment):
+        from .feature_discovery_index import validate_evidence
+        return not row.get("invalid_reason") and any(ref["path"] in self.index.production for ref in row["evidence"]) \
+            and all(validate_evidence(self.index, ref) for ref in row["evidence"]) \
+            and judgment.get("supported") == "yes" and bool(row.get("generator_receipts")) \
+            and bool(judgment.get("judge_receipt")) and judgment.get("candidate_sha256") == _hash(row)
+
+    def audit_catalog_boundaries(self):
+        """One additional independent audit before promoting implemented new IDs.
+
+        Retain primary reviews. Rejections and missing replies become unknown;
+        they do not enter the generator repair loop. A changed candidate set
+        invalidates the audit without invalidating successful scan tasks.
+        """
+        rows = [row for key, row in sorted(self.state["candidates"].items())
+                if self.state["reviews"].get(key, {}).get("relation") == "new"
+                and self._implemented_approval(row, self.state["reviews"][key])]
+        identity = _boundary_identity(self.seeds, self.state, repository=self.repository, pin=self.pin)
+        marker = {"identity": identity, "candidate_ids": [r["id"] for r in rows], "done": False}
+        previous = self.state.get("catalog_boundary_audit", {})
+        if previous.get("identity") != identity or previous.get("candidate_ids") != marker["candidate_ids"]:
+            if previous:
+                self.state.setdefault("boundary_history", []).append({"audit": deepcopy(previous),
+                    "reviews": deepcopy(self.state.get("boundary_reviews", {}))})
+            self.state["boundary_reviews"] = {}
+        self.state["catalog_boundary_audit"] = marker
+        decisions = self.state.setdefault("boundary_reviews", {})
+        pending = [r for r in rows if not _boundary_current(r, self.state["reviews"][r["id"]], decisions.get(r["id"], {}))]
+        # Collision families stay adjacent so the reviewer can classify aliases
+        # against one another, while the complete formal baseline remains visible.
+        pending.sort(key=lambda r: (re.sub(r"-[a-f0-9]{8}$", "", r["id"]), r["id"]))
+        batches = [pending[n:n + 12] for n in range(0, len(pending), 12)]
+        baseline = self._baseline()
+        self.save()
+        with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
+            for start in range(0, len(batches), self.concurrency):
+                jobs = {pool.submit(self._review, batch, baseline, audit=_boundary_context(marker)): batch
+                        for batch in batches[start:start + self.concurrency]}
+                stopped = False
+                for future in as_completed(jobs):
+                    batch = jobs[future]
+                    try:
+                        results = future.result()
+                    except BudgetExhausted:
+                        stopped = True
+                        continue
+                    except (ModelUnavailable, ValueError) as exc:
+                        results = {r["id"]: {"supported": "unsure", "relation": "unknown", "related_id": "",
+                            "reason": str(exc), "repair_blocked": True} for r in batch}
+                    for row in batch:
+                        decisions[row["id"]] = {**results[row["id"]], "candidate_sha256": _hash(row),
+                            "primary_review_sha256": _hash(self.state["reviews"][row["id"]])}
+                    self.save()
+                if stopped:
+                    return False
+        marker["done"] = True
+        self.save()
+        return True
+
+    def catalog(self, repo_dir, *, require_boundary=False):
         from .feature_discovery_index import validate_evidence
         seeds = deepcopy(self.seeds)
         by_id = {r["id"]: r for r in seeds}
         outcomes = []
         deferred = []
+        boundary_valid = _boundary_ready(self.seeds, self.state, repository=self.repository, pin=self.pin,
+                                         production_paths=self.index.production)
+        proposed_names = Counter()
+        formal_names = {name for seed in seeds for name in _catalog_names(seed)}
+        for key, row in self.state["candidates"].items():
+            checked = self.state.get("boundary_reviews", {}).get(key, {})
+            if boundary_valid and checked.get("supported") == "yes" and checked.get("relation") == "new" \
+                    and _boundary_current(row, self.state["reviews"].get(key, {}), checked):
+                proposed_names.update(_catalog_names(row))
         for key, row in sorted(self.state["candidates"].items()):
-            judgment = self.state["reviews"].get(key, {})
+            primary = self.state["reviews"].get(key, {})
+            judgment = primary
+            if require_boundary and primary.get("relation") == "new" and self._implemented_approval(row, primary):
+                checked = self.state.get("boundary_reviews", {}).get(key, {})
+                judgment = checked if boundary_valid and _boundary_current(row, primary, checked) else {
+                    "supported": "unsure", "relation": "unknown", "reason": "complete independent catalog boundary audit is missing"}
             refs = row["evidence"]
             source = sorted({r["path"] for r in refs if r["path"] in self.index.production})
             docs = sorted({r["path"] for r in refs if r["path"] in self.index.docs})
@@ -509,6 +652,14 @@ class DiscoveryEngine:
                       "status": "accepted" if accepted else "unknown", "evidence": refs,
                       "origin_rounds": row.get("origin_rounds", []), "reason": judgment.get("reason", "not independently reviewed"),
                       "generator_receipts": row.get("generator_receipts", []), "judge_receipt": judgment.get("judge_receipt"), "candidate_sha256": judgment.get("candidate_sha256")}
+            if judgment is not primary:
+                result["primary_judge_receipt"] = primary.get("judge_receipt")
+                result["boundary_review"] = deepcopy(judgment)
+            names = _catalog_names(row)
+            if accepted and require_boundary and relation == "new" and any(
+                    name in formal_names or proposed_names[name] > 1 for name in names):
+                accepted = False
+                result.update(status="unknown", reason="unresolved duplicate catalog title or alias; independent classification needed")
             if accepted and relation == "new" and key in by_id:
                 accepted = False
                 result.update(status="unknown", reason="new capability collides with an existing stable ID")
@@ -525,6 +676,19 @@ class DiscoveryEngine:
             outcomes.append(result)
         for row, judgment, source, docs, result in deferred:
             target = judgment.get("related_id") or row["id"]
+            if require_boundary:
+                visited = {row["id"]}
+                while target not in by_id and target not in visited:
+                    visited.add(target)
+                    target_row = self.state["candidates"].get(target)
+                    primary = self.state["reviews"].get(target, {})
+                    target_check = self.state.get("boundary_reviews", {}).get(target, primary)
+                    if target_row is None or not self._implemented_approval(target_row, primary) \
+                            or (primary.get("relation") == "new" and not _boundary_current(target_row, primary, target_check)) \
+                            or target_check.get("supported") != "yes" \
+                            or target_check.get("relation") not in ("implementation_supplement", "alias", "subcapability", "shared_component"):
+                        break
+                    target = target_check.get("related_id") or target
             if target not in by_id:
                 result.update(status="unknown", reason="related feature is not accepted in the frozen catalog")
                 continue
@@ -570,15 +734,51 @@ class _FeatureDiscovery(_Stage):
     def _cache_reusable(self, previous):
         if previous.discovery.get("done") and self._validate_saved_archives(previous.discovery):
             raise InitError("completed discovery native archives are unavailable; restore the archive before reuse")
-        return bool(previous.discovery.get("done")) and not self.retry_unfinished
+        if not previous.discovery.get("done") or self.retry_unfinished:
+            return False
+        # Published historical catalogs remain immutable. Unpublished previews
+        # must acquire the additive audit before publication, reusing their scan.
+        return previous.status == "published" or self._boundary_record_ready(previous)
+
+    def _boundary_record_ready(self, previous):
+        state = previous.discovery
+        if not state.get("catalog_boundary_audit", {}).get("done") or not state.get("index_sha256"):
+            return False
+        from .feature_discovery_index import load_discovery_index
+        # A checkpoint cannot declare an empty audit subset for implemented new
+        # candidates. Recover the verified inventory, independent of proposals.
+        for path in (Path(self.rt.state_dir) / "feature-discovery-index").glob("*.json"):
+            try:
+                index = load_discovery_index(path)
+            except ValueError:
+                continue
+            if index.sha256 == state["index_sha256"] and index.identity["pin"] == previous.pin:
+                return _boundary_ready(self._boundary_seeds(previous.kb_base_sha), state,
+                    repository=self.lifecycle.full_name, pin=previous.pin, production_paths=index.production)
+        return False
+
+    def _boundary_seeds(self, base_sha):
+        text = self.rt.knowledge.show(base_sha, self._coverage_policy_path())
+        return (yaml.safe_load(text) or {}).get("features", []) if text else []
 
     def _mode_identity(self):
         return False
 
     def _resume_input_problems(self, previous, digest):
-        return [] if previous.inputs_digest == digest else [
-            "discovery inputs changed; restore the original configuration to resume this prepared publication, "
-            "or preserve its checkpoint and use a new state directory"]
+        if previous.inputs_digest != digest:
+            return ["discovery inputs changed; restore the original configuration to resume this prepared publication, "
+                    "or preserve its checkpoint and use a new state directory"]
+        # Prepared publication resumes before the normal cache/archive gate.
+        # Audit an isolated record so a missing receipt blocks publication
+        # without rewriting the immutable prepared change or retained proofs.
+        audited = deepcopy(previous)
+        if self._validate_saved_archives(audited.discovery):
+            return ["prepared discovery native archives could not be replayed; restore the original archives "
+                    "before resuming this exact publication"]
+        if not self._boundary_record_ready(audited):
+            return ["prepared discovery has no complete catalog boundary audit; preserve its publication and checkpoint "
+                    "and audit a copy before creating a new publication"]
+        return []
 
     def _init_identity(self):
         return repr(replace(self.lifecycle.init, budget_usd=0.0)) + (
@@ -682,6 +882,25 @@ class _FeatureDiscovery(_Stage):
         except (KeyError, IndexError, TypeError, AttributeError, ValueError, OSError) as exc:
             raise ModelUnavailable(f"native approval binding differs: {exc}") from exc
 
+    def _verify_boundary_approval(self, key, row, checked, state):
+        self._verify_saved_approval(key, row, checked)
+        from ..trace_store import TraceStore
+        try:
+            store = TraceStore(Path(self.rt.state_dir) / "init" / "traces")
+            record = store.get(checked["judge_receipt"]["trace_id"])
+            prompt = store.blob(record["inputs"]["prompt"])
+            payload = json.loads(prompt.split("<untrusted_data>\n", 1)[1].rsplit("\n</untrusted_data>", 1)[0])
+            marker = state["catalog_boundary_audit"]
+            if payload.get("catalog_boundary_audit") != _boundary_context(marker):
+                raise ValueError("native catalog boundary audit identity differs")
+            formal = [r for r in payload["baseline"] if r.get("catalog_status") == "existing_feature"]
+            if _hash(formal) != marker["identity"]["formal_catalog_sha256"]:
+                raise ValueError("native catalog boundary review omitted or changed formal entries")
+            if checked.get("primary_review_sha256") != _hash(state["reviews"][key]):
+                raise ValueError("catalog boundary approval differs from its primary review")
+        except (KeyError, IndexError, TypeError, AttributeError, ValueError, OSError) as exc:
+            raise ModelUnavailable(f"native catalog boundary binding differs: {exc}") from exc
+
     def _validate_saved_archives(self, state):
         failures = []
         for key, task in state.get("tasks", {}).items():
@@ -710,6 +929,18 @@ class _FeatureDiscovery(_Stage):
                     "related_id": "", "reason": str(exc), "attempts": MAX_ATTEMPTS}
                 state.get("repair_drafts", {}).pop(key, None)
                 failures.append(key)
+        for key, checked in state.get("boundary_reviews", {}).items():
+            if checked.get("supported") != "yes":
+                continue
+            try:
+                self._verify_archived_receipt(checked["judge_receipt"], self.rt.judge)
+                self._verify_boundary_approval(key, state["candidates"][key], checked, state)
+            except (ModelUnavailable, KeyError) as exc:
+                checked.update(supported="unsure", relation="unknown", related_id="", reason=str(exc),
+                               repair_blocked=True)
+                state.get("catalog_boundary_audit", {})["done"] = False
+                # Keep the valid primary proof and scan; this candidate simply
+                # cannot promote without a usable supplemental approval.
         return failures
 
     def _build(self, tree):
@@ -748,6 +979,7 @@ class _FeatureDiscovery(_Stage):
         if state.get("identity") and state["identity"] != identity:
             return self._blocked(["discovery index or catalog identity changed; create a new batch"])
         state["identity"] = identity
+        state["index_sha256"] = index.sha256
         state["run_config"] = self.discovery_run_config
         if self.retry_unfinished:
             for task in state.get("tasks", {}).values():
@@ -759,8 +991,9 @@ class _FeatureDiscovery(_Stage):
                         checked.pop("repair_blocked")
                     else:
                         state["reviews"].pop(key)
-                elif checked.get("supported") != "yes":
-                    checked["attempts"] = 1  # repair using previous rejection, not unchanged resampling
+                # Content rejections retain their cumulative attempt count.
+                # Only a blocked native channel resumes; exhausted content does
+                # not acquire three more repairs on every explicit retry.
         budget = _ConcurrentBudget(self.budget, Path(self.rt.state_dir) / "init" / self.lifecycle.repo / "discovery-budget.json", identity)
         if hasattr(self.rt.gateway, "configure_zcode_pacing") and self.rt.generator.provider == "zcode":
             from .depth_pacing import SharedZcodePacer
@@ -796,7 +1029,14 @@ class _FeatureDiscovery(_Stage):
         if not scanned or not engine.review():
             state["done"] = False
             return self._blocked(["discovery incomplete; checkpoint saved; resume the same pinned batch"])
-        features, outcomes = engine.catalog(self.repo_dir)
+        if not engine.audit_catalog_boundaries():
+            state["done"] = False
+            return self._blocked(["catalog boundary audit incomplete; successful scan and primary reviews retained"])
+        self._validate_saved_archives(state)
+        # Archive failures are terminal unknowns, never synthetic approvals.
+        if not state["catalog_boundary_audit"].get("done"):
+            engine.audit_catalog_boundaries()
+        features, outcomes = engine.catalog(self.repo_dir, require_boundary=True)
         from .init_coverage import most_specific
         seed_ids = {f["id"] for f in seeds}
         outcome_map = {r["id"]: r for r in outcomes}
@@ -846,6 +1086,8 @@ class _FeatureDiscovery(_Stage):
             "invalid_candidates": sum(len(t.get("invalid_candidates", [])) for t in state["tasks"].values())}
         report = {"schema_version": 1, "repo": self.lifecycle.repo, "pin": self.record.pin,
                   "run_config": self.discovery_run_config,
+                  "catalog_boundary_audit": {**state["catalog_boundary_audit"],
+                      "counts": dict(Counter(r["supported"] for r in state.get("boundary_reviews", {}).values()))},
                   "complete": True, "done": True, "catalog_sha256": catalog_sha,
                   "feature_ids": [f["id"] for f in features],
                   "features": [{"id": f["id"], "owner": f["owner"], "title": f["title"]} for f in features],

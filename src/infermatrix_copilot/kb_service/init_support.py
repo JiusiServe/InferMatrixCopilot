@@ -356,6 +356,11 @@ def judge(rt: InitRuntime, budget: Budget, init, block, *, base: Mapping[str, st
     as verdict ``human`` with ``reasons["model"]`` set."""
     from .gate import judge_block
 
+    if rt.unlimited_subscription:
+        if rt.judge.fallback is not None:
+            raise ModelUnavailable("unlimited subscription judgment must not configure a fallback", allow_fallback=False)
+        if not rt.gateway.subscription_billing(rt.judge):
+            raise ModelUnavailable("subscription judge needs an authenticated subscription backend", allow_fallback=False)
     with budget.reserve(init.judge_call_usd) as reservation:
         verdict = judge_block(block, base=dict(base), head=dict(head), evidence=evidence,
                               gateway=rt.gateway, judge=rt.judge)

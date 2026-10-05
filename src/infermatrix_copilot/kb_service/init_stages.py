@@ -167,8 +167,8 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
         raise InitError("feature_ids must be a depth-only tuple of policy feature identifiers")
     if type(unlimited_subscription) is not bool:
         raise InitError("unlimited_subscription must be a boolean")
-    if unlimited_subscription and (stage not in ("feature-discovery", "knowledge-deepen") or budget_usd is not None):
-        raise InitError("--unlimited-subscription is for feature-discovery or knowledge-deepen only and conflicts with --budget-usd")
+    if unlimited_subscription and (stage not in ("feature-discovery", "modules", "knowledge", "knowledge-deepen") or budget_usd is not None):
+        raise InitError("--unlimited-subscription is for feature-discovery, modules, knowledge or knowledge-deepen only and conflicts with --budget-usd")
     if stage == "feature-discovery":
         from dataclasses import replace
         from .models import ModelRole
@@ -224,7 +224,8 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
         if any(role.fallback is not None for role in (rt.generator, rt.judge)):
             raise InitError("--unlimited-subscription requires pinned generator and judge without fallback")
         if rt.generator.provider != "zcode" or rt.generator.model.casefold() != "glm-5.3" \
-                or rt.judge.provider != "codex":
+                or rt.judge.provider != "codex" \
+                or rt.generator.model.casefold().split("-")[0] == rt.judge.model.casefold().split("-")[0]:
             raise InitError("--unlimited-subscription requires Zcode GLM-5.3 extraction and an independent Codex judge")
         for role in (rt.generator, rt.judge):
             try:
@@ -532,7 +533,7 @@ class _Stage:
             self.record.discovery["catalog_binding"] = self._discovery_binding()
         if chain.pin and pin != chain.pin:
             self.record.notes.append(f"pinned at {pin[:12]}, not at the earlier stages' {chain.pin[:12]}")
-        self.budget = Budget(init.budget_usd)
+        self.budget = Budget(None if rt.unlimited_subscription else init.budget_usd)
         self.base = {**main, **chain.knowledge}
         problems = chain.problems + self._restore_progress(previous) + self._precheck()
         if adapter_missing_problem:
@@ -680,6 +681,8 @@ class _Stage:
             identity = identity.replace(", feature_discovery_required=False", "")
         if self.rt.subscription_generator:
             identity += ":subscription-generator"
+        if self.rt.unlimited_subscription:
+            identity += ":unlimited-subscription"
         return identity
 
     def _mode_identity(self) -> bool:
