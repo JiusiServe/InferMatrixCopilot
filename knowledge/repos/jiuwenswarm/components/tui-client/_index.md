@@ -23,3 +23,12 @@ sources: []
 - [ui-rendering](ui-rendering/_index.md)
 - [TUI 对话与命令：实现深读](feature-depth-tui.md)
 - [已有 PR 自动修复：实现深读](feature-depth-autofix.md)
+
+## 代码快速入口（Direct）
+<!-- kb-init:quick-map -->
+
+触发词：tui client。PR 描述或改动命中下表一行时，先读该行的规则，再读页面其余部分。
+
+| PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
+|---|---|---|
+| tui client | 入口 | `jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.ts`、`jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.watch.ts`、`jiuwenswarm/channels/tui/frontend/src/index.ts` |

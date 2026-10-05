@@ -20,7 +20,8 @@ sources: []
 
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
-| start_services、jiuwenswarm-start、debug launcher、multi-instance、--dotenv、--name、… | 入口 | `jiuwenswarm/start_services.py`、`jiuwenswarm/dotenv_early.py`、`jiuwenswarm/init_workspace.py`、`jiuwenswarm/instance_manager/` |
+| start_services、jiuwenswarm-start、debug launcher、multi-instance、--dotenv、--name、… | 入口 | `jiuwenswarm/start_services.py`、`jiuwenswarm/dotenv_early.py`、`jiuwenswarm/init_workspace.py` |
+
 
 - [启动与实例隔离的设计取舍](design-tradeoffs.md) — 设计选择、收益与代价，以及 API、配置和关联功能入口。
 - [初始化与服务启动 功能知识](feature-bootstrap.md)
@@ -35,3 +36,4 @@ sources: []
 - [初始化与服务启动：实现深读](feature-depth-bootstrap.md)
 - [单机多实例：实现深读](feature-depth-instances.md)
 - [桌面宿主与自动更新：实现深读](feature-depth-desktop.md)
+- [scripts/ — 构建辅助与 WhatsApp 桥接脚本](jiuwenswarm-scripts.md)

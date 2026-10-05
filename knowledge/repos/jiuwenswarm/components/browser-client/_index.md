@@ -20,3 +20,12 @@ sources: []
 - [sidepanel](sidepanel/_index.md)
 - [webview](webview/_index.md)
 - [Chromium 浏览器扩展：实现深读](feature-depth-browser-client.md)
+
+## 代码快速入口（Direct）
+<!-- kb-init:quick-map -->
+
+触发词：browser client。PR 描述或改动命中下表一行时，先读该行的规则，再读页面其余部分。
+
+| PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
+|---|---|---|
+| browser client | 入口 | `jiuwenswarm/channels/browser/frontend/src/background/index.ts`、`jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts`、`jiuwenswarm/channels/browser/` |
