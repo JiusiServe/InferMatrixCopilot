@@ -47,13 +47,13 @@ export function applyLocale(root) {
   if (!root) return;
   const visit = node => {
     if (node.nodeType === Node.TEXT_NODE) {
-      if (node.parentElement?.closest("code,pre,textarea,input,[data-no-translate],#identity-name,#issued-secret")) return;
+      if (node.parentElement?.closest("svg,code,pre,textarea,input,[data-no-translate],#identity-name,#issued-secret")) return;
       let state = originals.get(node);
       if (!state || node.nodeValue !== state.applied) state = {source: node.nodeValue};
       state.applied = localizeText(state.source);
       originals.set(node, state);
       if (node.nodeValue !== state.applied) node.nodeValue = state.applied;
-    } else if (node.nodeType === Node.ELEMENT_NODE && !node.closest("[data-no-translate]")) {
+    } else if (node.nodeType === Node.ELEMENT_NODE && !node.closest("svg,[data-no-translate]")) {
       let state = originals.get(node) || {};
       for (const name of ["placeholder", "aria-label", "title"]) {
         const value = node.getAttribute(name);
