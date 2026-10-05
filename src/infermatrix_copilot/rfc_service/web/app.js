@@ -491,6 +491,29 @@ function updateGraphNodes(graphs) {
     });
   }
 }
+function enableGraphPanning(canvas) {
+  let drag = null;
+  canvas.addEventListener("pointerdown", event => {
+    if (!event.isPrimary || event.button !== 0 || event.target.closest(".roadmap-actionable,a,button")) return;
+    drag = {id: event.pointerId, x: event.clientX, y: event.clientY, left: canvas.scrollLeft, top: canvas.scrollTop};
+    canvas.setPointerCapture(event.pointerId);
+    canvas.classList.add("is-panning");
+    event.preventDefault();
+  });
+  canvas.addEventListener("pointermove", event => {
+    if (!drag || drag.id !== event.pointerId) return;
+    canvas.scrollLeft = drag.left + drag.x - event.clientX;
+    canvas.scrollTop = drag.top + drag.y - event.clientY;
+    event.preventDefault();
+  });
+  const stop = event => {
+    if (!drag || drag.id !== event.pointerId) return;
+    drag = null;
+    canvas.classList.remove("is-panning");
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  };
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) canvas.addEventListener(type, stop);
+}
 function dependencyGraph(rfc) {
   const models = graphModels(rfc);
   const sources = models.map(model => graphSource(model, translated, true));
@@ -507,6 +530,9 @@ function dependencyGraph(rfc) {
   activeGraphs = graphs;
   for (const [modelIndex, model] of models.entries()) {
     const canvas = element("div", {class: "graph roadmap-canvas"}, element("p", {class: "muted"}, "正在绘制路线图…"));
+    canvas.setAttribute("tabindex", "0");
+    canvas.setAttribute("aria-label", `${model.title}：拖动空白区域平移，点击节点查看详情`);
+    enableGraphPanning(canvas);
     const controls = element("div", {class: "actions"});
     const legend = element("div", {class: "graph-legend"}, ...["planned", "in_progress", "partial", "implemented", "accepted"].map(state => element("span", {class: `graph-key ${state}`}, state === "accepted" ? "已验收" : translated(state))));
     const section = element("section", {class: "roadmap-track"}, element("div", {class: "panel-title"}, element("h3", {}, model.title), controls), legend, canvas);
@@ -558,7 +584,7 @@ function dependencyGraph(rfc) {
       const zoom = delta => { scale = Math.max(.4, Math.min(2.5, scale + delta)); drawing.setAttribute("width", String(width * scale)); };
       const minus = button("−", () => zoom(-.2)); minus.setAttribute("aria-label", `${model.title} 缩小`);
       const plus = button("＋", () => zoom(.2)); plus.setAttribute("aria-label", `${model.title} 放大`);
-      controls.append(minus, plus, button("重置", () => { scale = 1; drawing.setAttribute("width", String(width)); }), button("下载 SVG", () => {
+      controls.append(minus, plus, button("重置", () => { scale = 1; drawing.setAttribute("width", String(width)); canvas.scrollLeft = canvas.scrollTop = 0; }), button("下载 SVG", () => {
         const exported = drawing.cloneNode(true);
         const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
         style.textContent = roadmapSVGStyles;

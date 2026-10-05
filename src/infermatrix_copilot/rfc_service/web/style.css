@@ -25,6 +25,7 @@
 .roadmap-canvas svg .roadmap-actionable:focus{outline:2px solid #2563eb;outline-offset:4px}
 
 svg[id^="rfc-graph-"] text{font-family:system-ui,sans-serif;font-size:15px}
+.roadmap-canvas{cursor:grab;touch-action:none;user-select:none}.roadmap-canvas.is-panning{cursor:grabbing}
 @media(max-width:600px){.roadmap-track>.panel-title{align-items:flex-start;flex-direction:column}.graph-details{padding:16px}.graph-details>.panel-title{top:-16px}}
 
 .rfc-prose-panel{content-visibility:auto;contain-intrinsic-size:auto 900px}.rfc-workspace{content-visibility:auto;contain-intrinsic-size:auto 1200px}@media print{.rfc-prose-panel,.rfc-workspace{content-visibility:visible;contain-intrinsic-size:none}}
