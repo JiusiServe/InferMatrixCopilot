@@ -5,6 +5,8 @@ import copy
 import hashlib
 import json
 import math
+import posixpath
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..knowledge_service.pinned_claims import Evidence, check_evidence
@@ -41,6 +43,83 @@ def offered_ranges(items):
     for item in items:
         ranges.setdefault(item["path"], []).append((item.get("start", 1), item["end"]))
     return ranges
+
+
+def related_test_sources(stage, paths, limit=20_000):
+    """Shared-index localization only: direct imports, symbols and real assertions.
+
+    Test text is evidence of the checks present, never of execution or absence.
+    The caller reserves its actual bytes inside the existing source budget.
+    """
+    index = stage.source_index
+    if index.identity["pin"] != stage.record.pin:
+        raise InitError("foundation test index source pin differs")
+    modules, stems, names = set(), set(), set()
+    for path in paths:
+        stem = path.rsplit(".", 1)[0]
+        stems.add(stem)
+        modules.add(stem.replace("/", "."))
+        if "/src/" in stem:
+            modules.add(stem.split("/src/", 1)[1].replace("/", "."))
+        names.update(s["name"] for s in index.entries.get(path, {}).get("symbols", [])
+                     if len(s["name"]) >= 5 and not s["name"].startswith("__"))
+        if index.entries.get(path, {}).get("language") != "python":
+            names.update(re.findall(r"\b(?:function|class|struct|fn|func|def|const)\s+([A-Za-z_]\w*)",
+                                    "\n".join(index.entries.get(path, {}).get("lines", []))))
+    if not names:
+        return []
+    symbols = re.compile(r"\b(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\b")
+    checks = re.compile(r"\bassert\b|\braises\s*\(|\bexpect\s*\(|\bassert\w*\s*\(")
+    out, used = [], 0
+    for path in sorted(index.tests):
+        entry = index.entries[path]
+        if entry.get("status") != "ready" or not entry.get("lines"):
+            continue
+        imports = []
+        for imported in entry.get("imports", []):
+            text = imported["text"]
+            tokens = re.findall(r"[A-Za-z_]\w*(?:\.\w+)*", text)
+            targets = set(tokens)
+            if tokens[:1] == ["from"] and "import" in tokens:
+                targets.update(tokens[1] + "." + name for name in tokens[tokens.index("import") + 1:])
+            quoted = re.findall(r"['\"]([^'\"]+)['\"]", text)
+            resolved = {posixpath.normpath(posixpath.join(posixpath.dirname(path), spec)).rsplit(".", 1)[0]
+                        if spec.startswith(".") else spec.rsplit(".", 1)[0] for spec in quoted}
+            if targets & modules or resolved & stems:
+                imports.append(imported["start"])
+        if not imports:
+            continue
+        lines = entry["lines"]
+        ranges = []
+        for test in entry.get("symbols", []):
+            start, end = test["start"], test["end"]
+            body = "\n".join(lines[start - 1:end])
+            if test["name"].startswith("test_") and symbols.search(body) and checks.search(body):
+                ranges.append((start, end))
+        if not ranges and entry.get("language") != "python":
+            # Unknown/non-Python parsers expose clues, not runtime relations.
+            hits = [n for n, line in enumerate(lines, 1) if checks.search(line)]
+            if symbols.search("\n".join(lines)):
+                ranges = [(max(1, n - 12), min(len(lines), n + 12)) for n in hits]
+        if not ranges:
+            continue
+        spans = [(n, min(len(lines), n + 20)) for n in imports] + ranges
+        merged = []
+        for start, end in sorted(spans):
+            if merged and start <= merged[-1][1] + 1:
+                merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+            else:
+                merged.append((start, end))
+        for start, end in merged:
+            text = "\n".join(f"{n}: {lines[n - 1]}" for n in range(start, end + 1))
+            size = len(text.encode())
+            if used + size > limit:
+                continue  # Never attest an incomplete line or silently fill gaps.
+            out.append({"path": path, "start": start, "end": end, "text": text,
+                        "total_lines": len(lines), "language": entry["language"],
+                        "test_context": "direct import/symbol localization; tests have not been executed"})
+            used += size
+    return out
 
 
 def range_is_offered(ranges, start, end):

@@ -30,7 +30,7 @@ from .init_stages import _Chain, _Stage, _numbered, _one_line, _page_frontmatter
 from .init_support import InitRecord, classify_verdict, generate, judge
 from .init_knowledge_inputs import SYSTEM_KNOWLEDGE, knowledge_prompt, source_owner, source_owners, foundation_evidence
 from .models import ModelUnavailable
-from .init_knowledge_parallel import offered_ranges, parallelism, run_jobs, restore_jobs, preferred_sources, start_interval, range_is_offered
+from .init_knowledge_parallel import offered_ranges, parallelism, run_jobs, restore_jobs, preferred_sources, start_interval, range_is_offered, related_test_sources
 
 FACETS = ("architecture", "api", "configuration", "tradeoffs", "features", "validation")
 MAX_SOURCE_BYTES = 100_000
@@ -232,15 +232,18 @@ class _Knowledge(_Stage):
                             "source_files": len(files[name]), "shown_files": 0}
             if not requested:
                 continue
-            source = self._sources(tree, sorted(files[name], key=lambda p: (-churn[p], p)), MAX_SOURCE_BYTES)
+            tests = related_test_sources(self, files[name]) if self.rt.unlimited_subscription else []
+            test_bytes = sum(len(item["text"].encode()) for item in tests)
+            source = self._sources(tree, sorted(files[name], key=lambda p: (-churn[p], p)), MAX_SOURCE_BYTES - test_bytes)
+            source.extend(tests)
             docs = self._docs_for(tree, owner)
             offered = offered_ranges(source + docs)
-            report[name]["shown_files"] = len(source)
-            report[name]["partial_files"] = [item["path"] for item in source if item["end"] < item["total_lines"]]
+            report[name]["shown_files"] = len(source) - len(tests)
+            report[name]["partial_files"] = [item["path"] for item in source if not item.get("test_context") and item["end"] < item["total_lines"]]
             self.record.unfinished.extend(f"{name}: byte cap truncated {path}"
                                           for path in report[name]["partial_files"])
-            if len(source) < len(files[name]):
-                self.record.unfinished.append(f"{name}: source cap showed {len(source)} of {len(files[name])} files")
+            if len(source) - len(tests) < len(files[name]):
+                self.record.unfinished.append(f"{name}: source cap showed {len(source) - len(tests)} of {len(files[name])} files")
             payload = {"repository": self.lifecycle.full_name, "pin": self.record.pin, "owner": name,
                        "facets": requested, "files": source, "docs": docs,
                        "existing_knowledge": self._bounded_context(existing_pages),
@@ -319,7 +322,10 @@ class _Knowledge(_Stage):
                 paths = [p.relative_to(tree).as_posix() for p in tree.rglob("*")
                          if p.is_file() and matches(p.relative_to(tree).as_posix(), feature.source_globs)]
                 source_paths = list(dict.fromkeys(list(feature.entry_points) + sorted(paths)))
-                source = preferred_sources(self, tree, feature.id, source_paths, MAX_SOURCE_BYTES)
+                tests = related_test_sources(self, source_paths) if self.rt.unlimited_subscription else []
+                test_bytes = sum(len(item["text"].encode()) for item in tests)
+                source = preferred_sources(self, tree, feature.id, source_paths, MAX_SOURCE_BYTES - test_bytes)
+                source.extend(tests)
                 docs = self._sources(tree, list(feature.docs), MAX_DOC_BYTES)
                 if not source:
                     self.record.unfinished.append(f"feature {feature.id}: missing readable source")
