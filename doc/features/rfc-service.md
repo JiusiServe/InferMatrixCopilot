@@ -45,8 +45,25 @@ not in user action payloads.
 
 ## Repositories and a draft
 
-RFC details, draft previews, and import previews display rendered Markdown,
-including headings, lists, tables, links, and code blocks. The browser uses the
+RFC details are a component-based workbench: Outcomes, goals and scope, interactive
+roadmaps and work grouped by track, design, acceptance and evidence, then risks and
+references. A shared browser projection parses heading tokens and original source
+spans, recognizing common English and Chinese sections. Unclassified content and
+historical snapshots remain available as collapsed supporting material. Task
+descriptions appear under the matching stable feature ID, never as a second full
+roadmap. Long sections render when expanded and unchanged sections are reused.
+
+The top Outcome separates declared goals, implemented work and acceptance counts.
+Its three recent verified results require passing criteria with non-stale evidence,
+verification version and environment. Merged PRs establish implementation only;
+performance prose and historical delivery snapshots remain labeled source claims.
+Outcome actions locate the corresponding tasks or acceptance records. Authorized
+users edit the complete source in a separate dialog, with revision conflict checks
+and unsaved input preserved across close/reopen and work updates. API and storage
+formats are unchanged.
+
+Draft previews, import previews, and individual content components display rendered
+Markdown, including headings, lists, tables, links, and code blocks. The browser uses the
 bundled markdown-it 15.0.2 parser (MIT, shipped with its license), with raw HTML
 disabled and external image fetching disabled. Original Markdown remains intact
 for editing, publication, and export.
