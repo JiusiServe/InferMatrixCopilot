@@ -179,3 +179,8 @@ def test_protected_identifiers_remain_valid_next_to_chinese():
     from collections import Counter
     from infermatrix_copilot.rfc_service.translations import _PROTECTED
     assert Counter(_PROTECTED.findall('H200 and E8 use generate() and source_code.')) == Counter(_PROTECTED.findall('使用H200和E8调用generate()以及source_code。'))
+
+
+def test_interface_catalog_includes_labels_inside_dynamic_templates():
+    from infermatrix_copilot.rfc_service.translations import ui_strings
+    assert {'工作空间', 'RFC 详情', '负责人', '验收', '实现'} <= set(ui_strings())

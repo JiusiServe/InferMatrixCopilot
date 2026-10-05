@@ -70,7 +70,10 @@ def ui_strings():
     for name in ("app.js", "roadmap-graph.mjs", "roadmap-components.mjs"):
         source = files(__package__).joinpath("web", name).read_text(encoding="utf-8")
         # Read JS literal tokens, including dynamic UI templates, without evaluating code.
-        for match in re.finditer(r'''(["'`])((?:\\.|(?!\1)[\s\S])*?)\1''', source):
+        matches = list(re.finditer(r'''(["'`])((?:\\.|(?!\1)[\s\S])*?)\1''', source))
+        # Also collect quoted labels inside template expressions.
+        matches += list(re.finditer(r'''(["'])((?:\\.|[^"'`\\\n])*)\1''', source))
+        for match in matches:
             text = match[2]
             if match[1] == "`":
                 counter = iter(range(100))
