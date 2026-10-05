@@ -1,5 +1,6 @@
 /* Same-origin RFC client. Markdown uses a bundled parser with raw HTML disabled. */
 import {graphModels, graphSource, roadmapSVGStyles} from "/roadmap-graph.mjs";
+import {displayMarkdown} from "/markdown-display.mjs";
 const markdown = window.markdownit({html: false, linkify: true});
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 
@@ -7,7 +8,7 @@ function markdownBody(text, sourceUrl = "") {
   const node = document.createElement("article");
   node.className = "markdown-body";
   // Only parser-generated HTML is inserted; source HTML is escaped by markdown-it.
-  node.innerHTML = markdown.render(String(text || "暂无正文。"));
+  node.innerHTML = markdown.render(displayMarkdown(text || "暂无正文。"));
   const used = new Set();
   for (const heading of node.querySelectorAll("h1,h2,h3,h4,h5,h6")) {
     const slug = heading.textContent.toLowerCase().replace(/[^\p{L}\p{N}_\s-]/gu, "").replace(/\s/g, "-") || "section";
