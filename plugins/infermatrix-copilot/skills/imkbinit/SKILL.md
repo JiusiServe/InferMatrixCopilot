@@ -330,3 +330,22 @@ a dry run, otherwise the opened PR). Summarise:
 
 Without explicit authorization for a broader batch or merge, stop after one stage. The owner reviews and merges its PR before the next
 stage can run. Never run two stages in one invocation, and never merge a PR.
+
+### Foundation concurrency (2026-10-06)
+
+Explicit `--stage knowledge --unlimited-subscription` shares at most 13 worker
+slots across extraction and all existing independent section judgments. Set
+`KB_KNOWLEDGE_CONCURRENCY` to 1–13 before starting; it is frozen in the input
+identity. Native Zcode starts share a default 5-second pacing interval;
+`KB_KNOWLEDGE_START_INTERVAL_S` may override it with a finite positive value
+up to 60 seconds and is also bound to the stage identity. The CLI coordinator alone saves real worker checkpoints and appends
+approved sections in deterministic order. Resume the same command/state to reuse
+completed native approvals; keep their external trace archives. Finite-budget
+runs retain the previous serial flow. New discovery features preferentially read
+the frozen report’s exact complete source spans; unread gaps cannot be cited.
+
+Completed unpublished caches and prepared-publication resumes also replay the
+original native proofs before any write or model call. Missing or changed
+archives reject reuse without changing the genuine record; restore the original
+archive to continue. Changed frozen inputs require a new batch. Published
+historical records remain unchanged.
