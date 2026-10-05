@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from infermatrix_copilot.kb_service.init_feature_discovery import SYSTEM_DISCOVER, SYSTEM_REVIEW, discovery_run_config
+from infermatrix_copilot.kb_service.init_feature_discovery import SYSTEM_DISCOVER, SYSTEM_REVIEW, SYSTEM_CONSOLIDATE, discovery_run_config
 from infermatrix_copilot.kb_service.init_support import InitError
 from infermatrix_copilot.kb_service.init_stages import run_stage
 from infermatrix_copilot.kb_service.models import ModelGateway
@@ -44,7 +44,7 @@ class NativeScript:
                              "relation": "new", "related_id": "", "aliases": [],
                              "evidence": [{"path": self.path, "start": offered["start"], "end": offered["end"]}]}]
             data = {"candidates": rows}
-        elif system == SYSTEM_REVIEW:
+        elif system in (SYSTEM_REVIEW, SYSTEM_CONSOLIDATE):
             data = {"decisions": {row["id"]: {"supported": "yes" if self.supported else "no",
                     "relation": "new" if self.supported else "unknown", "related_id": "",
                     "reason": "The cited public implementation supports the capability." if self.supported else "Unsupported candidate boundary."}

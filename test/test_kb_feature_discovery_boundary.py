@@ -196,6 +196,9 @@ class BoundaryNative(NativeScript):
 
 
 def test_legacy_unpublished_preview_reuses_all_scan_and_primary_records(world):
+    from pathlib import Path
+    import hashlib
+    from infermatrix_copilot.kb_service.init_feature_discovery import write_full_discovery_report, compact_discovery_report
     from infermatrix_copilot.kb_service.init_support import InitRecord
     rt, lifecycle, script, _ = _setup(world, script=BoundaryNative())
     previous = _run(rt, lifecycle)
@@ -206,12 +209,22 @@ def test_legacy_unpublished_preview_reuses_all_scan_and_primary_records(world):
     judge_calls = sum(c['role'] == 'judge' for c in script.calls)
     previous.discovery.pop('catalog_boundary_audit')
     previous.discovery.pop('boundary_reviews')
+    previous.discovery.pop('catalog_consolidation_audit')
+    previous.discovery.pop('consolidation_reviews')
+    # Simulate the actual older renderer, which had no consolidation namespace.
+    full = json.loads(Path(previous.discovery['full_artifact']['path']).read_text())
+    full.pop('catalog_consolidation_audit')
+    artifact = write_full_discovery_report(rt.state_dir, full)
+    text = json.dumps(compact_discovery_report(full, artifact), ensure_ascii=False, indent=2) + '\n'
+    path = Path(previous.pr['dry_run_dir']) / 'tree' / previous.discovery['report_path']
+    path.write_text(text)
+    previous.discovery.update(full_artifact=artifact, report_sha256=hashlib.sha256(text.encode()).hexdigest())
     previous.save(rt.state_dir)
     current = _run(rt, lifecycle)
     assert current.status == 'dry_run', current.problems
     assert current.discovery['tasks'] == original_tasks and current.discovery['reviews'] == original_reviews
     assert sum(c['role'] == 'generator' for c in script.calls) == generator_calls
-    assert sum(c['role'] == 'judge' for c in script.calls) == judge_calls + 1
+    assert sum(c['role'] == 'judge' for c in script.calls) == judge_calls + 2
     assert _report(current)[1]['catalog_boundary_audit']['done']
 
 
@@ -259,7 +272,7 @@ def test_prepared_catalog_without_boundary_proof_cannot_publish(world):
     assert len(script.calls) == calls and gh.pushed == pushes
 
 
-@pytest.mark.parametrize('review', ['primary', 'boundary'])
+@pytest.mark.parametrize('review', ['primary', 'boundary', 'consolidation'])
 @pytest.mark.parametrize('damage', ['missing', 'tampered'])
 def test_prepared_catalog_replays_native_archives_without_rewriting_proofs(world, review, damage):
     from pathlib import Path
@@ -275,7 +288,8 @@ def test_prepared_catalog_replays_native_archives_without_rewriting_proofs(world
     original_discovery = deepcopy(first.discovery)
     prepared = Path(first.pr['prepared'])
     prepared_bytes = prepared.read_bytes()
-    checked = next(iter(first.discovery['reviews' if review == 'primary' else 'boundary_reviews'].values()))
+    namespace = {'primary': 'reviews', 'boundary': 'boundary_reviews', 'consolidation': 'consolidation_reviews'}[review]
+    checked = next(iter(first.discovery[namespace].values()))
     native = store.get(checked['judge_receipt']['trace_id'])
     reply_hash = native['outputs']['reply'].removeprefix('sha256:')
     blob = store.root / 'blobs' / reply_hash[:2] / f'{reply_hash}.gz'

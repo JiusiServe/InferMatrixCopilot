@@ -180,6 +180,10 @@ What each stage opens:
   Keep primary reviews and native receipts; unsupported or unresolved duplicate
   titles/aliases stay unknown without another generator repair loop. Unpublished
   old previews reuse their scan and primary reviews to acquire this audit.
+  Before publication, jointly consolidate the actually admitted new proposals
+  against one another with counterpart implementation and consumer excerpts.
+  Retain original extraction and boundary proofs; unresolved duplicates stay
+  unknown. This is part of aggregation and independent review in phase 1.
   Exhausted content repairs remain exhausted on `--retry-unfinished`.
   `--from-existing` checks merged skeleton routes, while `--retry-unfinished`
   resumes supported work. `--budget-usd` controls cumulative accounting;
