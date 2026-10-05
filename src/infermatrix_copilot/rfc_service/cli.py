@@ -137,9 +137,22 @@ def main(argv: list[str] | None = None) -> int:
                         print("RFC reconciliation failed; inspect the operation and audit history", file=sys.stderr)
                     stop.wait(args.interval)
             thread = None
+            translation_thread = None
             if not args.no_worker:
                 thread = threading.Thread(target=worker, daemon=True)
                 thread.start()
+                if service.translations.enabled:
+                    def translate_worker():
+                        while not stop.is_set():
+                            try:
+                                service.translations.reconcile()
+                                result = service.translations.process()
+                            except Exception:
+                                result = {"processed": 0}
+                                print("RFC translation unavailable; source views remain accessible", file=sys.stderr)
+                            stop.wait(1 if result["processed"] else 5)
+                    translation_thread = threading.Thread(target=translate_worker, daemon=True)
+                    translation_thread.start()
             print(f"RFC service: {server.public_url}", flush=True)
             try:
                 server.serve_forever()
@@ -148,6 +161,8 @@ def main(argv: list[str] | None = None) -> int:
                 server.server_close()
                 if thread:
                     thread.join(timeout=2)
+                if translation_thread:
+                    translation_thread.join(timeout=2)
             return 0
         client = RFCClient(state_dir=state, service_url=service_url,
                            token=os.environ.get(args.token_env, ""), config_path=args.config)

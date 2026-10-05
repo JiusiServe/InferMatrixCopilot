@@ -2,6 +2,7 @@
 import {graphModels, graphSource, roadmapSVGStyles} from "/roadmap-graph.mjs";
 import {displayMarkdown} from "/roadmap-markdown-display.mjs";
 import {projectRFC, outcomeModel} from "/roadmap-components.mjs";
+import {currentLanguage, localizeText, setTranslations, applyLocale, initializeLocale, changeLanguage} from "/roadmap-locale.mjs";
 const markdown = window.markdownit({html: false, linkify: true});
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 
@@ -161,7 +162,7 @@ function readable(value) {
 function dateText(value) {
   if (!value) return "尚未同步";
   const date = new Date(typeof value === "number" ? value * 1000 : value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("zh-CN", {hour12: false});
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString(currentLanguage() === "en" ? "en-US" : "zh-CN", {hour12: false});
 }
 function notice(message, error = false) {
   clearTimeout(noticeTimer);
@@ -176,6 +177,7 @@ function signedOut() {
   activeGraphs = null;
   activeRFC = null;
   activeContent = null;
+  setTranslations(null);
   activeEditor = null;
   principal = null;
   repositories = [];
@@ -204,8 +206,8 @@ async function api(path, options = {}) {
   return value;
 }
 const compactActions = new Set(["rfcs.draft", "rfcs.import", "rfcs.update", "rfcs.work", "rfcs.decision", "rfcs.acl"]);
-const action = (name, payload = {}) => api(`/api/v1/actions/${encodeURIComponent(name)}`, {method: "POST", body: JSON.stringify({...payload, ...(compactActions.has(name) ? {view: "detail"} : {})})});
-const getRFC = (id) => api(`/api/v1/rfcs/${encodeURIComponent(id)}?view=detail`);
+const action = (name, payload = {}) => api(`/api/v1/actions/${encodeURIComponent(name)}`, {method: "POST", body: JSON.stringify({...payload, ...((compactActions.has(name) || name === "rfcs.suggestions") ? {language: currentLanguage()} : {}), ...(compactActions.has(name) ? {view: "detail"} : {})})});
+const getRFC = (id) => api(`/api/v1/rfcs/${encodeURIComponent(id)}?view=detail&language=${currentLanguage()}`);
 async function applyRFCResult(result) {
   if (!principal || !result?.id || !result.features || !location.hash.startsWith(`#rfc/${encodeURIComponent(result.id)}`)) return route();
   closeFeatureDialog();
@@ -322,7 +324,7 @@ async function route() {
   const [page, id] = hash.split("/");
   const active = page === "rfc" ? "dashboard" : page === "import" ? "draft" : page;
   for (const link of document.querySelectorAll("[data-nav]")) link.classList.toggle("active", link.dataset.nav === active);
-  $("breadcrumb").textContent = `工作空间 / ${{dashboard: "进展总览", draft: "创建 RFC", import: "纳管已有 RFC", rfc: "RFC 详情", operations: "操作记录", account: "个人令牌", admin: "团队与权限"}[page] || "进展总览"}`;
+  $("breadcrumb").textContent = `${localizeText("工作空间")} / ${localizeText({dashboard: "进展总览", draft: "创建 RFC", import: "纳管已有 RFC", rfc: "RFC 详情", operations: "操作记录", account: "个人令牌", admin: "团队与权限"}[page] || "进展总览")}`;
   rememberGraphViewport();
   content.replaceChildren(element("div", {class: "loading"}, "正在读取工作空间…"));
   try {
@@ -333,9 +335,10 @@ async function route() {
     else if (page === "operations") view = operationsView(await api("/api/v1/operations"));
     else if (page === "account") view = await accountView();
     else if (page === "admin" && principal.admin) view = await adminView();
-    else view = dashboardView(await api("/api/v1/rfcs?view=summary"));
+    else view = dashboardView(await api(`/api/v1/rfcs?view=summary&language=${currentLanguage()}`));
     if (sequence === routeSequence && principal) {
       content.replaceChildren(view);
+      applyLocale(content);
       if (page === "rfc") { restoreGraphViewport(); openGraphTarget(activeGraphs); }
     }
   } catch (error) {
@@ -346,6 +349,8 @@ async function route() {
 
 function dashboardView(data) {
   const list = data.rfcs || [];
+  setTranslations(null);
+  for (const rfc of list) setTranslations(rfc.translations, false);
   const wrapper = element("div");
   wrapper.append(heading("每个 RFC，都有下一步", "查看团队的计划、实现进展和等待验证的结果。",
     element("div", {class: "actions"}, button("刷新", route), element("a", {href: "#import", class: "badge blue"}, "纳管已有 RFC"), element("a", {href: "#draft", class: "primary badge"}, "＋ 创建 RFC"))));
@@ -490,6 +495,9 @@ async function operationNotice(result) {
   if (!id) { notice("操作已完成。"); return; }
   notice(`操作已进入队列：${id}。可在操作记录中查看结果。`);
 }
+function graphTooltip(feature) {
+  return `${localizeText(feature.title)}\n${localizeText("实现")}：${localizeText(translated(feature.implementation || feature.state))}\n${localizeText("验收")}：${localizeText(translated(feature.acceptance))}\n${localizeText("负责人")}：${feature.owner || localizeText("待认领")}`;
+}
 function updateGraphNodes(graphs) {
   for (const entry of graphs.entries) {
     const model = graphs.models[entry.index];
@@ -506,15 +514,15 @@ function updateGraphNodes(graphs) {
       for (const span of group.querySelectorAll("text .text-outer-tspan")) {
         if (span.textContent.includes("实现进度待更新")) span.setAttribute("data-graph-meta", "state");
         if (span.textContent.includes("负责人：等待工作认领")) span.setAttribute("data-graph-meta", "owner");
-        if (span.getAttribute("data-graph-meta") === "state") span.textContent = `${state === "accepted" ? "已验收" : translated(state)} · 验收：${translated(feature.acceptance || "pending")}`;
+        if (span.getAttribute("data-graph-meta") === "state") span.textContent = `${localizeText(state === "accepted" ? "已验收" : translated(state))} · ${localizeText("验收")}：${localizeText(translated(feature.acceptance || "pending"))}`;
         if (span.getAttribute("data-graph-meta") === "owner") {
           const owner = feature.owner || "待认领";
-          span.textContent = `负责人：${owner}`;
+          span.textContent = `${localizeText("负责人")}：${feature.owner || localizeText("待认领")}`;
           const width = owner.length > 20 ? (group.querySelector("rect")?.getBBox().width || 300) : Infinity;
           while (owner.length > 20 && span.getComputedTextLength() > width - 26 && span.textContent.length > 8) span.textContent = span.textContent.slice(0, -2) + "…";
         }
       }
-      group.querySelector("title").textContent = `${feature.title}\n实现：${translated(state)}\n验收：${translated(feature.acceptance)}\n负责人：${feature.owner || "待认领"}`;
+      group.querySelector("title").textContent = graphTooltip(feature);
     });
   }
 }
@@ -543,6 +551,11 @@ function enableGraphPanning(canvas) {
 }
 function dependencyGraph(rfc) {
   const models = graphModels(rfc);
+  for (const model of models) {
+    model.title = localizeText(model.title);
+    for (const node of model.nodes) node.title = localizeText(node.title);
+    for (const edge of model.edges) edge.label = localizeText(edge.label || "");
+  }
   const sources = models.map(model => graphSource(model, translated, true));
   const signature = JSON.stringify(models.map((model, index) => [model.title, sources[index]]));
   if (activeGraphs?.rfc.id === rfc.id && activeGraphs.signature === signature && activeGraphs.entries.length === models.length) {
@@ -597,13 +610,13 @@ function dependencyGraph(rfc) {
         group.setAttribute("role", "button");
         group.setAttribute("tabindex", "0");
         group.setAttribute("data-feature-id", node.feature ? node.id : "");
-        group.setAttribute("aria-label", `${node.title}：查看${node.feature ? "工作详情、关联 PR 和可用操作" : "关联工作"}`);
+        group.setAttribute("aria-label", `${node.title}：${localizeText("查看")}${localizeText(node.feature ? "工作详情、关联 PR 和可用操作" : "关联工作")}`);
         group.classList.add("roadmap-actionable");
         const open = event => { event.preventDefault(); const current = graphs.models[modelIndex]; graphDetails(graphs.rfc, current.nodes[index], current); };
         group.addEventListener("click", open);
         group.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") open(event); });
         const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-        title.textContent = node.feature ? `${node.feature.title}\n实现：${translated(node.feature.implementation || node.feature.state)}\n验收：${translated(node.feature.acceptance)}\n负责人：${node.feature.owner || "待认领"}` : node.title;
+        title.textContent = node.feature ? graphTooltip(node.feature) : node.title;
         group.prepend(title);
       });
       graphs.entries.push({index: modelIndex, groups});
@@ -695,7 +708,10 @@ function outcomePanel(rfc, projection) {
   const outcome = outcomeModel(rfc, projection);
   const goalList = element("ul", {class: "outcome-goals"});
   const goalText = (outcome.goals || []).flatMap(section => markdown.parse(displayMarkdown(section.markdown || ""), {}).filter(token => token.type === "inline").map(token => token.children?.map(child => child.content).join("") || token.content)).filter(Boolean);
-  for (const goal of goalText.slice(0, 3)) goalList.append(element("li", {}, button(goal.length > 220 ? goal.slice(0, 219) + "…" : goal, () => content.querySelector("#rfc-goals")?.scrollIntoView({behavior: "smooth"}), "text-action")));
+  for (const goal of goalText.slice(0, 3)) {
+    const localized = localizeText(goal);
+    goalList.append(element("li", {}, button(localized.length > 220 ? localized.slice(0, 219) + "…" : localized, () => content.querySelector("#rfc-goals")?.scrollIntoView({behavior: "smooth"}), "text-action")));
+  }
   if (!goalList.children.length) goalList.append(element("li", {class: "muted"}, "尚未声明明确目标，请在 RFC 中补充。"));
   const counts = element("div", {class: "outcome-counts"},
     element("div", {}, element("label", {}, "实现已落地"), element("strong", {}, `${outcome.implementation.implemented} / ${outcome.implementation.total}`), element("p", {class: "small muted"}, "合并和实现记录，验收单独确认。")),
@@ -705,7 +721,11 @@ function outcomePanel(rfc, projection) {
     element("p", {class: "small muted"}, `版本 ${item.evidence.revision} · ${item.evidence.environment} · ${dateText(item.verifiedAt)}`)));
   if (!outcome.verified.length) verified.append(element("p", {class: "small muted"}, "暂无带有效验证证据的已验收成果。"));
   const next = element("div", {class: "outcome-next"});
-  for (const item of outcome.next) next.append(button(`${item.title}${item.reason ? ` · ${item.reason}` : ""}`, () => locateRFCItem(item.criterionId ? "criterion" : "feature", item.criterionId || item.featureId || item.id), "text-action"));
+  for (const item of outcome.next) {
+    const control = button(item.title, () => locateRFCItem(item.criterionId ? "criterion" : "feature", item.criterionId || item.featureId || item.id), "text-action");
+    if (item.reason) control.append(" · ", element("span", {}, item.reason));
+    next.append(control);
+  }
   if (!outcome.next.length) next.append(element("p", {class: "small muted"}, rfc.complete ? "当前工作与验收均已完成。" : "补充可跟踪的工作和验收条件。"));
   const result = panel("成果（Outcome）", element("div", {class: "outcome-grid"},
     element("div", {}, element("h3", {}, "预期目标"), goalList), element("div", {}, element("h3", {}, "实际进展"), counts),
@@ -749,6 +769,7 @@ function openRFCEditor(rfc) {
 
 function detailView(rfc) {
   activeRFC = rfc;
+  setTranslations(rfc.translations);
   const wrapper = element("div");
   const source = rfc.source || {};
   const fresh = rfc.freshness || {};
@@ -766,6 +787,10 @@ function detailView(rfc) {
     link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }));
   wrapper.append(heading(rfc.title || "未命名 RFC", `${repoName(rfc.repo_id)} · ${rfc.id}`, actions));
+  const translation = rfc.translations;
+  if (translation?.enabled && (translation.pending || translation.failed)) wrapper.append(element("p", {class: "translation-status small muted", role: "status"},
+    element("span", {}, "翻译同步中"), `：${translation.ready}/${translation.total} · `,
+    element("span", {}, "未完成内容暂时显示原文。"), translation.failed ? element("span", {}, `${translation.failed} `, element("span", {}, "项稍后重试。")) : null));
   if (rfc.sync_status === "requires_reauthorization") {
     const warning = element("div", {class: "warning"}, "自动追踪已暂停：原授权已失效，需要维护者重新授权后才能继续同步。 ");
     if (canPublish(rfc)) warning.append(button("重新授权追踪", async () => {
@@ -962,6 +987,7 @@ function suggestionsPanel(rfc) {
       const result = await action("rfcs.suggestions", {rfc_id: rfc.id, offset: page * SUGGESTIONS_PER_PAGE, limit: SUGGESTIONS_PER_PAGE, status: "proposed"});
       if (current !== sequence || !list.isConnected || !principal) return;
       total = result.total;
+      setTranslations(result.translations, false);
       const last = Math.max(0, Math.ceil(total / SUGGESTIONS_PER_PAGE) - 1);
       if (page > last) { page = last; return draw(); }
       suggestionPages.set(rfc.id, page);
@@ -1138,5 +1164,10 @@ setInterval(async () => {
   try { await refreshCurrent(); } catch (error) { if (principal) notice(`刷新未完成：${error.message}`, true); }
 }, 30000);
 
+document.querySelectorAll("[data-language]").forEach(control => control.addEventListener("click", async () => {
+  await changeLanguage(control.dataset.language);
+  if (principal) await route();
+}));
+await initializeLocale();
 try { await signedIn(await api("/api/v1/me")); }
 catch { signedOut(); }

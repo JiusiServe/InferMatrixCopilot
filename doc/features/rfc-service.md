@@ -62,6 +62,28 @@ users edit the complete source in a separate dialog, with revision conflict chec
 and unsaved input preserved across close/reopen and work updates. API and storage
 formats are unchanged.
 
+The language switch provides English and Simplified Chinese views (`?lang=en`
+or `?lang=zh`), remembering only the public locale preference. Interface and RFC
+display strings are synchronized by GLM through the existing Zcode tool-less
+adapter; source Markdown, identifiers, code, links, numbers, owners and acceptance
+facts remain authoritative. Translated text stays in the service SQLite cache and
+browser session memory. Queue execution and cache reads recheck current RFC/source
+access; failed or stale translations never overwrite the source. Pending text
+remains readable in its source language with a synchronization indicator.
+
+Enable on an execution host with a logged-in Zcode CLI using provider config:
+
+```json
+{"translations":{"enabled":true,"backend":"zcode","model":"GLM-5.3-Flash","reasoning":"low","cli":"/path/to/zcode","timeout_seconds":180}}
+```
+
+The standalone worker translates changed text in batches, outside database
+transactions and independently of tracking operations. It resumes expired leases
+after restart and retries invalid/failed responses with backoff. The public UI
+catalog contains only shipped interface literals; RFC translation maps require
+the same authorization as the RFC and are filtered to currently visible strings.
+The language parameter is additive; API responses retain original canonical text.
+
 Draft previews, import previews, and individual content components display rendered
 Markdown, including headings, lists, tables, links, and code blocks. The browser uses the
 bundled markdown-it 15.0.2 parser (MIT, shipped with its license), with raw HTML

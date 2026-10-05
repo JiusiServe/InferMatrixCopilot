@@ -35,7 +35,7 @@ def content_digest(title, body):
 
 
 class RFCService:
-    def __init__(self, state_dir, providers=None, roots=None, clock=time.time):
+    def __init__(self, state_dir, providers=None, roots=None, clock=time.time, translator=None):
         self.store = Store(state_dir)
         self.providers = dict(providers or {})
         self.roots = [Path(p).expanduser().resolve() for p in (roots or [])]
@@ -46,6 +46,8 @@ class RFCService:
         with self.store.transaction() as con:
             con.execute("INSERT OR IGNORE INTO metadata VALUES ('writer_id',?)", (identifier("workspace"),))
         self.writer_id = self.store.one("SELECT value FROM metadata WHERE key='writer_id'")["value"]
+        from .translations import Translations
+        self.translations = Translations(self, translator)
 
     def capabilities(self):
         settings = self.settings()
@@ -208,7 +210,7 @@ class RFCService:
         fields = {"id", "repo_id", "title", "revision", "content_digest", "source", "state",
                   "enrolled", "restricted", "updated", "role", "can_write", "can_publish",
                   "implementation", "acceptance", "complete", "sync_status", "freshness",
-                  "next_actions", "last_discovery", "legacy_namespace", "namespace"}
+                  "next_actions", "last_discovery", "legacy_namespace", "namespace", "translations"}
         if mode == "detail":
             fields |= {"body", "features", "criteria", "scope", "auto_add", "max_auto_additions",
                        "grants", "historical_claims", "historical_priorities", "ambiguities"}
@@ -250,6 +252,8 @@ class RFCService:
             principal = self._current(con, principal)
             result = self._dispatch(con, principal, action, payload)
             if isinstance(result, dict) and "repo_id" in result and "features" in result:
+                if payload.get("language"):
+                    result["translations"] = self.translations.snapshot(con, principal, result, payload["language"])
                 result = self._compact_view(result, payload.get("view"))
             return result
 
@@ -386,6 +390,8 @@ class RFCService:
                     view = self._view(con, p, dict(row))
                     if data.get("query") and data["query"].casefold() not in (view["title"] + view["body"]).casefold():
                         continue
+                    if data.get("language"):
+                        view["translations"] = self.translations.snapshot(con, p, {"id": view["id"], "title": view["title"]}, data["language"])
                     result.append(self._compact_view(view, data.get("view")))
             return {"rfcs": result}
         if action == "rfcs.draft":
@@ -435,8 +441,11 @@ class RFCService:
                 if data.get("query"):
                     query = str(data["query"]).casefold()
                     items = [item for item in items if query in encode(item).casefold()]
-                return {"rfc_id": row["id"], "offset": offset, "limit": limit,
-                        "total": len(items), "suggestions": items[offset:offset + limit]}
+                result = {"rfc_id": row["id"], "offset": offset, "limit": limit,
+                          "total": len(items), "suggestions": items[offset:offset + limit]}
+                if data.get("language"):
+                    result["translations"] = self.translations.snapshot(con, p, {"id": row["id"], "suggestions": result["suggestions"]}, data["language"])
+                return result
             if action == "rfcs.export":
                 return {"rfc_id": row["id"], "markdown": row["body"], "content": row["body"], "tracking": view}
             return view
@@ -1099,4 +1108,10 @@ def build_service(state_dir, config_path=None):
         if opts.get("api_url"):
             kwargs["api_url"] = opts["api_url"]
         providers[name] = cls(**kwargs)
-    return RFCService(state_dir, providers=providers, roots=roots)
+    translation_config = config.get("translations", {})
+    translator = None
+    if translation_config.get("enabled"):
+        from .translations import ZcodeTranslator
+        if translation_config.get("backend", "zcode") != "zcode": raise ValueError("RFC translations require the configured Zcode backend")
+        translator = ZcodeTranslator(translation_config)
+    return RFCService(state_dir, providers=providers, roots=roots, translator=translator)

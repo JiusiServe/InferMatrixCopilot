@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS source_snapshots(id INTEGER PRIMARY KEY, rfc_id TEXT 
 CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, actor TEXT NOT NULL REFERENCES users(id), credential_id TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL, repo_id TEXT NOT NULL, rfc_id TEXT NOT NULL DEFAULT '', payload TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_digest TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', result TEXT NOT NULL DEFAULT '{}', error TEXT NOT NULL DEFAULT '', created REAL NOT NULL, updated REAL NOT NULL, worker TEXT NOT NULL DEFAULT '', lease_until REAL NOT NULL DEFAULT 0, UNIQUE(actor,idempotency_key));
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, actor TEXT NOT NULL, action TEXT NOT NULL, repo_id TEXT NOT NULL DEFAULT '', rfc_id TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '{}', created REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS operations_pending ON operations(status,lease_until,created);
+CREATE TABLE IF NOT EXISTS translations(scope TEXT NOT NULL, segment TEXT NOT NULL, language TEXT NOT NULL, source TEXT NOT NULL, translated TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', credential_id TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', attempts INTEGER NOT NULL DEFAULT 0, retry_at REAL NOT NULL DEFAULT 0, lease_until REAL NOT NULL DEFAULT 0, worker TEXT NOT NULL DEFAULT '', updated REAL NOT NULL, PRIMARY KEY(scope,segment,language));
+CREATE INDEX IF NOT EXISTS translations_pending ON translations(status,retry_at,lease_until,updated);
 """
 
 
