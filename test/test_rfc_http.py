@@ -119,6 +119,10 @@ def test_login_shell_contains_no_rfc_data_and_assets_are_allowlisted():
         assert b"Private project" not in raw
         assert "frame-ancestors 'none'" in headers["content-security-policy"]
         assert request(server, "GET", "/app.js")[0] == 200
+        status, _, parser = request(server, "GET", "/roadmap-markdown.js")
+        assert status == 200
+        assert b"markdown-it 15.0.2" in parser
+        assert b'/roadmap-markdown.js' in raw
         assert request(server, "GET", "/style.css")[0] == 200
         assert request(server, "GET", "/models.py")[0] == 401
 

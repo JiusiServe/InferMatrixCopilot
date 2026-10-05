@@ -1,4 +1,33 @@
-/* Same-origin RFC client. Private content is rendered as text, never HTML. */
+/* Same-origin RFC client. Markdown uses a bundled parser with raw HTML disabled. */
+const markdown = window.markdownit({html: false, linkify: true});
+markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
+
+function markdownBody(text, sourceUrl = "") {
+  const node = document.createElement("article");
+  node.className = "markdown-body";
+  // Only parser-generated HTML is inserted; source HTML is escaped by markdown-it.
+  node.innerHTML = markdown.render(String(text || "暂无正文。"));
+  const used = new Set();
+  for (const heading of node.querySelectorAll("h1,h2,h3,h4,h5,h6")) {
+    const slug = heading.textContent.toLowerCase().replace(/[^\p{L}\p{N}_\s-]/gu, "").replace(/\s/g, "-") || "section";
+    let id = slug, suffix = 0;
+    while (used.has(id)) id = `${slug}-${++suffix}`;
+    used.add(id);
+    heading.id = id;
+  }
+  for (const link of node.querySelectorAll("a")) {
+    const href = link.getAttribute("href") || "";
+    if (href.startsWith("#")) continue;
+    try {
+      const url = new URL(href, sourceUrl || location.href);
+      if (!["https:", "http:"].includes(url.protocol)) throw new Error("Unsupported link");
+      link.href = url.href;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    } catch { link.replaceWith(document.createTextNode(link.textContent)); }
+  }
+  return node;
+}
 const $ = (id) => document.getElementById(id);
 const content = $("content");
 let principal = null;
@@ -277,7 +306,7 @@ function draftView() {
       const result = await action("rfcs.draft", data);
       preview.replaceChildren();
       preview.className = "stack";
-      preview.append(element("h3", {}, result.title), element("pre", {class: "spec"}, result.body || "暂无正文"),
+      preview.append(element("h3", {}, result.title), markdownBody(result.body),
         element("div", {class: "status-row"}, badge("draft"), "已保存 · 尚未发布"),
         element("a", {href: `#rfc/${encodeURIComponent(result.id)}`}, "查看完整 RFC，并发布或纳管 →"));
       viewDirty = false;
@@ -348,7 +377,7 @@ function importView() {
         location.hash = `rfc/${encodeURIComponent(saved.id)}`;
       }, "primary");
       preview.className = "stack";
-      preview.replaceChildren(...[element("h3", {}, reviewed.title || "已有 RFC"), safeLink(reviewed.source?.url), element("pre", {class: "spec"}, reviewed.body || "暂无正文"),
+      preview.replaceChildren(...[element("h3", {}, reviewed.title || "已有 RFC"), safeLink(reviewed.source?.url), markdownBody(reviewed.body, reviewed.source?.url),
         element("p", {class: "small muted"}, "纳管前会再次核对来源，期间发生的修改需要重新预览。"), enroll].filter(Boolean));
     });
   });
@@ -455,7 +484,7 @@ function detailView(rfc) {
     await operationNotice(await action("rfcs.enroll", {rfc_id: rfc.id, content_digest: rfc.content_digest, expected_revision: rfc.revision})); await route();
   }));
   const metadata = element("div", {class: "status-row"}, safeLink(source.url), element("span", {}, `版本 ${String(rfc.revision || 1).slice(0, 10)}`), element("span", {}, `最后核验：${dateText(fresh.verification || fresh.last_verified_at || fresh.last_verified || fresh.checked_at)}`));
-  const body = element("pre", {class: "spec"}, rfc.body || "暂无正文。");
+  const body = markdownBody(rfc.body, source.url);
   const editing = element("details", {}, element("summary", {}, "编辑方案正文"));
   const editForm = element("form", {class: "stack"});
   editForm.append(field("标题", input("title", "RFC 标题", rfc.title || "", "text", true)), field("RFC 正文", element("textarea", {name: "body", rows: 13}, rfc.body || "")),

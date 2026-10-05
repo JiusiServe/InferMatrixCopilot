@@ -24,6 +24,7 @@ _STATIC = {
     "/roadmap.html": ("index.html", "text/html; charset=utf-8"),
     "/roadmap-500ms-cn.html": ("index.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/roadmap-markdown.js": ("markdown-it.min.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
 _COLLECTIONS = {

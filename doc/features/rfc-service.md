@@ -45,6 +45,12 @@ not in user action payloads.
 
 ## Repositories and a draft
 
+RFC details, draft previews, and import previews display rendered Markdown,
+including headings, lists, tables, links, and code blocks. The browser uses the
+bundled markdown-it 15.0.2 parser (MIT, shipped with its license), with raw HTML
+disabled and external image fetching disabled. Original Markdown remains intact
+for editing, publication, and export.
+
 Use `request ACTION --data FILE` for all versioned actions; `--data -` reads a
 JSON object from stdin. It supports user administration, grants, tokens, RFCs,
 operations and audit history without placing credentials in arguments.
