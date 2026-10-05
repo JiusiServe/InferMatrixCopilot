@@ -353,6 +353,9 @@ def restore_jobs(stage):
         raise InitError("foundation checkpoint input identity mismatch")
     for result in sorted(saved.get("tasks", {}).values(), key=lambda item: item["sequence"]):
         _apply(stage, result)
+    # This run has already replayed these immutable results, including native
+    # approvals. Feedback preparation need not replay their archives twice.
+    stage._foundation_validated_results = {r["result_sha256"] for r in saved.get("tasks", {}).values()}
 
 
 def _validate_fresh(stage, result):
@@ -376,6 +379,64 @@ def _validate_fresh(stage, result):
     result["result_sha256"] = _hash({k: v for k, v in result.items() if k != "result_sha256"})
 
 
+def _with_review_feedback(stage, jobs, saved):
+    """Only a same-batch v4 resume gets advisory, per-facet correction history."""
+    for original in jobs:
+        if (not stage.rt.unlimited_subscription
+                or original["payload"].get("foundation_prompt_version") != 4):
+            yield original
+            continue
+        if saved.get("tasks") and saved.get("binding") != stage.record.inputs_digest:
+            raise InitError("foundation feedback needs the same frozen batch identity")
+        history = {}
+        for prior in saved.get("tasks", {}).values():
+            if (prior.get("owner") != original["owner"].owner or prior.get("page") != original["page"]
+                    or prior.get("payload", {}).get("owner") != original["owner"].owner
+                    or prior.get("payload", {}).get("foundation_prompt_version") != 4
+                    or not set(prior.get("requested", [])) & set(original["requested"])):
+                continue
+            if prior.get("result_sha256") != _hash({k: v for k, v in prior.items() if k != "result_sha256"}):
+                raise InitError("foundation feedback prior result hash mismatch")
+            if prior.get("result_sha256") not in getattr(stage, "_foundation_validated_results", set()):
+                _validate_result(stage, prior)
+            history.setdefault(prior["input_sha256"], prior)
+        feedback, requested = {}, []
+        for facet in original["requested"]:
+            attempts = sorted((p for p in history.values() if facet in p["requested"]),
+                              key=lambda p: p["sequence"])
+            if len(attempts) >= 4:  # Initial extraction plus at most three corrections.
+                stage.record.unfinished.append(f"{original['owner'].owner}/{facet}: three review corrections exhausted; remains unknown")
+                continue
+            requested.append(facet)
+            if attempts:
+                latest = attempts[-1]
+                key = f"knowledge:{original['owner'].owner}:{facet}"
+                verdict = latest.get("verdicts", {}).get(key, {})
+                if (verdict.get("page") != original["page"] or verdict.get("facet") != facet
+                        or verdict.get("verdict") not in {"fail", "unsure", "unjudged"}):
+                    verdict = {}  # Unavailable advisory review, never another facet's reasons or an approval.
+                feedback[facet] = {"correction_round": len(attempts),
+                    "prior_attempts": [{"input_sha256": p["input_sha256"], "result_sha256": p["result_sha256"]}
+                                       for p in attempts],
+                    "last_verdict": verdict.get("verdict", "unknown"),
+                    "last_review_reasons": copy.deepcopy(verdict.get("reasons", {})),
+                    "last_error": latest.get("error", ""),
+                    "last_dropped_reasons": [p["why"] for p in latest.get("dropped", [])
+                                             if p.get("rule_id") == key and p.get("page") == original["page"]]}
+        if not requested:
+            continue
+        if not feedback and requested == original["requested"]:
+            yield original
+            continue
+        job = {**original, "payload": copy.deepcopy(original["payload"]), "requested": requested}
+        job["payload"]["facets"] = requested
+        if feedback:
+            job["payload"]["prior_review_feedback"] = {"advisory_only": True,
+                "scope": "Previous rejection/error data for these requested facets; not source evidence or approval.",
+                "facets": feedback}
+        yield job
+
+
 def run_jobs(stage, jobs):
     """One worker's generator and judges are serial, so the pool is the shared cap."""
     workers = parallelism(stage.rt)
@@ -388,6 +449,9 @@ def run_jobs(stage, jobs):
             pacer.prepare()
             stage.rt.gateway.configure_zcode_pacing(pacer)
     saved = stage.record.coverage.setdefault("foundation_jobs", {"binding": stage.record.inputs_digest, "tasks": {}})
+    jobs = list(_with_review_feedback(stage, jobs, saved))
+    if not jobs:
+        return
     completed = {}
     sequence = max((r["sequence"] for r in saved["tasks"].values()), default=-1) + 1
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="kb-foundation") as pool:
