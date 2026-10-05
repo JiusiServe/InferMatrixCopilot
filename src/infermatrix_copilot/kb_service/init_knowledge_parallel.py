@@ -114,7 +114,7 @@ class _CaptureGateway:
 
 
 def _worker(stage, job):
-    from .init_knowledge import SYSTEM_KNOWLEDGE, knowledge_prompt, knowledge_prompt, validate_sections
+    from .init_knowledge import SYSTEM_KNOWLEDGE, knowledge_prompt, validate_sections
     from .init_support import generate
     from .init_stages import _one_line
     worker = copy.copy(stage)
@@ -272,6 +272,49 @@ def _apply(stage, result):
         if item:
             accepted.append(item)
     return accepted
+
+
+def validate_checkpoint(stage, previous, digest):
+    """Read-only replay before cache reuse or any prepared publication write."""
+    import tempfile
+    from pathlib import Path
+    from .feature_discovery_index import build_discovery_index, discovery_scope
+    from .init_knowledge_inputs import source_owners
+
+    saved = previous.coverage.get("foundation_jobs", {})
+    if (previous.stage != "knowledge" or previous.repo != stage.lifecycle.repo
+            or previous.pin != stage._knowledge_run_pin
+            or previous.kb_base_sha != stage._base_sha or previous.inputs_digest != digest
+            or (saved and saved.get("binding") != digest)):
+        raise InitError("foundation checkpoint frozen input identity differs")
+    if not saved.get("tasks"):
+        return  # A genuine empty stage may reuse an already-covered merged KB.
+    context = copy.copy(stage)
+    context.record = copy.deepcopy(previous)
+    context.base = {**stage.rt.knowledge.knowledge_files(previous.kb_base_sha),
+                    **{p[len("knowledge/"):]: text for p, text in stage.overlay.items()
+                       if p.startswith("knowledge/")}}
+    context.tags = [stage.lifecycle.repo]
+    context.today = stage.rt.today()
+    problems = context._precheck()
+    if problems:
+        raise InitError("foundation checkpoint policy invalid: " + "; ".join(problems))
+    upstream = stage.rt.upstream(stage.lifecycle.repo, stage.lifecycle.full_name)
+    context.observer = upstream.observer(previous.pin, pull=stage.rt.pull)
+    # Export and index live only in a temporary directory. Do not repair or
+    # rewrite stage records, previews, pacing journals or shared index caches.
+    with tempfile.TemporaryDirectory(prefix="kb-foundation-proof-") as scratch:
+        tree = upstream.export(previous.pin, Path(scratch) / "tree")
+        context._inputs(tree)
+        if context.route_problem:
+            raise InitError(context.route_problem)
+        policy = getattr(context, "coverage_policy", None)
+        docs = list(stage.lifecycle.init.doc_globs) + list(policy.catalog_sources if policy else ())
+        index = build_discovery_index(tree, pin=previous.pin,
+                    scope=discovery_scope(stage.lifecycle.init, policy), doc_globs=sorted(set(docs)))
+        context.owners = list(source_owners(list(index.production), context.owners, policy).values())
+        for result in saved["tasks"].values():
+            _validate_result(context, result)
 
 
 def restore_jobs(stage):

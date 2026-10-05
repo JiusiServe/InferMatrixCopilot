@@ -111,11 +111,15 @@ def test_late_discovery_ranges_are_complete_and_gaps_are_not_offered(tmp_path):
         parallel.preferred_sources(stage, tmp_path, "new-feature", ["giant.ts"], 100000)
 
 
-@pytest.mark.parametrize("damage", ["judge", "generator", "owner", "facet", "offered", "section"])
-def test_native_checkpoint_replay_exact_approval_and_tamper_rejected(world, damage):
+def _complete_native(world, *, publish=False):
     seed_gateway = KnowledgeGateway()
     _chain(world, seed_gateway)
-    state = _runtime(world).state_dir
+    if publish:
+        from test_kb_init_skeleton import _commit
+        skeleton = InitRecord.load(_runtime(world).state_dir, "toy", "skeleton")
+        modules = InitRecord.load(_runtime(world).state_dir, "toy", "modules")
+        _commit(world["origin"], {**_tree(skeleton), **_tree(modules)}, "merge prerequisite pages")
+    state = _runtime(world).state_dir if not publish else world["tmp"] / "publish-state"
     traces = TraceStore(state / "init" / "traces")
     offline = KnowledgeGateway()
 
@@ -135,10 +139,24 @@ def test_native_checkpoint_replay_exact_approval_and_tamper_rejected(world, dama
             return Reply(blocks=[Block(type="text", text=text)], model=model)
 
     gateway = ModelGateway(None, transport_factory=lambda _: NativeTransport(), recorder=trace_recorder(traces))
-    rt = _runtime(world, gateway, generator=ModelRole("generator", "zcode", "GLM-5.3"))
+    rt = _runtime(world, gateway, state_dir=state, generator=ModelRole("generator", "zcode", "GLM-5.3"))
+    if publish:
+        from test_kb_init_skeleton import FakeGh
+        rt.gh_run = FakeGh(fail_create=1)
     rt.environ = {**rt.environ, "KB_KNOWLEDGE_CONCURRENCY": "2", "KB_KNOWLEDGE_START_INTERVAL_S": "0.001"}
-    record = run_stage(rt, _modules_lifecycle(), "knowledge", dry_run=True, unlimited_subscription=True)
-    assert record.status == "dry_run", record.problems
+    if publish:
+        rt.environ.update(ALLOW_PUSH="1", ALLOW_POST="1", KB_INIT_GIT_AUTHOR="Tester <tester@example.com>")
+    record = run_stage(rt, _modules_lifecycle(), "knowledge", dry_run=not publish,
+                       from_existing=publish, unlimited_subscription=True)
+    assert record.status == ("blocked" if publish else "dry_run"), record.problems
+    assert not record.unfinished
+    return rt, record, offline, traces
+
+
+
+@pytest.mark.parametrize("damage", ["judge", "generator", "owner", "facet", "offered", "section"])
+def test_native_checkpoint_replay_exact_approval_and_tamper_rejected(world, damage):
+    rt, record, offline, traces = _complete_native(world)
     artifacts = [a for task in record.coverage["foundation_jobs"]["tasks"].values() for a in task["artifacts"]]
     assert len(artifacts) == 12 and all(a["judge_receipt"]["native_trace_id"] for a in artifacts)
     first_tree = _tree(record)
@@ -261,3 +279,70 @@ def test_shared_page_assembly_preserves_existing_sections_and_both_owners():
     assert historical in stage.head[page]
     assert stage.head[page].index("owner=left") < stage.head[page].index("owner=right")
     assert len(stage.record.evidence) == 2
+
+
+@pytest.mark.parametrize("damage", ["missing_generator", "missing_judge", "tampered_generator", "tampered_judge", "binding", "config", "role"])
+def test_completed_cache_cannot_skip_proof_replay_or_overwrite_on_failure(world, damage):
+    rt, record, offline, traces = _complete_native(world)
+    assert record.status == "dry_run" and record.unfinished == []
+    artifact = next(iter(record.coverage["foundation_jobs"]["tasks"].values()))["artifacts"][0]
+    if damage.startswith("missing_") or damage.startswith("tampered_"):
+        role = damage.rsplit("_", 1)[1]
+        native = traces.get(artifact[role + "_receipt"]["native_trace_id"])
+        attempt = traces.root / "attempts" / native["result"]["native_attempt_id"] / "attempt.json"
+        if damage.startswith("missing_"):
+            attempt.unlink()
+        else:
+            saved = json.loads(attempt.read_text())
+            saved["status"] = "interrupted"
+            attempt.write_text(json.dumps(saved))
+    elif damage == "binding":
+        record.coverage["foundation_jobs"]["binding"] = "different-inputs"
+        record.save(rt.state_dir)
+    elif damage == "config":
+        rt.gateway._settings = SimpleNamespace(zcode_reasoning_level="low")
+    else:
+        rt.judge = ModelRole("judge", "codex", "different-model", "medium")
+    path = InitRecord.path(rt.state_dir, "toy", "knowledge")
+    before, calls = path.read_bytes(), len(offline.calls)
+    with pytest.raises(InitError, match="foundation"):
+        run_stage(rt, _modules_lifecycle(), "knowledge", dry_run=True, unlimited_subscription=True)
+    assert path.read_bytes() == before and len(offline.calls) == calls
+
+
+@pytest.mark.parametrize("damage", ["missing_generator", "missing_judge", "digest", "role", "config"])
+def test_prepared_publication_checks_original_proofs_before_resume(world, damage):
+    rt, record, offline, traces = _complete_native(world, publish=True)
+    assert record.pr["prepared"] and record.status == "blocked" and not record.unfinished
+    artifact = next(iter(record.coverage["foundation_jobs"]["tasks"].values()))["artifacts"][0]
+    restore = None
+    if damage.startswith("missing_"):
+        role = damage.rsplit("_", 1)[1]
+        native = traces.get(artifact[role + "_receipt"]["native_trace_id"])
+        attempt = traces.root / "attempts" / native["result"]["native_attempt_id"] / "attempt.json"
+        restore = attempt, attempt.read_bytes()
+        attempt.unlink()
+    elif damage == "digest":
+        record.inputs_digest = "wrong-inputs"
+        record.save(rt.state_dir)
+    elif damage == "role":
+        rt.judge = ModelRole("judge", "codex", "different-model", "medium")
+    else:
+        rt.gateway._settings = SimpleNamespace(zcode_reasoning_level="low")
+    path = InitRecord.path(rt.state_dir, "toy", "knowledge")
+    before, calls, pushes = path.read_bytes(), len(offline.calls), len(rt.gh_run.pushed)
+    with pytest.raises(InitError, match="foundation"):
+        run_stage(rt, _modules_lifecycle(), "knowledge", dry_run=False, from_existing=True, unlimited_subscription=True)
+    assert path.read_bytes() == before and len(offline.calls) == calls and len(rt.gh_run.pushed) == pushes
+    if restore:
+        restore[0].write_bytes(restore[1])
+        resumed = run_stage(rt, _modules_lifecycle(), "knowledge", dry_run=False, from_existing=True, unlimited_subscription=True)
+        assert resumed.status == "published" and len(offline.calls) == calls
+        # A previously published record remains immutable historical output,
+        # including retained limitations; archive loss cannot trigger a rerun.
+        resumed.unfinished.append("retained historical scan limitation")
+        resumed.save(rt.state_dir)
+        restore[0].unlink()
+        published_bytes = path.read_bytes()
+        cached = run_stage(rt, _modules_lifecycle(), "knowledge", dry_run=False, from_existing=True, unlimited_subscription=True)
+        assert cached.status == "published" and path.read_bytes() == published_bytes and len(offline.calls) == calls

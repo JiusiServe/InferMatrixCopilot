@@ -126,10 +126,34 @@ class _Knowledge(_Stage):
                                                "zcode_start_interval_s": start_interval(self.rt)}
         return options
 
+    def _discovery_gate(self, chain: _Chain, pin: str) -> None:
+        self._knowledge_run_pin = pin
+        super()._discovery_gate(chain, pin)
+
     def _cache_reusable(self, previous: InitRecord) -> bool:
+        if previous.status == "published":
+            return True  # Preserve immutable historical publication records.
+        if self.rt.unlimited_subscription and previous.status != "published":
+            self._validate_unpublished_checkpoint(previous, previous.inputs_digest)
         return not (self.rt.unlimited_subscription and previous.unfinished)
 
+    def _resume_input_problems(self, previous: InitRecord, digest: str) -> list[str]:
+        if self.rt.unlimited_subscription and previous.status != "published":
+            # Raise before generic _blocked writes: restoring an archive must
+            # leave the same genuine prepared publication resumable.
+            self._validate_unpublished_checkpoint(previous, digest)
+        return super()._resume_input_problems(previous, digest)
+
+    def _validate_unpublished_checkpoint(self, previous: InitRecord, digest: str) -> None:
+        from .init_knowledge_parallel import validate_checkpoint
+        validate_checkpoint(self, previous, digest)
+
     def _restore_progress(self, previous: InitRecord | None) -> list[str]:
+        if (self.rt.unlimited_subscription and previous is not None
+                and previous.coverage.get("foundation_jobs")
+                and previous.inputs_digest != self.record.inputs_digest):
+            from .init_support import InitError
+            raise InitError("foundation inputs changed; create a new pinned batch")
         if (self.rt.unlimited_subscription and previous is not None
                 and previous.inputs_digest == self.record.inputs_digest):
             from copy import deepcopy

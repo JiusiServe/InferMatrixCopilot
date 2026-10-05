@@ -339,3 +339,9 @@ approved sections in deterministic order. Resume the same command/state to reuse
 completed native approvals; keep their external trace archives. Finite-budget
 runs retain the previous serial flow. New discovery features preferentially read
 the frozen report’s exact complete source spans; unread gaps cannot be cited.
+
+Completed unpublished caches and prepared-publication resumes also replay the
+original native proofs before any write or model call. Missing or changed
+archives reject reuse without changing the genuine record; restore the original
+archive to continue. Changed frozen inputs require a new batch. Published
+historical records remain unchanged.
