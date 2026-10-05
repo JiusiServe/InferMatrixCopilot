@@ -161,6 +161,14 @@ class _Knowledge(_Stage):
             self.budget.spent_usd = previous.spent_usd
         return []
 
+    def _publish(self, changed: dict[str, str]) -> InitRecord:
+        targets = self.record.coverage.get("knowledge", {}).get("targets", {})
+        if (self.rt.unlimited_subscription and not self.dry_run
+                and targets.get("required") is True and targets.get("met") is not True):
+            return self._blocked(["foundation targets incomplete; native progress retained; "
+                                  "resume this same pinned publication batch to fill missing knowledge"])
+        return super()._publish(changed)
+
     def _build(self, tree: Path) -> InitRecord:
         if self.route_source == "none":
             return self._blocked(["knowledge needs owner routes: run and merge skeleton and modules first"])
