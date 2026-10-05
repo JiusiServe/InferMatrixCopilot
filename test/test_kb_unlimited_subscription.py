@@ -64,7 +64,7 @@ def test_cli_forwards_explicit_unlimited_mode_without_a_ceiling(tmp_path, monkey
 
 
 @pytest.mark.parametrize("command", [
-    ["init", "toy", "--stage", "knowledge"],
+    ["init", "toy", "--stage", "skeleton"],
     ["init", "toy", "--stage", "deepen"],
     ["init", "toy", "--suggest-seeds"],
     ["deepen", "toy", "--budget-usd", "100"],
@@ -134,7 +134,7 @@ def test_unlimited_stage_rejects_a_different_model_protocol_before_auth_or_calls
 
 
 @pytest.mark.parametrize("stage, options", [
-    ("knowledge", {"unlimited_subscription": True}),
+    ("skeleton", {"unlimited_subscription": True}),
     ("knowledge-deepen", {"unlimited_subscription": True, "budget_usd": 100.0}),
     ("knowledge-deepen", {"unlimited_subscription": "true"}),
 ])

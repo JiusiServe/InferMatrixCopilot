@@ -25,6 +25,109 @@ def git(*args):
     subprocess.run(["git", *map(str, args)], check=True, stdout=subprocess.DEVNULL)
 
 
+def baseline_inputs(args):
+    """Resolve the adapter from the immutable baseline, including aliased dirs."""
+    import yaml
+    from infermatrix_copilot.kb_service.knowledge_coverage import policy_path
+
+    names = subprocess.check_output(["git", "-C", str(args.root), "ls-tree", "-r", "--name-only",
+                                     args.baseline, "adapters"], text=True).splitlines()
+    found = []
+    for name in names:
+        if not re.fullmatch(r"adapters/[A-Za-z0-9_-]+/manifest\.yaml", name):
+            continue
+        text = subprocess.check_output(["git", "-C", str(args.root), "show", args.baseline + ":" + name], text=True)
+        manifest = yaml.safe_load(text)
+        if isinstance(manifest, dict) and isinstance(manifest.get("knowledge"), dict) \
+                and manifest["knowledge"].get("repo_subdir") == "repos/" + args.repo:
+            found.append((name, manifest))
+    if len(found) != 1:
+        raise ValueError("campaign baseline must contain exactly one adapter for this knowledge repository")
+    name, manifest = found[0]
+    relative = policy_path(args.repo, Path(name).parent)
+    text = subprocess.check_output(["git", "-C", str(args.root), "show", args.baseline + ":" + relative], text=True)
+    return manifest, text, relative
+
+
+def discovery_handoff(args):
+    """Validate a genuine completed record against the merged frozen catalog."""
+    from types import SimpleNamespace
+    from infermatrix_copilot.kb_service.init_stages import _Chain, _Stage
+    from infermatrix_copilot.kb_service.init_support import InitRecord
+    from infermatrix_copilot.kb_service.sources import KnowledgeRepo
+
+    manifest, _, relative = baseline_inputs(args)
+    report_path = f"eval/feature-discovery/{args.repo}-{args.pin[:12]}.json"
+    knowledge = KnowledgeRepo(args.root)
+    report = knowledge.show(args.baseline, report_path)
+    lifecycle = manifest.get("knowledge_lifecycle") or {}
+    configured = lifecycle.get("init") or {} if isinstance(lifecycle, dict) else None
+    if not isinstance(configured, dict):
+        raise ValueError("campaign baseline lifecycle/init must be a mapping")
+    path = getattr(args, "discovery_record", None)
+    if path is None:
+        if report is not None or configured.get("feature_discovery_required"):
+            raise ValueError("this campaign baseline requires --discovery-record; the frozen catalog gate cannot be omitted")
+        return None
+    path = Path(path).resolve()
+    raw = path.read_bytes()
+    record_hash = hashlib.sha256(raw).hexdigest()
+    expected = getattr(args, "discovery_record_sha256", None)
+    if expected is not None and record_hash != expected:
+        raise ValueError("discovery prerequisite record changed after campaign binding")
+    data = json.loads(raw)
+    if not isinstance(data, dict) or not isinstance(data.get("discovery"), dict):
+        raise ValueError("discovery handoff record must contain a discovery mapping")
+    record = InitRecord(**data)
+    if record.stage != "feature-discovery" or record.repo != args.repo or record.pin != args.pin \
+            or record.status not in ("published", "empty") or record.discovery.get("done") is not True \
+            or record.status == "published" and record.dry_run:
+        raise ValueError("discovery handoff requires the original published/empty completed record for this repository and pin")
+    # Reuse the production gate: verify real PR state, complete report, feature
+    # IDs, owners and the exact catalog/report hashes at the merged baseline.
+    # The temporary file is the original record's bytes, never a replacement
+    # status or a fabricated prerequisite. Native archives stay at their origin.
+    with tempfile.TemporaryDirectory(prefix="discovery-handoff-") as scratch:
+        state = Path(scratch)
+        copied = InitRecord.path(state, args.repo, "feature-discovery")
+        copied.parent.mkdir(parents=True)
+        copied.write_bytes(raw)
+        stage = _Stage(SimpleNamespace(state_dir=state, knowledge=knowledge, gh_run=subprocess.run),
+                       SimpleNamespace(repo=args.repo, knowledge_dir="repos/" + args.repo,
+                                       adapter_dir=Path(relative).parent,
+                                       init=SimpleNamespace(feature_discovery_required=True)),
+                       dry_run=False, pin=args.pin)
+        stage.STAGE = "knowledge-deepen"
+        stage.repo_dir, stage._base_sha = "repos/" + args.repo, args.baseline
+        chain = _Chain()
+        stage._discovery_gate(chain, args.pin)
+        if chain.problems:
+            raise ValueError("discovery handoff failed the merged catalog gate: " + "; ".join(chain.problems))
+        binding = stage._discovery_binding()
+    return {"record_path": str(path), "record_sha256": record_hash,
+            "report_path": report_path, **binding}
+
+
+def install_discovery_handoff(args, state, binding):
+    """Copy the exact immutable prerequisite into a worker without rewriting it."""
+    if binding is None:
+        return
+    from infermatrix_copilot.kb_service.init_support import InitRecord
+
+    raw = Path(binding["record_path"]).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != binding["record_sha256"]:
+        raise ValueError("discovery prerequisite record changed before worker handoff")
+    dest = InitRecord.path(state, args.repo, "feature-discovery")
+    if dest.exists():
+        if dest.read_bytes() != raw:
+            raise ValueError("worker discovery prerequisite differs from the immutable campaign record")
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    temporary = dest.with_suffix(".json.tmp")
+    temporary.write_bytes(raw)
+    os.replace(temporary, dest)
+
+
 def worker(args):
     state = args.state / f"worker-{args.worker}"
     state.mkdir(parents=True, exist_ok=True)
@@ -53,6 +156,12 @@ def run_worker(args, state):
     previous = InitRecord.load(state, args.repo, "knowledge-deepen")
     if previous and (previous.kb_base_sha != args.baseline or previous.pin != args.pin):
         raise RuntimeError("worker checkpoint source or knowledge baseline differs from campaign")
+    binding = discovery_handoff(args)
+    if binding is not None:
+        metadata = json.loads((args.state / "campaign.json").read_bytes())
+        if metadata.get("discovery") != binding:
+            raise RuntimeError("worker discovery handoff differs from the frozen campaign identity")
+        install_discovery_handoff(args, state, binding)
     runtime = InitRuntime.from_env(Settings(_env_file=None), state_dir=state)
     from infermatrix_copilot.kb_service.depth_pacing import SharedZcodePacer
     runtime.gateway.configure_zcode_pacing(SharedZcodePacer(
@@ -88,6 +197,9 @@ def main():
     parser.add_argument("--depth-index-path", type=Path)
     parser.add_argument("--repair-guidance", type=Path, help="Pinned, immutable localization hints for a newly authorized gap-repair batch")
     parser.add_argument("--repair-guidance-sha256", help=argparse.SUPPRESS)
+    parser.add_argument("--discovery-record", type=Path,
+                        help="Original completed, merged feature-discovery record; required for a discovered catalog")
+    parser.add_argument("--discovery-record-sha256", help=argparse.SUPPRESS)
     parser.add_argument("--zcode-pacing-path", type=Path)
     parser.add_argument("--zcode-start-interval", type=float, default=15.0)
     parser.add_argument("--zcode-rate-cooldown", type=float, default=90.0)
@@ -105,6 +217,8 @@ def main():
         args.depth_index_path = args.depth_index_path.resolve()
     if args.repair_guidance:
         args.repair_guidance = args.repair_guidance.resolve()
+    if args.discovery_record:
+        args.discovery_record = args.discovery_record.resolve()
     if args.zcode_pacing_path:
         args.zcode_pacing_path = args.zcode_pacing_path.resolve()
     from infermatrix_copilot.kb_service.depth_pacing import SharedZcodePacer
@@ -118,6 +232,8 @@ def main():
             parser.error("worker must belong to the campaign and have feature IDs")
         if args.repair_guidance and not re.fullmatch(r"[0-9a-f]{64}", args.repair_guidance_sha256 or ""):
             parser.error("guided workers require their parent's immutable guidance hash")
+        if args.discovery_record and not re.fullmatch(r"[0-9a-f]{64}", args.discovery_record_sha256 or ""):
+            parser.error("discovery workers require their parent's immutable prerequisite hash")
         return worker(args)
     args.baseline = subprocess.check_output(["git", "-C", str(args.root), "rev-parse", args.baseline + "^{commit}"], text=True).strip()
     args.state.mkdir(parents=True, exist_ok=True)
@@ -130,13 +246,11 @@ def main():
 
 
 def campaign(args, parser):
-    from infermatrix_copilot.kb_service.knowledge_coverage import load_policy, policy_path
+    from infermatrix_copilot.kb_service.knowledge_coverage import load_policy
     from infermatrix_copilot.kb_service.sources import KnowledgeRepo
-    import yaml
     from infermatrix_copilot.kb_service.outbox import atomic_write_json
 
-    manifest = yaml.safe_load((args.root / f"adapters/{args.repo}/manifest.yaml").read_text())
-    text = subprocess.check_output(["git", "-C", str(args.root), "show", args.baseline + ":" + policy_path(args.repo)], text=True)
+    manifest, text, _ = baseline_inputs(args)
     policy = load_policy(text, manifest["knowledge"]["repo_subdir"])
     if policy.semantic_depth_per_facet_gt is None:
         parser.error("campaign baseline must declare its global semantic completion target")
@@ -156,6 +270,12 @@ def campaign(args, parser):
                "features": len(policy.features), "denominator": len(policy.features) * 7,
                "workers": args.workers, "partitions": partitions,
                "acceptance_mode": getattr(args, "acceptance_mode", "strict")}
+    try:
+        binding = discovery_handoff(args)
+    except (ValueError, TypeError, OSError) as exc:
+        parser.error(str(exc))
+    if binding is not None:
+        summary["discovery"] = binding
     if getattr(args, "repair_guidance", None):
         from infermatrix_copilot.kb_service.depth_inputs import load_repair_guidance
         guidance = load_repair_guidance(args.repair_guidance, pin=args.pin,
@@ -206,6 +326,10 @@ def campaign(args, parser):
     jobs, checkpoints = [], []
     for number in range(args.workers):
         state = args.state / f"worker-{number}"
+        try:
+            install_discovery_handoff(args, state, binding)
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
         clone = state / "init/knowledge-repo"
         if not clone.exists():
             clone.parent.mkdir(parents=True, exist_ok=True)
@@ -227,6 +351,9 @@ def campaign(args, parser):
         if getattr(args, "repair_guidance", None):
             argv += ["--repair-guidance", str(args.repair_guidance),
                      "--repair-guidance-sha256", summary["repair_guidance_sha256"]]
+        if binding is not None:
+            argv += ["--discovery-record", binding["record_path"],
+                     "--discovery-record-sha256", binding["record_sha256"]]
         if args.retry:
             argv.append("--retry")
         jobs.append((number, argv))
