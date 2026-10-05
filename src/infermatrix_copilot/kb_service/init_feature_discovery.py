@@ -5,7 +5,7 @@ bounded packets cover the entire declared inventory; unknowns remain explicit.
 """
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from copy import deepcopy
@@ -503,60 +503,92 @@ class DiscoveryEngine:
                     self.save()
                 if stopped:
                     return False
-        # Failed candidates repair separately; missing evidence remains unknown.
-        for key, original in sorted(self.state["candidates"].items()):
-            decision = self.state["reviews"].get(key, {})
-            # Rewriting the same document cannot establish an implementation.
-            # Retain its independent verdict without paying for futile retries.
-            if decision.get("repair_blocked") or not any(ref["path"] in self.index.production for ref in original["evidence"]):
-                continue
-            repair_base = self.state.get("repairs", {}).get(key, {}).get("base_sha256", _hash(original))
-            while decision.get("supported") != "yes" and decision.get("attempts", 0) < MAX_ATTEMPTS:
-                attempt = decision.get("attempts", 0) + 1
-                try:
-                    drafts = self.state.setdefault("repair_drafts", {})
-                    draft = drafts.get(key)
+        return self._repair_parallel(baseline)
+
+    def _repair_extract(self, key, original, decision, baseline):
+        """One immutable extraction result; only the coordinator checkpoints it."""
+        files = self._context([original])
+        payload = {"repository": self.repository, "pin": self.pin, "round": "repair",
+                   "baseline": _bounded_baseline(baseline, _json(original), [key, original.get("related_id")]),
+                   "owners": self.owners, "candidate": original,
+                   "files": files, "repair_reason": decision.get("reason", "")}
+        reply = self.call("generator", SYSTEM_DISCOVER, _prompt(payload), validate_candidates)
+        proof = receipt(reply)
+        revised = next((r for r in reply.data["candidates"] if isinstance(r, dict) and r.get("id") == key), None)
+        if revised is None:
+            raise ValueError("repair must preserve the candidate ID")
+        validate_candidate(revised)
+        from .feature_discovery_index import validate_evidence
+        if not all(validate_evidence(self.index, ref) and _offered_reference(self.index, files, ref)
+                   for ref in revised["evidence"]):
+            raise ValueError("repair cites evidence outside its offered context")
+        revised = deepcopy(revised)
+        revised["generator_receipts"] = original["generator_receipts"] + [proof]
+        revised["origin_rounds"] = original["origin_rounds"]
+        return revised
+
+    def _repair_parallel(self, baseline):
+        # A candidate has at most one native call in flight. Extract and judge
+        # share the same ceiling, with every draft saved before its judge starts.
+        def eligible(key):
+            row, decision = self.state["candidates"][key], self.state["reviews"].get(key, {})
+            return decision.get("supported") != "yes" and decision.get("attempts", 0) < MAX_ATTEMPTS \
+                and not decision.get("repair_blocked") \
+                and any(ref["path"] in self.index.production for ref in row["evidence"])
+
+        ready = deque(key for key in sorted(self.state["candidates"]) if eligible(key))
+        stopped = False
+        with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
+            pending = {}
+            while ready or pending:
+                while not stopped and ready and len(pending) < self.concurrency:
+                    key = ready.popleft()
+                    original = deepcopy(self.state["candidates"][key])
+                    decision = deepcopy(self.state["reviews"].get(key, {}))
+                    attempt = decision.get("attempts", 0) + 1
+                    repair_base = self.state.get("repairs", {}).get(key, {}).get("base_sha256", _hash(original))
+                    draft = self.state.get("repair_drafts", {}).get(key)
                     if draft and draft["base_sha256"] == _hash(original) and draft["attempt"] == attempt:
                         revised = deepcopy(draft["candidate"])
+                        phase = "judge"
+                        future = pool.submit(self._review, [revised], baseline)
                     else:
-                        files = self._context([original])
-                        payload = {"repository": self.repository, "pin": self.pin, "round": "repair",
-                                   "baseline": _bounded_baseline(baseline, _json(original), [key, original.get("related_id")]),
-                                   "owners": self.owners, "candidate": original,
-                                   "files": files, "repair_reason": decision.get("reason", "")}
-                        reply = self.call("generator", SYSTEM_DISCOVER, _prompt(payload), validate_candidates)
-                        proof = receipt(reply)
-                        revised = next((r for r in reply.data["candidates"] if isinstance(r, dict) and r.get("id") == key), None)
-                        if revised is None:
-                            raise ValueError("repair must preserve the candidate ID")
-                        validate_candidate(revised)
-                        from .feature_discovery_index import validate_evidence
-                        if not all(validate_evidence(self.index, ref) and _offered_reference(self.index, files, ref)
-                                   for ref in revised["evidence"]):
-                            raise ValueError("repair cites evidence outside its offered context")
-                        revised = deepcopy(revised)
-                        revised["generator_receipts"] = original["generator_receipts"] + [proof]
-                        revised["origin_rounds"] = original["origin_rounds"]
-                        drafts[key] = {"base_sha256": _hash(original), "attempt": attempt, "candidate": deepcopy(revised)}
-                        self.save()  # Successful extraction survives a later review interruption.
-                    result = self._review([revised], baseline)[key]
-                    self.state["candidates"][key] = original = revised
-                    self.state.setdefault("repairs", {})[key] = {"base_sha256": repair_base, "candidate": deepcopy(revised)}
-                    decision = {**result, "attempts": attempt}
-                except BudgetExhausted:
-                    return False
-                except ModelUnavailable as exc:
-                    decision = {"supported": "unsure", "relation": "unknown", "related_id": "", "reason": str(exc),
-                                "attempts": decision.get("attempts", 1), "repair_blocked": True}
-                    self.state["reviews"][key] = decision
-                    self.save()  # Keep a successful repair draft for an explicit channel retry.
+                        revised = None
+                        phase = "extract"
+                        future = pool.submit(self._repair_extract, key, original, decision, baseline)
+                    pending[future] = (key, original, decision, attempt, repair_base, phase, revised)
+                if not pending:
                     break
+                future = next(as_completed(pending))
+                key, original, decision, attempt, repair_base, phase, revised = pending.pop(future)
+                try:
+                    result = future.result()
+                    if phase == "extract":
+                        self.state.setdefault("repair_drafts", {})[key] = {
+                            "base_sha256": _hash(original), "attempt": attempt, "candidate": deepcopy(result)}
+                        self.save()
+                        ready.appendleft(key)  # Judge the durable draft before another correction.
+                        continue
+                    self.state["candidates"][key] = revised
+                    self.state.setdefault("repairs", {})[key] = {"base_sha256": repair_base, "candidate": deepcopy(revised)}
+                    decision = {**result[key], "attempts": attempt}
+                except BudgetExhausted:
+                    # Stop new dispatch but drain and checkpoint all successes.
+                    stopped = True
+                    continue
+                except ModelUnavailable as exc:
+                    self.state["reviews"][key] = {"supported": "unsure", "relation": "unknown", "related_id": "", "reason": str(exc),
+                        "attempts": decision.get("attempts", 1), "repair_blocked": True}
+                    self.save()  # Preserve a successful draft for explicit channel retry.
+                    continue
                 except ValueError as exc:
                     decision = {"supported": "unsure", "relation": "unknown", "related_id": "", "reason": str(exc), "attempts": attempt}
                 self.state.get("repair_drafts", {}).pop(key, None)
                 self.state["reviews"][key] = decision
                 self.save()
-        return True
+                if eligible(key):
+                    ready.append(key)
+        return not stopped
 
     def _implemented_approval(self, row, judgment):
         from .feature_discovery_index import validate_evidence
@@ -693,7 +725,8 @@ class DiscoveryEngine:
                 result.update(status="unknown", reason="related feature is not accepted in the frozen catalog")
                 continue
             feature = by_id[target]
-            for field, additions in (("source_globs", source), ("entry_points", source), ("docs", docs)):
+            # Relation evidence does not certify an additional entry point.
+            for field, additions in (("source_globs", source), ("docs", docs)):
                 feature[field] = list(dict.fromkeys(feature.get(field, []) + additions))
         return list(by_id.values()), outcomes
 
