@@ -26,6 +26,7 @@ No rules are written here; deeper, rule-bearing coverage is stage 3.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -39,7 +40,8 @@ from .init_coverage import ROOT_MODULE, Owner, load_owners, module_coverage, mos
 from .init_stages import (
     _SLUG, ROUTES_NAME, _fence, _one_line, _page_frontmatter, _slug, _Stage, _title_of, review_route_line,
 )
-from .init_support import InitError, InitRecord, generate
+from .init_support import InitError, InitRecord, classify_verdict, generate, judge
+from .models import ModelUnavailable
 
 MAX_CARD_FILES = 200
 MAX_CARD_BYTES = 40_000
@@ -88,7 +90,7 @@ only supported navigation and leave its runtime role/default behavior unknown.
 """
 
 
-def _implementation_payload(payload: dict, index, pin: str) -> dict:
+def _implementation_payload(payload: dict, index, pin: str, *, max_bytes: int = MAX_CARD_BYTES) -> dict:
     """Share the card cap fairly; unread or cropped code never becomes whole-file evidence."""
     if index.identity.get("pin") != pin:
         raise ValueError("module implementation index differs from the fixed source SHA")
@@ -109,7 +111,7 @@ def _implementation_payload(payload: dict, index, pin: str) -> dict:
     def size():
         return len(_fence(out).encode("utf-8"))
 
-    if size() > MAX_CARD_BYTES:
+    if size() > max_bytes:
         raise ValueError("module metadata exceeds the implementation card byte cap; no evidence dispatched")
 
     def ranges(lines, count):
@@ -126,7 +128,7 @@ def _implementation_payload(payload: dict, index, pin: str) -> dict:
 
     for offset, (item, lines) in enumerate(readable):
         before = size()
-        allocation = (MAX_CARD_BYTES - before) // (len(readable) - offset)
+        allocation = (max_bytes - before) // (len(readable) - offset)
         limit = before + allocation
         item.update(status="complete", ranges=ranges(lines, len(lines)))
         if size() <= limit:
@@ -360,7 +362,7 @@ class _Modules(_Stage):
     STAGE = "modules"
 
     def _input_options(self) -> dict:
-        return {"module_prompt_version": 2} if self.rt.unlimited_subscription else {}
+        return {"module_prompt_version": 3} if self.rt.unlimited_subscription else {}
 
     def _build(self, tree: Path) -> InitRecord:
         routes_path = f"{self.repo_dir}/{ROUTES_NAME}"
@@ -602,13 +604,50 @@ class _Modules(_Stage):
             group = _slug(PurePosixPath(key.rstrip("/")).name or self.lifecycle.repo)
         headings = {k: _one_line((data.get("headings") or {}).get(k)).replace("*", "") or v
                     for k, v in _DEFAULT_HEADINGS.items()}
-        return _Card(
+        card = _Card(
             module=key, prefixes=[], title=_one_line(data["title"]),
             purpose=self._d5_prose(str(data.get("purpose") or "")),
             entry_points=items("entry_points", in_module, "what"), key_files=items("key_files", in_module, "what"),
             docs=items("docs", doc_paths, "why"),
             signals=[s for s in (_one_line(x, 60) for x in data.get("signals") or []) if s][:MAX_ITEMS],
             group=group, group_title=_one_line(data.get("group_title")) or group, headings=headings)
+        if self.rt.unlimited_subscription and not self._review_card(card, listed):
+            return None
+        return card
+
+    def _review_card(self, card: _Card, listed: list[dict]) -> bool:
+        """One independent source review; a rejected card cannot halt other modules."""
+        from ..knowledge_service.l1 import Block
+
+        referenced = {path for path, _ in card.entry_points + card.key_files}
+        page = f"{self.root}/{card.group}/module-review.md"
+        text = self._card_text(card)
+        text_sha = hashlib.sha256(text.encode()).hexdigest()
+        key = f"module:{card.module}"
+        payload = {"repository": self.lifecycle.full_name, "module": card.module,
+                   "files": [entry for entry in listed if entry["path"] in referenced],
+                   "doc_files": [path for path, _ in card.docs],
+                   "source_scope": "Only shown implementation ranges support behavior. Directory names do not "
+                   "establish runtime roles; default side effects require shown configuration and branches. "
+                   "Printed/manual instructions do not establish execution; unshown steps remain unknown."}
+        # Reserve the actual card text and the existing judge envelope/indentation.
+        allowance = MAX_CARD_BYTES - len(_fence({"card": text}).encode()) - 2048
+        try:
+            evidence = _implementation_payload(payload, self.source_index, self.record.pin, max_bytes=allowance)
+            verdict = judge(self.rt, self.budget, self.lifecycle.init,
+                            Block("prose", page, "", "prose", text_sha), base={}, head={page: text},
+                            evidence=[evidence])
+            label, dimensions, reasons, model = (classify_verdict(verdict), verdict.dimensions,
+                                                 verdict.reasons, verdict.model)
+        except (ValueError, BudgetExhausted, ModelUnavailable) as exc:
+            label, dimensions, reasons, model = "unjudged", {}, {"source_review": str(exc)}, ""
+        self.record.verdicts[key] = {"kind": "module_prose", "page": page, "verdict": label, "dimensions": dimensions,
+                                     "reasons": reasons, "model": model, "text_sha": text_sha}
+        if label != "pass":
+            self.record.unfinished.append(f"module {card.module}: source review {label}; card remains unknown")
+            self.record.dropped.append({"rule_id": key, "module": card.module,
+                                        "why": "source review: " + json.dumps(reasons)})
+        return label == "pass"
 
     def _card_text(self, card: _Card) -> str:
         """The card page. Sections are bold labels, not headings: the

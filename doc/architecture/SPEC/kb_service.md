@@ -432,13 +432,17 @@ x 必须为正。因阈值停下的调用（`stop_reason="max_budget"`）→ `Mo
   仓库入口页链接；`components/` 已存在却没有入口页时组直接放在仓库目录下。`_routes.yaml` 只追加（保留开头注释块，
   `routes_append_only` 校验不重排、不改名、不删除）。预算用完或超过卡片上限时，已写的卡片照常成 PR，剩下的模块进
   `unfinished`；报告里列出仍无路由的模块。测试：`test_kb_init_modules.py`。
-  显式 `--unlimited-subscription` 使用 `module_prompt_version: 2` 与独立的
+  显式 `--unlimited-subscription` 使用 `module_prompt_version: 3` 与独立的
   `SYSTEM_CARD_IMPL`，从固定 SHA 的共享索引提供带文件哈希、行号与完整性状态的实现片段；
   整个卡片输入仍受 40,000 UTF-8 字节限制，按剩余文件分配预算，能放下时提供全文，否则提供
   明确的首尾行段，未展示的行为保持未知。读取失败不使用替换字符补造源码；元数据本身超限时
   本模块保持未完成，不发起生成。卡片不能从目录名推断开发／运行时职责，也不能在未展示配置
   与分支时断言默认副作用；打印的手工操作须与实际执行区分。此模式仅保留每文件前四个签名，
   以留出实现片段预算；旧模式仍保留最多四十个签名，提示词和身份不变。
+  此模式每张候选地图卡再由独立 Codex 按实际引用文件的源码片段评审一次；沿用 prose 的
+  `faithful / does_not_weaken / non_contradictory` 三项，全部为 yes 才写入。真实结论、维度、
+  原因、模型与文本哈希保存在阶段记录；拒绝或无法评审只令本卡保持未知，其他组件继续。
+  未通过的卡片不增加模块路由覆盖，也不计入功能深度认可；后续功能／核心文件目标独立验收。
   测试：`test_kb_module_source_evidence.py`。
 
 ## 2026-09-30 kb init：阶段 3（deepen）与 shadow 开关
