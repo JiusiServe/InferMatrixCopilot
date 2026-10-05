@@ -59,6 +59,8 @@ MAX_RULES_PER_CALL = 12
 MAX_SEED_PAGES = 8
 MAX_EXCERPT_BYTES = 8 * 1024
 MAX_PROMPT_DOC_BYTES = 120_000
+BRANCH_SUFFIX_ENV = "KB_INIT_BRANCH_SUFFIX"
+_BRANCH_SUFFIX = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?")
 _SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,40}")
 _ID_PREFIX = re.compile(r"^([A-Z][A-Z0-9]{0,7})-")
 _TOP_HEADING = re.compile(r"(?m)^#{1,6}\s")
@@ -133,6 +135,15 @@ def validate_change(base: Mapping[str, str], head: Mapping[str, str], *, observe
 
 # -- stage entry -------------------------------------------------------------------
 
+def _init_branch_suffix(rt: InitRuntime) -> str:
+    """Validate a new batch's optional publication name before any model call."""
+    suffix = rt.environ.get(BRANCH_SUFFIX_ENV, "")
+    if not isinstance(suffix, str) or (suffix and not _BRANCH_SUFFIX.fullmatch(suffix)):
+        raise InitError(f"{BRANCH_SUFFIX_ENV} must be an optional lowercase slug of 1–40 characters "
+                        "using letters, digits and hyphens, with no leading or trailing hyphen")
+    return suffix
+
+
 def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str | None = None,
               pr_count: int | None = None, budget_usd: float | None = None,
               from_existing: bool = False, subscription_generator: bool = False,
@@ -143,8 +154,9 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
     record (also saved under ``<state_dir>/init/<repo>/<stage>.json``)."""
     if stage not in STAGES + INDEPENDENT_STAGES:
         raise InitError(f"unknown stage {stage!r}; one of {STAGES + INDEPENDENT_STAGES}")
-    if from_existing and stage not in ("feature-discovery", "knowledge", "knowledge-deepen"):
-        raise InitError("--from-existing is for feature-discovery or explanatory knowledge stages only")
+    _init_branch_suffix(rt)  # publication configuration is refused before any model call
+    if from_existing and stage not in ("feature-discovery", "modules", "knowledge", "knowledge-deepen"):
+        raise InitError("--from-existing is for feature-discovery, modules or explanatory knowledge stages only")
     if retry_unfinished and stage not in ("feature-discovery", "knowledge-deepen"):
         raise InitError("--retry-unfinished is for feature-discovery or knowledge-deepen only")
     if acceptance_mode not in ("strict", "lightweight") or (
@@ -461,6 +473,7 @@ class _Stage:
     def run(self) -> InitRecord:
         rt, lc, stage = self.rt, self.lifecycle, self.STAGE
         init = lc.init
+        self._branch_suffix = _init_branch_suffix(rt)
         self.repo_dir = lc.knowledge_dir
         base_sha = self._base_for_run(rt.knowledge.fetch())
         self._base_sha = base_sha
@@ -476,9 +489,14 @@ class _Stage:
         pin = upstream.resolve(self.pin or chain.pin or "HEAD")
         self._discovery_gate(chain, pin)
         self.overlay = dict(chain.repo_files)
+        input_options = dict(self._input_options())
+        if self._branch_suffix:
+            # Leave legacy checkpoint identities unchanged when the option is
+            # unset, but bind an explicit batch name before extracting anything.
+            input_options["publication_branch_suffix"] = self._branch_suffix
         digest = inputs_digest(stage=stage, repo=lc.repo, pin=pin, kb=base_sha, init=self._init_identity(),
                                generator=rt.generator.label(), judge=rt.judge.label(), dry_run=self._mode_identity(),
-                               chain=chain.key, **self._input_options())
+                               chain=chain.key, **input_options)
         record_path = InitRecord.path(rt.state_dir, lc.repo, stage)
         previous = InitRecord.load(rt.state_dir, lc.repo, stage)
         if previous is not None and previous.pr.get("prepared") and previous.status in ("publishing", "blocked"):
@@ -490,6 +508,9 @@ class _Stage:
                 self.record = previous
                 return self._blocked(chain.problems)
             problems = self._resume_input_problems(previous, digest)
+            if load_prepared(previous.pr["prepared"]).get("branch") != self._publication_branch():
+                problems.append("prepared publication belongs to a different branch suffix; "
+                                f"restore {BRANCH_SUFFIX_ENV} to its original value to resume")
             if self._frozen_discovery and previous.discovery.get("catalog_binding") != self._discovery_binding():
                 problems.append("prepared publication belongs to a different discovery catalog; preserve it and start a new batch")
             if problems:
@@ -546,8 +567,18 @@ class _Stage:
         chain = _Chain()
         parts: list[str] = []
         publisher = None
+        existing_skeleton = self.from_existing and self.STAGE in ("modules", "knowledge", "knowledge-deepen") \
+            and InitRecord.load(self.rt.state_dir, self.lifecycle.repo, "skeleton") is None
+        if existing_skeleton:
+            # An explicit rerun may start from a merged owner map. Only the
+            # absent skeleton record is replaced by this verification; any
+            # actual modules record keeps its own completion and merge gates.
+            chain = self._existing_skeleton_chain()
+            parts.append(chain.key)
         for stage in STAGES[:STAGES.index(self._chain_boundary())]:
             record = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, stage)
+            if stage == "skeleton" and existing_skeleton:
+                continue
             if stage == "feature-discovery":
                 # Centralized after pin resolution so --from-existing subclasses
                 # cannot bypass this gate, and the explicit pin must match.
@@ -717,7 +748,7 @@ class _Stage:
                 "report_sha256": self._frozen_discovery_report_sha256}
 
     def _existing_skeleton_chain(self) -> _Chain:
-        """Discovery can enrich a merged skeleton without inventing records."""
+        """Explicit enrichment can use a merged skeleton without inventing records."""
         if InitRecord.load(self.rt.state_dir, self.lifecycle.repo, "skeleton") is not None:
             return _Stage._chain(self)
         base = self.rt.knowledge.knowledge_files(self._base_sha)
@@ -730,10 +761,10 @@ class _Stage:
             return _Chain(problems=[f"--from-existing invalid skeleton routes: {exc}"])
         problems = []
         if not base.get(f"{self.repo_dir}/{INDEX_NAME}") or route_source == "none" or not owners:
-            problems.append("--from-existing discovery needs a merged repository index and owner routes")
+            problems.append("--from-existing needs a merged repository index and owner routes")
         for owner in owners:
             if not owner.path.startswith(self.repo_dir + "/") or owner.path not in base:
-                problems.append(f"--from-existing discovery owner page missing or outside repository: {owner.path}")
+                problems.append(f"--from-existing owner page missing or outside repository: {owner.path}")
         return _Chain(key=f"existing-discovery:{self._base_sha}", problems=problems)
 
     def _discovery_gate(self, chain: _Chain, pin: str) -> None:
@@ -1297,6 +1328,10 @@ class _Stage:
         return neutral_headings("\n".join(kept).strip())
 
     # -- output ----------------------------------------------------------------------
+    def _publication_branch(self) -> str:
+        suffix = getattr(self, "_branch_suffix", "")
+        return f"kb/init-{self.lifecycle.repo}-{self.STAGE}" + (f"-{suffix}" if suffix else "")
+
     def _publish(self, changed: dict[str, str]) -> InitRecord:
         rt, lc, record = self.rt, self.lifecycle, self.record
         stage = self.STAGE
@@ -1314,7 +1349,7 @@ class _Stage:
         else:
             prepared = save_prepared(
                 InitRecord.path(rt.state_dir, lc.repo, stage).with_name(f"{stage}-publish.json"),
-                base_sha=record.kb_base_sha, branch=f"kb/init-{lc.repo}-{stage}", files=changed,
+                base_sha=record.kb_base_sha, branch=self._publication_branch(), files=changed,
                 title=title, body=body, author=self.author, when=record.started_at)
             record.status = "publishing"
             record.pr = {"prepared": str(prepared)}

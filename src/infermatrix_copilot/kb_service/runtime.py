@@ -127,7 +127,8 @@ def trace_recorder(traces):
                 inputs={"system": entry["system"], "prompt": entry["prompt"]},
                 outputs={"reply": entry["reply"],
                          **({"native_events": entry["native_events"]} if "native_events" in entry else {})},
-                model={k: entry.get(k, "") for k in ("role", "provider", "model", "effort", "served_model")},
+                model={**{k: entry.get(k, "") for k in ("role", "provider", "model", "effort", "served_model")},
+                       **({"native_reasoning_level": entry["native_reasoning_level"]} if "native_reasoning_level" in entry else {})},
                 usage=entry.get("usage") or {}, seconds=entry.get("seconds"),
                 # spend: the requested stop threshold and the reported cost
                 # (None when unset/unknown), on failures too

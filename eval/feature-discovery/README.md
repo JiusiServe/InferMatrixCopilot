@@ -24,6 +24,14 @@ infermatrix-copilot kb init REPO --stage feature-discovery --from-existing \
 `KB_DISCOVERY_GENERATOR`、`KB_DISCOVERY_JUDGE`、`KB_DISCOVERY_CONCURRENCY` 可覆盖。
 `--budget-usd` 与不限订阅模式互斥。未报告实际费用时保持未知。
 
+批量提取可设置 `KB_DISCOVERY_PACKET_CHARS`（24000–192000，默认 24000），完整索引
+分片和读取范围保持不变。`KB_DISCOVERY_START_INTERVAL_S`（1–60 秒，默认 15）只配置
+启动间隔，仍保留 429/1302 冷却。`ZCODE_REASONING_LEVEL=low|high|max` 控制实际原生
+推理配置；模型角色的 effort 后缀不会替代它。三项设置记录在检查点和报告的
+`run_config`；原生追踪另存 `native_reasoning_level`。配置变化或旧检查点缺少这些身份
+字段时使用新状态目录，保留旧轨迹。扩大包不会证明已发现所有功能，也不取消独立评审。
+恰好达到每包 24 个候选上限的任务另列数量和 ID，保留为潜在遗漏线索。
+
 检查点绑定源码、范围、种子目录、索引版本、提示词与模型配置。成功分片、评审和待审修正稿可复用；预算中断不标为完成。竞争启动同一批次不会覆盖检查点。单项最多三次修正；通道故障保持未知，不重做已成功的提取。仅有文档的未知声明不通过重复改写变成实现证明。
 
 紧凑摘要写入 `eval/feature-discovery/`。完整输入、原生输出、工具事件、配置、用量和修正过程留在 Git 外。恢复时核验每个完成分片的原生归档，包括返回空候选的分片。Zcode 保存原生流式事件；Codex 保存 CLI 结束后按原顺序转发的事件。

@@ -130,6 +130,11 @@ class ModelGateway:
         """Only the explicit native campaign configures shared dispatch pacing."""
         self._zcode_pacer = pacer
 
+    @property
+    def zcode_reasoning_level(self):
+        """Effective native setting; the Zcode role's effort is not this value."""
+        return str(getattr(self._settings, "zcode_reasoning_level", "") or "max")
+
     def _transport(self, provider: str):
         if self._factory is not None:
             return self._factory(provider)
@@ -184,6 +189,8 @@ class ModelGateway:
         started = time.time()
         identity = {"role": role.name, "requested": role.label(), "provider": role.provider,
                     "model": role.model, "effort": role.effort, "fallback_from": fallback_from}
+        if role.provider == "zcode":
+            identity["native_reasoning_level"] = self.zcode_reasoning_level
         payload = {"system": system if record_payload else "", "prompt": prompt if record_payload else ""}
         begin = getattr(self._recorder, "begin_call", None)
         archive = begin({**identity, **payload}) if callable(begin) else None

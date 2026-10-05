@@ -1,6 +1,6 @@
 # trace_store.py —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-05 -->
 
 `LOC ~500 · trace/1：Copilot 与 RB 共用的模型调用/工具调用/判定/结果记录 · refactor-status: stable`
 
@@ -18,6 +18,8 @@
   `native-events.jsonl`，保留原生会话、输出、错误与调度等待事件。结束时绑定唯一的
   `model_call` 回执及输出、用量、耗时与状态；journal 不是另一笔调用，不能重复计费。
   中断未完成的 journal 保留输入和已收到的事件，未报告用量及费用保持未知。
+  对 Zcode，网关调用的 model 与 attempt.model 额外记录 `native_reasoning_level`，
+  表示实际写入会话配置的 low/high/max；role.effort 不是该 transport 的有效推理设置。
 
 - `bind_store(store)` / `current_store()`：把一个 store 绑定为当前进程/任务的采集汇（`tools.dispatch` 与
   `LLM.create` 两个 choke point 据此写 `tool_call` / `model_call`，失败调用记 `error` 且无 `outputs`）；
