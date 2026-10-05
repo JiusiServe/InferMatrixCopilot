@@ -506,7 +506,7 @@ function updateGraphNodes(graphs) {
       if (!group || !node.feature) return;
       const feature = node.feature;
       const state = feature.complete ? "accepted" : feature.implementation || feature.state || "planned";
-      const signature = JSON.stringify([feature.title, state, feature.acceptance, feature.owner]);
+      const signature = JSON.stringify([currentLanguage(), feature.title, state, feature.acceptance, feature.owner]);
       if (group.getAttribute("data-live-view") === signature) return;
       group.setAttribute("data-live-view", signature);
       group.classList.remove("planned", "accepted", "implemented", "partial", "in_progress", "blocked");
