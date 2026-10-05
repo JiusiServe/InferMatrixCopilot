@@ -30,6 +30,7 @@ from .init_stages import _Chain, _Stage, _numbered, _one_line, _page_frontmatter
 from .init_support import InitRecord, classify_verdict, generate, judge
 from .init_knowledge_inputs import SYSTEM_KNOWLEDGE, knowledge_prompt, source_owner, source_owners
 from .models import ModelUnavailable
+from .init_knowledge_parallel import offered_ranges, parallelism, run_jobs, restore_jobs, preferred_sources, start_interval
 
 FACETS = ("architecture", "api", "configuration", "tradeoffs", "features", "validation")
 MAX_SOURCE_BYTES = 100_000
@@ -118,8 +119,23 @@ class _Knowledge(_Stage):
     def _input_options(self) -> dict:
         path = self._coverage_policy_path()
         text = self.overlay.get(path) or self.rt.knowledge.show(self._base_sha, path) or ""
-        return {"knowledge_policy": hashlib.sha256(text.encode()).hexdigest(),
-                "from_existing": self.from_existing, "knowledge_prompt_version": 3}
+        options = {"knowledge_policy": hashlib.sha256(text.encode()).hexdigest(),
+                   "from_existing": self.from_existing, "knowledge_prompt_version": 3}
+        if self.rt.unlimited_subscription:
+            options["foundation_parallel"] = {"version": 1, "workers": parallelism(self.rt),
+                                               "zcode_start_interval_s": start_interval(self.rt)}
+        return options
+
+    def _cache_reusable(self, previous: InitRecord) -> bool:
+        return not (self.rt.unlimited_subscription and previous.unfinished)
+
+    def _restore_progress(self, previous: InitRecord | None) -> list[str]:
+        if (self.rt.unlimited_subscription and previous is not None
+                and previous.inputs_digest == self.record.inputs_digest):
+            from copy import deepcopy
+            self.record.coverage["foundation_jobs"] = deepcopy(previous.coverage.get("foundation_jobs", {}))
+            self.budget.spent_usd = previous.spent_usd
+        return []
 
     def _build(self, tree: Path) -> InitRecord:
         if self.route_source == "none":
@@ -138,6 +154,8 @@ class _Knowledge(_Stage):
         routes = self.owners
         owners = source_owners(paths, routes, policy)
         self.owners = list(owners.values())
+        if self.rt.unlimited_subscription:
+            restore_jobs(self)
         for rel in paths:
             hits = source_owner(rel, routes, owners)
             if hits:
@@ -158,6 +176,7 @@ class _Knowledge(_Stage):
                     return self._blocked([f"knowledge target {page} must be an explanatory architecture or guide page"])
         report = {}
         claims, evidence = {}, []
+        owner_jobs = []
         for position, name in enumerate(order):
             owner = owners[name]
             page = self._page_for(owner)
@@ -182,7 +201,7 @@ class _Knowledge(_Stage):
                 continue
             source = self._sources(tree, sorted(files[name], key=lambda p: (-churn[p], p)), MAX_SOURCE_BYTES)
             docs = self._docs_for(tree, owner)
-            offered = {item["path"]: item["end"] for item in source + docs}
+            offered = offered_ranges(source + docs)
             report[name]["shown_files"] = len(source)
             report[name]["partial_files"] = [item["path"] for item in source if item["end"] < item["total_lines"]]
             self.record.unfinished.extend(f"{name}: byte cap truncated {path}"
@@ -195,6 +214,10 @@ class _Knowledge(_Stage):
                        "language_sample": self._language_sample(),
                        "related_owners": [{"owner": o.owner, "scope_prefixes": list(o.prefixes)}
                                           for o in self.owners]}
+            if self.rt.unlimited_subscription:
+                owner_jobs.append({"owner": owner, "page": page, "payload": payload,
+                                   "offered": offered, "requested": requested})
+                continue
             try:
                 data = generate(self.rt, self.budget, self.lifecycle.init, system=SYSTEM_KNOWLEDGE,
                                 prompt=knowledge_prompt(payload), validate=validate_sections).data
@@ -216,14 +239,26 @@ class _Knowledge(_Stage):
                 break
             except ModelUnavailable as exc:
                 self.record.unfinished.append(f"knowledge owner {name}: unusable draft: {exc}")
+        if owner_jobs:
+            for job, results in run_jobs(self, owner_jobs):
+                name = job["owner"].owner
+                for key, text, entries, label in results:
+                    facet = key.rsplit(":", 1)[-1]
+                    claims[key] = text
+                    evidence.extend(entries)
+                    report[name]["facets"][facet] = "covered"
+                for facet in job["requested"]:
+                    verdict = self.record.verdicts.get(f"knowledge:{name}:{facet}", {})
+                    if verdict.get("verdict") in ("unsure", "unjudged"):
+                        report[name]["facets"][facet] = "needs_review"
         for name in order:
             report.setdefault(name, {"page": self._page_for(owners[name]),
                                      "facets": dict.fromkeys(FACETS, "missing"),
                                      "source_files": len(files[name]), "shown_files": 0})
         totals = {f: sum(r["facets"][f] == "covered" for r in report.values()) for f in FACETS}
-        self.record.coverage = {"knowledge": {"owners": report, "covered_by_facet": totals,
+        self.record.coverage["knowledge"] = {"owners": report, "covered_by_facet": totals,
                                               "total_owners": len(order), "unrouted_files": unrouted,
-                                              "pin": self.record.pin}}
+                                              "pin": self.record.pin}
         missing = [f"{name}/{facet}" for name, r in report.items() for facet, status in r["facets"].items()
                    if status != "covered"]
         self.record.unfinished.extend(f"missing knowledge: {item}" for item in missing)
@@ -243,23 +278,30 @@ class _Knowledge(_Stage):
                                          full_name=self.lifecycle.full_name, pin=self.record.pin,
                                          today=self.today, tags=self.tags, link_page=self._link_page)
             targets = audit_coverage(self.head, tree, policy, full_name=self.lifecycle.full_name, pin=self.record.pin)
+            feature_jobs = []
             for feature in policy.features:
                 if targets["features"]["items"][feature.id]["covered"]:
                     continue
                 paths = [p.relative_to(tree).as_posix() for p in tree.rglob("*")
                          if p.is_file() and matches(p.relative_to(tree).as_posix(), feature.source_globs)]
-                source = self._sources(tree, list(dict.fromkeys(list(feature.entry_points) + sorted(paths))), MAX_SOURCE_BYTES)
+                source_paths = list(dict.fromkeys(list(feature.entry_points) + sorted(paths)))
+                source = preferred_sources(self, tree, feature.id, source_paths, MAX_SOURCE_BYTES)
                 docs = self._sources(tree, list(feature.docs), MAX_DOC_BYTES)
                 if not source:
                     self.record.unfinished.append(f"feature {feature.id}: missing readable source")
                     continue
-                offered = {f["path"]: f["end"] for f in source + docs}
+                offered = offered_ranges(source + docs)
                 missing_facets = targets["features"]["items"][feature.id]["missing_facets"] or list(FACETS)
                 payload = {"repository": self.lifecycle.full_name, "pin": self.record.pin,
                            "owner": "feature-" + feature.id, "feature": feature.title, "facets": missing_facets,
                            "files": source, "docs": docs,
                            "existing_knowledge": self._bounded_context({feature.page: self.head.get(feature.page, "")}),
                            "language_sample": self._language_sample()}
+                if self.rt.unlimited_subscription:
+                    feature_jobs.append({"owner": Owner("feature-" + feature.id, feature.page, ()),
+                                         "page": feature.page, "payload": payload,
+                                         "offered": offered, "requested": missing_facets})
+                    continue
                 try:
                     data = generate(self.rt, self.budget, self.lifecycle.init, system=SYSTEM_KNOWLEDGE,
                                     prompt=knowledge_prompt(payload), validate=validate_sections).data
@@ -277,6 +319,11 @@ class _Knowledge(_Stage):
                     break
                 except ModelUnavailable as exc:
                     self.record.unfinished.append(f"feature {feature.id}: unusable draft: {exc}")
+            if feature_jobs:
+                for job, results in run_jobs(self, feature_jobs):
+                    for key, text, entries, label in results:
+                        claims[key] = text
+                        evidence.extend(entries)
             targets = audit_coverage(self.head, tree, policy, full_name=self.lifecycle.full_name, pin=self.record.pin)
             targets["policy_sha256"] = hashlib.sha256(policy_text.encode()).hexdigest()
             self.record.coverage["knowledge"]["targets"] = targets
@@ -400,7 +447,10 @@ class _Knowledge(_Stage):
         key = f"knowledge:{owner.owner}:{facet}"
         entries = []
         for entry in section["evidence"]:
-            if entry["path"] not in offered or entry["end"] > offered[entry["path"]]:
+            ranges = offered.get(entry["path"], [])
+            if isinstance(ranges, int):  # legacy callers offer an uninterrupted prefix
+                ranges = [(1, ranges)]
+            if not any(start <= entry["start"] <= entry["end"] <= end for start, end in ranges):
                 self.record.dropped.append({"rule_id": key, "page": page, "why": "evidence outside shown input"})
                 return None
             try:
@@ -409,20 +459,11 @@ class _Knowledge(_Stage):
                 self.record.dropped.append({"rule_id": key, "page": page, "why": str(exc)})
                 return None
         title = _one_line(data.get("title")) or f"{owner.owner} knowledge"
-        heading = _one_line(section.get("title")) or facet.capitalize()
-        text = neutral_headings(f"## {heading}\n\n" + section["body"].strip())
-        if section["interpretation"] == "inference":
-            text = text.replace("\n\n", "\n\nInference / 设计推断（非作者历史意图）：\n\n", 1)
+        text = self._render_section(section, entries)
         problems = check_rules({key: text}, self.observer)
         if problems:
             self.record.dropped.append({"rule_id": key, "page": page, "why": "; ".join(problems)})
             return None
-        citations = []
-        for entry in entries:
-            url = (f"https://github.com/{self.lifecycle.full_name}/blob/{self.record.pin}/"
-                   f"{quote(entry.path, safe='/')}#L{entry.start}-L{entry.end}")
-            citations.append(f"[{entry.path}:L{entry.start}–L{entry.end}]({url})")
-        text += "\n\nSources / 来源：" + ", ".join(citations) + "\n"
         front = _page_frontmatter(title, kind="architecture", today=self.today, tags=self.tags)
         verdict = judge(self.rt, self.budget, self.lifecycle.init, Block("prose", page, "", "prose",
                         hashlib.sha256(text.encode()).hexdigest()), base={},
@@ -435,6 +476,26 @@ class _Knowledge(_Stage):
             if label != "fail":
                 self.record.unfinished.append(f"{owner.owner}/{facet}: {label}; draft retained in model traces for review")
             return None
+        return self._append_approved(owner, page, title, facet, text, entries, label)
+
+    def _render_section(self, section, entries):
+        facet = section["facet"]
+        heading = _one_line(section.get("title")) or facet.capitalize()
+        text = neutral_headings(f"## {heading}\n\n" + section["body"].strip())
+        if section["interpretation"] == "inference":
+            text = text.replace("\n\n", "\n\nInference / 设计推断（非作者历史意图）：\n\n", 1)
+        citations = []
+        for entry in entries:
+            url = (f"https://github.com/{self.lifecycle.full_name}/blob/{self.record.pin}/"
+                   f"{quote(entry.path, safe='/')}#L{entry.start}-L{entry.end}")
+            citations.append(f"[{entry.path}:L{entry.start}–L{entry.end}]({url})")
+        text += "\n\nSources / 来源：" + ", ".join(citations) + "\n"
+        return text
+
+    def _append_approved(self, owner, page, title, facet, text, entries, label="pass"):
+        """Coordinator assembly of the exact independently approved prose."""
+        key = f"knowledge:{owner.owner}:{facet}"
+        front = _page_frontmatter(title, kind="architecture", today=self.today, tags=self.tags)
         marker = f"<!-- kb:knowledge owner={owner.owner} facet={facet} pin={self.record.pin} verdict={label} -->"
         current = self.head.get(page, front)
         proposed = current.rstrip() + "\n\n" + marker + "\n\n" + text + "\n"

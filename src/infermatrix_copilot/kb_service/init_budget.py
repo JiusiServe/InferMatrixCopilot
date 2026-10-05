@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Iterator, Mapping
@@ -128,7 +129,7 @@ class Reservation:
 
 class Budget:
     """A finite stage ceiling, or explicit None for uncapped accounting.
-    Not thread-safe (stages call models one at a time)."""
+    Reservations are atomic; independent native calls may share one budget."""
 
     def __init__(self, limit_usd: float | None, *, spent_usd: float = 0.0):
         if limit_usd is not None and (not math.isfinite(limit_usd) or limit_usd <= 0):
@@ -138,10 +139,12 @@ class Budget:
         self.limit_usd = float(limit_usd) if limit_usd is not None else None
         self.spent_usd = float(spent_usd)
         self._reserved = 0.0
+        self._lock = threading.RLock()
 
     @property
     def remaining_usd(self) -> float | None:
-        return None if self.limit_usd is None else self.limit_usd - self.spent_usd - self._reserved
+        with self._lock:
+            return None if self.limit_usd is None else self.limit_usd - self.spent_usd - self._reserved
 
     def can_reserve(self, amount: float) -> bool:
         """An explicit None ceiling keeps accounting without limiting calls."""
@@ -156,14 +159,16 @@ class Budget:
         call when it does not fit. On exit the charge (or, when the block did
         not charge, e.g. because the call raised, the whole reservation) is
         added to what was spent."""
-        if not self.can_reserve(amount):
-            raise BudgetExhausted(
-                f"reserving ${amount:.4f} would exceed the budget "
-                f"(spent ${self.spent_usd:.4f} of ${self.limit_usd:.2f})")
-        reservation = Reservation(amount)
-        self._reserved += amount
+        with self._lock:
+            if not self.can_reserve(amount):
+                raise BudgetExhausted(
+                    f"reserving ${amount:.4f} would exceed the budget "
+                    f"(spent ${self.spent_usd:.4f} of ${self.limit_usd:.2f})")
+            reservation = Reservation(amount)
+            self._reserved += amount
         try:
             yield reservation
         finally:
-            self._reserved -= amount
-            self.spent_usd += reservation.charged if reservation.charged is not None else amount
+            with self._lock:
+                self._reserved -= amount
+                self.spent_usd += reservation.charged if reservation.charged is not None else amount
