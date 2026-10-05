@@ -29,7 +29,7 @@ _STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/roadmap-markdown.js": ("markdown-it.min.js", "text/javascript; charset=utf-8"),
     "/roadmap-graph.mjs": ("roadmap-graph.mjs", "text/javascript; charset=utf-8"),
-    "/markdown-display.mjs": ("markdown-display.mjs", "text/javascript; charset=utf-8"),
+    "/roadmap-markdown-display.mjs": ("roadmap-markdown-display.mjs", "text/javascript; charset=utf-8"),
     "/roadmap-mermaid.js": ("roadmap-mermaid.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }

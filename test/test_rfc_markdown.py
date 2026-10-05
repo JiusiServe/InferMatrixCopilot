@@ -14,7 +14,7 @@ def test_source_comments_are_hidden_without_enabling_html():
     program = f"""
 import assert from 'node:assert/strict';
 import {{createRequire}} from 'node:module';
-import {{displayMarkdown}} from {(WEB / 'markdown-display.mjs').as_uri()!r};
+import {{displayMarkdown}} from {(WEB / 'roadmap-markdown-display.mjs').as_uri()!r};
 const require = createRequire(import.meta.url);
 const md = require({str(WEB / 'markdown-it.min.js')!r})({{html:false}});
 const body = '| PR | Status |\\n| --- | --- |\\n| #6844 | Merged |\\n<!-- roadmap-people: {{"6844":{{"author":"private-metadata"}}}} -->\\n<!-- roadmap-status:end -->\\n## Next';

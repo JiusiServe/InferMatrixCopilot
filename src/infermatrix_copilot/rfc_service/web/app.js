@@ -1,6 +1,6 @@
 /* Same-origin RFC client. Markdown uses a bundled parser with raw HTML disabled. */
 import {graphModels, graphSource, roadmapSVGStyles} from "/roadmap-graph.mjs";
-import {displayMarkdown} from "/markdown-display.mjs";
+import {displayMarkdown} from "/roadmap-markdown-display.mjs";
 const markdown = window.markdownit({html: false, linkify: true});
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 
