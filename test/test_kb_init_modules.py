@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from infermatrix_copilot.kb_service.init_modules import SYSTEM_CARD, _leading_doc, declaration, routes_append_only
+from infermatrix_copilot.kb_service.init_modules import SYSTEM_CARD, SYSTEM_CARD_IMPL, _leading_doc, declaration, routes_append_only
 from infermatrix_copilot.kb_service.init_stages import run_stage
 from infermatrix_copilot.kb_service.config import RepoLifecycle
 from infermatrix_copilot.kb_service.init_support import InitRecord
@@ -44,7 +44,7 @@ class CardGateway(FakeGateway):
         self.group = group
 
     def call_json(self, role, *, system, prompt, validate=None, max_budget_usd=None):
-        if system != SYSTEM_CARD:
+        if system not in (SYSTEM_CARD, SYSTEM_CARD_IMPL):
             reply = super().call_json(role, system=system, prompt=prompt, validate=validate,
                                       max_budget_usd=max_budget_usd)
             if system.startswith("You set up the review knowledge base"):
