@@ -143,17 +143,19 @@ def test_invalid_citation_remains_unknown_despite_positive_review(tmp_path):
     assert not features and outcomes[0]['status'] == 'unknown'
 
 
-def test_seed_id_and_owner_are_preserved_during_supplement(tmp_path):
+@pytest.mark.parametrize('relation', ['implementation_supplement', 'alias', 'subcapability', 'shared_component'])
+def test_seed_id_owner_and_entry_points_are_preserved_during_relation_merge(tmp_path, relation):
     idx = index(tmp_path, docs=False)
     seed = {'id': 'session', 'title': 'Existing session', 'owner': 'original', 'source_globs': ['src/original.py'],
             'entry_points': ['src/original.py'], 'docs': [], 'page': 'repos/demo/components/original/feature-session.md'}
     row = candidate(); row['generator_receipts'] = [{'trace_id': 'native-generator'}]
-    state = {'candidates': {'session': row}, 'reviews': {'session': {'supported': 'yes', 'relation': 'implementation_supplement',
+    state = {'candidates': {'session': row}, 'reviews': {'session': {'supported': 'yes', 'relation': relation,
              'related_id': 'session', 'reason': 'Same lifecycle', 'candidate_sha256': _hash(row), 'judge_receipt': {'trace_id': 'native-judge'}}}}
     engine = DiscoveryEngine(idx, seeds=[seed], owners=[], state=state, call=None, save=lambda: None)
     features, _ = engine.catalog('repos/demo')
     assert features[0]['owner'] == 'original' and features[0]['title'] == 'Existing session'
     assert features[0]['source_globs'] == ['src/original.py', 'src/session.py']
+    assert features[0]['entry_points'] == ['src/original.py']
     assert seed['source_globs'] == ['src/original.py']
 
 

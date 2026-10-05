@@ -5,6 +5,7 @@ import json
 import pytest
 
 from infermatrix_copilot.kb_service.init_budget import BudgetExhausted
+from infermatrix_copilot.kb_service.feature_discovery_index import build_discovery_index
 from infermatrix_copilot.kb_service.init_feature_discovery import (
     DiscoveryEngine, SYSTEM_REVIEW, _hash, _boundary_ready,
 )
@@ -144,14 +145,27 @@ def test_unresolved_same_title_new_candidates_stay_unknown(tmp_path):
     assert all(r['status'] == 'unknown' and 'duplicate' in r['reason'] for r in outcomes)
 
 
-def test_aliases_can_resolve_to_an_independently_accepted_new_parent(tmp_path):
+@pytest.mark.parametrize('relation', ['implementation_supplement', 'alias', 'subcapability', 'shared_component'])
+def test_aliases_can_resolve_to_an_independently_accepted_new_parent(tmp_path, relation):
     def call(role, system, prompt, validate):
-        mapping = {'parent': ('new', ''), 'alias-one': ('alias', 'parent'), 'alias-two': ('alias', 'alias-one')}
+        mapping = {'parent': ('new', ''), 'alias-one': (relation, 'parent'), 'alias-two': ('alias', 'alias-one')}
         _, data = decisions(prompt, lambda r: mapping[r['id']]); return reply(role, data)
     e = engine(tmp_path, [candidate(key=k, title=k) for k in ('parent', 'alias-one', 'alias-two')], call)
+    for key in ('alias-one', 'alias-two'):
+        path = f'src/{key}.py'
+        (tmp_path / path).write_text('def helper(identity):\n    return identity\n')
+        row = e.state['candidates'][key]
+        row['evidence'] = [{'path': path, 'start': 1, 'end': 2},
+                           {'path': 'docs/session.md', 'start': 1, 'end': 2}]
+        e.state['reviews'][key] = approved(row)
+    e.index = build_discovery_index(tmp_path, pin=PIN, scope={'roots': ['src/'], 'exclude': []},
+                                    doc_globs=['docs/*.md'])
     assert e.audit_catalog_boundaries()
     features, outcomes = e.catalog('repos/library', require_boundary=True)
     assert [f['id'] for f in features] == ['parent']
+    assert features[0]['entry_points'] == ['src/session.py']
+    assert set(features[0]['source_globs']) == {'src/session.py', 'src/alias-one.py', 'src/alias-two.py'}
+    assert features[0]['docs'] == ['docs/session.md']
     assert all(r['status'] == 'accepted' for r in outcomes)
 
 

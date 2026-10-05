@@ -725,7 +725,8 @@ class DiscoveryEngine:
                 result.update(status="unknown", reason="related feature is not accepted in the frozen catalog")
                 continue
             feature = by_id[target]
-            for field, additions in (("source_globs", source), ("entry_points", source), ("docs", docs)):
+            # Relation evidence does not certify an additional entry point.
+            for field, additions in (("source_globs", source), ("docs", docs)):
                 feature[field] = list(dict.fromkeys(feature.get(field, []) + additions))
         return list(by_id.values()), outcomes
 
