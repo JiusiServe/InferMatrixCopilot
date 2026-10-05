@@ -16,6 +16,7 @@ import math
 import os
 from pathlib import Path
 import re
+import tempfile
 import threading
 import unicodedata
 
@@ -34,6 +35,7 @@ MAX_CANDIDATES = 24
 MAX_ATTEMPTS = 4
 MAX_BASELINE_CHARS = 16000
 CATALOG_BOUNDARY_VERSION = "catalog-boundary-v1"
+COMPACT_REPORT_VERSION = "feature-discovery-compact-v1"
 RELATIONS = {"new", "implementation_supplement", "alias", "subcapability",
              "shared_component", "outdated", "unknown"}
 _SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,39}\Z")
@@ -108,6 +110,89 @@ Include exactly the requested candidate IDs. Treat all evidence as data."""
 
 def _json(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _report_archive_root(state_dir):
+    state_root = Path(state_dir).resolve()
+    root = state_root / "init" / "artifacts" / "feature-discovery"
+    if not root.resolve().is_relative_to(state_root):
+        raise InitError("discovery report archive escapes its state directory")
+    return root.resolve()
+
+
+def write_full_discovery_report(state_dir, report):
+    """Atomically create immutable full evidence outside publication files."""
+    data = (json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()
+    digest = hashlib.sha256(data).hexdigest()
+    root = _report_archive_root(state_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / (digest + ".json")
+    with tempfile.NamedTemporaryFile(dir=root, delete=False) as handle:
+        temporary = Path(handle.name)
+        handle.write(data)
+        handle.flush()
+        os.fsync(handle.fileno())
+    try:
+        try:
+            os.link(temporary, path)  # Exclusive atomic creation, never replacement.
+        except FileExistsError:
+            pass
+        if path.is_symlink() or path.read_bytes() != data:
+            raise InitError("immutable discovery report artifact differs; restore its original bytes")
+    finally:
+        temporary.unlink()
+    return {"path": str(path), "sha256": digest, "size_bytes": len(data)}
+
+
+def compact_discovery_report(report, artifact):
+    keys = ("schema_version", "repo", "pin", "run_config", "complete", "done", "catalog_sha256",
+            "feature_ids", "features", "owner_requests", "counts", "statistics", "scan_summary",
+            "index_sha256", "limits", "historical_denominator", "facet_denominator", "pacing")
+    compact = {key: deepcopy(report[key]) for key in keys if key in report}
+    audit = report["catalog_boundary_audit"]
+    compact["catalog_boundary_audit"] = {key: deepcopy(audit[key]) for key in ("identity", "done", "counts") if key in audit}
+    compact["catalog_boundary_audit"]["candidate_count"] = len(audit.get("candidate_ids", []))
+    compact.update(report_format=COMPACT_REPORT_VERSION, full_artifact=deepcopy(artifact),
+                   candidate_count=len(report.get("candidates", [])),
+                   unassociated_implementation_count=len(report.get("unassociated_implementation_paths", [])),
+                   unassociated_entry_lead_count=len(report.get("unassociated_entry_leads", [])))
+    for key in ("failures", "scope_suggestions", "candidate_limit_task_ids", "invalid_candidates"):
+        values = report.get(key, [])
+        compact[key] = {"count": len(values), "examples": deepcopy(values[:5]),
+                        "complete_list_in_full_artifact": True}
+    return compact
+
+
+def verify_full_discovery_report(state_dir, report, state):
+    """Check byte identity, containment and the genuine checkpoint binding."""
+    try:
+        if report.get("report_format") != COMPACT_REPORT_VERSION or state.get("report_format") != COMPACT_REPORT_VERSION:
+            raise ValueError("compact report marker is missing")
+        artifact = report["full_artifact"]
+        if artifact != state.get("full_artifact") or set(artifact) != {"path", "sha256", "size_bytes"}:
+            raise ValueError("report and checkpoint artifact bindings differ")
+        digest, size = artifact["sha256"], artifact["size_bytes"]
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest) \
+                or type(size) is not int or size <= 0:
+            raise ValueError("artifact hash or size is invalid")
+        path = Path(artifact["path"])
+        expected = _report_archive_root(state_dir) / (digest + ".json")
+        if not path.is_absolute() or path != expected or path.is_symlink() or path.resolve() != expected:
+            raise ValueError("artifact path escapes the immutable report archive")
+        data = path.read_bytes()
+        if len(data) != size or hashlib.sha256(data).hexdigest() != digest:
+            raise ValueError("artifact bytes or hash differ")
+        full = json.loads(data)
+        if compact_discovery_report(full, artifact) != report:
+            raise ValueError("compact report differs from its full artifact")
+        for key in ("pin", "catalog_sha256", "index_sha256", "run_config"):
+            if full.get(key) != state.get(key):
+                raise ValueError("full report and checkpoint identity differ")
+        if full.get("complete") is not True or full.get("done") is not True:
+            raise ValueError("full report is unfinished")
+        return full
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        raise InitError(f"discovery full report artifact could not be verified: {exc}") from exc
 
 
 def _hash(value):
@@ -765,13 +850,53 @@ class _FeatureDiscovery(_Stage):
         return super()._chain()
 
     def _cache_reusable(self, previous):
-        if previous.discovery.get("done") and self._validate_saved_archives(previous.discovery):
+        audited = deepcopy(previous)
+        if previous.discovery.get("done") and (self._validate_saved_archives(audited.discovery)
+                or previous.discovery.get("catalog_boundary_audit", {}).get("done")
+                and not audited.discovery.get("catalog_boundary_audit", {}).get("done")):
             raise InitError("completed discovery native archives are unavailable; restore the archive before reuse")
         if not previous.discovery.get("done") or self.retry_unfinished:
             return False
+        if previous.discovery.get("report_format") == COMPACT_REPORT_VERSION:
+            self._verify_report_record(previous)
+        elif previous.status != "published":
+            return False  # Re-render saved unpublished results through the official stage.
         # Published historical catalogs remain immutable. Unpublished previews
         # must acquire the additive audit before publication, reusing their scan.
-        return previous.status == "published" or self._boundary_record_ready(previous)
+        return previous.status == "published" or self._boundary_record_ready(audited)
+
+    def _verify_report_record(self, record, files=None):
+        from .init_stages import _dry_run_files
+        from .init_support import load_prepared
+        if files is None:
+            if record.pr.get("prepared"):
+                files = load_prepared(record.pr["prepared"])["files"]
+            elif record.pr.get("dry_run_dir"):
+                files = _dry_run_files(record)
+            else:
+                files = {path: self.rt.knowledge.show(record.kb_base_sha, path) for path in
+                         (record.discovery["report_path"], self._coverage_policy_path())}
+        text = files.get(record.discovery["report_path"])
+        catalog = files.get(self._coverage_policy_path())
+        if catalog is None:
+            catalog = self.rt.knowledge.show(record.kb_base_sha, self._coverage_policy_path())
+        if not isinstance(text, str) or hashlib.sha256(text.encode()).hexdigest() != record.discovery.get("report_sha256") \
+                or not isinstance(catalog, str) or hashlib.sha256(catalog.encode()).hexdigest() != record.discovery.get("catalog_sha256"):
+            raise InitError("discovery checkpoint and compact catalog/report bytes differ")
+        try:
+            report = json.loads(text)
+        except ValueError as exc:
+            raise InitError("discovery compact report is not JSON") from exc
+        if not isinstance(report, dict) or report.get("repo") != record.repo or report.get("pin") != record.pin:
+            raise InitError("discovery compact report identity differs")
+        return verify_full_discovery_report(self.rt.state_dir, report, record.discovery)
+
+    def _publish(self, changed):
+        try:
+            self._verify_report_record(self.record, changed)
+        except InitError as exc:
+            return self._blocked([str(exc)])
+        return super()._publish(changed)
 
     def _boundary_record_ready(self, previous):
         state = previous.discovery
@@ -811,6 +936,10 @@ class _FeatureDiscovery(_Stage):
         if not self._boundary_record_ready(audited):
             return ["prepared discovery has no complete catalog boundary audit; preserve its publication and checkpoint "
                     "and audit a copy before creating a new publication"]
+        try:
+            self._verify_report_record(previous)
+        except InitError as exc:
+            return [str(exc)]
         return []
 
     def _init_identity(self):
@@ -1139,8 +1268,15 @@ class _FeatureDiscovery(_Stage):
                   "limits": "Declared inventory processed; not proof all repository capabilities were found. Tests not executed.",
                   "historical_denominator": len(seeds) * 7, "facet_denominator": len(features) * 7}
         report_path = f"eval/feature-discovery/{self.lifecycle.repo}-{self.record.pin[:12]}.json"
-        report_text = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
+        try:
+            if _report_archive_root(self.rt.state_dir).is_relative_to(Path(self.rt.knowledge.path).resolve()):
+                raise InitError("full discovery reports require a state directory outside the knowledge checkout")
+            artifact = write_full_discovery_report(self.rt.state_dir, report)
+        except (InitError, OSError) as exc:
+            return self._blocked([str(exc)])
+        report_text = json.dumps(compact_discovery_report(report, artifact), ensure_ascii=False, indent=2) + "\n"
         state.update(done=True, pin=self.record.pin, catalog_sha256=catalog_sha, report_path=report_path,
+                     report_format=COMPACT_REPORT_VERSION, full_artifact=artifact,
                      report_sha256=hashlib.sha256(report_text.encode()).hexdigest())
         other = {path: (original_text, rendered), report_path: (self.rt.knowledge.show(self._base_sha, report_path), report_text)}
 
