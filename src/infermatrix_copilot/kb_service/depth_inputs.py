@@ -586,7 +586,7 @@ class DepthContext:
         return json.loads(json.dumps(result))
 
     def document_slices(self, docs, *, paths=(), limit=8_000, previous_review=None, evidence_round=0,
-                        facets=(), symbols=()):
+                        facets=(), symbols=(), preferred_ranges=()):
         """Select contiguous real lines from full indexed docs, then fallback input.
 
         References in a rejection take priority over a document prefix. The
@@ -605,6 +605,7 @@ class DepthContext:
         patterns = [re.compile(_FACET_PATTERNS[facet], re.I) for facet in facets if facet in _FACET_PATTERNS]
         references = [(match[1], int(match[2]), int(match[3] or match[2]))
                       for match in re.finditer(r"([\w./-]+):L?(\d+)(?:[-:]L?(\d+))?", review)]
+        references.extend(preferred_ranges)  # indexed filename matches, not approval evidence
         ranges, lines_by_path = [], {}
         for path in names:
             if not safe_source_path(path):
@@ -638,6 +639,16 @@ class DepthContext:
                 rotated.extend(tied[shift:] + tied[:shift])
             ranges = rotated
         selected, used = {}, 0
+        for path, start, end in preferred_ranges:
+            lines = lines_by_path.get(path, {})
+            if not all(number in lines for number in range(start, end + 1)):
+                continue
+            pending = {number: lines[number] for number in range(start, end + 1)
+                       if number not in selected.get(path, {})}
+            size = sum(len(line.encode("utf-8")) + 1 for line in pending.values())
+            if used + size <= limit:
+                selected.setdefault(path, {}).update(pending)
+                used += size
         for _, path, start, end in ranges:
             for number in range(start, end + 1):
                 line = lines_by_path[path][number]

@@ -9,7 +9,7 @@ import re
 import time
 from collections import Counter
 from dataclasses import dataclass, replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from ..knowledge_service.lifecycle import Page
 from ..knowledge_service.ops import page_over_capacity
@@ -397,7 +397,65 @@ class _KnowledgeDepth(_Knowledge):
         if visits[key] >= 3:
             slot["blocked"] = "three unsuccessful repairs with the same pinned evidence; needs new evidence or a corrected candidate"
 
-    def _docs(self, tree: Path, feature, owner) -> list[dict]:
+    def _docs(self, tree: Path, feature, owner, *, context=None, facets=(),
+              previous_review=None, evidence_round=0) -> list[dict]:
+        if context is not None and context.mode == "lightweight" and context.index is not None:
+            # A source-only feature can still have a README/SKILL/design guide
+            # beside its implementation. Select only real indexed ancestor
+            # documents, never another component's sibling directory.
+            by_parent = {}
+            for path, fact in context.index.files.items():
+                document = PurePosixPath(path)
+                if (document.suffix.lower() not in
+                        {".md", ".mdx", ".rst", ".txt", ".adoc"} or fact["sha256"] is None):
+                    continue
+                name = document.stem.lower()
+                priority = next((number for number, prefix in enumerate(
+                    ("skill", "readme", "design", "architecture", "reference"))
+                    if name.startswith(prefix)), 5)
+                by_parent.setdefault(document.parent.as_posix(), []).append((priority, path))
+            adjacent = []
+            for source in context._scope(feature):
+                for distance, parent in enumerate(PurePosixPath(source).parents):
+                    siblings = by_parent.get(parent.as_posix(), ())
+                    adjacent.extend((distance, priority, path) for priority, path in siblings)
+                    if any(priority < 4 for priority, _ in siblings):
+                        break  # the nearest component guide is the local boundary
+            paths = list(dict.fromkeys([*feature.docs, *(path for _, _, path in sorted(adjacent))]))
+            filenames = {PurePosixPath(path).name for path in context._scope(feature)}
+            preferred = []
+            for path in paths:
+                matches, examples, fenced = [], [], False
+                for number, line in enumerate(context.index.files.get(path, {}).get("lines", ()), 1):
+                    if line.lstrip().startswith(("```", "~~~")):
+                        fenced = not fenced
+                    if any(name in line for name in filenames):
+                        matches.append(number)
+                        if fenced:
+                            examples.append(number)
+                # Existing executable examples beat prose lists of unrelated
+                # tools. Nearby output shapes/criteria remain real line ranges.
+                preferred.extend((path, max(1, number - 6),
+                                  min(len(context.index.files[path]["lines"]), number + 6))
+                                 for number in (examples or matches))
+            # The immutable index supplies complete real line ranges, including
+            # late manual acceptance steps. The existing 8KB packet cap applies.
+            docs, used = [], 0
+            for number, path in enumerate(paths):
+                selected = context.document_slices([], paths=(path,),
+                           limit=(8000 - used) // (len(paths) - number), facets=facets,
+                           previous_review=previous_review, evidence_round=evidence_round,
+                           preferred_ranges=preferred)
+                docs.extend(selected)
+                used += sum(len(line.encode("utf-8")) + 1 for item in selected for line in item["text"])
+            if docs:
+                # build() rereads whole indexed documents. Offering a generic
+                # owner path here would let that reread crowd out the local
+                # command/criteria despite this first selection's byte cap.
+                return docs
+            generic = [item for item in self._docs_for(tree, owner) if item["path"] not in paths]
+            return context.document_slices(generic, limit=8000, facets=facets,
+                         previous_review=previous_review, evidence_round=evidence_round)
         docs = self._sources(tree, list(feature.docs), MAX_DOC_BYTES // 2)
         used = sum(len(d["text"].encode("utf-8")) for d in docs)
         for item in self._docs_for(tree, owner):
@@ -444,17 +502,28 @@ class _KnowledgeDepth(_Knowledge):
         owner = next((o for o in self.owners if o.owner == feature.owner),
                      Owner(feature.owner, feature.page, tuple(p.split("*", 1)[0] for p in feature.source_globs)))
         guidance = getattr(self, "_repair_guidance", None)
-        docs = [] if guidance else self._docs(tree, feature, owner)
+        requested = entry.get("requested_facets") or [f for f in FACETS if f not in old_blocks]
+        docs = [] if guidance else self._docs(tree, feature, owner, context=context,
+                    facets=requested, previous_review=entry.get("reason"),
+                    evidence_round=entry.get("evidence_round", 0))
         existing = self._bounded_context(self._existing_knowledge(owner, self.head.get(feature.page, "")))
         if lightweight:
             docs = self._bounded_slices(docs, 8000)
             existing = self._bounded_texts(existing, 4000)
-        requested = entry.get("requested_facets") or [f for f in FACETS if f not in old_blocks]
         retrieval = context.guided(feature, requested, guidance) if guidance else context.build(
             feature, self.head.get(feature.page, ""), docs, facets=requested,
             previous_review=entry.get("reason"), evidence_round=entry.get("evidence_round", 0))
         if lightweight:
-            docs = retrieval.get("docs", docs)
+            if context.index is not None and not guidance:
+                # Preserve the already selected local document ranges; a second
+                # full-index rerank can replace their commands/criteria. Bind
+                # the actual final packet, without changing any saved payload.
+                retrieval["docs"] = docs
+                retrieval["context_sha256"] = hashlib.sha256(json.dumps(
+                    {key: value for key, value in retrieval.items() if key != "context_sha256"},
+                    sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+            else:
+                docs = retrieval.get("docs", docs)
         files = retrieval["files"]
         if not files and not (lightweight and docs):
             entry["attempts"] = entry.get("attempts", 0) + 1

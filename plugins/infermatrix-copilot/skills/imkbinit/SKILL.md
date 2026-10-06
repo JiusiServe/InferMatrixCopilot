@@ -307,6 +307,15 @@ points, and separately measures paths-only ambiguity. Retrieval remains bounded
 to two documents and 6,000 content characters. Distinguish all `available_facets`
 from actually delivered `included_facets`, `not_injected_facets`, and their bases;
 read the remaining relevant facets through the existing bounded doc tools.
+Lightweight depth also reads existing indexed project documents in each source
+file's ancestor directories up to the nearest component guide, including
+adjacent SKILL, README, design and reference guides. Generic owner documents
+are the fallback when local text is unavailable. Documents share the existing
+8 KB budget, favor real source filename windows, and retain exact pinned ranges
+in the final packet. Documented manual operations
+and observable expected results may support an explicitly unexecuted manual
+validation entry; unrelated sibling components and invented tests cannot.
+Keep saved native inputs and cumulative correction counts unchanged on resume.
 `verified_gaps` describe absent evidence, not tests passed; missing facets remain
 unknown. Save reports outside `knowledge/` and report retrieval separately from
 breadth/depth and actual PR quality. This audit does not establish bug recall.
