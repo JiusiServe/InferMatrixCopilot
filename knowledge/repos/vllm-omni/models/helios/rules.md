@@ -10,6 +10,12 @@ confidence: high
 
 # Helios cross-attention cache 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| cross-attention KV、text projection、source weakref、LRU、clear | `HELIOS-CACHE-1a` | `vllm_omni/diffusion/models/helios/cross_attn_cache.py::SourceTensorLRUCache` → `vllm_omni/diffusion/models/helios/helios_transformer.py::HeliosTransformer3DModel` |
+
 ## HELIOS-CACHE-1a — source tensor 指纹必须有 liveness，不能以地址等同跨请求内容
 
 - 触发：修改 Helios text projection / cross-attention KV cache 的 key、LRU 或生命周期。

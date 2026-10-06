@@ -10,6 +10,15 @@ confidence: high
 
 # YuE2 synthesis 与完成边界规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| HOLD、side-stream synthesis、cancel、preemption、完成音频重交付 | `YUE2-SYNTH-1a`、`YUE2-SYNTH-1b` | `vllm_omni/model_executor/models/yue2/yue2.py` 的 `_SynthesisJob`、`_SynthesisQueue`、`_ship_audio`；`tests/worker/test_yue2_request_state.py` |
+| speech/native tokenizer、lyrics/style/ABC、frame budget | [请求合同](rules-interface.md)：`YUE2-INPUT-1a` | `vllm_omni/entrypoints/openai/tts_adapters/yue2.py::Yue2Adapter`；`vllm_omni/tokenizers/yue2_prompt.py`、`vllm_omni/tokenizers/yue2_tokenizer.py` |
+| MoT weight mapping、whole-song noise、NAR、FP32 tiled VAE | [数值合同](rules-interface.md)：`YUE2-NUMERIC-1a` | `vllm_omni/model_executor/models/yue2/yue2.py` 的 `partition_checkpoint_weights`、`song_chunks` 与 VAE decode |
+| SheetSage2、ABC/MIDI、offline snapshot、speech request export | [Score handoff](rules-score-handoff.md)：`YUE2-SCORE-1a` | `tools/sheetsage2_transcribe.py`；`tests/tools/test_sheetsage2_transcribe.py` |
+
 ## YUE2-SYNTH-1a — side-stream synthesis 的 HOLD、队列和 buffer lifetime 必须闭合
 
 - 触发：修改 `_SynthesisJob`/`_SynthesisQueue`、HOLD budget、request admission 或 preemption history reconciliation。

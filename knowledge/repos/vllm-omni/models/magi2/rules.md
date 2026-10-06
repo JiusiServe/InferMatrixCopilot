@@ -9,6 +9,13 @@ sources: ["PR #7206"]
 
 # MAGI-2 BF16 routed MoE 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| BF16 dispatch、packing/cache、route buffer、reload/device move | `MAGI2-MOE-1a` | `vllm_omni/diffusion/models/magi2/mh_moe.py::Magi2MultiHeadMoE`；`vllm_omni/diffusion/models/magi2/modeling_magi2.py` 的 weight-loading caller |
+| grouped GEMM、SwiGLU7、head/expert routing、launch config | `MAGI2-MOE-1b` | `vllm_omni/diffusion/models/magi2/fused_moe_kernels.py::invoke_fused_moe_bf16`；`tests/diffusion/models/magi2/test_moe_kernel_contract.py` |
+
 ## MAGI2-MOE-1a — Fused BF16 dispatch 必须保留 eligibility 和派生 cache 失效
 
 - 触发：修改Magi2MultiHeadMoE本地forward、gate/uppacking、routebuffers或checkpointreload。

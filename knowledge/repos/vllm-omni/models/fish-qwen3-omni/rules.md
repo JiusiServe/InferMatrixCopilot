@@ -10,6 +10,12 @@ confidence: high
 
 # Fish Speech S2 Pro streaming 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| initial/steady chunk、backlog、left context、finish/terminal | `FISH-STREAM-1a` | `vllm_omni/model_executor/stage_input_processors/fish_speech.py::slow_ar_to_dac_decoder_async_chunk`；`tests/model_executor/stage_input_processors/test_fish_speech_async_chunk.py` |
+
 ## FISH-STREAM-1a — 自适应 chunk 使用绝对 emitted-frame frontier
 
 - 触发：修改 Fish Speech async chunk processor、initial/steady chunk policy 或 backlog 驱动的 chunk-size 切换。

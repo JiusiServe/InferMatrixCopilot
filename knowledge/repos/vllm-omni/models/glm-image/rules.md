@@ -10,6 +10,12 @@ confidence: high
 
 # GLM-Image token-ID handoff 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| TOKEN_IDS、generated/source IDs、AR→DiT、auxiliary hidden | `GLMIMAGE-IDS-1a`；共享 naming/accumulation 另查 [输出合同](../../components/model-executor/rules-output-contract.md) | `vllm_omni/model_executor/stage_input_processors/glm_image.py::ar2diffusion`；`vllm_omni/outputs/output_modality.py`、`vllm_omni/outputs/output_processor.py`；`tests/model_executor/stage_input_processors/test_glm_image.py` |
+
 ## GLMIMAGE-IDS-1a — generated IDs 与 source-image IDs 必须保留各自 handoff
 
 - 触发：修改 GLM-Image engine_output_type、AR auxiliary output 或 ar2diffusion bridge。

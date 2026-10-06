@@ -9,6 +9,11 @@ sources: ["PR #8478"]
 
 # IndexTTS2 request-end payload 规则
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| generic pooler hidden、request end、latent/code-only、S2Mel payload | `ITTS2-1a` | `vllm_omni/model_executor/models/indextts2/indextts2_talker.py::IndexTTS2TalkerForConditionalGeneration` → `vllm_omni/model_executor/stage_input_processors/indextts2.py::talker2s2mel_full_payload` |
 
 ## ITTS2-1a — S2Mel 的整段 latent 必须在 request end 交付
 
