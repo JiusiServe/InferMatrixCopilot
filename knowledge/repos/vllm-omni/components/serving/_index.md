@@ -47,3 +47,7 @@ sources: []
 - [Realtime video 增量 prefill 规则](rules-video-stream-prefill.md) — warmup/abort、窗口身份与已解码帧 snapshot。
 
 - [Sleep/wake ACK 与 admission](rules-sleep-control.md) — worker/RPC failure、partial-stage recovery 与 stage-ID 预校验。
+
+- [effective video config 与 borrowed RGB eligibility](rules-video-encoding.md)。
+
+- [duplex bounded delivery、cancel guard 与creation payload大小](rules-duplex-output-delivery.md)。

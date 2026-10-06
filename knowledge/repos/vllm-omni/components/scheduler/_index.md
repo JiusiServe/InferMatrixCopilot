@@ -48,3 +48,5 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_g
 - [release 双 waiting queue、deferred set 与 resumable cleanup：SCHED-RELEASE-1a、SCHED-5g](rules-release-queues.md)。
 
 - [empty terminal、staged-payloadreceivegate与tail守恒](rules-stream-terminals.md)。
+
+- [native sender-only admission 与 opt-in first-chunk express](rules-first-chunk-express.md)。

@@ -35,3 +35,5 @@ confidence: high
   built-in `supported_speakers` 不属于 stored voice。
 - 其他源码入口与具体不变量见 Qwen3-TTS rules；模型家族结构见
   [Qwen-Omni](../qwen-omni/_index.md)。
+
+- [当前step prompt projection、requestID cache 与speaker embedding](rules-prompt-preprocess.md)。

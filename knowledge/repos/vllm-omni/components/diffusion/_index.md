@@ -72,3 +72,5 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 - [Attention execution-path 能力](rules-attention-contracts.md) — 有效 metadata、FA4 编译边界与未迁移平台。
 
 shared RMSNorm 的empty-input与fused精度边界沿 tensor dtype rules 的DIFF-NORM-1a核对。
+
+- [registered video SHM 与 borrowed mapping ownership](rules-video-transport.md)。

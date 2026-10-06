@@ -53,3 +53,7 @@ sources: []
 
 - [显式seed、whole-MTPgraph与NVIDIA/ROCm抽样边界](rules-request-rng.md)。
 - [异步output slab、producer事件与storage所有权](rules-output-snapshots.md)。
+
+- [MRv2 aux tree、narrow sampler、sampled embedding 与 generation输出](rules-mrv2-output-contracts.md)。
+
+- [settled row predicate与preemption replay fallback](rules-settled-preprocess.md)。
