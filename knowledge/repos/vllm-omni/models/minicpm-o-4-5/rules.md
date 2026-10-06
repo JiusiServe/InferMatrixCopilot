@@ -195,8 +195,8 @@ confidence: high
 - 触发：MiniCPM-o native duplex 的连续音频、LISTEN/SPEAK handoff 或 server VAD interruption。
 - 强制：模型说话时仍把音频单元追加到同一可恢复 Stage0，保留 KV/runtime state 和上一
   terminator；仅确认的 empty/control-only handoff 可在没有 speech conditioning 时跳过，其他
-  缺 latent/hidden-state 的 speech handoff 仍报错。LISTEN 是成功且不需要 Talker hidden state，
-  SPEAK 才转交 Talker。默认模型拥有的模式固定为 `listen_only`，不会创建/调用 Silero；只有
+  缺 latent/hidden-state 的 speech handoff 仍报错。plain LISTEN 是成功且不需要 Talker hidden state；含 turn_eos 的 speech-closure
+  LISTEN 仍须转交 Talker，边界见 [turn closure](rules-duplex-turn-closure.md)。默认模型拥有的模式固定为 `listen_only`，不会创建/调用 Silero；只有
   `turn_detection.type=server_vad` 且 `interrupt_response=true` 才选择 `barge_in_on_speech`，
   并拒绝 `interrupt_response=false` 的第三模式。server VAD hard cancellation 必须显式 opt-in，
   阈值不得落到使 silence branch 不可达的边界。

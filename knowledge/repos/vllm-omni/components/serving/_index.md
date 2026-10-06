@@ -51,3 +51,7 @@ sources: []
 - [effective video config 与 borrowed RGB eligibility](rules-video-encoding.md)。
 
 - [duplex bounded delivery、cancel guard 与creation payload大小](rules-duplex-output-delivery.md)。
+
+- [voice删除403/404与typedexceptions](rules-voice-management.md)。
+
+- [sleep/wakeup非空stage_ids与nonnegativelevel](rules-control-request-schema.md)。

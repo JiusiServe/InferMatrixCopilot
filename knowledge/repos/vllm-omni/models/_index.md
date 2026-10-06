@@ -32,3 +32,5 @@ PersonaPlex 的 staged 与 unified full-duplex 双入口、Mimi 状态和 lockst
 
 选择一个模型 owner 后停止枚举其他模型。跨模型共用的不变量应进入
 [components](../components/_index.md)，不要复制到多个模型目录。
+
+- [MAGI-2 Preview本地BF16routedMoE](magi2/_index.md)。

@@ -77,3 +77,4 @@ Realtime video 不以「每 200 ms append」定义 frame cadence：首个约 103
 - camera tile 与 first-append reservation 查本页已链接的 native duplex 规则 MCPMO-DUPLEX-TILE-1a。
 
 - [MRv2 turn 与输出状态](rules-mrv2-state.md)：MCPMO-MRV2-1a–1d，区分 native V1 duplex、live row ledger、codec sampling、共享 V1 hooks 与显式 cached ISTFT。
+- [native LISTEN speech unit的turn end](rules-duplex-turn-closure.md)。

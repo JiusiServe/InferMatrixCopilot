@@ -74,3 +74,5 @@ sources: ["PR #5673", "PR #5869", "PR #6424", "PR #6955", vllm_omni/data_entry_k
 - 审查 cosyvoice3 的停止逻辑、流式 chunk 数学或 TRT 引擎构建;跨 GPU 部署
   性能问题先读 YAML 头注的连续性数据。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。
+
+- [标准FP32 F0、TF32恢复与nativevocoder](rules-f0-device.md)。
