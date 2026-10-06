@@ -179,6 +179,12 @@ class Outbox:
         # what the publisher checks main against before every merge: every
         # governed knowledge commit since the active snapshot must be trusted
         trusted = json.loads(self._ledger.get_cursor("*", "trusted_merges") or "[]")
+        from .reconcile import read_receipts
+        from .sources import KnowledgeRepo
+
+        knowledge = KnowledgeRepo(Path(os.environ.get("KB_KNOWLEDGE_CLONE") or self.root / "knowledge-repo"))
+        reviewed = read_receipts(knowledge, self.root, self._key.public_key())
+        trusted = sorted(set(trusted) | reviewed)
         return {"issued_at": self._clock(), "repos": repos,
                 "provenance": {"active": self._ledger.active_snapshot() or "", "trusted": trusted}}
 

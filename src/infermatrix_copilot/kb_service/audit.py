@@ -85,6 +85,9 @@ def disposals(rt) -> dict[str, str]:
 
 
 def _records(rt) -> dict:
+    from .reconcile import trusted_commits
+
+    reviewed = trusted_commits(rt)
     merge_shas, merged_heads, pending = set(), set(), set()
     for lifecycle in rt.registry.values():
         for changeset in rt.ledger.changesets(lifecycle.repo, _RECORDED):
@@ -98,7 +101,7 @@ def _records(rt) -> dict:
             if changeset.get("head_sha"):
                 pending.add(changeset["head_sha"])
     disposed = disposals(rt)
-    return {"merges": merge_shas, "heads": merged_heads, "pending": pending,
+    return {"merges": merge_shas | reviewed, "reviewed": reviewed, "heads": merged_heads, "pending": pending,
             "disposed": disposed, "disposing": set(disposed.values())}
 
 
@@ -126,8 +129,10 @@ def _knowledge_paths(rt, sha: str, parents: list[str]) -> list[str]:
 def open_unknown(rt) -> list[str]:
     """Unknown commits not disposed of yet."""
     disposed = disposals(rt)
+    from .reconcile import trusted_commits
+    reviewed = trusted_commits(rt)
     return sorted(name[len(UNKNOWN):] for name in rt.ledger.cursors_with_prefix("*", UNKNOWN)
-                  if name[len(UNKNOWN):] not in disposed)
+                  if name[len(UNKNOWN):] not in disposed and name[len(UNKNOWN):] not in reviewed)
 
 
 def provenance_problems(rt, sha: str) -> list[str]:
@@ -151,7 +156,9 @@ def provenance_problems(rt, sha: str) -> list[str]:
 def publish_trusted(rt) -> None:
     """What the publisher may treat as trusted on main (control record)."""
     recs = _records(rt)
-    trusted = sorted(recs["merges"] | set(recs["disposed"]) | recs["disposing"])[-TRUSTED_KEEP:]
+    # Supervised trust is never cached: control publication verifies its
+    # durable receipts directly, so removal/corruption cannot renew stale trust.
+    trusted = sorted((recs["merges"] - recs["reviewed"]) | set(recs["disposed"]) | recs["disposing"])[-TRUSTED_KEEP:]
     rt.ledger.set_cursor("*", TRUSTED, json.dumps(trusted))
 
 
@@ -264,12 +271,13 @@ def _issue_pending_reverts(rt, main: str) -> None:
     if not getattr(rt, "lease_owner", None):
         return
     disposed = disposals(rt)
+    remaining = set(open_unknown(rt))
     for name, raw in sorted(rt.ledger.cursors_with_prefix("*", UNKNOWN).items(),
                             key=lambda item: json.loads(item[1]).get("at", 0)):
         record = json.loads(raw)
         sha = name[len(UNKNOWN):]
         lifecycle = rt.registry.get(record.get("repo") or "")
-        if record.get("state") != "revert_pending" or lifecycle is None or sha in disposed:
+        if record.get("state") != "revert_pending" or lifecycle is None or sha in disposed or sha not in remaining:
             continue
         record.update(_issue_revert(rt, lifecycle, sha, record, main))
         rt.ledger.set_cursor("*", name, json.dumps(record))
