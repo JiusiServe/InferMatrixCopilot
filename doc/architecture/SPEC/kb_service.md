@@ -324,6 +324,10 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
   接收明确的 `commits` 和 `events` JSON；每项事件给出 `id`、`outcome`（`covered`、`already_covered`、`no_rule`）、
   操作员审阅理由 `reason`，覆盖事件还须给出 `rules: [{path, rule_id}]`。路径以 `repos/` 开始，不含 `knowledge/`。
   `no_rule` 不声称任何规则。覆盖规则必须在精确目标快照中有效，且引用该事件的原始上游 PR。
+- 只有原始 `merged_pr` payload 缺少 `merge_commit_sha` 时，可显式给该项完整 `source_merge_sha`；
+  从注册 adapter 的 `RepoLifecycle.full_name` 取得上游，实时核验 GitHub PR 的 repository/number/URL、
+  merged 状态、精确 merge/head SHA 和 merge time（原始 timestamp 存在时须相符）。此补充证明进入签名计划与回执，
+  不改写原始 payload 字节/哈希，不能覆盖既有 merge SHA；apply 与重复 apply 都从签名行保留 pin 并重新取证，漂移即拒绝。
 - 目标须已监督接收并实际激活；认证操作员、真实 owner merge、精确 head 上的当前 CI、原始事件身份和 payload 哈希、
   规则块、两个校验器及完整快照 manifest 均进入签名计划。选择不能包含不存在的事件或拆开已有源事件 batch。
 - `--apply PLAN` 持有独占 ledger lease 和激活锁，重新验证全部证据；源事件、规则、main/active 或 CI 漂移即拒绝。

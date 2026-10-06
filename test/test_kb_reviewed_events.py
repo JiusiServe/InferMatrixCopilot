@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -223,3 +224,131 @@ def test_active_snapshot_corruption_and_nonexistent_source_event_refuse(world):
     with pytest.raises(RuntimeError, match="snapshot"):
         settlement.apply_plan(w.rt, plan, w.key)
     assert w.rt.ledger.event(event)["status"] == "pending"
+
+
+def _historical_ready(w, monkeypatch, *, status="pending"):
+    event, coverage = _ready(w, status=status)
+    original = w.rt.ledger.event(event)["payload"]
+    original.pop("merge_commit_sha")
+    original["merged_at"] = "2026-10-01T01:02:03Z"
+    raw = json.dumps(original, indent=2)  # retain the exact legacy bytes, not just their canonical digest
+    w.rt.ledger._conn.execute("UPDATE events SET payload=? WHERE id=?", (raw, event))
+    item = coverage["events"][0]
+    item["source_merge_sha"] = "a" * 40
+    repository = w.rt.registry["demo"].full_name
+    upstream = {"number": 10, "html_url": f"https://github.com/{repository}/pull/10",
+                "merged": True, "merged_at": original["merged_at"], "merge_commit_sha": "a" * 40,
+                "head": {"sha": "b" * 40}, "base": {"repo": {"full_name": repository}}}
+    calls, existing_get = [], w.rt.github.get
+
+    def get(path, **params):
+        if path == f"/repos/{repository}/pulls/10":
+            calls.append(path)
+            return upstream
+        return existing_get(path, **params)
+
+    monkeypatch.setattr(w.rt.github, "get", get)
+    return event, coverage, upstream, raw, calls
+
+
+@pytest.mark.parametrize("status", ["pending", "drafted", "rejected"])
+def test_historical_merge_attestation_preserves_payload_and_revalidates_retry(world, monkeypatch, status):
+    w = world
+    event, coverage, upstream, raw, calls = _historical_ready(w, monkeypatch, status=status)
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    planned = verify(settlement.PLAN_PURPOSE, plan, w.key.public_key())["events"][0]
+    assert planned["source_merge_sha"] == "a" * 40
+    assert planned["source_event"]["payload_sha256"] == reconcile._digest(json.loads(raw))
+    assert planned["upstream_merge"] == {"repository": w.rt.registry["demo"].full_name, "number": 10,
+                                         "url": upstream["html_url"], "merge_sha": "a" * 40,
+                                         "head_sha": "b" * 40, "merged_at": upstream["merged_at"]}
+    receipt = settlement.apply_plan(w.rt, plan, w.key)
+    assert settlement.apply_plan(w.rt, plan, w.key) == receipt
+    assert len(calls) == 3  # prepare, apply and retry each obtain fresh upstream evidence
+    assert w.rt.ledger._conn.execute("SELECT payload FROM events WHERE id=?", (event,)).fetchone()[0] == raw
+    assert "merge_commit_sha" not in w.rt.ledger.event(event)["payload"]
+    evidence = verify(settlement.RECEIPT_PURPOSE, json.loads(receipt.read_text()), w.key.public_key())["events"][0]
+    assert evidence["upstream_merge"] == planned["upstream_merge"]
+    assert evidence["source_event"]["status"] == status
+
+
+@pytest.mark.parametrize("failure", ["missing_sha", "short_sha", "wrong_sha", "wrong_number", "wrong_repo",
+                                     "wrong_url", "unmerged", "missing_head", "bad_time", "wrong_time",
+                                     "missing_registry", "invalid_upstream", "malformed_base", "malformed_head"])
+def test_historical_source_needs_exact_configured_live_merge_evidence(world, monkeypatch, failure):
+    w = world
+    event, coverage, upstream, raw, _calls = _historical_ready(w, monkeypatch)
+    if failure == "missing_sha":
+        coverage["events"][0].pop("source_merge_sha")
+    elif failure == "short_sha":
+        coverage["events"][0]["source_merge_sha"] = "a" * 12
+    elif failure == "wrong_sha":
+        upstream["merge_commit_sha"] = "c" * 40
+    elif failure == "wrong_number":
+        upstream["number"] = 11
+    elif failure == "wrong_repo":
+        upstream["base"]["repo"]["full_name"] = "other/demo"
+    elif failure == "wrong_url":
+        upstream["html_url"] = "https://github.com/other/demo/pull/10"
+    elif failure == "unmerged":
+        upstream["merged"] = False
+    elif failure == "missing_head":
+        upstream["head"]["sha"] = ""
+    elif failure == "bad_time":
+        upstream["merged_at"] = "2026-10-01"
+    elif failure == "wrong_time":
+        upstream["merged_at"] = "2026-10-02T01:02:03Z"
+    elif failure == "missing_registry":
+        w.rt.registry.pop("demo")
+    elif failure == "malformed_base":
+        upstream["base"] = "other/demo"
+    elif failure == "malformed_head":
+        upstream["head"] = "b" * 40
+    else:
+        w.rt.registry["demo"] = replace(w.rt.registry["demo"], full_name="../wrong/demo")
+    with pytest.raises(reconcile.ReconciliationError):
+        settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    assert not (w.rt.state_dir / "event-settlements").exists()
+    assert w.rt.ledger.event(event)["status"] == "pending"
+    assert w.rt.ledger._conn.execute("SELECT payload FROM events WHERE id=?", (event,)).fetchone()[0] == raw
+
+
+@pytest.mark.parametrize("drift", ["head", "merge", "time", "repository"])
+def test_historical_upstream_drift_refuses_apply_before_receipt(world, monkeypatch, drift):
+    w = world
+    event, coverage, upstream, _raw, _calls = _historical_ready(w, monkeypatch)
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    if drift == "head":
+        upstream["head"]["sha"] = "c" * 40
+    elif drift == "merge":
+        upstream["merge_commit_sha"] = "c" * 40
+    elif drift == "time":
+        upstream["merged_at"] = "2026-10-02T01:02:03Z"
+    else:
+        upstream["base"]["repo"]["full_name"] = "other/demo"
+    with pytest.raises(reconcile.ReconciliationError):
+        settlement.apply_plan(w.rt, plan, w.key)
+    assert not (w.rt.state_dir / "event-settlements").exists()
+    assert w.rt.ledger.event(event)["status"] == "pending"
+
+
+@pytest.mark.parametrize("expected", ["a" * 40, "c" * 40])
+def test_historical_override_cannot_replace_existing_immutable_merge(world, expected):
+    w = world
+    event, coverage = _ready(w)
+    coverage["events"][0]["source_merge_sha"] = expected
+    with pytest.raises(reconcile.ReconciliationError):
+        settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    assert w.rt.ledger.event(event)["payload"]["merge_commit_sha"] == "a" * 40
+
+
+def test_historical_proof_does_not_relax_whole_batch_selection(world, monkeypatch):
+    w = world
+    event, coverage, _upstream, _raw, _calls = _historical_ready(w, monkeypatch)
+    other = w.rt.ledger.record_event("demo", "merged_pr", "11", {"merge_commit_sha": "b" * 40})
+    with w.rt.ledger.lease() as owner:
+        w.rt.ledger.stage_intake(owner, "demo", "whole-historical-batch", status="failed", verdicts=[], human_reason="",
+                                detail={"event_ids": [event, other]}, drafted_events=[event, other])
+    with pytest.raises(ValueError, match="whole existing source batch"):
+        settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    assert w.rt.ledger.event(other)["status"] == "drafted"

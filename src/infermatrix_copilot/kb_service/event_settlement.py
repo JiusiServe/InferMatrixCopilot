@@ -10,6 +10,7 @@ import json
 import os
 import re
 import tempfile
+from datetime import datetime
 
 from ..knowledge_service.lifecycle import CITATION, Page, safe_source_path
 from ..knowledge_service.signing import canonical_json, sign, verify
@@ -25,6 +26,60 @@ RECEIPT_PURPOSE = "kb-reviewed-event-settlement"
 def _source(event: dict) -> dict:
     return {k: event[k] for k in ("id", "repo", "source", "external_id", "created_at", "status", "detail")} | {
         "payload_sha256": _digest(event["payload"])}
+
+
+def _merged_time(value: object) -> datetime:
+    if not isinstance(value, str):
+        raise ReconciliationError("upstream merge time must be an explicit timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ReconciliationError("upstream merge time is invalid") from exc
+    if parsed.tzinfo is None:
+        raise ReconciliationError("upstream merge time must have a timezone")
+    return parsed
+
+
+def _historical_merge(rt, event: dict, item: dict) -> dict:
+    """Attest missing historical metadata without rewriting the source payload."""
+    payload = event["payload"]
+    expected = item.get("source_merge_sha")
+    if "merge_commit_sha" in payload:
+        sha = payload["merge_commit_sha"]
+        if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+            raise ReconciliationError("original source merge SHA is invalid")
+        if "source_merge_sha" in item:
+            if expected != sha:
+                raise ReconciliationError("supplied source merge SHA conflicts with the immutable payload")
+            raise ReconciliationError("source_merge_sha is only for an original payload missing its merge SHA")
+        return {}
+    if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{40}", expected):
+        raise ReconciliationError("historical source requires an explicit full source_merge_sha")
+    lifecycle = rt.registry.get(event["repo"])
+    upstream = getattr(lifecycle, "full_name", "")
+    if not isinstance(upstream, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", upstream):
+        raise ReconciliationError("historical source requires the configured upstream repository")
+    number = int(event["external_id"])
+    pr = rt.github.get(f"/repos/{upstream}/pulls/{number}")
+    if not isinstance(pr, dict):
+        raise ReconciliationError("upstream PR evidence must be an object")
+    base, head_data = pr.get("base"), pr.get("head")
+    if not isinstance(base, dict) or not isinstance(base.get("repo"), dict) or not isinstance(head_data, dict):
+        raise ReconciliationError("upstream PR repository and head evidence are malformed")
+    base, head = base["repo"], head_data.get("sha")
+    if type(pr.get("number")) is not int or pr["number"] != number \
+            or not isinstance(base.get("full_name"), str) or base["full_name"].lower() != upstream.lower() \
+            or pr.get("html_url") != f"https://github.com/{upstream}/pull/{number}" \
+            or pr.get("merged") is not True or pr.get("merge_commit_sha") != expected \
+            or not isinstance(head, str) or not re.fullmatch(r"[0-9a-f]{40}", head):
+        raise ReconciliationError("historical source has unmatched upstream PR merge evidence")
+    merged_at = pr.get("merged_at")
+    merged_time = _merged_time(merged_at)
+    if "merged_at" in payload and _merged_time(payload["merged_at"]) != merged_time:
+        raise ReconciliationError("upstream merge time conflicts with the immutable payload")
+    return {"source_merge_sha": expected, "upstream_merge": {
+        "repository": upstream, "number": number, "url": pr["html_url"],
+        "merge_sha": expected, "head_sha": head, "merged_at": merged_at}}
 
 
 def _active(rt, target: str, manifest: str) -> None:
@@ -71,7 +126,7 @@ def prepare(rt, *, target: str, allow_mergers: list[str], required_checks: list[
     files, rows, seen = rt.knowledge.knowledge_files(target), [], set()
     previous = {r["source_event"]["id"]: r for r in (settled or {}).get("events", [])}
     for item in coverage["events"]:
-        if not isinstance(item, dict) or set(item) - {"id", "outcome", "rules", "reason"}:
+        if not isinstance(item, dict) or set(item) - {"id", "outcome", "rules", "reason", "source_merge_sha"}:
             raise ReconciliationError("invalid selected event coverage")
         event_id, outcome, reason_text = item.get("id"), item.get("outcome"), item.get("reason", "")
         if type(event_id) is not int or event_id in seen or outcome not in {"covered", "already_covered", "no_rule"}:
@@ -80,7 +135,8 @@ def prepare(rt, *, target: str, allow_mergers: list[str], required_checks: list[
             raise ReconciliationError("every event disposition needs the operator's review reason")
         seen.add(event_id)
         event = rt.ledger.event(event_id)
-        if event["source"] != "merged_pr" or not event["external_id"].isdigit() or not event["payload"].get("merge_commit_sha"):
+        if event["source"] != "merged_pr" or not re.fullmatch(r"[1-9][0-9]*", event["external_id"]) \
+                or not isinstance(event["payload"], dict):
             raise ReconciliationError("settlement requires an immutable merged upstream PR event")
         source = _source(event)
         prior = previous.get(event_id)
@@ -91,6 +147,7 @@ def prepare(rt, *, target: str, allow_mergers: list[str], required_checks: list[
         premature_discard = source["status"] == "done" and source["detail"] == "no rules"
         if source["status"] not in {"pending", "rejected", "drafted"} and not premature_discard:
             raise ReconciliationError("only pending, rejected, drafted or original done/no rules events can be settled")
+        historical = _historical_merge(rt, event, item)
         rules = item.get("rules", [])
         if not isinstance(rules, list) or (outcome == "no_rule" and rules) or (outcome != "no_rule" and not rules):
             raise ReconciliationError("covered events need exact rule references; no-rule events cannot claim rules")
@@ -108,7 +165,7 @@ def prepare(rt, *, target: str, allow_mergers: list[str], required_checks: list[
                 raise ReconciliationError("covered rule must cite the original upstream PR")
             proved.append({**reference, "section_sha256": _digest(matches[0].text)})
         rows.append({"source_event": source, "outcome": outcome, "reason": reason_text.strip(),
-                     "rules": sorted(proved, key=lambda r: (r["path"], r["rule_id"]))})
+                     "rules": sorted(proved, key=lambda r: (r["path"], r["rule_id"])), **historical})
     changesets = rt.ledger.changesets_for_events(seen)
     previous_changesets = {row["id"]: row for row in (settled or {}).get("changesets", [])}
     for change in changesets:
@@ -161,7 +218,8 @@ def apply_plan(rt, envelope: dict, key):
                          if data.get("plan_sha256") == _digest(envelope)), None)
         coverage = {"commits": [row["sha"] for row in planned["commits"]],
                     "events": [{"id": row["source_event"]["id"], "outcome": row["outcome"], "reason": row["reason"],
-                                "rules": [{k: ref[k] for k in ("path", "rule_id")} for ref in row["rules"]]}
+                                "rules": [{k: ref[k] for k in ("path", "rule_id")} for ref in row["rules"]],
+                                **({"source_merge_sha": row["source_merge_sha"]} if "source_merge_sha" in row else {})}
                                for row in planned["events"]]}
         fresh = prepare(rt, target=planned["target"], allow_mergers=planned["allow_mergers"],
                         required_checks=planned["required_checks"], reason=planned["reason"], coverage=coverage,
