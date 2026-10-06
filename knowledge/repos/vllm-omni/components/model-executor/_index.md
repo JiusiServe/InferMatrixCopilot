@@ -1,7 +1,7 @@
 ---
 title: "Model Executor"
 created: 2026-07-10
-updated: 2026-09-22
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, components, model-executor]
 sources: []
@@ -43,3 +43,5 @@ sources: []
 | 采样循环不变量、热路径缓存、AR 音频侧路、preprocess phase/one-token prefill | [运行时热路径合同](rules-runtime-hot-paths.md) |
 
 | NPU runner、ROCm 分页注意力、NPU 模型补丁 | [平台后端合同](rules-platform-backends.md)   新增核对：EXEC-10f、EXEC-10f2。 |
+
+- [MRv2 attention capture 边界](rules-attention-capture.md) — mixed FULL、separate decode 与当前请求 boundary。

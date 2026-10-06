@@ -1,10 +1,10 @@
 ---
 title: "Higgs-Audio 规则"
 created: 2026-09-05
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #6422", "PR #7065", vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.py, vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_tokenizer.py, vllm_omni/worker/gpu_model_runner.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/model_executor/models/higgs_audio_v3/test_higgs_audio_v3.py, tests/e2e/online_serving/test_higgs_audio_v3.py, "PR #7076"]
+sources: ["PR #8426", "PR #6422", "PR #7065", vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.py, vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_tokenizer.py, vllm_omni/worker/gpu_model_runner.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/model_executor/models/higgs_audio_v3/test_higgs_audio_v3.py, tests/e2e/online_serving/test_higgs_audio_v3.py, "PR #7076"]
 confidence: high
 ---
 
@@ -54,6 +54,13 @@ confidence: high
   一部分的 chunked prefill 和 legacy `-100` caller 注入正确 code rows；serving smoke 证明相同
   路径重写时 cache salt 仍变化。H100 voice-clone E2E 未在该 PR 的 lanes 运行，不能把 unit
   coverage 宣称为 end-to-end 证据。^[PR #7065]
+
+## HIGGS-FIXTURE-1a — 绕过构造器的 state fixture 须显式建立被测路径依赖
+
+- 触发：修改 Higgs V3 `make_state`、以 `object.__new__` 构造的 model state，或被该替身调用的 `add_request`/eager-MTP 路径。
+- 强制：根据实际被测调用初始化 fixture 的全部依赖；绕过构造器时显式创建 `_stream_pos` 和与该 state 绑定的 `EagerMTPState(state)`，不能假设正常 `__init__` 已执行。
+- 禁止：只设置模型/runner mock 就直接访问未建立的 eager state；用作者旧树的 CI 通过排除后续组合树上的 fixture 失配；把 PR 的待运行测试计划说成已通过。
+- 验收：运行 `tests/model_executor/models/higgs_audio_v3/test_mrv2_state.py` 的 CPU case，并让真实被测方法访问这些依赖；初始化缺失时回归应失败。^[PR #8426]
 
 ## HIGGS-3a — 共享 reference-code encode 必须屏蔽请求取消并以 task 身份退休
 

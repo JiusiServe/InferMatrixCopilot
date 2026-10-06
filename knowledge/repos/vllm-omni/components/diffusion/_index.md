@@ -1,7 +1,7 @@
 ---
 title: "Diffusion"
 created: 2026-07-10
-updated: 2026-09-22
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/attention/backends/flashinfer_attn.py]
@@ -60,3 +60,9 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 
 
 - [Diffusion 平台 kernel 与设备合同](rules-platform-kernels.md) 新增核对：DIFF-1ai5。
+
+- [测试替身与类型契约](rules-test-contracts.md) — streaming executor、payload 收窄与实际 CPU/type 门禁。
+
+- [HSDP pre-sharded 权重加载](rules-hsdp-weight-loading.md) — meta-first binding、rank-local I/O 与真实双卡 parity。
+
+- [Attention execution-path 能力](rules-attention-contracts.md) — 有效 metadata、FA4 编译边界与未迁移平台。

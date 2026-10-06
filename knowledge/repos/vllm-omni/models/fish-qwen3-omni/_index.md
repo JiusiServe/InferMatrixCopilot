@@ -1,7 +1,7 @@
 ---
 title: "Fish Speech S2 Pro（fish_qwen3_omni,双 AR 单 stage）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, models]
 sources: [vllm_omni/model_executor/models/fish_speech/, vllm_omni/attention/fish_kvcache_attn.py, vllm_omni/deploy/fish_qwen3_omni.yaml]
@@ -63,3 +63,5 @@ sources: [vllm_omni/model_executor/models/fish_speech/, vllm_omni/attention/fish
 - 审查 fish 的 KV 注意力、背压流式或 chunked-prefill 约束改动;上调并发前
   先读 high_concurrency YAML 的 knob 语义。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。
+
+- [Fish Speech streaming 规则](rules.md) — 自适应 chunk 的绝对帧 frontier 与 terminal。

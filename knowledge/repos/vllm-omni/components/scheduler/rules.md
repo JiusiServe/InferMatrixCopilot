@@ -1,10 +1,10 @@
 ---
 title: "Scheduler 规则"
 created: 2026-07-16
-updated: 2026-09-05
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/core/sched/test_omni_scheduler_mixin_timeouts.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6089", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619", "PR #6680", "PR #6626", "PR #6529", tests/core/sched/test_omni_ar_scheduler_aborted_queue_sweep.py, tests/core/sched/test_omni_scheduler_streaming_input_counter.py, tests/core/sched/test_omni_sched_deferred_free_fence.py, "PR #6831", tests/e2e/online_serving/test_nemotron_voicechat_duplex.py]
+sources: ["PR #8259", "PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/core/sched/test_omni_scheduler_mixin_timeouts.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6089", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619", "PR #6680", "PR #6626", "PR #6529", tests/core/sched/test_omni_ar_scheduler_aborted_queue_sweep.py, tests/core/sched/test_omni_scheduler_streaming_input_counter.py, tests/core/sched/test_omni_sched_deferred_free_fence.py, "PR #6831", tests/e2e/online_serving/test_nemotron_voicechat_duplex.py]
 ---
 
 # Scheduler 规则
@@ -323,9 +323,9 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 ## SCHED-6d — 显式 prompt replacement 必须一次性释放旧状态并回到 admission
 
 - 触发：running 或 computed 的 async prompt 显式携带 `replace_streaming_prompt`，或 ready 的 replacement 进入 scheduler。
-- 强制：替换先释放旧 KV/encoder state 一次，清除 in-flight prefill 所有权和 connector watermark；stale fence 以当前 `num_in_flight_tokens` 赋值，再将请求回到 `WAITING` 并走正常 admission。
+- 强制：替换先释放旧 KV/encoder state 一次，清除 in-flight prefill 所有权和 connector watermark；stale fence 先设 `drop_stale_output=True`，以当前 `num_in_flight_tokens` 赋值，再将请求回到 `WAITING` 并走正常 admission。
 - 禁止：只更新 prompt 而继承旧 cache/watermark；把同一 in-flight frame 在更新和 replacement 路径重复计入 stale；绕过 scheduler admission 直接恢复运行。
-- 验收：覆盖 running replacement、ready async replacement 的重复 reset 和正常重新调度；断言 KV/encoder 释放各一次、watermark 清零、stale counter 恰好可排空且首个新 segment frame 不被丢弃。 ^[PR #6406]
+- 验收：覆盖 running replacement、ready async replacement 的重复 reset 和正常重新调度；断言 KV/encoder 释放各一次、watermark 清零、stale counter 恰好可排空且首个新 segment frame 不被丢弃。 ^[PR #6406] ^[PR #8259]
 
 ## SCHED-6e — 流式 segment 边界必须在 request mutation 前冻结发送 watermark
 
