@@ -57,6 +57,8 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   （合并 PR、PR 证据有界摘录、release/tag）、本机 Copilot 运行经验收件目录。
 - `intake`：每个事件由生成器起草类型化操作（只允许 add/edit_same_meaning/replace/retire），
   `apply_operations` 必须接受，最多两轮带精确错误的修复；多事件合并为一个变更集。
+  系统提示明确操作字段的字符串类型；未用可选字段省略或为空字符串，`new_page` 是目标路径而非布尔标志。
+  原生起草与 `kb-intake.draft` 共用 `draft_changes` 的提示，严格 schema 校验保持不变。
 - `gate`：L1 → 逐块 L2（每类块只问适用维度）→ 按 owner 目录的一致性检查；
   外部引用、protected、熔断（按仓库计算）、任何不确定 → human；L1 失败不调用模型。
 - `runtime`：collect → intake → gate → publish；shadow 只记录；变更集文件存 `changesets/<id>.json`。
