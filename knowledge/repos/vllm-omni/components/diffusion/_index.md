@@ -31,6 +31,10 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 | 遇到什么 | 查看哪里 |
 |---|---|
 | Wan exact/fused BF16预算、channels_last首帧Conv2d与cache/fallback | [Wan fastpath规则](rules-wan-fastpath.md) |
+| FlashInfer FP32 per-tensor scale、TRTLLM SAGE ragged/Smooth-K 与量化环境变量 precedence | [FlashInfer quantization rules](rules-flashinfer-quantization.md) |
+| TRTLLM opaque custom-op workspace/fake dtype 与实际 verified execution scope | [TRTLLM execution rules](rules-trtllm-execution.md) |
+| AR-Diffusion kernel legal page、ragged sink/recent KV、scratch offset 与固定 block-table width | [AR paging geometry rules](rules-ar-paging-geometry.md) |
+| Ray cluster placement、env/RPC transport、bounded teardown 与 idle failure | [Ray executor rules](rules-ray-executor.md) |
 | 理解共享职责和数据流 | [architecture](architecture.md) |
 | 根据 PR 描述直达 execution parity、checkpoint/artifact identity、quality evidence 或 system-runtime 异常清理规则组与第一批源码、custom-op mutable schema | [rules 与代码地图](rules.md) |
 | image/diffusion timing、step normalization、missing-versus-zero 与 benchmark 解释边界 | [metrics evidence rules](rules-metrics.md) |
