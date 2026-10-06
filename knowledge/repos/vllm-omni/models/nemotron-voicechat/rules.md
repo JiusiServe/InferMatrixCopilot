@@ -21,7 +21,7 @@ confidence: high
 ## NVC-1a — 原生 duplex 是 frame-locked、可恢复的三 stage 数据面
 
 - 触发：修改 duplex deploy、native runtime extension、Stage-0 append，或 Thinker→Talker→Code2Wav handoff。
-- 强制：只接受每 80 ms 一帧的 1280-sample/16 kHz PCM 输入；Stage 0 跨 wake 保留可恢复 request，text/function side channel 只消费 scheduler 在本次 wake 冻结的 `new_token_ids`。Talker 的累计 code history 在送入有状态 Code2Wav 前只传未见 suffix；native `codec_streaming` 可在当前累计 timeline 耗尽时结束一个 segment，offline async-stream 则必须同时等 `upstream_finished`，包括零进度 wake。共享的下游 receiver requeue/cleanup 遵循 [SCHED-5g](../../components/scheduler/rules.md#sched-5g-resumable-async-chunk-终态清理必须以-live-queue-所有权为准)。
+- 强制：只接受每 80 ms 一帧的 1280-sample/16 kHz PCM 输入；Stage 0 跨 wake 保留可恢复 request，text/function side channel 只消费 scheduler 在本次 wake 冻结的 `new_token_ids`。Talker 的累计 code history 在送入有状态 Code2Wav 前只传未见 suffix；native `codec_streaming` 可在当前累计 timeline 耗尽时结束一个 segment，offline async-stream 则必须同时等 `upstream_finished`，包括零进度 wake。共享的下游 receiver requeue/cleanup 遵循 [SCHED-5g](../../components/scheduler/rules-release-queues.md#sched-5g-resumable-async-chunk-终态清理必须以-live-queue-所有权为准)。
 - 禁止：把 scheduler segment finish 当作 codec stream lifetime finish；重放累计 code prefix 到 causal codec cache；从 `supports_core_resumable_request` 推出公开 reusable KV lease（该 adapter 明确 `supports_core_kv_lease=false`）。
 - 验收：固定 PCM contract、append/runtime contract、scheduler resume 和 data-plane tests 均须通过；offline async-stream completion 也须保持既有终端语义。^[PR #6089]
 

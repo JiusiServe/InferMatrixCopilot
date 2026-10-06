@@ -10,7 +10,7 @@ confidence: high
 
 # FlashInfer attention quantization 合同
 
-本页细化 [FlashInfer plan 合同 DIFF-4h](rules-system-runtime.md#diff-4h-flashinfer-mixed-dtype-plan-必须绑定完整-runtime-shape-与-mask-内容)；TRTLLM packed/SP admission 仍由 [DIFF-1m](rules-attention.md#diff-1m-trtllm-packed-padding-skip-softmax-与-sage-必须保留-producer-sp-和-schedule-合同) 约束。
+本页细化 [FlashInfer plan 合同 DIFF-4h](rules-system-runtime.md#diff-4h-flashinfer-mixed-dtype-plan-必须绑定完整-runtime-shape-与-mask-内容)；TRTLLM packed/SP admission 仍由 [DIFF-1m](rules-attention.md#diff-1m-trtllm-packed-paddingskip-softmax-与-sage-必须保留-producersp-和-schedule-合同) 约束。
 
 ## DIFF-13a — FP8 per-tensor scale 必须在 FP32 中计算并被实际 kernel 消费
 
