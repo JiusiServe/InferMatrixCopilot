@@ -22,7 +22,7 @@ from .init_history import _CheckpointBudget
 from .init_knowledge import MAX_DOC_BYTES, _Knowledge
 from .init_stages import _one_line, _page_frontmatter
 from .init_support import InitError, InitRecord, generate
-from .knowledge_coverage import audit_coverage, feature_metadata, inventory
+from .knowledge_coverage import audit_coverage, coverage_targets_met, feature_metadata, inventory
 from .knowledge_depth import (
     FACETS, audit_depth, build_absence_certificate, depth_page, digest,
     render_block, validate_draft, verified_blocks,
@@ -70,6 +70,14 @@ class _KnowledgeDepth(_Knowledge):
             ":unlimited-subscription" if getattr(self.rt, "unlimited_subscription", False) else "")
 
     def _input_options(self) -> dict:
+        foundation = {}
+        if self.foundation_mode == "partial":
+            from .foundation_publication import foundation_handoff
+            binding = foundation_handoff(self.foundation_record_path, knowledge=self.rt.knowledge,
+                        baseline=self._base_sha, repo=self.lifecycle.repo, pin=self._knowledge_run_pin,
+                        publisher=self._publisher())
+            self._foundation_binding = binding
+            foundation = {"foundation_mode": "partial", "foundation": binding}
         if self.acceptance_mode == "lightweight":
             from .depth_index import INDEX_VERSION
             index_options = {"acceptance_mode": self.acceptance_mode, "depth_index_version": INDEX_VERSION}
@@ -87,7 +95,7 @@ class _KnowledgeDepth(_Knowledge):
             index_options["repair_guidance_sha256"] = self._repair_guidance["guidance_sha256"]
         return {**super()._input_options(), "depth_version": 5 if self.acceptance_mode == "lightweight" else 4,
                 "depth_feature_ids": list(self.feature_ids),
-                **index_options}
+                **index_options, **foundation}
 
     def _base_for_run(self, latest: str) -> str:
         previous = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, self.STAGE)
@@ -138,6 +146,11 @@ class _KnowledgeDepth(_Knowledge):
         policy = self.coverage_policy
         self.today = time.strftime("%Y-%m-%d", time.gmtime(self.record.started_at))
         state = self.record.depth
+        if self.foundation_mode == "partial":
+            state["foundation_mode"] = "partial"
+            state["foundation"] = self._foundation_binding
+            state["execution_scope"] = {"feature_ids": list(dict.fromkeys(self.feature_ids))
+                if self.feature_ids else [f.id for f in policy.features], "complete": False}
         state.setdefault("version", 1)
         states = state.setdefault("features", {})
         accepted = state.setdefault("accepted", {})
@@ -164,7 +177,7 @@ class _KnowledgeDepth(_Knowledge):
         if initial["problems"]:
             return self._blocked(initial["problems"])
         breadth = audit_coverage(self.head, tree, policy, full_name=self.lifecycle.full_name, pin=self.record.pin)
-        if policy.semantic_depth_per_facet_gt is not None and not breadth["met"]:
+        if policy.semantic_depth_per_facet_gt is not None and not coverage_targets_met(breadth, self.foundation_mode):
             self.record.coverage = {"semantic_depth": initial, "breadth": breadth}
             state["done"] = False
             return self._blocked(["structural coverage target is unmet; restore feature and production-file coverage before depth extraction"])
@@ -259,12 +272,18 @@ class _KnowledgeDepth(_Knowledge):
                     if page in self.head:
                         self.head[page] = feature_metadata(self.head[page], feature)
         depth = audit_depth(self.head, tree, policy, self.record.pin)
+        if self.foundation_mode == "partial":
+            state["execution_scope"] = {"feature_ids": [f.id for f in selected_features], "complete": not stopped}
         state["target_met"] = depth["target_met"]
         state["all_resolved"] = not any(x["unknown_facets"] for x in depth["features"].values())
         breadth = audit_coverage(self.head, tree, policy, full_name=self.lifecycle.full_name, pin=self.record.pin)
-        state["done"] = not stopped and (depth["target_met"] and breadth["met"]
+        state["done"] = not stopped and (depth["target_met"] and coverage_targets_met(breadth, self.foundation_mode)
                                          if policy.semantic_depth_per_facet_gt is not None else True)
         self.record.coverage = {"semantic_depth": depth, "breadth": breadth}
+        if self.foundation_mode == "partial":
+            self.record.coverage["foundation"] = {"mode": "partial", "init_complete": False,
+                "foundation_targets_met": breadth["met"],
+                "structural_targets_met": coverage_targets_met(breadth, "partial")}
         self.record.unfinished = [f"depth {id_}/{facet}" for id_, item in depth["features"].items()
                                   for facet in item["unknown_facets"]]
         self.record.notes = [n for n in self.record.notes if not n.startswith("knowledge depth stopped:")]
@@ -339,7 +358,7 @@ class _KnowledgeDepth(_Knowledge):
     def _publish(self, changed):
         depth = self.record.coverage.get("semantic_depth", {})
         unmet = self.coverage_policy.semantic_depth_per_facet_gt is not None and (
-            not depth.get("target_met") or not self.record.coverage.get("breadth", {}).get("met"))
+            not depth.get("target_met") or not coverage_targets_met(self.record.coverage.get("breadth", {}), self.foundation_mode))
         if unmet and not self.dry_run:
             return self._blocked(["semantic depth target is unmet; publication is blocked, checkpoint retained"])
         result = super()._publish(changed)
@@ -538,6 +557,8 @@ class _KnowledgeDepth(_Knowledge):
         front = _page_frontmatter(_one_line(feature.title) + "：实现深读", kind="architecture",
                                   today=self.today, tags=self.tags)
         related = f"[功能概览]({Path(feature.page).name}) · [owner 入口](_index.md)\n\n"
+        if self.foundation_mode == "partial" and feature.page not in self.head:
+            related = "[owner 入口](_index.md)\n\n"
         proposed = front + related + "\n\n".join(blocks[f] for f in FACETS if f in blocks) + "\n"
         # Retrieve exactly the attested spans, including retained prior facets.
         evidence = []

@@ -599,7 +599,7 @@ proof `basis` 缺省 supported，旧区块不改写。verified_absent 当前只�
 可选政策 `semantic_depth: {per_facet_gt: 0.90}` 对每个维度严格执行大于目标，并要求
 每个功能至少一个认可区块；79 功能时每维至少 72，553 分母不缩减。target_met 与
 批次遍历完成分别记录。提取前复核结构覆盖；结构门槛不足先阻断，不消耗模型调用。
-结构覆盖与深度门槛均须满足才能发布。深度未达标 dry run 为 partial，保存预览但步骤不成功；发布阻断。
+默认 strict 流程中，结构覆盖与深度门槛均须满足才能发布。深度未达标 dry run 为 partial，保存预览但步骤不成功；发布阻断。
 执行 API 的 feature_ids 只限定调度范围；审计仍包含完整政策中的所有功能和维度。
 显式列表保留执行顺序并纳入输入摘要；零深度功能仍优先，之后按列表顺序开展首轮。
 并行批次各自保留检查点，合并认可页面后须重新通过全量验收，不能发布分组的部分结果。
@@ -617,6 +617,14 @@ proof `basis` 缺省 supported，旧区块不改写。verified_absent 当前只�
 modules/knowledge 的公共阶段预算仅在显式启用时改为 None；单独选择订阅生成器
 仍保留原记账上限。该模式绑定检查点身份，无此选项时的旧摘要保持不变；
 feature-discovery 与 knowledge-deepen 继续使用各自已有的检查点及身份实现。
+
+`--foundation-mode partial` 是显式基础知识部分发布及其新深度批次交接选项，
+不降低七维认可门槛。基础发布只重放已经结束的订阅批次，保留原生成身份、任务、
+修正次数、真实未知项与 `init_complete=false`；源码、原生证明、格式和结构覆盖
+仍须通过。新深度批次要求原始已合并发布记录，绑定模式、记录和收据哈希，
+同一完整功能目录和七维分母不变。收据、紧凑 PR 正文和 prepared 恢复契约见
+[`foundation_publication`](kb_service/foundation_publication.md)，操作入口见
+[部分发布说明](../../knowledge/partial-foundation.md)。
 
 ### 2026-10-02 轻量认可、13 功能任务与轨迹留存
 

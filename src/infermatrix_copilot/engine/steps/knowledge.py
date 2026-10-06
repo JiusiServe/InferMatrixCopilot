@@ -187,6 +187,11 @@ async def init_stage(ctx: StepContext) -> StepResult:
                 kwargs[option] = True
         if ctx.params.get("acceptance_mode"):
             kwargs["acceptance_mode"] = str(ctx.params["acceptance_mode"])
+        if ctx.params.get("foundation_mode"):
+            kwargs["foundation_mode"] = str(ctx.params["foundation_mode"])
+        if ctx.params.get("foundation_record"):
+            from pathlib import Path
+            kwargs["foundation_record_path"] = Path(ctx.params["foundation_record"])
         record = run_stage(rt, lifecycle, stage, dry_run=dry_run, pin=pin, **kwargs)
     except (InitError, NotImplementedError, ValueError) as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
