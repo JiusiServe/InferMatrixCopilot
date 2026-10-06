@@ -65,3 +65,4 @@ sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", "PR #4322"
  | [Qwen-Omni rules](rules.md)   新增核对：QOMNI-1h、QOMNI-1h2、QOMNI-1h3、QOMNI-1h4。 |
 
 | Thinker audio resampler 或 deepstack meta-device buffer | [Thinker 输入与 buffer 规则](rules-thinker-input.md) |
+- [MRv2 sampled handoff、first audio 与 decoder opt-in](rules-mrv2-audio.md)

@@ -77,3 +77,5 @@ sources: ["PR #6422", "PR #7065", vllm_omni/entrypoints/openai/serving_speech.py
   codec 常量（8×1026,25 fps × hop 960;v2 称 BOS/EOS 1024/1025,v3 称
   BOC/EOC 1024/1025）。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。
+
+- [V3 MRv2 state、sampling 与 audio snapshots](rules-mrv2-audio.md)

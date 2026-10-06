@@ -167,3 +167,5 @@ Qwen3-VL text encoder 的 cuDNN SDPA process-global-state restore、encoder-rank
 CPU-only validation limit 见 [encoder state rules](rules-encoder-state.md)。
 
 - [rules-quality](rules-quality.md) 新增核对：MMH3-4a2。
+
+- [latent upscaler、second-pass refinement 与容量门禁](rules-latent-refinement.md)
