@@ -6,13 +6,18 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from test_kb_audit import _git, _land, _setup
 
 from infermatrix_copilot.kb_service import reconcile
+from infermatrix_copilot.kb_service.accept import accept_pending, request_accept
 from infermatrix_copilot.kb_service.activate import activate
-from infermatrix_copilot.kb_service.accept import request_accept, accept_pending
-from infermatrix_copilot.kb_service.audit import audit_main, open_unknown, provenance_problems, publish_trusted
+from infermatrix_copilot.kb_service.audit import (
+    audit_main,
+    open_unknown,
+    provenance_problems,
+    publish_trusted,
+)
 from infermatrix_copilot.knowledge_service.signing import SignatureError, verify
-from test_kb_audit import _setup, _land, _git
 
 
 class MergeGitHub:
@@ -39,7 +44,7 @@ class MergeGitHub:
 
 @pytest.fixture
 def world(tmp_path, monkeypatch):
-    rt, lifecycle, scheduler, origin = _setup(tmp_path)
+    rt, _lifecycle, scheduler, origin = _setup(tmp_path)
     _land(origin, "knowledge/AGENTS.md", "# Agent instructions\n", "baseline entry")
     for name in ("check_knowledge_tree.py", "check_wiki_lint.py"):
         _land(origin, f"knowledge/tools/{name}", "import subprocess\nsubprocess.run(['git','ls-files','--error-unmatch','knowledge/AGENTS.md'], check=True, capture_output=True)\nprint('fixture validation passed')\n", "baseline validator")
@@ -53,8 +58,8 @@ def world(tmp_path, monkeypatch):
     monkeypatch.setattr(reconcile, "_repository", lambda knowledge: "org/kb")
     monkeypatch.setenv("KB_KNOWLEDGE_CLONE", str(rt.knowledge.path))
     return SimpleNamespace(rt=rt, scheduler=scheduler, origin=origin, sha=sha, base=baseline,
-                           key=rt.outbox._key, options=dict(target=sha, allow_mergers=["owner"],
-                                                          required_checks=["suite"], reason="authorized owner recovery"))
+                           key=rt.outbox._key, options={"target": sha, "allow_mergers": ["owner"],
+                                                       "required_checks": ["suite"], "reason": "authorized owner recovery"})
 
 
 def test_supervised_admission_passes_real_activation_without_disposing_or_changing_modes(world):

@@ -148,7 +148,7 @@ def _validate_target(knowledge, target: str) -> dict:
             tool = source / "knowledge" / "tools" / name
             if not tool.is_file():
                 raise ReconciliationError(f"mandatory validator missing: {name}")
-            run = subprocess.run([sys.executable, str(tool)], cwd=source, capture_output=True, timeout=180)
+            run = subprocess.run([sys.executable, str(tool)], cwd=source, capture_output=True, timeout=180, check=False)
             if run.returncode:
                 detail = (run.stdout + run.stderr).decode(errors="replace")[-2000:]
                 raise ReconciliationError(f"{name} failed: {detail}")
