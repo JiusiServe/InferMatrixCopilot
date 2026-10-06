@@ -67,3 +67,6 @@ sources: [vllm_omni/model_executor/models/voxcpm2/, vllm_omni/deploy/voxcpm2.yam
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。
 
 - [rules](rules.md)：VOXCPM2-2a 的请求噪声隔离与 VOXCPM2-3a 的 LocDiT 参数/solver 边界。
+- [rules](rules.md) 新增核对：VOXCPM2-2a。
+
+- [NPU estimator exact graphs 与延迟平台注册](rules-npu-graphs.md)

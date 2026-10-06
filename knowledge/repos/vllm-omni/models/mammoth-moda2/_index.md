@@ -51,3 +51,6 @@ sources: ["PR #6694", vllm_omni/model_executor/models/mammoth_moda2/, vllm_omni/
   PR 作者的单张 GPU 示例外推硬件、吞吐、质量或全部任务支持。^[PR #6694]
 
 T2I None/default 与16-pixel dimension validation：MAMMO-1d；沿本目录 rules 审查入口核对。
+- [step execution、request scheduler 与 CFG](rules-step-runtime.md)
+- [TeaCache joint context 与 fused QK RoPE](rules-cache-kernels.md)
+- [image route、AR grid 与 legacy image stage](rules-image-serving.md)
