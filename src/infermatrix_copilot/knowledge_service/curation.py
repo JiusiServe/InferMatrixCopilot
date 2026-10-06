@@ -20,6 +20,32 @@ __all__ = ["KnowledgeCurator", "KnowledgeValidatorError", "_apply_supported"]
 
 
 class KnowledgeCurator(ApplyMixin, ProposalMixin, PromptMixin, CatalogMixin):
+    @staticmethod
+    def reviewed_rule_evidence(page_text: str, *, rule_id: str, source_reference: str) -> dict[str, str]:
+        """Verify one active, source-citing rule and return its exact block digest."""
+        from .lifecycle import Page
+
+        sections = [section for section in Page.parse(page_text).rules() if section.rule_id == rule_id]
+        if len(sections) != 1 or sections[0].footer.status != "active" or source_reference not in sections[0].citations:
+            raise KnowledgeCurationError("reviewed rule must exist once, be active, and cite its source")
+        return {"rule_id": rule_id, "source_reference": source_reference,
+                "section_sha256": hashlib.sha256(sections[0].text.encode("utf-8")).hexdigest()}
+
+    @staticmethod
+    def installed_knowledge_file(path: str) -> bytes:
+        """Read a canonical governed page from this installed provider package."""
+        from importlib.resources import files
+
+        from .lifecycle import safe_source_path
+
+        if not safe_source_path(path) or not path.startswith("knowledge/repos/") or not path.endswith(".md"):
+            raise InvalidRequestError("installed knowledge path must be a canonical repository Markdown page")
+        target = files("infermatrix_copilot").joinpath(*path.split("/"))
+        try:
+            return target.read_bytes()
+        except (OSError, ValueError) as exc:
+            raise KnowledgeCurationError("installed provider knowledge page is unavailable") from exc
+
     def __init__(
         self,
         workspace_root: str | Path,

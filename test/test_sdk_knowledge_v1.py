@@ -139,6 +139,34 @@ def test_catalog_is_repo_scoped_sorted_and_path_free(workspace):
     assert all(not Path(item).is_absolute() for item in all_pages)
 
 
+def test_reviewed_rule_evidence_is_active_source_bound_and_byte_exact():
+    import hashlib
+
+    proof = KnowledgeCurator.reviewed_rule_evidence(PAGE_TEXT, rule_id="X-1", source_reference="PR #1")
+    section = PAGE_TEXT[PAGE_TEXT.index("## X-1"):]
+    assert proof["section_sha256"] == hashlib.sha256(section.encode()).hexdigest()
+    for text, rule, source in [(PAGE_TEXT, "X-0", "PR #1"), (PAGE_TEXT, "X-1", "PR #2"),
+                               (PAGE_TEXT + "<!-- kb:rule status=retired since=v1 retired_at=v2 reason=duplicate evidence=proof -->\n", "X-1", "PR #1")]:
+        with pytest.raises(KnowledgeCurationError):
+            KnowledgeCurator.reviewed_rule_evidence(text, rule_id=rule, source_reference=source)
+
+
+@pytest.mark.parametrize("path", ["/knowledge/repos/x/rules.md", "knowledge/repos/../x/rules.md", "knowledge/tools/check.py"])
+def test_installed_knowledge_file_rejects_noncanonical_paths(path):
+    with pytest.raises(InvalidRequestError):
+        KnowledgeCurator.installed_knowledge_file(path)
+
+
+def test_installed_knowledge_file_uses_package_resources_without_workspace_overrides(monkeypatch, tmp_path):
+    import importlib.resources
+
+    page = tmp_path / PAGE
+    page.parent.mkdir(parents=True)
+    page.write_text(PAGE_TEXT)
+    monkeypatch.setattr(importlib.resources, "files", lambda package: tmp_path)
+    assert KnowledgeCurator.installed_knowledge_file(PAGE) == PAGE_TEXT.encode()
+
+
 def _non_empty(text: str) -> int:
     return sum(1 for line in text.splitlines() if line.strip())
 
