@@ -28,9 +28,9 @@ from .init_budget import BudgetExhausted
 from .init_coverage import Owner
 from .init_stages import _Chain, _Stage, _numbered, _one_line, _page_frontmatter, neutral_headings
 from .init_support import InitRecord, classify_verdict, generate, judge
-from .init_knowledge_inputs import SYSTEM_KNOWLEDGE, knowledge_prompt, source_owner, source_owners
+from .init_knowledge_inputs import SYSTEM_KNOWLEDGE, knowledge_prompt, source_owner, source_owners, foundation_evidence
 from .models import ModelUnavailable
-from .init_knowledge_parallel import offered_ranges, parallelism, run_jobs, restore_jobs, preferred_sources, start_interval
+from .init_knowledge_parallel import offered_ranges, parallelism, run_jobs, restore_jobs, preferred_sources, start_interval, range_is_offered, related_test_sources
 
 FACETS = ("architecture", "api", "configuration", "tradeoffs", "features", "validation")
 MAX_SOURCE_BYTES = 100_000
@@ -72,6 +72,8 @@ def validate_sections(data: dict) -> None:
 @dataclass
 class _Knowledge(_Stage):
     STAGE = "knowledge"
+    foundation_mode: str = "strict"
+    foundation_record_path: Path | None = None
 
     def _chain(self) -> _Chain:
         if not self.from_existing:
@@ -108,6 +110,8 @@ class _Knowledge(_Stage):
             except (ValueError, TypeError) as exc:
                 return [f"knowledge coverage policy: {exc}"]
             self.coverage_policy = policy
+            if self.foundation_mode == "partial" and policy.semantic_depth_per_facet_gt is None:
+                return ["partial foundation requires a final semantic-depth acceptance policy"]
             for feature in policy.features:
                 existing = self.base.get(feature.page)
                 if existing:
@@ -120,7 +124,8 @@ class _Knowledge(_Stage):
         path = self._coverage_policy_path()
         text = self.overlay.get(path) or self.rt.knowledge.show(self._base_sha, path) or ""
         options = {"knowledge_policy": hashlib.sha256(text.encode()).hexdigest(),
-                   "from_existing": self.from_existing, "knowledge_prompt_version": 3}
+                   "from_existing": self.from_existing,
+                   "knowledge_prompt_version": 4 if self.rt.unlimited_subscription else 3}
         if self.rt.unlimited_subscription:
             options["foundation_parallel"] = {"version": 1, "workers": parallelism(self.rt),
                                                "zcode_start_interval_s": start_interval(self.rt)}
@@ -135,6 +140,8 @@ class _Knowledge(_Stage):
             return True  # Preserve immutable historical publication records.
         if self.rt.unlimited_subscription and previous.status != "published":
             self._validate_unpublished_checkpoint(previous, previous.inputs_digest)
+        if self.STAGE == "knowledge" and self.foundation_mode == "partial":
+            return False  # Reconstruct a truthful publication-only scope from the saved native tasks.
         return not (self.rt.unlimited_subscription and previous.unfinished)
 
     def _resume_input_problems(self, previous: InitRecord, digest: str) -> list[str]:
@@ -142,6 +149,9 @@ class _Knowledge(_Stage):
             # Raise before generic _blocked writes: restoring an archive must
             # leave the same genuine prepared publication resumable.
             self._validate_unpublished_checkpoint(previous, digest)
+        if self.STAGE == "knowledge":
+            from .foundation_publication import verify_prepared_receipt
+            verify_prepared_receipt(self, previous)
         return super()._resume_input_problems(previous, digest)
 
     def _validate_unpublished_checkpoint(self, previous: InitRecord, digest: str) -> None:
@@ -149,6 +159,10 @@ class _Knowledge(_Stage):
         validate_checkpoint(self, previous, digest)
 
     def _restore_progress(self, previous: InitRecord | None) -> list[str]:
+        if self.STAGE == "knowledge" and self.foundation_mode == "partial" and previous is not None:
+            self._validate_unpublished_checkpoint(previous, self.record.inputs_digest)
+            from .foundation_publication import validate_initial_scope
+            validate_initial_scope(self, previous)
         if (self.rt.unlimited_subscription and previous is not None
                 and previous.coverage.get("foundation_jobs")
                 and previous.inputs_digest != self.record.inputs_digest):
@@ -163,11 +177,27 @@ class _Knowledge(_Stage):
 
     def _publish(self, changed: dict[str, str]) -> InitRecord:
         targets = self.record.coverage.get("knowledge", {}).get("targets", {})
+        if self.STAGE == "knowledge" and self.foundation_mode == "partial":
+            from .foundation_publication import freeze_receipt
+            freeze_receipt(self, changed)
+            return super()._publish(changed)
         if (self.rt.unlimited_subscription and not self.dry_run
                 and targets.get("required") is True and targets.get("met") is not True):
             return self._blocked(["foundation targets incomplete; native progress retained; "
                                   "resume this same pinned publication batch to fill missing knowledge"])
         return super()._publish(changed)
+
+    def _resume(self, previous: InitRecord) -> InitRecord:
+        if self.STAGE == "knowledge" and self.foundation_mode == "partial":
+            from .init_stages import render_pr_body
+            from .init_support import load_prepared, save_prepared
+            # The common run path has already replayed native/source/receipt
+            # and checked the frozen catalog, branch and generation identity.
+            prepared = load_prepared(previous.pr["prepared"])
+            body = render_pr_body(previous, self.lifecycle)
+            if prepared["body"] != body:
+                save_prepared(Path(previous.pr["prepared"]), **{**prepared, "body": body})
+        return super()._resume(previous)
 
     def _build(self, tree: Path) -> InitRecord:
         if self.route_source == "none":
@@ -177,6 +207,12 @@ class _Knowledge(_Stage):
         from .feature_discovery_index import build_for_stage
 
         self.source_index = build_for_stage(tree, self)
+        publication_only = self.foundation_mode == "partial"
+        if publication_only and not getattr(self, "coverage_policy", None):
+            return self._blocked(["partial foundation publication requires an explicit coverage policy"])
+        visited_owners, visited_features = [], []
+        if publication_only and not self.record.coverage.get("foundation_jobs", {}).get("tasks"):
+            return self._blocked(["partial foundation publication requires a genuine saved native batch"])
         files: dict[str, list[str]] = {}
         unrouted = []
         policy = getattr(self, "coverage_policy", None)
@@ -210,6 +246,7 @@ class _Knowledge(_Stage):
         claims, evidence = {}, []
         owner_jobs = []
         for position, name in enumerate(order):
+            visited_owners.append(name)
             owner = owners[name]
             page = self._page_for(owner)
             existing = self.head.get(page, "")
@@ -231,15 +268,20 @@ class _Knowledge(_Stage):
                             "source_files": len(files[name]), "shown_files": 0}
             if not requested:
                 continue
-            source = self._sources(tree, sorted(files[name], key=lambda p: (-churn[p], p)), MAX_SOURCE_BYTES)
+            if publication_only:
+                continue  # No fourth extraction or review: existing task proofs were replayed by restore_jobs.
+            tests = related_test_sources(self, files[name]) if self.rt.unlimited_subscription else []
+            test_bytes = sum(len(item["text"].encode()) for item in tests)
+            source = self._sources(tree, sorted(files[name], key=lambda p: (-churn[p], p)), MAX_SOURCE_BYTES - test_bytes)
+            source.extend(tests)
             docs = self._docs_for(tree, owner)
             offered = offered_ranges(source + docs)
-            report[name]["shown_files"] = len(source)
-            report[name]["partial_files"] = [item["path"] for item in source if item["end"] < item["total_lines"]]
+            report[name]["shown_files"] = len(source) - len(tests)
+            report[name]["partial_files"] = [item["path"] for item in source if not item.get("test_context") and item["end"] < item["total_lines"]]
             self.record.unfinished.extend(f"{name}: byte cap truncated {path}"
                                           for path in report[name]["partial_files"])
-            if len(source) < len(files[name]):
-                self.record.unfinished.append(f"{name}: source cap showed {len(source)} of {len(files[name])} files")
+            if len(source) - len(tests) < len(files[name]):
+                self.record.unfinished.append(f"{name}: source cap showed {len(source) - len(tests)} of {len(files[name])} files")
             payload = {"repository": self.lifecycle.full_name, "pin": self.record.pin, "owner": name,
                        "facets": requested, "files": source, "docs": docs,
                        "existing_knowledge": self._bounded_context(existing_pages),
@@ -247,6 +289,7 @@ class _Knowledge(_Stage):
                        "related_owners": [{"owner": o.owner, "scope_prefixes": list(o.prefixes)}
                                           for o in self.owners]}
             if self.rt.unlimited_subscription:
+                payload["foundation_prompt_version"] = 4
                 owner_jobs.append({"owner": owner, "page": page, "payload": payload,
                                    "offered": offered, "requested": requested})
                 continue
@@ -312,12 +355,18 @@ class _Knowledge(_Stage):
             targets = audit_coverage(self.head, tree, policy, full_name=self.lifecycle.full_name, pin=self.record.pin)
             feature_jobs = []
             for feature in policy.features:
+                visited_features.append(feature.id)
+                if publication_only:
+                    continue
                 if targets["features"]["items"][feature.id]["covered"]:
                     continue
                 paths = [p.relative_to(tree).as_posix() for p in tree.rglob("*")
                          if p.is_file() and matches(p.relative_to(tree).as_posix(), feature.source_globs)]
                 source_paths = list(dict.fromkeys(list(feature.entry_points) + sorted(paths)))
-                source = preferred_sources(self, tree, feature.id, source_paths, MAX_SOURCE_BYTES)
+                tests = related_test_sources(self, source_paths) if self.rt.unlimited_subscription else []
+                test_bytes = sum(len(item["text"].encode()) for item in tests)
+                source = preferred_sources(self, tree, feature.id, source_paths, MAX_SOURCE_BYTES - test_bytes)
+                source.extend(tests)
                 docs = self._sources(tree, list(feature.docs), MAX_DOC_BYTES)
                 if not source:
                     self.record.unfinished.append(f"feature {feature.id}: missing readable source")
@@ -330,6 +379,7 @@ class _Knowledge(_Stage):
                            "existing_knowledge": self._bounded_context({feature.page: self.head.get(feature.page, "")}),
                            "language_sample": self._language_sample()}
                 if self.rt.unlimited_subscription:
+                    payload["foundation_prompt_version"] = 4
                     feature_jobs.append({"owner": Owner("feature-" + feature.id, feature.page, ()),
                                          "page": feature.page, "payload": payload,
                                          "offered": offered, "requested": missing_facets})
@@ -369,6 +419,16 @@ class _Knowledge(_Stage):
             for feature in policy.features:
                 if feature.page in self.head:
                     self.head[feature.page] = feature_metadata(self.head[feature.page], feature)
+        if publication_only:
+            self.record.coverage["foundation_scope"] = {
+                "version": 1, "kind": "publication-only reconstruction",
+                "complete": visited_owners == order and visited_features == [f.id for f in policy.features],
+                "owners": visited_owners, "features": visited_features,
+                "index_sha256": self.source_index.sha256,
+                "index_identity": self.source_index.identity,
+                "index_failures": self.source_index.failures,
+                "terminal_tasks": sorted(self.record.coverage["foundation_jobs"]["tasks"]),
+                "native_dispatches": 0}
         return self._conclude(claims, evidence)
 
     def _page_for(self, owner: Owner) -> str:
@@ -480,9 +540,7 @@ class _Knowledge(_Stage):
         entries = []
         for entry in section["evidence"]:
             ranges = offered.get(entry["path"], [])
-            if isinstance(ranges, int):  # legacy callers offer an uninterrupted prefix
-                ranges = [(1, ranges)]
-            if not any(start <= entry["start"] <= entry["end"] <= end for start, end in ranges):
+            if not range_is_offered(ranges, entry["start"], entry["end"]):
                 self.record.dropped.append({"rule_id": key, "page": page, "why": "evidence outside shown input"})
                 return None
             try:
@@ -509,6 +567,12 @@ class _Knowledge(_Stage):
                 self.record.unfinished.append(f"{owner.owner}/{facet}: {label}; draft retained in model traces for review")
             return None
         return self._append_approved(owner, page, title, facet, text, entries, label)
+
+    def _judge_evidence(self, entries):
+        payload = getattr(self, "_foundation_payload", {})
+        if self.rt.unlimited_subscription and payload.get("foundation_prompt_version") == 4:
+            return foundation_evidence(self, payload)
+        return super()._judge_evidence(entries)
 
     def _render_section(self, section, entries):
         facet = section["facet"]

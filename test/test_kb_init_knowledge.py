@@ -8,6 +8,7 @@ import pytest
 from infermatrix_copilot.kb_service.init_knowledge import (
     FACETS, MAX_DOC_BYTES, SYSTEM_KNOWLEDGE, _Knowledge, knowledge_prompt, validate_sections,
 )
+from infermatrix_copilot.kb_service.init_knowledge_inputs import SYSTEM_KNOWLEDGE_V4
 from infermatrix_copilot.kb_service.init_stages import run_stage
 from infermatrix_copilot.kb_service.init_support import InitRecord
 from infermatrix_copilot.knowledge_service.lifecycle import Page
@@ -126,7 +127,7 @@ class KnowledgeGateway(CardGateway):
         self.cost = cost
 
     def call_json(self, role, *, system, prompt, validate=None, max_budget_usd=None):
-        if system != SYSTEM_KNOWLEDGE:
+        if system not in (SYSTEM_KNOWLEDGE, SYSTEM_KNOWLEDGE_V4):
             return super().call_json(role, system=system, prompt=prompt, validate=validate,
                                      max_budget_usd=max_budget_usd)
         from infermatrix_copilot.kb_service.models import ModelReply

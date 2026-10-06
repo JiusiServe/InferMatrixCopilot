@@ -387,7 +387,7 @@ def audit_coverage(head: dict[str, str], tree: Path, policy: CoveragePolicy,
                                 "covered": complete, "missing_facets": sorted(set(FACETS) - facets),
                                 "source_evidence": has_source, "doc_evidence": has_docs,
                                 "documentation_required": bool(feature.docs), "doc_requirement_met": doc_requirement_met,
-                                "implemented": bool(implemented)}
+                                "implemented": bool(implemented), "basic_explanation": len(text.strip()) >= 500}
     covered.intersection_update(files)
     core_ratio = len(covered) / len(files) if files else 0.0
     feature_count = sum(f["covered"] for f in features.values())
@@ -400,12 +400,29 @@ def audit_coverage(head: dict[str, str], tree: Path, policy: CoveragePolicy,
                              "This is structural knowledge coverage, not exhaustive behavior analysis or test coverage."},
             "catalog_sources": {"declared": list(policy.catalog_sources), "missing": missing_catalogs},
             "met": bool(files) and not missing_catalogs and core_ratio >= policy.target and feature_count == len(features),
+            "structural": {"met": bool(files) and not missing_catalogs and core_ratio >= policy.target
+                           and all(f["implemented"] for f in features.values()),
+                           "inventory_valid": bool(files), "catalog_valid": not missing_catalogs,
+                           "core_target_met": bool(files) and core_ratio >= policy.target,
+                           "implementation_scope_met": all(f["implemented"] for f in features.values()),
+                           "source_evidence_features": sum(f["source_evidence"] for f in features.values()),
+                           "doc_requirement_features": sum(f["doc_requirement_met"] for f in features.values()),
+                           "basic_explanation_features": sum(f["basic_explanation"] for f in features.values()),
+                           "total_features": len(features)},
             "core": {"target": policy.target, "covered": len(covered), "total": len(files),
                      "ratio": core_ratio, "roots": list(policy.roots), "exclude": list(policy.exclude),
                      "suffixes": list(policy.suffixes), "filenames": list(policy.filenames), "covered_files": sorted(covered),
                      "missing_files": sorted(set(files) - covered), "contract_files": len(cards),
                      "stale_contracts": sorted(stale)},
             "features": {"target": 1.0, "covered": feature_count, "total": len(features), "items": features}}
+
+
+def coverage_targets_met(report: dict, foundation_mode: str = "strict") -> bool:
+    """Separate structural prerequisites from six-facet foundation completion."""
+    if foundation_mode not in ("strict", "partial"):
+        raise ValueError("foundation_mode must be strict or partial")
+    return (report.get("met") is True if foundation_mode == "strict"
+            else report.get("structural", {}).get("met") is True)
 
 
 def add_contract_pages(head: dict[str, str], tree: Path, policy: CoveragePolicy, owners: list[Owner],

@@ -108,6 +108,29 @@ def discovery_handoff(args):
             "report_path": report_path, **binding}
 
 
+def foundation_handoff(args):
+    """Bind explicit partial depth to the genuine published foundation bytes."""
+    mode = getattr(args, "foundation_mode", "strict")
+    path = getattr(args, "foundation_record", None)
+    if mode == "strict" and path is None:
+        return None
+    if mode != "partial" or path is None:
+        raise ValueError("partial depth requires --foundation-record; strict depth cannot use one")
+    from infermatrix_copilot.kb_service.foundation_publication import foundation_handoff as validate
+    from infermatrix_copilot.kb_service.init_support import InitError
+    from infermatrix_copilot.kb_service.sources import KnowledgeRepo
+
+    try:
+        binding = validate(Path(path), knowledge=KnowledgeRepo(args.root), baseline=args.baseline,
+                           repo=args.repo, pin=args.pin)
+    except InitError as exc:
+        raise ValueError(str(exc)) from exc
+    expected = getattr(args, "foundation_record_sha256", None)
+    if expected is not None and expected != binding["record_sha256"]:
+        raise ValueError("foundation prerequisite record changed after campaign binding")
+    return binding
+
+
 def install_discovery_handoff(args, state, binding):
     """Copy the exact immutable prerequisite into a worker without rewriting it."""
     if binding is None:
@@ -162,6 +185,11 @@ def run_worker(args, state):
         if metadata.get("discovery") != binding:
             raise RuntimeError("worker discovery handoff differs from the frozen campaign identity")
         install_discovery_handoff(args, state, binding)
+    foundation = foundation_handoff(args)
+    if foundation is not None:
+        metadata = json.loads((args.state / "campaign.json").read_bytes())
+        if metadata.get("foundation_mode") != "partial" or metadata.get("foundation") != foundation:
+            raise RuntimeError("worker foundation handoff differs from the frozen campaign identity")
     runtime = InitRuntime.from_env(Settings(_env_file=None), state_dir=state)
     from infermatrix_copilot.kb_service.depth_pacing import SharedZcodePacer
     runtime.gateway.configure_zcode_pacing(SharedZcodePacer(
@@ -175,7 +203,9 @@ def run_worker(args, state):
                        feature_ids=tuple(args.feature_ids.split(",")), retry_unfinished=args.retry,
                        acceptance_mode=getattr(args, "acceptance_mode", "strict"),
                        depth_index_path=getattr(args, "depth_index_path", None),
-                       stop_file=getattr(args, "stop_file", None))
+                       stop_file=getattr(args, "stop_file", None),
+                       **({"foundation_mode": "partial", "foundation_record_path": Path(foundation["record_path"])}
+                          if foundation is not None else {}))
     if record.kb_base_sha != args.baseline or record.pin != args.pin:
         raise RuntimeError("worker completed against a different source or knowledge baseline")
     print(json.dumps({"worker": args.worker, "status": record.status, "problems": record.problems,
@@ -200,6 +230,10 @@ def main():
     parser.add_argument("--discovery-record", type=Path,
                         help="Original completed, merged feature-discovery record; required for a discovered catalog")
     parser.add_argument("--discovery-record-sha256", help=argparse.SUPPRESS)
+    parser.add_argument("--foundation-mode", choices=("strict", "partial"), default="strict")
+    parser.add_argument("--foundation-record", type=Path,
+                        help="Original published partial foundation record; required for explicit partial depth")
+    parser.add_argument("--foundation-record-sha256", help=argparse.SUPPRESS)
     parser.add_argument("--zcode-pacing-path", type=Path)
     parser.add_argument("--zcode-start-interval", type=float, default=15.0)
     parser.add_argument("--zcode-rate-cooldown", type=float, default=90.0)
@@ -219,6 +253,10 @@ def main():
         args.repair_guidance = args.repair_guidance.resolve()
     if args.discovery_record:
         args.discovery_record = args.discovery_record.resolve()
+    if args.foundation_record:
+        args.foundation_record = args.foundation_record.resolve()
+    if (args.foundation_mode == "partial") != bool(args.foundation_record):
+        parser.error("partial foundation mode requires --foundation-record; strict mode cannot use one")
     if args.zcode_pacing_path:
         args.zcode_pacing_path = args.zcode_pacing_path.resolve()
     from infermatrix_copilot.kb_service.depth_pacing import SharedZcodePacer
@@ -234,6 +272,8 @@ def main():
             parser.error("guided workers require their parent's immutable guidance hash")
         if args.discovery_record and not re.fullmatch(r"[0-9a-f]{64}", args.discovery_record_sha256 or ""):
             parser.error("discovery workers require their parent's immutable prerequisite hash")
+        if args.foundation_record and not re.fullmatch(r"[0-9a-f]{64}", args.foundation_record_sha256 or ""):
+            parser.error("partial workers require their parent's immutable foundation hash")
         return worker(args)
     args.baseline = subprocess.check_output(["git", "-C", str(args.root), "rev-parse", args.baseline + "^{commit}"], text=True).strip()
     args.state.mkdir(parents=True, exist_ok=True)
@@ -272,10 +312,13 @@ def campaign(args, parser):
                "acceptance_mode": getattr(args, "acceptance_mode", "strict")}
     try:
         binding = discovery_handoff(args)
+        foundation = foundation_handoff(args)
     except (ValueError, TypeError, OSError) as exc:
         parser.error(str(exc))
     if binding is not None:
         summary["discovery"] = binding
+    if foundation is not None:
+        summary.update(foundation_mode="partial", foundation=foundation)
     if getattr(args, "repair_guidance", None):
         from infermatrix_copilot.kb_service.depth_inputs import load_repair_guidance
         guidance = load_repair_guidance(args.repair_guidance, pin=args.pin,
@@ -287,7 +330,9 @@ def campaign(args, parser):
     metadata = args.state / "campaign.json"
     if metadata.exists():
         prior = json.loads(metadata.read_text())
-        if prior.get("repair_guidance_sha256") != summary.get("repair_guidance_sha256") or any(
+        if (prior.get("foundation_mode", "strict") != summary.get("foundation_mode", "strict")
+                or prior.get("foundation") != summary.get("foundation")
+                or prior.get("repair_guidance_sha256") != summary.get("repair_guidance_sha256")) or any(
                 prior.get(key) != value for key, value in summary.items()):
             parser.error("campaign identity changed; use a fresh state directory")
     stop_file = getattr(args, "stop_file", None) or args.state / "STOP"
@@ -354,6 +399,9 @@ def campaign(args, parser):
         if binding is not None:
             argv += ["--discovery-record", binding["record_path"],
                      "--discovery-record-sha256", binding["record_sha256"]]
+        if foundation is not None:
+            argv += ["--foundation-mode", "partial", "--foundation-record", foundation["record_path"],
+                     "--foundation-record-sha256", foundation["record_sha256"]]
         if args.retry:
             argv.append("--retry")
         jobs.append((number, argv))
