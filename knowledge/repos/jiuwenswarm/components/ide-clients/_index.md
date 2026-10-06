@@ -27,3 +27,8 @@ sources: []
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
 | ide clients | 入口 | `jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/JiuwenSwarmService.kt`、`jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/ChatToolWindow.kt`、`jiuwenswarm/channels/ide/packages/vscode-extension/src/editor/DiffApplier.ts` |
+
+- [JetBrains 插件（ide-clients）：架构、API、配置与行为](knowledge.md)
+- [IDE 端代理文件编辑直接应用（DiffApplier）](feature-ide-file-edit-diff-apply.md)
+- [IDE 单轮文件快照与回退（Rewind）](feature-ide-turn-rewind-snapshot.md)
+- [shared-webview](shared-webview/_index.md)

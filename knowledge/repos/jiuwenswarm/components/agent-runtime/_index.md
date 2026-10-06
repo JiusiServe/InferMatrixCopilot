@@ -25,12 +25,11 @@ sources: []
 ## 代码快速入口（Direct）
 <!-- kb-init:quick-map -->
 
-触发词：runtime、AgentRuntime、session create/switch/fork、session.delete、plan mode、model catalog、permission snapshot、MCP reference、push handler、process CLI、agent definition、运行时、session lane、execution registry、work scheduler、deliver_control、cancel_execution、close_session、QUIESCING、control input、心跳链。PR 描述或改动命中下表一行时，先读该行的规则，再读页面其余部分。
+触发词：runtime、AgentRuntime、session create/switch/fork、session.delete、plan mode、model catalog、permission snapshot、MCP reference、push handler、process CLI、agent definition、运行时。PR 描述或改动命中下表一行时，先读该行的规则，再读页面其余部分。
 
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
 | runtime、AgentRuntime、session create/switch/fork、session.delete、plan mode、model… | 入口 | `jiuwenswarm/runtime/agent_definition.py`、`jiuwenswarm/runtime/context.py`、`jiuwenswarm/runtime/events.py` |
-| session 执行协调、lane 排队、deliver_control、cancel_execution、close_session | Runtime Session 协调器（见目录内容） | `jiuwenswarm/runtime/session/coordinator.py`、`jiuwenswarm/runtime/session/execution_registry.py`、`jiuwenswarm/runtime/session/work_scheduler.py` |
 
 ## 验证入口
 
@@ -46,3 +45,6 @@ sources: []
 - [项目、会话与历史管理 功能知识](feature-projects-sessions.md)
 - [agent-runtime 源码接口与集成边界 01](source-contracts-01.md)
 - [项目、会话与历史管理：实现深读](feature-depth-projects-sessions.md)
+- [共享 Agent 运行时（jiuwenswarm/runtime/service.py AgentRuntime）](knowledge.md)
+- [声明式 root Agent 定义执行（invoke_agent/stream_agent）](feature-runtime-agent-definition-execution.md)
+- [会话输入通道（steer/follow_up）与执行绑定 — 知识页](feature-session-input-steering.md)

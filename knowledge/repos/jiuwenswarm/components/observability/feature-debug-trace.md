@@ -11,7 +11,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/调试追踪.md
 feature: "debug-trace"
 entry_points: ["jiuwenswarm/server/runtime/debug_trace/config.py", "jiuwenswarm/server/runtime/debug_trace/stream_logger.py"]
-source_globs: ["jiuwenswarm/server/runtime/debug_trace/config.py", "jiuwenswarm/server/runtime/debug_trace/stream_logger.py", "jiuwenswarm/server/runtime/debug_trace/*.py"]
+source_globs: ["jiuwenswarm/server/runtime/debug_trace/config.py", "jiuwenswarm/server/runtime/debug_trace/stream_logger.py", "jiuwenswarm/server/runtime/debug_trace/*.py", "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py", "jiuwenswarm/common/debug_dump.py", "jiuwenswarm/server/runtime/debug_trace/paths.py", "jiuwenswarm/server/runtime/debug_trace/context.py", "jiuwenswarm/server/runtime/debug_trace/directives.py", "jiuwenswarm/server/runtime/debug_trace/subagent_capture.py", "jiuwenswarm/server/runtime/debug_trace/task_tool_patch.py", "jiuwenswarm/channels/web/frontend/vite.config.ts", "deploy/observability/upload_traces_to_langfuse.py", "jiuwenswarm/server/runtime/agent_adapter/team_helpers.py"]
 ---
 
 # Debug Dump 与 OTel 的职责、接口与配置

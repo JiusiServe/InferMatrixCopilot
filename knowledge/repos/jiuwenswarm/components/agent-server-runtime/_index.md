@@ -57,3 +57,4 @@ sources: []
 - [主动推荐、频率限制与主 Agent 交付：实现深读](feature-depth-proactive-recommendation.md)
 
 - [Skill 自演进：实现深读](feature-depth-skill-evolution.md)
+- [Workspace Git Diff 聚合（get_git_diff）与实时监控](feature-workspace-git-diff.md)

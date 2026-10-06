@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/频道.md
 feature: "ssh"
 entry_points: ["jiuwenswarm/gateway/channel_manager/protocol/ssh/ssh_connect.py"]
-source_globs: ["jiuwenswarm/gateway/channel_manager/protocol/ssh/ssh_connect.py", "jiuwenswarm/gateway/channel_manager/protocol/ssh/*.py"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/protocol/ssh/ssh_connect.py", "jiuwenswarm/gateway/channel_manager/protocol/ssh/*.py", "jiuwenswarm/extensions/agentos/auth/ssh_authenticator.py", "jiuwenswarm/extensions/agentos/auth/ssh_key_issuer.py", "jiuwenswarm/extensions/agentos/auth/ssh_key_registry.py", "jiuwenswarm/extensions/agentos/agentos_router/router_client.py", "jiuwenswarm/extensions/agentos/agentos_router/ssh_relay.py", "jiuwenswarm/extensions/agentos/auth/common.py", "jiuwenswarm/extensions/agentos/auth/credential_authenticator.py", "jiuwenswarm/gateway/app_gateway.py", "jiuwenswarm/gateway/channel_manager/protocol/ssh/__init__.py", "jiuwenswarm/gateway/channel_manager/protocol/ssh/config.py", "jiuwenswarm/gateway/channel_manager/protocol/ssh/server.py"]
 ---
 
 # SSH 频道与远程终端 的职责、接口与配置

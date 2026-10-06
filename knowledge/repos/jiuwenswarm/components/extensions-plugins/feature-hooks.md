@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Harness.md
 feature: "hooks"
 entry_points: ["jiuwenswarm/extensions/manager.py"]
-source_globs: ["jiuwenswarm/extensions/manager.py", "jiuwenswarm/extensions/*.py"]
+source_globs: ["jiuwenswarm/extensions/manager.py", "jiuwenswarm/extensions/*.py", "jiuwenswarm/extensions/callback_compat.py", "jiuwenswarm/extensions/loader.py", "jiuwenswarm/extensions/registry.py", "jiuwenswarm/extensions/sdk/agent_server_client.py", "jiuwenswarm/extensions/sdk/base.py", "jiuwenswarm/extensions/sdk/crypto_utility.py", "jiuwenswarm/extensions/sdk/third_agent.py", "jiuwenswarm/extensions/types.py", "jiuwenswarm/extensions/sdk/__init__.py", "jiuwenswarm/extensions/__init__.py", "jiuwenswarm/gateway/message_handler/message_handler.py", "jiuwenswarm/extensions/hook_event.py", "jiuwenswarm/extensions/hooks_context.py", "jiuwenswarm/gateway/hooks/handler.py", "jiuwenswarm/server/hooks/executor.py", "jiuwenswarm/common/hooks_config.py", "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py", "jiuwenswarm/server/hooks/user_hook_rail.py", "jiuwenswarm/channels/web/frontend/src/App.tsx"]
 ---
 
 # 生命周期 Hooks 与扩展 的职责、接口与配置

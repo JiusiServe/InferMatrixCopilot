@@ -1,7 +1,7 @@
 ---
 title: "agent-runtime 源码接口与集成边界 01"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-06
 type: architecture
 tags: [jiuwenswarm]
 sources: []
@@ -162,4 +162,13 @@ sources: []
 - 模块级配置或常量名称：`TEAM_DELETION_GATE`；实际值与使用条件见源码。
 
 源码依据：[完整声明与实现](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/runtime/session_delete.py#L1-L146)。
+<!-- /kb:file -->
+
+<!-- kb:file path=jiuwenswarm/runtime/__init__.py pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=c71aec5d3acb97a6168baffce58220a3ea789ef708886f5231c256b3c2f2e84e -->
+**`jiuwenswarm/runtime/__init__.py`**
+
+- 源码对模块职责的说明：Lazy public surface for the transport-independent JiuwenSwarm Runtime.。
+- 集成依赖（导入声明，不等于全部运行时依赖）：`from __future__ import annotations`；`from importlib import import_module`；`from typing import TYPE_CHECKING, Any`。
+
+源码依据：[完整声明与实现](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/runtime/__init__.py#L1-L36)。
 <!-- /kb:file -->

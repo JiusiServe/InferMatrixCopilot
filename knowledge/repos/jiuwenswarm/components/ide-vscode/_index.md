@@ -19,3 +19,6 @@ sources: []
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
 | ide vscode | 入口 | `jiuwenswarm/channels/ide/packages/vscode-extension/src/terminal/TerminalManager.ts`、`jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/ChatPanel.ts` |
+
+- [ide-vscode：VS Code 聊天面板与终端命令镜像](knowledge.md)
+- [IDE 终端命令镜像执行（VS Code 扩展与 JetBrains 插件）](feature-ide-terminal-command-mirror.md)

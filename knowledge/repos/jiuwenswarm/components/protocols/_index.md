@@ -18,3 +18,4 @@ sources: []
 - [E2A 统一请求响应协议：实现深读](feature-depth-e2a.md)
 - [A2A 接入与 AgentCard：实现深读](feature-depth-a2a.md)
 - [ACP 与 stdio 桥接：实现深读](feature-depth-acp.md)
+- [jiuwenswarm/common/e2a：E2A 统一请求/响应协议组件知识](knowledge-protocols.md)

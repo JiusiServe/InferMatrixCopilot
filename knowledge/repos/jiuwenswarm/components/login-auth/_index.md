@@ -18,10 +18,7 @@ sources: []
 
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
-| 登录、华为账号、Account Kit、OAuth、PKCE、id_token、refresh_token、免费模型、积分、APIG、远端配置、auth | 入口 | `jiuwenswarm/common/auth/service.py`、`jiuwenswarm/common/auth/account_kit.py` |
-| 登录会话落盘、加密存档、Gateway/AgentServer 共享登录态 | 入口 | `jiuwenswarm/common/auth/session_store.py` |
-| Gateway 转发前的凭据消毒与注入、`jiuwen-login:` 句柄、请求钩子、推送续期 | 入口 | `jiuwenswarm/common/auth/passthrough.py`、`jiuwenswarm/common/auth/login_credentials.py` |
-| 登录模型列表、目录缓存、`login_model_settings` | 入口 | `jiuwenswarm/common/auth/model_catalog.py` |
+| 登录、华为账号、Account Kit、OAuth、PKCE、id_token、refresh_token、免费模型、积分、APIG、远端配置、auth | 入口 | `jiuwenswarm/common/auth/service.py`、`jiuwenswarm/common/auth/account_kit.py`、`jiuwenswarm/common/auth/session_store.py` |
 
 ## 专题入口
 
@@ -31,3 +28,4 @@ sources: []
 - [账号登录与凭据续期 功能知识](feature-login.md)
 - [login-auth 源码接口与集成边界 01](source-contracts-01.md)
 - [账号登录与凭据续期：实现深读](feature-depth-login.md)
+- [login-auth：华为账号登录与免费模型凭据（common/auth）](knowledge.md)

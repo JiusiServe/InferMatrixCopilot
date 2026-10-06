@@ -21,3 +21,5 @@ sources: []
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
 | sdk clients | 入口 | `sdks/python/src/jiuwenswarm_sdk/client.py` |
+
+- [jiuwenswarm Python SDK Client (sdks/python/src/jiuwenswarm_sdk/client.py)](knowledge.md)

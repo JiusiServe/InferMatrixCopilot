@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/application-plugins.md
 feature: "applications"
 entry_points: ["jiuwenswarm/extensions/application_host.py"]
-source_globs: ["jiuwenswarm/extensions/application_host.py"]
+source_globs: ["jiuwenswarm/extensions/application_host.py", "jiuwenswarm/channels/web/frontend/src/applicationPlugins/manifest.ts", "jiuwenswarm/channels/web/frontend/src/applicationPlugins/types.ts", "jiuwenswarm/channels/web/frontend/src/applicationPlugins/useApplicationPlugins.ts", "jiuwenswarm/extensions/sdk/application_plugin.py", "jiuwenswarm/channels/web/frontend/src/applicationPlugins/ApplicationTaskControls.tsx", "jiuwenswarm/channels/web/frontend/src/applicationPlugins/taskProgressStore.ts", "jiuwenswarm/channels/web/frontend/src/applicationPlugins/ApplicationPluginOutlet.tsx", "jiuwenswarm/channels/web/frontend/src/App.tsx"]
 ---
 
 # Application Plugin 与前端贡献 的职责、接口与配置

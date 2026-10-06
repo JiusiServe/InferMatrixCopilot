@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/MCP配置.md
 feature: "mcp"
 entry_points: ["jiuwenswarm/common/mcp_config.py"]
-source_globs: ["jiuwenswarm/common/mcp_config.py"]
+source_globs: ["jiuwenswarm/common/mcp_config.py", "jiuwenswarm/server/agent_ws_server.py", "jiuwenswarm/server/runtime/mcp/call_timeout_patch.py", "jiuwenswarm/server/runtime/agent_adapter/interface_code.py", "jiuwenswarm/server/runtime/mcp/cli_driver.py", "jiuwenswarm/server/runtime/mcp/state_store.py", "jiuwenswarm/server/runtime/mcp/credential.py", "jiuwenswarm/server/runtime/mcp/registry.py", "jiuwenswarm/common/config.py", "jiuwenswarm/server/runtime/mcp/exc_group.py", "jiuwenswarm/server/runtime/agent_manager.py", "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py", "jiuwenswarm/server/runtime/mcp/package_manifest.py", "jiuwenswarm/server/runtime/marketplace/asset_mcp_publish_converter.py", "jiuwenswarm/server/runtime/mcp/__init__.py", "jiuwenswarm/runtime/mcp_references.py", "jiuwenswarm/server/runtime/agent_adapter/interface.py", "jiuwenswarm/agents/swarm/assembly.py"]
 ---
 
 # MCP 配置、凭据与资源 的职责、接口与配置

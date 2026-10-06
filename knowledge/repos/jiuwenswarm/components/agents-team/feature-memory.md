@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/记忆.md
 feature: "memory"
 entry_points: ["jiuwenswarm/agents/harness/common/memory/manager.py"]
-source_globs: ["jiuwenswarm/agents/harness/common/memory/manager.py", "jiuwenswarm/agents/harness/common/memory/*"]
+source_globs: ["jiuwenswarm/agents/harness/common/memory/manager.py", "jiuwenswarm/agents/harness/common/memory/*", "jiuwenswarm/server/runtime/agent_adapter/interface.py", "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py", "jiuwenswarm/agents/harness/common/memory/dreaming/__init__.py", "jiuwenswarm/agents/harness/common/memory/dreaming/sweeper.py", "jiuwenswarm/agents/harness/common/memory/external_memory_config.py", "jiuwenswarm/agents/harness/common/memory/external_memory_builder.py", "jiuwenswarm/agents/harness/common/memory/forbidden.py", "jiuwenswarm/resources/agent/workspace/skills/advanced-daily-report/collectors/memory_collector.py", "jiuwenswarm/agents/harness/common/memory/embeddings.py", "jiuwenswarm/agents/harness/common/tools/memory_tools.py", "jiuwenswarm/common/config.py", "jiuwenswarm/agents/harness/common/rails/memory_forbidden_rail.py", "jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py", "jiuwenswarm/agents/harness/common/memory/internal.py", "jiuwenswarm/agents/harness/common/memory/config.py", "jiuwenswarm/agents/harness/common/memory/__init__.py", "jiuwenswarm/agents/harness/common/memory/types.py", "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/memory.ts", "jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts", "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/memory-path-utils.ts", "jiuwenswarm/channels/tui/frontend/src/app-state.ts"]
 ---
 
 # 长期记忆 的职责、接口与配置

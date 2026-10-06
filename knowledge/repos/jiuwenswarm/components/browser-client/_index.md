@@ -29,3 +29,6 @@ sources: []
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
 | browser client | 入口 | `jiuwenswarm/channels/browser/frontend/src/background/index.ts`、`jiuwenswarm/channels/browser/frontend/src/sidepanel/index.ts`、`jiuwenswarm/channels/browser/` |
+
+- [JiuwenSwarm browser-client（Chromium 扩展）背景服务与内容脚本](knowledge.md)
+- [browser-client 源码接口与集成边界 01](source-contracts-01.md)

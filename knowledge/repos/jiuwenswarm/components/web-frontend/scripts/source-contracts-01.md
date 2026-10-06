@@ -1,7 +1,7 @@
 ---
 title: "scripts 源码接口与集成边界 01"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-06
 type: architecture
 tags: [jiuwenswarm]
 sources: []
@@ -81,4 +81,22 @@ sources: []
 - 集成边界的导入/加载声明：`import assert from 'node:assert/strict';`；`import { readFile } from 'node:fs/promises';`。
 
 源码依据：[完整声明与实现](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/scripts/test-team-a2ui-render-path.mjs#L1-L65)。
+<!-- /kb:file -->
+
+<!-- kb:file path=jiuwenswarm/scripts/generate-agent-folders.js pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=92fe2b6266246a458d9d5871ea4a7645502923067fc15f378d455aa4825b126e -->
+**`jiuwenswarm/scripts/generate-agent-folders.js`**
+
+- 源码声明的类型、组件或调用边界：`fs`, `path`, `scriptDir`, `envRoot`, `agentFromEnv`, `packageAgentFromResources`, `agentRoot`, `outputPath`；这是词法声明索引，不把局部变量当成对外导出 API。
+- 集成边界的导入/加载声明：`const fs = require('fs');`；`const path = require('path');`。
+
+源码依据：[完整声明与实现](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/scripts/generate-agent-folders.js#L1-L112)。
+<!-- /kb:file -->
+
+<!-- kb:file path=jiuwenswarm/scripts/watch-folders.js pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=73c7e6c086512c07a4b7038fa1bbf58a57721155ae4d9e0585982cdcecbcb01b -->
+**`jiuwenswarm/scripts/watch-folders.js`**
+
+- 源码声明的类型、组件或调用边界：`path`, `generate`, `child`, `chokidar`, `envWorkspace`, `homeDir`, `userAgentDir`, `fallbackRepoAgentDir`；这是词法声明索引，不把局部变量当成对外导出 API。
+- 集成边界的导入/加载声明：`const { spawn } = require('child_process');`；`const path = require('path');`；`const chokidar = require('chokidar');`。
+
+源码依据：[完整声明与实现](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/scripts/watch-folders.js#L1-L48)。
 <!-- /kb:file -->

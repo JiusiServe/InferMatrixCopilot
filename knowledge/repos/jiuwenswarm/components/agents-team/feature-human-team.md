@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/AgentTeam人类成员联机协作.md
 feature: "human-team"
 entry_points: ["jiuwenswarm/agents/harness/team/team_manager.py"]
-source_globs: ["jiuwenswarm/agents/harness/team/team_manager.py", "jiuwenswarm/agents/harness/team/*"]
+source_globs: ["jiuwenswarm/agents/harness/team/team_manager.py", "jiuwenswarm/agents/harness/team/*", "jiuwenswarm/gateway/routing/session_sharing.py", "jiuwenswarm/server/runtime/agent_adapter/team_helpers.py", "jiuwenswarm/gateway/message_handler/join_exit_handlers.py", "jiuwenswarm/channels/web/frontend/src/components/ChatPanel/index.tsx"]
 ---
 
 # 人类团队成员与人工协作 的职责、接口与配置

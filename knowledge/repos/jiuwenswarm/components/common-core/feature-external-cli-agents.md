@@ -11,7 +11,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/设置与频道升级迁移指南.md
 feature: "external-cli-agents"
 entry_points: ["jiuwenswarm/common/external_cli_runtime.py", "jiuwenswarm/common/external_cli_catalog.py"]
-source_globs: ["jiuwenswarm/common/external_cli_runtime.py", "jiuwenswarm/common/external_cli_catalog.py"]
+source_globs: ["jiuwenswarm/common/external_cli_runtime.py", "jiuwenswarm/common/external_cli_catalog.py", "jiuwenswarm/common/config_panel/config_set_handlers.py", "jiuwenswarm/common/config.py", "jiuwenswarm/extensions/agentos/agentos_router/router_client.py", "jiuwenswarm/channels/web/frontend/src/components/ExternalCliAgentsSection.tsx", "jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py", "jiuwenswarm/channels/web/frontend/src/components/ExternalCliInstallDialog.css", "jiuwenswarm/channels/web/frontend/src/components/ExternalCliInstallDialog.tsx", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/ExperimentalSettings.tsx", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/externalCliInstallState.ts", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/definition.ts", "jiuwenswarm/gateway/channel_manager/tui/tui_connect.py", "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/switch.ts", "jiuwenswarm/channels/tui/frontend/src/core/commands/registry.ts", "jiuwenswarm/channels/web/frontend/src/App.tsx"]
 ---
 
 # 外部 Claude 与 Codex CLI 智能体的职责、接口与配置

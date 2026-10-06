@@ -11,7 +11,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/模式系统.md
 feature: "modes"
 entry_points: ["jiuwenswarm/runtime/mode_catalog.py", "jiuwenswarm/common/mode_matrix.py"]
-source_globs: ["jiuwenswarm/runtime/mode_catalog.py", "jiuwenswarm/common/mode_matrix.py", "jiuwenswarm/server/runtime/agent_adapter/*.py"]
+source_globs: ["jiuwenswarm/runtime/mode_catalog.py", "jiuwenswarm/common/mode_matrix.py", "jiuwenswarm/server/runtime/agent_adapter/*.py", "jiuwenswarm/server/runtime/agent_manager.py", "jiuwenswarm/runtime/request.py", "jiuwenswarm/server/agent_ws_server.py", "jiuwenswarm/agents/harness/code/rails/code_confirm_interrupt_rail.py", "jiuwenswarm/channels/web/frontend/src/features/code-mode/gitPublishState.ts", "jiuwenswarm/channels/web/frontend/src/features/planMode/wireMode.ts", "jiuwenswarm/server/runtime/tenant_agent_pool.py", "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/mode.ts", "jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts", "jiuwenswarm/channels/tui/frontend/src/core/event-handlers.ts", "jiuwenswarm/server/runtime/agent_adapter/user_turn.py", "jiuwenswarm/channels/web/frontend/src/config/chatConfig.tsx", "jiuwenswarm/channels/web/frontend/src/config/permissionProfiles.ts", "jiuwenswarm/server/runtime/session/work_mode.py"]
 ---
 
 # Agent、Code 与 Team 模式 的职责、接口与配置

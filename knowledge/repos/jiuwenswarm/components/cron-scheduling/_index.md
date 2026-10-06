@@ -42,3 +42,4 @@ sources: []
 - [cron-scheduling 源码接口与集成边界 01](source-contracts-01.md)
 
 - [定时任务与调度存储：实现深读](feature-depth-cron.md)
+- [cron-scheduling：CronJob 模型、双后端存储与投递路由](knowledge.md)

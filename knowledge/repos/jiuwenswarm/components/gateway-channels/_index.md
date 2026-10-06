@@ -21,7 +21,8 @@ sources: []
 
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
-| cli、chat、命令行、CLI 频道、gateway client、websocket、tui、renderer、jsonl、spinner、SIGINT、… | 入口 | `jiuwenswarm/channels/cli/`、`jiuwenswarm/channels/process_cli/` |
+| cli、chat、命令行、CLI 频道、gateway client、websocket、tui、renderer、jsonl、spinner、SIGINT、… | 入口 | `jiuwenswarm/channels/`、`jiuwenswarm/channels/cli/`、`jiuwenswarm/channels/process_cli/` |
+
 
 - [Process CLI 频道（jiuwenswarm/channels/process_cli）审查规则](rules.md)
 
@@ -65,3 +66,15 @@ sources: []
 - [Telegram 频道：实现深读](feature-depth-im-telegram.md)
 - [Discord 频道：实现深读](feature-depth-im-discord.md)
 - [WhatsApp 频道：实现深读](feature-depth-im-whatsapp.md)
+- [Gateway Web 频道处理器（channel_manager/web/app_web_handlers.py）](knowledge-gateway-channels.md)
+- [进程式 CLI 频道（process_cli）：REPL、worker 与会话操作](knowledge.md)
+- [/security-review 安全审查斜杠命令与 git 预执行](feature-channel-security-review-slash-command.md)
+- [Gateway Config-Save Hot Reload（_on_config_saved：agent.reload_config 重试、重启兜底与副作用）](feature-gateway-config-hot-reload.md)
+- [Gateway HealthCheck 周期探活服务 (jiuwenswarm/gateway/health_check)](feature-gateway-health-check.md)
+- [GatewayServer 多路由 WebSocket 宿主与会话/请求路由表](feature-gateway-server-multi-route-ws.md)
+- [IM Attachment Persist Hook (E2A + HTTP Bridge) — ChannelManager wiring](feature-im-attachment-persist-hook-969909e1.md)
+- [IM Channel Hot Reconfiguration (_apply_channel_config lifecycle across 11 channels)](feature-im-channel-hot-reconfig.md)
+- [界面语言配置 RPC（preferred_language）— Gateway Web Handler](feature-locale-conf-rpc.md)
+- [3rdagent.list / 3rdagent.switch 第三方智能体切换](feature-thirdagent-list-switch.md)
+- [@path 文件引用内联与 @agent 提及解析（MessageHandler）](feature-at-file-reference-inlining-b1a822e1.md)
+- [scripts](scripts/_index.md)

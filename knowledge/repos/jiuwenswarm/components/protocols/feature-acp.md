@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/ACP插件使用.md
 feature: "acp"
 entry_points: ["jiuwenswarm/acp/stdio_client.py"]
-source_globs: ["jiuwenswarm/acp/stdio_client.py", "jiuwenswarm/acp/*.py"]
+source_globs: ["jiuwenswarm/acp/stdio_client.py", "jiuwenswarm/acp/*.py", "jiuwenswarm/agents/harness/common/tools/acp_chat/__init__.py", "jiuwenswarm/agents/harness/common/tools/acp_chat/tool.py", "jiuwenswarm/channels/acp/app_acp.py", "jiuwenswarm/gateway/channel_manager/protocol/acp/acp_connect.py", "scripts/run_gateway_acp.cmd", "scripts/run_gateway_acp.sh", "jiuwenswarm/agents/harness/common/tools/acp_output_tools.py", "jiuwenswarm/gateway/message_handler/message_handler.py", "jiuwenswarm/common/e2a/acp/session_updates.py", "jiuwenswarm/acp/cli.py", "jiuwenswarm/common/acp/stdio_client.py", "jiuwenswarm/acp/__init__.py", "jiuwenswarm/acp/subprocess_env.py", "jiuwenswarm/common/acp/subprocess_env.py", "jiuwenswarm/common/e2a/acp/acp_tool_updates.py", "jiuwenswarm/common/e2a/adapters.py", "jiuwenswarm/server/agent_ws_server.py"]
 ---
 
 # ACP 与 stdio 桥接 的职责、接口与配置

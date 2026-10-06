@@ -30,3 +30,4 @@ sources: []
 - [observability 源码接口与集成边界 01](source-contracts-01.md)
 - [执行轨迹与保留：实现深读](feature-depth-observability.md)
 - [Debug Dump 与 OTel：实现深读](feature-depth-debug-trace.md)
+- [JiuwenSwarm 可观测性：轨迹存储路由、有界写入与每会话 SQLite（jiuwenswarm/observability）](knowledge.md)

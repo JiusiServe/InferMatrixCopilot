@@ -14,3 +14,4 @@ sources: []
 - [channels-web](channels-web/_index.md)
 - [server-runtime](server-runtime/_index.md)
 - [A2UI 生成式界面：实现深读](feature-depth-a2ui.md)
+- [a2ui owner — A2UI 生成式界面（后端集成与 Web 前端渲染）](knowledge-a2ui.md)

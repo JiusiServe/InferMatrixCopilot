@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/命令行指令.md
 feature: "cli"
 entry_points: ["jiuwenswarm/cli/main.py"]
-source_globs: ["jiuwenswarm/cli/main.py", "jiuwenswarm/cli/*.py"]
+source_globs: ["jiuwenswarm/cli/main.py", "jiuwenswarm/cli/*.py", "jiuwenswarm/channels/cli/chat.py", "jiuwenswarm/channels/cli/main.py", "jiuwenswarm/cli/_terminal.py", "jiuwenswarm/cli/chat.py", "jiuwenswarm/cli/gateway_client.py", "jiuwenswarm/channels/cli/events.py", "jiuwenswarm/channels/cli/gateway_client.py", "jiuwenswarm/gateway/message_handler/prompts/__init__.py", "jiuwenswarm/gateway/message_handler/prompts/review_prompt.py"]
 ---
 
 # 交互式命令行 的职责、接口与配置

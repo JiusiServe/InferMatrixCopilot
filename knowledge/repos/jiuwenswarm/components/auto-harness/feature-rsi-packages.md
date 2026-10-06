@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/AutoHarness.md
 feature: "rsi-packages"
 entry_points: ["jiuwenswarm/agents/harness/common/rsi/harness_activation.py"]
-source_globs: ["jiuwenswarm/agents/harness/common/rsi/harness_activation.py", "jiuwenswarm/agents/harness/common/rsi/*"]
+source_globs: ["jiuwenswarm/agents/harness/common/rsi/harness_activation.py", "jiuwenswarm/agents/harness/common/rsi/*", "jiuwenswarm/agents/harness/common/auto_harness/service.py", "jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py", "jiuwenswarm/agents/harness/common/rsi/plugin_catalog.py", "jiuwenswarm/channels/web/frontend/src/features/rsi/rsiApi.ts"]
 ---
 
 # Harness Package 与热激活 的职责、接口与配置
