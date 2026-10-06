@@ -12,7 +12,7 @@ confidence: high
 
 入口见 [Model Executor 规则](rules.md)。
 
-## EXEC-11a — Breeze graph RNG 与深度层 autotune 必须按真实平台能力分支
+## EXEC-17a — Breeze graph RNG 与深度层 autotune 必须按真实平台能力分支
 
 - 触发：修改 Breeze first-code sampler、depth decoder graph 测试或 depth-layer compile options。
 - 强制：captured-generator-state 路径仅在 NVIDIA CUDA 且 `CUDAGraph.register_generator_state`

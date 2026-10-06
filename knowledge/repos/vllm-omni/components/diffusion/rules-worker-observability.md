@@ -17,7 +17,7 @@ confidence: high
 - 禁止：在 parallel state 可用前读 group；用 global rank 代替 topology local rank；让非 HSDP/非 EP 路径访问 FS/RP/EP；只更新 OS title 或日志之一；因 optional `setproctitle` 不可用让 worker 启动失败。
 - 验收：覆盖初始化前 generic 名称且不读 group、singleton、省略规则、DP/PP/SP/CFG/TP、FS、multi-replica RP、conditional EP、缺少 `setproctitle` 仍装饰日志，以及 Linux `ps` 可见 title；本提交的验证边界为 unit/CPU Gloo，未提供本地 GPU 证据。^[PR #6722]
 
-## DIFF-4x — offload memory A/B 必须在实际 worker 内测 process-local allocator peak
+## DIFF-17a — offload memory A/B 必须在实际 worker 内测 process-local allocator peak
 
 - 触发：修改layerwise-offload memory assertion、collective RPC probe或共享GPU上的memory归因。
 - 强制：model构造后在diffusion worker内synchronize并reset allocator peak，完成generate后再次
