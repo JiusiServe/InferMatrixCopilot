@@ -45,3 +45,5 @@ sources: []
 | NPU runner、ROCm 分页注意力、NPU 模型补丁 | [平台后端合同](rules-platform-backends.md)   新增核对：EXEC-10f、EXEC-10f2。 |
 
 - [MRv2 attention capture 边界](rules-attention-capture.md) — mixed FULL、separate decode 与当前请求 boundary。
+
+- [release processor/dummy、profiling、state selection 与 auxiliary output：EXEC-RELEASE-1a–1d](rules-release-contracts.md)。

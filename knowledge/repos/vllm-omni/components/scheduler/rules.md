@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #8259", "PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/core/sched/test_omni_scheduler_mixin_timeouts.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6089", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619", "PR #6680", "PR #6626", "PR #6529", tests/core/sched/test_omni_ar_scheduler_aborted_queue_sweep.py, tests/core/sched/test_omni_scheduler_streaming_input_counter.py, tests/core/sched/test_omni_sched_deferred_free_fence.py, "PR #6831", tests/e2e/online_serving/test_nemotron_voicechat_duplex.py]
+sources: ["PR #8459", "PR #8259", "PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/core/sched/test_omni_scheduler_mixin_timeouts.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6089", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619", "PR #6680", "PR #6626", "PR #6529", tests/core/sched/test_omni_ar_scheduler_aborted_queue_sweep.py, tests/core/sched/test_omni_scheduler_streaming_input_counter.py, tests/core/sched/test_omni_sched_deferred_free_fence.py, "PR #6831", tests/e2e/online_serving/test_nemotron_voicechat_duplex.py]
 ---
 
 # Scheduler 规则
@@ -267,12 +267,6 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 - 验收：覆盖解析、stall/reset、完成/abort 与健康同批请求；超时为 `FINISHED_ERROR`。Nemotron 固定
   `240 < 300`，server request-ID/error 先于 client timeout，健康 control 两者皆不触达。^[PR #6033] ^[PR #6831]
 
-## SCHED-5g — resumable async-chunk 终态清理必须以 live queue 所有权为准
-
-- 触发：resumable async-chunk 请求在一个流式 segment 结束时进入 `FINISHED_STOPPED`，但仍由 `running`、`waiting`、`skipped_waiting` 或 connector 隐藏队列持有，随后 session close、取消或其他路径调用 `finish_requests`。
-- 强制：先物化可能被多层消费的 request-id iterator，并在 adapter 清理前快照 `skipped_waiting` 中承担流式等待计数的请求；只对仍有活队列所有权的目标 resumable 终态请求恢复状态，`skipped_waiting` 恢复为 `WAITING_FOR_STREAMING_REQ`，`running`/`waiting` 按实际队列对齐；下游 async-chunk 的 segment stop 必须先清除该 segment 的 finished 标记。只有 connector `receives_chunks`、最终 stage `model_config.session_mode == "duplex"` 且 request 仍为 `WAITING_FOR_STREAMING_REQ` 时，才从 `skipped_waiting` 转为 ordinary `WAITING` 并恢复 connector polling；sender-only 或 turn-mode stage 保持 parked，等待显式 streaming update。同一 update 尾部按 stale stopped 集合清理时不得移除已重新入队的 request；running purge 必须限定本次 finish 集合，并确保 `_free_request`、coordinator 与 connector 清理恰好执行一次。
-- 禁止：把任意已完成请求重新打开；对脱离所有 live queue、可能等待 deferred block free 的终态请求调用释放；因 request 在本轮进入时是 `WAITING_FOR_CHUNK` 就撤销其同轮 requeue；全局清空 running 中无关的 resumable segment；重复消费单遍 request-id iterator，或因非流式 skipped 请求错误减少 streaming counter。
-- 验收：AR 与 generation scheduler 均覆盖 hidden、`running`、`waiting`、`skipped_waiting`、脱离队列及无关 resumable 请求；另覆盖 connector-fed duplex receiver 从 segment stop 同轮转回 `WAITING`，断言它保留在 waiting queue、离开 skipped queue、流式等待计数递减且 segment-finished 标记清除；sender-only duplex 与 connector-fed turn-mode controls 必须仍 parked，同时也清除标记。首次 finish 恰好释放、第二次无操作，并验证 generator request-id 输入。PR 作者报告的 H100 E2E 与 574-pass CPU/config suite 是提交时证据，不是当前环境或跨硬件保证。^[PR #6089] ^[PR #6360] ^[PR #6680]
 
 ## SCHED-5i — consumed connector contract failure 必须在 scheduler thread 终止 live request
 
@@ -341,9 +335,9 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 - 强制：同一迟到 frame 必须联合结算 scheduled-token stale window 与
   `async_tokens_to_discard`；前者按 scheduled-token accounting，后者按该 frame 的 generated-token
   数递减，任一 fence 命中就不得 append/emit。处理 pending input 前后都从
-  `waiting`、`skipped_waiting` 与 `running` 清除 `FINISHED_ABORTED`，随后按 live queue ownership
-  重算 `num_waiting_for_streaming_input`。
-- 禁止：两个 stale domain 只消费一个；只清普通 waiting/running 而遗留 hidden skipped queue；
+  `waiting`、`kv_holding_waiting` 与 `running` 清除 `FINISHED_ABORTED`，随后按 live queue ownership
+  清理相应 `deferred_waiting` 集合成员，重算 `num_waiting_for_streaming_input`。
+- 禁止：两个 stale domain 只消费一个；只清普通 waiting/running 而遗留 KV-holding queue 或 deferred set；
   用增减猜 streaming counter；把 unacknowledged response snapshot 当作有界 lifetime，或把
   sliding-recompute/后续 playback ACK 修复归因于本提交。
 - 验收：覆盖一个 frame 同时命中两种 fence、仅命中任一 fence、三类 queue 的 abort sweep、

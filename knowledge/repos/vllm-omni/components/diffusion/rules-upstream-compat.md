@@ -1,14 +1,30 @@
 ---
 title: "Diffusion upstream 兼容规则"
 created: 2026-09-02
-updated: 2026-09-05
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5976", vllm_omni/diffusion/compile.py, vllm_omni/diffusion/layers/fused_moe.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_diffusers_adapter.py, vllm_omni/quantization/_copy_missing_attrs.py, tests/diffusion/test_compile.py, tests/e2e/accuracy/test_qwen_image.py, "PR #6287", "PR #6273"]
+sources: ["PR #8459", "PR #5976", vllm_omni/diffusion/compile.py, vllm_omni/diffusion/layers/fused_moe.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_diffusers_adapter.py, vllm_omni/quantization/_copy_missing_attrs.py, tests/diffusion/test_compile.py, tests/e2e/accuracy/test_qwen_image.py, "PR #6287", "PR #6273"]
 confidence: high
 ---
 
 # Diffusion upstream 兼容规则
+
+## DIFF-RELEASE-FP8-1a — online FP8 与 serialized checkpoint 必须由不同 config 接纳
+
+- 触发：升级 upstream quantization API、diffusion `fp8` factory 或 checkpoint config reconciliation。
+- 强制：未序列化 BF16/FP16 权重的既有 `fp8` 入口使用 `DiffusionFp8Config` 对接
+  native `OnlineQuantizationConfig`，保留 linear/MoE 的 per-tensor static weight spec 与
+  ignored layers；checkpoint 已 serialized 时使用 upstream `Fp8Config`，磁盘 metadata
+  可经现有 reconciliation 替换 online config。method 名仍为 `fp8`，不能因此混用 config。
+- 强制：online compatibility config 只接纳 dynamic activation；拒绝 serialized flag、
+  block-wise weight size 与 store dtype。upstream online shorthand 经 canonical resolver
+  生成 `QuantizationConfigArgs`；显式 native args 保持原对象，无可用 args 时报错。
+- 禁止：向新版 serialized-only `Fp8Config` 传 online 用法；为了构造成功静默忽略
+  activation/block/store 选项；把 native kernel smoke 当作量化音视频质量已合格。
+- 验收：online/serialized 两路、ignored layers、显式 args identity、无 args 与非法
+  options；GPU 用真实 BF16 weights 执行 native online kernel，模型质量与不同 FP8
+  layout/HSDP 另按对应 owner 合同验证。^[PR #8459]
 
 ## DIFF-4k — upstream API shim 与 accuracy backend 必须按能力而非名字对齐
 
