@@ -1,10 +1,10 @@
 ---
 title: "topology 与部署 profile 合同"
 created: 2026-09-04
-updated: 2026-09-10
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_runtime.py, tests/engine/test_async_omni_engine_stage_init.py, vllm_omni/deploy/, "PR #6186", "PR #6813", "PR #6291", "PR #6829", vllm_omni/config/pipeline_registry.py, tests/config/test_config_factory.py, tests/config/test_omni_config.py, tests/config/test_pipeline_registry.py, tests/utils/test_tracking_parser.py, "PR #6230", vllm_omni/entrypoints/utils.py, tests/entrypoints/test_serve.py, tests/entrypoints/test_utils.py, "PR #7272"]
+sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #5885", "PR #6082", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_runtime.py, tests/engine/test_async_omni_engine_stage_init.py, vllm_omni/deploy/, "PR #6186", "PR #6813", "PR #6291", "PR #6829", vllm_omni/config/pipeline_registry.py, tests/config/test_config_factory.py, tests/config/test_omni_config.py, tests/config/test_pipeline_registry.py, tests/utils/test_tracking_parser.py, "PR #6230", vllm_omni/entrypoints/utils.py, tests/entrypoints/test_serve.py, tests/entrypoints/test_utils.py, "PR #7272", "PR #8184"]
 confidence: high
 ---
 
@@ -124,3 +124,11 @@ confidence: high
 - 强制：LLM/AR stage 把 `additional_config` 纳入 runtime typed owner，深拷贝投影到最终 engine args；diffusion stage 继续只由 diffusion config projection 拥有该字段，runtime 侧保持 `None`。未知字段校验与跨 stage 隔离不变。
 - 禁止：因 diffusion 已有同名字段就拒绝 LLM stage；让 LLM 与 diffusion 共享同一 mutable dict；在 projection 静默丢弃 NPU Code2Wav 等已声明的 LLM `additional_config`。
 - 验收：LLM stage round-trip 非默认值到 engine args 且 mutation 不回写 source/邻 stage；MiniCPM-o NPU profile 读回 graph keys；diffusion stage 断言值只在 `diffusion_config.additional_config`。^[PR #7272]
+
+
+## CONF-5m — stage runner override 必须与 native session 和平台门禁一起解析
+
+- 触发：修改 `StageDeployConfig.model_runner`、runner resolution、平台overlay或 mixed V1/MRv2 pipeline。
+- 强制：stage的`v1|v2`覆盖deploy默认，legacy/structured两路把同一结果投影到`use_v2_model_runner`；native MRv2、存在upstream input的stage只允许`session_mode=turn`。平台V1 fallback清除既有stage V2 opt-in，完成platform stage overlay后再校验最终值；NPU/XPU最终含任一V2仍须拒绝。
+- 禁止：只按pipeline默认选择runner；通过free-form engine args绕过structured owner；让native下游MRv2接受streaming/duplex；在平台overlay前校验一次后漏掉stage override。
+- 验收：stage/deploy precedence、invalid runner、native turn/control与非turn拒绝、V1平台fallback及overlay后NPU/XPU拒绝都覆盖legacy/structured结果。^[PR #8184]

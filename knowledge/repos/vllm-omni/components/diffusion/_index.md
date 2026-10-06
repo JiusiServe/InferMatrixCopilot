@@ -37,6 +37,7 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 | CustomOp XPU platform dispatch、PyTorch-native fallback、CUDA contract 与非同义 override 边界 | [CustomOp dispatch rules](rules-custom-op-dispatch.md) |
 | runtime temporary 与 loader-scoped parameter dtype、shared RMSNorm accuracy | [tensor dtype rules](rules-tensor-dtype.md) |
 | Wan VAE height/width spatial reshard、empty tail、attention extent | [Wan spatial-shard rules](rules-wan-spatial-shard.md) |
+| 完整图像 batch VAE decode、native tiling、uneven/idle rank 与 gather 顺序 | [Batch VAE decode rules](rules-vae-batch.md) |
 | multi-DiT、dotted `_dit_modules`、loader-to-offloader handoff 与跨 Cache-DiT/compile/LoRA/offload lifecycle、batch sampling-key 的 provided 标志 | [component lifecycle rules](rules-component-lifecycle.md)   新增核对：DIFF-2ag。 |
 
 | PEFT 与 distilled LoRA、startup fusion、delta/key/alpha、Qwen/Wan transformer mapping、PEFT suspend/resume | [LoRA rules](rules-lora.md)   新增核对：DIFF-2ag2、DIFF-2ag3。 |

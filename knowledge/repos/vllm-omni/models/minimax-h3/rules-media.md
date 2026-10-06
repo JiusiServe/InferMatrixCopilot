@@ -1,10 +1,10 @@
 ---
 title: "MiniMax H3 媒体输入与精度规则"
 created: 2026-09-02
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/engine/stage_runtime.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_async_omni_engine_stage_init.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #6064", "PR #6813", "PR #6824", "PR #6720", "PR #7281", "PR #5691", "PR #5699"]
+sources: ["PR #5752", "PR #5829", "PR #5885", "PR #5978", "PR #6555", "PR #6688", .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-ready.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/model_executor/models/minimax_h3/reference_video.py, vllm_omni/model_executor/stage_input_processors/minimax_h3.py, vllm_omni/engine/stage_runtime.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_async_omni_engine_stage_init.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/entrypoints/openai_api/test_video_server.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #6064", "PR #6813", "PR #6824", "PR #6720", "PR #7281", "PR #5691", "PR #5699", "PR #8253"]
 confidence: high
 ---
 
@@ -178,3 +178,11 @@ confidence: high
 - 验收：强制覆盖 torchaudio 成功、torchaudio 失败后 soundfile 成功、soundfile 失败后
   ffmpeg 成功及 subprocess 失败；mono/stereo 的 dtype、channel order、rate 与临时目录
   cleanup 都断言，direct audio 和 video-demux 路径结果一致。 ^[PR #5699]
+
+
+## MMH3-2u — Ref2VA 参考媒体只能做必要网格对齐或大视频缩小
+
+- 触发：修改 H3 reference image/video 的尺寸解析、resize 或 transcode。
+- 强制：参考图保留既有 ratio `[0.4,2.5]` 与维度 `[256,5760]` 校验，仅把原尺寸对齐到32网格；不再放大到固定2048短边。视频保留原canvas拟合和最大像素约束，但若该canvas面积大于源面积，改为对源尺寸做32网格对齐。已对齐的小输入保持原尺寸，网格舍入仍可调整未对齐的轴。
+- 禁止：用固定canvas放大小参考图/视频；移除既有非法ratio/dimension拒绝；把网格舍入说成任意输入像素尺寸完全不变。
+- 验收：覆盖已对齐/未对齐图像、小/大视频和非法输入；`640×384`视频保持原尺寸，`1920×1152`按既有canvas缩至`1280×768`。^[PR #8253]

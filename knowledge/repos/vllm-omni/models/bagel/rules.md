@@ -1,10 +1,10 @@
 ---
 title: "BAGEL 实现规则"
 created: 2026-09-02
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5775", "PR #5884", "PR #6359", "PR #7049", vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/models/bagel/bagel_transformer.py, vllm_omni/diffusion/models/bagel/pipeline_bagel.py, vllm_omni/diffusion/models/lance/lance_transformer.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/test_diffusion_engine_dummy_run.py, tests/diffusion/models/bagel/test_step_execution.py, "PR #7287"]
+sources: ["PR #5775", "PR #5884", "PR #6359", "PR #7049", vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/models/bagel/bagel_transformer.py, vllm_omni/diffusion/models/bagel/pipeline_bagel.py, vllm_omni/diffusion/models/lance/lance_transformer.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/test_diffusion_engine_dummy_run.py, tests/diffusion/models/bagel/test_step_execution.py, "PR #7287", "PR #8177"]
 confidence: high
 ---
 
@@ -15,6 +15,7 @@ confidence: high
 | PR 描述信号 | 规则 |
 |---|---|
 | CFG position ID、nested DiT owner、step image wave/request state | `BAGEL-1`–`BAGEL-3` |
+| prefill、ViT/VAE 或 CFG cache-update 在 SP 下重复进入 collective | `BAGEL-5` |
 
 ## BAGEL-1：CFG position ID 沿序列轴合并
 
@@ -101,3 +102,10 @@ regression 必须对 request 和 step 两种 mode 都断言两个 inference step
 **合同**：画布优先级为 **显式请求 > `kv_metadata["image_shape"]` > 输入图像推导**。`size=auto` 在 API 层解析为源尺寸后，必须用 `height_not_provided`/`width_not_provided` 标记非意图画布；preprocessor 对派生画布同样置位。显式边长按 latent stride 向下对齐并告警；超过 checkpoint 上限以 `OmniClientError`（HTTP 400）拒绝。源图仍可为 VAE/ViT prefill 做 stride 对齐，但不得覆盖已请求的输出画布。非流式 generation/edit 响应的 `size` 必须来自实际生成图像。
 
 **验收**：显式 `size` 不被源图或 AR 发布的 KV shape 覆盖；`size=auto` 与纯离线 img2img 保持派生对齐；越界拒绝；响应 `size` 与解码图像一致。^[PR #7287]
+
+## BAGEL-5 — 复制的 prefill/cache-update 相位必须跳过 SP strategy
+
+- 触发：修改 `PackedAttentionMoT` 的 `_forward_und`、`_forward_gen`、attention 构造或 CFG cache-update。
+- 强制：每个 SP rank 持有完整序列的 causal prefill、ViT/VAE 和 CFG cache-update 使用 `skip_sequence_parallel=True` 的 causal/local noncausal attention；参数无关的 local noncausal 层与 strategy 层分开。`_forward_gen` 仅在 SP active 且 `not update_past_key_values` 时进入 joint denoise strategy。
+- 禁止：把复制的完整序列当 shard 送入 Ulysses all-to-all；让 `_forward_und` 进入 strategy；为修复 cache-update 而关闭原本分片的 denoise 路径。
+- 验收：断言构造期 causal/local opt-out 与 joint noncausal 的 opt-in；覆盖 SP cache-update、SP denoise、非 SP 和 causal/noncausal prefill 的实际 dispatch 与 KV shape。^[PR #8177]
