@@ -329,7 +329,7 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
 - `--apply PLAN` 持有独占 ledger lease 和激活锁，重新验证全部证据；源事件、规则、main/active 或 CI 漂移即拒绝。
   不同签名用途 `kb-reviewed-event-plan` / `kb-reviewed-event-settlement`，不可作为知识历史接收回执使用。
   `event-settlements/<内容哈希>.json` 经 fsync、硬链接原子创建且禁止替换；崩溃后可用原计划完成相同的 ledger 提交。
-- 仅所选 pending/rejected/drafted 事件成为 `done`，记录诚实的 `manual_reviewed_merged` 和回执引用。
+- 仅所选 pending/rejected/drafted 事件，或原始 detail 精确为 `no rules` 的 done 事件，可记录诚实的 `manual_reviewed_merged` 和回执引用。后者允许纠正过早丢弃，签名回执保留原始 done/no rules 决定；其他终态不得覆盖。
   其完整源 batch 和 refinement 后代也记录 `manual_reviewed_merged`，停止重复生成；原来的失败判决和 verdict 不变。
   只解决被完整覆盖 changeset 的人工队列，不影响其他事件、PR、发布模式或知识信任。
 - 测试：`test_kb_reviewed_events.py`。

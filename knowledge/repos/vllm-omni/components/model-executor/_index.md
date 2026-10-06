@@ -9,6 +9,8 @@ sources: []
 
 # Model Executor
 
+- [MRv2 optional codec](rules-mrv2-optional-codec.md) — missing attribute 与 eager-MTP replay eligibility。
+
 - 源码入口：`vllm_omni/model_executor/`（layers、model_loader、models、stage_input_processors）、
   `vllm_omni/model_extras/`（模型专有请求/prompt 转换）、`vllm_omni/worker/`（gpu_*_worker、
   gpu_*_model_runner、mixins）、`vllm_omni/inputs/`（runner 输入预处理）和设备平台层

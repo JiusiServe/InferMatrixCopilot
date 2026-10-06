@@ -61,6 +61,31 @@ def test_no_rule_requires_signed_reason_without_inventing_a_rule(world):
     assert verify(settlement.RECEIPT_PURPOSE, json.loads(receipt.read_text()), w.key.public_key())["events"][0]["rules"] == []
 
 
+@pytest.mark.parametrize("no_rule", [False, True])
+def test_original_no_rules_disposition_can_be_reviewed_without_erasing_history(world, no_rule):
+    w = world
+    event, coverage = _ready(w, status="done", no_rule=no_rule)
+    w.rt.ledger.set_event_status(event, "done", "no rules")
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    receipt = settlement.apply_plan(w.rt, plan, w.key)
+    assert settlement.apply_plan(w.rt, plan, w.key) == receipt
+    evidence = verify(settlement.RECEIPT_PURPOSE, json.loads(receipt.read_text()), w.key.public_key())["events"][0]
+    assert evidence["source_event"]["status"] == "done"
+    assert evidence["source_event"]["detail"] == "no rules"
+    assert evidence["outcome"] == ("no_rule" if no_rule else "already_covered")
+    assert json.loads(w.rt.ledger.event(event)["detail"])["outcome"] == "manual_reviewed_merged"
+
+
+@pytest.mark.parametrize("detail", ["old draft", "no rules ", '{"outcome":"manual_reviewed_merged","receipt":"other"}'])
+def test_other_completed_events_cannot_have_their_history_replaced(world, detail):
+    w = world
+    event, coverage = _ready(w, status="done")
+    w.rt.ledger.set_event_status(event, "done", detail)
+    with pytest.raises(reconcile.ReconciliationError, match="original done/no rules"):
+        settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    assert w.rt.ledger.event(event)["detail"] == detail
+
+
 def test_failed_batches_and_descendants_stop_but_verdicts_and_unrelated_queue_remain(world):
     w = world
     event, coverage = _ready(w)

@@ -88,8 +88,9 @@ def prepare(rt, *, target: str, allow_mergers: list[str], required_checks: list[
             detail = json.loads(event["detail"])
             if detail.get("receipt") == receipt and detail.get("outcome") == "manual_reviewed_merged":
                 source["status"], source["detail"] = prior["source_event"]["status"], prior["source_event"]["detail"]
-        if source["status"] not in {"pending", "rejected", "drafted"}:
-            raise ReconciliationError("only pending, rejected or drafted source events can be settled")
+        premature_discard = source["status"] == "done" and source["detail"] == "no rules"
+        if source["status"] not in {"pending", "rejected", "drafted"} and not premature_discard:
+            raise ReconciliationError("only pending, rejected, drafted or original done/no rules events can be settled")
         rules = item.get("rules", [])
         if not isinstance(rules, list) or (outcome == "no_rule" and rules) or (outcome != "no_rule" and not rules):
             raise ReconciliationError("covered events need exact rule references; no-rule events cannot claim rules")
