@@ -1990,6 +1990,9 @@ def _coverage_lines(coverage: dict) -> list[str]:
 
 def render_pr_body(record: InitRecord, lifecycle) -> str:
     """The PR body: the init record in reviewable form (design §9)."""
+    if record.stage == "knowledge" and record.coverage.get("foundation_publication", {}).get("foundation_mode") == "partial":
+        from .foundation_publication import render_partial_body
+        return render_partial_body(record, lifecycle)
     lines = [
         f"`kb init` stage **{record.stage}** for `{lifecycle.repo}` (`{lifecycle.full_name}`).",
         "",

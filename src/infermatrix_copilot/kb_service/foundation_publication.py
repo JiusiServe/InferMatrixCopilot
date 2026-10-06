@@ -202,3 +202,30 @@ def foundation_handoff(record_path, *, knowledge, baseline, repo, pin, publisher
                 "files_sha256": payload["files_sha256"]}
     except (OSError, ValueError, KeyError, TypeError, InitError) as exc:
         raise InitError("partial foundation handoff is unavailable or differs from the merged baseline") from exc
+
+
+def render_partial_body(record, lifecycle):
+    """Bounded PR metadata; full native verdicts/history remain in the record."""
+    from collections import Counter
+    publication = record.coverage["foundation_publication"]
+    targets = record.coverage["knowledge"]["targets"]
+    core, features = targets["core"], targets["features"]
+    unknown = publication["unknown_foundation_facets"]
+    counts = Counter(facet for facets in unknown.values() for facet in facets)
+    ref = publication["receipt"]
+    lines = [f"`kb init knowledge`：`{lifecycle.repo}`（`{lifecycle.full_name}`）的基础知识部分发布。", "",
+        "本次仅发布已获原生独立评审认可的内容，保留真实未知项。初始化尚未完成。", "",
+        f"- 固定源码：`{record.pin}`", f"- 知识基线：`{record.kb_base_sha}`",
+        f"- 原生成身份：`{record.inputs_digest}`（保留任务及修正次数）",
+        f"- 六维基础知识完整功能：{features['covered']}/{features['total']}；基础目标达标：{targets['met']}。",
+        f"- 生产文件结构覆盖：{core['covered']}/{core['total']}（{core['ratio']:.2%}），政策目标 {core['target']:.2%}。",
+        f"- 尚未知的基础维度：{sum(counts.values())} 项，涉及 {len(unknown)} 个功能。",
+        f"- 本次模型追加调用：{record.coverage['foundation_scope']['native_dispatches']}；实际订阅费用：未知。",
+        "- `init_complete=false`；七维深度认可、检索验收、独立审查和 CI 仍为后续交付门槛。", "",
+        "| 基础维度 | 未知项 |", "| --- | ---: |"]
+    lines += [f"| {facet} | {counts.get(facet, 0)} |" for facet in
+              ("architecture", "api", "configuration", "features", "tradeoffs", "validation")]
+    lines += ["", f"- 冻结发布收据：`{ref['path']}`", f"- 收据 SHA-256：`{ref['sha256']}`",
+        "- 完整输入、输出、工具轨迹、原生评审、失败原因和未决项保存在原始 Git 外阶段记录及收据中。",
+        "- 固定 SHA 的引用、原生证明、知识结构和格式已校验；本 PR 合并仍需完整 CI 与独立审查。", ""]
+    return "\n".join(lines)

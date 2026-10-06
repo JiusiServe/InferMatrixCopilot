@@ -187,6 +187,18 @@ class _Knowledge(_Stage):
                                   "resume this same pinned publication batch to fill missing knowledge"])
         return super()._publish(changed)
 
+    def _resume(self, previous: InitRecord) -> InitRecord:
+        if self.STAGE == "knowledge" and self.foundation_mode == "partial":
+            from .init_stages import render_pr_body
+            from .init_support import load_prepared, save_prepared
+            # The common run path has already replayed native/source/receipt
+            # and checked the frozen catalog, branch and generation identity.
+            prepared = load_prepared(previous.pr["prepared"])
+            body = render_pr_body(previous, self.lifecycle)
+            if prepared["body"] != body:
+                save_prepared(Path(previous.pr["prepared"]), **{**prepared, "body": body})
+        return super()._resume(previous)
+
     def _build(self, tree: Path) -> InitRecord:
         if self.route_source == "none":
             return self._blocked(["knowledge needs owner routes: run and merge skeleton and modules first"])
