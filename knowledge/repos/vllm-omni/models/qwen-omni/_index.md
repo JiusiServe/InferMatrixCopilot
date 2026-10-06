@@ -60,5 +60,6 @@ sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", "PR #4322"
 | 遇到什么 | 查看哪里 |
 |---|---|
 | stage 拓扑、代际差异与官方性能优化结论 | [architecture](architecture.md) |
+| Realtime audio history 与 Qwen token/ms 近似 truncate 对齐 | [Realtime 音频 history 规则](rules-realtime.md) |
 | Qwen3-Omni Thinker MRoPE、CUDA compilation custom-op boundary、AWQ/compressed-tensors 名称映射、MoE backend default/override、固定种子音频回归、audio-encoder head/TP divisibility、Qwen2.5 code2wav soft-fail/旧 speech helper，或 code predictor 的 RoPE theta/rope_parameters 读取
  | [Qwen-Omni rules](rules.md)   新增核对：QOMNI-1h、QOMNI-1h2、QOMNI-1h3、QOMNI-1h4。 |

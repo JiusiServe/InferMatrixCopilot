@@ -42,5 +42,6 @@ sources: []
 | stage config→EngineArgs projection、explicit `devices`、TP/local-DP/PP、replica layout 或 worker 创建前的 layout guard | [stage 启动与设备布局规则](rules-stage-startup.md)   新增核对：SERV-12c、SERV-8b。 |
 | 公开请求字段的校验、来源冲突、alias/extras 归一与 consumer view | [请求输入合同](rules-request-input.md)   新增核对：SERV-4r、SERV-4r2、SERV-4r3、SERV-4r4、SERV-4s、SERV-4r5、SERV-4i2。 |
 | speech 输出采样率 capability、resample、streaming header/flush | [speech 输出规则](rules-speech-output.md)   新增核对：SERV-9c。 |
+| OpenAI Realtime routing、PCM16 admission、部分 session 更新、response 终态与有界 history/truncate | [Realtime 请求与会话规则](rules-realtime-openai.md) |
 
 - [Realtime video 增量 prefill 规则](rules-video-stream-prefill.md) — warmup/abort、窗口身份与已解码帧 snapshot。
