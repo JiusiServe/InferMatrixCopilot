@@ -107,6 +107,36 @@ function graphTargetNode(model, target) {
   return null;
 }
 
+function workRemovalDialog(rfc, feature) {
+  if (!canPublish(rfc)) return;
+  closeFeatureDialog();
+  const restoring = Boolean(feature.dropped);
+  const title = restoring ? "恢复工作项" : "移除工作项";
+  const dialog = element("dialog", {class: "graph-details work-removal", "aria-label": title});
+  featureDialog = dialog;
+  const form = element("form", {class: "stack"});
+  const reason = element("textarea", {name: "reason", rows: 3, required: true, maxlength: 4000});
+  const submit = element("button", {type: "submit", class: restoring ? "" : "danger"}, restoring ? "确认恢复" : "确认移除");
+  form.append(element("h2", {}, title), element("p", {"data-no-translate": ""}, `${feature.id} · ${feature.title}`),
+    element("p", {class: "small muted"}, restoring ? "恢复后，工作项将重新显示在路线图中。" : "工作项将从路线图中移除；原文、证据和历史保留，可随时恢复。"),
+    field(restoring ? "恢复原因" : "移除原因（会保留历史）", reason),
+    element("div", {class: "actions"}, submit, button("取消", () => closeFeatureDialog())));
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    if (submit.disabled) return;
+    if (!reason.value.trim()) { reason.focus(); return; }
+    busy(submit, async () => {
+      await applyRFCResult(await action("rfcs.work", {rfc_id: rfc.id, op: restoring ? "restore" : "drop", feature_id: feature.id,
+        reason: reason.value.trim(), expected_revision: rfc.revision}));
+    });
+  });
+  dialog.append(form);
+  dialog.addEventListener("close", () => { dialog.remove(); if (featureDialog === dialog) featureDialog = null; });
+  document.body.append(dialog);
+  dialog.showModal();
+  reason.focus();
+}
+
 function graphDetails(rfc, node, model) {
   closeFeatureDialog();
   const dialog = element("dialog", {class: "graph-details", "aria-label": `${node.title} 的工作详情`});
@@ -1134,11 +1164,7 @@ function workPanel(rfc, allowAdd = true) {
       state.setAttribute("aria-label", `${feature.title || feature.id} 的工作状态`);
       operations.append(state, button("记录工作状态", () => update({state: state.value})));
     }
-    if (canPublish(rfc)) operations.append(button(feature.dropped ? "恢复" : "移除", async () => {
-      const reason = prompt(feature.dropped ? "恢复原因" : "移除原因（会保留历史）");
-      if (reason === null || !reason.trim()) return;
-      await applyRFCResult(await action("rfcs.work", {rfc_id: rfc.id, op: feature.dropped ? "restore" : "drop", feature_id: feature.id, reason}));
-    }, feature.dropped ? "" : "danger"));
+    if (canPublish(rfc)) operations.append(button(feature.dropped ? "恢复" : "移除", () => workRemovalDialog(rfc, feature), feature.dropped ? "" : "danger"));
     const historical = historicalClaims(rfc, feature);
     const cache = rfcContent(rfc);
     const descriptions = cache.projection.featureSections[feature.id] || [];

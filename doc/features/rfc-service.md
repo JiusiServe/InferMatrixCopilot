@@ -127,6 +127,12 @@ also toggles a focused work node. Selection survives refresh and language change
 checkbox picker remains available on mobile. Selection is temporary, limited to
 the current authorized RFC, and omitted from downloaded SVGs.
 
+Maintainers can click a work node and choose **Remove**, enter a reason in the
+on-page confirmation form, and confirm. Removed work disappears from the SVG;
+its original source, evidence and history remain available. Use **Restore** on
+the removed task in the work list to bring it back. Both actions check the RFC
+version, and cancelling the form makes no change.
+
 The same operations are available through SDK, CLI and MCP:
 
 ```json
