@@ -1,7 +1,7 @@
 ---
 title: "Ming-Omni-TTS"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, models, model-executor]
 sources: ["PR #4341", vllm_omni/model_executor/models/ming_tts/]
@@ -33,3 +33,5 @@ LLM/conditioning 产生 latent condition，CFM/DiT solver 运行 ODE/SDE 采样�
 
 - 审查 Ming-TTS dense/MoE、CFM CUDA Graph、solver dtype、CFG 或 Audio VAE 输出。
 - 通用公开 speech 参数与 streaming 错误转到 [Serving rules](../../components/serving/rules.md)。
+
+ISTFT FP32 operands → complex64：MING-4a；沿本目录 rules 审查入口核对。

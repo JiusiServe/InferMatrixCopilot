@@ -1,7 +1,7 @@
 ---
 title: "LingBot-Video"
 created: 2026-08-10
-updated: 2026-08-10
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: [vllm_omni/diffusion/models/lingbot_video/, vllm_omni/model_extras/lingbot_video.py, vllm_omni/diffusion/registry.py, "PR #5311"]
@@ -26,3 +26,5 @@ sources: [vllm_omni/diffusion/models/lingbot_video/, vllm_omni/model_extras/ling
 - PR 涉及 `lingbot_video`、`LingBotVideoPipeline`、T2I/T2V/TI2V 选择、LingBot 分辨率预设、
   causal-VAE 帧网格或首帧条件。
 - 性能数字只能回到可复现 benchmark；本页不把 PR 的单机耗时/显存结果升级为 gate。
+
+decoded keyed media 的 zero-to-one range：LBV-2b；沿本目录 rules 审查入口核对。

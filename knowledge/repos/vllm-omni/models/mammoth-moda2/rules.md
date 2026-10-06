@@ -1,10 +1,10 @@
 ---
 title: "MammothModa2 规则"
 created: 2026-09-04
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, model-executor, diffusion]
-sources: ["PR #6694", vllm_omni/model_extras/mammothmodal2_preview.py, vllm_omni/model_executor/models/mammoth_moda2/mammoth_moda2.py, vllm_omni/model_executor/stage_input_processors/mammoth_moda2.py, vllm_omni/diffusion/models/mammoth_moda2/pipeline_mammothmoda2_dit.py, tests/model_extras/test_model_extras.py, tests/e2e/offline_inference/test_mammoth_moda2_expansion.py, "PR #7102"]
+sources: ["PR #6694", vllm_omni/model_extras/mammothmodal2_preview.py, vllm_omni/model_executor/models/mammoth_moda2/mammoth_moda2.py, vllm_omni/model_executor/stage_input_processors/mammoth_moda2.py, vllm_omni/diffusion/models/mammoth_moda2/pipeline_mammothmoda2_dit.py, tests/model_extras/test_model_extras.py, tests/e2e/offline_inference/test_mammoth_moda2_expansion.py, "PR #7102", "PR #7482"]
 confidence: high
 ---
 
@@ -57,3 +57,11 @@ confidence: high
 - 强制：跨 stage 传输保持 AR 源 dtype（FP16/BF16）的 contiguous `full_hidden_states`；EngineCore/OmniSerializer 以 raw bytes 保留 bfloat16，不得为“过 numpy 边界”无条件 `.float()` 扩成 FP32。DiT 在选完 text/image 条件行之后，才在既有最终转换点落到 model device/dtype。
 - 禁止：在 bridge 或 condition split 处提前 host-side float32 加倍 staging 与 H2D；把精度优化扩成 request-end streaming / Layer-2 lifecycle 设计；或假定旧 FP32 wire 注释仍有效。
 - 验收：FP16/BF16 经 serialize/deserialize 往返 dtype 与数值不变；condition split 输出保持 transfer dtype 直至最终 cast；connector 级 BF16 round-trip 覆盖。^[PR #7102]
+
+
+## MAMMO-1d — T2I 尺寸必须在 AR grid 构造前拒绝非法值
+
+- 触发：修改 MammothModa2 prompt builder 的 height/width 默认、AR grid 或 image metadata。
+- 强制：每一轴仅 None 使用1024；显式值必须为正且是16的倍数，再以16-pixel patch 构造 grid。三种 registry/model class alias 共享校验；一个轴省略不能掩盖另一轴非法值。
+- 禁止：用 value or 1024 把0变成默认；floor division 静默截断513等尺寸；让 prompt grid 与 metadata/request image size 不一致。
+- 验收：三个 class alias 覆盖双 None、单轴省略、16边界与普通矩形；每轴负数、0、1/15/17/513及另一轴省略的 control 都须 ValueError，合法尺寸的 prompt grid 与 metadata 同时正确。^[PR #7482]

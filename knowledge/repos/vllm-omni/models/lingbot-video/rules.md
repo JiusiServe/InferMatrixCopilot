@@ -1,10 +1,10 @@
 ---
 title: "LingBot-Video 规则"
 created: 2026-08-10
-updated: 2026-09-04
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/diffusion/models/lingbot_video/image_condition.py, vllm_omni/diffusion/models/lingbot_video/pipeline_lingbot_video.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/model_extras/lingbot_video.py, vllm_omni/model_extras/registry.py, examples/offline_inference/text_to_image/text_to_image.py, examples/offline_inference/image_to_video/image_to_video.py, tests/diffusion/models/lingbot_video/test_request_utils.py, tests/diffusion/models/lingbot_video/test_image_condition.py, tests/diffusion/models/lingbot_video/test_pipeline_lingbot_video.py, tests/entrypoints/openai_api/test_image_server.py, tests/entrypoints/openai_api/test_video_server.py, "PR #5311", "PR #5976", "PR #6049", "Issue #5883"]
+sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/diffusion/models/lingbot_video/image_condition.py, vllm_omni/diffusion/models/lingbot_video/pipeline_lingbot_video.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/model_extras/lingbot_video.py, vllm_omni/model_extras/registry.py, examples/offline_inference/text_to_image/text_to_image.py, examples/offline_inference/image_to_video/image_to_video.py, tests/diffusion/models/lingbot_video/test_request_utils.py, tests/diffusion/models/lingbot_video/test_image_condition.py, tests/diffusion/models/lingbot_video/test_pipeline_lingbot_video.py, tests/entrypoints/openai_api/test_image_server.py, tests/entrypoints/openai_api/test_video_server.py, "PR #5311", "PR #5976", "PR #6049", "Issue #5883", "PR #7037"]
 ---
 
 # LingBot-Video 规则
@@ -87,7 +87,7 @@ sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/d
 
 - 触发：修改 pipeline return、postprocess、image/video formatter、batch/output count 或异常映射。
 - 强制：pipeline 返回 `DiffusionOutput(output={"image": value})` 或 `{ "video": value }`；postprocess
-  必须要求二者恰好一个、按 output type 转换而不丢 key。T2I decode 必须恰好一帧并移除 frame
+  必须要求二者恰好一个、按 output type 转换而不丢 key。decoded keyed image/video 的 `[0,1]` tensor 必须转为 NumPy FP32 路径，避免 video API 将 floating tensor 当作 `[-1,1]` 再归一化；即使 keyed `output_type=pt` 也如此。bare pt tensor 与 image/video latent 保持既有 tensor 行为。T2I decode 必须恰好一帧并移除 frame
   轴；latent output 保持 tensor。
   `num_outputs_per_prompt != 1` 与 normalization 的 TypeError/ValueError 在 pipeline `forward`
   统一转为 `OmniClientError`，使 image/video 路径都返回 HTTP 400；不要只在 image API 加不对称
@@ -95,5 +95,5 @@ sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/d
 - 禁止：postprocess 丢掉 modality key；让 n>1 成为 500；以内部防御性 ValueError 代替公开
   request normalization。
 - 验收：同时覆盖 formatter 的 image/video key、T2I 单帧 shape、TI2V input cardinality、最终
-  image size limit、frame-count precedence 和 n>1 的 400。PR 所报 H200 单次耗时、峰值显存与
+  image size limit、frame-count precedence 和 n>1 的 400；FP32/BF16 与 omitted/pt/np 的黑、中灰、白须穿过真实 API frame conversion 后保持原 `[0,1]` 值，不能只测全白；bare pt 与 latent identity control 保持。^[PR #7037] PR 所报 H200 单次耗时、峰值显存与
   bitwise parity 缺少本知识树可复跑的命令/产物，不能作为性能或精度 gate。

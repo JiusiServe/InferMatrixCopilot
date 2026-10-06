@@ -1,10 +1,10 @@
 ---
 title: "Ming-Omni-TTS 规则"
 created: 2026-07-20
-updated: 2026-09-04
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #4341", "PR #6119"]
+sources: ["PR #4341", "PR #6119", "PR #7538"]
 confidence: high
 ---
 
@@ -60,3 +60,11 @@ confidence: high
 - 强制：引擎内的 `SpeakerEmbeddingExtractor` 默认使用 `allow_download=False`，依赖已预取且包含 `campplus.onnx` 的模型目录；引擎构造前的离线 `end2end` 提取必须显式传 `allow_download=True`，并限制解析到 `campplus.onnx`。
 - 禁止：在线请求路径在缓存未命中时隐式联网，离线引擎前处理使用 cache-only 却假定文件已经预取，或在 `VLLM_USE_MODELSCOPE` 下假定 HF 的 `local_files_only` 分支能够完成 ModelScope 首次解析。
 - 验收：覆盖本地已解析目录、缓存命中/未命中和离线显式下载三条路径；确认缺失 `campplus.onnx` 明确失败，ModelScope 预取后的目录走短路，并验证 serving 与离线提取都能产生 speaker embedding。 ^[PR #6119]
+
+
+## MING-4a — ISTFT complex spectrum 必须由 FP32 operands 显式构造
+
+- 触发：修改 common/ming/audio_dsp.py 的 ISTFTHead.forward 或 magnitude/phase 到 complex spectrum 的转换。
+- 强制：先将 mag、x、y 显式转 float32，再构造 mag * (x + 1j*y)，得到 complex64；后续 streaming buffers、window 与 fused/native ISTFT 选择合同保持。
+- 禁止：依赖 BF16/FP16 complex promotion，使新 torch dtype 落到 FFT 不支持的 bcomplex32/complex32；把局部 spectrum precision 修复写成全模型 FP32 或通用 XPU 性能提升。
+- 验收：覆盖 BF16、FP16、FP32 spectrum dtype 与 native FFT；FP32 control 要保持逐值一致；fused gate 与 streaming last-chunk/buffer 路径分别验证。当前 PR 无新增 regression test，模型 smoke 不能替代这些 dtype 边界检查。^[PR #7538]
