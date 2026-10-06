@@ -1,10 +1,10 @@
 ---
 title: "Diffusion tensor dtype 规则"
 created: 2026-09-03
-updated: 2026-09-04
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5067", "PR #5068", "PR #5174", "PR #5981", "Issue #5880", vllm_omni/diffusion/layers/norm.py, tests/diffusion/layers/test_norm.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_latents.py"]
+sources: ["PR #5067", "PR #5068", "PR #5174", "PR #5981", "Issue #5880", vllm_omni/diffusion/layers/norm.py, tests/diffusion/layers/test_norm.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_latents.py", "PR #7489"]
 confidence: high
 ---
 
@@ -36,3 +36,11 @@ confidence: high
 - 禁止：只对 LTX-2.5 应用 token-major layout；在 BF16 mask 上提前乘 `noise_scale`；直接用 CUDA scalar tensor 做 sigma 除法；让 padding 或共享全局 RNG 改变请求的随机状态；仅凭 shape 和可运行性宣称数值 parity。
 - 验收：对 2、2.3、2.5 参数化 seeded generated/provided latent 测试，逐值核对 layout、stride、后续 RNG 状态、FP32 noising 和 sigma arithmetic；ancestral step 再与固定官方 reference 对照，硬件 parity 必须固定 attention backend 与 checkpoint revision。^[PR #6070]
 
+
+
+## DIFF-NORM-1a — shared RMSNorm 必须对 empty stream 保持 native fallback 与明确精度边界
+
+- 触发：修改sharedRMSNorm的CUDA/HIPdispatch或MammothModa2caption/refiner/QKnorm替换。
+- 强制：compile或x.numel()==0走native，保留residual处理及fused异常fallback；替换Qwen2RMSNorm保持checkpoint参数名/shape/eps，包括captionembedder重建。共享FP32accumulation仍由DIFF-1c拥有。
+- 禁止：对CFG无条件branch的zero-tokenstreamlaunch fusedkernel；将一次rounding的shared/fused结果宣称与先cast后weightmultiply的Qwen2路径bit-identical；fallback结果冒充真实fused精度证据。
+- 验收：CPU/acceleratorempty、residual、compilecontrol及checkpointload覆盖；真实Previewhidden/QKshape验证fusedpath被调用、相对旧路径一BF16step界及独立float64referenceerror；模型parity/性能不能从单kernel测试外推。 ^[PR #7489]

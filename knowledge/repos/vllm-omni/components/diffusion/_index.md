@@ -69,3 +69,5 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 - [HSDP pre-sharded 权重加载](rules-hsdp-weight-loading.md) — meta-first binding、rank-local I/O 与真实双卡 parity。
 
 - [Attention execution-path 能力](rules-attention-contracts.md) — 有效 metadata、FA4 编译边界与未迁移平台。
+
+shared RMSNorm 的empty-input与fused精度边界沿 tensor dtype rules 的DIFF-NORM-1a核对。

@@ -47,3 +47,6 @@ sources: []
 - [MRv2 attention capture 边界](rules-attention-capture.md) — mixed FULL、separate decode 与当前请求 boundary。
 
 - [release processor/dummy、profiling、state selection 与 auxiliary output：EXEC-RELEASE-1a–1d](rules-release-contracts.md)。
+
+- [显式seed、whole-MTPgraph与NVIDIA/ROCm抽样边界](rules-request-rng.md)。
+- [异步output slab、producer事件与storage所有权](rules-output-snapshots.md)。

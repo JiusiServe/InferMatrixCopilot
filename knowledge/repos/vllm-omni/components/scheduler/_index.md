@@ -46,3 +46,5 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_g
 - [Running prefix-cache reset 能力](rules-prefix-reset-capability.md) — active request 的拓扑能力检查与拒绝边界。
 
 - [release 双 waiting queue、deferred set 与 resumable cleanup：SCHED-RELEASE-1a、SCHED-5g](rules-release-queues.md)。
+
+- [empty terminal、staged-payloadreceivegate与tail守恒](rules-stream-terminals.md)。
