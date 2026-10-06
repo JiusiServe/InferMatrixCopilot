@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #8459", "PR #5976", "PR #5957", vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, tests/config/test_endpoint_policy.py, "PR #5036", "PR #6642", "PR #6773", "PR #6707", vllm_omni/config/endpoint_policy.py, "PR #6051", "PR #7426", "PR #5647"]
+sources: ['PR #8459', 'PR #5976', 'PR #5957', vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, tests/config/test_endpoint_policy.py, 'PR #5036', 'PR #6642', 'PR #6773', 'PR #6707', vllm_omni/config/endpoint_policy.py, 'PR #6051', 'PR #7426', 'PR #5647', 'PR #8518']
 confidence: high
 ---
 
@@ -118,3 +118,15 @@ confidence: high
   已删除就宣称所有内部兼容路径已移除。
 - 验收：公开 rejection 与 canonical forwarding 测试通过；每个暂留内部/direct 路径有独立
   compatibility test，直到后续迁移显式删除。 ^[PR #5647]
+
+## SERV-7i — parsed logging settings 必须先于 Omni command validation 与 dispatch 生效
+
+- 触发：升级vLLM logger初始化合同或修改Omni CLI/module API-server入口。
+- 强制：Omni CLI在parse_args后、recognized command validate前调用upstream
+  `configure_logging_from_args(args)`，然后dispatch；直接module API server也在parse后、
+  model同步/后续validation与startup前调用同一入口。不得只依赖import-time logger defaults。
+- 禁止：只修 `vllm serve --omni` 而遗漏 `python -m ...api_server`，或在validate/dispatch后
+  才应用用户settings；logo可见不能替代level/config实际生效或模型startup证明。
+- 验收：两个真实entrypoint分别核对parsed settings→configure→validate/startup顺序，并用
+  显式logging参数检查效果。source的logo观察只支持初始化修复，未解决module入口仍显示
+  vLLM logo的既有问题，也不提供其它功能/模型运行资格。^[PR #8518]

@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni CI 规则"
 created: 2026-08-23
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #8459", "PR #7648", "PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6311", "PR #6339", "PR #6343", "PR #6468", "PR #6523", "PR #6613", "PR #6555", "PR #6650", .buildkite/common/scripts/run_cov_split.sh, pyproject.toml, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py, .buildkite/common/scripts/upload_pipeline.py, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/clean.py, tests/helpers/client.py, tests/helpers/mark.py, tests/helpers/runtime.py, tests/helpers/stage_config.py, tests/buildkite/test_upload_pipeline.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/dfx/stability/, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/nightly/run_nightly_jobs.sh, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py, .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, "PR #6704", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", "PR #6696", vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/benchmarks/patch/patch.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, "PR #6674", docker/Dockerfile.npu, docker/Dockerfile.npu.a3, docker/Dockerfile.npu.ci, docker/Dockerfile.npu.ci.a3, "PR #6818", "PR #6830", "PR #6884", tests/diffusion/conftest.py, tests/diffusion/attention/test_flash_attn.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #6947", "PR #7118", "PR #6597", "PR #7371", "PR #7534"]
+sources: ['PR #8459', 'PR #7648', 'PR #3422', 'PR #5074', 'PR #5255', 'PR #5310', 'PR #5402', 'PR #5524', 'PR #5543', 'PR #5670', 'PR #5713', 'PR #5780', 'PR #5823', 'PR #5836', 'PR #5957', 'PR #5976', docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, 'PR #5845', 'PR #5872', 'PR #6008', 'PR #6048', 'PR #6056', 'PR #6096', 'PR #6102', 'PR #6202', 'PR #6208', 'PR #6273', 'PR #6293', 'PR #6311', 'PR #6339', 'PR #6343', 'PR #6468', 'PR #6523', 'PR #6613', 'PR #6555', 'PR #6650', .buildkite/common/scripts/run_cov_split.sh, pyproject.toml, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py, .buildkite/common/scripts/upload_pipeline.py, .buildkite/cuda/test-nightly.yml, .buildkite/cuda/test-weekly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/helpers/clean.py, tests/helpers/client.py, tests/helpers/mark.py, tests/helpers/runtime.py, tests/helpers/stage_config.py, tests/buildkite/test_upload_pipeline.py, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/dfx/stability/, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/e2e/online_serving/test_minimax_h3_dlo_dp2_t2va.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/nightly/run_nightly_jobs.sh, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py, .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, 'PR #6704', tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, 'PR #6743', 'PR #6696', vllm_omni/benchmarks/metrics/metrics.py, vllm_omni/benchmarks/patch/patch.py, tests/benchmarks/metrics/test_metrics.py, tests/benchmarks/patch/test_patch.py, 'PR #6674', docker/Dockerfile.npu, docker/Dockerfile.npu.a3, docker/Dockerfile.npu.ci, docker/Dockerfile.npu.ci.a3, 'PR #6818', 'PR #6830', 'PR #6884', tests/diffusion/conftest.py, tests/diffusion/attention/test_flash_attn.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, 'PR #6947', 'PR #7118', 'PR #6597', 'PR #7371', 'PR #7534', 'PR #8346', 'PR #8239', 'PR #8528']
 confidence: high
 ---
 
@@ -70,6 +70,15 @@ selector、90-minute timeout 与 explicit dependencies 只证明该 job 的配�
 PR 报告的 collection=1 和 local two-card B300 184.97 s 是该精确 workload 的作者报告，不能
 提升为 Buildkite H100 pass、通用并发可靠性或性能 gate。^[PR #6555]
 
+- 一个文件同时含 CPU unit 与真实 GPU kernel 时，tier/modality 可以 module-level，但 `cpu`
+  只给 CPU case；GPU case 用硬件 helper，避免 module `cpu` 把它们送进 Simple shards。专用
+  AR paged-attention GPU lane 设置 `VLLM_OMNI_AR_FA_REQUIRED=1`：缺可用 FlashAttention 必须
+  fail，optional local run 才可 skip。READY/MERGE ROCm lane 保持相同完整数值矩阵，CUDA merge
+  保留对应 lane；job-local AITER/Torch extension cache 和内层 timeout 留出 step cleanup 窗口。
+- 验收对 whole-file 按实际 CPU/GPU selectors 分别 collection，CPU 不收 GPU case、GPU 不收
+  CPU case；required backend 不可用必须红，不能以所有 GPU case skip 换绿。PR #8346 的精确
+  matrix 为 57 CPU/16 GPU，数字只资格化该 head，不是未来固定 census。^[PR #8346]
+
 ## OMNI-CI-1b — 回归 fence 必须锚定可观察合同且非空转
 
 - 触发：新增 bug regression、API guard、route census 或 middleware fence。
@@ -100,12 +109,20 @@ PR 报告的 collection=1 和 local two-card B300 184.97 s 是该精确 workload
   example 时，仍须保持原 marker 与测试语义。
 - 禁止：把 `nightly-test` label 当 weekly CPU coverage gate；让 `NIGHTLY=1` 顺带占用
   L2/L3；用 pipeline 已上传推断嵌套 group 一定执行；通过 `pytest --collect-only | grep ...`
-  枚举文件却不传播 collection 失败或不检查结果非空。PR #6311 合并时 weekly TTS 循环仍有
-  这个 fail-green 缺口，不能把该 lane 的绿色结果当作完整 TTS collection 证据。
+  枚举文件却不传播 collection 失败或不检查结果非空。PR #6311 的旧 weekly TTS 动态循环曾有
+  这个 fail-green 缺口；当前显式 family inventory 与失败传播见下述 PR #8239 合同。
 - 验收：对 docs-only、CI-level-only、普通 main、三种 schedule env、CUDA/NPU 与每个 PR label
   逐项渲染 bootstrap，并断言 child upload、`--e2e` 和 group-level `if`；coverage helper 分别
   验证 weekly-main 拆分上传与其他环境 combined/no-cov。任何动态 collection 都要让 import
   error、零 selection 和单文件失败使 job 红。^[PR #6311]
+
+- 长 TTS weekly sweep 可按模型 family 拆分为有界 step，保持一文件一 pytest process、原
+  env/selector/run-level；显式 file list 循环累积任何失败并最终非零退出。新增文件要审计全部
+  family inventory，不能保留旧 collect-only pipeline 的 fail-green 行为。
+- tier/cadence 迁移按 case 而非整个 module：MiniCPM continuous-window 为 full_model，在 CUDA/
+  NPU duplex nightly 跑并从 broad sweep 排除，另两 window case 仍 advanced_model；π0.5 标 slow
+  后属于 weekly YAML 的 `NON_CRITICAL=1` group，不能仅凭文件名声称 `WEEKLY=1` 会执行它。
+  验收同时渲染 group `if`、marker 与去重路径；静态 wiring 不提供 full-checkpoint pass。^[PR #8239]
 
 ## OMNI-CI-2a — CI 工具、schema 和 hook 是可复现供应链
 
@@ -130,30 +147,10 @@ PR 报告的 collection=1 和 local two-card B300 184.97 s 是该精确 workload
   现有 unit test 另外直接断言 count 等于 budget，所以下降但未改 constant 时 hook 会通过，
   而该 test 若被收集仍会失败；两者应统一为同一非递增语义。^[PR #6008]
 
-## OMNI-CI-2e — release rebase 的 image、容器资源与实际辅助负载必须成套对齐
+## 构建产物与 release rebase
 
-- 触发：升级 vLLM/torch base image，或新版本在 startup 增加资源检查、编译缓存与 warmup 行为。
-- 强制：正式 release 直接使用同版本 base image 的自洽依赖集；只有目标是未发布 SHA 时才恢复
-  wheel 重装及其 torch/CUDA/NumPy ABI 修复。容器显式满足新 startup check（共享内存等），硬件数
-  同时计入测试辅助模型：主模型占卡时，Whisper 等 grader 需要 spare accelerator 才能避免 CPU 超时。
-- 禁止：在 release image 上保留补偿旧 image 的依赖手术；用 Docker 默认 `/dev/shm`；只按被测模型
-  卡数配置 lane 而忽略 grader；把部分 nightly green 当全部兼容问题已关闭。
-- v0.28 对齐的 release-boundary example：CUDA/CI/ROCm base image 与 installed vLLM 都指向
-  `v0.28.0`；CI Dockerfile 在官方同版本 image 出现后移除临时 wheel reinstall，而不是把旧
-  0.27 image 上的 ABI repair 带入 release。文档安装 pin 也必须同步；非 release SHA 才恢复
-  明确的 wheel/ABI block。^[PR #6606]
-- NPU v0.28 对齐要求 `Dockerfile.npu`、`.npu.a3`、`.npu.ci`、`.npu.ci.a3` 四个既有 image
-  一起继承 matching `vllm-ascend:v0.28.0` 并显式设置 `VLLM_TARGET_DEVICE=npu`，同时保留 spawn
-  multiprocessing。该四-image 合同不能从 CI image 成功外推为 production、全模型或性能兼容。
-  ^[PR #6674]
-- v0.31 对齐时 CUDA/CI/ROCm 使用官方同版 release image；CI dependency resolution 后
-  检查 installed vLLM exact version，GPU job 开始时再验证 usable CUDA、FlashInfer 与
-  `vllm._C_stable_libtorch` 导入。Omni 版本 override 使用 `VLLM_OMNI_VERSION_OVERRIDE`，
-  避免通用 setuptools-scm override 污染 dependency source build 的真实版本；CPU image
-  builder 的 version check 不能替代 GPU runtime check。保留原 accuracy thresholds，
-  failed ASR 音频 artifact 只用于诊断，不能降低请求/ASR 断言。^[PR #8459]
-- 验收：image tag 与目标 release 一致；startup 通过共享内存 preflight；目标 lane 证明实际 grader
-  device；每个残余失败独立记录，尤其数值/质量回归不能由 API 兼容测试替代。^[PR #5976]
+镜像与checkout版本、容器startup资源、辅助grader负载、Python支持范围及无VCS wheel合同，
+见[构建与版本规则](rules-build-compatibility.md)（`OMNI-CI-2e`, `OMNI-CI-2j`, `OMNI-CI-2k`）。
 
 ## OMNI-CI-3a — DFX baseline artifact 与性能回归 gate 是两个合同
 

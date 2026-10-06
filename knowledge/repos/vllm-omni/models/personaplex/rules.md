@@ -1,10 +1,10 @@
 ---
 title: "PersonaPlex 规则"
 created: 2026-09-02
-updated: 2026-09-06
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #4771", "PR #6318", docs/design/fullduplex-personaplex.md, vllm_omni/model_executor/models/personaplex/duplex/serving_adapter.py, vllm_omni/model_executor/stage_input_processors/personaplex.py, tests/e2e/features/fullduplex/, tests/entrypoints/openai_api/test_duplex_handler.py]
+sources: ["PR #4771", "PR #6318", docs/design/fullduplex-personaplex.md, vllm_omni/model_executor/models/personaplex/duplex/serving_adapter.py, vllm_omni/model_executor/stage_input_processors/personaplex.py, tests/e2e/features/fullduplex/, tests/entrypoints/openai_api/test_duplex_handler.py, "PR #7399", "PR #7481"]
 confidence: high
 ---
 
@@ -87,3 +87,29 @@ confidence: high
   speech 宣称成 `supports_barge_in=true`。
 - 验收：public capability/config 不出现 dead sampling controls，非 greedy 请求明确拒绝或
   归一化；capability 保持 `supports_barge_in=false`。^[PR #4771]
+
+## PPLEX-1d — Mimi encode 只计算被消费的 codebook prefix
+
+- 触发：修改 `PersonaPlexMimiCodec.encode_frame()` 的HF quantizer调用或返回codec layout。
+- 强制：向真实 `quantizer.encode` 传 `num_quantizers=CODEBOOKS`（当前8），只计算semantic+所需
+  acoustic prefix；返回仍是contiguous long `[batch,CODEBOOKS]`，不得修改checkpoint加载、decoder
+  的32-codebook capacity或streaming front-end state。前8的residual选择不依赖后24层。
+- 禁止：先算32再slice并声称避免suffix工作；重排prefix浮点运算；以synthetic quantizer-only
+  speedup推断full codec/LM、audio quality、GPU memory或并发session收益。
+- 验收：非零real HF quantizer fixture与旧full32路径逐token相等，spy断言prefix层执行且suffix
+  零调用；batch1/2/9下跨ring-wrap、slot reset与full reset仍prefix相等，decoder容量不变。
+  stateless quantizer之后重复断言所有front-end内部state不是prefix优化必要证据；GPU微测需
+  单独记录版本、warmup、交替order、source hash与synthetic范围。^[PR #7399]
+
+## PPLEX-1e — prefill vectorization 必须保留逐 token embedding 语义
+
+- 触发：优化talker `_build_prefill_embed` 或duplex first-append的voice/persona prefill。
+- 强制：非负offset/span用一次 `[1,1+n_q,span]` stack和一次现有embedding调用；text超过末尾
+  用zero_text=3，agent行用有效silence prefix，user行用有效user_sine或silence fallback，过短
+  code tensor按原分支处理。embedding仍按既有固定table-add顺序，不作沿span的浮点reduction。
+- 禁止：每token `.item()` 将device scalar读回Python；改padding、audio fallback、dtype/device/
+  contiguous layout或输入tensor；重复first-append prefill。helper速度不能外推serving整体速度。
+- 验收：faithful旧loop和手算layout在CPU/GPU FP32/BF16/FP16下逐byte相等，覆盖nonzero offset、
+  partial/at-end/past-end/empty text、strided/short/absent audio与chunk拼接；拒绝所有scalar read
+  时仍只有一次embedding调用。Stage0真实embedding integration证明first append只一次prefill，
+  second append只含live frame；组合stack的E2E结果不能单独归因此PR。^[PR #7481]

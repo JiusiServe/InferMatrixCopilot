@@ -30,11 +30,12 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 
 | 遇到什么 | 查看哪里 |
 |---|---|
+| Wan exact/fused BF16预算、channels_last首帧Conv2d与cache/fallback | [Wan fastpath规则](rules-wan-fastpath.md) |
 | 理解共享职责和数据流 | [architecture](architecture.md) |
 | 根据 PR 描述直达 execution parity、checkpoint/artifact identity、quality evidence 或 system-runtime 异常清理规则组与第一批源码、custom-op mutable schema | [rules 与代码地图](rules.md) |
 | image/diffusion timing、step normalization、missing-versus-zero 与 benchmark 解释边界 | [metrics evidence rules](rules-metrics.md) |
 | vLLM/torch rebase、MoE/quant helper 漂移、kernel backend capability 与 matched accuracy | [upstream 兼容规则](rules-upstream-compat.md) |
-| worker process title、拓扑局部 rank 与日志前缀 | [worker observability rules](rules-worker-observability.md) |
+| worker process title、拓扑局部 rank、日志前缀与offload worker-local allocator峰值 | [worker observability rules](rules-worker-observability.md) |
 | 平台 IR-op priority、Inductor/eager 默认顺序、pipeline compile 准入与模型 hook 合并 | [platform runtime rules](rules-platform-runtime.md) |
 | CustomOp XPU platform dispatch、PyTorch-native fallback、CUDA contract 与非同义 override 边界 | [CustomOp dispatch rules](rules-custom-op-dispatch.md) |
 | runtime temporary 与 loader-scoped parameter dtype、shared RMSNorm accuracy | [tensor dtype rules](rules-tensor-dtype.md) |

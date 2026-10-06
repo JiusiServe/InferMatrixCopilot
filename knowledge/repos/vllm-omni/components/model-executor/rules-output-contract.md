@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5146", "PR #6152", vllm_omni/outputs/, "PR #7448", "PR #7608", "PR #7843"]
+sources: ['PR #5146', 'PR #6152', vllm_omni/outputs/, 'PR #7448', 'PR #7608', 'PR #7843', 'PR #8500']
 confidence: high
 ---
 
@@ -54,3 +54,15 @@ confidence: high
 - 强制：`consolidate_tensors` 接收 modality，并对每个 key 调用 `get_accumulation_strategy(modality, key)`。流水线通过 `register_key_accumulation_strategy` 注册覆盖；Qwen3-TTS 必须将 `codes.audio`→`CONCAT_DIM0`、`codes.ref`→`REPLACE`。`CONCAT_LAST` 失败仍可 flatten 后拼接；其他策略失败必须带 key 名 raise，不得静默 keep-last。
 - 禁止：整 payload 共用单一 modality 默认；把 codec-frame 矩阵当 `CONCAT_LAST` 波形；把非 `audio` 键的 concat 失败吞成 keep-last。
 - 验收：合成张量证明 `codes.audio` 沿 dim0 拼满、`codes.ref` 只保留一份，以及错误策略 raise；真实波形键仍走 `CONCAT_LAST`。^[PR #7608]
+
+## EXEC-7e — routed-expert 回归必须验证受支持的 native V2 auxiliary output
+
+- 触发：升级vLLM native auxiliary output或修改GPU routed-expert tests。
+- 强制：GPU auxiliary output的consumer是V2 runner `aux_output_connector_output`；测试经真实
+  native copy/process边界，保留decode/prefill rows、token_start和sampling mask，分别验证不同
+  sampled/rejected token counts都传入copy。legacy GPU辅助输出继续由既有配置gate拒绝。
+- 禁止：mock已删除的legacy `_omni_extract_routed_experts`，为保住旧测试恢复dead API；或只
+  检查sampled count，使相同/全零rejected count隐藏遗漏。
+- 验收：compact width1/2的native V2结果保持row/offset/mask并出现两项不同count arrays；
+  legacy config仍拒绝。test-only修复不改变production支持范围；旧vLLM0.30环境静态验证不证明
+  vLLM0.31 runtime，需单独的exact-head目标lane结果。^[PR #8500]
