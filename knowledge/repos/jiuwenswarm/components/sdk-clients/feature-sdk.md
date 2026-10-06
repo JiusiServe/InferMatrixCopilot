@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:sdks/README.md
 feature: "sdk"
 entry_points: ["sdks/python/src/jiuwenswarm_sdk/client.py"]
-source_globs: ["sdks/python/src/jiuwenswarm_sdk/client.py", "sdks/*"]
+source_globs: ["sdks/python/src/jiuwenswarm_sdk/client.py", "sdks/*", "jiuwenswarm/channels/process_cli/protocol/version.py", "sdks/python/src/jiuwenswarm_sdk/protocol.py", "sdks/python/src/jiuwenswarm_sdk/types.py", "sdks/typescript/src/index.ts", "sdks/typescript/src/protocol.ts", "jiuwenswarm/runtime/service.py", "sdks/python/src/jiuwenswarm_sdk/__init__.py"]
 ---
 
 # Python 与 TypeScript SDK 的职责、接口与配置

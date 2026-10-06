@@ -16,3 +16,4 @@ sources: []
 - [scripts](scripts/_index.md)
 - [scripts-nfs](scripts-nfs/_index.md)
 - [打包与部署：实现深读](feature-depth-deployment.md)
+- [packaging-deploy：冻结入口、容器与 yuanrong 部署链路](knowledge-packaging-deploy.md)

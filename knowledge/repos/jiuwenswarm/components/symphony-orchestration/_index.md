@@ -35,7 +35,7 @@ sources: []
 
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
-| symphony、graph build、图谱构建、fingerprint、能力指纹、evolution、经验演进、experience candidate、… | 入口 | `jiuwenswarm/symphony/adapter.py`、`jiuwenswarm/symphony/build.py`、`jiuwenswarm/symphony/config.py` |
+| symphony、graph build、图谱构建、fingerprint、能力指纹、evolution、经验演进、experience candidate、… | 入口 | `components/agent-runtime/`、`components/gateway-channels/`、`jiuwenswarm/symphony/adapter.py` |
 
 ## 验证入口
 
@@ -52,3 +52,4 @@ sources: []
 - [shared](shared/_index.md)
 - [skill-retrieval](skill-retrieval/_index.md)
 - [Symphony 检索与图谱编排：实现深读](feature-depth-symphony.md)
+- [Symphony orchestration service (jiuwenswarm/symphony/service.py) 基础知识页](knowledge.md)

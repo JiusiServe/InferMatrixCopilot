@@ -11,7 +11,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/设置与频道升级迁移指南.md
 feature: "proactive-recommendation"
 entry_points: ["jiuwenswarm/agents/harness/common/recommendation/proactive_engine.py", "jiuwenswarm/server/runtime/proactive_adapter.py"]
-source_globs: ["jiuwenswarm/agents/harness/common/recommendation/proactive_engine.py", "jiuwenswarm/server/runtime/proactive_adapter.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/recommendation/proactive_engine.py", "jiuwenswarm/server/runtime/proactive_adapter.py", "jiuwenswarm/agents/harness/common/recommendation/calendar_source.py", "jiuwenswarm/agents/harness/common/recommendation/proactive_actions.py", "jiuwenswarm/agents/harness/common/recommendation/feedback_collector.py", "jiuwenswarm/server/agent_ws_server.py", "jiuwenswarm/agents/harness/common/recommendation/gradient_updater.py", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/ExperimentalSettings.tsx", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/experimental/definition.ts", "jiuwenswarm/channels/web/frontend/src/components/ChatPanel/ProactiveRecommendationCard.tsx", "jiuwenswarm/agents/harness/common/recommendation/__init__.py", "jiuwenswarm/server/runtime/agent_adapter/interface.py", "jiuwenswarm/agents/harness/common/recommendation/proactive_prompts.py", "jiuwenswarm/agents/harness/common/recommendation/profile_extractor.py", "jiuwenswarm/agents/harness/common/recommendation/situation_report.py", "jiuwenswarm/channels/web/frontend/src/App.tsx"]
 ---
 
 # 主动推荐、频率限制与主 Agent 交付的职责、接口与配置

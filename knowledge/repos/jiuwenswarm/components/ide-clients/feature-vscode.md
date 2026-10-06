@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/ide/vscode/VSCode插件.md
 feature: "vscode"
 entry_points: ["jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts"]
-source_globs: ["jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts", "jiuwenswarm/channels/ide/packages/vscode-extension/*"]
+source_globs: ["jiuwenswarm/channels/ide/packages/vscode-extension/src/extension.ts", "jiuwenswarm/channels/ide/packages/vscode-extension/*", "jiuwenswarm/channels/ide/packages/shared-webview/chat.html", "jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/ChatPanel.ts", "jiuwenswarm/channels/ide/packages/vscode-extension/src/ui/StatusBar.ts", "jiuwenswarm/channels/ide/packages/vscode-extension/src/client/protocol.ts", "jiuwenswarm/channels/ide/packages/vscode-extension/src/client/WsClient.ts", "jiuwenswarm/channels/ide/packages/jetbrains-plugin/src/main/kotlin/com/jiuwenswarm/plugin/ui/SwarmMapPanel.kt", "jiuwenswarm/channels/ide/packages/vscode-extension/esbuild.js", "jiuwenswarm/channels/ide/packages/vscode-extension/src/editor/DiffViewer.ts", "jiuwenswarm/channels/browser/frontend/src/webview/chat.html"]
 ---
 
 # VS Code 客户端 的职责、接口与配置

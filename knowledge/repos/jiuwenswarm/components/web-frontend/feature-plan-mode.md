@@ -12,7 +12,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Harness.md
 feature: "plan-mode"
 entry_points: ["jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts", "jiuwenswarm/channels/web/frontend/src/stores/planStore.ts"]
-source_globs: ["jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts", "jiuwenswarm/channels/web/frontend/src/stores/planStore.ts"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/features/planMode/planModeGate.ts", "jiuwenswarm/channels/web/frontend/src/stores/planStore.ts", "jiuwenswarm/agents/harness/code/prompt/plan_approval.py", "jiuwenswarm/agents/harness/code/rails/code_plan_approval_interrupt_rail.py", "jiuwenswarm/agents/harness/code/rails/code_plan_approval_rail.py", "jiuwenswarm/channels/web/frontend/src/features/planMode/planEntrySource.ts", "jiuwenswarm/runtime/plan.py", "jiuwenswarm/server/agent_ws_server.py", "jiuwenswarm/server/runtime/agent_adapter/interface.py", "jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx", "jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts", "jiuwenswarm/channels/web/frontend/src/App.tsx", "jiuwenswarm/channels/browser/frontend/src/webview/chat.html", "jiuwenswarm/agents/harness/work/rails/work_agent_mode_rail.py"]
 ---
 
 # 计划模式与多入口切换限制的职责、接口与配置

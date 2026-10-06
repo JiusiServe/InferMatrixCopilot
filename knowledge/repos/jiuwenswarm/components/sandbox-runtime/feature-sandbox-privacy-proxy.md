@@ -11,7 +11,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenbox/README_CN.md
 feature: "sandbox-privacy-proxy"
 entry_points: ["jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy.py", "jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy_manager.py"]
-source_globs: ["jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy.py", "jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy_manager.py"]
+source_globs: ["jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy.py", "jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy_manager.py", "jiuwenbox/src/jiuwenbox/proxy/__init__.py", "jiuwenbox/src/jiuwenbox/server/app.py", "jiuwenbox/src/jiuwenbox/server/policy_reader.py", "jiuwenbox/src/jiuwenbox/server/proxy_manager.py", "jiuwenbox/src/jiuwenbox/server/routes/proxy.py"]
 ---
 
 # JiuwenBox 推理隐私代理的职责、接口与配置

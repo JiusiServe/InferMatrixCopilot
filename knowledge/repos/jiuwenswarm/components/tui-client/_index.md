@@ -32,3 +32,5 @@ sources: []
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
 | tui client | 入口 | `jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.ts`、`jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.watch.ts`、`jiuwenswarm/channels/tui/frontend/src/index.ts` |
+
+- [tui-client：CliPiAppState 应用状态中枢（app-state.ts）](knowledge.md)

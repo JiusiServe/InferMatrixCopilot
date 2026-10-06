@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/华为账号登录.md
 feature: "login"
 entry_points: ["jiuwenswarm/common/auth/service.py"]
-source_globs: ["jiuwenswarm/common/auth/service.py", "jiuwenswarm/common/auth/*.py"]
+source_globs: ["jiuwenswarm/common/auth/service.py", "jiuwenswarm/common/auth/*.py", "jiuwenswarm/extensions/agentos/agentos_router/agentos_authenticator.py", "jiuwenswarm/channels/web/frontend/src/services/authClient.ts", "jiuwenswarm/common/auth/session_store.py", "jiuwenswarm/gateway/channel_manager/web/web_http_auth.py", "jiuwenswarm/gateway/app_gateway.py", "jiuwenswarm/gateway/message_handler/message_handler.py", "jiuwenswarm/common/auth/__init__.py", "jiuwenswarm/common/auth/account_kit.py", "jiuwenswarm/channels/web/hub_oauth.py", "jiuwenswarm/channels/web/frontend/src/components/AssetPublishDrawer/index.tsx", "jiuwenswarm/channels/web/app_web.py", "jiuwenswarm/common/auth/login_credentials.py", "jiuwenswarm/common/auth/passthrough.py", "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py", "jiuwenswarm/common/auth/net.py", "jiuwenswarm/common/auth/session_owners.py", "jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/OpenAIAccountField.tsx", "jiuwenswarm/common/auth/remote_config.py", "jiuwenswarm/channels/web/frontend/src/stores/authStore.ts", "jiuwenswarm/channels/web/frontend/src/components/LoginDialog/LoginDialog.css", "jiuwenswarm/channels/web/frontend/src/components/LoginDialog/index.tsx", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/models/OpenAIAccountField.css"]
 ---
 
 # 账号登录与凭据续期 的职责、接口与配置

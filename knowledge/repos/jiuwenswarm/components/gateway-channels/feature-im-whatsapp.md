@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/海外频道.md
 feature: "im-whatsapp"
 entry_points: ["jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py"]
-source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/*"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/whatsapp_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/whatsapp/*", "jiuwenswarm/scripts/whatsapp-bridge.js"]
 ---
 
 # WhatsApp 频道 的职责、接口与配置

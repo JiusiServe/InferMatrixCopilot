@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/Skill自演进.md
 feature: "skill-evolution"
 entry_points: ["jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py"]
-source_globs: ["jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py", "jiuwenswarm/agents/harness/common/rails/*"]
+source_globs: ["jiuwenswarm/server/runtime/agent_adapter/evolution_helpers.py", "jiuwenswarm/agents/harness/common/rails/*", "jiuwenswarm/gateway/message_handler/evolution_approval.py", "jiuwenswarm/gateway/message_handler/message_handler.py", "jiuwenswarm/channels/web/frontend/src/components/ChatPanel/evolution-status.ts", "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py", "jiuwenswarm/runtime/evolution.py", "jiuwenswarm/server/runtime/skill/skill_manager.py", "jiuwenswarm/channels/web/frontend/src/components/SkillPanel/useEvolution.ts", "jiuwenswarm/channels/web/frontend/src/features/SkillEvolutionModal/index.tsx", "jiuwenswarm/agents/swarm/providers/evolution_rails.py", "jiuwenswarm/server/runtime/agent_adapter/team_helpers.py", "jiuwenswarm/agents/harness/team/team_manager.py", "jiuwenswarm/channels/tui/frontend/src/app-state.ts"]
 ---
 
 # Skill 自演进 的职责、接口与配置

@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/安装指南.md
 feature: "bootstrap"
 entry_points: ["jiuwenswarm/init_workspace.py"]
-source_globs: ["jiuwenswarm/init_workspace.py"]
+source_globs: ["jiuwenswarm/init_workspace.py", "jiuwenswarm/server/agent_ws_server.py", "jiuwenswarm/app.py", "jiuwenswarm/common/config.py", "jiuwenswarm/common/utils.py", "jiuwenswarm/debug_launcher.py", "jiuwenswarm/resources/agent/workspace/skills/delayed-restart-app/launch_delayed_restart.py", "jiuwenswarm/server/lifecycle.py", "jiuwenswarm/gateway/app_gateway.py", "jiuwenswarm/gateway/__init__.py", "jiuwenswarm/gateway/channel_manager/channel_manager.py", "scripts/harmony_entry.py", "jiuwenswarm/common/process_supervision.py", "jiuwenswarm/runtime/service.py", "jiuwenswarm/start_services.py"]
 ---
 
 # 初始化与服务启动 的职责、接口与配置

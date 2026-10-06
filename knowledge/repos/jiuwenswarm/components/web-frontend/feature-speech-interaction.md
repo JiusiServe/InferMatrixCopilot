@@ -13,7 +13,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/README.md
 feature: "speech-interaction"
 entry_points: ["jiuwenswarm/channels/web/frontend/src/features/taskAsr/useTaskAsr.ts", "jiuwenswarm/channels/web/frontend/src/features/taskAsr/featureFlag.ts", "jiuwenswarm/channels/web/frontend/src/utils/tts.ts", "jiuwenswarm/channels/web/frontend/src/hooks/useSpeech.ts"]
-source_globs: ["jiuwenswarm/channels/web/frontend/src/features/taskAsr/useTaskAsr.ts", "jiuwenswarm/channels/web/frontend/src/features/taskAsr/featureFlag.ts", "jiuwenswarm/channels/web/frontend/src/utils/tts.ts", "jiuwenswarm/channels/web/frontend/src/hooks/useSpeech.ts"]
+source_globs: ["jiuwenswarm/channels/web/frontend/src/features/taskAsr/useTaskAsr.ts", "jiuwenswarm/channels/web/frontend/src/features/taskAsr/featureFlag.ts", "jiuwenswarm/channels/web/frontend/src/utils/tts.ts", "jiuwenswarm/channels/web/frontend/src/hooks/useSpeech.ts", "jiuwenswarm/channels/web/frontend/src/hooks/useWebSocket.ts", "jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx", "jiuwenswarm/channels/web/frontend/src/utils/speechDetection/silero.worker.ts", "jiuwenswarm/channels/web/frontend/src/utils/speechDetection/sileroVad.ts", "jiuwenswarm/channels/web/frontend/src/utils/speechDetection/speechGate.ts"]
 ---
 
 # 语音输入、回复朗读与停止的职责、接口与配置

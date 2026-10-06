@@ -11,7 +11,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/浏览器.md
 feature: "browser-tools"
 entry_points: ["jiuwenswarm/agents/swarm/browser_runtime.py", "jiuwenswarm/agents/harness/common/browser_config.py"]
-source_globs: ["jiuwenswarm/agents/swarm/browser_runtime.py", "jiuwenswarm/agents/harness/common/browser_config.py", "jiuwenswarm/agents/harness/common/*"]
+source_globs: ["jiuwenswarm/agents/swarm/browser_runtime.py", "jiuwenswarm/agents/harness/common/browser_config.py", "jiuwenswarm/agents/harness/common/*", "jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/navigate.py", "jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/browser/definition.ts", "jiuwenswarm/agents/harness/common/tools/browser_timeout_policy.py", "jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/ensure_browser.py", "jiuwenswarm/resources/agent/workspace/skills/huawei-cloud-maas-setup/scripts/lib/cdp_client.py", "scripts/verify_playwright_mcp_offline.py", "jiuwenswarm/common/playwright_mcp_runtime.py", "scripts/update_playwright_mcp_runtime.py", "jiuwenswarm/agents/swarm/config_specs.py", "jiuwenswarm/agents/swarm/providers/code_subagents.py", "jiuwenswarm/server/runtime/agent_adapter/trusted_web_search.py", "jiuwenswarm/channels/web/frontend/src/features/browserAgentActivity.ts", "jiuwenswarm/agents/harness/common/tools/web_fetch_tools.py"]
 ---
 
 # 浏览器服务与网页工具 的职责、接口与配置

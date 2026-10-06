@@ -23,3 +23,5 @@ sources: []
 | PR 描述在做什么 | 精确规则 | 第一批 live 源码 |
 |---|---|---|
 | sandbox runtime | 入口 | `jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy.py`、`jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy_manager.py`、`jiuwenbox/src/jiuwenbox/server/app.py` |
+
+- [sandbox-runtime（JiuwenBox 服务与推理隐私代理）](knowledge.md)

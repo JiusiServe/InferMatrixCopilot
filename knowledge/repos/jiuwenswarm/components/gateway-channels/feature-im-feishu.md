@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/国内频道.md
 feature: "im-feishu"
 entry_points: ["jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_connect.py"]
-source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/feishu/*"]
+source_globs: ["jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_connect.py", "jiuwenswarm/gateway/channel_manager/im_platforms/feishu/*", "jiuwenswarm/gateway/channel_manager/channel_manager.py", "jiuwenswarm/common/config.py", "jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_streaming_card.py", "jiuwenswarm/gateway/channel_manager/im_platforms/feishu/feishu_file_service.py", "jiuwenswarm/gateway/channel_manager/im_platforms/platform_adapter/message.py", "jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/channelFormItems.ts", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/channelRequirements.ts", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/useChannelForm.ts", "jiuwenswarm/channels/web/frontend/src/features/settings/modules/channels/useSettingsChannelsController.ts"]
 ---
 
 # 飞书 频道 的职责、接口与配置

@@ -11,7 +11,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/自动修复PR.md
 feature: "autofix"
 entry_points: ["jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.ts", "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.watch.ts"]
-source_globs: ["jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr*.ts"]
+source_globs: ["jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr*.ts", "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.prompts.ts", "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.status.ts", "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.ts", "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/autofix-pr.watch.ts"]
 ---
 
 # 已有 PR 自动修复的命令、轮询与权限边界

@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/命令行指令.md
 feature: "process-cli"
 entry_points: ["jiuwenswarm/channels/process_cli/app.py"]
-source_globs: ["jiuwenswarm/channels/process_cli/app.py", "jiuwenswarm/channels/process_cli/*.py"]
+source_globs: ["jiuwenswarm/channels/process_cli/app.py", "jiuwenswarm/channels/process_cli/*.py", "jiuwenswarm/channels/process_cli/machine_signals.py", "jiuwenswarm/channels/process_cli/control_commands.py", "jiuwenswarm/channels/process_cli/display_context.py", "jiuwenswarm/channels/process_cli/duplex_control.py", "jiuwenswarm/channels/process_cli/duplex_protocol.py", "jiuwenswarm/channels/process_cli/duplex_input.py", "jiuwenswarm/channels/process_cli/main.py", "jiuwenswarm/channels/process_cli/render.py", "jiuwenswarm/channels/process_cli/client.py", "jiuwenswarm/channels/process_cli/live_input.py", "jiuwenswarm/channels/process_cli/live_layout.py", "jiuwenswarm/channels/process_cli/machine.py", "jiuwenswarm/channels/process_cli/protocol/model.py", "jiuwenswarm/channels/process_cli/protocol/version.py", "jiuwenswarm/channels/process_cli/protocol/__init__.py", "jiuwenswarm/channels/process_cli/protocol/jsonl.py", "jiuwenswarm/channels/process_cli/protocol/query.py", "jiuwenswarm/channels/process_cli/query.py", "jiuwenswarm/channels/process_cli/query_entry.py", "jiuwenswarm/channels/process_cli/repl.py", "jiuwenswarm/channels/process_cli/ui.py", "jiuwenswarm/channels/process_cli/machine_result.py", "jiuwenswarm/channels/process_cli/session_guard.py", "jiuwenswarm/channels/process_cli/commands.py", "jiuwenswarm/channels/process_cli/prompt.py"]
 ---
 
 # 机器执行与本地 CLI 的职责、接口与配置

@@ -10,7 +10,7 @@ sources:
 - openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/TUI使用SwarmFlow指南.md
 feature: "swarmflow"
 entry_points: ["jiuwenswarm/agents/harness/team/handlers/workflow_state.py"]
-source_globs: ["jiuwenswarm/agents/harness/team/handlers/workflow_state.py", "jiuwenswarm/agents/harness/team/handlers/*"]
+source_globs: ["jiuwenswarm/agents/harness/team/handlers/workflow_state.py", "jiuwenswarm/agents/harness/team/handlers/*", "jiuwenswarm/server/runtime/agent_adapter/team_helpers.py", "jiuwenswarm/channels/web/frontend/src/utils/swarmflowAdvisory.ts", "jiuwenswarm/channels/web/frontend/src/components/teamArea/AgentDetailModal.tsx", "jiuwenswarm/agents/harness/team/team_manager.py", "jiuwenswarm/channels/web/frontend/src/components/ChatPanel/InputArea.tsx", "jiuwenswarm/channels/tui/frontend/src/ui/app-screen.ts", "jiuwenswarm/common/config.py", "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py", "jiuwenswarm/server/agent_ws_server.py", "jiuwenswarm/channels/web/frontend/src/components/teamArea/SwarmflowTreeView.tsx", "jiuwenswarm/channels/tui/frontend/src/core/workflows.ts", "jiuwenswarm/channels/web/frontend/src/components/teamArea/workflowTypes.ts", "jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/swarmflows.ts", "jiuwenswarm/channels/web/frontend/src/App.tsx", "jiuwenswarm/channels/web/frontend/src/components/teamArea/SwarmflowGraphView.tsx", "jiuwenswarm/channels/web/frontend/src/stores/sessionStore.ts", "jiuwenswarm/channels/web/frontend/src/services/webClient.ts", "jiuwenswarm/agents/harness/team/handlers/workflow_monitor_handler.py", "jiuwenswarm/server/wire_truncate.py"]
 ---
 
 # SwarmFlow 工作流与 HITL 的职责、接口与配置

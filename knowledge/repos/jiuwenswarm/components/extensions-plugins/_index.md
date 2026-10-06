@@ -22,6 +22,7 @@ sources: []
 |---|---|---|
 | extension、扩展、plugin、应用插件、hook、registry、loader、manifest、yuanrong、openYuanRong、cl… | 入口 | `jiuwenswarm/extensions/agent_client/`、`jiuwenswarm/extensions/application_host.py`、`jiuwenswarm/extensions/callback_compat.py` |
 
+
 - [video_duplex 全双工扩展审查规则：任务检查点、授权投递与 Provider 协议](rules.md)
 
 ## 验证入口
@@ -48,3 +49,8 @@ sources: []
 - [生命周期 Hooks 与扩展：实现深读](feature-depth-hooks.md)
 - [Application Plugin 与前端贡献：实现深读](feature-depth-applications.md)
 - [音视频双工扩展：实现深读](feature-depth-video-duplex.md)
+- [AgentOS 沙箱创建与幂等对账（jiuwenswarm agentos_router）](feature-agentos-sandbox-create-lifecycle.md)
+- [Voice/Video Duplex Managed Agent Task Service（持久队列、并发与不确定性语义）](feature-video-agent-managed-task-service.md)
+- [YuanRong FaaS 函数调用（非流式 + SSE 流式）](feature-yuanrong-faas-invocation.md)
+- [jiuwenswarm 扩展与插件：video_duplex 实时音视频 RPC 与 AgentOS Router 客户端](knowledge.md)
+- [YuanRong Agent 容器文件传输（上传/下载/列举/建目录）](feature-yuanrong-agent-file-transfer.md)

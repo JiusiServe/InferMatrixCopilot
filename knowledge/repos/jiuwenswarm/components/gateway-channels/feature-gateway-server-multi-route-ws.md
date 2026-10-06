@@ -1,0 +1,48 @@
+---
+title: "GatewayServer 多路由 WebSocket 宿主与会话/请求路由表"
+created: 2026-10-06
+updated: 2026-10-06
+type: architecture
+tags: [jiuwenswarm]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L651-L680, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L1040-L1052, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L813-L847, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L1618-L1644, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L1060-L1066, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L1078-L1092, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L1094-L1105, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L1107-L1148, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L1572-L1592, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L943-L978, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L979-L1007]
+feature: "gateway-server-multi-route-ws"
+entry_points: ["jiuwenswarm/gateway/app_gateway.py"]
+source_globs: ["jiuwenswarm/gateway/app_gateway.py", "jiuwenswarm/gateway/channel_manager/channel_manager.py", "jiuwenswarm/gateway/routing/route_binding.py", "jiuwenswarm/gateway/channel_manager/base.py", "jiuwenswarm/gateway/routing/keys.py"]
+---
+
+# GatewayServer 多路由 WebSocket 宿主与会话/请求路由表
+
+<!-- kb:knowledge owner=feature-gateway-server-multi-route-ws facet=configuration pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**GatewayServerConfig 与 RouteConfig**
+
+`GatewayServerConfig` 默认 enabled=True、host="127.0.0.1"、port=19001；`__post_init__` 在 routes 为空且同时给出 path 和 channel_id 时，兼容地合成单条 RouteConfig。每条 `RouteConfig` 除 local_handlers 字典和 forward_methods/forward_no_local_handler_methods 外，还可挂 inbound/outbound_interceptor、cleanup/disconnect/session_bind_handler 钩子，以及 V2 新增的 ws_channel（委托注册的外部 Channel，如 tui 的 TuiChannel；None 表示该 route 不委托）。路由匹配 `_resolve_route` 按精确路径并容忍尾部斜杠变体。
+
+Sources / 来源：[jiuwenswarm/gateway/app_gateway.py:L651–L680](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L651-L680), [jiuwenswarm/gateway/app_gateway.py:L1040–L1052](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L1040-L1052)
+
+<!-- kb:knowledge owner=feature-gateway-server-multi-route-ws facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**2↔3 元组双向兜底与委托注册的职责拆分**
+
+Inference / 设计推断（非作者历史意图）：
+
+`_lookup_client` 在精确键 MISS 后做防御性双向兜底（3 元组降级查 2 元组、2 元组升级扫描前缀匹配的 3 元组、再裸 scope 兜底），注释引用设计 §6.3，动机是链路某环节丢 agent_ref 时不至于响应 dropped——代价是查找语义变宽，同 session 多 agent_ref 场景下兜底可能命中非严格对应连接（此为推断）。ws_channel 路由上，GatewayServer 保留自身表做入站响应反查，但把出站 chunk 精确路由委托给 TuiChannel 的五维索引，形成双路由表并存的职责拆分。
+
+Sources / 来源：[jiuwenswarm/gateway/app_gateway.py:L813–L847](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L813-L847), [jiuwenswarm/gateway/app_gateway.py:L1618–L1644](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L1618-L1644)
+
+<!-- kb:knowledge owner=feature-gateway-server-multi-route-ws facet=api pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**公共入口与回包契约**
+
+`GatewayServer(config, router)` 构造后通过 `register_local_handler(path, method, handler)` 注册本地方法（路由不存在时自动合成 RouteConfig），`start()`/`stop()`/`wait_until_closed()` 管理生命周期。回包接口 `send_response(ws, req_id, ok, payload, error, code)` 发送 `type=res` 帧：失败时必附 `error`（缺省 "request failed"），`code` 仅在传入真值时才写入帧，是可选字段。`send_event(ws, event, payload)` 发送 `type=event` 帧；两者发送失败均只记 debug 日志不抛出。
+
+Sources / 来源：[jiuwenswarm/gateway/app_gateway.py:L1060–L1066](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L1060-L1066), [jiuwenswarm/gateway/app_gateway.py:L1078–L1092](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L1078-L1092), [jiuwenswarm/gateway/app_gateway.py:L1094–L1105](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L1094-L1105), [jiuwenswarm/gateway/app_gateway.py:L1107–L1148](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L1107-L1148)
+
+<!-- kb:knowledge owner=feature-gateway-server-multi-route-ws facet=features pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**会话独占的两道防线：实时拒绝与 pending 挂起提升**
+
+同 session 多连接冲突由两段逻辑分别处理。forward 路径中，若 session_key 已绑定到另一个仍活跃的连接，直接回 `SESSION_IN_USE` 错误帧并终止该请求，不会把新连接挂起（app_gateway.py:1572-1588）。挂起发生在 `_bind_route_session_client`：绑定冲突时若新 ws 仍打开，则记入 `_pending_session_clients` 并返回 False；旧连接断开清理后由 `_promote_pending_session_client` 提升——仅当 pending ws 仍打开且当前无其他活跃占用者时写入 `_session_to_client`，且仅在 route 配置了 session_bind_handler 时才调用该钩子。
+
+Sources / 来源：[jiuwenswarm/gateway/app_gateway.py:L1572–L1592](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L1572-L1592), [jiuwenswarm/gateway/app_gateway.py:L943–L978](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L943-L978), [jiuwenswarm/gateway/app_gateway.py:L979–L1007](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L979-L1007)
+
