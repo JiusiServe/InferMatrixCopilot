@@ -224,6 +224,8 @@ def main(argv: list[str] | None = None) -> int:
     reconcile.add_argument("--allow-merger", action="append", default=[])
     reconcile.add_argument("--require-check", action="append", default=[])
     reconcile.add_argument("--reason", default="")
+    reconcile.add_argument("--event-coverage", type=Path,
+                           help="settle selected source events against already admitted, active owner-merged rules")
     run = sub.add_parser("run")
     run.add_argument("--playbook", required=True)
     run.add_argument("--repo", required=True)
@@ -353,13 +355,25 @@ def main(argv: list[str] | None = None) -> int:
         try:
             key = _signing_key()
             if args.plan:
-                envelope = make_plan(rt, key, target=args.target or "", allow_mergers=args.allow_merger,
-                                     required_checks=args.require_check, reason=args.reason)
+                options = {"target": args.target or "", "allow_mergers": args.allow_merger,
+                           "required_checks": args.require_check, "reason": args.reason}
+                if args.event_coverage:
+                    from .event_settlement import make_plan as make_event_plan
+
+                    envelope = make_event_plan(rt, key, coverage=json.loads(args.event_coverage.read_text()), **options)
+                else:
+                    envelope = make_plan(rt, key, **options)
                 with args.plan.open("xb") as handle:
                     handle.write(canonical_json(envelope))
                 print(f"verified reconciliation plan: {args.plan}; no commit admitted")
             else:
-                receipt = apply_plan(rt, json.loads(args.apply.read_text()), key)
+                envelope = json.loads(args.apply.read_text())
+                if envelope.get("purpose") == "kb-reviewed-event-plan":
+                    from .event_settlement import apply_plan as apply_event_plan
+
+                    receipt = apply_event_plan(rt, envelope, key)
+                else:
+                    receipt = apply_plan(rt, envelope, key)
                 print(f"supervised reconciliation receipt: {receipt}; pause and publication modes unchanged")
             return 0
         except (ValueError, OSError, KeyError, RuntimeError, subprocess.SubprocessError) as exc:

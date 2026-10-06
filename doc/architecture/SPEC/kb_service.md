@@ -318,6 +318,22 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
   有待异步接受、撤回或原始 intake 候选的提交拒绝进入此路径。`kb status` 显示已核验的 `supervised_commits`。
 - 测试：`test_kb_reconcile_reviewed.py`。
 
+## 2026-10-06 已审阅源事件的监督完成
+
+- `kb reconcile-reviewed --event-coverage FILE --plan PLAN --target SHA --allow-merger LOGIN --require-check NAME --reason TEXT`
+  接收明确的 `commits` 和 `events` JSON；每项事件给出 `id`、`outcome`（`covered`、`already_covered`、`no_rule`）、
+  操作员审阅理由 `reason`，覆盖事件还须给出 `rules: [{path, rule_id}]`。路径以 `repos/` 开始，不含 `knowledge/`。
+  `no_rule` 不声称任何规则。覆盖规则必须在精确目标快照中有效，且引用该事件的原始上游 PR。
+- 目标须已监督接收并实际激活；认证操作员、真实 owner merge、精确 head 上的当前 CI、原始事件身份和 payload 哈希、
+  规则块、两个校验器及完整快照 manifest 均进入签名计划。选择不能包含不存在的事件或拆开已有源事件 batch。
+- `--apply PLAN` 持有独占 ledger lease 和激活锁，重新验证全部证据；源事件、规则、main/active 或 CI 漂移即拒绝。
+  不同签名用途 `kb-reviewed-event-plan` / `kb-reviewed-event-settlement`，不可作为知识历史接收回执使用。
+  `event-settlements/<内容哈希>.json` 经 fsync、硬链接原子创建且禁止替换；崩溃后可用原计划完成相同的 ledger 提交。
+- 仅所选 pending/rejected/drafted 事件成为 `done`，记录诚实的 `manual_reviewed_merged` 和回执引用。
+  其完整源 batch 和 refinement 后代也记录 `manual_reviewed_merged`，停止重复生成；原来的失败判决和 verdict 不变。
+  只解决被完整覆盖 changeset 的人工队列，不影响其他事件、PR、发布模式或知识信任。
+- 测试：`test_kb_reviewed_events.py`。
+
 ## 2026-09-29 一致性冲突只算本次改动的
 一致性评审看整个 owner 目录，但只有**涉及本次改动的规则**（新增、编辑、退役、被替代的规则 ID）的冲突才使变更失败；
 两条都未被改动的规则之间的冲突已经在 main 上，记入该目录的 `preexisting`，不计入变更（精炼也无法修复它，否则该目录
