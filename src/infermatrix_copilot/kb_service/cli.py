@@ -38,6 +38,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -90,16 +91,17 @@ def _outbox(state_dir: Path, ledger):
     return Outbox(state_dir, _signing_key(), ledger, clock=time.time)
 
 
-def _unknown_status(ledger) -> dict:
+def _unknown_status(ledger, reviewed: set[str] | None = None) -> dict:
     """Unknown knowledge commits not disposed of, with any accept request."""
     from .accept import ACCEPT
     from .audit import DISPOSED, UNKNOWN
 
     disposed = {n[len(DISPOSED):] for n in ledger.cursors_with_prefix("*", DISPOSED)}
+    reviewed = reviewed or set()
     out = {}
     for name, raw in ledger.cursors_with_prefix("*", UNKNOWN).items():
         sha = name[len(UNKNOWN):]
-        if sha in disposed:
+        if sha in disposed or sha in reviewed:
             continue
         record = json.loads(raw)
         request = ledger.get_cursor("*", ACCEPT + sha)
@@ -214,6 +216,14 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("control")
     accept = sub.add_parser("accept-unknown")
     accept.add_argument("sha")
+    reconcile = sub.add_parser("reconcile-reviewed", help="verify and admit an exact owner-merged knowledge history")
+    action = reconcile.add_mutually_exclusive_group(required=True)
+    action.add_argument("--plan", type=Path, help="write a signed plan; does not admit any commit")
+    action.add_argument("--apply", type=Path, help="revalidate and apply a previously inspected signed plan")
+    reconcile.add_argument("--target", help="exact current main SHA, required when preparing a plan")
+    reconcile.add_argument("--allow-merger", action="append", default=[])
+    reconcile.add_argument("--require-check", action="append", default=[])
+    reconcile.add_argument("--reason", default="")
     run = sub.add_parser("run")
     run.add_argument("--playbook", required=True)
     run.add_argument("--repo", required=True)
@@ -333,6 +343,30 @@ def main(argv: list[str] | None = None) -> int:
     if args.command in ("init", "widen", "deepen"):
         # before any ledger is opened: kb init never touches the service's kb.db
         return _init_command(args, _state_dir(args.state_dir))
+    if args.command == "reconcile-reviewed":
+        from ..config import Settings
+        from ..knowledge_service.signing import canonical_json
+        from .runtime import KbRuntime
+        from .reconcile import make_plan, apply_plan
+
+        rt = KbRuntime.from_env(Settings(), state_dir=_state_dir(args.state_dir))
+        try:
+            key = _signing_key()
+            if args.plan:
+                envelope = make_plan(rt, key, target=args.target or "", allow_mergers=args.allow_merger,
+                                     required_checks=args.require_check, reason=args.reason)
+                with args.plan.open("xb") as handle:
+                    handle.write(canonical_json(envelope))
+                print(f"verified reconciliation plan: {args.plan}; no commit admitted")
+            else:
+                receipt = apply_plan(rt, json.loads(args.apply.read_text()), key)
+                print(f"supervised reconciliation receipt: {receipt}; pause and publication modes unchanged")
+            return 0
+        except (ValueError, OSError, KeyError, RuntimeError, subprocess.SubprocessError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        finally:
+            rt.ledger.close()
 
     state_dir = _state_dir(args.state_dir)
     ledger = _ledger(state_dir)
@@ -341,6 +375,12 @@ def main(argv: list[str] | None = None) -> int:
         if _sync_repos(ledger, registry) and os.environ.get("KB_SIGNING_KEY"):
             _refresh(state_dir, ledger, registry)
         if args.command == "status":
+            from .reconcile import read_receipts
+            from .sources import KnowledgeRepo
+
+            public = _signing_key().public_key() if (state_dir / "reconciliations").exists() else None
+            reviewed = read_receipts(KnowledgeRepo(Path(os.environ.get("KB_KNOWLEDGE_CLONE") or
+                                                      state_dir / "knowledge-repo")), state_dir, public)
             report = {
                 "state_dir": str(state_dir),
                 "active_snapshot": ledger.active_snapshot(),
@@ -351,7 +391,8 @@ def main(argv: list[str] | None = None) -> int:
                      "human_queue": len(ledger.human_queue(row["repo"])) if row["repo"] != "*" else None}
                     for row in ledger.all_repo_states()
                 ],
-                "unknown_commits": _unknown_status(ledger),
+                "unknown_commits": _unknown_status(ledger, reviewed),
+                "supervised_commits": sorted(reviewed),
             }
             json.dump(report, sys.stdout, indent=2, sort_keys=True)
             print()

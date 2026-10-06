@@ -25,6 +25,8 @@
   只有 auto_merge 仓库才有非停止类写动作，shadow 与 disabled 一律不发布；
   `close`/`open_revert_pr` 总可执行）。
 - `cli`：`infermatrix-copilot kb keygen|status|pause|resume|control`。
+- `reconcile`：负责人已合并的初始化/管理知识历史的显式接收；固定目标与 active、GitHub PR/merger/当前检查、
+  完整 first-parent 提交清单、目标树的两个校验器及真实快照验证，签名计划经重新验证后才安装不可变回执。
 
 ## 不变量
 - 模块不出现任何仓库名；仓库差异只来自 adapter 配置。
@@ -295,6 +297,24 @@ issue（同一报告只开一个），标签不存在时不带标签重试，绝
   （幂等 upsert）记入退役账本，下个发版的巡检据此 purge。
 - `kb status` 新增 `unknown_commits`：未处置的未知提交及其接受请求的状态。
 - 测试：`test_kb_accept_unknown.py`。
+
+## 2026-10-06 负责人已合并历史的监督接收
+
+- `kb reconcile-reviewed --plan FILE --target SHA --allow-merger LOGIN --require-check NAME --reason TEXT`
+  核验当前 main 的完整 SHA 与 active 的连续 first-parent 历史；所有知识提交都绑定唯一真实已合并 PR、
+  merge SHA、父提交、完整原始 diff 哈希、允许的 merger、认证操作员和实际 review 状态。
+  指定检查须在精确 PR head 上当前成功；同一 app/context 的较早失败重试不覆盖最新结果。
+- 在目标树的独立临时导出中执行两个必须存在且成功的知识校验器；导出不能遗漏或改变 git 树的任何知识 blob，
+  被服务的 Markdown/YAML 必须为普通 UTF-8 文件。构建并加载临时快照，验证格式、所有文件哈希、树和路由。
+- 计划按 `kb-reconciliation-plan` 签名但不授予信任。`--apply FILE` 持有激活锁并重新核验所有证据，
+  main/active 或证据变化即拒绝；仅两个 pin 均未改变时重复 apply 复用同一回执。
+- 回执按不同用途 `kb-reviewed-reconciliation` 签名，包含操作员/理由/检查/校验器及快照哈希，
+  在 `reconciliations/<内容哈希>.json` 通过 fsync 和硬链接原子创建，禁止覆盖和符号链接。
+  审计和激活每次重新验证签名、仓库及精确提交清单；控制记录直接读取回执，不在 `trusted_merges` 缓存监督信任。
+  缺失回执使提交恢复未知，损坏回执拒绝激活/控制续签，后续新增知识提交仍保持未知。
+- 保持 `accept-unknown` 和自动质量门不变；不伪造 `disposed:`，不更改暂停或发布模式。
+  有待异步接受、撤回或原始 intake 候选的提交拒绝进入此路径。`kb status` 显示已核验的 `supervised_commits`。
+- 测试：`test_kb_reconcile_reviewed.py`。
 
 ## 2026-09-29 一致性冲突只算本次改动的
 一致性评审看整个 owner 目录，但只有**涉及本次改动的规则**（新增、编辑、退役、被替代的规则 ID）的冲突才使变更失败；

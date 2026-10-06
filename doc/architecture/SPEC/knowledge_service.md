@@ -40,7 +40,11 @@ reported as reconciliation.
 
 `signing` provides Ed25519 envelopes whose signature covers a purpose tag plus
 the canonical JSON payload, so a signature made for one purpose (gate verdict,
-outbox item, control record, publisher ack) never verifies for another. It
+outbox item, control record, publisher ack, reconciliation plan, supervised
+reconciliation receipt) never verifies for another. Plans use
+`kb-reconciliation-plan`; only revalidated receipts use the distinct
+`kb-reviewed-reconciliation` purpose, and neither can be replayed as an
+automatic gate verdict or publisher action. It
 needs only `cryptography`.
 
 ## 2026-09-28 verdict
