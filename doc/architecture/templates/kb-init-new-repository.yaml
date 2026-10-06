@@ -1,4 +1,6 @@
 # Merge this snippet into a NEW repository adapter's manifest.yaml.
+# Adapter-free repositories first use `kb onboard` and explicitly accept the
+# generated scope proposal; see ../portable-kb.md for the full local workflow.
 # Retain the adapter's own knowledge_lifecycle mode, permissions and release policy.
 # Existing adapters opt in explicitly; this template does not migrate them.
 knowledge_lifecycle:

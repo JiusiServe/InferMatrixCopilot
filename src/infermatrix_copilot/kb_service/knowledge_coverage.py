@@ -51,8 +51,8 @@ def feature_metadata(text: str, feature) -> str:
     return page.render()
 
 
-_FILE = re.compile(r"<!-- kb:file path=(\S+) pin=([a-f0-9]{40}) sha256=([a-f0-9]{64}) -->\n(.*?)\n<!-- /kb:file -->", re.S)
-_FACET = re.compile(r"<!-- kb:knowledge owner=feature-([a-z0-9-]+) facet=([a-z]+) pin=([a-f0-9]{40})"
+_FILE = re.compile(r"<!-- kb:file path=(\S+) pin=((?:[a-f0-9]{40}|[a-f0-9]{64})) sha256=([a-f0-9]{64}) -->\n(.*?)\n<!-- /kb:file -->", re.S)
+_FACET = re.compile(r"<!-- kb:knowledge owner=feature-([a-z0-9-]+) facet=([a-z]+) pin=((?:[a-f0-9]{40}|[a-f0-9]{64}))"
                     r"(?: verdict=(pass|unsure|unjudged))? -->")
 _SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
 _LEXICAL_NO_CODE = re.compile(r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|/\*[\s\S]*?\*/|//[^\n]*|<!--[\s\S]*?-->''')
@@ -167,7 +167,9 @@ def load_policy(text: str, repo_dir: str) -> CoveragePolicy:
 
 
 def matches(path: str, patterns: tuple[str, ...]) -> bool:
-    return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
+    return any(fnmatch.fnmatchcase(path, pattern)
+               or (pattern.startswith("**/") and fnmatch.fnmatchcase(path, pattern[3:]))
+               for pattern in patterns)
 
 
 def inventory(tree: Path, policy: CoveragePolicy) -> list[str]:
@@ -289,7 +291,8 @@ def render_contract(full_name: str, pin: str, path: str, raw: str) -> str | None
         return None
     body, _ = contract
     end = len(raw.splitlines())
-    ref = f"[完整声明与实现](https://github.com/{full_name}/blob/{pin}/{quote(path, safe='/')}#L1-L{end})"
+    from .source_links import source_link
+    ref = f"[完整声明与实现]({source_link(full_name, pin, path, 1, end)})"
     return f"**`{path}`**\n\n{body}\n\n源码依据：{ref}。"
 
 
@@ -302,8 +305,8 @@ def contract_block(full_name: str, pin: str, path: str, raw: str) -> str | None:
 
 
 def _citations(text: str, tree: Path, full_name: str, pin: str) -> set[str]:
-    pattern = re.compile(r"https://github\.com/" + re.escape(full_name) + r"/blob/" + pin
-                         + r"/([^\s)#]+)#L(\d+)(?:-L(\d+))?")
+    from .source_links import source_base
+    pattern = re.compile(re.escape(source_base(full_name, pin)) + r"([^\s)#]+)#L(\d+)(?:-L(\d+))?")
     valid = set()
     for encoded, start, end in pattern.findall(text):
         path = unquote(encoded)

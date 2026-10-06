@@ -231,6 +231,7 @@ class RunService:
         env["DEFAULT_REPO"] = self.settings.default_repo
         env["REPO_PATHS"] = json.dumps(self.settings.repo_paths)
         env["REPO_FULL_NAMES"] = json.dumps(self.settings.repo_full_names)
+        env["ALLOWED_KNOWLEDGE_REPOSITORIES"] = json.dumps(self.settings.allowed_knowledge_repositories)
         # The child re-authorizes the request's `repo_path`, so it must judge it
         # against the SAME roots and identities this server did — otherwise the
         # re-check silently validates against different config than the parent.
@@ -557,17 +558,30 @@ class RunService:
     def _docs(self, repo: str) -> KnowledgeDocs:
         """Build the same repo-scoped knowledge view used by workflow agents."""
         from ..adapters.base import AdapterRegistry
+        from ..knowledge_view import KnowledgeView, _load_view
+        from ..kb_service.repo_spec import resolve_snapshot_repo
 
         repo = repo or self.settings.default_repo
-        if repo not in self.settings.mcp_allowed_repos:
+        current = KnowledgeView.current()
+        kdir = Path(self.settings.knowledge_dir).resolve()
+        if current.verified or current.root.resolve() == kdir:
+            view = current
+        elif (kdir.parent / "MANIFEST.json").is_file():
+            view = _load_view(str(kdir.parent))
+        else:
+            view = KnowledgeView(kdir, f"unverified:{kdir}")
+        binding = resolve_snapshot_repo(view, repo)
+        if repo not in self.settings.mcp_allowed_repos and (binding is None or binding.repo_id not in self.settings.mcp_allowed_repos):
             raise PolicyError(f"repo {repo!r} is not permitted")
+        if binding is not None:
+            return KnowledgeDocs(view.root, binding.knowledge_slice, verify=view.path)
         try:
             adapter = AdapterRegistry(self.settings.adapters_dir).resolve(
                 name=repo.replace("-", "_"))
         except Exception as exc:
             raise PolicyError(f"no knowledge adapter for repo {repo!r}") from exc
         kn = adapter.manifest.get("knowledge") or {}
-        return KnowledgeDocs(self.settings.knowledge_dir, kn.get("repo_subdir"))
+        return KnowledgeDocs(view.root, kn.get("repo_subdir"), verify=view.path)
 
     def doc_search(self, query: str, repo: str = "", limit: int = 40) -> dict:
         """Search general + the selected repo's curated Markdown knowledge."""

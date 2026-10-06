@@ -266,6 +266,13 @@ def test_first_source_only_catalog_has_native_review_and_no_knowledge_rewrite(wo
     assert report["complete"] and report["done"] and report["feature_ids"] == ["engine-step"]
     assert report["historical_denominator"] == 0 and report["facet_denominator"] == 7
     assert report["catalog_sha256"] == hashlib.sha256(files["adapters/toy/knowledge-coverage.yaml"].encode()).hexdigest()
+    assert report["scan_mode"] == "full" and report["scan_paths"] is None
+    assert report["unit_summary"]["associated"] == record.discovery["unit_resolution"]["associated"]
+    assert report["residual_summary"]["completed_rounds"] == 2
+    bundle = report["evidence_bundles"]["engine-step"]
+    assert bundle["pin"] == record.pin and bundle["catalog_sha256"] == report["catalog_sha256"]
+    assert bundle["refs"] and bundle["unit_ids"]
+    assert all("text" not in ref for ref in bundle["refs"])
     candidate = _full_report(record)["candidates"][0]
     assert candidate["status"] == "accepted"
     receipts = candidate["generator_receipts"] + [candidate["judge_receipt"]]

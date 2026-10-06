@@ -1,6 +1,7 @@
 """InferMatrixCopilot embedded SDK v1 public surface."""
 
 from .direct import DirectClient, get_capabilities
+from ...knowledge_context import ContextBudget
 from .knowledge import KnowledgeCurator, KnowledgeValidatorError
 from .models import (
     DIRECT_API_VERSION,
@@ -56,6 +57,7 @@ __all__ = [
     "STRICT_API_VERSION",
     "TRACE_SCHEMA",
     "Capabilities",
+    "ContextBudget",
     "ChangedPath",
     "CarriedFinding",
     "FindingRecheck",

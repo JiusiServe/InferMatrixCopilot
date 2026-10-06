@@ -27,12 +27,14 @@ from .init_stages import _Stage
 from .init_support import InitError, InitRecord, generate, inputs_digest
 from .models import ModelUnavailable
 
-VERSION = "feature-discovery-v1"
+VERSION = "feature-discovery-v2"
 MAX_PACKET_CHARS = 24000
 MAX_CONFIGURED_PACKET_CHARS = 192000
 DEFAULT_START_INTERVAL_S = 15.0
 MAX_CANDIDATES = 24
 MAX_ATTEMPTS = 4
+MAX_RESIDUAL_ROUNDS = 2
+MAX_SATURATION_SPLITS = 2
 MAX_BASELINE_CHARS = 16000
 CATALOG_BOUNDARY_VERSION = "catalog-boundary-v1"
 COMPACT_REPORT_VERSION = "feature-discovery-compact-v1"
@@ -73,6 +75,9 @@ def discovery_run_config(rt, environ=None):
             "zcode_reasoning_level": level}
 SYSTEM_DISCOVER = """Discover distinct software capabilities from the supplied pinned evidence.
 First documentation establishes a baseline; source/test packets expand it.
+Use the entry_contract_leads to explore actual behavior and contracts, not
+only the document baseline's words. In a residual round focus on unexplained
+entries; a lead is not itself a feature, and its relationships may be unknown.
 Read actual bodies, not just headings, filenames or scan lists. A capability
 has meaningful observable behavior or an internal contract/lifecycle. A file,
 function, UI page or setting is not automatically a separate capability. Link
@@ -165,7 +170,8 @@ def write_full_discovery_report(state_dir, report):
 def compact_discovery_report(report, artifact):
     keys = ("schema_version", "repo", "pin", "run_config", "complete", "done", "catalog_sha256", "catalog_renderer_version",
             "feature_ids", "features", "owner_requests", "counts", "statistics", "scan_summary",
-            "index_sha256", "limits", "historical_denominator", "facet_denominator", "pacing")
+    "index_sha256", "limits", "historical_denominator", "facet_denominator", "pacing",
+    "unit_summary", "residual_summary", "evidence_bundles", "scan_mode", "scan_paths")
     compact = {key: deepcopy(report[key]) for key in keys if key in report}
     audit = report["catalog_boundary_audit"]
     compact["catalog_boundary_audit"] = {key: deepcopy(audit[key]) for key in ("identity", "done", "counts") if key in audit}
@@ -472,7 +478,7 @@ class DiscoveryEngine:
     results and use a shared generator/judge concurrency ceiling.
     """
     def __init__(self, index, *, seeds, owners, state, call, save, concurrency=13, repository="", pin="",
-                 packet_chars=None):
+                 packet_chars=None, scan_paths=None):
         packet_chars = MAX_PACKET_CHARS if packet_chars is None else packet_chars
         if isinstance(packet_chars, bool) or not isinstance(packet_chars, int) \
                 or not MAX_PACKET_CHARS <= packet_chars <= MAX_CONFIGURED_PACKET_CHARS:
@@ -481,10 +487,21 @@ class DiscoveryEngine:
         self.call, self.save, self.concurrency = call, save, concurrency
         self.repository, self.pin = repository, pin
         self.packet_chars = packet_chars
+        self.scan_paths = None if scan_paths is None else frozenset(scan_paths)
+        if self.scan_paths is not None and any(path not in index.entries for path in self.scan_paths):
+            raise ValueError("incremental discovery paths are outside the frozen index")
         self.state.setdefault("tasks", {})
         self.state.setdefault("candidates", {})
         self.state.setdefault("reviews", {})
         self.state.setdefault("failures", [])
+        # Attempts survive changed evidence and supplemental rounds. Native
+        # judgments remain bound to the candidate hash they actually assessed.
+        self.state.setdefault("review_attempts", {})
+        for key, checked in self.state["reviews"].items():
+            self.state["review_attempts"][key] = max(self.state["review_attempts"].get(key, 0), checked.get("attempts", 0))
+        from .feature_discovery_index import contract_units
+        self.units = [unit for unit in contract_units(index)
+                      if self.scan_paths is None or unit["path"] in self.scan_paths]
 
     def _baseline(self):
         return [{"catalog_status": "existing_feature", **{k: row.get(k) for k in ("id", "title", "owner", "source_globs")}} for row in self.seeds] + [
@@ -492,6 +509,8 @@ class DiscoveryEngine:
 
     def _packets(self, kind):
         chunks = [c for c in self.index.chunks if (c["kind"] == "doc") == (kind == "doc")]
+        if self.scan_paths is not None:
+            chunks = [c for c in chunks if c["path"] in self.scan_paths]
         # Unassociated implementation regions first; every declared chunk still runs.
         from .knowledge_coverage import matches
         if kind != "doc":
@@ -515,8 +534,15 @@ class DiscoveryEngine:
         payload = {"repository": self.repository, "pin": self.pin, "round": key.split(":")[0],
                    "baseline": _bounded_baseline(baseline, "\n".join(c["text"] for c in evidence)),
                    "owners": self.owners, "files": evidence}
+        leads = [unit for unit in self.units if any(
+            c["path"] == unit["path"] and c.get("start", 0) <= unit["start"] <= c.get("end", 0)
+            for c in evidence)]
+        payload["entry_contract_leads"] = leads[:128]
+        payload["entry_contract_lead_count"] = len(leads)
+        payload["lead_limitations"] = "Localization leads, not certified features or runtime/test relationships."
         last_error = self.state["tasks"].get(key, {}).get("reason", "")
-        for attempt in range(MAX_ATTEMPTS):
+        attempts = self.state["tasks"].get(key, {}).get("attempts", 0)
+        for attempt in range(attempts, MAX_ATTEMPTS):
             try:
                 reply = self.call("generator", SYSTEM_DISCOVER, _prompt({**payload, "repair_reason": last_error}), validate_candidates)
                 proof = receipt(reply)
@@ -533,7 +559,7 @@ class DiscoveryEngine:
                                for ref in row["evidence"]):
                         row["invalid_reason"] = "citation not present in offered pinned lines"
                     row["generator_receipts"] = [proof]
-                    row["origin_rounds"] = [payload["round"]]
+                    row["origin_rounds"] = ["source", payload["round"]] if payload["round"].startswith("residual") else [payload["round"]]
                     checked.append(row)
                 return {"status": "complete", "attempts": attempt + 1, "candidates": checked, "invalid_candidates": invalid, "receipt": proof,
                         "candidate_limit_reached": len(reply.data["candidates"]) == MAX_CANDIDATES}
@@ -543,7 +569,8 @@ class DiscoveryEngine:
                 return {"status": "unknown", "attempts": attempt + 1, "reason": str(exc), "candidates": []}
             except ValueError as exc:
                 last_error = str(exc)
-        return {"status": "unknown", "attempts": MAX_ATTEMPTS, "reason": last_error, "candidates": []}
+        return {"status": "unknown", "attempts": MAX_ATTEMPTS,
+                "reason": last_error or "initial extraction and three corrections exhausted", "candidates": []}
 
     def _collect(self, task, *, invalidate=True):
         for incoming in task.get("candidates", []):
@@ -552,6 +579,12 @@ class DiscoveryEngine:
             old = self.state["candidates"].get(key)
             if old is None:
                 self.state["candidates"][key] = row
+                continue
+            # Rediscovery with exactly the same claim/evidence is not a new
+            # candidate revision. Retain the original native approval binding;
+            # the extra extraction is still preserved in its task archive.
+            if all(old.get(field) == row.get(field) for field in
+                   ("title", "description", "owner", "relation", "related_id", "aliases", "evidence", "invalid_reason")):
                 continue
             # Same stable ID may gather implementation evidence from another layer.
             names = {unicodedata.normalize("NFKC", name).casefold().strip() for name in
@@ -569,52 +602,97 @@ class DiscoveryEngine:
             if old.get("invalid_reason") and not row.get("invalid_reason"):
                 old.pop("invalid_reason", None)
             if invalidate and _hash(old) != previous_hash:
-                self.state["reviews"].pop(key, None)
+                checked = self.state["reviews"].get(key, {})
+                self.state["review_attempts"][key] = max(self.state["review_attempts"].get(key, 0), checked.get("attempts", 0))
+
+    @staticmethod
+    def _packet_key(kind, packet):
+        return kind + ":" + _hash([{k: c.get(k) for k in
+            ("path", "start", "end", "sha256", "status", "character_start", "character_end")} for c in packet])
+
+    @staticmethod
+    def _split_packet(packet):
+        """Deterministic smaller evidence, never another sample of the same cap."""
+        if len(packet) > 1:
+            middle = len(packet) // 2
+            return [packet[:middle], packet[middle:]]
+        item = packet[0]
+        lines = item.get("text", "").split("\n")
+        if len(lines) < 2 or item.get("partial_line") or item.get("start", 0) < 1:
+            return []
+        middle = len(lines) // 2
+        return [[{**item, "text": "\n".join(lines[:middle]), "end": item["start"] + middle - 1}],
+                [{**item, "text": "\n".join(lines[middle:]), "start": item["start"] + middle}]]
+
+    def _rebuild_candidates(self):
+        self.state["candidates"] = {}
+        for _, task in sorted(self.state["tasks"].items()):
+            self._collect(task, invalidate=False)
+        for key, override in self.state.get("repairs", {}).items():
+            aggregated = self.state["candidates"].get(key)
+            if aggregated and _hash(aggregated) == override["base_sha256"]:
+                self.state["candidates"][key] = deepcopy(override["candidate"])
+        for key, checked in list(self.state["reviews"].items()):
+            current = self.state["candidates"].get(key)
+            if current and checked.get("candidate_sha256") and checked["candidate_sha256"] != _hash(current):
+                self.state["review_attempts"][key] = max(self.state["review_attempts"].get(key, 0), checked.get("attempts", 0))
+
+    def _run_packet_work(self, kind, packets):
+        ready, visited = deque(), set()
+
+        def schedule(packet, depth=0, parent=""):
+            key = self._packet_key(kind, packet)
+            if key in visited:
+                return
+            visited.add(key)
+            task = self.state["tasks"].get(key, {})
+            if task.get("status") in ("complete", "unknown"):
+                if task.get("candidate_limit_reached"):
+                    expand(key, packet, depth)
+                return
+            ready.append((key, packet, depth, parent))
+
+        def expand(key, packet, depth):
+            task = self.state["tasks"][key]
+            children = self._split_packet(packet) if depth < MAX_SATURATION_SPLITS else []
+            task["split_depth"] = depth
+            task["split_children"] = [self._packet_key(kind, child) for child in children]
+            task["overflow_unknown"] = not bool(children)
+            for child in children:
+                schedule(child, depth + 1, key)
+
+        for packet in packets:
+            schedule(packet)
+        baseline, stopped = self._baseline(), False
+        with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
+            pending = {}
+            while ready or pending:
+                while not stopped and ready and len(pending) < self.concurrency:
+                    key, packet, depth, parent = ready.popleft()
+                    pending[pool.submit(self._extract, key, packet, baseline)] = (key, packet, depth, parent)
+                if not pending:
+                    break
+                future = next(as_completed(pending))
+                key, packet, depth, parent = pending.pop(future)
+                try:
+                    task = future.result()
+                except BudgetExhausted:
+                    stopped = True
+                    self.state["tasks"].setdefault(key, {}).update(status="pending", reason="budget exhausted")
+                else:
+                    task.update(split_depth=depth, split_parent=parent)
+                    self.state["tasks"][key] = task
+                    self._collect(task)
+                    if task.get("candidate_limit_reached"):
+                        expand(key, packet, depth)
+                self.save()
+        self._rebuild_candidates()
+        self.save()
+        return not stopped
 
     def scan(self):
         for kind in ("doc", "source"):
-            work = []
-            for packet in self._packets(kind):
-                key = kind + ":" + _hash([{k: c.get(k) for k in ("path", "start", "end", "sha256", "status", "character_start", "character_end")} for c in packet])
-                if self.state["tasks"].get(key, {}).get("status") in ("complete", "unknown"):
-                    continue
-                work.append((key, packet))
-            baseline = self._baseline()
-            stopped = False
-            with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
-                # Bound submitted work as well as executing calls. Budget exhaustion
-                # stops further scheduling while already-running calls checkpoint.
-                pending, cursor = {}, 0
-                while cursor < len(work) or pending:
-                    while not stopped and cursor < len(work) and len(pending) < self.concurrency:
-                        key, packet = work[cursor]; cursor += 1
-                        pending[pool.submit(self._extract, key, packet, baseline)] = key
-                    if not pending:
-                        break
-                    future = next(as_completed(pending)); key = pending.pop(future)
-                    try:
-                        task = future.result()
-                    except BudgetExhausted:
-                        stopped = True
-                        self.state["tasks"][key] = {"status": "pending", "reason": "budget exhausted"}
-                    else:
-                        self.state["tasks"][key] = task
-                        self._collect(task)
-                    self.save()
-            # Stable aggregation independent of concurrent completion order.
-            self.state["candidates"] = {}
-            for _, task in sorted(self.state["tasks"].items()):
-                self._collect(task, invalidate=False)
-            for key, override in self.state.get("repairs", {}).items():
-                aggregated = self.state["candidates"].get(key)
-                if aggregated and _hash(aggregated) == override["base_sha256"]:
-                    self.state["candidates"][key] = deepcopy(override["candidate"])
-            for key, checked in list(self.state["reviews"].items()):
-                current = self.state["candidates"].get(key)
-                if checked.get("supported") == "yes" and current and checked.get("candidate_sha256") != _hash(current):
-                    self.state["reviews"].pop(key)
-            self.save()
-            if stopped:
+            if not self._run_packet_work(kind, self._packets(kind)):
                 self.state["scan_complete"] = False
                 return False
         self.state["scan_complete"] = True
@@ -669,7 +747,11 @@ class DiscoveryEngine:
         return results
 
     def review(self):
-        pending = [row for key, row in sorted(self.state["candidates"].items()) if key not in self.state["reviews"]]
+        pending = [row for key, row in sorted(self.state["candidates"].items())
+                   if (key not in self.state["reviews"] or
+                       self.state["reviews"][key].get("candidate_sha256") and
+                       self.state["reviews"][key]["candidate_sha256"] != _hash(row))
+                   and self.state["review_attempts"].get(key, 0) < MAX_ATTEMPTS]
         baseline = self._baseline()
         batches = [pending[n:n + 12] for n in range(0, len(pending), 12)]
         stopped = False
@@ -687,7 +769,8 @@ class DiscoveryEngine:
                         decisions = {r["id"]: {"supported": "unsure", "relation": "unknown", "related_id": "", "reason": str(exc), "repair_blocked": True} for r in rows}
                     for row in rows:
                         result = decisions[row["id"]]
-                        result["attempts"] = 1
+                        result["attempts"] = self.state["review_attempts"].get(row["id"], 0) + 1
+                        self.state["review_attempts"][row["id"]] = result["attempts"]
                         self.state["reviews"][row["id"]] = result
                     self.save()
                 if stopped:
@@ -721,7 +804,7 @@ class DiscoveryEngine:
         # share the same ceiling, with every draft saved before its judge starts.
         def eligible(key):
             row, decision = self.state["candidates"][key], self.state["reviews"].get(key, {})
-            return decision.get("supported") != "yes" and decision.get("attempts", 0) < MAX_ATTEMPTS \
+            return decision.get("supported") != "yes" and self.state["review_attempts"].get(key, decision.get("attempts", 0)) < MAX_ATTEMPTS \
                 and not decision.get("repair_blocked") \
                 and any(ref["path"] in self.index.production for ref in row["evidence"])
 
@@ -734,7 +817,7 @@ class DiscoveryEngine:
                     key = ready.popleft()
                     original = deepcopy(self.state["candidates"][key])
                     decision = deepcopy(self.state["reviews"].get(key, {}))
-                    attempt = decision.get("attempts", 0) + 1
+                    attempt = self.state["review_attempts"].get(key, decision.get("attempts", 0)) + 1
                     repair_base = self.state.get("repairs", {}).get(key, {}).get("base_sha256", _hash(original))
                     draft = self.state.get("repair_drafts", {}).get(key)
                     if draft and draft["base_sha256"] == _hash(original) and draft["attempt"] == attempt:
@@ -774,10 +857,136 @@ class DiscoveryEngine:
                     decision = {"supported": "unsure", "relation": "unknown", "related_id": "", "reason": str(exc), "attempts": attempt}
                 self.state.get("repair_drafts", {}).pop(key, None)
                 self.state["reviews"][key] = decision
+                self.state["review_attempts"][key] = max(self.state["review_attempts"].get(key, 0), decision.get("attempts", 0))
                 self.save()
                 if eligible(key):
                     ready.append(key)
         return not stopped
+
+    def unit_resolution(self, features=None, outcomes=None):
+        """Only independently accepted line anchors explain an inventory unit.
+
+        File/glob association, an unknown candidate and a neighboring symbol
+        cannot hide another unexplained entry in the same production file.
+        """
+        if features is None or outcomes is None:
+            features, outcomes = self.catalog("repos/discovery")
+        formal = {f["id"] for f in features}
+        mapping = {unit["id"]: [] for unit in self.units}
+        accepted = {r["id"]: r for r in outcomes if r["status"] == "accepted"}
+        by_path = {}
+        for unit in self.units:
+            if unit["status"] == "ready":
+                by_path.setdefault(unit["path"], []).append(unit)
+
+        def target(row):
+            key, visited = row["id"], set()
+            while key not in formal and key not in visited:
+                visited.add(key)
+                related = accepted.get(key, {}).get("related_id", "")
+                if not related:
+                    return ""
+                key = related
+            return key if key in formal else ""
+
+        for row in accepted.values():
+            feature_id = target(row)
+            if not feature_id:
+                continue
+            statement = " ".join(str(row.get(key, "")) for key in ("title", "description"))
+            for ref in row["evidence"]:
+                cited = [unit for unit in by_path.get(ref["path"], [])
+                         if ref["start"] <= unit["start"] <= ref["end"]]
+                anchors = {unit["start"] for unit in cited}
+                for unit in cited:
+                    name = unit["name"].rsplit(".", 1)[-1]
+                    named = unit["kind"] == "public_contract" and re.search(
+                        r"(?<![\w$])" + re.escape(name) + r"(?![\w$])", statement, re.IGNORECASE)
+                    # A broad source reference supports the candidate's claim,
+                    # but does not explain every independent entry in that file.
+                    if len(anchors) == 1 or named:
+                        mapping[unit["id"]].append(feature_id)
+        mapping = {key: sorted(set(ids)) for key, ids in mapping.items()}
+        remaining = [unit for unit in self.units if not mapping[unit["id"]]]
+        return {"version": "accepted-unit-mapping-v2", "mapping": mapping,
+                "unassociated_units": remaining, "total": len(mapping),
+                "associated": sum(bool(ids) for ids in mapping.values())}
+
+    def supplemental_scan(self):
+        """At most two checkpointed residual passes over unexplained units.
+
+        Success means every planned task has a terminal outcome, not that all
+        software capabilities were found. Identical packets are never sampled
+        again merely to seek a more favorable discovery result.
+        """
+        from .feature_discovery_index import unit_evidence, unit_test_lookup
+        if not hasattr(self, "_unit_test_lookup"):
+            self._unit_test_lookup = unit_test_lookup(self.index, [u["name"] for u in self.units])
+        rounds = self.state.setdefault("residual_rounds", {})
+        by_id = {unit["id"]: unit for unit in self.units}
+        seen = set()
+        for number in range(1, MAX_RESIDUAL_ROUNDS + 1):
+            key = str(number)
+            marker = rounds.get(key)
+            if marker and marker.get("complete"):
+                seen.update(marker.get("packet_sha256", []))
+                continue
+            if marker is None:
+                resolution = self.unit_resolution()
+                marker = rounds[key] = {"unit_ids": [u["id"] for u in resolution["unassociated_units"]],
+                                        "complete": False, "unknown_units": {}, "packet_sha256": []}
+                self.save()
+            packets = []
+            for unit_id in marker["unit_ids"]:
+                unit = by_id[unit_id]
+                packet = unit_evidence(self.index, unit, max_chars=min(self.packet_chars,
+                    MAX_PACKET_CHARS * number // 2), test_lookup=self._unit_test_lookup)
+                fingerprint = _hash(packet)
+                if not packet:
+                    marker["unknown_units"][unit_id] = "entry evidence unreadable, empty or exceeds complete-line budget"
+                elif fingerprint in seen:
+                    marker["unknown_units"][unit_id] = "no additional evidence beyond the previous residual pass"
+                else:
+                    packets.append(packet)
+                    if fingerprint not in marker["packet_sha256"]:
+                        marker["packet_sha256"].append(fingerprint)
+            if not self._run_packet_work("residual" + key, packets) or not self.review():
+                self.save()
+                return False
+            marker["complete"] = True
+            seen.update(marker["packet_sha256"])
+            self.save()
+        self.state["residual_complete"] = True
+        self.state["unit_resolution"] = self.unit_resolution()
+        self.save()
+        return True
+
+    def feature_evidence(self, features, outcomes):
+        """Frozen bundle inputs; statements remain in their original archives."""
+        resolution = self.unit_resolution(features, outcomes)
+        result = {f["id"]: {"refs": [], "unit_ids": [], "receipts": []} for f in features}
+        accepted = {row["id"]: row for row in outcomes if row["status"] == "accepted"}
+        for unit_id, ids in resolution["mapping"].items():
+            for feature_id in ids:
+                result[feature_id]["unit_ids"].append(unit_id)
+        for row in outcomes:
+            if row["status"] != "accepted":
+                continue
+            feature_id, visited = row["id"], set()
+            while feature_id not in result and feature_id not in visited:
+                visited.add(feature_id)
+                feature_id = accepted.get(feature_id, {}).get("related_id", "")
+            if feature_id not in result:
+                continue
+            item = result[feature_id]
+            for ref in row["evidence"]:
+                item["refs"].append({"path": ref["path"], "start": ref["start"], "end": ref["end"],
+                                     "sha256": self.index.entries[ref["path"]]["sha256"]})
+            item["receipts"] += row.get("generator_receipts", []) + [row["judge_receipt"]]
+        for item in result.values():
+            for field in ("refs", "unit_ids", "receipts"):
+                item[field] = [value for _, value in sorted({_json(v): v for v in item[field]}.items())]
+        return result
 
     def _implemented_approval(self, row, judgment):
         from .feature_discovery_index import validate_evidence
@@ -1269,7 +1478,7 @@ class _FeatureDiscovery(_Stage):
         if previous and previous.discovery:
             if self.retry_unfinished and previous.status == "published":
                 raise InitError("published discovery batch is immutable; use a new state directory after merging")
-            if not re.fullmatch(r"[0-9a-f]{40}", previous.kb_base_sha or ""):
+            if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", previous.kb_base_sha or ""):
                 raise InitError("discovery checkpoint knowledge baseline is invalid")
             if not self.pin:
                 self.pin = previous.pin
@@ -1281,7 +1490,8 @@ class _FeatureDiscovery(_Stage):
         self.discovery_run_config = discovery_run_config(self.rt, self.rt.environ)
         return {"discovery_version": VERSION, "prompt_sha256": _hash([SYSTEM_DISCOVER, SYSTEM_REVIEW]), "catalog_seed_sha256": hashlib.sha256(policy.encode()).hexdigest(),
                 "discovery_concurrency": getattr(self.rt, "discovery_concurrency", 13),
-                "discovery_run_config": self.discovery_run_config}
+                "discovery_run_config": self.discovery_run_config,
+                "discovery_paths": sorted(self.rt.discovery_paths) if getattr(self.rt, "discovery_paths", None) is not None else None}
 
     def _restore_progress(self, previous):
         if previous and previous.discovery:
@@ -1472,31 +1682,61 @@ class _FeatureDiscovery(_Stage):
         from .knowledge_coverage import load_policy
         path = self._coverage_policy_path()
         original_text = self.overlay.get(path) or self.rt.knowledge.show(self._base_sha, path)
+        existing_policy = None
         try:
             if original_text:
-                load_policy(original_text, self.repo_dir)
+                existing_policy = load_policy(original_text, self.repo_dir)
         except (ValueError, TypeError, yaml.YAMLError) as exc:
             return self._blocked([f"discovery catalog policy: {exc}"])
         try:
             index = build_for_stage(tree, self)
         except (OSError, ValueError) as exc:
             return self._blocked([f"discovery input inventory could not be verified: {exc}"])
+        portable_spec = getattr(self.rt, "portable_spec", None)
+        if portable_spec:
+            from .git_source import GitSource
+            from .repo_spec import repository_inventory
+
+            declared = repository_inventory(GitSource(self.upstream.path), portable_spec)
+            empty_markers = {path for path, entry in index.entries.items()
+                             if entry.get("classification") == "empty_package_marker"}
+            missing = sorted(set(declared["production"]) - set(index.production) - empty_markers)
+            additional = sorted(set(index.production) - set(declared["production"]))
+            root_mismatch = existing_policy and set(existing_policy.roots) != set(portable_spec.source_roots)
+            target_mismatch = existing_policy and (existing_policy.target < portable_spec.coverage_target
+                or existing_policy.semantic_depth_per_facet_gt is None
+                or existing_policy.semantic_depth_per_facet_gt < portable_spec.per_facet_gt)
+            if missing or additional or target_mismatch or root_mismatch:
+                self.record.discovery["scope_migration"] = {"status": "reviewed_proposal_required",
+                    "pin": self.record.pin, "missing_production": missing, "additional_production": additional,
+                    "targets": {"coverage_target": portable_spec.coverage_target,
+                                "per_facet_gt": portable_spec.per_facet_gt},
+                    "target_mismatch": bool(target_mismatch), "root_mismatch": bool(root_mismatch)}
+                return self._blocked(["portable catalog scope or targets differ from the reviewed repository proposal; "
+                                      "preserve the checkpoint and review a scope/policy migration before discovery"])
         raw = yaml.safe_load(original_text) if original_text else {
             "schema_version": 1, "required": True,
             "core": {"roots": list(self.lifecycle.init.source_roots) or ["."], "exclude": list(self.lifecycle.init.exclude), "target": self.lifecycle.init.coverage_target},
             "features": []}
         if original_text is None:
             from .knowledge_coverage import SUFFIXES
-            raw["core"]["suffixes"] = sorted(set(SUFFIXES) | {Path(p).suffix for p in index.production if Path(p).suffix})
+            portable = (getattr(self, "manifest", {}) or {}).get("portable_scope")
+            raw["core"]["suffixes"] = (list(index.identity["scope"]["suffixes"]) if isinstance(portable, dict)
+                else sorted(set(SUFFIXES) | {Path(p).suffix for p in index.production if Path(p).suffix}))
             raw["core"]["filenames"] = sorted(set(index.identity["scope"].get("filenames", [])) |
                                                    {Path(p).name for p in index.production if not Path(p).suffix})
             raw["core"]["exclude"] = list(dict.fromkeys(raw["core"]["exclude"] +
                 ["tests/*", "test/*", "*/tests/*", "*/test/*", "__tests__/*", "*/__tests__/*", "*.test.*", "*.spec.*"]))
+            if isinstance(portable, dict):
+                raw["core"]["exclude"] = list(dict.fromkeys(raw["core"]["exclude"] + list(portable.get("test_globs", []))))
+                raw["semantic_depth"] = {"per_facet_gt": portable_spec.per_facet_gt if portable_spec else 0.90,
+                                         "acceptance_mode": "lightweight"}
         seeds = raw["features"]
         state = self.record.discovery
         identity = inputs_digest(version=VERSION, prompts=_hash([SYSTEM_DISCOVER, SYSTEM_REVIEW]), index=index.sha256, seeds=seeds,
                                  generator=self.rt.generator.label(), judge=self.rt.judge.label(),
-                                 run_config=self.discovery_run_config)
+                                 run_config=self.discovery_run_config,
+                                 scan_paths=sorted(self.rt.discovery_paths) if getattr(self.rt, "discovery_paths", None) is not None else None)
         if state.get("identity") and state["identity"] != identity:
             return self._blocked(["discovery index or catalog identity changed; create a new batch"])
         state["identity"] = identity
@@ -1543,11 +1783,12 @@ class _FeatureDiscovery(_Stage):
         engine = DiscoveryEngine(index, seeds=seeds, owners=[o.owner for o in self.owners], state=state,
                                  call=call, save=save, concurrency=getattr(self.rt, "discovery_concurrency", 13),
                                  repository=self.lifecycle.full_name, pin=self.record.pin,
-                                 packet_chars=self.discovery_run_config["packet_chars"])
+                                 packet_chars=self.discovery_run_config["packet_chars"],
+                                 scan_paths=getattr(self.rt, "discovery_paths", None))
         scanned = engine.scan()
         self._validate_saved_archives(state)
         save()
-        if not scanned or not engine.review():
+        if not scanned or not engine.review() or not engine.supplemental_scan():
             state["done"] = False
             return self._blocked(["discovery incomplete; checkpoint saved; resume the same pinned batch"])
         if not engine.audit_catalog_boundaries():
@@ -1574,6 +1815,13 @@ class _FeatureDiscovery(_Stage):
         rendered = yaml.safe_dump(raw, sort_keys=False, allow_unicode=True)
         load_policy(rendered, self.repo_dir)
         catalog_sha = hashlib.sha256(rendered.encode()).hexdigest()
+        from .evidence_bundle import build_evidence_bundle
+        feature_evidence = engine.feature_evidence(features, outcomes)
+        evidence_bundles = {fid: build_evidence_bundle(index, fid, catalog_hash=catalog_sha,
+            refs=items["refs"], unit_ids=items["unit_ids"], receipts=items["receipts"])
+            for fid, items in feature_evidence.items()}
+        unit_resolution = engine.unit_resolution(features, outcomes)
+        state["unit_resolution"] = unit_resolution
         known_owners = {o.owner for o in self.owners}
         requests = []
         for owner in sorted({f["owner"] for f in features} - known_owners):
@@ -1582,7 +1830,7 @@ class _FeatureDiscovery(_Stage):
                              "source_paths": sorted({p for f in owned for p in (f.get("entry_points") or f["source_globs"])}),
                              "page": f"{self.repo_dir}/components/{owner}/_index.md"})
         counts = Counter((r["relation"] if r["status"] == "accepted" else r["status"]) for r in outcomes)
-        associated = {ref["path"] for item in outcomes for ref in item["evidence"]}
+        associated = {ref["path"] for item in outcomes if item["status"] == "accepted" for ref in item["evidence"]}
         unassociated = [p for p in index.production if p not in associated]
         statistics = {
             "document_candidates": sum("doc" in r["origin_rounds"] for r in outcomes),
@@ -1596,6 +1844,8 @@ class _FeatureDiscovery(_Stage):
             "candidate_limit_tasks": sum(t.get("candidate_limit_reached", False) for t in state["tasks"].values()),
             "invalid_candidates": sum(len(t.get("invalid_candidates", [])) for t in state["tasks"].values())}
         report = {"schema_version": 1, "repo": self.lifecycle.repo, "pin": self.record.pin,
+                  "scan_mode": "incremental" if engine.scan_paths is not None else "full",
+                  "scan_paths": sorted(engine.scan_paths) if engine.scan_paths is not None else None,
                   "catalog_renderer_version": CATALOG_RENDERER_VERSION,
                   "run_config": self.discovery_run_config,
                   "catalog_boundary_audit": {**state["catalog_boundary_audit"],
@@ -1606,18 +1856,33 @@ class _FeatureDiscovery(_Stage):
                   "feature_ids": [f["id"] for f in features],
                   "features": [{"id": f["id"], "owner": f["owner"], "title": f["title"]} for f in features],
                   "owner_requests": requests, "counts": dict(counts), "statistics": statistics, "candidates": outcomes,
+                  "feature_evidence": feature_evidence, "evidence_bundles": evidence_bundles,
+                  "unit_resolution": unit_resolution,
+                  "unit_summary": {"version": unit_resolution["version"], "total": unit_resolution["total"],
+                      "associated": unit_resolution["associated"],
+                      "unknown": len(unit_resolution["unassociated_units"]),
+                      "examples": unit_resolution["unassociated_units"][:5]},
+                  "residual_summary": {"max_rounds": MAX_RESIDUAL_ROUNDS,
+                      "completed_rounds": sum(bool(r.get("complete")) for r in state.get("residual_rounds", {}).values()),
+                      "complete": state.get("residual_complete", False),
+                      "overflow_unknown_tasks": sum(bool(t.get("overflow_unknown")) for t in state["tasks"].values())},
                   "unassociated_implementation_paths": unassociated,
                   "unassociated_entry_leads": [{"path": p, "symbols": index.entries[p].get("symbols", []),
                        "parse_status": index.entries[p]["parse_status"]} for p in unassociated],
                   "scan_summary": {"documents": len(index.docs), "production_files": len(index.production),
                                    "tests": len(index.tests), "tasks": len(state["tasks"]),
+                                   "scanned_documents": sum(engine.scan_paths is None or p in engine.scan_paths for p in index.docs),
+                                   "scanned_production_files": sum(engine.scan_paths is None or p in engine.scan_paths for p in index.production),
+                                   "scanned_tests": sum(engine.scan_paths is None or p in engine.scan_paths for p in index.tests),
                                    "unknown_tasks": sum(t["status"] == "unknown" for t in state["tasks"].values())},
                   "failures": index.failures, "scope_suggestions": index.scope_suggestions,
                   "candidate_limit_task_ids": [key for key, task in sorted(state["tasks"].items()) if task.get("candidate_limit_reached")],
                   "invalid_candidates": [{"task": key, **item} for key, task in sorted(state["tasks"].items())
                                            for item in task.get("invalid_candidates", [])],
                   "index_sha256": index.sha256,
-                  "limits": "Declared inventory processed; not proof all repository capabilities were found. Tests not executed.",
+                  "limits": ("Selected incremental paths processed; unselected fixed-inventory paths not fully traversed in this batch. "
+                             if engine.scan_paths is not None else "Declared inventory processed; ") +
+                             "not proof all repository capabilities were found. Tests not executed.",
                   "historical_denominator": len(seeds) * 7, "facet_denominator": len(features) * 7}
         report_path = f"eval/feature-discovery/{self.lifecycle.repo}-{self.record.pin[:12]}.json"
         try:

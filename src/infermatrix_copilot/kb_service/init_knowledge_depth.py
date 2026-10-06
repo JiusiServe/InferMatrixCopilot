@@ -72,10 +72,19 @@ class _KnowledgeDepth(_Knowledge):
     def _input_options(self) -> dict:
         foundation = {}
         if self.foundation_mode == "partial":
-            from .foundation_publication import foundation_handoff
-            binding = foundation_handoff(self.foundation_record_path, knowledge=self.rt.knowledge,
-                        baseline=self._base_sha, repo=self.lifecycle.repo, pin=self._knowledge_run_pin,
-                        publisher=self._publisher())
+            if getattr(self.rt, "portable_spec", None):
+                from .portable_init import check_local_acceptance
+                record = InitRecord.load(self.rt.state_dir, self.lifecycle.repo, "knowledge")
+                if record is None or record.status != "accepted" or record.pin != self._knowledge_run_pin:
+                    raise InitError("portable depth requires an accepted foundation at the same source pin")
+                head = check_local_acceptance(self.rt, record)
+                binding = {"local_head_sha": head, "inputs_digest": record.inputs_digest,
+                           "catalog_binding": record.discovery.get("catalog_binding"), "init_complete": False}
+            else:
+                from .foundation_publication import foundation_handoff
+                binding = foundation_handoff(self.foundation_record_path, knowledge=self.rt.knowledge,
+                            baseline=self._base_sha, repo=self.lifecycle.repo, pin=self._knowledge_run_pin,
+                            publisher=self._publisher())
             self._foundation_binding = binding
             foundation = {"foundation_mode": "partial", "foundation": binding}
         if self.acceptance_mode == "lightweight":
@@ -102,7 +111,7 @@ class _KnowledgeDepth(_Knowledge):
         if previous and previous.depth:
             if self.retry_unfinished and previous.status == "published":
                 raise InitError("published depth batch is immutable; use a new state directory after merging its PR")
-            if not re.fullmatch(r"[0-9a-f]{40}", previous.kb_base_sha):
+            if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", previous.kb_base_sha):
                 raise InitError("depth checkpoint has an invalid knowledge baseline")
             if self.rt.knowledge._git("cat-file", "-t", previous.kb_base_sha).decode().strip() != "commit":
                 raise InitError("depth checkpoint knowledge baseline is unavailable")
@@ -186,7 +195,7 @@ class _KnowledgeDepth(_Knowledge):
             policy_text = self.overlay.get(policy_path) or self.rt.knowledge.show(self._base_sha, policy_path)
             context = DepthContext(tree, inventory(tree, policy), mode="lightweight",
                                    cache_path=self.depth_index_path, pin=self.record.pin,
-                                   policy_sha256=digest(policy_text))
+                                   policy_sha256=digest(policy_text), discovery=self._discovery_catalog())
             if getattr(self, "_repair_guidance", None):
                 from .depth_inputs import load_repair_guidance
                 checked_guidance = load_repair_guidance(
@@ -195,7 +204,7 @@ class _KnowledgeDepth(_Knowledge):
                 if checked_guidance["guidance_sha256"] != self._repair_guidance["guidance_sha256"]:
                     raise InitError("repair guidance changed after checkpoint identity was captured")
         else:
-            context = DepthContext(tree, inventory(tree, policy))
+            context = DepthContext(tree, inventory(tree, policy), discovery=self._discovery_catalog())
         by_id = {f.id: f for f in policy.features}
         selected_features = tuple(by_id[fid] for fid in dict.fromkeys(self.feature_ids)) if self.feature_ids else policy.features
         # Finish a fair first pass before targeted repairs. Subscription mode

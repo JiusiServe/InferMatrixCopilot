@@ -125,6 +125,11 @@ class ModelGateway:
         self._recorder = recorder
         self._subscription_transports: dict[str, Any] = {}
         self._zcode_pacer = zcode_pacer
+        self._dispatch = None
+
+    def configure_dispatch(self, dispatch):
+        """Portable initialization opts into one shared native dispatch cap."""
+        self._dispatch = dispatch
 
     def configure_zcode_pacing(self, pacer):
         """Only the explicit native campaign configures shared dispatch pacing."""
@@ -179,6 +184,18 @@ class ModelGateway:
                    validate: Callable[[dict], None] | None = None,
                    max_budget_usd: float | None = None, record_payload: bool = True,
                    fallback_from: str = "") -> ModelReply:
+        kwargs = dict(system=system, prompt=prompt, validate=validate,
+                      max_budget_usd=max_budget_usd, record_payload=record_payload,
+                      fallback_from=fallback_from)
+        if self._dispatch is None:
+            return self._call_json_native(role, **kwargs)
+        with self._dispatch.slot():
+            return self._call_json_native(role, **kwargs)
+
+    def _call_json_native(self, role: ModelRole, *, system: str, prompt: str,
+                          validate: Callable[[dict], None] | None = None,
+                          max_budget_usd: float | None = None, record_payload: bool = True,
+                          fallback_from: str = "") -> ModelReply:
         """``max_budget_usd`` is a per-call STOP THRESHOLD, not a hard cap:
         the transport starts no further API request once the call's spend
         reaches it, but the request that crosses it is billed in full. A

@@ -263,12 +263,40 @@ def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
     repo_subdir = None
     if adapter is not None:
         repo_subdir = (adapter.manifest.get("knowledge") or {}).get("repo_subdir")
-    docs = KnowledgeDocs(kdir, repo_subdir)
+    from ...knowledge_view import KnowledgeView, _load_view
+    from ...kb_service.repo_spec import resolve_snapshot_repo
+    current = KnowledgeView.current()
+    if current.root.resolve() == kdir.resolve():
+        view = current
+    elif (kdir.parent / "MANIFEST.json").is_file():
+        view = _load_view(str(kdir.parent.resolve()))
+    else:
+        view = KnowledgeView(kdir.resolve(), f"unverified:{kdir.resolve()}")
+    state = getattr(ctx, "state", {})
+    params = getattr(ctx, "params", {})
+    selector = str((state.get("task_spec") or {}).get("repo") or "")
+    binding = resolve_snapshot_repo(view, selector) if selector else None
+    if binding is not None:
+        repo_subdir = binding.knowledge_slice
+    docs = KnowledgeDocs(kdir, repo_subdir, verify=view.path)
+    profile = params.get("knowledge_context_profile", "adaptive" if (kdir / "_repositories.yaml").is_file() else "legacy")
+    adaptive = None
+    session_id = ""
+    if profile == "adaptive" and binding is not None:
+        from ...knowledge_context import ContextBudget, KnowledgeContextService
+        adaptive = KnowledgeContextService(view, ctx.run_dir / "knowledge-context.sqlite",
+                    allowed_repositories=getattr(ctx.settings, "allowed_knowledge_repositories", ()))
+        head = str(state.get("pr_head_sha") or (state.get("task_spec") or {}).get("expected_head_sha") or "")
+        budget = ContextBudget(**dict(params.get("knowledge_context_budget") or {}))
+        session_id = adaptive.open_session(selector, source_pin=head,
+                                          review_id=ctx.run_dir.name, budget=budget)["session_id"]
 
-    def doc_search(query: str, **_: Any) -> str:
+    def doc_search(query: str, repository: str | None = None, **_: Any) -> str:
         """Tool: grep the knowledge base's markdown for `query`; return
         knowledge-relative `path:line:text` matches (capped), or a sentinel."""
         try:
+            if adaptive is not None:
+                return json.dumps(adaptive.search(session_id, query, repository=repository), ensure_ascii=False)
             hits = docs.search(query)
         except KnowledgeDocsError as exc:
             return f"refused: {exc}"
@@ -276,10 +304,12 @@ def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
             f"{h['path']}:{h['line']}:{h['text']}" for h in hits
         ) or "(no matching docs)"
 
-    def doc_read(path: str, offset: int = 0, **_: Any) -> str:
+    def doc_read(path: str, offset: int = 0, repository: str | None = None, **_: Any) -> str:
         """Tool: read a knowledge-base doc by its knowledge-relative path
         (windowed 24k chars; page with offset). Refuses paths escaping the base."""
         try:
+            if adaptive is not None:
+                return json.dumps(adaptive.read(session_id, path, offset=offset, repository=repository), ensure_ascii=False)
             page = docs.read(path, offset=offset)
         except FileNotFoundError:
             return f"(no such doc: {path})"
@@ -291,33 +321,57 @@ def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
                        f"offset={page['next_offset']}]")
         return window
 
-    def doc_related(changed_files: list[str], query: str = "", **_: Any) -> str:
+    def doc_related(changed_files: list[str], query: str = "", repository: str | None = None, **_: Any) -> str:
         """The same bounded implementation context used by Direct plans."""
         try:
+            if adaptive is not None:
+                packet = adaptive.related(session_id, changed_files, query=query, repository=repository)
+                ctx.trace.record("review_knowledge_injected", session_id=session_id,
+                                 model_content_sha256=packet["model_content_sha256"],
+                                 model_content=packet["model_content"], documents=packet["documents"],
+                                 consumed_tokens=packet["consumed_tokens"], token_accounting=packet["token_accounting"])
+                return json.dumps(packet, ensure_ascii=False)
             return json.dumps(docs.related(changed_files, query=query), ensure_ascii=False)
         except KnowledgeDocsError as exc:
             return json.dumps({"status": "refused", "reason": str(exc), "documents": []})
 
     s = {"type": "string"}
-    return {
+    tools = {
         "doc_related": ToolDef(
-            "doc_related", "Retrieve at most two relevant implementation explanations for changed files. "
+            "doc_related", "Retrieve relevant implementation explanations within the active context budget. "
                            "Includes pinned sources and missing facets; verify against the PR head.",
-            {"type": "object", "properties": {"changed_files": {"type": "array", "items": s}, "query": s},
+            {"type": "object", "properties": {"changed_files": {"type": "array", "items": s}, "query": s, "repository": s},
              "required": ["changed_files"]}, doc_related),
         "doc_search": ToolDef(
             "doc_search",
             "Search the repo's curated knowledge base (community docs) for a "
             "string; returns knowledge-relative path:line matches to open with "
             "doc_read.",
-            {"type": "object", "properties": {"query": s}, "required": ["query"]},
+            {"type": "object", "properties": {"query": s, "repository": s}, "required": ["query"]},
             doc_search),
         "doc_read": ToolDef(
             "doc_read",
             "Read a doc from the curated knowledge base by its knowledge-relative "
             "path (e.g. `repos/<repo>/rules.md`, or a `general/...` guide it "
             "links to). Windowed; page with offset.",
-            {"type": "object", "properties": {"path": s,
+            {"type": "object", "properties": {"path": s, "repository": s,
                                               "offset": {"type": "integer"}},
              "required": ["path"]}, doc_read),
     }
+    if adaptive is not None:
+        def context_briefing(**_: Any) -> str:
+            paths = list(ctx.settings.knowledge_general_docs or [])
+            if adapter is not None:
+                paths += list((adapter.manifest.get("knowledge") or {}).get("briefing_docs") or [])
+            rows = [{"path": path} for path in dict.fromkeys(paths) if (view.root / path).is_file()]
+            return json.dumps(adaptive.inject(session_id, rows, purpose="general-and-owner-briefing"), ensure_ascii=False)
+
+        def context_expand(target_tokens: int, reason: str, **_: Any) -> str:
+            return json.dumps(adaptive.expand(session_id, target_tokens=target_tokens, reason=reason), ensure_ascii=False)
+
+        tools["doc_context_briefing"] = ToolDef("doc_context_briefing", "Budget the pinned general/owner briefing.",
+                                               {"type": "object", "properties": {}}, context_briefing)
+        tools["doc_context_expand"] = ToolDef("doc_context_expand", "Expand cumulative knowledge context within model reservations, with an unresolved contract as reason.",
+            {"type": "object", "properties": {"target_tokens": {"type": "integer"}, "reason": {"type": "string"}},
+             "required": ["target_tokens", "reason"]}, context_expand)
+    return tools

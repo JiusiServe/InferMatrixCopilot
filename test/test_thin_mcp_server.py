@@ -110,6 +110,11 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "update_knowledge",
         "doc_search",
         "doc_read",
+        "open_knowledge_context",
+        "read_knowledge_context",
+        "search_knowledge_context",
+        "expand_knowledge_context",
+        "related_knowledge_context",
     }
 
     review = mcp.tools["review"](

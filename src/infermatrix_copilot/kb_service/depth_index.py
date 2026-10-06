@@ -55,7 +55,7 @@ class SharedDepthIndex:
 
 
 def _identity(pin, policy_sha256, production):
-    if not re.fullmatch(r"[a-f0-9]{40}", pin or ""):
+    if not re.fullmatch(r"(?:[a-f0-9]{40}|[a-f0-9]{64})", pin or ""):
         raise ValueError("shared depth index needs a full immutable pin")
     if not re.fullmatch(r"[a-f0-9]{64}", policy_sha256 or ""):
         raise ValueError("shared depth index needs the policy SHA256")

@@ -36,7 +36,7 @@ FACETS = ("architecture", "api", "configuration", "tradeoffs", "features", "vali
 MAX_SOURCE_BYTES = 100_000
 MAX_DOC_BYTES = 30_000
 MAX_FILES = 60
-_MARKER = re.compile(r"<!-- kb:knowledge owner=([a-z0-9-]+) facet=([a-z]+) pin=([0-9a-f]{40})"
+_MARKER = re.compile(r"<!-- kb:knowledge owner=([a-z0-9-]+) facet=([a-z]+) pin=((?:[0-9a-f]{40}|[0-9a-f]{64}))"
                      r"(?: verdict=(pass|unsure|unjudged))? -->")
 _OWNER = re.compile(r"[a-z0-9][a-z0-9-]{0,40}")
 
@@ -177,6 +177,27 @@ class _Knowledge(_Stage):
 
     def _publish(self, changed: dict[str, str]) -> InitRecord:
         targets = self.record.coverage.get("knowledge", {}).get("targets", {})
+        if self.STAGE == "knowledge" and getattr(self.rt, "portable_spec", None):
+            from .knowledge_coverage import coverage_targets_met
+
+            owners = self.record.coverage.get("knowledge", {}).get("owners", {})
+            self.record.coverage["foundation"] = {
+                "mode": "partial", "tier": "foundation", "init_complete": False,
+                "foundation_targets_met": targets.get("met") is True,
+                "structural_targets_met": coverage_targets_met(targets, "partial"),
+                "catalog_binding": self.record.discovery.get("catalog_binding", {}),
+                "unknown_features": {key: list(item.get("missing_facets", []))
+                    for key, item in targets.get("features", {}).get("items", {}).items()
+                    if item.get("missing_facets")},
+                "unknown_owners": {key: [facet for facet, status in item.get("facets", {}).items()
+                    if status != "covered"] for key, item in owners.items()
+                    if any(status != "covered" for status in item.get("facets", {}).values())},
+                "unknown_core_files": list(targets.get("core", {}).get("missing_files", [])),
+                "claim": "Accepted foundation retains supported context and explicit unknowns; "
+                         "it does not establish seven-facet final acceptance or executed tests."}
+            self.record.notes.append("portable foundation preview: unsupported facets remain unknown; "
+                                     "final semantic-depth and structural targets are unchanged")
+            return super()._publish(changed)
         if self.STAGE == "knowledge" and self.foundation_mode == "partial":
             from .foundation_publication import freeze_receipt
             freeze_receipt(self, changed)
@@ -368,6 +389,17 @@ class _Knowledge(_Stage):
                 source = preferred_sources(self, tree, feature.id, source_paths, MAX_SOURCE_BYTES - test_bytes)
                 source.extend(tests)
                 docs = self._sources(tree, list(feature.docs), MAX_DOC_BYTES)
+                discovery = self._discovery_catalog()
+                bundle = discovery.get("evidence_bundles", {}).get(feature.id)
+                if bundle:
+                    from .evidence_bundle import materialize_bundle, bounded_spans
+                    try:
+                        spans = materialize_bundle(bundle, tree, pin=self.record.pin,
+                                                   catalog_hash=discovery["catalog_sha256"])
+                    except (ValueError, OSError, UnicodeError) as exc:
+                        return self._blocked([f"discovery evidence handoff: {exc}"])
+                    source = bounded_spans([s for s in spans if s["kind"] != "doc"] + source, MAX_SOURCE_BYTES)
+                    docs = bounded_spans([s for s in spans if s["kind"] == "doc"] + docs, MAX_DOC_BYTES)
                 if not source:
                     self.record.unfinished.append(f"feature {feature.id}: missing readable source")
                     continue
@@ -582,8 +614,8 @@ class _Knowledge(_Stage):
             text = text.replace("\n\n", "\n\nInference / 设计推断（非作者历史意图）：\n\n", 1)
         citations = []
         for entry in entries:
-            url = (f"https://github.com/{self.lifecycle.full_name}/blob/{self.record.pin}/"
-                   f"{quote(entry.path, safe='/')}#L{entry.start}-L{entry.end}")
+            from .source_links import source_link
+            url = source_link(self.lifecycle.full_name, self.record.pin, entry.path, entry.start, entry.end)
             citations.append(f"[{entry.path}:L{entry.start}–L{entry.end}]({url})")
         text += "\n\nSources / 来源：" + ", ".join(citations) + "\n"
         return text

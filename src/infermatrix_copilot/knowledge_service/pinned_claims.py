@@ -35,7 +35,7 @@ from typing import Callable, Iterable, Mapping
 
 from .facts import FactsError, claims_in, describe, holds, merge_claims, observe
 
-_SHA = re.compile(r"[0-9a-f]{40}")
+_SHA = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
 
 
 def _gh_pull(repository: str, number: int) -> dict:

@@ -30,7 +30,7 @@ import yaml
 
 DEPTH_FACETS = ("flow", "api", "configuration", "dependencies", "failure_modes", "tradeoffs", "validation")
 DEPTH_ABSENCE_DETECTOR = "static-test-association-v2"
-DEPTH_BLOCK = re.compile(r"<!-- kb:depth feature=([a-z0-9-]+) facet=([a-z_]+) pin=([0-9a-f]{40}) "
+DEPTH_BLOCK = re.compile(r"<!-- kb:depth feature=([a-z0-9-]+) facet=([a-z_]+) pin=((?:[0-9a-f]{40}|[0-9a-f]{64})) "
                          r"sha256=([0-9a-f]{64}) -->\n(.*?)\n<!-- /kb:depth -->", re.S)
 
 

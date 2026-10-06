@@ -17,6 +17,7 @@ import subprocess
 import uuid
 
 INDEX_VERSION = "feature-discovery-index-v2"
+CONTRACT_UNIT_VERSION = "contract-units-v1"
 MAX_CHUNK_CHARS = 12_000
 DOC_SUFFIXES = {".md", ".mdx", ".rst", ".adoc", ".txt"}
 _RESOURCE_SUFFIXES = {".json", ".yaml", ".yml", ".toml", ".ini", ".lock", ".xml", ".csv", ".svg", ".map", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf",
@@ -158,7 +159,7 @@ def _tracked(tree, pin):
 
 
 def _identity(pin, scope, doc_globs, source_digest):
-    if not re.fullmatch(r"[a-f0-9]{40}", pin or ""):
+    if not re.fullmatch(r"(?:[a-f0-9]{40}|[a-f0-9]{64})", pin or ""):
         raise ValueError("discovery index needs a full immutable source SHA")
     roots = list(scope.get("roots") or (".",))
     for root in roots:
@@ -193,16 +194,21 @@ def build_discovery_index(tree, *, pin, scope, doc_globs=(), cache_path=None):
         except ValueError: pass  # stale/corrupt caches never alter this batch's source scope
     roots, excluded = identity["scope"]["roots"], scope.get("exclude", ())
     extensions, filenames = scope.get("suffixes"), scope.get("filenames", ())
+    test_globs = tuple(scope.get("test_globs", ()))
     entries, production, tests, docs, failures, suggestions = {}, [], [], [], [], []
     for path in names:
         if not _safe(path): raise ValueError("unsafe tracked path in discovery inventory")
         suffix = PurePosixPath(path).suffix.lower()
         doc = _match(path, doc_globs)
-        test = is_test(path)
+        test = is_test(path) or _match(path, test_globs)
         exclusion_hits = [pattern for pattern in excluded if _match(path, [pattern])]
         # Test directories excluded from production remain available to the
         # test index. Other exclusions (vendor/build/generated) remain effective.
-        if exclusion_hits and not (test and all(_test_only_exclusion(p) for p in exclusion_hits)):
+        def test_exclusion(pattern):
+            hard = {"vendor", "third_party", "third-party", "node_modules", "generated", "dist", "build"}
+            return _test_only_exclusion(pattern) or (pattern in test_globs and
+                not any(part in hard for part in pattern.casefold().split("/")))
+        if exclusion_hits and not (test and all(test_exclusion(p) for p in exclusion_hits)):
             continue
         known = suffix in _LANGUAGES or _match(PurePosixPath(path).name, filenames)
         unfamiliar = suffix not in DOC_SUFFIXES | _RESOURCE_SUFFIXES and bool(suffix) and not known
@@ -220,7 +226,7 @@ def build_discovery_index(tree, *, pin, scope, doc_globs=(), cache_path=None):
             source = _under(path, roots) and (PurePosixPath(path).suffix in extensions
                                               or _match(PurePosixPath(path).name, filenames))
         if not doc and not test and not source:
-            if known and not _under(path, roots): suggestions.append({"path": path, "reason": "code outside declared production roots"})
+            if (known or unfamiliar) and not _under(path, roots): suggestions.append({"path": path, "reason": "code outside declared production roots"})
             elif (known or unfamiliar or shebang) and _under(path, roots): suggestions.append({"path": path, "reason": "unsupported suffix outside declared suffix scope"})
             continue
         kind = "doc" if doc else "test" if test else "source"
@@ -330,6 +336,128 @@ def evidence_excerpt(index, reference):
             "sha256": entry["sha256"], "kind": entry["kind"]}
 
 
+def contract_units(index):
+    """Conservative public-entry/contract leads, never certified features.
+
+    Unit identity is independent of the candidate/catalog set. Parsed Python
+    spans and lexical declarations/registrations in other languages supply
+    anchors; opaque or unreadable files retain an explicit module lead. The
+    complete inventory scan remains authoritative even when these hints miss
+    a dynamic registration or a language-specific construct.
+    """
+    units = []
+    declaration = re.compile(
+        r"\b(?:export\s+(?:default\s+)?(?:async\s+)?(?:function|class|const|let)|"
+        r"pub(?:\([^)]*\))?\s+(?:async\s+)?(?:fn|struct|trait)|"
+        r"(?:public|open)\s+(?:static\s+)?(?:fun|class|interface)|"
+        r"(?:function|class|interface|struct|fn|func|fun))\s+([\w$]+)")
+    arrow = re.compile(r"\b(?:export\s+)?(?:const|let|var)\s+([\w$]+)\s*=.*(?:=>|function\b)")
+    registration = re.compile(
+        r"(?:\.(?:get|post|put|delete|patch|route|command|add_parser|register|"
+        r"register_plugin|add_route|add_task|schedule)\s*\(|"
+        r"@(?:\w+\.)*(?:route|command|task)\b|"
+        r"\b(?:module\.exports|exports\.[\w$]+)\s*=)")
+    ui_event = re.compile(r"\b(?:onClick|onSubmit|onChange|on:click|on:submit)\s*=|@(?:click|submit)=")
+    for path in index.production:
+        entry = index.entries[path]
+        lines = entry.get("lines", [])
+        anchors = []
+        if entry.get("status") == "ready":
+            if entry.get("language") == "python" and entry.get("parse_status") == "parsed":
+                anchors.extend((s["start"], s.get("end", s["start"]), "public_contract", s["name"])
+                               for s in entry.get("symbols", []) if not s["name"].startswith("_"))
+            for number, line in enumerate(lines, 1):
+                match = declaration.search(line) or arrow.search(line)
+                if match and entry.get("language") != "python":
+                    anchors.append((number, min(len(lines), number + 39), "public_contract", match[1]))
+                if registration.search(line):
+                    anchors.append((number, min(len(lines), number + 39), "registration", line.strip()[:120]))
+                if ui_event.search(line):
+                    anchors.append((number, min(len(lines), number + 19), "ui_entry", line.strip()[:120]))
+        if not anchors:
+            anchors.append((1 if lines else 0, len(lines), "module_contract", PurePosixPath(path).stem))
+        for start, end, kind, name in sorted(set(anchors)):
+            units.append({"id": _sha([CONTRACT_UNIT_VERSION, index.identity["pin"], path,
+                                      entry.get("sha256"), start, end, kind, name]),
+                          "path": path, "start": start, "end": end, "kind": kind,
+                          "name": name, "language": entry.get("language", "unknown"),
+                          "status": entry.get("status", "error"),
+                          "parse_status": entry.get("parse_status", "unknown"),
+                          "sha256": entry.get("sha256", "")})
+    return units
+
+
+def unit_test_lookup(index, names):
+    """One shared pass over nested tests for all named entry leads."""
+    wanted = {name for name in names if re.fullmatch(r"[A-Za-z_$][\w$]{2,}", name)}
+    found = {name: [] for name in wanted}
+    for path in index.tests:
+        test = index.entries[path]
+        if test.get("status") != "ready":
+            continue
+        seen = set()
+        for number, line in enumerate(test["lines"], 1):
+            hits = set(re.findall(r"[A-Za-z_$][\w$]*", line)) & wanted - seen
+            if not hits:
+                continue
+            window = test["lines"][max(0, number - 6):number + 10]
+            if re.search(r"\bassert\w*\b|\bexpect\s*\(|\braises\s*\(", "\n".join(window)):
+                ref = {"path": path, "start": max(1, number - 5), "end": min(len(test["lines"]), number + 10)}
+                for name in hits:
+                    found[name].append(ref)
+                seen.update(hits)
+    return found
+
+
+def unit_evidence(index, unit, *, max_chars=12000, test_lookup=None):
+    """Bounded anchor/body plus directly named imports/tests, all real lines.
+
+    Related text is only a localization hint. No lexical match establishes a
+    runtime call, test association, executed test or verified absence.
+    """
+    if type(max_chars) is not int or max_chars < 1:
+        raise ValueError("unit evidence budget must be positive")
+    entry = index.entries[unit["path"]]
+    if entry.get("status") != "ready" or unit["start"] < 1:
+        return []
+    result, used = [], 0
+
+    def offer(path, start, end):
+        nonlocal used
+        item = evidence_excerpt(index, {"path": path, "start": start, "end": end})
+        # Preserve whole lines. An oversize anchor stays an unresolved lead;
+        # partial text must never be offered with a complete-line citation.
+        while len(item["text"]) + used + 150 > max_chars and end > start:
+            end -= 1
+            item = evidence_excerpt(index, {"path": path, "start": start, "end": end})
+        if len(item["text"]) + used + 150 > max_chars:
+            return
+        if any(p["path"] == path and p["start"] <= start and p["end"] >= end for p in result):
+            return
+        result.append(item)
+        used += len(item["text"]) + 150
+
+    start, end = unit["start"], unit["end"]
+    offer(unit["path"], max(1, start - 3), min(end, start + 59))
+    if end > start + 59:
+        offer(unit["path"], max(start + 60, end - 19), end)
+    offered_body = "\n".join(item["text"] for item in result)
+    helpers = [s for s in entry.get("symbols", []) if s["start"] != start and
+               re.search(r"(?<![\w$])" + re.escape(s["name"]) + r"\s*\(", offered_body)]
+    for helper in helpers[:8]:
+        offer(unit["path"], helper["start"], min(helper.get("end", helper["start"]), helper["start"] + 59))
+    for imported in entry.get("imports", [])[:12]:
+        number = imported["start"]
+        offer(unit["path"], number, number)
+    name = unit.get("name", "")
+    related = unit_test_lookup(index, [name]) if test_lookup is None else test_lookup
+    for ref in related.get(name, []):
+        offer(ref["path"], ref["start"], ref["end"])
+        if used >= max_chars - 150:
+            break
+    return result
+
+
 def build_for_stage(tree, stage):
     from .knowledge_coverage import load_policy, policy_path
     policy = getattr(stage, "coverage_policy", None)
@@ -340,6 +468,12 @@ def build_for_stage(tree, stage):
     doc_globs = list(stage.lifecycle.init.doc_globs)
     if policy: doc_globs += list(policy.catalog_sources)
     scope = discovery_scope(stage.lifecycle.init, policy)
+    manifest = getattr(stage, "manifest", {}) or {}
+    portable = manifest.get("portable_scope") if isinstance(manifest, dict) else None
+    if isinstance(portable, dict):
+        if policy is None:
+            scope.update(suffixes=list(portable.get("suffixes", [])), filenames=list(portable.get("filenames", [])))
+        scope["test_globs"] = list(portable.get("test_globs", []))
     name = _sha([stage.record.pin, scope, sorted(set(doc_globs))])
     return build_discovery_index(tree, pin=stage.record.pin, scope=scope, doc_globs=sorted(set(doc_globs)),
                                  cache_path=stage.rt.state_dir / "feature-discovery-index" / f"{name}.json")

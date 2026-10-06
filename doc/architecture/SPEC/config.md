@@ -1,6 +1,6 @@
 # config.py —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-06 -->
 
 `LOC ~658 · 配置 · refactor-status: oversized`
 
@@ -26,6 +26,11 @@ worker 数 `strict_max_workers`（`STRICT_MAX_WORKERS`，默认 1，启动时校
 以带标记的 JSON 评论贴到该锁定的 mailbox issue，供另一台主机上的 reviewbot 摄取）。
 
 ## 公开契约
+
+`allowed_knowledge_repositories`（`ALLOWED_KNOWLEDGE_REPOSITORIES`，默认空 tuple）是
+运行主机授权读取的跨仓库 ID。它不进入模型工具的权限参数；授权仍须与固定快照中的
+confirmed 依赖及源码/目录 pin 一同验证，空配置只允许当前仓库。
+
 带全部可调项的 `Settings`；`reviewer` / `intent`（回退到 `agent_model`）；
 `repo_path(name)`；`model_for(mode)`；`tier_target(role)` → `ResolvedTarget`；
 `expansion_env()`；`knowledge_runtime_repos`；`allowed_repo_roots`

@@ -247,7 +247,7 @@ class DepthContext:
     """
 
     def __init__(self, tree: Path, production: list[str], *, index=None, cache_path=None,
-                 pin=None, policy_sha256=None, mode="strict"):
+                 pin=None, policy_sha256=None, mode="strict", discovery=None):
         system_prompt(mode)
         if index is not None and cache_path is not None:
             raise ValueError("provide an index or cache_path, not both")
@@ -256,6 +256,7 @@ class DepthContext:
             index = load_depth_index(cache_path, pin=pin, policy_sha256=policy_sha256, production=production)
         self.tree, self.production = tree, sorted(set(production))
         self.index, self.mode = index, mode
+        self.discovery = discovery or {}
         if index is not None:
             from .depth_index import _identity
             expected = _identity(pin or index.identity["pin"], policy_sha256 or index.identity["policy_sha256"], production)
@@ -887,6 +888,13 @@ class DepthContext:
             else:
                 relevant.extend(p for p in self.production if self._import_targets(p)[0] & set(source))
         relevant = list(dict.fromkeys(relevant))
+        discovery_bundle = self.discovery.get("evidence_bundles", {}).get(feature.id)
+        discovery_spans = []
+        if discovery_bundle:
+            from .evidence_bundle import materialize_bundle
+            discovery_spans = materialize_bundle(discovery_bundle, self.tree, pin=self.discovery["pin"],
+                                                 catalog_hash=self.discovery["catalog_sha256"])
+            relevant = list(dict.fromkeys([s["path"] for s in discovery_spans if s["kind"] != "doc"] + relevant))
         tiers = {path: 3 if path in feature.entry_points else 2 if path in source
                  else 1 if path in dependencies else 0
                  for path in relevant}
@@ -972,6 +980,9 @@ class DepthContext:
                         flow_pairs.append((tiers[path], base + 35, pair))
                         ranges.extend((base + 35, p, start, end) for p, start, end in pair)
         # Sorting before rotation preserves priority; only ties rotate between rounds.
+        for span in discovery_spans:
+            if span["kind"] != "doc":
+                ranges.append((20_000, span["path"], span["start"], span["end"]))
         ordered = sorted(set(ranges), key=lambda r: (-tiers.get(r[1], 4), -r[0], r[1], r[2], r[3]))
         if evidence_round and ordered:
             rotated = []
@@ -1093,5 +1104,7 @@ class DepthContext:
             payload["docs"] = self.document_slices(docs, paths=getattr(feature, "docs", ()),
                                                   previous_review=previous_review, evidence_round=evidence_round,
                                                   facets=facets, symbols=symbols)
+        if discovery_bundle:
+            payload["discovery_bundle_sha256"] = discovery_bundle["bundle_sha256"]
         payload["context_sha256"] = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
         return payload

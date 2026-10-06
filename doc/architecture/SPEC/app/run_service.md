@@ -1,12 +1,19 @@
 # app/run_service.py —— 规范
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-06 -->
 
 `RunService` is the durable application boundary shared by the embedded
 Strict SDK and MCP transport. It owns policy-checked reserve/start, a queue
 drained by `STRICT_MAX_WORKERS` workers (default 1), isolated child launch, startup/orphan reconciliation,
 readiness, bounded status/result polling, and repository-scoped knowledge
 reads. Construction and polling require no CLI or MCP module import.
+
+Knowledge reads resolve repository slices from the same frozen view's registry,
+with legacy adapters retained as fallback. Search/read always pass the view's
+manifest verifier. Child launch forwards the host-only
+`ALLOWED_KNOWLEDGE_REPOSITORIES`; tool input cannot grant cross-repository access.
+Strict adaptive document tools share the run's `KnowledgeContextService` ledger;
+legacy standalone document endpoints retain their per-call read windows.
 
 Reservation and run ID containment go directly through `RunReservation`,
 not the workflow `Copilot` facade. `Copilot` remains for playbook readiness

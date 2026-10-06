@@ -145,6 +145,17 @@ def _document(document: dict, view: KnowledgeView, pin: str, problems: list[str]
         problems.append(f"{label}: document exceeds 3000 characters")
     if any(row["pin"] != pin for row in sections.values()):
         problems.append(f"{label}: served depth has another source pin")
+    # A clipped snippet truthfully advertises no *intact* included facet. Bind
+    # its actual prose to one frozen section instead of inferring absence from
+    # included_facets=[] or accepting the partial flag without reading content.
+    fragment = content.rstrip()
+    partial_candidates = [facet for facet, section in sections.items()
+                          if document.get("partial") is True and fragment.strip()
+                          and len(fragment) < len(section["content"].strip())
+                          and section["content"].strip().startswith(fragment)]
+    partial_facet = partial_candidates[0] if len(partial_candidates) == 1 else None
+    if len(partial_candidates) > 1:
+        problems.append(f"{label}: partial context cannot be attributed to one intact facet")
     facet_states = {}
     for facet in FACETS:
         section = sections.get(facet)
@@ -156,6 +167,8 @@ def _document(document: dict, view: KnowledgeView, pin: str, problems: list[str]
                 injection = "partial"
             else:
                 problems.append(f"{label}: declared injected facet {facet} is absent from actual content")
+        elif facet == partial_facet:
+            injection = "partial"
         facet_states[facet] = {"status": section["basis"] if section else "unknown", "injection": injection,
                                "gap_label": section["gap_label"] if section else None}
     return {**document, "content_sha256": _hash(content), "page_sha256": _hash(raw),

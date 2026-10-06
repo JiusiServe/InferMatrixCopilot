@@ -78,7 +78,7 @@ def _adapter_repo_name(adapter: RepoAdapter) -> str:
 def load_routes(repo: str, view: KnowledgeView | None = None) -> dict | None:
     """Return a repository's validated `_routes.yaml`, or None when it has none."""
     view = _view(view)
-    return _load_routes(view, _normalize_repo(repo))
+    return _load_routes(view, _normalize_repo(repo, view))
 
 
 _REPO_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -198,10 +198,14 @@ _FINDING_DISPOSITIONS = {
 _EVIDENCE_HEAD_SHA = re.compile(r"[0-9a-f]{7,40}")
 
 
-def _normalize_repo(repo: str) -> str:
+def _normalize_repo(repo: str, view: KnowledgeView | None = None) -> str:
     selected = str(repo or "").strip()
     if not selected:
         raise ValueError("repo is required")
+    from .kb_service.repo_spec import resolve_snapshot_repo
+    binding = resolve_snapshot_repo(_view(view), selected)
+    if binding is not None:
+        return binding.knowledge_slice.removeprefix("repos/")
     alias = _repo_aliases().get(selected.casefold())
     if alias:
         return alias
@@ -221,7 +225,7 @@ def _adapter_changed_file_routes(
     view: KnowledgeView | None = None,
 ) -> tuple[list[dict[str, object]], list[str]]:
     view = _view(view)
-    selected_repo = _normalize_repo(repo)
+    selected_repo = _normalize_repo(repo, view)
     adapter = _adapter_for_repo(selected_repo)
     if adapter is None:
         return [], [str(path).replace("\\", "/") for path in changed_files]
@@ -425,7 +429,7 @@ def _direct_knowledge_routes(
     option: the owners were already computed and then discarded.
     """
     view = _view(view)
-    selected_repo = _normalize_repo(repo)
+    selected_repo = _normalize_repo(repo, view)
     changed_files = changed_files or []
     if not isinstance(changed_files, list) or any(
         not isinstance(path, str) for path in changed_files
@@ -438,6 +442,13 @@ def _direct_knowledge_routes(
     # served this repo's owner knowledge for a repo we do not serve.
     routes_table = _load_routes(view, selected_repo)
     if routes_table is None or not routes_table["owners"]:
+        from .kb_service.repo_spec import resolve_snapshot_repo
+        registered = resolve_snapshot_repo(view, repo)
+        if registered is not None and registered.registry_hash:
+            return {"status": "description_unrouted", "selected_by": "snapshot_registry",
+                    "changed_files_role": "unmatched_visible", "routes": [], "scope_validation": [],
+                    "unmatched_changed_files": list(changed_files),
+                    "unmatched_policy": "This registered repository has no owner route for these paths; feature context remains available."}
         # Adapter presence decides which non-default-repo case this is. Without the
         # gate, a repo we do not serve at all fell into the adapter path, whose
         # helper returns every changed file as "unmatched" when there is no
@@ -631,7 +642,7 @@ def direct_review_plan(
     ]
     mandatory_review_guides = _direct_mandatory_review_guides(view)
     related_started = time.perf_counter()
-    normalized = _normalize_repo(repo)
+    normalized = _normalize_repo(repo, view)
     subdir = f"repos/{normalized}" if _REPO_NAME.fullmatch(normalized) and routing.get("status") != "unsupported_exact_router" else None
     related = KnowledgeDocs(view.root, subdir, verify=view.path).related(
         changed_files, query="\n".join((title, body, diff)))

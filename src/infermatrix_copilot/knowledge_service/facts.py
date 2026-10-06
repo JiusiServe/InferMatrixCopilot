@@ -205,7 +205,7 @@ def recheck(upstream: dict, facts: list[dict], observer: Observer) -> list[str]:
     if upstream.get("repository") != observer.repository:
         return [f"facts are about {upstream.get('repository')}, not {observer.repository}"]
     sha = str(upstream.get("sha") or "")
-    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+    if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", sha):
         return ["the verdict names no pinned upstream SHA"]
     for fact in facts:
         try:
