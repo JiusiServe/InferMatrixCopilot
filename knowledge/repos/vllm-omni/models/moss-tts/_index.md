@@ -54,6 +54,7 @@ sources: ["PR #5635", "PR #6664", "PR #6543", "PR #4982", vllm_omni/model_execut
 
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
+| registered voice generation、cold resolver 与 prefix salt | [registered reference](rules-registered-reference.md) | 服务端绑定与音频一致性 |
 | delay 生命周期、伪文本 logits、双代 tokenizer | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
 | codec v1/v2 选择、projection/checkpoint topology | [rules](rules.md#direct-代码快速入口) | loader 门禁与测试缺口 |
 | online request `seed`、Nano/Local/Delay/Realtime 的可复现性或并发 | 同页 `MOSSTTS-3a` | adapter precedence 与各变体 RNG 边界 |

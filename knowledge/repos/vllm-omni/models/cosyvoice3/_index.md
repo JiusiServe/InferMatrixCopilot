@@ -50,6 +50,9 @@ sources: ["PR #5673", "PR #5869", "PR #6424", "PR #6955", vllm_omni/data_entry_k
 
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
+| live conditioning、full payload 与 token-only streaming | [rules-conditioning-handoff](rules-conditioning-handoff.md) | 可执行约束与验收 |
+| 有界 HiFT graph、precision signature 与 capability profile | [rules-streaming-graphs](rules-streaming-graphs.md) | 可执行约束与验收 |
+| packed Flow/HiFT、ragged frames、reference cache、RAS/standard | [rules-packed-inference](rules-packed-inference.md) | 可执行约束与验收 |
 | RAS 停止机制、双交接注册、TRT 门 | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
 | CosyVoice3 TensorRT CFM 的 stream handoff、allocator lifetime、context pool、plan 并发发布、tmp 所有权或 cleanup failure | [rules](rules.md) | `COSYVOICE3-1a/1b` 的顺序、发布边界与验收   新增核对：COSYVOICE3-2a、COSYVOICE3-1c。 |
 

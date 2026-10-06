@@ -34,6 +34,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 
 | 遇到什么 | 查看哪里 |
 |---|---|
+| API speech_cache budgets、继承与 process-local singleton | [speech cache](rules-speech-cache.md) |
 | 理解配置从 deploy、CLI、默认 factory 到 structured/legacy config 的稳定边界 | [配置构造架构](architecture.md) |
 | 根据 PR 描述直达 strict schema、pipeline sampling constraints、deploy/topology、composable strategy、global engine args 的 owner 校验、CLI-only 负向 alias 或显存配置的规则组与第一批源码、环境变量 inventory | [配置开发门禁与代码地图](rules.md)   新增核对：CONF-3e。 |
 
