@@ -172,7 +172,8 @@ def _filtered(text, page, retired):
     return text
 
 
-def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
+def assemble(root: Path, state: Path, source: Path, *, retirement_reports=(),
+             foundation_mode="strict", foundation_record_path: Path | None = None):
     """Return metadata and validated writes without modifying any input."""
     root, state, source = root.resolve(), state.resolve(), source.resolve()
     metadata_raw = (state / "campaign.json").read_bytes()
@@ -181,6 +182,25 @@ def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
     if not isinstance(repo, str) or not re.fullmatch(r"[a-zA-Z0-9_-]+", repo) \
             or not all(isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{40}", sha) for sha in (baseline, pin)):
         raise ValueError("campaign needs a safe repo and immutable source/knowledge SHAs")
+    if foundation_mode not in ("strict", "partial") or (
+            foundation_mode == "partial") != bool(foundation_record_path):
+        raise ValueError("partial assembly requires its foundation record; strict assembly cannot use one")
+    if campaign.get("foundation_mode", "strict") != foundation_mode:
+        raise ValueError("assembly foundation mode differs from campaign")
+    foundation = None
+    if foundation_mode == "partial":
+        from infermatrix_copilot.kb_service.foundation_publication import foundation_handoff
+        from infermatrix_copilot.kb_service.init_support import InitError
+        from infermatrix_copilot.kb_service.sources import KnowledgeRepo
+        try:
+            foundation = foundation_handoff(foundation_record_path, knowledge=KnowledgeRepo(root),
+                                            baseline=baseline, repo=repo, pin=pin)
+        except InitError as exc:
+            raise ValueError(str(exc)) from exc
+        if campaign.get("foundation") != foundation:
+            raise ValueError("assembly foundation record differs from campaign")
+    elif campaign.get("foundation") is not None:
+        raise ValueError("strict assembly cannot reuse partial foundation metadata")
     if _git(root, "rev-parse", baseline + "^{commit}").decode().strip() != baseline \
             or _git(source, "rev-parse", "HEAD").decode().strip() != pin \
             or _git(source, "status", "--porcelain", "--untracked-files=no").strip():
@@ -236,6 +256,12 @@ def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
                (("stage", "knowledge-deepen"), ("repo", repo), ("pin", pin), ("kb_base_sha", baseline))):
             raise ValueError("worker checkpoint identity differs from campaign: " + worker)
         depth = record.get("depth", {})
+        if foundation is not None and (depth.get("foundation_mode") != "partial"
+                                        or depth.get("foundation") != foundation):
+            raise ValueError("worker foundation identity differs from campaign: " + worker)
+        if foundation is None and (depth.get("foundation_mode", "strict") != "strict"
+                                   or depth.get("foundation") is not None):
+            raise ValueError("strict campaign cannot reuse partial worker state: " + worker)
         entries, accepted = depth.get("features", {}), depth.get("accepted", {})
         if not isinstance(entries, dict) or not isinstance(accepted, dict) or set(entries) - set(features):
             raise ValueError("worker checkpoint has invalid feature state: " + worker)
@@ -267,6 +293,8 @@ def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
                 eligible_features.add(feature.id)
             old = baseline_pages.get(page)
             related = f"[功能概览]({PurePosixPath(feature.page).name}) · [owner 入口](_index.md)"
+            if foundation_mode == "partial" and _baseline(root, baseline, "knowledge/" + feature.page) is None:
+                related = "[owner 入口](_index.md)"
             expected_body = _outside_blocks(old) if old is not None else ["# " + _one_line(feature.title) + "：实现深读", related]
             if _outside_blocks(candidate) != expected_body:
                 raise ValueError("accepted page alters prose outside approved blocks: " + feature.id)
@@ -342,6 +370,8 @@ def assemble(root: Path, state: Path, source: Path, *, retirement_reports=()):
               "eligible_feature_count": len(eligible_features),
               "pages": changes, "index_links": new_links, "planned_files": sorted(writes),
               "receipts": receipts, "native_archive_audit_required": True, "problems": []}
+    if foundation is not None:
+        report.update(foundation_mode="partial", foundation=foundation)
     return report, writes
 
 
@@ -351,6 +381,8 @@ def main():
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--source-tree", type=Path, required=True)
     parser.add_argument("--retirement-report", type=Path, action="append", default=[])
+    parser.add_argument("--foundation-mode", choices=("strict", "partial"), default="strict")
+    parser.add_argument("--foundation-record", type=Path)
     parser.add_argument("--report", type=Path)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
@@ -364,7 +396,8 @@ def main():
                              for n in range(campaign["workers"]))]:
                     handle = stack.enter_context(lock.open("r"))
                     fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            report, writes = assemble(args.root, args.state, args.source_tree, retirement_reports=args.retirement_report)
+            report, writes = assemble(args.root, args.state, args.source_tree, retirement_reports=args.retirement_report,
+                                     foundation_mode=args.foundation_mode, foundation_record_path=args.foundation_record)
             report["applied"] = args.apply
             if args.apply:
                 for page, text in writes.items():

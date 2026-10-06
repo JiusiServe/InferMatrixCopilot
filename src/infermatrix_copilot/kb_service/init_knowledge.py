@@ -72,6 +72,8 @@ def validate_sections(data: dict) -> None:
 @dataclass
 class _Knowledge(_Stage):
     STAGE = "knowledge"
+    foundation_mode: str = "strict"
+    foundation_record_path: Path | None = None
 
     def _chain(self) -> _Chain:
         if not self.from_existing:
@@ -108,6 +110,8 @@ class _Knowledge(_Stage):
             except (ValueError, TypeError) as exc:
                 return [f"knowledge coverage policy: {exc}"]
             self.coverage_policy = policy
+            if self.foundation_mode == "partial" and policy.semantic_depth_per_facet_gt is None:
+                return ["partial foundation requires a final semantic-depth acceptance policy"]
             for feature in policy.features:
                 existing = self.base.get(feature.page)
                 if existing:
@@ -136,6 +140,8 @@ class _Knowledge(_Stage):
             return True  # Preserve immutable historical publication records.
         if self.rt.unlimited_subscription and previous.status != "published":
             self._validate_unpublished_checkpoint(previous, previous.inputs_digest)
+        if self.STAGE == "knowledge" and self.foundation_mode == "partial":
+            return False  # Reconstruct a truthful publication-only scope from the saved native tasks.
         return not (self.rt.unlimited_subscription and previous.unfinished)
 
     def _resume_input_problems(self, previous: InitRecord, digest: str) -> list[str]:
@@ -143,6 +149,9 @@ class _Knowledge(_Stage):
             # Raise before generic _blocked writes: restoring an archive must
             # leave the same genuine prepared publication resumable.
             self._validate_unpublished_checkpoint(previous, digest)
+        if self.STAGE == "knowledge":
+            from .foundation_publication import verify_prepared_receipt
+            verify_prepared_receipt(self, previous)
         return super()._resume_input_problems(previous, digest)
 
     def _validate_unpublished_checkpoint(self, previous: InitRecord, digest: str) -> None:
@@ -150,6 +159,10 @@ class _Knowledge(_Stage):
         validate_checkpoint(self, previous, digest)
 
     def _restore_progress(self, previous: InitRecord | None) -> list[str]:
+        if self.STAGE == "knowledge" and self.foundation_mode == "partial" and previous is not None:
+            self._validate_unpublished_checkpoint(previous, self.record.inputs_digest)
+            from .foundation_publication import validate_initial_scope
+            validate_initial_scope(self, previous)
         if (self.rt.unlimited_subscription and previous is not None
                 and previous.coverage.get("foundation_jobs")
                 and previous.inputs_digest != self.record.inputs_digest):
@@ -164,6 +177,10 @@ class _Knowledge(_Stage):
 
     def _publish(self, changed: dict[str, str]) -> InitRecord:
         targets = self.record.coverage.get("knowledge", {}).get("targets", {})
+        if self.STAGE == "knowledge" and self.foundation_mode == "partial":
+            from .foundation_publication import freeze_receipt
+            freeze_receipt(self, changed)
+            return super()._publish(changed)
         if (self.rt.unlimited_subscription and not self.dry_run
                 and targets.get("required") is True and targets.get("met") is not True):
             return self._blocked(["foundation targets incomplete; native progress retained; "
@@ -178,6 +195,12 @@ class _Knowledge(_Stage):
         from .feature_discovery_index import build_for_stage
 
         self.source_index = build_for_stage(tree, self)
+        publication_only = self.foundation_mode == "partial"
+        if publication_only and not getattr(self, "coverage_policy", None):
+            return self._blocked(["partial foundation publication requires an explicit coverage policy"])
+        visited_owners, visited_features = [], []
+        if publication_only and not self.record.coverage.get("foundation_jobs", {}).get("tasks"):
+            return self._blocked(["partial foundation publication requires a genuine saved native batch"])
         files: dict[str, list[str]] = {}
         unrouted = []
         policy = getattr(self, "coverage_policy", None)
@@ -211,6 +234,7 @@ class _Knowledge(_Stage):
         claims, evidence = {}, []
         owner_jobs = []
         for position, name in enumerate(order):
+            visited_owners.append(name)
             owner = owners[name]
             page = self._page_for(owner)
             existing = self.head.get(page, "")
@@ -232,6 +256,8 @@ class _Knowledge(_Stage):
                             "source_files": len(files[name]), "shown_files": 0}
             if not requested:
                 continue
+            if publication_only:
+                continue  # No fourth extraction or review: existing task proofs were replayed by restore_jobs.
             tests = related_test_sources(self, files[name]) if self.rt.unlimited_subscription else []
             test_bytes = sum(len(item["text"].encode()) for item in tests)
             source = self._sources(tree, sorted(files[name], key=lambda p: (-churn[p], p)), MAX_SOURCE_BYTES - test_bytes)
@@ -317,6 +343,9 @@ class _Knowledge(_Stage):
             targets = audit_coverage(self.head, tree, policy, full_name=self.lifecycle.full_name, pin=self.record.pin)
             feature_jobs = []
             for feature in policy.features:
+                visited_features.append(feature.id)
+                if publication_only:
+                    continue
                 if targets["features"]["items"][feature.id]["covered"]:
                     continue
                 paths = [p.relative_to(tree).as_posix() for p in tree.rglob("*")
@@ -378,6 +407,16 @@ class _Knowledge(_Stage):
             for feature in policy.features:
                 if feature.page in self.head:
                     self.head[feature.page] = feature_metadata(self.head[feature.page], feature)
+        if publication_only:
+            self.record.coverage["foundation_scope"] = {
+                "version": 1, "kind": "publication-only reconstruction",
+                "complete": visited_owners == order and visited_features == [f.id for f in policy.features],
+                "owners": visited_owners, "features": visited_features,
+                "index_sha256": self.source_index.sha256,
+                "index_identity": self.source_index.identity,
+                "index_failures": self.source_index.failures,
+                "terminal_tasks": sorted(self.record.coverage["foundation_jobs"]["tasks"]),
+                "native_dispatches": 0}
         return self._conclude(claims, evidence)
 
     def _page_for(self, owner: Owner) -> str:

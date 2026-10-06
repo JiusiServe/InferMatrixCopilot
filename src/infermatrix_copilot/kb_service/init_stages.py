@@ -149,7 +149,8 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
               from_existing: bool = False, subscription_generator: bool = False,
               retry_unfinished: bool = False, unlimited_subscription: bool = False,
               feature_ids: tuple[str, ...] = (), acceptance_mode: str = "strict",
-              depth_index_path: Path | None = None, stop_file: Path | None = None) -> InitRecord:
+              depth_index_path: Path | None = None, stop_file: Path | None = None,
+              foundation_mode: str = "strict", foundation_record_path: Path | None = None) -> InitRecord:
     """Run one ``kb init`` stage for ``lifecycle``'s repository and return its
     record (also saved under ``<state_dir>/init/<repo>/<stage>.json``)."""
     if stage not in STAGES + INDEPENDENT_STAGES:
@@ -162,6 +163,13 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
     if acceptance_mode not in ("strict", "lightweight") or (
         stage != "knowledge-deepen" and (acceptance_mode != "strict" or depth_index_path or stop_file)):
         raise InitError("acceptance_mode must be strict or lightweight and depth options require knowledge-deepen")
+    if foundation_mode not in ("strict", "partial") or (
+            foundation_mode == "strict" and foundation_record_path is not None):
+        raise InitError("foundation_mode must be strict or partial; a foundation record requires partial mode")
+    if foundation_mode == "partial" and (
+            stage not in ("knowledge", "knowledge-deepen") or not unlimited_subscription
+            or bool(foundation_record_path) != (stage == "knowledge-deepen")):
+        raise InitError("partial foundation requires unlimited knowledge, or knowledge-deepen with its published foundation record")
     if feature_ids and (stage != "knowledge-deepen" or not isinstance(feature_ids, tuple)
                         or any(not isinstance(f, str) or not f for f in feature_ids)):
         raise InitError("feature_ids must be a depth-only tuple of policy feature identifiers")
@@ -242,6 +250,10 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
                "stop_file": stop_file} if stage == "knowledge-deepen" else {}
     if stage == "feature-discovery":
         options = {"retry_unfinished": retry_unfinished}
+    if foundation_mode == "partial":
+        options["foundation_mode"] = foundation_mode
+        if stage == "knowledge-deepen":
+            options["foundation_record_path"] = foundation_record_path
     return stage_class(rt, lifecycle, dry_run=dry_run, pin=pin, notes=notes, author=author,
                        from_existing=from_existing, **options).run()
 

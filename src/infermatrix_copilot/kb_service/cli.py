@@ -140,6 +140,18 @@ def _init_command(args, state_dir: Path) -> int:
     from .runner import run_playbook
 
     params = {"stage": args.stage, "dry_run": "true" if args.dry_run else "false", "pin": args.pin or ""}
+    foundation_mode = getattr(args, "foundation_mode", "strict")
+    foundation_record = getattr(args, "foundation_record", None)
+    if foundation_mode != "strict" or foundation_record is not None:
+        if foundation_mode != "partial" or args.stage not in ("knowledge", "knowledge-deepen") or not args.unlimited_subscription:
+            print("--foundation-mode partial requires unlimited knowledge or knowledge-deepen", file=sys.stderr)
+            return 2
+        if bool(foundation_record) != (args.stage == "knowledge-deepen"):
+            print("--foundation-record is required only for partial knowledge-deepen", file=sys.stderr)
+            return 2
+        params["foundation_mode"] = foundation_mode
+        if foundation_record is not None:
+            params["foundation_record"] = str(foundation_record)
     if getattr(args, "acceptance_mode", "strict") != "strict":
         if args.stage != "knowledge-deepen":
             print("--acceptance-mode is for knowledge-deepen only", file=sys.stderr)
@@ -235,6 +247,10 @@ def main(argv: list[str] | None = None) -> int:
     init.add_argument("--retry-unfinished", action="store_true", help="retry unfinished discovery/depth work, preserving prior spend")
     init.add_argument("--acceptance-mode", choices=("strict", "lightweight"), default="strict",
                       help="depth recognition standard; lightweight uses pinned citations and one independent feature review")
+    init.add_argument("--foundation-mode", choices=("strict", "partial"), default="strict",
+                      help="explicitly publish retained partial foundation or bind depth to that publication; targets stay unchanged")
+    init.add_argument("--foundation-record", type=Path,
+                      help="original published partial foundation record, required for partial knowledge-deepen")
     for name, stage in (("widen", "knowledge"), ("deepen", "knowledge-deepen")):
         cmd = sub.add_parser(name, help="feature breadth" if name == "widen" else "feature implementation depth")
         cmd.add_argument("repo")
@@ -242,6 +258,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd.add_argument("--pin")
         cmd.add_argument("--subscription-generator", action="store_true")
         cmd.add_argument("--unlimited-subscription", action="store_true")
+        cmd.add_argument("--foundation-mode", choices=("strict", "partial"), default="strict")
+        cmd.add_argument("--foundation-record", type=Path)
         if name == "deepen":
             cmd.add_argument("--budget-usd", type=float)
             cmd.add_argument("--retry-unfinished", action="store_true")
