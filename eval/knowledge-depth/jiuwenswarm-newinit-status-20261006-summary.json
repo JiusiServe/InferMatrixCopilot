@@ -1,0 +1,1494 @@
+{
+  "acceptance": {
+    "all13_terminal_checkpoint_status": {
+      "approval_binding_problems": 0,
+      "final_knowledge_publication": "blocked",
+      "init_complete": false,
+      "model_calls_in_readonly_entry": 0,
+      "native_binding_problems": 0,
+      "observed_scopes_complete": 13,
+      "observed_stages_partial": 13,
+      "official_checkpoint_bindings": 13,
+      "preservation_problems": 0,
+      "source_problems": 0,
+      "status": "execution_complete_stages_partial",
+      "validator_problems": 0
+    },
+    "depth_publication_allowed": false,
+    "init_complete": false,
+    "native_approval_binding": {
+      "count": 1047,
+      "independent_exact_block_and_native_row_confirmation": true,
+      "problems": 0,
+      "status": "pass"
+    },
+    "original552_preservation": {
+      "exact_whole_blocks_and_native_rows_unchanged": 552,
+      "historical_count": 552,
+      "independent_receipt_sha256": "6d959de1335e8e7a5425e68f38dca4150e6fe4cb433f158f0270a727a5079266",
+      "original552_checked": 552,
+      "problems": [],
+      "status": "pass"
+    },
+    "pinned_source_depth_audit": {
+      "approval_bindings_checked": true,
+      "event_derived_status": 1,
+      "event_note": "The wrapper derives this1 from pure audit_depth/audit_coverage API results. It is not a native source-audit CLI process exit. Evidence integrity and semantic coverage targets are separate.",
+      "integrity_pass": true,
+      "problems": 0,
+      "status": "gate_failed",
+      "targets_met": false
+    },
+    "reason": "dependencies/failure_modes/tradeoffs/validation below156; one feature has no recognized depth; current attempts exhausted",
+    "retrieval": {
+      "depth_required_all173": {
+        "actual_cli_returncode": 1,
+        "cases": 519,
+        "interpretation": "All173 remain in the denominator. Probe facet injection counts sum to1211 slots per query family and include164 unknown slots in not_injected. These are actual offline returned-context counts, not a model PR review accuracy or speed measurement.",
+        "problems": [
+          "dev-ws-traffic-logger: no intact depth available"
+        ],
+        "status": "failed",
+        "summary": {
+          "available_facet_status": {
+            "supported": 1047,
+            "unknown": 164,
+            "verified_absent": 0
+          },
+          "features_with_intact_depth": 172,
+          "probes": {
+            "description_and_paths": {
+              "cases": 173,
+              "depth_hits": 172,
+              "feature_hits": 173,
+              "max_content_chars": 5991,
+              "max_documents": 2,
+              "target_feature_injection": {
+                "full": 588,
+                "not_injected": 623,
+                "partial": 0
+              }
+            },
+            "paths_only": {
+              "cases": 173,
+              "depth_hits": 167,
+              "feature_hits": 168,
+              "max_content_chars": 5991,
+              "max_documents": 2,
+              "target_feature_injection": {
+                "full": 570,
+                "not_injected": 641,
+                "partial": 0
+              }
+            },
+            "query_only": {
+              "cases": 173,
+              "depth_hits": 172,
+              "feature_hits": 173,
+              "max_content_chars": 5873,
+              "max_documents": 2,
+              "target_feature_injection": {
+                "full": 613,
+                "not_injected": 598,
+                "partial": 0
+              }
+            }
+          },
+          "total_facets": 1211,
+          "total_features": 173
+        }
+      },
+      "generic_catalog_probes": {
+        "cases": 346,
+        "description_and_paths": {
+          "cases": 173,
+          "depth_hits": 172,
+          "expected_depth": 172,
+          "feature_hits": 173,
+          "max_content_chars": 5991,
+          "median_elapsed_ms": 2655
+        },
+        "interpretation": "Catalog probes test context delivery, not real PR bug recall or review quality. Paths-only probes are diagnostic when multiple features share entry points. Intact depth prose does not revalidate upstream source or the PR head.",
+        "paths_only_diagnostic": {
+          "cases": 173,
+          "depth_hits": 167,
+          "expected_depth": 172,
+          "feature_hits": 168,
+          "max_content_chars": 5991,
+          "median_elapsed_ms": 2655
+        },
+        "paths_only_misses_not_omitted_from_feature_catalog": true,
+        "problems": 0,
+        "status": "pass"
+      },
+      "max_characters": 6000,
+      "max_pages": 2,
+      "offline_probe_latency_ms": {
+        "interpretation": "Actual catalog retrieval probe time, not native model/PR review latency; no speed gain comparison.",
+        "median": 2655
+      },
+      "status": "generic_pass_all173_depth_requirement_failed"
+    },
+    "source_helper_ci": {
+      "exact_head": "a8309ea466e6962f3fa53088694693b7fea1d017",
+      "merged_sha": "29f2844235345d03e2920f14cd213d2ef59575a6",
+      "status": "pass",
+      "url": "https://github.com/JiusiServe/InferMatrixCopilot/actions/runs/37399780976"
+    },
+    "validators": {
+      "api": "run_knowledge_validators",
+      "interpretation": "Knowledge format, path and reference validation; this does not establish semantic coverage completion or upstream runtime tests passing.",
+      "passed": true,
+      "problems": [],
+      "status": "pass"
+    }
+  },
+  "created_at": "2026-10-06T02:20:15.996184+00:00",
+  "evidence": {
+    "complete_trace_archive": {
+      "bytes": 2486,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/audit/depth-natural-terminal-complete-trace-archive-binding-20261006.json",
+      "sha256": "983595acae56db2becdda001c44603934529c700943fbab5323d4a5ad17a29ef"
+    },
+    "depth_retrieval": {
+      "bytes": 2882562,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/terminal-depth-unpublished-preview-20261006/depth-retrieval.json",
+      "sha256": "87242af79987406b4e9f19a5b7101f0131eba6252c209c44b4effc0e4931500b"
+    },
+    "final_checkpoint_status": {
+      "bytes": 17891,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/terminal-depth-unpublished-preview-20261006/checkpoint-status.json",
+      "sha256": "14d988bd48aaf6bec0fb3cb9b2c67bc7321369ce26f015a88c4f706f60f90f21"
+    },
+    "generic_retrieval": {
+      "bytes": 572922,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/terminal-depth-unpublished-preview-20261006/retrieval.json",
+      "sha256": "18b7f95738116600dbe3a320fe53a927d62662a96a69f5aed60b1283e80c9f62"
+    },
+    "independent1047_and_original552_binding": {
+      "bytes": 1699,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/audit/terminal-depth-all1047-independent-bindings-20261006.json",
+      "sha256": "6d959de1335e8e7a5425e68f38dca4150e6fe4cb433f158f0270a727a5079266"
+    },
+    "independent_final_preview_results": {
+      "bytes": 23946,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/audit/terminal-depth-preview-results-independent-review-20261006.json",
+      "sha256": "31f6f98ddf11ddbdcc9cd032fa34c6f367ff83895b07410e3d04b9863cdcbcbc"
+    },
+    "logger_provenance": {
+      "bytes": 38482,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/audit/depth-dev-ws-traffic-logger-native-provenance-20261006.json",
+      "sha256": "4c90120c76a9a0f253556a3f6ffbd162471f456b8c7a40279d160b7a122eaa7f"
+    },
+    "native_approvals": {
+      "bytes": 1113747,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/terminal-depth-unpublished-preview-20261006/native-approvals.json",
+      "sha256": "12b195891545a1fff4aaf84333bc0f1ea061f81d5ee208361a3525f342282d17"
+    },
+    "native_stream_structure": {
+      "bytes": 3313,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/audit/depth-native-terminal-stream-structure-20261006.json",
+      "sha256": "7d8d1c6c57a961df4b92b013f52ad74c9b85732d33ee20e7aa5cdc7917213e36"
+    },
+    "official_audit_events": {
+      "bytes": 9692,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/terminal-depth-unpublished-preview-20261006/audit-exits.json",
+      "sha256": "9a0b1aadb0c3111befac9d8f534446d389aed8671fc9df070ae45bf75ce3a107"
+    },
+    "original552_preservation": {
+      "bytes": 98,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/terminal-depth-unpublished-preview-20261006/preservation.json",
+      "sha256": "fe03f99b4f282c1d9f5030f7b6f54f8e4862264135aeba99a1bf0bb6f87bb3c1"
+    },
+    "original_and_previous_sizes": {
+      "bytes": 5957,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/baseline-size-measurements.json",
+      "sha256": "4a96d1fd92187158915eb7b997bf2414a66feb91ad55fa382b71146dfe0f39ff"
+    },
+    "published_foundation": {
+      "bytes": 7165,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/audit/foundation-partial-fd0-published-summary-20261006.json",
+      "sha256": "eb210aba4b4282f82c52c13aa048ae4ea9043513b83c086b12e4056d6e71d1b7"
+    },
+    "published_size": {
+      "bytes": 610,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/audit/jiuwenswarm-actual-merged-knowledge-size-20261006.json",
+      "sha256": "9bc6c33beae1667f186f762a61822a248055d86b09f49bdb56fe8a72668453db"
+    },
+    "source_audit": {
+      "bytes": 503208,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/terminal-depth-unpublished-preview-20261006/source-depth.json",
+      "sha256": "3bb54dbb1b9d915a8f28c8e363282810a06258a4fb88ac56dbdc9a4ab2e7af2c"
+    },
+    "source_freshness": {
+      "bytes": 396,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/audit/source-delivery-observation-20261006.json",
+      "sha256": "7b3b4ba5442381bcc04f4524cb3f5cc38dc926ef40b4676ba136aca4faac3d0e"
+    },
+    "source_freshness_historical": {
+      "bytes": 340,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/audit/source-current-terminal-unpublished-20261006.json",
+      "sha256": "963458da489aab3ca10ca304b9e929b1705830c36501e98e753e42952b764abf"
+    },
+    "source_helper_full_ci": {
+      "bytes": 2743,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/audit/depth-adjacent-docs-pr321-final-ci-a8309ea4-20261006.json",
+      "sha256": "92b71c9efbec59d51af1d3aeb51f0b6e8db9f339d3bff2e08d13feee11180543"
+    },
+    "terminal": {
+      "bytes": 25871,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/audit/depth-resume-natural-terminal-20261006.json",
+      "sha256": "f360bf31e124a34af1d2b1a3c510e4d1f2703f01a8fe20976e0d285ca9e78e23"
+    },
+    "validators": {
+      "bytes": 68,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/terminal-depth-unpublished-preview-20261006/validators.json",
+      "sha256": "1905c2faf2e06592a1e33e1436620962434994e3cdfe1c15a4115193a7bc44cc"
+    }
+  },
+  "finalized_at": "2026-10-06T02:50:23.188442+00:00",
+  "limitations": [
+    "Published KB depth remains552/1211;1047/1211 is an unpublished audited preview.",
+    "Historical552/553 and new173x7 denominator must not be mixed.",
+    "File count and byte size are not knowledge accuracy; structural coverage is not behavior or test coverage.",
+    "No new PR review experiment was run; no PR review accuracy or latency improvement is claimed.",
+    "Freshness describes one fixed pin and one actual develop query, not continuous synchronization.",
+    "All original author-document prose was not re-audited for implementation conflicts in this status report; document dates and historical health ledgers do not prove current behavior validity."
+  ],
+  "native_generation_and_judging": {
+    "attempts_total": 707,
+    "extraction_and_review_independent": true,
+    "fees": "unknown",
+    "generator": "zcode:GLM-5.3",
+    "initial_attempts": 266,
+    "initial_pacing_s": 5,
+    "judge": "codex:gpt-6.1-sol:medium",
+    "max_logical_attempts_per_facet": 4,
+    "native_reasoning_level": "low",
+    "new_pr_accuracy_or_speed_claims": false,
+    "new_pr_review_ab_experiment": false,
+    "observed_over_limit": [],
+    "observed_rate_limit_events": 0,
+    "observed_served_codex": "unreported",
+    "observed_served_glm": "GLM-5.3",
+    "resumed_attempts": 441,
+    "resumed_complete_generator": 234,
+    "resumed_complete_judge": 205,
+    "resumed_generator_parser_failures": 2,
+    "shared_concurrency_limit": 13
+  },
+  "next_round_constraints": {
+    "additional_calls_by_this_report": 0,
+    "existing_counters_reset": false,
+    "explicitly_reviewed_retry_authorization_required": true,
+    "old_native_verdicts_rewritten": false,
+    "thresholds_weakened": false,
+    "valid_new_evidence_required": true
+  },
+  "original_maintainer_docs": {
+    "independent_depth_recognition": "not_measured_on_this_report; author documents are not our native approval records",
+    "production_file_explicit_reference_coverage": {
+      "covered": null,
+      "denominator": 2199,
+      "interpretation": "Code document counts and frontmatter path frequencies are document distribution, not production file coverage; no new full prose mapping audit was run.",
+      "ratio": null,
+      "status": "unknown_not_remapped_in_this_report"
+    },
+    "scope": ".doc_project_maintainer/",
+    "size": {
+      "all_files_under_1024_bytes": 142,
+      "bytes": 8598881,
+      "categories": {
+        "<root>": {
+          "bytes": 27458,
+          "files": 3,
+          "markdown_bytes": 7416,
+          "markdown_files": 2
+        },
+        "audit-queues": {
+          "bytes": 976565,
+          "files": 1,
+          "markdown_bytes": 0,
+          "markdown_files": 0
+        },
+        "audit-signatures": {
+          "bytes": 60875,
+          "files": 128,
+          "markdown_bytes": 0,
+          "markdown_files": 0
+        },
+        "changes": {
+          "bytes": 32489,
+          "files": 14,
+          "markdown_bytes": 32489,
+          "markdown_files": 14
+        },
+        "code": {
+          "bytes": 748868,
+          "files": 265,
+          "markdown_bytes": 748868,
+          "markdown_files": 265
+        },
+        "decisions": {
+          "bytes": 4044,
+          "files": 1,
+          "markdown_bytes": 4044,
+          "markdown_files": 1
+        },
+        "directories": {
+          "bytes": 6940,
+          "files": 6,
+          "markdown_bytes": 6940,
+          "markdown_files": 6
+        },
+        "ledger-archive": {
+          "bytes": 6354881,
+          "files": 6,
+          "markdown_bytes": 0,
+          "markdown_files": 0
+        },
+        "modules": {
+          "bytes": 23845,
+          "files": 9,
+          "markdown_bytes": 23845,
+          "markdown_files": 9
+        },
+        "project": {
+          "bytes": 345761,
+          "files": 20,
+          "markdown_bytes": 81608,
+          "markdown_files": 16
+        },
+        "verification": {
+          "bytes": 17155,
+          "files": 8,
+          "markdown_bytes": 0,
+          "markdown_files": 0
+        }
+      },
+      "code_document_path_groups": {
+        "jiuwenswarm/server/agent_ws_server.py": 251,
+        "jiuwenswarm/server/app_agentserver.py": 3,
+        "jiuwenswarm/server/runtime": 11
+      },
+      "code_frontmatter_source_counts": {
+        "jiuwenswarm/server/agent_ws_server.py": 251,
+        "jiuwenswarm/server/app_agentserver.py": 3,
+        "jiuwenswarm/server/runtime/agent_adapter/interface_deep.py": 5,
+        "jiuwenswarm/server/runtime/agent_warm_pool.py": 6
+      },
+      "files": 461,
+      "inventory_sha256": "79de500806fe3fa8f10954061fdfb23deb36ae614a0d674ca26415bd8676e9af",
+      "markdown_bytes": 905210,
+      "markdown_files": 313,
+      "markdown_median_bytes": 2982,
+      "markdown_under_1024_bytes": 12,
+      "suffix_counts": {
+        ".gz": 6,
+        ".json": 133,
+        ".md": 313,
+        ".yaml": 9
+      },
+      "unicode_characters": 2243938,
+      "utf8_bytes": 2244000,
+      "utf8_files": 455
+    },
+    "source_pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b"
+  },
+  "pr_review_context_examples": [
+    {
+      "context": "Development-mode API: new job202 versus reused active job200/reused=true, completed-only download409 otherwise. Useful for checking client/API compatibility, not measured accuracy gain.",
+      "delivery": "published_foundation",
+      "feature": "share-image-export",
+      "page": "knowledge/repos/jiuwenswarm/components/web-frontend/feature-share-image-export.md"
+    },
+    {
+      "context": "Optional dependency warnings do not fail exit status; required failures do. Manual validation entry exists but was not asserted executed.",
+      "delivery": "published_foundation",
+      "feature": "xlsx-doctor-selfcheck",
+      "page": "knowledge/repos/jiuwenswarm/components/config-resources/feature-xlsx-doctor-selfcheck.md"
+    },
+    {
+      "context": "Six approved foundation sections already explain GET entries/count, ENOENT empty200, other read failures500, masked POST append,405 for unsupported methods, limit default300/clamped1–2000 and startup truncation. Seven-facet depth remains0; supplement source context per change. Four depth attempts missed logger implementation excerpts, and scanner rejected runtime path prose; earlier evidence arrays referenced README rather than fabricated implementation citations.",
+      "delivery": "published_foundation_with_unknown_depth",
+      "feature": "dev-ws-traffic-logger",
+      "page": "knowledge/repos/jiuwenswarm/components/web-frontend/feature-dev-ws-traffic-logger.md"
+    }
+  ],
+  "previous_knowledge": {
+    "checkout_sha": "73b245f569d61cfb9e9e3e0e065cf1845291a910",
+    "core_covered": 2043,
+    "core_total": 2199,
+    "depth_denominator": 553,
+    "depth_evidence_production_files": 205,
+    "depth_recognized": 552,
+    "formal_features": 79,
+    "size": {
+      "all_files_under_1024_bytes": 226,
+      "bytes": 4108425,
+      "categories": {
+        "<root>": {
+          "bytes": 40176,
+          "files": 5,
+          "markdown_bytes": 28874,
+          "markdown_files": 4
+        },
+        "components": {
+          "bytes": 4068249,
+          "files": 740,
+          "markdown_bytes": 4068249,
+          "markdown_files": 740
+        }
+      },
+      "content_groups": {
+        "configuration": {
+          "bytes": 11302,
+          "files": 1
+        },
+        "formal_feature_depth": {
+          "bytes": 1038126,
+          "files": 79
+        },
+        "formal_feature_foundation": {
+          "bytes": 578995,
+          "files": 79
+        },
+        "navigation": {
+          "bytes": 143397,
+          "files": 241
+        },
+        "other_pages": {
+          "bytes": 371825,
+          "files": 49
+        },
+        "source_contract_catalog": {
+          "bytes": 1964780,
+          "files": 296
+        }
+      },
+      "depth_marker_count": 552,
+      "files": 745,
+      "formal_feature_count": 79,
+      "formal_feature_owner_count": 21,
+      "immediate_component_directories": [
+        "a2ui",
+        "agent-runtime",
+        "agent-server-runtime",
+        "agents-team",
+        "auto-harness",
+        "browser-client",
+        "common-core",
+        "config-resources",
+        "cron-scheduling",
+        "extensions-plugins",
+        "gateway-channels",
+        "ide-clients",
+        "launch",
+        "login-auth",
+        "observability",
+        "packaging-deploy",
+        "protocols",
+        "sandbox-runtime",
+        "sdk-clients",
+        "subpackages",
+        "symphony-orchestration",
+        "tui-client",
+        "web-frontend"
+      ],
+      "inventory_sha256": "406d17d7e86f82cadcbff788b8c492f2be1c5f92e52cb4adf08674727ab036b0",
+      "markdown_bytes": 4097123,
+      "markdown_files": 744,
+      "markdown_median_bytes": 3611.5,
+      "markdown_under_1024_bytes": 226,
+      "noncatalog_feature_named_pages": [
+        "knowledge/repos/jiuwenswarm/feature-map.md"
+      ],
+      "page_group_counts": {
+        "feature_depth": 79,
+        "feature_foundation": 80,
+        "navigation": 241,
+        "other_pages": 43,
+        "owner_knowledge": 5,
+        "source_contract_catalog": 296
+      },
+      "page_type_bytes": {
+        "architecture": 3304946,
+        "guide": 624080,
+        "index": 143397,
+        "rule": 24700
+      },
+      "page_type_counts": {
+        "architecture": 410,
+        "guide": 89,
+        "index": 241,
+        "rule": 4
+      },
+      "route_owner_count": 21,
+      "route_owner_ids": [
+        "a2ui",
+        "agent-runtime",
+        "agent-server-runtime",
+        "agents-team",
+        "auto-harness",
+        "common-core",
+        "config-resources",
+        "cron-scheduling",
+        "docs",
+        "extensions-plugins",
+        "gateway-channels",
+        "gateway-channels-2",
+        "launch",
+        "login-auth",
+        "observability",
+        "packaging-deploy",
+        "protocols",
+        "subpackages",
+        "symphony-orchestration",
+        "tests-ci",
+        "web-frontend"
+      ],
+      "suffix_counts": {
+        ".md": 744,
+        ".yaml": 1
+      },
+      "unicode_characters": 3414332,
+      "utf8_bytes": 4108425,
+      "utf8_files": 745
+    }
+  },
+  "published_foundation": {
+    "accepted_slots": 927,
+    "all_six_features": 108,
+    "core_covered": 2058,
+    "core_ratio": 0.9358799454297408,
+    "core_target": 0.85,
+    "core_total": 2199,
+    "features": 173,
+    "full_foundation_target_met": false,
+    "init_complete": false,
+    "new_features_with_approved_content": 94,
+    "publication_mode": "explicit_user_approved_partial",
+    "receipt_sha256": "7390aa73f0aa31c5685a148e390d69322d3b18836ec7ddb7ea0221bcd261f66d",
+    "record_sha256": "d721ba25a9ad41441dce7f6dfb3b884937590595b87578d89547f059e54c61dd",
+    "structural_target_met": true,
+    "total_slots": 1038,
+    "unknown_by_facet": {
+      "api": 17,
+      "architecture": 13,
+      "configuration": 11,
+      "features": 21,
+      "tradeoffs": 33,
+      "validation": 16
+    },
+    "unknown_slots": 111
+  },
+  "published_knowledge": {
+    "checkout_sha": "29f2844235345d03e2920f14cd213d2ef59575a6",
+    "depth_denominator": 1211,
+    "depth_ratio": 0.4558216350123865,
+    "depth_recognized": 552,
+    "formal_features": 173,
+    "new_features": 94,
+    "original_features_preserved": 79,
+    "partial_foundation_merge_sha": "5b714d74ec56ba055842110e34f8cfaf355806df",
+    "partial_foundation_pr": "https://github.com/JiusiServe/InferMatrixCopilot/pull/320",
+    "scope": "knowledge/repos/jiuwenswarm/",
+    "size": {
+      "bytes": 5359641,
+      "files": 864,
+      "files_under_1024_bytes": 225,
+      "manifest_sha256": "13c4dd56488678e38a403a631b02467326831afc4c7e9de524b050e58aa31dc8",
+      "markdown_bytes": 5345734,
+      "markdown_files": 863,
+      "markdown_median_bytes": 5821,
+      "utf8_bytes": 5359641,
+      "utf8_files": 864
+    },
+    "unpublished_depth_included": false
+  },
+  "recommendations_not_implemented": [
+    {
+      "basis": [
+        "logger_provenance",
+        "source_audit"
+      ],
+      "priority": 1,
+      "proposal": "Forward actual discovery-approved source spans to downstream extraction, rather than rediscovering from file names."
+    },
+    {
+      "basis": [
+        "published_foundation",
+        "logger_provenance"
+      ],
+      "priority": 2,
+      "proposal": "Reuse already approved foundation body and its actual source ranges instead of only a bounded prefix."
+    },
+    {
+      "basis": [
+        "logger_provenance"
+      ],
+      "priority": 3,
+      "proposal": "Improve generic TypeScript nested-plugin/arrow-function and mid-file entry localization; keep unresolved relations unknown."
+    },
+    {
+      "basis": [
+        "logger_provenance",
+        "source_audit"
+      ],
+      "priority": 4,
+      "proposal": "Distinguish runtime output paths from pinned source citations; remove unsupported extra qualifiers/references before a fresh independent review, without reusing approval hashes for changed prose."
+    }
+  ],
+  "repo": "openJiuwen-ai/jiuwenswarm",
+  "report_kind": "published_foundation_and_blocked_unpublished_depth",
+  "schema_version": 1,
+  "source_freshness": {
+    "affected_features": [],
+    "checked_at": "2026-10-06T02:39:20.731690+00:00",
+    "commit_gap": 0,
+    "continuous_update_claim": false,
+    "develop_sha": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+    "matches_fixed_pin": true,
+    "observation": "actual git ls-remote refs/heads/develop",
+    "pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b"
+  },
+  "source_pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "status": "incomplete_published_foundation_unpublished_depth",
+  "trace_archive": {
+    "actual_native_tool_calls_reported": 0,
+    "bytes": 385771097,
+    "corrupt": [],
+    "files": {
+      "blob": 2146,
+      "native_journal": 707,
+      "native_stream": 707,
+      "record_jsonl": 13,
+      "shared_source_index": 1,
+      "stage_record": 13,
+      "terminal_metadata": 7,
+      "trace_index": 13
+    },
+    "global_cache_dependency": false,
+    "manifest": {
+      "bytes": 1591830,
+      "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/archive/depth-natural-terminal-20261006T020618Z-a8309ea4/manifest.json",
+      "sha256": "4cf14193669d2ce84b33ba41c950ee61da3d1fe0dc708938eb88eda11916afa6"
+    },
+    "missing": [],
+    "note": "Complete persisted prompt/system/reply/stream/tool-event/configuration/usage records; no native tools were invoked in these turns; SQLite copies are derived convenience data.",
+    "path": "/data/zhoutaichang/copilot/.kb-jiuwenswarm-newinit-prep-20261005/archive/depth-natural-terminal-20261006T020618Z-a8309ea4",
+    "source_files_unchanged": true,
+    "verified_worker_local_blob_references": 2146
+  },
+  "unpublished_depth_preview": {
+    "denominator": 1211,
+    "facet_threshold_count": 156,
+    "features": 173,
+    "features_with_all_seven": 88,
+    "features_with_any_recognized": 172,
+    "init_complete": false,
+    "lightweight": 840,
+    "minimum_additional_to_all_facet_thresholds": 58,
+    "missing_by_feature": [
+      {
+        "id": "a2x-registry-client-sdk",
+        "missing_facets": [
+          "dependencies"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "agent-template-layered-validation",
+        "missing_facets": [
+          "failure_modes",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "agentos-sandbox-create-lifecycle",
+        "missing_facets": [
+          "flow",
+          "api"
+        ],
+        "owner": "extensions-plugins"
+      },
+      {
+        "id": "arxiv-visual-extraction",
+        "missing_facets": [
+          "configuration",
+          "failure_modes",
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ascend-chrome-trace-generator",
+        "missing_facets": [
+          "dependencies",
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ascend-trace-auto-instrumentation",
+        "missing_facets": [
+          "flow",
+          "dependencies",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ascend-trace-compile-safety-checker",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ascend-trace-instrumentation-planner",
+        "missing_facets": [
+          "flow",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ascend-trace-preprocessor",
+        "missing_facets": [
+          "failure_modes"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "audit-integrity-hmac-signing",
+        "missing_facets": [
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "audit-report-html-renderer",
+        "missing_facets": [
+          "dependencies",
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "channel-security-review-slash-command",
+        "missing_facets": [
+          "flow"
+        ],
+        "owner": "gateway-channels"
+      },
+      {
+        "id": "chat-session-stats-dashboard",
+        "missing_facets": [
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "web-frontend"
+      },
+      {
+        "id": "code-mode-branch-selector",
+        "missing_facets": [
+          "failure_modes",
+          "validation"
+        ],
+        "owner": "web-frontend"
+      },
+      {
+        "id": "code-mode-commit-push",
+        "missing_facets": [
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "web-frontend"
+      },
+      {
+        "id": "command-execution-tool",
+        "missing_facets": [
+          "tradeoffs"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "context-usage-indicator",
+        "missing_facets": [
+          "dependencies",
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "web-frontend"
+      },
+      {
+        "id": "cross-channel-history-search-skill",
+        "missing_facets": [
+          "api",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "daily-report-skill",
+        "missing_facets": [
+          "tradeoffs"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "dev-ws-traffic-logger",
+        "missing_facets": [
+          "flow",
+          "api",
+          "configuration",
+          "dependencies",
+          "failure_modes",
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "web-frontend"
+      },
+      {
+        "id": "docx-pro-cli",
+        "missing_facets": [
+          "api",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "dynamic-memory-cli",
+        "missing_facets": [
+          "dependencies"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "financial-document-parser",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "frontend-incremental-lint-gate",
+        "missing_facets": [
+          "api",
+          "validation"
+        ],
+        "owner": "web-frontend"
+      },
+      {
+        "id": "gateway-config-hot-reload",
+        "missing_facets": [
+          "api",
+          "validation"
+        ],
+        "owner": "gateway-channels"
+      },
+      {
+        "id": "gateway-health-check",
+        "missing_facets": [
+          "dependencies"
+        ],
+        "owner": "gateway-channels"
+      },
+      {
+        "id": "gateway-server-multi-route-ws",
+        "missing_facets": [
+          "dependencies",
+          "failure_modes"
+        ],
+        "owner": "gateway-channels"
+      },
+      {
+        "id": "github-issue-feedback-script",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "huawei-maas-apikey-creation",
+        "missing_facets": [
+          "dependencies",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "huawei-maas-cdp-authorize",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "huawei-realname-account-check",
+        "missing_facets": [
+          "flow"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ide-file-edit-diff-apply",
+        "missing_facets": [
+          "api",
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "ide-clients"
+      },
+      {
+        "id": "ide-terminal-command-mirror",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "ide-vscode"
+      },
+      {
+        "id": "ide-turn-rewind-snapshot",
+        "missing_facets": [
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "ide-clients"
+      },
+      {
+        "id": "im-attachment-persist-hook-969909e1",
+        "missing_facets": [
+          "flow",
+          "dependencies",
+          "failure_modes"
+        ],
+        "owner": "gateway-channels"
+      },
+      {
+        "id": "im-channel-hot-reconfig",
+        "missing_facets": [
+          "flow",
+          "validation"
+        ],
+        "owner": "gateway-channels"
+      },
+      {
+        "id": "im-feishu",
+        "missing_facets": [
+          "tradeoffs"
+        ],
+        "owner": "gateway-channels"
+      },
+      {
+        "id": "llm-wiki-knowledge-base",
+        "missing_facets": [
+          "tradeoffs"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "local-doc-ocr-offline",
+        "missing_facets": [
+          "dependencies",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "locale-conf-rpc",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "gateway-channels"
+      },
+      {
+        "id": "maas-auto-open-models",
+        "missing_facets": [
+          "dependencies",
+          "tradeoffs"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "opc-add-slide",
+        "missing_facets": [
+          "configuration",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "pdf-reading-tool",
+        "missing_facets": [
+          "flow",
+          "failure_modes"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "plugin-package-initializer",
+        "missing_facets": [
+          "dependencies",
+          "failure_modes",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ppt-deck-finalize",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ppt-evidence-preparation",
+        "missing_facets": [
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ppt-execution-lock-validator",
+        "missing_facets": [
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ppt-figure-panel-layout",
+        "missing_facets": [
+          "configuration",
+          "dependencies",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ppt-opc-thumbnail",
+        "missing_facets": [
+          "flow",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "ppt-system-diagram-renderer",
+        "missing_facets": [
+          "failure_modes",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "pptx-structural-audit",
+        "missing_facets": [
+          "api",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "rsi-dataset-folder-check",
+        "missing_facets": [
+          "configuration"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "rsi-experiment-ui",
+        "missing_facets": [
+          "dependencies",
+          "validation"
+        ],
+        "owner": "web-frontend"
+      },
+      {
+        "id": "runtime-agent-definition-execution",
+        "missing_facets": [
+          "flow"
+        ],
+        "owner": "agent-runtime"
+      },
+      {
+        "id": "sdd-design-rail",
+        "missing_facets": [
+          "flow"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "share-image-export",
+        "missing_facets": [
+          "flow"
+        ],
+        "owner": "web-frontend"
+      },
+      {
+        "id": "skill-generator-cli",
+        "missing_facets": [
+          "configuration",
+          "dependencies",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "skill-page-scrape-blocks",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "sop-structure-extraction",
+        "missing_facets": [
+          "api",
+          "configuration",
+          "failure_modes",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "user-todos-tool",
+        "missing_facets": [
+          "failure_modes",
+          "validation"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "video-agent-managed-task-service",
+        "missing_facets": [
+          "dependencies"
+        ],
+        "owner": "extensions-plugins"
+      },
+      {
+        "id": "video-coarse-scan-frame-extraction",
+        "missing_facets": [
+          "failure_modes"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "web-asset-publish-flow",
+        "missing_facets": [
+          "dependencies"
+        ],
+        "owner": "web-frontend"
+      },
+      {
+        "id": "web-i18n-zh-en",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "web-frontend"
+      },
+      {
+        "id": "web-native-directory-picker",
+        "missing_facets": [
+          "flow",
+          "dependencies",
+          "validation"
+        ],
+        "owner": "web-frontend"
+      },
+      {
+        "id": "web-search-tools",
+        "missing_facets": [
+          "dependencies"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "workspace-git-diff",
+        "missing_facets": [
+          "failure_modes",
+          "validation"
+        ],
+        "owner": "agent-server-runtime"
+      },
+      {
+        "id": "xiaoyi-alarm-crud",
+        "missing_facets": [
+          "failure_modes"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "xiaoyi-calendar-tools",
+        "missing_facets": [
+          "api",
+          "dependencies",
+          "validation"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "xiaoyi-call-phone-tool",
+        "missing_facets": [
+          "failure_modes",
+          "validation"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "xiaoyi-collection-tools",
+        "missing_facets": [
+          "configuration",
+          "dependencies",
+          "validation"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "xiaoyi-contact-search",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "xiaoyi-location-tool",
+        "missing_facets": [
+          "failure_modes",
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "xiaoyi-note-tools",
+        "missing_facets": [
+          "dependencies",
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "xiaoyi-photo-gallery-tools",
+        "missing_facets": [
+          "failure_modes",
+          "validation"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "xiaoyi-pushdata-store-and-viewer",
+        "missing_facets": [
+          "api",
+          "dependencies",
+          "validation"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "xiaoyi-save-to-phone-tools",
+        "missing_facets": [
+          "flow",
+          "api",
+          "validation"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "xiaoyi-timestamp-utc8-tool",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "agents-team"
+      },
+      {
+        "id": "xlsx-add-computed-column",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "xlsx-doctor-selfcheck",
+        "missing_facets": [
+          "configuration",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "xlsx-formula-check",
+        "missing_facets": [
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "xlsx-insert-row",
+        "missing_facets": [
+          "dependencies"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "xlsx-reader-structural-diff",
+        "missing_facets": [
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "config-resources"
+      },
+      {
+        "id": "yuanrong-agent-file-transfer",
+        "missing_facets": [
+          "configuration",
+          "tradeoffs"
+        ],
+        "owner": "extensions-plugins"
+      },
+      {
+        "id": "yuanrong-faas-invocation",
+        "missing_facets": [
+          "flow",
+          "dependencies",
+          "tradeoffs",
+          "validation"
+        ],
+        "owner": "extensions-plugins"
+      }
+    ],
+    "new_recognized_over_previous": 495,
+    "per_facet": {
+      "api": {
+        "eligible_ratio": 0.930635838150289,
+        "eligible_recognized": 161,
+        "label": "API 契约",
+        "lightweight_recognized": 126,
+        "minimum_additional_to_threshold": 0,
+        "ratio": 0.930635838150289,
+        "recognized": 161,
+        "strict_recognized": 35,
+        "supported": 161,
+        "target_met": true,
+        "unknown": 12,
+        "verified_absent": 0
+      },
+      "configuration": {
+        "eligible_ratio": 0.9421965317919075,
+        "eligible_recognized": 163,
+        "label": "配置与默认行为",
+        "lightweight_recognized": 112,
+        "minimum_additional_to_threshold": 0,
+        "ratio": 0.9421965317919075,
+        "recognized": 163,
+        "strict_recognized": 51,
+        "supported": 163,
+        "target_met": true,
+        "unknown": 10,
+        "verified_absent": 0
+      },
+      "dependencies": {
+        "eligible_ratio": 0.8439306358381503,
+        "eligible_recognized": 146,
+        "label": "依赖与关联功能",
+        "lightweight_recognized": 123,
+        "minimum_additional_to_threshold": 10,
+        "ratio": 0.8439306358381503,
+        "recognized": 146,
+        "strict_recognized": 23,
+        "supported": 146,
+        "target_met": false,
+        "unknown": 27,
+        "verified_absent": 0
+      },
+      "failure_modes": {
+        "eligible_ratio": 0.8959537572254336,
+        "eligible_recognized": 155,
+        "label": "失败与降级行为",
+        "lightweight_recognized": 131,
+        "minimum_additional_to_threshold": 1,
+        "ratio": 0.8959537572254336,
+        "recognized": 155,
+        "strict_recognized": 24,
+        "supported": 155,
+        "target_met": false,
+        "unknown": 18,
+        "verified_absent": 0
+      },
+      "flow": {
+        "eligible_ratio": 0.9075144508670521,
+        "eligible_recognized": 157,
+        "label": "执行流程",
+        "lightweight_recognized": 135,
+        "minimum_additional_to_threshold": 0,
+        "ratio": 0.9075144508670521,
+        "recognized": 157,
+        "strict_recognized": 22,
+        "supported": 157,
+        "target_met": true,
+        "unknown": 16,
+        "verified_absent": 0
+      },
+      "tradeoffs": {
+        "eligible_ratio": 0.8728323699421965,
+        "eligible_recognized": 151,
+        "label": "设计取舍",
+        "lightweight_recognized": 127,
+        "minimum_additional_to_threshold": 5,
+        "ratio": 0.8728323699421965,
+        "recognized": 151,
+        "strict_recognized": 24,
+        "supported": 151,
+        "target_met": false,
+        "unknown": 22,
+        "verified_absent": 0
+      },
+      "validation": {
+        "eligible_ratio": 0.6589595375722543,
+        "eligible_recognized": 114,
+        "label": "验证与测试入口",
+        "lightweight_recognized": 86,
+        "minimum_additional_to_threshold": 42,
+        "ratio": 0.6589595375722543,
+        "recognized": 114,
+        "strict_recognized": 28,
+        "supported": 114,
+        "target_met": false,
+        "unknown": 59,
+        "verified_absent": 0
+      }
+    },
+    "per_facet_gt": 0.9,
+    "production_evidence_files": 350,
+    "production_evidence_ratio": 0.15916325602546613,
+    "production_files": 2199,
+    "published": false,
+    "ratio": 0.8645747316267548,
+    "recognized": 1047,
+    "strict": 207,
+    "supported": 1047,
+    "target_met": false,
+    "unknown": 164,
+    "upstream_runtime_tests_executed_by_this_init": "not_established; validation knowledge does not imply tests ran",
+    "validation_kind_counts": {
+      "automated_runtime": 46,
+      "automated_source_text": 1,
+      "documented_manual": 21,
+      "helper_unit": 18,
+      "unclassified": 28
+    },
+    "verified_absent": 0,
+    "zero_depth_features": [
+      "dev-ws-traffic-logger"
+    ],
+    "zero_depth_reason": "Logger source localization omitted relevant middle implementation ranges; runtime path prose was rejected by the source path scanner. Genuine foundation six sections remain published. Depth unknown does not imply no implementation/tests or no usable existing knowledge."
+  }
+}
