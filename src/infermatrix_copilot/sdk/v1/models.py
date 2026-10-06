@@ -320,8 +320,16 @@ class StrictRuntimeConfig(_Serializable):
     max_workers: int = 1
 
     def __post_init__(self) -> None:
-        if not self.repository.alias or self.repository.full_name.count("/") != 1:
-            raise InvalidRequestError("Strict runtime needs a repository alias and full name")
+        if not self.repository.alias:
+            raise InvalidRequestError("Strict runtime needs a repository alias")
+        if self.repository.full_name:
+            if "/" not in self.repository.full_name or any(not part for part in self.repository.full_name.split("/")):
+                raise InvalidRequestError("Strict repository namespace must have non-empty path segments")
+        else:
+            from ...kb_service.repo_spec import resolve_snapshot_repo
+            from ...knowledge_view import KnowledgeView
+            if resolve_snapshot_repo(KnowledgeView.current(), self.repository.alias) is None:
+                raise InvalidRequestError("Strict runtime needs a registered repository or forge full name")
         if not self.checkout_path or not self.allowed_root:
             raise InvalidRequestError("Strict runtime needs a checkout and allowed root")
         if (isinstance(self.max_workers, bool)

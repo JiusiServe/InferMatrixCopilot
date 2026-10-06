@@ -1,6 +1,10 @@
 # knowledge_service/ — provider curation components
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-06 -->
+
+Pinned source identities and depth markers accept full SHA-1 or SHA-256 Git
+commits. Evidence bodies, stored hashes and native approval semantics remain
+unchanged; accepting a wider object identity never renews an old approval.
 
 The provider owns knowledge curation beneath the public SDK v1 facade.
 `KnowledgeCurator` composes four domain components over one explicit work

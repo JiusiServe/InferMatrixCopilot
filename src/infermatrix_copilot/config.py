@@ -201,6 +201,8 @@ class Settings(BaseSettings):
     # repos. knowledge_general_docs is the always-on general slice; every deeper
     # doc is reachable on demand via doc_search/doc_read.
     knowledge_dir: Path = _resource_dir("knowledge")
+    # Host authorization only: model tools cannot enlarge their repository scope.
+    allowed_knowledge_repositories: tuple[str, ...] = ()
     knowledge_general_docs: list[str] = ["general/_index.md"]
     # Drop directory for bugfix-run intake records (KNOWLEDGE_INTAKE_DIR):
     # after a pr_debug run lands a real push, `pr.harvest_debug_knowledge`

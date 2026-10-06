@@ -1,13 +1,13 @@
 # direct_routing.py —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-06 -->
 
 `LOC ~880 · Direct 模式完整策略包与仓库中立的知识路由 · refactor-status: stable`
 
 ## 职责
 Direct 模式的知识路由**机制**。模块中不出现任何被服务仓库的名字：每个仓库的
-owner/model 路由表是知识数据 `knowledge/repos/<repo>/_routes.yaml`，仓库别名
-来自 `adapters/<repo>/manifest.yaml` 的 `repo.full_name`/`repo.aliases`。
+owner/model 路由表是知识数据 `knowledge/repos/<repo>/_routes.yaml`，仓库身份和别名
+优先来自同一固定视图的 `_repositories.yaml`，旧 adapter 别名保持兼容。
 公开面由 `contract.py` 再导出。
 
 ## 公开契约
@@ -39,7 +39,9 @@ Direct policy bundle）、`direct_knowledge_routes`、
   为模块级 `__getattr__` 惰性别名。
 - **路由选择按数据而非仓库名**：仓库有非空 `_routes.yaml` → title/body owner
   路由 + 模型路由 + scope fallback；否则有 adapter → changed-file 路由；否则
-  `unsupported_exact_router`。`_routes.yaml` 引用的页面不存在时 fail-closed。
+  `unsupported_exact_router`。已注册但未生成 owner routes 的仓库返回显式
+  `description_unrouted`，仍可检索自己的说明知识；不得借用其他仓库路由。
+  `_routes.yaml` 引用的页面不存在时 fail-closed。
 - `repo` 必填：空值抛 `ValueError`，不再默认某个仓库；形似路径的仓库名直接
   视为不支持。
 - **changed files 校验选择、绝不静默替换选择**：title/body 选 owner，
@@ -71,7 +73,9 @@ stdlib + PyYAML + `.adapters`（AdapterError / AdapterRegistry / RepoAdapter）+
 ## 扩展点
 新 owner 路由/模型规则 → 改对应仓库的 `_routes.yaml`（schema_version 1：
 `owners[{owner, path, signals, scope_prefixes}]`、可选 `models{dir, page}`）；
-新仓库 → 提供 adapter 与 `_routes.yaml`，不改 `src/`。
+新仓库 → 提供固定视图 registry 与 `_routes.yaml`，不要求打包 adapter、不改 `src/`。
+已有 adapter 仓库继续兼容。自适应 SDK 通过统一会话对本模块选出的规则/导航再计量；
+旧 bundle 的 6,000 字符相关背景预算保持不变。
 
 ## 测试
 `test_knowledge_view_routing.py`（150 个真实 vllm-omni PR 的黄金路由输出、

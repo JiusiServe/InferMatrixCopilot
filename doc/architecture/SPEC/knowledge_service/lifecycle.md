@@ -1,6 +1,8 @@
 # knowledge_service/lifecycle.py —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-06 -->
+
+深度区块的固定源码身份支持完整 SHA-1 或 SHA-256；旧区块正文、哈希及证明语义保持不变。
 
 深度验证入口缺失证书的当前检测器为 `static-test-association-v2`；解析、证书工厂和
 检索形状校验共用 `DEPTH_ABSENCE_DETECTOR`，算法升级不复用旧检测器身份。

@@ -1,6 +1,6 @@
 # knowledge_docs.py —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-06 -->
 
 `LOC ~280 · 供 Direct 与 Agent 共用的只读知识检索 · refactor-status: ok`
 
@@ -33,7 +33,8 @@ stdlib 与 `knowledge_service.lifecycle` 的页面/完整深读正文解析；�
 结构化接口卡不进入背景。确定性优先级为固定来源路径、生产入口、源码 glob，再结合
 功能 ID/标题和正文词命中；相同 feature 去重，完整深读优先于基础功能页。
 最多返回两页、每页 3,000 字符、总计 6,000 字符；优先完整 facet，超长单 facet 仍提供
-截断片段并标 `more_available`。返回来源 pin、命中路径、已有/缺失 facet，不验证 PR head。
+截断片段并标 `partial` 与 `more_available`，不把截断 facet 列入 `included_facets`。
+返回来源 pin、命中路径、已有/缺失 facet，不验证 PR head。
 `available_facets` 表示页内可用维度，`included_facets` 表示本次正文实际注入的维度；
 `not_injected_facets` 是已有但因预算未注入的维度，调用方可用原有有界读取补读。
 `facet_basis` 与 `included_facet_basis` 分别对应已有及已注入维度的认可依据。
@@ -59,3 +60,12 @@ stdlib 与 `knowledge_service.lifecycle` 的页面/完整深读正文解析；�
 
 ## 2026-09-28 退役规则不再提供
 `read`/`search` 经 `visible_text` 去掉退役规则后再返回。
+
+## 自适应调用边界（2026-10-06）
+
+旧默认仍是两页、6,000 字符。`related` 允许显式覆盖 `max_documents`、
+`max_page_chars`、`max_content_chars` 与 `max_changed_files`；自适应服务可取消改变文件
+列表的前缀限制。可选上限是 100 页、每页 65,536 字符、总 262,144 字符，最终实际交付
+仍由 `KnowledgeContextService` 累计预算裁剪。这些是字符限制，不是模型实际 token 用量。
+纯解析缓存按原文内容寻址，所有命中仍先验证固定快照的真实字节；不缓存路径读取以绕过
+完整性检查。此读取器没有累计补读账本；累计预算由显式会话服务负责。

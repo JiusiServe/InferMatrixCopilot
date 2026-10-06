@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-10-02 -->
+<!-- verified-against: 2026-10-06 -->
 
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
@@ -16,6 +16,18 @@
 `thin_mcp_server` 或其私有 helper。
 
 ## 公开契约
+
+- 显式自适应知识协议：`ContextBudget`、`DirectClient.open_knowledge_context` /
+  `plan_adaptive` / `read_knowledge_context` / `search_knowledge_context` /
+  `related_knowledge_context` / `expand_knowledge_context`。仅 `model_content` 是实际注入
+  正文；引用没有 SDK 额外 excerpt。会话默认 24k、最大累计 64k，计量单位和实际用量
+  未知状态明确返回；规则、导航、相关知识和补读同预算。旧 v1 `plan` 默认两页/6k 不变。
+- 自适应会话支持 SHA-1/SHA-256 pin，可从私有运行 SQLite 恢复原冻结 view；签发的
+  review context 绑定完整请求。旧 v1 completion 的 SHA-1 校验不因新增知识协议放宽。
+  `allowed_knowledge_repositories` 是 DirectClient 构造时的主机权限配置，不是工具授权。
+- capabilities 的支持仓库来自固定视图 registry；新仓库不要求打包 adapter。
+  `StrictRuntimeConfig` 在 registry 已识别仓库时允许不填 forge full_name；这只提供
+  知识身份兼容，不承诺旧 Strict PR 获取链路支持所有 forge 或无 forge PR。
 
 - `get_capabilities()` / `DirectClient.capabilities()` 返回 typed
   `Capabilities`：distribution/SDK/Direct/Strict/Quality/Knowledge 版本、resource revision、支持仓库、
@@ -88,10 +100,10 @@
   validator 缺失则写前 fail closed，执行失败/超时则逐 byte rollback 全部目标页。
   同一 work checkout 的 writer 以 process 内 mutex 与位于系统临时目录的
   `flock` 串行化；等待后的 SHA 复核让第二个 stale writer 失败，不会覆盖首个结果。
-- **知识 orchestration 留在宿主**：SDK 不 clone、调用 model、管理 ledger、commit、
+- **知识出版 orchestration 留在宿主**：SDK 不 clone、调用 model、管理出版 ledger、commit、
   push、开 PR 或 schedule。ReviewBot 必须向 `KnowledgeCurator` 传 dedicated work
   checkout，并继续拥有重试、artifact 与本地补丁导出；SDK 也绝不写 packaged
-  knowledge tree。
+  knowledge tree。自适应 DirectClient 仅管理知识上下文的运行账本，不代替知识出版治理。
 - SDK、Quality API 版本常量为 `1.0.0`；Direct 为 `1.1.0`，Strict 为 `1.4.0`
   （1.1 新增 `finding_dispositions`；1.2 新增 `findings`；1.3 新增显式 recheck；
   1.4 新增 `StrictRuntimeConfig.max_workers`），Knowledge 为 `1.1.0`

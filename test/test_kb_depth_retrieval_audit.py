@@ -105,8 +105,31 @@ def test_long_facet_is_partial_injection_and_remains_a_budgeted_followup(auditor
         assert case["facet_injection"]["api"] == "partial"
         document = case["documents"][0]
         assert document["content_chars"] <= 3000
+        assert document["partial"] is True
+        assert document["included_facets"] == []
+        assert document["included_facet_basis"] == {}
+        assert document["available_facets"] == document["not_injected_facets"] == ["api"]
         assert case["followup_read_paths"] == [document["path"]]
     assert report["summary"]["probes"]["query_only"]["target_feature_injection"]["full"] == 0
+
+
+@pytest.mark.parametrize("content", ["", "Unrelated prose."])
+def test_partial_metadata_without_real_section_prose_is_not_depth(auditor, world, monkeypatch, content):
+    root, _ = world(1, long=True)
+    direct = auditor.direct_review_plan
+
+    def missing_partial_content(*args, **kwargs):
+        plan = direct(*args, **kwargs)
+        selected = plan["related_knowledge"]["documents"][0]
+        assert selected["partial"] and selected["included_facets"] == []
+        selected["content"] = content
+        plan["related_knowledge"]["content_chars"] = len(content)
+        return plan
+
+    monkeypatch.setattr(auditor, "direct_review_plan", missing_partial_content)
+    report = auditor.audit_retrieval(root, "retrievaldemo", PIN, require_depth=True)
+    assert report["summary"]["probes"]["query_only"]["depth_hits"] == 0
+    assert any("feature depth absent from actual Direct context" in p for p in report["problems"])
 
 
 def test_verified_test_gap_is_visible_without_claiming_tests_passed(auditor, world):

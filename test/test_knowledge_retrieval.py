@@ -124,8 +124,52 @@ def test_bounds_keep_large_depth_retrievable_and_budget_followup(tmp_path):
     _page(k, third.page, "Third context", third)
     related = KnowledgeDocs(k, "repos/r").related(["pkg/models/catalog.py"])
     assert len(related["documents"]) == 2 and related["content_chars"] <= 6000
-    assert related["documents"][0]["included_facets"] == ["api"]
+    assert related["documents"][0]["included_facets"] == []
+    assert related["documents"][0]["available_facets"] == ["api"]
+    assert related["documents"][0]["partial"]
     assert all(d["more_available"] for d in related["documents"])
+
+
+def test_clipped_facet_never_claims_intact_injection_with_custom_meter(tmp_path):
+    from infermatrix_copilot.knowledge_context import KnowledgeContextService
+    from infermatrix_copilot.knowledge_view import KnowledgeView
+
+    k = tmp_path / "knowledge"
+    _page(k, "repos/r/depth.md", _block(tmp_path, body="Long behavior. " * 6000))
+    binding = {"repo_id": "r", "knowledge_slice": "repos/r", "source_pin": PIN,
+               "catalog_hash": "b" * 64, "policy_hash": "c" * 64}
+    service = KnowledgeContextService(KnowledgeView(k, "fixture"), tmp_path / "meter.db",
+        resolver=lambda view, selector: binding, tokenizer=lambda text: (len(text) + 3) // 4,
+        tokenizer_id="four-character-test-v1")
+    session = service.open_session("r", source_pin=PIN, review_id="large-facet")["session_id"]
+    result = service.related(session, ["pkg/models/catalog.py"])
+    ref = result["documents"][0]
+    assert ref["partial"]
+    assert ref["available_facets"] == ["api"]
+    assert ref["included_facets"] == []
+    assert ref["not_injected_facets"] == ["api"]
+    assert ref["included_facet_acceptance_modes"] == {}
+    service.expand(session, target_tokens=64000, reason="Read more related context")
+    assert service.related(session, ["pkg/models/catalog.py"])["status"] == "no_new_context"
+
+
+def test_budget_clipping_removes_all_intact_facet_metadata(tmp_path):
+    from infermatrix_copilot.knowledge_context import ContextBudget, KnowledgeContextService
+    from infermatrix_copilot.knowledge_view import KnowledgeView
+
+    k = tmp_path / "knowledge"
+    _page(k, "repos/r/depth.md", _block(tmp_path, body="Supported behavior. " * 150))
+    binding = {"repo_id": "r", "knowledge_slice": "repos/r", "source_pin": PIN,
+               "catalog_hash": "b" * 64, "policy_hash": "c" * 64}
+    service = KnowledgeContextService(KnowledgeView(k, "fixture"), tmp_path / "meter.db",
+                                      resolver=lambda view, selector: binding)
+    session = service.open_session("r", source_pin=PIN, review_id="budget-clip",
+                                   budget=ContextBudget(initial_tokens=2000))["session_id"]
+    result = service.related(session, ["pkg/models/catalog.py"])
+    ref = result["documents"][0]
+    assert ref["partial"] and result["truncated"]
+    assert ref["included_facets"] == [] and ref["not_injected_facets"] == ["api"]
+    assert ref["included_facet_basis"] == ref["included_facet_acceptance_modes"] == {}
 
 
 def test_snapshot_verifier_runs_before_read_even_for_excluded_cards(tmp_path):

@@ -114,6 +114,15 @@ def _refresh(state_dir: Path, ledger, registry) -> None:
 
 def _init_command(args, state_dir: Path) -> int:
     from ..config import Settings
+    from .repo_spec import RepoRegistry
+    if RepoRegistry(state_dir).resolve(args.repo) is not None:
+        from .portable_commands import run_portable_init
+        from .init_support import InitError
+        try:
+            return run_portable_init(args, state_dir)
+        except (InitError, ValueError, OSError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
     if args.suggest_seeds == bool(args.stage):
         print("kb init: pass exactly one of --stage or --suggest-seeds", file=sys.stderr)
@@ -212,7 +221,9 @@ def main(argv: list[str] | None = None) -> int:
     calibrate.add_argument("--repo", required=True)
     serve = sub.add_parser("serve")
     serve.add_argument("--once", action="store_true")
-    sub.add_parser("activate")
+    activation = sub.add_parser("activate")
+    activation.add_argument("--snapshot", type=Path, help="verify and activate an explicitly selected portable snapshot")
+    activation.add_argument("--allow-partial", action="store_true", help="explicitly serve an accepted foundation; initialization remains incomplete")
     rollback = sub.add_parser("rollback")
     rollback.add_argument("--to", required=True)
     traces = sub.add_parser("traces")
@@ -275,7 +286,38 @@ def main(argv: list[str] | None = None) -> int:
     publish.add_argument("--interval", type=float, default=60.0)
     publish.add_argument("--publisher-state",
                          help="default: $KB_PUBLISHER_STATE or ~/.infermatrix-copilot/kb-publisher")
+    from .portable_commands import add_commands
+    add_commands(sub)
     args = parser.parse_args(argv)
+    supplied = sys.argv[1:] if argv is None else argv
+    args.acceptance_mode_explicit = any(value == "--acceptance-mode" or value.startswith("--acceptance-mode=") for value in supplied)
+
+    if args.command in {"onboard", "repo", "mirror", "update"}:
+        from .portable_commands import command
+        from .init_support import InitError
+        from .sources import SourceError
+        from .knowledge_store import KnowledgeStoreError
+        try:
+            return command(args, _state_dir(args.state_dir))
+        except (InitError, SourceError, KnowledgeStoreError, ValueError, OSError, KeyError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+    if args.command == "activate" and args.snapshot is not None:
+        from .activate import activation_lock, verify_snapshot, switch_active, ActivationError
+        from .portable_publication import check_publication
+        from .knowledge_store import KnowledgeStoreError
+        try:
+            snapshot = args.snapshot.resolve(strict=True)
+            state_dir = _state_dir(args.state_dir)
+            with activation_lock(state_dir):
+                view = verify_snapshot(snapshot)
+                publication = check_publication(view, allow_partial=args.allow_partial)
+                switch_active(state_dir, snapshot)
+            print(json.dumps({"active_snapshot": view.public_snapshot, "verified": True, **publication}))
+            return 0
+        except (ActivationError, KnowledgeStoreError, OSError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
     if args.command == "keygen":
         from ..knowledge_service.signing import generate_private_key, public_key_text

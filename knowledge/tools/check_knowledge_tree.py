@@ -117,7 +117,7 @@ def local_target(raw_target: str) -> str | None:
         target = target[1:-1]
     elif " " in target:
         target = target.split(" ", 1)[0]
-    if target.startswith(("http://", "https://", "mailto:", "#")):
+    if target.startswith(("http://", "https://", "repo://", "mailto:", "#")):
         return None
     return unquote(target.split("#", 1)[0])
 

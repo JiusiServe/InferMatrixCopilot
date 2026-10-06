@@ -5,6 +5,16 @@
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
 ## 职责
+- 通用接入：`git_source` 固定任意 Git 来源，`repo_spec` 保存经明确接受的范围；
+  `portable_init` 创建本地受审工作区，`portable_commands` 提供 onboard、register、
+  目录接受、发布和增量批次准备，不伪造已合并 PR。见 [通用知识库流程](../portable-kb.md)。
+- 功能发现：文档轮、源码轮、独立评审、最多两轮残留补查；共享完整库存和入口/契约单元，
+  单项最多三次修正，失败保持未知。`evidence_bundle` 将固定哈希行段传给后续阶段。
+- 存储与接受：`knowledge_store` 单一主存储加只读镜像；`portable_publication` 区分 foundation
+  与 final，默认只激活真实最终回执，显式 partial 仍为未完成。最终复核完整生产库存、
+  七维分别 >90%、每功能认可和 ≥85% 结构覆盖，原生认可由 `native_depth_audit` 重放。
+- `source_links` 为 GitHub、GitLab 和本地 `repo://` 源码生成固定版本引用；原 GitHub 引用
+  与历史认可正文保持一致。通用知识 pin 支持 SHA‑1/SHA‑256。
 - `config`：解析 adapter `knowledge_lifecycle`（未知键、非法模式/触发器、缺失审计插件、
   知识目录与 adapter 不一致、私有上游配 `auto_merge`、`auto_merge` 无校准集均抛
   `LifecycleConfigError`）；`load_registry` 返回按仓库名的注册表，`general` 由服务配置。

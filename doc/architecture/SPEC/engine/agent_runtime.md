@@ -1,10 +1,17 @@
 # engine/agent_runtime/ —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-06 -->
 
 `LOC ~1690（7 个文件） · 引擎（受治理的 agent 运行时） · refactor-status: ok`
 
 ## 职责
+
+含 `_repositories.yaml` 的固定快照默认采用 `knowledge_context_profile="adaptive"`；
+旧快照默认 legacy，也可显式选择。`doc_search` / `doc_read` / `doc_related`、规则与
+`doc_context_briefing` 共用 run 私有累计会话，`doc_context_expand` 必须给原因且保留
+源码/输出留白。实际注入正文和哈希写 trace，runner直接注入已围栏的 `model_content`。
+跨仓库 target 只选择已确认依赖，授权由 Settings 固定传入；模型工具不能授予权限。
+
 
 开启 `profile_briefing_enabled` 且证据包含 `pr_diff` 时，runner 使用既有 diff parser 提取
 路径，通过 `doc_related` 在首个模型调用前注入同一有界知识背景。内容放入 untrusted

@@ -1,6 +1,6 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-10-06 -->
 
 `LOC ~490 · 默认 MCP：Direct 门面 + Strict 入口 · refactor-status: ok`
 
@@ -9,12 +9,17 @@
 并在被要求时桥接到 Strict。
 
 ## 功能
-七个工具：`review`（按 `mode` 分流）、`validate_direct_review`、
+十二个工具：`review`（按 `mode` 分流）、`validate_direct_review`、
 `get_review_status` / `get_review_result`（转发给 `CopilotMCP`）、
-`update_knowledge`、`doc_search`、`doc_read`。
+`update_knowledge`、`doc_search`、`doc_read`，以及显式自适应会话
+`open_knowledge_context` / `read_knowledge_context` / `search_knowledge_context` /
+`related_knowledge_context` / `expand_knowledge_context`。
 
 ## 公开契约
-上述七个工具；`build_mcp(...)`；`main()`。
+上述十二个工具；`build_mcp(...)`；`main()`。`review(knowledge_profile="adaptive")`
+返回单一实际 `model_content` 和不重复正文的引用；默认 `legacy` 保持旧契约。
+会话工具累积预算，跨仓库目标只在主机授权与 confirmed 固定依赖同时成立时可读；
+模型不能通过工具参数扩大权限。模型容量与源码/输出留白是明确配置，非探测结果。
 
 ## 不变量（**C1**、**C2**、**D1**）
 - **Direct 在这个 server 里不跑任何模型。** 它返回知识路由和一份治理契约；阅读由
@@ -60,7 +65,8 @@
 - **每个工具都声明 `ToolAnnotations`，且提示必须真实。** 审批门控的宿主（codex 对
   无注解工具逐次弹批准框，headless 下自动取消，见 #86）靠这些提示放行只读面：
   `review` 是唯一保留状态变更（预留 Strict run）与触网（Strict 子进程）的工具，
-  其余六个全部 `readOnlyHint=true`。把一个会写的工具标成只读，比不标更糟。
+  其余工具全部 `readOnlyHint=true`，相对于源码、知识内容和 forge 都只读；会话接口
+  会写主机私有运行账本。把一个会修改知识或源码的工具标成只读，比不标更糟。
   （要求 `mcp>=1.8`，注解类型自该版本起可用。）
 
 ## 边界 —— 不属于这里

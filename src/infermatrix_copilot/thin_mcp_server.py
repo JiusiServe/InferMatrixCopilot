@@ -210,6 +210,9 @@ def build_mcp(
     from mcp.types import ToolAnnotations
 
     core = core or CopilotMCP(settings)
+    from .sdk.v1.direct import DirectClient
+    context_client = DirectClient(knowledge_context_path=core.settings.run_root / "knowledge-context.sqlite",
+                                 allowed_knowledge_repositories=core.settings.allowed_knowledge_repositories)
 
     # Approval-gating hosts (codex asks per-call approval for tools without
     # hints, and cancels them outright in headless runs) read these
@@ -274,6 +277,7 @@ def build_mcp(
         expected_head_sha: str = "",
         idempotency_key: str = "",
         diff: str = "",
+        knowledge_profile: str = "legacy",
     ) -> dict:
         """Begin a Direct or Strict review.
 
@@ -310,6 +314,14 @@ def build_mcp(
             if selected_mode not in {"direct", "strict"}:
                 raise ValueError("mode must be 'direct' or 'strict'")
             if selected_mode == "direct":
+                if knowledge_profile == "adaptive":
+                    from .sdk.v1.models import ChangedPath, DirectReviewRequest, RepositoryRef
+                    request = DirectReviewRequest(idempotency_key or f"direct:{target}", RepositoryRef(repo),
+                                                  0, expected_head_sha, title, body,
+                                                  tuple(ChangedPath(path) for path in changed_files or ()), diff=diff)
+                    return context_client.plan_adaptive(request)
+                if knowledge_profile != "legacy":
+                    raise ValueError("knowledge_profile must be legacy or adaptive")
                 return direct_review_plan(
                     repo,
                     title=title,
@@ -479,6 +491,41 @@ def build_mcp(
             }
 
         return _guard(run)
+
+    @mcp.tool(annotations=read_only)
+    def open_knowledge_context(repo: str, source_pin: str, review_id: str,
+                               model_context_tokens: int = 131072,
+                               source_reserve_tokens: int = 32000,
+                               output_reserve_tokens: int = 8192) -> dict:
+        """Open an explicit adaptive 24k/64k session; supplied model capacity is configuration, not detected usage."""
+        from .sdk.v1.models import DirectReviewRequest, RepositoryRef
+        from .knowledge_context import ContextBudget
+        def run():
+            request = DirectReviewRequest(review_id, RepositoryRef(repo), 0, source_pin, "", "", ())
+            return context_client.open_knowledge_context(request, budget=ContextBudget(
+                model_context_tokens=model_context_tokens, source_reserve_tokens=source_reserve_tokens,
+                output_reserve_tokens=output_reserve_tokens))
+        return _guard(run)
+
+    @mcp.tool(annotations=read_only)
+    def read_knowledge_context(session_id: str, path: str, offset: int = 0, repository: str | None = None) -> dict:
+        """Read source-pinned knowledge using the session's remaining cumulative budget."""
+        return _guard(lambda: context_client.read_knowledge_context(session_id, path, offset=offset, repository=repository))
+
+    @mcp.tool(annotations=read_only)
+    def search_knowledge_context(session_id: str, query: str, repository: str | None = None) -> dict:
+        """Search snippets consume the same budget as full knowledge reads."""
+        return _guard(lambda: context_client.search_knowledge_context(session_id, query, repository=repository))
+
+    @mcp.tool(annotations=read_only)
+    def related_knowledge_context(session_id: str, changed_files: list[str], query: str = "", repository: str | None = None) -> dict:
+        """Select additional intact feature contexts within the shared remaining budget."""
+        return _guard(lambda: context_client.related_knowledge_context(session_id, changed_files, query=query, repository=repository))
+
+    @mcp.tool(annotations=read_only)
+    def expand_knowledge_context(session_id: str, target_tokens: int, reason: str) -> dict:
+        """Request more context, with a concrete unresolved contract; never consumes reserved source/output capacity."""
+        return _guard(lambda: context_client.expand_knowledge_context(session_id, target_tokens=target_tokens, reason=reason))
 
     return mcp
 

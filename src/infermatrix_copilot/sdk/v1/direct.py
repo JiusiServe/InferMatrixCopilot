@@ -90,13 +90,11 @@ def get_capabilities(
 
     from ...knowledge_view import KnowledgeView
 
-    knowledge = KnowledgeView.current().root
+    view = KnowledgeView.current()
+    knowledge = view.root
     adapters = adapters_root()
-    repositories = tuple(sorted(
-        path.name
-        for path in (knowledge / "repos").iterdir()
-        if path.is_dir() and (path / "_index.md").is_file()
-    ))
+    from ...kb_service.repo_spec import list_snapshot_repos
+    repositories = tuple(binding.repo_id for binding in list_snapshot_repos(view))
     locking = bool(supports_file_locking)
     return Capabilities(
         distribution_version=_distribution_version(),
@@ -134,13 +132,19 @@ class DirectClient:
     cannot grow memory without limit.
     """
 
-    def __init__(self, *, max_issued_contexts: int = _DEFAULT_CONTEXT_LIMIT) -> None:
+    def __init__(self, *, max_issued_contexts: int = _DEFAULT_CONTEXT_LIMIT,
+                 knowledge_context_path: str | Path | None = None,
+                 allowed_knowledge_repositories: tuple[str, ...] = ()) -> None:
         if max_issued_contexts < 1:
             raise InvalidRequestError("max_issued_contexts must be >= 1")
         self._adapters = adapters_root()
         self._max_issued_contexts = int(max_issued_contexts)
         self._issued_contexts: OrderedDict[str, _IssuedContext] = OrderedDict()
         self._context_lock = threading.Lock()
+        self._knowledge_context_path = Path(knowledge_context_path) if knowledge_context_path else \
+            Path.home() / ".infermatrix-copilot" / "knowledge-context.sqlite"
+        self._knowledge_context_services: dict[str, Any] = {}
+        self._allowed_knowledge_repositories = tuple(allowed_knowledge_repositories)
 
     @staticmethod
     def _view():
@@ -250,7 +254,7 @@ class DirectClient:
             next_offset=next_offset,
         )
 
-    def _request_values(self, request: DirectReviewRequest) -> tuple[str, list[str]]:
+    def _request_values(self, request: DirectReviewRequest, *, allow_sha256: bool = False) -> tuple[str, list[str]]:
         alias = request.repository.alias.strip()
         if not request.review_id.strip():
             raise InvalidRequestError("review_id must not be empty")
@@ -258,11 +262,14 @@ class DirectClient:
             raise InvalidRequestError("pr_number must be >= 0")
         if not alias:
             raise InvalidRequestError("repository alias must not be empty")
-        if alias.replace("_", "-").casefold() not in {
+        from ...kb_service.repo_spec import resolve_snapshot_repo
+        binding = resolve_snapshot_repo(self._view(), alias)
+        if binding is None and alias.replace("_", "-").casefold() not in {
             item.casefold() for item in self.capabilities().supported_repositories
         }:
             raise UnsupportedRepositoryError(f"unsupported repository: {alias!r}")
-        if not _FULL_SHA.fullmatch(request.expected_head_sha.strip()):
+        head = request.expected_head_sha.strip()
+        if not _FULL_SHA.fullmatch(head) and not (allow_sha256 and re.fullmatch(r"[0-9a-fA-F]{64}", head)):
             raise InvalidRequestError(
                 "expected_head_sha must be exactly 40 hexadecimal characters"
             )
@@ -277,6 +284,87 @@ class DirectClient:
                 )
             changed_files.append(path.as_posix())
         return alias, changed_files
+
+    def open_knowledge_context(self, request: DirectReviewRequest, *, budget=None) -> dict:
+        """Opt into the cumulative adaptive protocol; the v1 plan stays unchanged."""
+        from ...knowledge_context import KnowledgeContextService
+        alias, _ = self._request_values(request, allow_sha256=True)
+        view = self._view()
+        service = KnowledgeContextService(view, self._knowledge_context_path,
+                                          allowed_repositories=self._allowed_knowledge_repositories)
+        status = service.open_session(alias, source_pin=request.expected_head_sha.casefold(),
+                                      review_id=request.review_id, budget=budget)
+        self._knowledge_context_services[status["session_id"]] = service
+        return status
+
+    def _knowledge_context(self, session_id: str):
+        service = self._knowledge_context_services.get(session_id)
+        if service is None:
+            import sqlite3
+            from ...knowledge_context import KnowledgeContextService
+            from ...knowledge_view import KnowledgeView, _load_view
+            if not re.fullmatch(r"[0-9a-f]{64}", session_id) or not self._knowledge_context_path.is_file():
+                raise InvalidRequestError("unknown knowledge session")
+            with sqlite3.connect(self._knowledge_context_path) as db:
+                row = db.execute("SELECT state FROM sessions WHERE id=?", (session_id,)).fetchone()
+            if row is None:
+                raise InvalidRequestError("unknown knowledge session")
+            identity = json.loads(row[0])["identity"]["view"]
+            root = Path(identity["root"])
+            if (root.parent / "MANIFEST.json").is_file():
+                view = _load_view(str(root.parent))
+            else:
+                view = KnowledgeView(root, identity["snapshot"])
+            service = KnowledgeContextService(view, self._knowledge_context_path,
+                                              allowed_repositories=self._allowed_knowledge_repositories)
+            service.status(session_id)  # validate pinned bytes before resuming
+            self._knowledge_context_services[session_id] = service
+        return service
+
+    def plan_adaptive(self, request: DirectReviewRequest, *, budget=None) -> dict:
+        """Return one budgeted model packet, with references instead of SDK excerpts."""
+        from ...direct_routing import direct_review_plan
+        alias, changed = self._request_values(request, allow_sha256=True)
+        status = self.open_knowledge_context(request, budget=budget)
+        service, session_id = self._knowledge_context(status["session_id"]), status["session_id"]
+        raw = direct_review_plan(alias, title=request.title, body=request.body,
+                                 changed_files=changed, diff=request.diff, view=service.view)
+        routes = [{"path": service.view.relative(row["path"]), "kind": "direct_map"}
+                  for row in raw["knowledge_routes"]]
+        procedures = [{"path": service.view.relative(path)} for path in raw["mandatory_review_guides"]]
+        guide_packet = service.inject(session_id, procedures + routes, purpose="review-procedures-and-owner-routes")
+        related = service.related(session_id, changed, query="\n".join((request.title, request.body, request.diff)))
+        # There is exactly one injectable copy of every returned content fragment.
+        content = guide_packet["model_content"] + related["model_content"]
+        context_id = _sha256(json.dumps({"session_id": session_id, "request": request.to_dict()},
+                                       sort_keys=True).encode())
+        self._remember_context(context_id, request.expected_head_sha.casefold(),
+                               tuple(row.to_dict() for row in request.carried_findings), service.view)
+        return {"protocol_version": "knowledge-context-1", "session_id": session_id,
+                "review_context_id": context_id,
+                "expected_head_sha": request.expected_head_sha.casefold(),
+                "model_content": content, "model_content_sha256": hashlib.sha256(content.encode()).hexdigest(),
+                "documents": guide_packet["documents"] + related["documents"],
+                "budget": service.status(session_id), "routing": raw["routing"],
+                "execution_budget": raw["execution_budget"],
+                "first_review_checklist": raw["first_review_checklist"],
+                "progress_update": raw["progress_update"], "completion_gate": raw["completion_gate"],
+                "guidance": related.get("guidance", ""),
+                "truncated": guide_packet["truncated"] or related["truncated"]}
+
+    def read_knowledge_context(self, session_id: str, document_id: str, *, offset: int = 0,
+                               repository: str | None = None) -> dict:
+        return self._knowledge_context(session_id).read(session_id, document_id, offset=offset, repository=repository)
+
+    def search_knowledge_context(self, session_id: str, query: str, *, repository: str | None = None) -> dict:
+        return self._knowledge_context(session_id).search(session_id, query, repository=repository)
+
+    def related_knowledge_context(self, session_id: str, changed_files: list[str], *, query: str = "",
+                                  repository: str | None = None) -> dict:
+        return self._knowledge_context(session_id).related(session_id, changed_files, query=query, repository=repository)
+
+    def expand_knowledge_context(self, session_id: str, *, target_tokens: int, reason: str) -> dict:
+        return self._knowledge_context(session_id).expand(session_id, target_tokens=target_tokens, reason=reason)
 
     def _remember_context(
         self, context_id: str, expected_head_sha: str, carried=(), view=None,
@@ -325,7 +413,9 @@ class DirectClient:
             )
             for item in raw.get("knowledge_routes") or []
         )
-        repo_name = alias.replace("_", "-")
+        from ...kb_service.repo_spec import resolve_snapshot_repo
+        binding = resolve_snapshot_repo(view, alias)
+        repo_name = binding.knowledge_slice.removeprefix("repos/") if binding else alias.replace("_", "-")
         map_candidates = (
             view.root / "README.md",
             view.root / "general" / "_index.md",

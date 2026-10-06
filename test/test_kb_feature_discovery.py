@@ -43,10 +43,12 @@ def test_packet_candidate_cap_is_an_explicit_omission_lead(tmp_path):
     engine = DiscoveryEngine(idx, seeds=[], owners=[], state={}, call=call, save=lambda: None,
                              packet_chars=96000)
     assert engine.scan()
-    assert len(engine.state['tasks']) == 1
-    task = next(iter(engine.state['tasks'].values()))
-    assert task['candidate_limit_reached']
-    assert len(task['candidates']) == 24
+    assert len(engine.state['tasks']) == 3
+    tasks = list(engine.state['tasks'].values())
+    assert all(task['candidate_limit_reached'] for task in tasks)
+    assert any(task.get('split_children') for task in tasks)
+    assert sum(bool(task.get('overflow_unknown')) for task in tasks) == 2
+    assert all(len(task['candidates']) == 24 for task in tasks)
 
 
 def reply(role, data, archived=True):

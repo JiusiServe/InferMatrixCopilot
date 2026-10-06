@@ -173,7 +173,7 @@ def inbound_links() -> set[Path]:
                 continue
             for m in MARKDOWN_LINK.finditer(line):
                 t = m.group(1).split("#", 1)[0].strip()
-                if t and not t.startswith(("http://", "https://", "mailto:")):
+                if t and not t.startswith(("http://", "https://", "repo://", "mailto:")):
                     targets.add((p.parent / t).resolve())
     return targets
 

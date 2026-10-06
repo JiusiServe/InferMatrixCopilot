@@ -631,9 +631,10 @@ def render_block(feature, section: dict, tree: Path, full_name: str, pin: str, *
     if proof["trace"]:
         body += "调用路径：" + " → ".join(chr(96) + s["path"] + chr(96) + "（" + chr(96) + s["symbol"] + chr(96) + "）"
                                     for s in proof["trace"]) + "\n\n"
+    from .source_links import source_link
     body += "来源：" + ", ".join(
-        f"[{e['path']}:L{e['start']}–L{e['end']}](https://github.com/{full_name}/blob/{pin}/"
-        f"{quote(e['path'], safe='/')}#L{e['start']}-L{e['end']})" for e in section["evidence"]) + "\n"
+        f"[{e['path']}:L{e['start']}–L{e['end']}]({source_link(full_name, pin, e['path'], e['start'], e['end'])})"
+        for e in section["evidence"]) + "\n"
     body += "\n<!-- kb:depth-proof " + json.dumps(proof, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + " -->"
     return (f"<!-- kb:depth feature={feature.id} facet={section['facet']} pin={pin} sha256={digest(body)} -->\n"
             + body + "\n<!-- /kb:depth -->")

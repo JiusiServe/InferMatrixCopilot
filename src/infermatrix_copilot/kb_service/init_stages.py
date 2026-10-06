@@ -167,8 +167,8 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
             foundation_mode == "strict" and foundation_record_path is not None):
         raise InitError("foundation_mode must be strict or partial; a foundation record requires partial mode")
     if foundation_mode == "partial" and (
-            stage not in ("knowledge", "knowledge-deepen") or not unlimited_subscription
-            or bool(foundation_record_path) != (stage == "knowledge-deepen")):
+            stage not in ("knowledge", "knowledge-deepen") or (not unlimited_subscription and not getattr(rt, "portable_spec", None))
+            or (bool(foundation_record_path) != (stage == "knowledge-deepen") and not getattr(rt, "portable_spec", None))):
         raise InitError("partial foundation requires unlimited knowledge, or knowledge-deepen with its published foundation record")
     if feature_ids and (stage != "knowledge-deepen" or not isinstance(feature_ids, tuple)
                         or any(not isinstance(f, str) or not f for f in feature_ids)):
@@ -500,6 +500,8 @@ class _Stage:
         upstream = rt.upstream(lc.repo, lc.full_name)
         upstream.sync()
         pin = upstream.resolve(self.pin or chain.pin or "HEAD")
+        if getattr(rt, "portable_spec", None) and pin != rt.portable_spec.source_pin:
+            raise InitError("portable source pin differs from the accepted batch; create a new batch")
         self._discovery_gate(chain, pin)
         self.overlay = dict(chain.repo_files)
         input_options = dict(self._input_options())
@@ -645,9 +647,20 @@ class _Stage:
                 chain.knowledge.clear()   # main holds it, and every stage before it
                 chain.repo_files.clear()
                 parts.append(f"{stage}:merged:{number}")
+            elif record.status == "accepted" and getattr(self.rt, "portable_spec", None):
+                from .portable_init import check_local_acceptance
+                try:
+                    head = check_local_acceptance(self.rt, record)
+                except InitError as exc:
+                    chain.problems.append(str(exc))
+                    continue
+                parts.append(f"{stage}:local-accepted:{head}")
             elif record.status == "empty":
                 parts.append(f"{stage}:empty:{record.inputs_digest}")
             elif record.status == "dry_run":
+                if getattr(self.rt, "portable_spec", None):
+                    chain.problems.append(f"accept the {stage} preview before starting {self.STAGE}")
+                    continue
                 if not self.dry_run:
                     chain.problems.append(f"the {stage} stage was only a dry run; publish it and merge its PR "
                                           f"before publishing {self.STAGE}")
@@ -814,7 +827,17 @@ class _Stage:
                 if state != "MERGED":
                     chain.problems.append("merge the feature-discovery PR before continuing")
                     return
+            elif record.status == "accepted" and getattr(self.rt, "portable_spec", None):
+                from .portable_init import check_local_acceptance
+                try:
+                    check_local_acceptance(self.rt, record)
+                except InitError as exc:
+                    chain.problems.append(str(exc))
+                    return
             elif record.status == "dry_run" and self.dry_run:
+                if getattr(self.rt, "portable_spec", None):
+                    chain.problems.append("accept the feature-discovery catalog before continuing")
+                    return
                 try:
                     files = _dry_run_files(record)
                 except InitError as exc:
@@ -1360,6 +1383,9 @@ class _Stage:
             dest = InitRecord.path(rt.state_dir, lc.repo, stage).with_name(f"{stage}-dryrun")
             InitPublisher.dry_run(dest, changed, title=title, body=body)
             record.pr = {"dry_run_dir": str(dest)}
+            if getattr(rt, "portable_spec", None):
+                record.pr["checked_files_sha256"] = {p: hashlib.sha256(t.encode()).hexdigest()
+                    for p, t in sorted(changed.items())}
             record.status = "dry_run"
         else:
             prepared = save_prepared(

@@ -49,7 +49,7 @@ ALLOW_POST_ENV = "ALLOW_POST"
 AUTHOR_ENV = "KB_INIT_GIT_AUTHOR"
 CLONE_ENV = "KB_INIT_KNOWLEDGE_CLONE"
 _AUTHOR = re.compile(r"(?P<name>[^<>]+?)\s*<(?P<email>[^<>\s]+@[^<>\s]+)>")
-_SHA = re.compile(r"[0-9a-f]{40}")
+_SHA = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
 # what an init PR may write, repository-relative
 INIT_PATHS = (
     re.compile(r"knowledge/(?:repos/[A-Za-z0-9._-]+|general)/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\.(?:md|yaml)"),
@@ -169,8 +169,12 @@ class UpstreamPin:
         listing = self._git("ls-remote", "--symref", "origin", "HEAD").decode(errors="replace")
         match = re.search(r"^ref:\s+(refs/heads/\S+)\s+HEAD$", listing, re.MULTILINE)
         if match is None:
-            raise InitError(f"{self.full_name} does not report a default branch")
-        self._git("symbolic-ref", "HEAD", match.group(1))
+            # A local source can intentionally have a detached HEAD and no origin.
+            # Fetch that exact object; do not fabricate a default branch.
+            self._git("fetch", "--quiet", "origin", "+HEAD:refs/kb/source-head")
+            self._git("update-ref", "--no-deref", "HEAD", self._git("rev-parse", "refs/kb/source-head").decode().strip())
+        else:
+            self._git("symbolic-ref", "HEAD", match.group(1))
 
     def resolve(self, ref: str) -> str:
         sha = self._git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}").decode().strip()
@@ -179,24 +183,13 @@ class UpstreamPin:
         return sha
 
     def export(self, pin: str, dest: Path) -> Path:
-        """The tree at ``pin`` as plain files (``git archive``; members that
-        would land outside ``dest`` are refused)."""
-        data = self._git("archive", "--format=tar", pin)
-        dest = Path(dest)
-        dest.mkdir(parents=True, exist_ok=True)
-        root = dest.resolve()
-        with tarfile.open(fileobj=io.BytesIO(data)) as archive:
-            for member in archive.getmembers():
-                target = (dest / member.name).resolve()
-                if not target.is_relative_to(root) or member.issym() or member.islnk():
-                    continue  # links and escapes are not docs or code we read
-                if member.isdir():
-                    target.mkdir(parents=True, exist_ok=True)
-                elif member.isfile():
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    source = archive.extractfile(member)
-                    target.write_bytes(source.read() if source is not None else b"")
-        return dest
+        """Materialize exact committed blobs, without Git archive attributes."""
+        from .git_source import GitSource
+        from .sources import SourceError
+        try:
+            return GitSource(self.path).export(pin, dest)
+        except SourceError as exc:
+            raise InitError(str(exc)) from exc
 
     def observer(self, pin: str, *, pull=None) -> PinnedObserver:
         return PinnedObserver(self.path, self.full_name, pin, pull=pull)
@@ -254,7 +247,7 @@ def collect_docs(root: Path, globs: tuple[str, ...], *, max_files: int = MAX_DOC
 
 @dataclass
 class InitRuntime:
-    settings: Any
+    settings: Any = field(repr=False)
     state_dir: Path
     registry: dict
     gateway: ModelGateway
@@ -263,7 +256,7 @@ class InitRuntime:
     knowledge: Any                    # sources.KnowledgeRepo
     github: Any                       # sources.GitHubReader
     prices: dict[str, Price] = field(default_factory=load_prices)
-    environ: Mapping[str, str] = field(default_factory=lambda: dict(os.environ))
+    environ: Mapping[str, str] = field(default_factory=lambda: dict(os.environ), repr=False)
     clock: Callable[[], float] = time.time
     gh_run: Callable[..., subprocess.CompletedProcess] = subprocess.run
     upstream_remote: Callable[[str], str] | None = None   # full_name -> clone URL (tests)
@@ -271,6 +264,8 @@ class InitRuntime:
     subscription_generator: bool = False
     unlimited_subscription: bool = False
     discovery_concurrency: int = 13
+    portable_spec: Any = None
+    discovery_paths: tuple[str, ...] | None = None
 
     @property
     def init_dir(self) -> Path:
