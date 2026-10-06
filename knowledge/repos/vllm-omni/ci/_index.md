@@ -207,6 +207,8 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
 
 ## 目录内容
 
+- [Graph 测试 buffer](rules-graph-buffer-fixtures.md) — fake estimator 未写 tail 的确定性初始化。
+
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 审查硬件 lane（含 MiniMax-H3 DLO DP2 ready smoke 的证据边界）、回归 fence、CI 工具供应链、ASR 文本比较或 xdist/shared fixture、Buildkite 失败日志与运行时差异 | [CI rules](rules.md)   新增核对：OMNI-CI-1g、OMNI-CI-1h。 |

@@ -9,6 +9,8 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 
 # Diffusion
 
+- [IPC 与客户端错误](rules-ipc-errors.md) — dead-peer send、abort no-op 与单 GPU status 保留。
+
 - 源码入口：`vllm_omni/diffusion/` 全树，含 17 个子模块：attention、cache、diffusion_kv、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
 - 源码校验：以上子模块均已在 `main @ 44d3ae10`（upstream `main` 快照）验证存在；MiniMax-H3 的 VAE eager
   ops 仍由模型 owner 维护，其他 shared/模型机制按各自规则审查

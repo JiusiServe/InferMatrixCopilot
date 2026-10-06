@@ -9,7 +9,9 @@ sources: [vllm_omni/diffusion/models/helios/, vllm_omni/diffusion/registry.py]
 
 # Helios
 
-以下事实在 `main @ 5d44868e` 复核（源码派生页,尚无本模型的运行经验沉淀）。
+- [Cross-attention cache 规则](rules.md) — source weakref、地址重用与 intra-request KV reuse。
+
+以下事实在 `main @ 5d44868e` 复核（历史结构快照；当前 cache 约束见模型规则）。
 
 ## 名称与范围
 

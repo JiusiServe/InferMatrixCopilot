@@ -45,3 +45,5 @@ sources: []
 | OpenAI Realtime routing、PCM16 admission、部分 session 更新、response 终态与有界 history/truncate | [Realtime 请求与会话规则](rules-realtime-openai.md) |
 
 - [Realtime video 增量 prefill 规则](rules-video-stream-prefill.md) — warmup/abort、窗口身份与已解码帧 snapshot。
+
+- [Sleep/wake ACK 与 admission](rules-sleep-control.md) — worker/RPC failure、partial-stage recovery 与 stage-ID 预校验。

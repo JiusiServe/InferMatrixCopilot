@@ -1,14 +1,25 @@
 ---
 title: "LTX-2.5 DiffVAE 规则"
 created: 2026-09-04
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, ltx2, diffusion]
-sources: ["PR #6189", "PR #7000", "PR #7020", recipes/LTX/LTX-2.5.md, requirements/common.txt, docs/user_guide/diffusion/attention_backends/huggingface_hub.md, vllm_omni/diffusion/models/ltx2/ltx2_components.py, vllm_omni/diffusion/models/ltx2/ltx2_conditioning.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder_distributed.py, vllm_omni/diffusion/models/ltx2/ltx2_latents.py, vllm_omni/diffusion/models/ltx2/ltx2_request.py, vllm_omni/diffusion/models/ltx2/ltx2_runtime.py, tests/diffusion/models/ltx2/test_ltx25_pipeline.py, tests/diffusion/models/ltx2/test_ltx2_output_cuda.py, tests/diffusion/models/ltx2/test_ltx2_pipeline.py, tests/diffusion/models/ltx2/test_ltx2_vae.py, "PR #7231", "PR #7350"]
+sources: ["PR #6189", "PR #7000", "PR #7020", recipes/LTX/LTX-2.5.md, requirements/common.txt, docs/user_guide/diffusion/attention_backends/huggingface_hub.md, vllm_omni/diffusion/models/ltx2/ltx2_components.py, vllm_omni/diffusion/models/ltx2/ltx2_conditioning.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder.py, vllm_omni/diffusion/models/ltx2/ltx2_diffusion_decoder_distributed.py, vllm_omni/diffusion/models/ltx2/ltx2_latents.py, vllm_omni/diffusion/models/ltx2/ltx2_request.py, vllm_omni/diffusion/models/ltx2/ltx2_runtime.py, tests/diffusion/models/ltx2/test_ltx25_pipeline.py, tests/diffusion/models/ltx2/test_ltx2_output_cuda.py, tests/diffusion/models/ltx2/test_ltx2_pipeline.py, tests/diffusion/models/ltx2/test_ltx2_vae.py, "PR #7231", "PR #7350", "PR #8453"]
 confidence: high
 ---
 
 # LTX-2.5 DiffVAE 规则
+
+## LTX-ACCURACY-1a — 单 H100 的 LTX-2 distilled T2V reference 必须保留 matched offload profile
+
+- 触发：修改 LTX official-similarity matrix、ltx2_distilled_t2v fixture 或 offload 选择。
+- 强制：该全分辨率单 H100 case 启用 layerwise offload，reference 与 Omni 保持 bf16
+  arithmetic、相同 checkpoint/seed/recipe 与独立 similarity thresholds；shutdown 用共享
+  无权重恢复的 teardown 合同，不能为 OOM 改 accuracy 数值口径。
+- 禁止：一个 case 通过就扩大到 LTX 全 matrix、其他卡或普遍性能收益；把 official 与
+  Omni 的不同 offload 执行时间当作相同性能条件。
+- 验收：实际跑该 full_model hardware selector，核对视频/音频指标及 clean exit；
+  单次作者 H100 结果仅支持该 case 的范围。^[PR #8453]
 
 ## Direct 代码快速入口
 
