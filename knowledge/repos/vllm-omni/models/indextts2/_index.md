@@ -1,7 +1,7 @@
 ---
 title: "IndexTTS2（非流式两 stage,GPT talker + S2Mel/BigVGAN）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, models]
 sources: [vllm_omni/model_executor/models/indextts2/, vllm_omni/deploy/indextts2.yaml, vllm_omni/model_executor/stage_input_processors/indextts2.py]
@@ -58,3 +58,5 @@ sources: [vllm_omni/model_executor/models/indextts2/, vllm_omni/deploy/indextts2
 - 审查 indextts2 的全载荷合同、tokenizer 旁路或 stage-1 hf_overrides 性能
   开关;想给它加流式先看 architecture 里的非流式根因。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。
+
+- [request-endlatent、generichidden与整段S2Mel交付](rules.md)。

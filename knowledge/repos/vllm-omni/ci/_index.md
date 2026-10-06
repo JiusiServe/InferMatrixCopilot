@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni CI"
 created: 2026-07-10
-updated: 2026-09-22
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, ci]
 sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md, tests/diffusion/quantization/test_svdquant_config.py, tests/diffusion/quantization/test_svdquant_linear.py, tests/diffusion/quantization/test_svdquant_tp_loading.py, tests/diffusion/quantization/test_wan_autoround_mxfp4.py, tests/e2e/offline_inference/test_wan21_autoround_mxfp4.py, "PR #5544", "PR #6162", "PR #6170", "PR #6303", "PR #6390", "PR #6613", .buildkite/cuda/test-nightly.yml, tests/e2e/online_serving/run_minicpmo_realtime_duplex_server_vad.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/e2e/online_serving/test_qwen_image_expansion.py, tests/dfx/perf/tests/test_qwen_image_vllm_omni.json, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6054", .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, tests/e2e/online_serving/test_hunyuan_video_15_expansion.py, tests/dfx/perf/tests/test_hunyuanvideo15_t2v_vllm_omni.json, tests/dfx/perf/tests/test_hunyuanvideo15_i2v_vllm_omni.json, "PR #6349", .buildkite/amd/scripts/bootstrap-amd-omni.sh, .buildkite/amd/test-amd-merge.yml, .buildkite/amd/test-amd-ready.yml, tests/diffusion/distributed/test_tensor_parallel.py, tests/diffusion/offloader/test_diffusion_layerwise_offload.py, tests/helpers/clean.py, "PR #6704", tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/stage_input_processors/test_minicpmo_4_5_async_chunk.py, "PR #5464", "PR #6730", "PR #6745", "PR #6727", tests/diffusion/quantization/test_quantization_quality.py, "PR #5831", tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json, tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json, "PR #6743", tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, "PR #6742", "PR #6650", pyproject.toml, tests/helpers/mark.py, tests/helpers/tests/test_mark.py, tools/pre_commit/check_test_marks.py, "PR #6174", .buildkite/cuda/test-weekly.yml, tests/e2e/offline_inference/test_dots_tts_expansion.py, "PR #6556", tests/e2e/online_serving/minimax_h3/]
@@ -174,11 +174,11 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
 
 ## XPU base-image resolution and support-table boundary
 
-- The Intel Buildkite XPU lane targets vLLM `v0.28.0`. Its Omni image layers on
+- The Intel Buildkite XPU lane and Docker default must target the same checkout release. Its Omni image layers on
   `vllm/vllm-openai-xpu:${VLLM_VERSION}` and clears that image's serving entrypoint so the
   result remains a shell/test container. The base carries the matching XPU runtime and vLLM;
   Omni installs only its own layers. Keep the Dockerfile default and lane environment version
-  aligned.
+  aligned; the source PR #8528 aligns both and the install command to v0.31.0. ^[PR #8528]
 - Before building, CI pulls the published upstream base freshly. If that pull fails it may use
   an existing local copy; only if neither exists does it build the same vLLM tag from upstream
   `docker/Dockerfile.xpu`, optionally under `VLLM_BASE`. Thus a fallback is provenance-aligned,
@@ -198,19 +198,22 @@ sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overvie
   Qwen3-TTS CustomVoice `async_chunk` Whisper-validation case is an 80-minute,
   `NonBlocking` quarantined step. It must return to the blocking sharded lane only after
   the AMD failure is resolved; a passing neighboring shard does not establish that result.
-- ROCm memory assertions sample steady-state inference and report peak usage relative to
-  each run's initial device use, after cache cleanup. They therefore do not count retained
-  compiler/workspace allocations from a preceding topology as model memory, and the ROCm
-  layerwise-offload floor remains a conservative 512 MiB signal rather than a portability
-  or performance claim. Cleanup diagnostics use bounded `rocm-smi` calls because an
-  optional `amd-smi` CPER ioctl can remain uninterruptibly blocked. ^[PR #6704]
+- ROCm offload memory assertion现在由实际diffusion worker内同步reset/read的process-local
+  allocator peak支持，不能用parent device-global total-free减initial归因model saving；RPC返回
+  rank0不证明all-rank max。机制/quality证据边界见[DIFF-4x](../components/diffusion/rules-worker-observability.md)。
+  cleanup diagnostics仍有独立timeout，保守offload floor不构成portability或performance保证。
+  ^[PR #6704] ^[PR #8189]
+
 
 ## 目录内容
 
+- [Graph 测试 buffer](rules-graph-buffer-fixtures.md) — fake estimator 未写 tail 的确定性初始化。
+
 | 遇到什么 | 查看哪里 |
 |---|---|
+| 构建wheel runtime data、无VCS archive parity或声明Python版本的安装/导入支持 | [构建与版本合同](rules-build-compatibility.md) |
 | 审查硬件 lane（含 MiniMax-H3 DLO DP2 ready smoke 的证据边界）、回归 fence、CI 工具供应链、ASR 文本比较或 xdist/shared fixture、Buildkite 失败日志与运行时差异 | [CI rules](rules.md)   新增核对：OMNI-CI-1g、OMNI-CI-1h。 |
-| AMD/ROCm timeout、quarantine、memory signal、single-card diffusion job 的 multi-card marker 排除、Qwen3-TTS argv 或 Qwen3-Omni control-plane fixture | [AMD/ROCm CI rules](rules-amd.md)   新增核对：OMNI-CI-2i、OMNI-CI-2i2、OMNI-CI-2i3、OMNI-CI-2i4。 |
+| AMD/ROCm timeout、quarantine、memory signal、single-card diffusion job 的 multi-card marker 排除、Qwen3-TTS argv 或 Qwen3-Omni control-plane fixture | [AMD/ROCm CI rules](rules-amd.md)   新增核对：OMNI-CI-2i、OMNI-CI-2i2、OMNI-CI-2i3、OMNI-CI-2i4、OMNI-CI-2i5、OMNI-CI-2i6。 |
 | CUDA L4 Kubernetes preset、GPU-count shard、resource/retry policy | [L4 Kubernetes CI rules](rules-l4-k8s.md) |
 | Whisper 转写 helper 的 GPU 首选、16 GiB 门槛、CPU fallback 或 CUDA ready/merge source dependency | [Whisper 转写 CI 规则](rules-whisper-transcription.md) |
 | 查看仓库特有 CI 陷阱 | [CI guides](guides/_index.md) |

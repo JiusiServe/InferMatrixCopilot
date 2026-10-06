@@ -1,10 +1,10 @@
 ---
 title: "MiniMax H3 缓存与任务生命周期规则"
 created: 2026-09-04
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", "PR #6666", "PR #6714", "PR #6909", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/fasth3.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/npu/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/entrypoints/openai/video_api_utils.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_fasth3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_native_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #7162", "PR #7062", "PR #7838"]
+sources: ["PR #5703", "PR #5720", "PR #5810", "PR #5837", "PR #5840", "PR #5853", "PR #5991", "PR #6476", "PR #6550", "PR #6666", "PR #6714", "PR #6909", vllm_omni/diffusion/models/minimax_h3/batched_packing.py, vllm_omni/diffusion/models/minimax_h3/fasth3.py, vllm_omni/diffusion/models/minimax_h3/lora.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/npu/lora.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/entrypoints/openai/video_api_utils.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_fasth3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_native_lora.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_step_execution.py, tests/entrypoints/openai_api/test_video_api_utils.py, "PR #7162", "PR #7062", "PR #7838", "PR #8378"]
 confidence: high
 ---
 
@@ -238,3 +238,11 @@ Cache-DiT、TeaCache、distilled sigma schedule 与 Turbo LoRA 的生命周期�
 - 强制：默认 latent-tail continuation 只在 Ref2VA request execution（非 step）下启用；window/overlap 必须落在 `17n+5` 网格且 window∈[107,345]、overlap<window。每窗 denoise 新鲜目标，用上一窗 AV latent 尾作 guide 条件行（共享新目标时间原点），丢弃新采样 overlap，只追加后缀。媒体时间按全局帧起点偏移（保留小数），文本/静图/空间位不变；多窗 prompt 独立编码，媒体原点锚定最长 text 前缀之后。音频边界用累积帧时间线的 `_audio_t`，避免逐窗取整漂移。长序列 QK-norm 扁平偏移使用 int64。
 - 禁止：在 step execution 上开 continuation；用 per-window 舍入累积 A/V 漂移；让 prompt 长度推动 AV 时间轴；把 guide 写成 masked target 前缀；把全局偏移承诺为精确镜头切换。
 - 验收：窗口规划、overlap discard/append、全局 temporal offset、多 prompt 同源媒体时钟、lock_source 与 int64 QK 偏移。^[PR #7838]
+
+
+## MMH3-2v — sampler 状态必须隔离到请求与 AV stream
+
+- 触发：修改 H3 sampler 参数、request/step denoise loop 或多请求合批。
+- 强制：省略 sampler 保持 `euler`；`res_multistep` 经统一名称校验，在每个请求内为 video/audio 的各自sigma schedule创建独立 solver。step模式把solver保存在该 `StepRequestState`；每步只按递增index消费一次。固定 distilled `base_schedule` 仅允许Euler，其他选择以说明验证限制的 `ValueError` 拒绝。
+- 禁止：跨请求或AV stream共享denoised history；对固定蒸馏schedule静默启用RES；重复或乱序推进solver；为支持新sampler改变默认Euler的浮点运算顺序。
+- 验收：默认Euler跨dtype保持bit-parity；RES系数与固定参考fixture对应；覆盖request/step一致性、mixed-sampler batch、locked audio、latent edit、首次/末次Euler更新、非法schedule及重复/乱序step拒绝。验收必须有实际solver测试，PR文字列出的实验不能替代可复现测试证据。^[PR #8378]

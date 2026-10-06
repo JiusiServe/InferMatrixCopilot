@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni Configuration"
 created: 2026-07-16
-updated: 2026-09-22
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, components, config]
 sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
@@ -34,11 +34,12 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 
 | 遇到什么 | 查看哪里 |
 |---|---|
+| API speech_cache budgets、继承与 process-local singleton | [speech cache](rules-speech-cache.md) |
 | 理解配置从 deploy、CLI、默认 factory 到 structured/legacy config 的稳定边界 | [配置构造架构](architecture.md) |
 | 根据 PR 描述直达 strict schema、pipeline sampling constraints、deploy/topology、composable strategy、global engine args 的 owner 校验、CLI-only 负向 alias 或显存配置的规则组与第一批源码、环境变量 inventory | [配置开发门禁与代码地图](rules.md)   新增核对：CONF-3e。 |
 
 | 对象存储 URI、HF cache snapshot 或空 `config.json` 的模型名称回退与 pipeline 路由 | [模型引用路由规则](rules-model-reference-routing.md) |
-| stage full-payload transport capability、topology-owned projection 或 deploy/CLI override rejection | [stage transport capability](rules-stage-transport.md) |
+| stage full-payload transport capability、topology-owned projection、async-chunk 自动模式或 deploy/CLI override rejection | [stage transport capability](rules-stage-transport.md) |
 | diffusion Ulysses SymmMem transport flag 的 deploy/CLI/default-stage projection | [diffusion parallel transport rules](rules-diffusion-parallel-transport.md) |
 | diffusion attention shorthand、structured config 与 global override 的优先级和最终规范表示 | [diffusion attention precedence](rules-diffusion-attention-precedence.md) |
 | legacy stage engine args 的 copy boundary、connector/default injection、repeated build mutation、global engine args 的 owner 校验或 CLI-only 负向 alias | [legacy engine-args isolation](rules-legacy-engine-args.md)   新增核对：VOMNI-CFG-1u。 |
@@ -50,6 +51,6 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 | 审查或新增 process 环境变量、stage `env` 和安全诊断输出 | [environment-variable contract](environment-variable-contract.md) |
 | 计算多 stage 显存预算 | [deployment memory budget](deployment-memory-budget.md) |
 | 添加新模型和注册点 | [adding a model](adding-a-model.md) |
-| composable strategy 的 axis、并行拓扑、load balancing owner 与 resolve_omni_config 统一解析 | [并行拓扑合同](rules-parallel-topology.md) |
+| composable strategy、并行拓扑、VAE batch mode 的 WORLD→DP 门禁与 load balancing owner | [并行拓扑合同](rules-parallel-topology.md) |
 
-| 冻结 topology、辅助 stage 注入、模型专用 deploy profile 与 LLM `additional_config` 投影 | [topology 与部署 profile](rules-topology-profiles.md) |
+| 冻结 topology、辅助 stage、mixed V1/MRv2 runner、deploy profile 与 `additional_config` 投影 | [topology 与部署 profile](rules-topology-profiles.md) |

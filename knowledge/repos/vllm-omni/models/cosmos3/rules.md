@@ -1,10 +1,10 @@
 ---
 title: "Cosmos3 规则"
 created: 2026-07-20
-updated: 2026-09-26
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/diffusion/models/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107", "PR #5614", "PR #6325", "PR #6913", "PR #6920", "PR #7427", "PR #7971"]
+sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/diffusion/models/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107", "PR #5614", "PR #6325", "PR #6913", "PR #6920", "PR #7427", "PR #7971", "PR #7592"]
 confidence: high
 ---
 
@@ -173,3 +173,11 @@ confidence: high
 - 强制：T2I、video 与 policy checkpoint 共享 `model_type=cosmos3_omni` 和同一 `model_index.json` `_class_name`。`OMNI_PIPELINES` 不得注册可被该 metadata 自动命中的 `cosmos3_omni`。policy 用 `cosmos3_policy`，omni overlay 用 `cosmos3_omni_deploy`，两者都不声明 `hf_architectures` / `diffusers_class_name`，只经 YAML `pipeline:` 选中。单 stage overlay 必须 `async_chunk: false`；`guardrails: false` 等 stage extras 只有选中该 key 后才会合并。无 `--deploy-config` 时 T2I/video 仍走 CLI 单 stage fallback；`--no-guardrails` 仍是 CLI-only 路径。
 - 禁止：为了让 `--deploy-config` 生效而把 `cosmos3_omni` 做成 auto-detect（会吞掉 policy/video）；静默丢弃 deploy YAML 却宣称 guardrails/stage extras 已生效。
 - 验收：断言 `cosmos3_omni` 不在 registry、opt-in key 无 auto-capture 字段；`cosmos3_omni.yaml` 经 `merge_pipeline_deploy` 得到 `guardrails is False` 与 `final_output_type="video"`。^[PR #7971]
+
+
+## COSMOS-8a — 采样状态与 transformer forward 必须分开控制 dtype
+
+- 触发：修改 Cosmos3 noise、scheduler/CFG state、conditioning mask 或 transformer 输入/输出 cast。
+- 强制：默认 sampling_dtype 为 FP32；初始 latent、条件图像/控制 mask、action/sound 和 scheduler 更新沿该 dtype 保持。仅在 predict_noise 的指定模型输入边界递归转 model dtype，transformer tensor/tuple 输出再转 sampling dtype。
+- 禁止：把默认 sampling state 随 BF16 权重整体降精度；遗漏 nested list/tuple 的输入 cast，或让 transformer 输出 dtype 反向决定 scheduler dtype。代码允许显式 sampling_dtype override，不能把默认策略写成禁止任何 override。
+- 验收：断言默认 FP32 state、BF16 model boundary 和 FP32 prediction return；覆盖 tensor/tuple、nested media、action/sound、transfer 以及显式同 model dtype 的 control。改变默认精度还须固定输入与 seed 比较输出质量，shape smoke 不能替代。^[PR #7592]

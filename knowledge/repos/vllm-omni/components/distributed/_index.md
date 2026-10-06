@@ -55,3 +55,6 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
 | 跨 stage `async_chunk` 流式语义 | [async chunk](async-chunk.md) |
 | TP KV receive consensus、chunk boundary、active-window 合同与 Mooncake TCP write completion | [distributed rules](rules.md)   新增核对：DIST-1l、DIST-1l2、DIST-1l3、DIST-1l4。 |
 
+- [SHM arrival hints、独立 work event 与 polling fallback](rules-shm-readiness.md)。
+
+- [stage-0-final、CFG KV/chunk 分区与全部stage后回收](rules-shm-final-cleanup.md)。

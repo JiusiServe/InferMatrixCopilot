@@ -1,14 +1,27 @@
 ---
 title: "Omni 输出类型合同"
 created: 2026-09-04
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5146", "PR #6152", vllm_omni/outputs/, "PR #7448", "PR #7608"]
+sources: ['PR #5146', 'PR #6152', vllm_omni/outputs/, 'PR #7448', 'PR #7608', 'PR #7843', 'PR #8500']
 confidence: high
 ---
 
 # Omni 输出类型合同
+
+## EXEC-OUTPUT-1a — output type 只接受 canonical 名称，字段命名不证明表示正确
+
+- 触发：修改 OutputModality parsing、engine_output_type config、payload naming 或 DELTA retention。
+- 强制：只接受 text/image/audio/latent/token_ids 的 lowercase 无空白名称与非空 `+`/`,`
+  组合；None 保持默认，显式空值穿过 config 并在 output-processor 初始化失败，清理已
+  启动 replica。TOKEN_IDS 是独立类型且不 drain；generic model_outputs/hidden 沿共享
+  default-key 命名，显式 auxiliary keys 保留，已有 per-key accumulation strategy 优先。
+- 禁止：把 token_ids 当 text alias；lower/strip 吞掉错误配置；因为 generic hidden 被
+  改名就当其 tensor values 已转成离散 IDs；改变已有 latent 表示或丢弃非流式中间全量上下文。
+- 验收：canonical/alias/case/whitespace/empty 解析、explicit-empty startup cleanup、dim0
+  accumulation、DELTA retention 与 key override；tensor normalization 前后值不变，
+  独立 auxiliary outputs 有明确 keys。平台-specific auxiliary producer 另验。^[PR #7843]
 
 `EXEC-7a`–`EXEC-7b`：Omni 输出必须是扁平的 `RequestOutput` 子类，并保持其字段与复制合同。触发条件与其余审查组见 [model-executor 共享规则](rules.md) 的 Direct 代码快速入口。
 
@@ -41,3 +54,15 @@ confidence: high
 - 强制：`consolidate_tensors` 接收 modality，并对每个 key 调用 `get_accumulation_strategy(modality, key)`。流水线通过 `register_key_accumulation_strategy` 注册覆盖；Qwen3-TTS 必须将 `codes.audio`→`CONCAT_DIM0`、`codes.ref`→`REPLACE`。`CONCAT_LAST` 失败仍可 flatten 后拼接；其他策略失败必须带 key 名 raise，不得静默 keep-last。
 - 禁止：整 payload 共用单一 modality 默认；把 codec-frame 矩阵当 `CONCAT_LAST` 波形；把非 `audio` 键的 concat 失败吞成 keep-last。
 - 验收：合成张量证明 `codes.audio` 沿 dim0 拼满、`codes.ref` 只保留一份，以及错误策略 raise；真实波形键仍走 `CONCAT_LAST`。^[PR #7608]
+
+## EXEC-7e — routed-expert 回归必须验证受支持的 native V2 auxiliary output
+
+- 触发：升级vLLM native auxiliary output或修改GPU routed-expert tests。
+- 强制：GPU auxiliary output的consumer是V2 runner `aux_output_connector_output`；测试经真实
+  native copy/process边界，保留decode/prefill rows、token_start和sampling mask，分别验证不同
+  sampled/rejected token counts都传入copy。legacy GPU辅助输出继续由既有配置gate拒绝。
+- 禁止：mock已删除的legacy `_omni_extract_routed_experts`，为保住旧测试恢复dead API；或只
+  检查sampled count，使相同/全零rejected count隐藏遗漏。
+- 验收：compact width1/2的native V2结果保持row/offset/mask并出现两项不同count arrays；
+  legacy config仍拒绝。test-only修复不改变production支持范围；旧vLLM0.30环境静态验证不证明
+  vLLM0.31 runtime，需单独的exact-head目标lane结果。^[PR #8500]

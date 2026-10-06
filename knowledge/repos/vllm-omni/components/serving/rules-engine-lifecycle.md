@@ -39,18 +39,6 @@ confidence: high
 - 验收：sleep 两个 stage、只 wake 一个时 generation 仍拒绝，随后 wake 另一个才放行。
   ^[PR #4834]
 
-### SERV-5b — 只有成功 ACK 和真实 backend capability 才能转为 warm
-
-- 触发：worker ACK 可返回 error，或不同 backend 对 level-2 restore 能力不同。
-- 强制：逐目标确认成功 ACK 后再清状态；level-2 能力按 backend/stage 表达。
-- 禁止：错误 ACK 也清 tag；用 engine 全局禁令误伤已经支持 restore 的 diffusion worker。
-- 验收：失败 ACK 保留 sleeping 状态；支持 level-2 的 diffusion 路径仍能
-  sleep → wake → generate，不支持的 stage 在调用 worker 前明确拒绝。
-  assembled app 对不支持的 level-2 wake 保留 sleeping state，并把既有
-  `NotImplementedError` 映射为 OpenAI-style structured HTTP 501；bare route mock 只证明
-  exception propagation，不能代替这条 live contract。^[PR #4834] ^[PR #4905]
-  ^[PR #4912] ^[PR #5713]
-
 ### SERV-5c — 共享服务类重构必须闭合全部构造状态
 
 - 触发：移动 model-specific capability 到 adapter、增加 factory/`__new__` 快路径，或让同一
@@ -147,34 +135,6 @@ confidence: high
 - 强制：adapter 初始化时一次性加载 `TTSCapabilities` 快照；静态模型能力归 adapter，`supported_speakers` 与 `supported_languages` 使用 `frozenset`，`precomputed_speakers` 保存 profile metadata，server 只拥有 `uploaded_speakers`，可用 speakers 由两者并集派生且上传集合独立维护。
 - 禁止：让 server 保存或修改静态能力；把上传 voice 合并进 built-in speaker 集合后在删除时 `discard`，或把 frozen dataclass 误解为内部 profile mapping 的深层不可变；在共享 serving 中恢复 model-type capability 分支。
 - 验收：构造相关 adapter，断言能力在初始化后进入 snapshot、集合类型正确且内置/预计算/上传 voice 的并集完整；删除与 built-in 同名的上传 voice 后内置 voice 仍存在，并验证无 adapter 的 diffusion 路径不会触发 adapter 属性错误或专属维度校验。^[PR #6138]
-
-### SERV-5m — AR lifecycle 控制必须先封锁 admission，并以 backend 完成信号收尾
-
-- 触发：修改 `AsyncOmni` 的 pause/resume、sleep/wake 或 abort，或改变
-  `StagePool.collective_rpc` 到 AR EngineCore / diffusion worker 的控制面路由。
-- 强制：在 sleep drain/offload 前设置 frontend admission gate；AR stage 经 orchestrator
-  路由到 EngineCore 的 `pause_scheduler`、`resume_scheduler`、`sleep`、`wake_up`，diffusion
-  stage 继续走 worker sleep/wake RPC。`wake_up()` 不得替 AR/mixed engine 解除 admission，只有
-  `resume_generation()` 可以解除；已 paused 时的定向 pause 和 cache clear 仍须执行。stage ID
-  必须先校验范围。只允许这四个已知 EngineCore helper 使用 `*_async` fast path，并保持 caller
-  timeout；其余 RPC 仍走 collective path。需要 frontend cleanup 的 abort 必须关联 result，等待
-  orchestrator 完成 stage abort、binding release 和 request cleanup 后才移除 frontend state，失败或
-  timeout 必须保留 state 并传播。
-- 强制：sleep 先关闭 admission，再等待所有 in-flight `_admitting` submissions drained 后才 offload；P0
-  先 reset MM cache，stage tag 保留 per-stage scope。wake 不重新开启 AR admission，仍只由
-  `resume_generation()` 解除。AR abort 必须把 cumulative terminal-prefix token 由 output processor
-  传至 stage pool/orchestrator 并 ACK 回 async queue；先物理 abort，再 commit output/request state，且
-  state 延迟到 generator 消费后清理。只移除最后一个 child，只有最后 terminal output 收敛；control RPC
-  exceptions 必须传播。diffusion abort 路径未因本 PR 改写。
-- 禁止：以单一 frontend flag 代替 AR scheduler 控制；在 sleep RPC 后才阻止 `generate()`；让
-  wake 隐式 resume；因已 paused 跳过不同 stage scope 或 cache reset；将任意同名 `*_async` helper
-  绕过 collective timeout；在 abort ack 前 pop request state，或将 abort failure 当成功。
-- 验收：覆盖 AR-only、diffusion-only 和 mixed stage 路由；sleep 进行时 generation 等待，AR
-  sleep → wake 后仍需显式 resume，跨 AR+diffusion 的 sleep/wake E2E 必须在 post-wake
-  `generate()` 前显式调用 `resume_generation()`，而 diffusion-only sleep → wake 可恢复 admission；重复/定向
-  pause 仍调用 scheduler 与 cache clear，非法 stage ID 产生明确错误，fast path 仅命中四个方法且
-  timeout 生效；abort success 后才清理 frontend state，orchestrator error 与 timeout 时 state 保留。
-  本 PR 的测试/PR body 没有独立 GPU performance 或全量 diffusion-abort evidence。^[PR #6084] ^[PR #6581] ^[PR #6367]
 
 ### SERV-5n — remote replica attach/detach 必须按本次 membership generation 判定
 

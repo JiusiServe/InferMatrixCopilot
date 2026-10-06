@@ -334,6 +334,69 @@ class Ledger:
             (repo, status, limit)).fetchall()
         return [{**dict(r), "payload": json.loads(r["payload"])} for r in rows]
 
+    def event(self, event_id: int) -> dict[str, Any]:
+        row = self._conn.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"source event {event_id} does not exist")
+        return {**dict(row), "payload": json.loads(row["payload"])}
+
+    def changesets_for_events(self, event_ids: set[int]) -> list[dict]:
+        """Whole source batches and their refinement descendants, never a partial batch."""
+        rows = [_changeset_row(r) for r in self._conn.execute("SELECT * FROM changesets")]
+        selected = set()
+        for row in rows:
+            ids = set(row["detail"].get("event_ids") or [])
+            if ids & event_ids:
+                if not ids <= event_ids:
+                    raise ValueError("event settlement must cover the whole existing source batch")
+                selected.add(row["id"])
+        while True:
+            descendants = {row["id"] for row in rows if any(
+                item.get("changeset") in selected for item in row["detail"].get("refine_history") or [])}
+            if descendants <= selected:
+                break
+            selected |= descendants
+        return [row for row in rows if row["id"] in selected]
+
+    def settle_reviewed_events(self, owner: str, rows: list[dict], changesets: list[dict], receipt: str) -> None:
+        """Apply verified manual dispositions atomically; preserve model verdicts."""
+        import hashlib
+
+        from ..knowledge_service.signing import canonical_json
+
+        now = self._clock()
+        with self.fenced(owner) as cur:
+            for item in rows:
+                source = item["source_event"]
+                row = cur.execute("SELECT * FROM events WHERE id=?", (source["id"],)).fetchone()
+                if row is None or any(row[k] != source[k] for k in ("repo", "source", "external_id", "created_at")) \
+                        or hashlib.sha256(canonical_json(json.loads(row["payload"]))).hexdigest() != source["payload_sha256"]:
+                    raise ValueError("source event identity or payload changed before settlement")
+                completed = json.dumps({"outcome": "manual_reviewed_merged", "receipt": receipt,
+                                        "disposition": item["outcome"], "reason": item["reason"]}, sort_keys=True)
+                if row["status"] == "done" and row["detail"] == completed:
+                    continue
+                if row["status"] != source["status"] or row["detail"] != source["detail"]:
+                    raise ValueError("source event changed before settlement")
+                cur.execute("UPDATE events SET status='done', detail=?, updated_at=? WHERE id=?",
+                            (completed, now, source["id"]))
+            completed_changesets = set()
+            for change in changesets:
+                row = cur.execute("SELECT status, detail FROM changesets WHERE id=?", (change["id"],)).fetchone()
+                detail = json.loads(row["detail"])
+                if detail.get("manual_reviewed_event_settlement") == receipt and row["status"] == "manual_reviewed_merged":
+                    completed_changesets.add(change["id"])
+                    continue
+                if row["status"] != change["status"] or detail != change["detail"]:
+                    raise ValueError("source changeset changed before settlement")
+                detail["manual_reviewed_event_settlement"] = receipt
+                cur.execute("UPDATE changesets SET status='manual_reviewed_merged', detail=?, updated_at=? WHERE id=?",
+                            (json.dumps(detail, sort_keys=True), now, change["id"]))
+                completed_changesets.add(change["id"])
+            for queue in cur.execute("SELECT id, changeset_id FROM human_queue WHERE resolved_at IS NULL").fetchall():
+                if queue["changeset_id"] in completed_changesets:
+                    cur.execute("UPDATE human_queue SET resolved_at=? WHERE id=?", (now, queue["id"]))
+
     def set_event_status(self, event_id: int, status: str, detail: str = "") -> None:
         with self.tx() as cur:
             cur.execute(

@@ -1,6 +1,13 @@
 # knowledge_service/curation.py — provider curation contract
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-10-06 -->
+
+`KnowledgeCurator.reviewed_rule_evidence(page_text, rule_id=..., source_reference=...)`
+uses the canonical parser to verify one active, source-citing rule and returns
+its exact UTF-8 section SHA256. `installed_knowledge_file(path)` reads canonical
+`knowledge/repos/*.md` package resources from the installed provider, independent
+of workspaces and environment overrides. Consumers can prove reviewed coverage
+without copying domain parsing or importing provider-private modules.
 
 `KnowledgeCurator` composes provider-owned catalog, bounded evidence prompt,
 proposal validation, append-only apply, fixed validator execution, and byte-exact

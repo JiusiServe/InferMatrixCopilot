@@ -1,0 +1,354 @@
+"""Manual source completion needs real merged admission and the exact active rules."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import replace
+
+import pytest
+
+from infermatrix_copilot.kb_service import event_settlement as settlement, reconcile
+from infermatrix_copilot.kb_service.activate import activate, switch_active
+from infermatrix_copilot.kb_service.ledger import LeaseError
+from infermatrix_copilot.knowledge_service.signing import SignatureError, verify
+from test_kb_intake_gate import PAGE
+from test_kb_reconcile_reviewed import world  # noqa: F401
+
+
+@pytest.fixture(autouse=True)
+def settlement_repository(world, monkeypatch):
+    monkeypatch.setattr(settlement, "_repository", reconcile._repository)
+
+
+def _ready(w, *, status="pending", no_rule=False):
+    reconcile.apply_plan(w.rt, reconcile.make_plan(w.rt, w.key, **w.options), w.key)
+    activate(w.rt, w.sha)
+    event = w.rt.ledger.record_event("demo", "merged_pr", "11" if no_rule else "10",
+                                    {"source_reference": "PR #11" if no_rule else "PR #10",
+                                     "merge_commit_sha": "a" * 40, "body": "immutable upstream evidence"})
+    if status != "pending":
+        w.rt.ledger.set_event_status(event, status, "original model rejection" if status == "rejected" else "old draft")
+    coverage = {"commits": [w.sha], "events": [{"id": event, "outcome": "no_rule" if no_rule else "already_covered",
+                "reason": "owner reviewed source; no durable rule" if no_rule else "owner reviewed the cited existing rule",
+                "rules": [] if no_rule else [{"path": PAGE, "rule_id": "DEMO-1a"}]}]}
+    w.rt.ledger.release_lease(w.rt.lease_owner)
+    return event, coverage
+
+
+@pytest.mark.parametrize("status", ["pending", "rejected", "drafted"])
+def test_selected_event_completes_honestly_and_future_events_stay_pending(world, status):
+    w = world
+    event, coverage = _ready(w, status=status)
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    assert w.rt.ledger.event(event)["status"] == status
+    future = w.rt.ledger.record_event("demo", "merged_pr", "12", {"merge_commit_sha": "b" * 40})
+    receipt = settlement.apply_plan(w.rt, plan, w.key)
+    assert settlement.apply_plan(w.rt, plan, w.key) == receipt
+    completed = w.rt.ledger.event(event)
+    assert completed["status"] == "done"
+    assert json.loads(completed["detail"])["outcome"] == "manual_reviewed_merged"
+    assert w.rt.ledger.event(future)["status"] == "pending"
+    assert reconcile.trusted_commits(w.rt) == {w.sha}  # settlement adds no history trust
+    verified = verify(settlement.RECEIPT_PURPOSE, json.loads(receipt.read_text()), w.key.public_key())
+    assert verified["events"][0]["source_event"]["status"] == status
+
+
+def test_no_rule_requires_signed_reason_without_inventing_a_rule(world):
+    w = world
+    event, coverage = _ready(w, no_rule=True)
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    receipt = settlement.apply_plan(w.rt, plan, w.key)
+    assert json.loads(w.rt.ledger.event(event)["detail"])["disposition"] == "no_rule"
+    assert verify(settlement.RECEIPT_PURPOSE, json.loads(receipt.read_text()), w.key.public_key())["events"][0]["rules"] == []
+
+
+@pytest.mark.parametrize("no_rule", [False, True])
+def test_original_no_rules_disposition_can_be_reviewed_without_erasing_history(world, no_rule):
+    w = world
+    event, coverage = _ready(w, status="done", no_rule=no_rule)
+    w.rt.ledger.set_event_status(event, "done", "no rules")
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    receipt = settlement.apply_plan(w.rt, plan, w.key)
+    assert settlement.apply_plan(w.rt, plan, w.key) == receipt
+    evidence = verify(settlement.RECEIPT_PURPOSE, json.loads(receipt.read_text()), w.key.public_key())["events"][0]
+    assert evidence["source_event"]["status"] == "done"
+    assert evidence["source_event"]["detail"] == "no rules"
+    assert evidence["outcome"] == ("no_rule" if no_rule else "already_covered")
+    assert json.loads(w.rt.ledger.event(event)["detail"])["outcome"] == "manual_reviewed_merged"
+
+
+@pytest.mark.parametrize("detail", ["old draft", "no rules ", '{"outcome":"manual_reviewed_merged","receipt":"other"}'])
+def test_other_completed_events_cannot_have_their_history_replaced(world, detail):
+    w = world
+    event, coverage = _ready(w, status="done")
+    w.rt.ledger.set_event_status(event, "done", detail)
+    with pytest.raises(reconcile.ReconciliationError, match="original done/no rules"):
+        settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    assert w.rt.ledger.event(event)["detail"] == detail
+
+
+def test_failed_batches_and_descendants_stop_but_verdicts_and_unrelated_queue_remain(world):
+    w = world
+    event, coverage = _ready(w)
+    with w.rt.ledger.lease() as owner:
+        original = w.rt.ledger.new_changeset_id("demo", "intake")
+        w.rt.ledger.stage_intake(owner, "demo", original, status="failed", drafted_events=[event],
+                                detail={"event_ids": [event], "decision": {"status": "fail"}},
+                                verdicts=[{"layer": "gate", "verdict": "fail"}], human_reason="model failed")
+        child = w.rt.ledger.new_changeset_id("demo", "refine")
+        w.rt.ledger.stage_intake(owner, "demo", child, kind="refine", status="failed", drafted_events=[],
+                                detail={"refine_history": [{"changeset": original}], "decision": {"status": "fail"}},
+                                verdicts=[{"layer": "gate", "verdict": "fail"}], human_reason="refinement failed")
+    w.rt.ledger.enqueue_human("demo", "unrelated task")
+    before = w.rt.ledger._conn.execute("SELECT * FROM verdicts").fetchall()
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    settlement.apply_plan(w.rt, plan, w.key)
+    assert w.rt.ledger.changeset(original)["status"] == "manual_reviewed_merged"
+    assert w.rt.ledger.changeset(child)["status"] == "manual_reviewed_merged"
+    assert w.rt.ledger.changeset(original)["detail"]["decision"]["status"] == "fail"
+    assert w.rt.ledger._conn.execute("SELECT * FROM verdicts").fetchall() == before
+    remaining = w.rt.ledger.human_queue()
+    assert "unrelated task" in [row["reason"] for row in remaining]
+    assert not any(row["changeset_id"] in {original, child} for row in remaining)
+
+
+@pytest.mark.parametrize("drift", ["payload", "identity", "status", "created_at"])
+def test_source_replacement_or_state_drift_refuses_before_receipt(world, drift):
+    w = world
+    event, coverage = _ready(w)
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    if drift == "payload":
+        w.rt.ledger._conn.execute("UPDATE events SET payload=? WHERE id=?", (json.dumps({"merge_commit_sha": "b" * 40}), event))
+    elif drift == "identity":
+        w.rt.ledger._conn.execute("UPDATE events SET external_id='15' WHERE id=?", (event,))
+    elif drift == "created_at":
+        w.rt.ledger._conn.execute("UPDATE events SET created_at=created_at+1 WHERE id=?", (event,))
+    else:
+        w.rt.ledger.set_event_status(event, "rejected", "a newer result")
+    with pytest.raises(reconcile.ReconciliationError):
+        settlement.apply_plan(w.rt, plan, w.key)
+    assert not (w.rt.state_dir / "event-settlements").exists()
+
+
+@pytest.mark.parametrize("failure", ["missing_rule", "wrong_scope", "no_citation", "no_reason", "no_merge", "failed_check"])
+def test_unproven_coverage_cannot_complete_source_events(world, failure):
+    w = world
+    event, coverage = _ready(w)
+    if failure == "missing_rule":
+        coverage["events"][0]["rules"][0]["rule_id"] = "MISSING-1"
+    elif failure == "wrong_scope":
+        coverage["events"][0]["rules"][0]["path"] = "repos/other/rules.md"
+    elif failure == "no_citation":
+        w.rt.ledger._conn.execute("UPDATE events SET external_id='15' WHERE id=?", (event,))
+    elif failure == "no_reason":
+        coverage["events"][0]["reason"] = ""
+    elif failure == "no_merge":
+        coverage["commits"] = [w.base]
+    else:
+        w.rt.github.checks[0]["conclusion"] = "failure"
+    with pytest.raises(reconcile.ReconciliationError):
+        settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    assert w.rt.ledger.event(event)["status"] == "pending"
+
+
+def test_wrong_active_target_and_corrupt_receipts_refuse(world):
+    w = world
+    event, coverage = _ready(w)
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    switch_active(w.rt.state_dir, w.rt.state_dir / "snapshots" / w.base)
+    with pytest.raises(reconcile.ReconciliationError, match="exact target"):
+        settlement.apply_plan(w.rt, plan, w.key)
+    activate(w.rt, w.sha)
+    receipt = settlement.apply_plan(w.rt, plan, w.key)
+    receipt.write_text("{}")
+    with pytest.raises(reconcile.ReconciliationError, match="modified"):
+        settlement.apply_plan(w.rt, plan, w.key)
+
+
+def test_plan_is_not_a_receipt_and_running_scheduler_blocks_apply(world):
+    w = world
+    _event, coverage = _ready(w)
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    directory = w.rt.state_dir / "event-settlements"
+    directory.mkdir()
+    (directory / f"{reconcile._digest(plan)}.json").write_text(json.dumps(plan))
+    with pytest.raises(SignatureError):
+        settlement.apply_plan(w.rt, plan, w.key)
+    for path in directory.glob("*.json"):
+        path.unlink()
+    with w.rt.ledger.lease():
+        with pytest.raises(LeaseError):
+            settlement.apply_plan(w.rt, plan, w.key)
+
+
+def test_partial_failed_batch_is_refused(world):
+    w = world
+    event, coverage = _ready(w)
+    other = w.rt.ledger.record_event("demo", "merged_pr", "11", {"merge_commit_sha": "b" * 40})
+    with w.rt.ledger.lease() as owner:
+        w.rt.ledger.stage_intake(owner, "demo", "whole-batch", status="failed", verdicts=[], human_reason="",
+                                detail={"event_ids": [event, other]}, drafted_events=[event, other])
+    with pytest.raises(ValueError, match="whole existing source batch"):
+        settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+
+
+def test_crash_after_receipt_before_commit_retries_without_another_receipt(world, monkeypatch):
+    w = world
+    event, coverage = _ready(w)
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    real_settle = w.rt.ledger.settle_reviewed_events
+
+    def crash(*_args):
+        raise RuntimeError("simulated process exit before ledger commit")
+
+    monkeypatch.setattr(w.rt.ledger, "settle_reviewed_events", crash)
+    with pytest.raises(RuntimeError, match="simulated"):
+        settlement.apply_plan(w.rt, plan, w.key)
+    assert w.rt.ledger.event(event)["status"] == "pending"
+    (receipt,) = (w.rt.state_dir / "event-settlements").glob("*.json")
+    monkeypatch.setattr(w.rt.ledger, "settle_reviewed_events", real_settle)
+    assert settlement.apply_plan(w.rt, plan, w.key) == receipt
+    assert w.rt.ledger.event(event)["status"] == "done"
+
+
+def test_active_snapshot_corruption_and_nonexistent_source_event_refuse(world):
+    w = world
+    event, coverage = _ready(w)
+    coverage["events"][0]["id"] = event + 100
+    with pytest.raises(ValueError, match="does not exist"):
+        settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    coverage["events"][0]["id"] = event
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    page = w.rt.state_dir / "active" / "knowledge" / PAGE
+    page.write_text(page.read_text() + "\nunauthorized mutation\n")
+    with pytest.raises(RuntimeError, match="snapshot"):
+        settlement.apply_plan(w.rt, plan, w.key)
+    assert w.rt.ledger.event(event)["status"] == "pending"
+
+
+def _historical_ready(w, monkeypatch, *, status="pending"):
+    event, coverage = _ready(w, status=status)
+    original = w.rt.ledger.event(event)["payload"]
+    original.pop("merge_commit_sha")
+    original["merged_at"] = "2026-10-01T01:02:03Z"
+    raw = json.dumps(original, indent=2)  # retain the exact legacy bytes, not just their canonical digest
+    w.rt.ledger._conn.execute("UPDATE events SET payload=? WHERE id=?", (raw, event))
+    item = coverage["events"][0]
+    item["source_merge_sha"] = "a" * 40
+    repository = w.rt.registry["demo"].full_name
+    upstream = {"number": 10, "html_url": f"https://github.com/{repository}/pull/10",
+                "merged": True, "merged_at": original["merged_at"], "merge_commit_sha": "a" * 40,
+                "head": {"sha": "b" * 40}, "base": {"repo": {"full_name": repository}}}
+    calls, existing_get = [], w.rt.github.get
+
+    def get(path, **params):
+        if path == f"/repos/{repository}/pulls/10":
+            calls.append(path)
+            return upstream
+        return existing_get(path, **params)
+
+    monkeypatch.setattr(w.rt.github, "get", get)
+    return event, coverage, upstream, raw, calls
+
+
+@pytest.mark.parametrize("status", ["pending", "drafted", "rejected"])
+def test_historical_merge_attestation_preserves_payload_and_revalidates_retry(world, monkeypatch, status):
+    w = world
+    event, coverage, upstream, raw, calls = _historical_ready(w, monkeypatch, status=status)
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    planned = verify(settlement.PLAN_PURPOSE, plan, w.key.public_key())["events"][0]
+    assert planned["source_merge_sha"] == "a" * 40
+    assert planned["source_event"]["payload_sha256"] == reconcile._digest(json.loads(raw))
+    assert planned["upstream_merge"] == {"repository": w.rt.registry["demo"].full_name, "number": 10,
+                                         "url": upstream["html_url"], "merge_sha": "a" * 40,
+                                         "head_sha": "b" * 40, "merged_at": upstream["merged_at"]}
+    receipt = settlement.apply_plan(w.rt, plan, w.key)
+    assert settlement.apply_plan(w.rt, plan, w.key) == receipt
+    assert len(calls) == 3  # prepare, apply and retry each obtain fresh upstream evidence
+    assert w.rt.ledger._conn.execute("SELECT payload FROM events WHERE id=?", (event,)).fetchone()[0] == raw
+    assert "merge_commit_sha" not in w.rt.ledger.event(event)["payload"]
+    evidence = verify(settlement.RECEIPT_PURPOSE, json.loads(receipt.read_text()), w.key.public_key())["events"][0]
+    assert evidence["upstream_merge"] == planned["upstream_merge"]
+    assert evidence["source_event"]["status"] == status
+
+
+@pytest.mark.parametrize("failure", ["missing_sha", "short_sha", "wrong_sha", "wrong_number", "wrong_repo",
+                                     "wrong_url", "unmerged", "missing_head", "bad_time", "wrong_time",
+                                     "missing_registry", "invalid_upstream", "malformed_base", "malformed_head"])
+def test_historical_source_needs_exact_configured_live_merge_evidence(world, monkeypatch, failure):
+    w = world
+    event, coverage, upstream, raw, _calls = _historical_ready(w, monkeypatch)
+    if failure == "missing_sha":
+        coverage["events"][0].pop("source_merge_sha")
+    elif failure == "short_sha":
+        coverage["events"][0]["source_merge_sha"] = "a" * 12
+    elif failure == "wrong_sha":
+        upstream["merge_commit_sha"] = "c" * 40
+    elif failure == "wrong_number":
+        upstream["number"] = 11
+    elif failure == "wrong_repo":
+        upstream["base"]["repo"]["full_name"] = "other/demo"
+    elif failure == "wrong_url":
+        upstream["html_url"] = "https://github.com/other/demo/pull/10"
+    elif failure == "unmerged":
+        upstream["merged"] = False
+    elif failure == "missing_head":
+        upstream["head"]["sha"] = ""
+    elif failure == "bad_time":
+        upstream["merged_at"] = "2026-10-01"
+    elif failure == "wrong_time":
+        upstream["merged_at"] = "2026-10-02T01:02:03Z"
+    elif failure == "missing_registry":
+        w.rt.registry.pop("demo")
+    elif failure == "malformed_base":
+        upstream["base"] = "other/demo"
+    elif failure == "malformed_head":
+        upstream["head"] = "b" * 40
+    else:
+        w.rt.registry["demo"] = replace(w.rt.registry["demo"], full_name="../wrong/demo")
+    with pytest.raises(reconcile.ReconciliationError):
+        settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    assert not (w.rt.state_dir / "event-settlements").exists()
+    assert w.rt.ledger.event(event)["status"] == "pending"
+    assert w.rt.ledger._conn.execute("SELECT payload FROM events WHERE id=?", (event,)).fetchone()[0] == raw
+
+
+@pytest.mark.parametrize("drift", ["head", "merge", "time", "repository"])
+def test_historical_upstream_drift_refuses_apply_before_receipt(world, monkeypatch, drift):
+    w = world
+    event, coverage, upstream, _raw, _calls = _historical_ready(w, monkeypatch)
+    plan = settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    if drift == "head":
+        upstream["head"]["sha"] = "c" * 40
+    elif drift == "merge":
+        upstream["merge_commit_sha"] = "c" * 40
+    elif drift == "time":
+        upstream["merged_at"] = "2026-10-02T01:02:03Z"
+    else:
+        upstream["base"]["repo"]["full_name"] = "other/demo"
+    with pytest.raises(reconcile.ReconciliationError):
+        settlement.apply_plan(w.rt, plan, w.key)
+    assert not (w.rt.state_dir / "event-settlements").exists()
+    assert w.rt.ledger.event(event)["status"] == "pending"
+
+
+@pytest.mark.parametrize("expected", ["a" * 40, "c" * 40])
+def test_historical_override_cannot_replace_existing_immutable_merge(world, expected):
+    w = world
+    event, coverage = _ready(w)
+    coverage["events"][0]["source_merge_sha"] = expected
+    with pytest.raises(reconcile.ReconciliationError):
+        settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    assert w.rt.ledger.event(event)["payload"]["merge_commit_sha"] == "a" * 40
+
+
+def test_historical_proof_does_not_relax_whole_batch_selection(world, monkeypatch):
+    w = world
+    event, coverage, _upstream, _raw, _calls = _historical_ready(w, monkeypatch)
+    other = w.rt.ledger.record_event("demo", "merged_pr", "11", {"merge_commit_sha": "b" * 40})
+    with w.rt.ledger.lease() as owner:
+        w.rt.ledger.stage_intake(owner, "demo", "whole-historical-batch", status="failed", verdicts=[], human_reason="",
+                                detail={"event_ids": [event, other]}, drafted_events=[event, other])
+    with pytest.raises(ValueError, match="whole existing source batch"):
+        settlement.make_plan(w.rt, w.key, coverage=coverage, **w.options)
+    assert w.rt.ledger.event(other)["status"] == "drafted"

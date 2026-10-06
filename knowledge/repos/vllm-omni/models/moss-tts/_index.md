@@ -1,7 +1,7 @@
 ---
 title: "MOSS-TTS 家族（Delay/Realtime/Local/Nano,一族八 deploy）"
 created: 2026-07-21
-updated: 2026-09-22
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, models]
 sources: ["PR #5635", "PR #6664", "PR #6543", "PR #4982", vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts/reference_encoder.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer_v2.py, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/]
@@ -54,6 +54,7 @@ sources: ["PR #5635", "PR #6664", "PR #6543", "PR #4982", vllm_omni/model_execut
 
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
+| registered voice generation、cold resolver 与 prefix salt | [registered reference](rules-registered-reference.md) | 服务端绑定与音频一致性 |
 | delay 生命周期、伪文本 logits、双代 tokenizer | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
 | codec v1/v2 选择、projection/checkpoint topology | [rules](rules.md#direct-代码快速入口) | loader 门禁与测试缺口 |
 | online request `seed`、Nano/Local/Delay/Realtime 的可复现性或并发 | 同页 `MOSSTTS-3a` | adapter precedence 与各变体 RNG 边界 |
@@ -81,3 +82,7 @@ sources: ["PR #5635", "PR #6664", "PR #6543", "PR #4982", vllm_omni/model_execut
 - 审查任一 MOSS 变体的码流、codec checkpoint 代际、CUDA-graph 开关或 serving 适配;新增变体时先对
   这 8 份 YAML 的差异矩阵。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。
+
+reference attention 平台 keyword/LSE 与短 Unix socket fixture：MOSS-REF-BACKEND-1a/MOSS-REF-TEST-1a；沿本目录 rules 审查入口核对。
+
+- [Local MRv2slot、逐行seed、ramp、first-chunk与sharedreference生命周期](rules-local-streaming.md)。

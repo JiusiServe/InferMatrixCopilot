@@ -1,14 +1,40 @@
 ---
 title: "Serving upstream 兼容规则"
 created: 2026-09-02
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #5976", "PR #5957", vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, tests/config/test_endpoint_policy.py, "PR #5036", "PR #6642", "PR #6773", "PR #6707", vllm_omni/config/endpoint_policy.py, "PR #6051", "PR #7426", "PR #5647"]
+sources: ['PR #8459', 'PR #5976', 'PR #5957', vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, tests/config/test_endpoint_policy.py, 'PR #5036', 'PR #6642', 'PR #6773', 'PR #6707', vllm_omni/config/endpoint_policy.py, 'PR #6051', 'PR #7426', 'PR #5647', 'PR #8518']
 confidence: high
 ---
 
 # Serving upstream 兼容规则
+
+## SERV-RELEASE-KV-1a — 新 release KV hints 必须无损穿过 request 升级与 wire
+
+- 触发：新增 upstream request 字段或修改 Omni `generate`、stage submission、wire conversion。
+- 强制：nonstream 与 streaming 首次 submission 都将 `kv_hints` 传入真实 input processor；
+  `EngineCoreRequest` 升级为 Omni request、wire transport 和 scheduler conversion 保留
+  `kv_hints` 与 session identity。diffusion stage 不具有该 AR/LLM KV cache，显式拒绝 hints。
+  fixed prompt-token scores 从 worker CPU snapshot 经 scheduler 到 engine output 保持
+  request identity，partial prefill 不伪造完整 score 输出。
+- 禁止：仅在入口接纳字段却在重新包装 dataclass 时丢失；忽略 diffusion 的 hints；
+  在 async scores copy 完成前读取，或让另一 request 的 scores 混入当前输出。
+- 验收：有/无 hints、stream/nonstream、payload upgrade→wire→scheduler，及 diffusion
+  refusal；fixed-token scores 分别覆盖 host copy 与真实 CUDA copy 路径。接口通过不等于
+  remote KV 性能或完整模型 logprob 质量已经验收。^[PR #8459]
+
+## SERV-RELEASE-KV-1b — 释放 KV memory 必须在完成 pause 后经 EngineCore 执行
+
+- 触发：修改 `release_kv_cache_memory`、stage RPC 路由、pause/wake lifecycle。
+- 强制：仅选择 AR stages；要求 frontend pause 已完成且 `_admitting==0`，Stage 0 被选择
+  时先清 frontend multimodal cache，再用 EngineCore helper 释放 KV。成功后记录 KV sleep，
+  恢复前保持 admission hold；以 `wake_up(tags=["kv_cache"])` 恢复再 resume。
+- 禁止：仅调用 worker collective RPC 绕过 EngineCore paused/resident 检查；缺失 helper
+  时报成功；释放 diffusion stage；RPC 或 pause failure 后伪造成功的 frontend 状态。
+- 验收：未 pause 拒绝、admission drain、AR/diffusion 混合选择、真实 helper 路由、
+  unsupported helper/error propagation、KV wake tag 与 resume admission。mock 测试
+  只证明路由及状态合同，真实显存释放量需另外测量。^[PR #8459]
 
 ## SERV-7a — upstream launcher 生命周期兼容必须保持模式检测语义
 
@@ -92,3 +118,15 @@ confidence: high
   已删除就宣称所有内部兼容路径已移除。
 - 验收：公开 rejection 与 canonical forwarding 测试通过；每个暂留内部/direct 路径有独立
   compatibility test，直到后续迁移显式删除。 ^[PR #5647]
+
+## SERV-7i — parsed logging settings 必须先于 Omni command validation 与 dispatch 生效
+
+- 触发：升级vLLM logger初始化合同或修改Omni CLI/module API-server入口。
+- 强制：Omni CLI在parse_args后、recognized command validate前调用upstream
+  `configure_logging_from_args(args)`，然后dispatch；直接module API server也在parse后、
+  model同步/后续validation与startup前调用同一入口。不得只依赖import-time logger defaults。
+- 禁止：只修 `vllm serve --omni` 而遗漏 `python -m ...api_server`，或在validate/dispatch后
+  才应用用户settings；logo可见不能替代level/config实际生效或模型startup证明。
+- 验收：两个真实entrypoint分别核对parsed settings→configure→validate/startup顺序，并用
+  显式logging参数检查效果。source的logo观察只支持初始化修复，未解决module入口仍显示
+  vLLM logo的既有问题，也不提供其它功能/模型运行资格。^[PR #8518]

@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni Benchmark 规则"
 created: 2026-09-05
-updated: 2026-09-26
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, benchmark]
-sources: ["PR #7648", "PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py, "PR #7130", "PR #7259", "PR #7624", "PR #7504", "PR #8107"]
+sources: ["PR #7648", "PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py, "PR #7130", "PR #7259", "PR #7624", "PR #7504", "PR #8107", "PR #7312", "PR #6538"]
 confidence: high
 ---
 
@@ -93,3 +93,33 @@ confidence: high
 - 强制：`run_diffusion_benchmark.py` 只跑 `is_diffusion_perf_config` 为真的 case（`benchmark_params[].dataset`）；`run_benchmark.py` 只跑 omni-bench case（`dataset_name`）。schema 过滤看字段，不看 `mark`。迁移 JSON 后，所有引用该文件的 CUDA/NPU/AMD 步骤必须一起换 runner，并改用对应的 `BENCHMARK_DIR` 与 artifact glob。
 - 禁止：一边已迁 omni-bench、一边仍调 diffusion runner（会 skip 全部 case，pytest 0 selected / exit 5）；把某一平台的 runner 修复外推为其他 pipeline 已对齐。
 - 验收：扫描全部 `.buildkite` 调用，断言 runner 与 JSON schema 一致；HunyuanVideo-1.5 t2v 等已迁 JSON 不得再回到 `run_diffusion_benchmark.py`。^[PR #8107]
+
+## BENCH-1i — startup 与 raw-load 数字必须保持测量边界并拒绝残缺样本
+
+- 触发：修改 MammothModa2 startup/storage benchmark、stage log parser 或 raw safetensors loading诊断。
+- 强制：分别报告import、Omni构建、first/subsequent generate与process→first image；保存实际
+  script hash、source/config/依赖、线程/cgroup、cache条件与每次fresh-process样本。parallel stage
+  intervals可重叠，不能相加；weight-load与model-load差值只是setup估计，缺字段保持未测量。
+- 强制：无 `BENCH_JSON` 为incomplete，`--require-complete`使其失败；storage wrapper传播engine
+  exit，删除旧summary/当前label旧输出，仅汇总本次成功logs。shard selection必须全匹配且非空。
+  raw-loader materialization含page faults/CPU allocation/copy，H2D含GPU allocation；CUDA setup
+  和operation warmup在timer外，不能称为disk bandwidth或engine-level read/cast/copy分解。
+- 禁止：把requested eviction当保证cold machine/NFS server cache；用一次fixed-seed image equality
+  宣称跨prompt/mode质量等价。1Hz device-global GPU采样含其他users且可能漏transient peak，
+  process-tree RSS也只是采样；parser first-milestone的stage timeline不证明multi-replica全体时间。
+- 验收：覆盖day/year rollover、无completion、engine非零退出、旧log/summary、缺shard/partial
+  selection；报告rotated fresh-process重复样本及spread，memory polling另跑。性能结果只适用
+  实际hardware/config，CUDA graph memory/headroom和质量另做matched验证。^[PR #7312]
+
+## BENCH-1j — archived baseline 刷新必须绑定明确采样窗口与 workload
+
+- 触发：据nightly archive改DFX perf JSON硬件bucket或调高latency/降低throughput reference。
+- 强制：逐metric/hardware/concurrency给出immutable raw-run links、成功数、排除原因、软件/
+  workload差异与重算方法；同window nightly等权算术平均，最后一次round，不暗加margin。
+  temporary realtime backend与ordinary HTTP Seed-TTS、duplex timing边界不可混用；不同版本/
+  性能period分开，并披露选旧window或只有two-night coverage的敏感性限制。
+- 禁止：选择性删除慢night或把未知revision的archived均值当fixed-version因果对照；把更新
+  reference说成优化目标已达成，或在无consumer时说成active performance regression gate。
+- 验收：独立由原始数据重算全部更改值，保持benchmark/deployment/tolerances未改且bucket/
+  sweep位置一致；说明完整metric counts/失败数。PR #6538的69值属于历史reference，不能
+  推断H100 reference-audio变更解释全部shift或C8 RTF<1目标已实现。^[PR #6538]

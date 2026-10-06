@@ -1,13 +1,15 @@
 ---
 title: "Diffusion"
 created: 2026-07-10
-updated: 2026-09-22
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/attention/backends/flashinfer_attn.py]
 ---
 
 # Diffusion
+
+- [IPC 与客户端错误](rules-ipc-errors.md) — dead-peer send、abort no-op 与单 GPU status 保留。
 
 - 源码入口：`vllm_omni/diffusion/` 全树，含 17 个子模块：attention、cache、diffusion_kv、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
 - 源码校验：以上子模块均已在 `main @ 44d3ae10`（upstream `main` 快照）验证存在；MiniMax-H3 的 VAE eager
@@ -28,15 +30,21 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 
 | 遇到什么 | 查看哪里 |
 |---|---|
+| Wan exact/fused BF16预算、channels_last首帧Conv2d与cache/fallback | [Wan fastpath规则](rules-wan-fastpath.md) |
+| FlashInfer FP32 per-tensor scale、TRTLLM SAGE ragged/Smooth-K 与量化环境变量 precedence | [FlashInfer quantization rules](rules-flashinfer-quantization.md) |
+| TRTLLM opaque custom-op workspace/fake dtype 与实际 verified execution scope | [TRTLLM execution rules](rules-trtllm-execution.md) |
+| AR-Diffusion kernel legal page、ragged sink/recent KV、scratch offset 与固定 block-table width | [AR paging geometry rules](rules-ar-paging-geometry.md) |
+| Ray cluster placement、env/RPC transport、bounded teardown 与 idle failure | [Ray executor rules](rules-ray-executor.md) |
 | 理解共享职责和数据流 | [architecture](architecture.md) |
 | 根据 PR 描述直达 execution parity、checkpoint/artifact identity、quality evidence 或 system-runtime 异常清理规则组与第一批源码、custom-op mutable schema | [rules 与代码地图](rules.md) |
 | image/diffusion timing、step normalization、missing-versus-zero 与 benchmark 解释边界 | [metrics evidence rules](rules-metrics.md) |
 | vLLM/torch rebase、MoE/quant helper 漂移、kernel backend capability 与 matched accuracy | [upstream 兼容规则](rules-upstream-compat.md) |
-| worker process title、拓扑局部 rank 与日志前缀 | [worker observability rules](rules-worker-observability.md) |
+| worker process title、拓扑局部 rank、日志前缀与offload worker-local allocator峰值 | [worker observability rules](rules-worker-observability.md) |
 | 平台 IR-op priority、Inductor/eager 默认顺序、pipeline compile 准入与模型 hook 合并 | [platform runtime rules](rules-platform-runtime.md) |
 | CustomOp XPU platform dispatch、PyTorch-native fallback、CUDA contract 与非同义 override 边界 | [CustomOp dispatch rules](rules-custom-op-dispatch.md) |
 | runtime temporary 与 loader-scoped parameter dtype、shared RMSNorm accuracy | [tensor dtype rules](rules-tensor-dtype.md) |
 | Wan VAE height/width spatial reshard、empty tail、attention extent | [Wan spatial-shard rules](rules-wan-spatial-shard.md) |
+| 完整图像 batch VAE decode、native tiling、uneven/idle rank 与 gather 顺序 | [Batch VAE decode rules](rules-vae-batch.md) |
 | multi-DiT、dotted `_dit_modules`、loader-to-offloader handoff 与跨 Cache-DiT/compile/LoRA/offload lifecycle、batch sampling-key 的 provided 标志 | [component lifecycle rules](rules-component-lifecycle.md)   新增核对：DIFF-2ag。 |
 
 | PEFT 与 distilled LoRA、startup fusion、delta/key/alpha、Qwen/Wan transformer mapping、PEFT suspend/resume | [LoRA rules](rules-lora.md)   新增核对：DIFF-2ag2、DIFF-2ag3。 |
@@ -60,3 +68,13 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 
 
 - [Diffusion 平台 kernel 与设备合同](rules-platform-kernels.md) 新增核对：DIFF-1ai5。
+
+- [测试替身与类型契约](rules-test-contracts.md) — streaming executor、payload 收窄与实际 CPU/type 门禁。
+
+- [HSDP pre-sharded 权重加载](rules-hsdp-weight-loading.md) — meta-first binding、rank-local I/O 与真实双卡 parity。
+
+- [Attention execution-path 能力](rules-attention-contracts.md) — 有效 metadata、FA4 编译边界与未迁移平台。
+
+shared RMSNorm 的empty-input与fused精度边界沿 tensor dtype rules 的DIFF-NORM-1a核对。
+
+- [registered video SHM 与 borrowed mapping ownership](rules-video-transport.md)。

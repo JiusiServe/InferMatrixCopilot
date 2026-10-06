@@ -1,10 +1,10 @@
 ---
 title: "Diffusion component lifecycle 规则"
 created: 2026-09-02
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5720", "PR #5853", "PR #5882", "PR #5884", "PR #6486", "PR #6591", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/offloader/startup.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/models/sana_video/test_cache_offload.py, tests/diffusion/test_diffusion_model_runner.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072", "PR #7078", "PR #7047"]
+sources: ["PR #5720", "PR #5853", "PR #5882", "PR #5884", "PR #6486", "PR #6591", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/offloader/startup.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/models/sana_video/test_cache_offload.py, tests/diffusion/test_diffusion_model_runner.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py", "PR #6072", "PR #7078", "PR #7047", "PR #8453"]
 confidence: high
 ---
 
@@ -109,7 +109,9 @@ residency 留在模型 owner。规则入口与其他共享机制仍见 [Diffusio
   enable boundary；该 boundary 必须 take-and-remove state exactly once。backend enable 从 hook/
   staging/lease acquisition 到 initial prefetch 失败时先 quiesce and disable，再关闭仍属 loader 的
   state；已提交 final-layout restore 在 preferred mode 只能以 fresh canonical model retry，required
-  mode 必须传播失败。worker shutdown 必须在 destroy distributed state 前 disable offloader；registered
+  mode 必须传播失败。worker shutdown 必须在 destroy distributed state 前关闭 offloader；
+  layerwise shutdown 与可再次 enable 的 disable 分开：前者清 hook/state 时不恢复整份 DiT
+  到 GPU，后者仍为后续 reuse 恢复 weights。registered
   HWR mmap teardown 先 drain/release source references、unregister all ranges，再 close lease。若 unregister
   失败，保留 registration 与 open lease（跨 fresh retry/backend GC 亦然）供 retry 或 process exit，不能
   让 finalizer unmap CUDA 仍持有的页面。
@@ -118,7 +120,8 @@ residency 留在模型 owner。规则入口与其他共享机制仍见 [Diffusio
 - 验收：覆盖 absent/taken startup state、backend construction/enable/prefetch failure、single fresh
   retry 与 required no-retry；断言 partial backend disable、carrier/lease close、fresh path bypasses
   HWR and checkpoint mmap；另注入 unregistration failure，断言 retryable retention、backend drop 和
-  distributed teardown ordering。^[PR #6486] ^[PR #6591]
+  distributed teardown ordering；layerwise shutdown 不调用 restore-next-block 且清全部 hooks，
+  不把 mock cleanup 成功外推为每个模型退出都满足 executor grace。^[PR #6486] ^[PR #6591] ^[PR #8453]
 
 ## DIFF-2ad — batch-first sampling gate 的 provided 标志必须进入 RequestBatchSamplingParamsKey
 

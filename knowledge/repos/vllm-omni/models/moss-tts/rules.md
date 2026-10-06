@@ -1,10 +1,10 @@
 ---
 title: "MOSS-TTS 规则"
 created: 2026-09-02
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #5635", "PR #6908", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, "PR #6241", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local_depth.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py", "PR #6543", "PR #4982", vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/moss_tts/reference_encoder.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, tests/entrypoints/openai_api/test_tts_adapter.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/model_executor/models/moss_tts/test_reference_encoder.py, "PR #7885"]
+sources: ["PR #5635", "PR #6908", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, "PR #6241", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local_depth.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py", "PR #6543", "PR #4982", vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/model_executor/models/moss_tts/reference_encoder.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, tests/entrypoints/openai_api/test_tts_adapter.py, tests/entrypoints/openai_api/test_serving_speech.py, tests/model_executor/models/moss_tts/test_reference_encoder.py, "PR #7885", "PR #8463", "PR #8447"]
 confidence: high
 ---
 
@@ -118,3 +118,19 @@ confidence: high
 - 强制：共享 resolve LRU 只存 owned、C-contiguous `float32` 数组，容量按 `nbytes` 记账；finalize 必须 `copy=True` 切断对更大 decode 缓冲的 view。list 接口仅在调用边界临时 `.tolist()`，不得保留第二份 list 缓存。server-side encoder 走 array resolver；tensor 构造仍 copy，隔离缓存数组。drainer 在 `finally` 中丢弃已完成的 `first`/`jobs` 引用后再等待下一项。
 - 禁止：把 `list[float]` 作为长期缓存存储；让完成 batch 在等下一队列项时继续持有；调用方原地 mutate 缓存数组。
 - 验收：覆盖数组所有权、list 兼容路径、cache hit 不保留第二 list，以及 completed-batch 生命周期释放。^[PR #7885]
+
+
+## MOSS-REF-BACKEND-1a — reference attention 必须按平台保持 kernel keyword 与返回合同
+
+- 触发：修改 MOSS reference encoder 的 local-window varlen attention 或 ROCm backend dispatch。
+- 强制：NVIDIA 使用 vLLM FlashAttention 并传 fa_version；ROCm 优先 AITER、仅 ImportError 时回退 upstream flash_attn，均不传 NVIDIA 专有 fa_version。AITER 且 grad enabled 且 Q/K/V 任一 requires_grad 时请求 return_lse=True；统一解包 tuple 的 attention tensor。
+- 禁止：在 ROCm 无条件导入 NVIDIA extension；把 AITER 的 LSE keyword 传给 upstream fallback；在 inference/graph path 额外分配 LSE，或改变 causal window 与 padded-query mask。
+- 验收：覆盖 NVIDIA、AITER grad/inference 和 upstream fallback 的调用参数/返回类型；两种 FA version 的窗口 SDPA parity、padded-row zeroing 与 valid causal prefix 不受未来 padding 污染都必须保持。^[PR #8463]
+
+
+## MOSS-REF-TEST-1a — Unix socket 测试必须使用短路径并按 fixture 生命周期释放
+
+- 触发：MOSS shared reference encoder 测试创建 ref-encoder.sock，或修改共享目录 fixture。
+- 强制：为 socket 使用独立短 TemporaryDirectory(prefix="moss-ref-")，与 pytest 嵌套 tmp_path_factory 路径脱钩；fixture 在 context 内 yield，使目录覆盖 client/host 使用期；保留跨 encoder single-flight 与相同 artifact/key/音频断言。
+- 禁止：把 socket 放到可能超过 AF_UNIX 限制的深层 pytest 目录；仅缩短路径就削弱共享/cleanup 断言，或把测试修复宣称为 production 行为变化。
+- 验收：在深层 pytest base dir 的 CPU/ROCm lane 跑 test_shared_reference_encoder.py 与 test_inline_reference_shared_across_encoders，确认无 AF_UNIX path too long 且原断言成立。^[PR #8447]

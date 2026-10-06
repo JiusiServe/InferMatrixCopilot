@@ -1,13 +1,15 @@
 ---
 title: "Model Executor"
 created: 2026-07-10
-updated: 2026-09-22
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, components, model-executor]
 sources: []
 ---
 
 # Model Executor
+
+- [MRv2 optional codec](rules-mrv2-optional-codec.md) — missing attribute 与 eager-MTP replay eligibility。
 
 - 源码入口：`vllm_omni/model_executor/`（layers、model_loader、models、stage_input_processors）、
   `vllm_omni/model_extras/`（模型专有请求/prompt 转换）、`vllm_omni/worker/`（gpu_*_worker、
@@ -34,12 +36,24 @@ sources: []
 
 | 遇到什么 | 查看哪里 |
 |---|---|
+| Breeze ROCm RNG fallback、CUDA generator registration或depth-layer Triton autotune | [Breeze平台合同](rules-breeze-rocm.md) |
 | 理解共享职责和阶段边界 | [architecture](architecture.md) |
 | 根据 PR 描述直达 stage config、runner preprocess、stage runtime、bridge/batch 或 loader 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
 | runtime info、跨 stage payload、batch 与 request RNG 合同 | [跨 stage bridge 与 batch 合同](rules-bridge-batch.md) |
 | loader 的 dtype/config 获取、fused shard 与多模块 checkpoint 载入 | [loader 合同](rules-loader-contract.md) |
 | shared image example envelope 与 model_extras 参数声明 | [image task envelope 合同](rules-image-task-envelope.md) |
-| Omni 输出类型与字段/复制合同 | [输出类型合同](rules-output-contract.md)   新增核对：EXEC-7c、EXEC-7d。 |
+| Omni 输出类型、字段/复制合同与V2 native routed-expert auxiliary output | [输出类型合同](rules-output-contract.md)   新增核对：EXEC-7c、EXEC-7d。 |
 | 采样循环不变量、热路径缓存、AR 音频侧路、preprocess phase/one-token prefill | [运行时热路径合同](rules-runtime-hot-paths.md) |
 
 | NPU runner、ROCm 分页注意力、NPU 模型补丁 | [平台后端合同](rules-platform-backends.md)   新增核对：EXEC-10f、EXEC-10f2。 |
+
+- [MRv2 attention capture 边界](rules-attention-capture.md) — mixed FULL、separate decode 与当前请求 boundary。
+
+- [release processor/dummy、profiling、state selection 与 auxiliary output：EXEC-RELEASE-1a–1d](rules-release-contracts.md)。
+
+- [显式seed、whole-MTPgraph与NVIDIA/ROCm抽样边界](rules-request-rng.md)。
+- [异步output slab、producer事件与storage所有权](rules-output-snapshots.md)。
+
+- [MRv2 aux tree、narrow sampler、sampled embedding 与 generation输出](rules-mrv2-output-contracts.md)。
+
+- [settled row predicate与preemption replay fallback](rules-settled-preprocess.md)。

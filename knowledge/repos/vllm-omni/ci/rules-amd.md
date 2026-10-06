@@ -1,10 +1,10 @@
 ---
 title: "AMD/ROCm CI 规则"
 created: 2026-09-05
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234", "PR #6966", "PR #7395", "PR #6978", "PR #7398"]
+sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234", "PR #6966", "PR #7395", "PR #6978", "PR #7398", "PR #8342", "PR #7935", "PR #7933", "PR #8527", "PR #8189", "PR #8520"]
 confidence: high
 ---
 
@@ -16,7 +16,8 @@ confidence: high
   cleanup diagnostics、Qwen3-TTS argv，或 Qwen3-Omni sleep/abort control-plane E2E 变更。
 - 强制：debug-only READY+MERGE composition 保留 normal branch selection、一个 shared build dependency
   和 named groups；MI300 long steps 有 explicit bounds，已知 failing case 保持独立、time-bounded
-  `NonBlocking`。memory comparisons 在 model/offload 后采样、减每 run initial device use 并清 cache；
+  `NonBlocking`。memory comparisons 在 model/offload 后采样并清 cache；原 device-global
+  incremental sampling 已由 worker-local allocator peak 合同替代，见 DIFF-4x；
   optional cleanup diagnostic 也必须 bounded。ROCm offload threshold 只是一项机制 signal，不是
   portability/capacity/performance claim。^[PR #6704]
 - 强制：MI300 blocking layerwise-offload step 只 deselect exact Stable Audio parameter，并以 dependent
@@ -43,6 +44,14 @@ confidence: high
 - 禁止：让 `cards_2+` 测试在单卡 worker 上 spawn rank1→GPU1 导致 `invalid device ordinal`；用邻近 green shard 宣称 multi-GPU routing 已修好。
 - 验收：pipeline argv/collection 断言单卡 job 排除 multi-card markers、双卡 job 收集目标文件；硬件 marker helper 覆盖 ROCm 声明。^[PR #7234]
 
+- Simple CPU diffusion shard 即使 module 同时带 cpu，也必须排除全部 multi-card case；Pi0.5
+  的昂贵 module-scoped CPU fixture 可整体迁到独立 blocking lane，避免拆到不同 shard 重复启动。
+  AuK 四个 graph case 用独立 GPU selector；Ulysses mask-layout 在真实 two-GPU lane执行。
+- PR #8342 的 `not cards_2…cards_8` 仅修 multi-card misrouting，不保证排除所有 cards_1 GPU
+  case。MERGE 的 Ulysses command 又位于 Z-Image TP 后；前一 command hang/fail 时目标可能未执行。
+  审查须检查目标 node 的实际终态，不从 YAML presence/邻近 pass 推断全树 CPU/GPU routing 闭环。
+  专用 CPU/GPU per-test marker 防空转合同见 OMNI-CI-1a。^[PR #8342]
+
 ## OMNI-CI-2i — AMD bootstrap 必须按 ready/merge-test 标签选择 L2/L3 suite
 
 - 触发：修改 `.buildkite/amd` bootstrap、`select_test_suites.py`、AMD PR label 路由，或 skip-ci 对 AMD suite 的过滤。
@@ -64,9 +73,42 @@ confidence: high
 - 禁止：把 `nightly-test` 当成无 suite 的噪声 label；用 L2/L3 diff gate 静默丢掉已选 nightly；把实验 nightly 阈值外推为 CUDA H100 基线。
 - 验收：渲染 `DEBUG_TEST_YAML=nightly`、`NIGHTLY=1`、组合 label 与 docs-only+nightly，断言 suite spec 与子 pipeline 叶子集合。^[PR #6978]
 
+- 新 AMD nightly 使用 shared native runner、精确 node/selector 的 fail-closed collect-only，
+  再执行同一 selection，JUnit 从 /tmp staged 到 checkout-relative artifact root。rendered template
+  已注入 amd-build 依赖时不重复 source field；通用 template/schema tests 与 rendered inspection
+  验证所有权，避免每新增 job 都复制只复述配置的 UT。
+- LingBot ROCm 单卡仅给 CFG-off case MI325 eligibility，batch-CFG sibling 仍 CUDA-only；Cosmos3
+  保留 CUDA marks并增加 exact ROCm T2I node。NonBlocking、collection 与 artifact 不是模型质量
+  或目标 MI300 pass。两个 source 的最终 step budget 都为 90min。^[PR #7935] ^[PR #7933]
+- Cosmos3 prewarm 与 server 使用同一 job-local AITER/Torch cache。仅在 ROCm、真实 FA可用且
+  `AITER_JIT_DIR` 明示时，以 masked/unmasked BF16 MHA 分别检查输出 shape/finite 和两项预期
+  `.so` 存在；prewarm 55min、test 25min 均以 TERM/kill bounds 留出 90min step信封。^[PR #7933]
+
 ## OMNI-CI-2i4 — AMD entrypoints GPU ready job 必须单次 pytest、有界超时并检测进程泄漏
 
 - 触发：修改 `.buildkite/amd/test-amd-ready.yml` 的 entrypoints/R2-02 GPU coverage、artifact 根路径，或 teardown 进程快照比较。
 - 强制：`mi300_1` NonBlocking job 设 `VLLM_WORKER_MULTIPROC_METHOD=spawn`，marker 排除 `cards_2`–`cards_8`，只跑一次 verbose pytest（禁止第二趟 `--collect-only`）。内层 `timeout` 短于 Buildkite step，为 teardown/artifact 留窗口。artifact 根在 Buildkite checkout；前后 `ps` 快照用 PID+start-time 身份比较，泄漏则 fail closed。零 collection 不得被允许通过。
 - 禁止：依赖 PID-only 比较掩盖 reuse；把 CUDA pipeline 定义当作 ROCm ready 覆盖；用邻近 green shard 宣称本 job 合同已满足。
 - 验收：结构断言单次 pytest、超时信封、marker、六类 artifact 与 `process-cleanup` PASS；真实 MI300 跑通 selected node。^[PR #7398]
+
+## OMNI-CI-2i5 — AMD exit-status retry 只能表达有界恢复策略
+
+- 触发：为 AMD READY/MERGE Simple Diffusion shards 增加 automatic retry。
+- 强制：两 suite 保持相同 `exit_status: 134, limit: 1`，Kubernetes retry 从 fresh pod 开始。
+  assertion exit1、timeout124、OOM137 与其他 exit不在该 retry selector 中。
+- 禁止：将任意134诊断为GPU hang，或让源码确定性失败/冷编译timeout进入无界重跑；成功retry
+  不抹去原失败证据。job-specific配置UT不应替代 generic retry/template保留与真实失败日志。
+- 验收：rendered READY/MERGE 保留唯一134 retry及既有timeout；从original/retry job日志核对
+  source SHA、pod身份、exit与terminal结果，分别报告status选择和实际根因。^[PR #8520]
+
+## OMNI-CI-2i6 — AMD AITER cache 复用必须保留完整文件与 blocking backend 覆盖
+
+- 触发：将cold-compiling diffusion attention tests迁入共享AITER lane或修改test backend override。
+- Mammoth READY 保留整个 attention file：blocking model lane 在 production `OmniDiffusionConfig`
+  context 下显式 TORCH_SDPA；default AITER 的完整 file 位于已有 nonblocking attention suite 后，
+  共用已暖的 job cache。直接构造 DiT 时也必须进入相同 config context，并断言 env override到达
+  `TransformerBlock`。不能只挪一个 node、只设 env 或只延长 timeout 来宣称避免 cold compilation；
+  两条 backend/lane 分开资格化，warm default run 不代替 blocking SDPA或MERGE coverage。^[PR #8527]
+- 验收：rendered argv覆盖完整file与两个backend；production config context下直接构造layer
+  证明显式backend到达consumer，default backend仍命中平台默认；exact target jobs分别记录
+  collection、cache复用和terminal结果。静态/缺依赖的local run不能宣称MI300 runtime pass。^[PR #8527]

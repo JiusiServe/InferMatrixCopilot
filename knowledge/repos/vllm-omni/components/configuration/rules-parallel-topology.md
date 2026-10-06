@@ -1,10 +1,10 @@
 ---
 title: "并行拓扑合同"
 created: 2026-09-04
-updated: 2026-09-09
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, config]
-sources: [vllm_omni/config/composable_parallel/, vllm_omni/config/config_factory.py, vllm_omni/config/stage_config.py, "PR #5531", "PR #5140"]
+sources: [vllm_omni/config/composable_parallel/, vllm_omni/config/config_factory.py, vllm_omni/config/stage_config.py, "PR #5531", "PR #5140", "PR #8162"]
 confidence: high
 ---
 
@@ -71,3 +71,11 @@ confidence: high
 - 强制：标准与 headless 生产路径只调用 `resolve_omni_config()` 获得 `OmniConfigResolution`（structured config、runtime compatibility stages、strategy-derived LB、effective deploy path）；factory 的 create/legacy 方法是 resolver 与测试的下层 primitive，engine/entrypoint 不得绕过 resolver 直接选源。通用单 stage diffusion 仅在 registry 解析失败后作为 fallback；legacy `stage_configs_path`/`stage_configs` 必须显式报错。
 - 禁止：engine 侧二次合成 default diffusion stage 或重复 merge LoRA/attention/quant/cache/profiler；把 OmegaConf-compatible stages 宣传为稳定公共 ABI；静默恢复已删除的 stage-configs-path 行为。
 - 验收：同一 model+deploy+override 在标准与 headless 路径得到等价 topology 与 LB policy；覆盖 registry 命中、generic diffusion fallback、以及拒绝已删除 legacy 参数。^[PR #5140]
+
+
+## CONF-4g — VAE batch mode 必须在最终 WORLD 拓扑上保持 DP/PP/CFG=1
+
+- 触发：修改`vae_parallel_mode=batch`、diffusion/Omni并行配置校验或WORLD→DP推导。
+- 强制：两类配置都接受batch mode，但仅允许DP=PP=CFG=1；DP尚未指定时，必须在WORLD-derived DP完成后再次检查，不能把`None`当成已证明的1。runtime decoder合同见[batch VAE rules](../diffusion/rules-vae-batch.md)。
+- 禁止：batch mode与独立请求的DP或PP/CFG group组合；只检查显式DP而遗漏推导值；把TP rank数当成请求合批许可。
+- 验收：覆盖各axis>1的拒绝、有效TP topology、omittedDP推导出>1的拒绝，以及两类配置的相同mode枚举。^[PR #8162]

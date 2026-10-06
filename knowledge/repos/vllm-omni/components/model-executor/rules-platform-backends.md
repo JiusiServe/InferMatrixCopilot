@@ -1,14 +1,25 @@
 ---
 title: "平台后端合同"
 created: 2026-09-04
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102", "PR #6563", "PR #6054", vllm_omni/platforms/npu/platform.py, tests/platforms/npu/test_diffusion_platform.py, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6674", vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_generation_model_runner.py, vllm_omni/platforms/npu/worker/npu_model_runner.py, "PR #7301", "PR #7393"]
+sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py", "PR #5569", "vllm_omni/platforms/xpu/utils.py", "PR #5048", "PR #6350", "PR #6102", "PR #6563", "PR #6054", vllm_omni/platforms/npu/platform.py, tests/platforms/npu/test_diffusion_platform.py, tests/platforms/npu/test_diffusion_attn_backend_selector.py, "PR #6674", vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_generation_model_runner.py, vllm_omni/platforms/npu/worker/npu_model_runner.py, "PR #7301", "PR #7393", "PR #8330"]
 confidence: high
 ---
 
 # 平台后端合同
+
+## EXEC-NPU-INIT-1a — 模型补丁必须在 platform 初始化完成后、worker 建模之前安装
+
+- 触发：修改 NPUOmniPlatform constructor/set_device、VoxCPM2 patch import 或 worker class。
+- 强制：会经模型 transitive dependencies 再解析 current_omni_platform 的补丁不得在
+  platform constructor 导入；在 super.set_device 之后、worker 构造模型之前幂等安装，
+  保持既有 custom-op/device 设置与 worker class。
+- 禁止：因为直接 model import 看起来 lazy 就在 constructor 安装；只验证 normal serve
+  而不检查先 import 模型的 collection；把 CPU/mock 的 import-order 测试当作 NPU graph parity。
+- 验收：platform 构造不安装 VoxCPM2 patch，set_device 顺序为底层设备→补丁→custom ops，
+  重复安装不重复 wrap；pytest collection 与真实 NPU execution 分开记录。^[PR #8330]
 
 `EXEC-10a`–`10e`、`EXEC-12a`–`EXEC-13h`：NPU 平台 runner 的 runtime mode 与 dummy-run 接口、ROCm 分页注意力的 packed KV varlen 路径，以及 NPU 模型补丁的注册与回归。触发条件与其余审查组见 [model-executor 共享规则](rules.md) 的 Direct 代码快速入口。
 

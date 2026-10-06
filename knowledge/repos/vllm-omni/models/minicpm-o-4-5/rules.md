@@ -38,8 +38,8 @@ confidence: high
 | tokenizer/processor、`trust_remote_code` | MCPMO-1a | pipeline/config factory → `model_executor/models/minicpmo_4_5/` loader |
 | TTS extra、backend 初始化、空音频 | MCPMO-1b | `minicpmo_4_5_omni_tts.py::MiniCPMO45OmniTTSForConditionalGeneration`、`minicpmo_4_5_token2wav.py::MiniCPMO45Token2wav` |
 | Code2Wav TensorRT、DiT/Campplus、engine cache/profile | MCPMO-1c | `minicpmo_4_5_code2wav.py::MiniCPMO45Code2Wav` → `batched_token2wav.py::BatchedToken2Wav._estimator_step`；共享实现 `step_audio2/step_audio2_dit_trt.py` |
-| HiFT CUDA Graph、chunk bucket、lazy capture、iSTFT | [`MCPMO-1d`](rules-cuda-graphs.md#mcpmo-1d-hift-graph-只捕获稳定-pre-istft-子图并限界-shape-cache) | `cuda_graph_wrapper.py::HiFTGraphWrapper` → `BatchedToken2Wav._hift_inference` → shared `HiFTGenerator` |
-| CFM DiT CUDA Graph、shape cache、generation retirement、eager fallback | [`MCPMO-1e`](rules-cuda-graphs.md#mcpmo-1e-cfm-dit-cuda-graph-必须按-shape-整代退休并保持-eager-parity) | `cuda_graph_wrapper.py::CFMGraphWrapper` → `BatchedToken2Wav._estimator_step` |
+| HiFT CUDA Graph、chunk bucket、lazy capture、iSTFT | [`MCPMO-1d`](rules-cuda-graphs.md#mcpmo-1e-legacy-step-level-cfm-dit-graph-必须按-shape-整代退休并保持-eager-parity) | `cuda_graph_wrapper.py::HiFTGraphWrapper` → `BatchedToken2Wav._hift_inference` → shared `HiFTGenerator` |
+| CFM DiT CUDA Graph、shape cache、generation retirement、eager fallback | [`MCPMO-1e`](rules-cuda-graphs.md#mcpmo-1e-legacy-step-level-cfm-dit-graph-必须按-shape-整代退休并保持-eager-parity) | `cuda_graph_wrapper.py::CFMGraphWrapper` → `BatchedToken2Wav._estimator_step` |
 | batch、`runtime_info`、stage handoff | MCPMO-3a/3b | `stage_input_processors/minicpmo_4_5_omni.py` → `minicpmo_4_5_omni.py::MiniCPMO45OmniForConditionalGeneration` → TTS/code2wav |
 | Seed-TTS、chat `ref_audio`、runtime-ref、Code2Wav handoff | [MCPMO-3e](rules-code2wav-batching.md#mcpmo-3e-minicpm-o-45-reference-audio-必须经过私有-prompt-到-code2wav-handoff) | serving chat MediaConnector → original prompt private key → `llm2tts` buffer → Code2Wav |
 | Talker codec sampling、repetition penalty、request RNG/compaction | MCPMO-3c | `minicpmo_4_5_omni_tts.py::{make_omni_output,_sample_audio_codes,_apply_batched_repetition_penalty}` → `test_talker_batching.py` |
@@ -195,8 +195,8 @@ confidence: high
 - 触发：MiniCPM-o native duplex 的连续音频、LISTEN/SPEAK handoff 或 server VAD interruption。
 - 强制：模型说话时仍把音频单元追加到同一可恢复 Stage0，保留 KV/runtime state 和上一
   terminator；仅确认的 empty/control-only handoff 可在没有 speech conditioning 时跳过，其他
-  缺 latent/hidden-state 的 speech handoff 仍报错。LISTEN 是成功且不需要 Talker hidden state，
-  SPEAK 才转交 Talker。默认模型拥有的模式固定为 `listen_only`，不会创建/调用 Silero；只有
+  缺 latent/hidden-state 的 speech handoff 仍报错。plain LISTEN 是成功且不需要 Talker hidden state；含 turn_eos 的 speech-closure
+  LISTEN 仍须转交 Talker，边界见 [turn closure](rules-duplex-turn-closure.md)。默认模型拥有的模式固定为 `listen_only`，不会创建/调用 Silero；只有
   `turn_detection.type=server_vad` 且 `interrupt_response=true` 才选择 `barge_in_on_speech`，
   并拒绝 `interrupt_response=false` 的第三模式。server VAD hard cancellation 必须显式 opt-in，
   阈值不得落到使 silence branch 不可达的边界。

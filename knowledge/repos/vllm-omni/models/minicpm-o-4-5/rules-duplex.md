@@ -1,14 +1,31 @@
 ---
 title: "MiniCPM-o 4.5 native duplex 规则"
 created: 2026-09-04
-updated: 2026-09-22
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #6318", "PR #6346", "PR #6404", "PR #6458", "PR #6619", "PR #6630", "PR #6678", "PR #6626", "PR #6767", "PR #6821", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, vllm_omni/model_executor/stage_input_processors/minicpmo_4_5_omni.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/deploy/minicpmo_4_5_2gpu.yaml, vllm_omni/deploy/minicpmo_4_5_3gpu.yaml, vllm_omni/deploy/minicpmo_4_5_8x4090.yaml, examples/online_serving/minicpmo/realtime_duplex_demo.py, vllm_omni/experimental/fullduplex/client.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/adapter.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/session.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/stage0.py, vllm_omni/entrypoints/duplex/realtime_input.py, vllm_omni/entrypoints/duplex/runtime_adapter.py, vllm_omni/entrypoints/duplex/runtime_bridge.py, vllm_omni/entrypoints/duplex/serving.py, vllm_omni/entrypoints/duplex/session_runner.py, vllm_omni/experimental/fullduplex/video_stacking.py, tests/config/test_config_factory.py, tests/engine/duplex/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py, tests/examples/test_minicpmo_realtime_duplex_simple_demo.py, "PR #6529", vllm_omni/entrypoints/duplex/protocol.py, vllm_omni/entrypoints/duplex/realtime_state.py, tests/entrypoints/openai/test_duplex_protocol.py, "PR #6799", "PR #7416"]
+sources: ["PR #6318", "PR #6346", "PR #6404", "PR #6458", "PR #6619", "PR #6630", "PR #6678", "PR #6626", "PR #6767", "PR #6821", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, vllm_omni/model_executor/stage_input_processors/minicpmo_4_5_omni.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/deploy/minicpmo_4_5_2gpu.yaml, vllm_omni/deploy/minicpmo_4_5_3gpu.yaml, vllm_omni/deploy/minicpmo_4_5_8x4090.yaml, examples/online_serving/minicpmo/realtime_duplex_demo.py, vllm_omni/experimental/fullduplex/client.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/adapter.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/session.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/stage0.py, vllm_omni/entrypoints/duplex/realtime_input.py, vllm_omni/entrypoints/duplex/runtime_adapter.py, vllm_omni/entrypoints/duplex/runtime_bridge.py, vllm_omni/entrypoints/duplex/serving.py, vllm_omni/entrypoints/duplex/session_runner.py, vllm_omni/experimental/fullduplex/video_stacking.py, tests/config/test_config_factory.py, tests/engine/duplex/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, tests/entrypoints/openai_api/test_duplex_handler.py, tests/examples/test_minicpmo_realtime_duplex_simple_demo.py, "PR #6529", vllm_omni/entrypoints/duplex/protocol.py, vllm_omni/entrypoints/duplex/realtime_state.py, tests/entrypoints/openai/test_duplex_protocol.py, "PR #6799", "PR #7416", "PR #8462", "PR #8007"]
 confidence: high
 ---
 
 # MiniCPM-o 4.5 native duplex 规则
+
+## MCPMO-DUPLEX-TILE-1a — camera token 预算必须与真正 image processor 的 tile 一致
+
+- 触发：修改 native duplex vision tile、first-append prompt reservation 或 processor lookup。
+- 强制：从 Stage 0 实际 checkpoint 的 image-processor config 读取正整数
+  `scale_resolution`，以平方作为 tile pixels；使用
+  `ImageProcessingMixin.get_image_processor_dict(..., local_files_only=True)` 的查找顺序，
+  nested `processor_config.json.image_processor` 优先，否则读取 `preprocessor_config.json`。
+  不从受 `hf_overrides` 影响的 `hf_config.slice_config/image_size` 推断 processor tile。
+- 强制：无可读 processor config、非法 side 或 bool 时保留 `None`，继续 sliced-count
+  reservation；不访问网络补取。一个 append 的 vision token count 只计算一次，first-unit
+  分支复用它；独立 audio budget 与公开 `duplex_scheduler_token_budget` 合同保持一致。
+- 禁止：用 config.json 的较大 tile 缩减真实 processor 的 sliced token 预算；把 missing
+  config 视为零 vision tokens；为相同 append 重复 decode base frame。
+- 验收：processor/config tile 故意不一致、nested config 优先、非法/缺失本地配置、
+  首 append 仅一次 base-frame decode 和 audio budget 不变；500×500 的已切片 pair 在
+  processor side448/config side560 时仍保留264 tokens，而不是132。^[PR #8462]
 
 ## MCPMO-4b — native duplex session update 必须如实拒绝不可重建的上下文
 
@@ -47,14 +64,16 @@ confidence: high
 ## MCPMO-4e — shipping profile 必须共服 chat 与 native duplex
 
 - 触发：修改任一 `minicpmo_4_5*.yaml`、duplex session placement 或 Stage 1 Talker 默认/运行时采样参数。
-- 强制：所有 shipping profile 设置 `session_mode=duplex`，且 `active_stream_window` 只限制
-  first-packet admission，不是 session lifetime cap。default/2gpu/3gpu profile 的 window、
-  `duplex_session.max_sessions` 与 Stage 0/1 `max_num_seqs` 均为 4；8×4090 profile 因 24GB
-  资源边界保持 window/stage capacity 1，并沿用 default session capacity 1。replica overlay 从 base
-  继承这些字段。YAML 保留 chat 的 Stage 1 `min_tokens=50` 与既有 codec 参数，native duplex adapter
-  仅在该 session 的 runtime config 覆盖 `min_tokens=0`；AR stage 保留默认 async scheduler。^[PR #6767]
+- 强制：所有 shipping profile 设置 `session_mode=duplex`；shipping profile 省略
+  `active_stream_window`，默认 0 的 unlimited path 见 MCPMO-4j。PR #8007 合并的 default
+  profile 将 `duplex_session.max_sessions` 与 Stage 0/1/2 `max_num_seqs` 提升至 16，
+  2gpu/3gpu profile 仍为 4；8×4090 的 stage capacity 与 default session capacity 保持 1。
+  replica overlay 从 base 继承这些字段。YAML 保留 chat 的 Stage 1 `min_tokens=50`，native
+  duplex adapter 只在 session runtime config 覆盖为 0；AR stage 保留默认 async scheduler。
+  default Talker 的 KV budget 为 4 GiB，因为 physical KV preemption 后的增量 full-attention
+  replay 尚不支持，不能仅增加 admission 而忽略实际 KV 容量。^[PR #6767] ^[PR #7416] ^[PR #8007]
 - 禁止：恢复独立 `minicpmo_4_5_duplex.yaml`；在 replica overlay 重复并漂移 session 配置；为 duplex 全局关闭 async scheduling；或把 runtime-only floor 写回 YAML 而改变 chat TTS。
-- 验收：展开四份 base profile 及三个 replica overlay，断言全部 duplex-enabled、窗口与 session capacity 正确；同一 server 分别验证 `/v1/realtime?duplex=1` 和 chat，前者 Stage 1 看到 `min_tokens=0`、后者仍看到 `50`。删除旧 overlay 是部署文件名迁移，外部显式引用必须同步更新。PR #6767 的 L20X concurrency=4 观察只证明该精确 profile/workload 的 first-packet admission，不构成通用吞吐、延迟或硬件保证。^[PR #6458] ^[PR #6619] ^[PR #6767]
+- 验收：展开四份 base profile 及三个 replica overlay，断言全部 duplex-enabled、窗口与各 profile 的 session/stage capacity 正确；同一 server 分别验证 `/v1/realtime?duplex=1` 和 chat，前者 Stage 1 看到 `min_tokens=0`、后者仍看到 `50`。删除旧 overlay 是部署文件名迁移，外部显式引用必须同步更新。PR #6767 的 L20X concurrency=4 观察只证明该精确 profile/workload 的 first-packet admission，不构成通用吞吐、延迟或硬件保证。^[PR #6458] ^[PR #6619] ^[PR #6767]
 
 - admission/expiry E2E probe 必须从实际启动的 deploy YAML 经
   `load_deploy_config(...).duplex_session.max_sessions` 取得 admission limit，不能保留

@@ -1,7 +1,7 @@
 ---
 title: "Scheduler（AR/生成请求调度）"
 created: 2026-07-16
-updated: 2026-09-22
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, components, scheduler]
 sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, vllm_omni/core/prefix_cache.py, docs/design/module/ar_runtime.md, docs/design/module/archive/ar_module.md]
@@ -42,3 +42,11 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_g
 | 按 PR 描述直达 prefix cache、token budget、upstream 接口或 side-stream 首批源码 | [rules / Direct 代码快速入口](rules.md#direct-代码快速入口) |
 
 - [rules-shared-lifecycle](rules-shared-lifecycle.md) 新增核对：SCHED-6a2。
+
+- [Running prefix-cache reset 能力](rules-prefix-reset-capability.md) — active request 的拓扑能力检查与拒绝边界。
+
+- [release 双 waiting queue、deferred set 与 resumable cleanup：SCHED-RELEASE-1a、SCHED-5g](rules-release-queues.md)。
+
+- [empty terminal、staged-payloadreceivegate与tail守恒](rules-stream-terminals.md)。
+
+- [native sender-only admission 与 opt-in first-chunk express](rules-first-chunk-express.md)。

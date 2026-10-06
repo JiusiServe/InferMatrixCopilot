@@ -234,7 +234,9 @@ def test_real_tree_operations_pass_both_validators(tmp_path):
         Op("replace", page, first, _rule("SCHEDKB-1b", cite="PR #8203"),
            new_rule_id="SCHEDKB-1b", new_page=new_page, evidence="PR #8203"),
     ]
-    result = apply_operations(files, ops, release="v0.31.0", today=TODAY)
+    # The shipped tree advances independently of the synthetic fixtures.
+    today = max(TODAY, Page.parse(files[page]).frontmatter_field("updated"))
+    result = apply_operations(files, ops, release="v0.31.0", today=today)
     head = {**files, **result.files}
     # active pages still citing the retired IDs are flagged for the change set
     # to fix; the point here is that both validators accept the written tree

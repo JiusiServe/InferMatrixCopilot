@@ -1,10 +1,10 @@
 ---
 title: "Serving duplex 编排规则"
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-10-06
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #6529", vllm_omni/engine/orchestrator.py, tests/engine/test_orchestrator_segment_stage_keying.py, tests/engine/test_orchestrator_stage_input_bridge.py]
+sources: ["PR #6529", vllm_omni/engine/orchestrator.py, tests/engine/test_orchestrator_segment_stage_keying.py, tests/engine/test_orchestrator_stage_input_bridge.py, "PR #8489"]
 confidence: high
 ---
 
@@ -23,3 +23,15 @@ confidence: high
 - 验收：多 stage 交错上报 boundary，逐 stage 验证 metrics、final-output、bridge 与 duplex context
   只见自身 token/metadata；覆盖 missing-stage fresh state 与不会经过 raw-output loop 的 diffusion
   branch。^[PR #6529]
+
+## SERV-6k — model-specific duplex harness 必须共享同一有界输出 buffer
+
+- 触发：修改 `OpenDuplexSessionMessage` 合同、generic Harness字段或PersonaPlex/Nemotron harness。
+- 强制：从manager使用的同一 `DuplexSessionRuntimeConfig` 派生max_pending_output_bytes/events，
+  创建单个 `DuplexOutputBuffer`，将同一object传给open message和Harness供event drain；构造
+  扩展后的Harness用显式keywords，保持production `output_buffer` 必填。
+- 禁止：将required参数改成optional/default来掩盖stale tests；open和drain使用不同buffer，
+  或复制一套与manager不一致的limits；用旧positional field顺序让queue/buffer错位。
+- 验收：generic与两model-specific runner suites使用相同公开open/drain合同，旧代码重现fixture
+  error/失败后修复通过；核对正常events与teardown，test-only修复不证明新模型或全transport能力。
+  原source在同allocation A/B得到64通过；目标CI证据仍须按真实source/hardware单独资格化。^[PR #8489]

@@ -9,6 +9,8 @@ sources: [vllm_omni/model_executor/models/glm_image/, vllm_omni/diffusion/models
 
 # GLM-Image
 
+- [Token-ID handoff 规则](rules.md) — generated/source IDs 与辅助 hidden 的表示边界。
+
 以下事实在 `main @ 5d44868e` 复核。**树内定位**（知识树自身的路由约定,非源码
 事实）：AR→DiT 图像编辑（i2i/IT2I）行为对齐时的参照家族——hunyuan 的
 [it2i-gap](../hunyuan-image3/it2i-gap.md) 以它为对齐基准,定位依据见

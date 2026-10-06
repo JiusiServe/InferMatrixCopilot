@@ -1,7 +1,7 @@
 ---
 title: "MammothModa2（Preview/Dev 的 AR→DiT 与 AR-only 拓扑）"
 created: 2026-09-04
-updated: 2026-09-22
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #6694", vllm_omni/model_executor/models/mammoth_moda2/, vllm_omni/diffusion/models/mammoth_moda2/, vllm_omni/model_executor/stage_input_processors/mammoth_moda2.py, vllm_omni/deploy/mammoth_moda2.yaml, vllm_omni/deploy/mammoth_moda2_ar.yaml]
@@ -49,3 +49,8 @@ sources: ["PR #6694", vllm_omni/model_executor/models/mammoth_moda2/, vllm_omni/
 - Preview/Dev 的支持范围以合并后的 upstream docs/registry 为准：Preview 有文生图与
   image understanding；Dev 在 supported-model 表只声明 AR-only image understanding。不要从
   PR 作者的单张 GPU 示例外推硬件、吞吐、质量或全部任务支持。^[PR #6694]
+
+T2I None/default 与16-pixel dimension validation：MAMMO-1d；沿本目录 rules 审查入口核对。
+- [step execution、request scheduler 与 CFG](rules-step-runtime.md)
+- [TeaCache joint context 与 fused QK RoPE](rules-cache-kernels.md)
+- [image route、AR grid 与 legacy image stage](rules-image-serving.md)
