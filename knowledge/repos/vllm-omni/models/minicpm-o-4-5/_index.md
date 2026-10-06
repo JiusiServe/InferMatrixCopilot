@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5"
 created: 2026-07-20
-updated: 2026-09-22
+updated: 2026-10-06
 type: index
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", "PR #6404", "PR #6678", "PR #6628", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/engine/duplex/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, vllm_omni/experimental/fullduplex/client.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/stage0.py, vllm_omni/entrypoints/duplex/realtime_input.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/platforms/npu/models/minicpmo_4_5_code2wav.py, "PR #6082", "PR #6587"]
+sources: ["PR #3642", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", "PR #6404", "PR #6678", "PR #6628", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/engine/duplex/test_duplex_deploy_config.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex_expansion.py, vllm_omni/experimental/fullduplex/client.py, vllm_omni/model_executor/models/minicpmo_4_5/duplex/stage0.py, vllm_omni/entrypoints/duplex/realtime_input.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_cfm_graph_capture_gating.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, vllm_omni/platforms/npu/models/minicpmo_4_5_code2wav.py, "PR #6082", "PR #6587", "PR #8007", "PR #8332", "PR #8443", "PR #8462"]
 confidence: high
 ---
 
@@ -34,7 +34,7 @@ Step-Audio2 的 token2wav。engine cache/profile 与 fallback 门禁见 MCPMO-1c
 四份 bundled deploy 在 CUDA 上另默认开启 HiFT graph：只 capture pre-iSTFT 子图，按 connector
 chunk/cache shape 预捕并限量 lazy capture，且不服从 stage `enforce_eager`；非 CUDA 回 eager。
 HiFT/CFM 的 shape、显存、并发、整代退休与部分-graph 性能证据边界见
-[Code2Wav CUDA graph 规则](rules-cuda-graphs.md)。 新增核对：MCPMO-1k。
+[Code2Wav CUDA graph 规则](rules-cuda-graphs.md)。 新增核对：MCPMO-1k；legacy step-level 与 Whole-Euler 必须按实际路径区分。
 
 Thinker 的 Whisper/APM audio encoder 仍构造 dense `[B,1,T,T]` mask；chunk mask 已用
 broadcasted query/key index 代替逐 row Python fill，但不改变 chunk/left-context/lookahead
@@ -71,3 +71,7 @@ Realtime video 不以「每 200 ms append」定义 frame cadence：首个约 103
 - [MiniCPM-o 4.5 Code2Wav 运行时合同](rules-code2wav-runtime.md)：`MCPMO-1f`, `MCPMO-1g`, `MCPMO-1h`, `MCPMO-1i`。
 
 - [rules-loader](rules-loader.md) 新增核对：MCPMO-5a2。
+
+- [Whole-Euler 与 resident graph 合同](rules-resident-graphs.md)：MCPMO-GRAPH-1a–1e，涵盖显式 backend、共享 arena、总预算、ragged fallback、ordinary TF32 与 exact continuation 预捕。
+- [输入 encoder graph 合同](rules-encoder-graphs.md)：MCPMO-ENCODER-1a/1b，保持 exact packed batch、资格、输出与 stream 所有权、admission 与 terminal capture failure。
+- camera tile 与 first-append reservation 查本页已链接的 native duplex 规则 MCPMO-DUPLEX-TILE-1a。
