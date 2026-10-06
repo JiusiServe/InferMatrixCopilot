@@ -191,3 +191,23 @@ def test_reference_command_and_observable_output_survive_giant_skill_and_prose_l
     manual = "\n".join(line for d in docs if d["path"] == reference for line in d["text"])
     assert "python preprocess.py input output" in manual and '"points"' in manual
     _assert_real_spans(root, docs)
+
+
+@pytest.mark.parametrize("round_number", [0, 1, 2, 3])
+def test_preferred_real_command_window_is_reserved_before_keyword_rotation(tmp_path, round_number):
+    root = tmp_path / "repo"
+    source = "pkg/main.py"
+    _write(root, source, "def run():\n    return 1\n")
+    path = "pkg/SKILL.md"
+    _write(root, path, "manual pytest expected assert 测试验证步骤预期。\n" * 100
+           + "```bash\npython main.py --check\n```\n预期输出 points 非空；本轮未执行。\n")
+    index = _index(root, [source])
+    context = _context(root, source, index)
+    docs = context.document_slices([], paths=(path,), facets=("validation",),
+                                   evidence_round=round_number, limit=400,
+                                   preferred_ranges=((path, 101, 104),))
+    content = "\n".join(line for d in docs for line in d["text"])
+    assert "python main.py --check" in content and "预期输出 points 非空" in content
+    assert sum(len(line.encode()) + 1 for d in docs for line in d["text"]) <= 400
+    for d in docs:
+        assert d["text"] == (root / path).read_text().splitlines()[d["start"]-1:d["end"]]

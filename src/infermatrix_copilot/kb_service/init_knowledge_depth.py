@@ -435,7 +435,8 @@ class _KnowledgeDepth(_Knowledge):
                             examples.append(number)
                 # Existing executable examples beat prose lists of unrelated
                 # tools. Nearby output shapes/criteria remain real line ranges.
-                preferred.extend((path, number, number)
+                preferred.extend((path, max(1, number - 6),
+                                  min(len(context.index.files[path]["lines"]), number + 6))
                                  for number in (examples or matches))
             # The immutable index supplies complete real line ranges, including
             # late manual acceptance steps. The existing 8KB packet cap applies.

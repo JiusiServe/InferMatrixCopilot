@@ -639,6 +639,16 @@ class DepthContext:
                 rotated.extend(tied[shift:] + tied[:shift])
             ranges = rotated
         selected, used = {}, 0
+        for path, start, end in preferred_ranges:
+            lines = lines_by_path.get(path, {})
+            if not all(number in lines for number in range(start, end + 1)):
+                continue
+            pending = {number: lines[number] for number in range(start, end + 1)
+                       if number not in selected.get(path, {})}
+            size = sum(len(line.encode("utf-8")) + 1 for line in pending.values())
+            if used + size <= limit:
+                selected.setdefault(path, {}).update(pending)
+                used += size
         for _, path, start, end in ranges:
             for number in range(start, end + 1):
                 line = lines_by_path[path][number]
