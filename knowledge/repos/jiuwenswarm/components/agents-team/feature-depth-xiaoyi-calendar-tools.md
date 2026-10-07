@@ -1,0 +1,53 @@
+---
+title: "设备日历日程工具（create/search_calendar_event）：实现深读"
+created: 2026-10-06
+updated: 2026-10-06
+type: architecture
+tags: [jiuwenswarm]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L113-L129, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L137-L164, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L166-L173, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L137-L160, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L244-L256, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L219-L229, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L265-L267, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/utils.py:L198-L207, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/utils.py:L210-L228, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L121-L125, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L72-L79]
+feature: "xiaoyi-calendar-tools"
+entry_points: ["jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py"]
+source_globs: ["jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py"]
+---
+
+# 设备日历日程工具（create/search_calendar_event）：实现深读
+
+[功能概览](feature-xiaoyi-calendar-tools.md) · [owner 入口](_index.md)
+
+<!-- kb:depth feature=xiaoyi-calendar-tools facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=ae20634ebed2441d906ebcbd43786b9b8e9c046de76c5c0259088c31b0abd2d5 -->
+**create_calendar_event：校验后构造命令并经 execute_device_command 下发**
+校验 title/dt_start/dt_end 非空，strptime 按 %Y-%m-%d %H:%M:%S 转毫秒时间戳，构造 executeParam 后 await execute_device_command("CreateCalendarEvent", command)；若 result 为 dict 才调用 raise_if_device_error，最后返回 format_success_response。
+
+来源：[jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L113–L129](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py#L113-L129), [jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L137–L164](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py#L137-L164), [jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L166–L173](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py#L166-L173)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":129,"path":"jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py","sha256":"d8f9ddb09452cae0bb3a582db1fc579a4967aca75bd37436851406af3d48b365","start":113},{"end":164,"path":"jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py","sha256":"2c7b201cba3b138121480561fe01fd7efe09e1c8f133d178c213d0a857358ebc","start":137},{"end":173,"path":"jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py","sha256":"f705847914b8993b10841fa241f37a126199dbd93d8aa029916917f037f00867","start":166}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=xiaoyi-calendar-tools facet=configuration pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=472920258adec57f946d5d476d7c01abec4c730ae0b257cb11e609c8095f44a0 -->
+**命令字面量硬编码：timeOut 5、bundleName com.huawei.hmos.calendardata**
+两处命令构造均硬编码 executeMode="background"、timeOut 5、bundleName "com.huawei.hmos.calendardata"；create 的 executeParam 不含 appType/permissionId，search 则含 appType="OHOS_APP" 与 permissionId=[]。所示片段内无外部配置读取。
+
+来源：[jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L137–L160](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py#L137-L160), [jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L244–L256](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py#L244-L256)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":160,"path":"jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py","sha256":"93f7a10912fc4a6997a40fbe356dffef60fd274e68b47e9584defa7d2e7b7478","start":137},{"end":256,"path":"jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py","sha256":"121af4bef125859d049d264c487bcb4016f64998f5519cb03088e687f5b3e222","start":244}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=xiaoyi-calendar-tools facet=failure_modes pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=f3b749558e27485e59b093ec80d2cf11e672ee00a205b474bb5a23dfbd1d7ac1 -->
+**输入错误抛 ToolInputError；设备错误码与超时分别转 RuntimeError 传播**
+search 中 start_time/end_time 缺失或 _parse_time_string_ymd_hhmmss 抛 ValueError 时转为 ToolInputError 并原样重抛；设备 outputs 的 code 失败或 retErrCode 非 "0" 时 raise_if_device_error 抛 RuntimeError；execute_device_command 超时抛 asyncio.TimeoutError 转为 RuntimeError，finally 中注销事件处理器。
+
+来源：[jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L219–L229](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py#L219-L229), [jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L265–L267](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py#L265-L267), [jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/utils.py:L198–L207](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/utils.py#L198-L207), [jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/utils.py:L210–L228](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/utils.py#L210-L228)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":229,"path":"jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py","sha256":"8289e32065ee30ae459d5477ae07f53884e8bcb1274157665c3d5c31f5c11886","start":219},{"end":267,"path":"jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py","sha256":"2189769086d9c4e29b3db12505c1d09ea158db0e7f129f30d18b42b13f695203","start":265},{"end":207,"path":"jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/utils.py","sha256":"14978fe0cb6f23d3b789c8877bf3809be5867f4e150aaa8c06653dfc3887d465","start":198},{"end":228,"path":"jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/utils.py","sha256":"a169af0afefd26625f182cf29b8ee64ff9143b48e91f859ae040a396304da003","start":210}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=xiaoyi-calendar-tools facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=994f6d8301e21578712b9ae43976899846775b15557059c803ea58d00736dde9 -->
+**朴素 datetime 解析实现简单，但结果依赖主机本地时区**
+设计推断（非作者历史意图）：
+
+（推断）create 用 strptime+timestamp()、解析器用 datetime(...).timestamp()*1000，均按本地时区换算毫秒，实现简洁；代价是同一输入字符串在不同时区主机上产生不同的毫秒时间戳。
+
+来源：[jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L121–L125](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py#L121-L125), [jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py:L72–L79](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py#L72-L79)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":125,"path":"jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py","sha256":"9416a343568485f1869f6935951119d1e3f23aea9d58efed9e4b275d8a6591f4","start":121},{"end":79,"path":"jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/calendar_tools.py","sha256":"73438926b086b59dd4fabddf8775ee0efebb8478c520b0bfee5b1dc987395d16","start":72}],"trace":[]} -->
+<!-- /kb:depth -->
