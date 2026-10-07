@@ -4,7 +4,7 @@ created: 2026-10-06
 updated: 2026-10-06
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/tasks/service.py:L183-L210, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/tasks/service.py:L491-L533, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/tests/backend/test_managed_tasks.py:L69-L84, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/tasks/service.py:L79-L113, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/task_adapter.py:L283-L293, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/tasks/service.py:L582-L591]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/tasks/service.py:L183-L210, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/tasks/service.py:L491-L533, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/tests/backend/test_managed_tasks.py:L69-L84, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/tasks/service.py:L79-L113, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/task_adapter.py:L283-L293, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/tasks/service.py:L582-L591, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/tasks/service.py:L219-L236, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/video_duplex/backend/tasks/store.py:L36-L48]
 feature: "video-agent-managed-task-service"
 entry_points: ["jiuwenswarm/extensions/video_duplex/backend/tasks/service.py"]
 source_globs: ["jiuwenswarm/extensions/video_duplex/backend/tasks/service.py", "jiuwenswarm/extensions/video_duplex/backend/tasks/rail.py"]
@@ -68,4 +68,13 @@ test_retry_conflict_scope_and_cancel_before_dispatch asserts submit with the sam
 来源：[jiuwenswarm/extensions/video_duplex/tests/backend/test_managed_tasks.py:L69–L84](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/extensions/video_duplex/tests/backend/test_managed_tasks.py#L69-L84)
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":84,"path":"jiuwenswarm/extensions/video_duplex/tests/backend/test_managed_tasks.py","sha256":"4c21d515edfb0e9328504412a8dc50e8435ca34695929a2beb0f3f46b13a711b","start":69}],"trace":[],"validation_kind":"automated_runtime"} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=video-agent-managed-task-service facet=dependencies pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=99d395ef89df8e030373766ae8a9d1dfc0aedfd4c9406e73598be46fe8ccf82e -->
+**submit 依赖注入的 store 的 get/put/command；store.transaction 依赖 sqlite3（timeout=10、BEGIN IMMEDIATE）**
+submit（回放未命中时）调用注入的 self.store.get 校验 depends_on 依赖、put 持久化任务、command 记录 command_id 回执，随后 kick() 并返回 task。store.transaction 以 sqlite3.connect(path, timeout=10) 开连接，执行 BEGIN IMMEDIATE 后 yield db 并 commit；BaseException 时 rollback 并 re-raise，finally 中关闭连接。所示行不证明 submit 进入 transaction。
+
+来源：[jiuwenswarm/extensions/video_duplex/backend/tasks/service.py:L219–L236](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/extensions/video_duplex/backend/tasks/service.py#L219-L236), [jiuwenswarm/extensions/video_duplex/backend/tasks/store.py:L36–L48](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/extensions/video_duplex/backend/tasks/store.py#L36-L48)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":236,"path":"jiuwenswarm/extensions/video_duplex/backend/tasks/service.py","sha256":"a6c4af71495d9887ed3b0fdb0c591ceaf27faffbdbb898da2a43441d5076bc17","start":219},{"end":48,"path":"jiuwenswarm/extensions/video_duplex/backend/tasks/store.py","sha256":"fe5a47d2fc6417b6a862d53c8209e524e4a90fee7beb6fbb2f14a59a9c467d22","start":36}],"trace":[]} -->
 <!-- /kb:depth -->

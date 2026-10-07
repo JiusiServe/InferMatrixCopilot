@@ -4,7 +4,7 @@ created: 2026-10-06
 updated: 2026-10-06
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/yuanrong_frontend_client.py:L1304-L1332, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/yuanrong_frontend_client.py:L1315-L1324, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/web/container_file_http.py:L618-L626, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/yuanrong_frontend_client.py:L1333-L1369, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/extensions/test_yuanrong_frontend_client.py:L1171-L1183, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/yuanrong_frontend_client.py:L924-L967]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/yuanrong_frontend_client.py:L1304-L1332, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/yuanrong_frontend_client.py:L1315-L1324, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/web/container_file_http.py:L618-L626, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/yuanrong_frontend_client.py:L1333-L1369, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/extensions/test_yuanrong_frontend_client.py:L1171-L1183, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/yuanrong_frontend_client.py:L924-L967, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/extensions/yuanrong_frontend_client.py:L936-L948]
 feature: "yuanrong-agent-file-transfer"
 entry_points: ["jiuwenswarm/extensions/yuanrong_frontend_client.py"]
 source_globs: ["jiuwenswarm/extensions/yuanrong_frontend_client.py", "jiuwenswarm/gateway/channel_manager/web/container_file_http.py"]
@@ -57,4 +57,15 @@ test_mkdir_agent_dir_rejects_empty_path 断言 path 为空白时抛出 match="pa
 来源：[tests/unit_tests/extensions/test_yuanrong_frontend_client.py:L1171–L1183](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/extensions/test_yuanrong_frontend_client.py#L1171-L1183)
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":1183,"path":"tests/unit_tests/extensions/test_yuanrong_frontend_client.py","sha256":"fdb1a1484127399cae8f25b66578f7c273dbc3121981ef6b5e6d93a6873b3c89","start":1171}],"trace":[],"validation_kind":"automated_runtime"} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=yuanrong-agent-file-transfer facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=9c154b2ce32adf8b36c9fb94770962537290464076581f59623d457b33118722 -->
+**mkdir 输入校验用两种异常类型：空值抛 ValueError，路径含 NUL 抛 YuanrongAgentFileError(400)**
+设计推断（非作者历史意图）：
+
+在 936-948 行的本地分支中，instance_id 或 path 归一化后为空分别抛 ValueError，而 path 含 "\x00" 抛 YuanrongAgentFileError(http_status=400, error_code="BAD_REQUEST")；两种拒绝都发生在第 948 行调用 _normalize_mkdir_mode 之前。（推断）收益是可按异常类型区分编程错误与可透传的请求错误，代价是调用方需同时处理两类异常。
+
+来源：[jiuwenswarm/extensions/yuanrong_frontend_client.py:L936–L948](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/extensions/yuanrong_frontend_client.py#L936-L948)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":948,"path":"jiuwenswarm/extensions/yuanrong_frontend_client.py","sha256":"42bb956df6d60245249631a26c47f9229ddfd3bd9095facb05d9e45a448a56e5","start":936}],"trace":[]} -->
 <!-- /kb:depth -->

@@ -4,7 +4,7 @@ created: 2026-10-06
 updated: 2026-10-06
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/shared-webview/chat.html:L3398-L3407, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/shared-webview/chat.html:L3391-L3396, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/shared-webview/chat.html:L4348-L4361, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/shared-webview/chat.html:L4352-L4364]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/shared-webview/chat.html:L3398-L3407, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/shared-webview/chat.html:L3391-L3396, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/shared-webview/chat.html:L4348-L4361, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/shared-webview/chat.html:L4352-L4364, "openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:docs/zh/ide/jetbrains/JetBrains插件指南.md:L139-L155", openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/ide/packages/shared-webview/chat.html:L4503-L4516]
 feature: "chat-session-stats-dashboard"
 entry_points: ["jiuwenswarm/channels/ide/packages/shared-webview/chat.html"]
 source_globs: ["jiuwenswarm/channels/ide/packages/shared-webview/chat.html"]
@@ -57,4 +57,24 @@ When state.contextUsagePercent is null and not (state.contextTokensUsed > 0 and 
 来源：[jiuwenswarm/channels/ide/packages/shared-webview/chat.html:L4352–L4364](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/ide/packages/shared-webview/chat.html#L4352-L4364)
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":4364,"path":"jiuwenswarm/channels/ide/packages/shared-webview/chat.html","sha256":"cb65b4c336e0928ded82327bcd04dd7a4b649960c5e439b13fc62f68baf18e6c","start":4352}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=chat-session-stats-dashboard facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=c21d3368bda5c0f9922a436868e0cddb1e3158965843ca8ea42b19521afc8f82 -->
+**6% 最小柱高保证零值轮可见但牺牲严格比例**
+bars() 对每柱高度取 Math.max(6, Math.round(v / maxVal * 100))，且归一化分母 maxTok/maxDur 由 Math.max(...,1) 保证至少为 1；收益是数值为 0 或极小的轮次仍有 6% 高度可见，代价是低于 6% 的柱不再与数值严格成比例。
+
+来源：[jiuwenswarm/channels/ide/packages/shared-webview/chat.html:L4503–L4516](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/ide/packages/shared-webview/chat.html#L4503-L4516)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":4516,"path":"jiuwenswarm/channels/ide/packages/shared-webview/chat.html","sha256":"d626c3562211f8d9a0039c6a386b4efc94162cd2cbca6752441176332e039684","start":4503}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=chat-session-stats-dashboard facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=69e972f7f52cf804f852764054f7ba800dfd710b11f749a1fbaa7404646d4c06 -->
+**Documented manual check (NOT EXECUTED): stats bar appears after first turn; chart toggle and hover details after two turns**
+文档中的人工验收步骤（本轮未执行）：
+
+JetBrains 插件指南记载（未执行）：统计栏在第一轮完成后出现并显示轮数/错误/Token 等指标；两轮或更多后条形图图标切换迷你图，悬停条形可查看该轮详情。此为文档记载的手工核对步骤，非自动化断言。
+
+来源：[docs/zh/ide/jetbrains/JetBrains插件指南.md:L139–L155](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/docs/zh/ide/jetbrains/JetBrains%E6%8F%92%E4%BB%B6%E6%8C%87%E5%8D%97.md#L139-L155)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":155,"path":"docs/zh/ide/jetbrains/JetBrains插件指南.md","sha256":"f22c0031a798626c8982a218dcfbb5961d746ac0c12f44422159ff86afd2820a","start":139}],"trace":[],"validation_kind":"documented_manual"} -->
 <!-- /kb:depth -->

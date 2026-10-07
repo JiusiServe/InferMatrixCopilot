@@ -4,7 +4,7 @@ created: 2026-10-06
 updated: 2026-10-06
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/channel_manager.py:L362-L364, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3191-L3196, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3205-L3242, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2579-L2586, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2729-L2745, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3210-L3212, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3197-L3203, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3229-L3239, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/channel_manager.py:L366-L387]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/channel_manager.py:L362-L364, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3191-L3196, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3205-L3242, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2579-L2586, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2729-L2745, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3210-L3212, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3197-L3203, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3229-L3239, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/channel_manager.py:L366-L387, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2475-L2517]
 feature: "im-channel-hot-reconfig"
 entry_points: ["jiuwenswarm/gateway/app_gateway.py"]
 source_globs: ["jiuwenswarm/gateway/app_gateway.py", "jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py"]
@@ -59,4 +59,13 @@ Benefit (documented in the docstring): retrying one failed optional channel avoi
 来源：[jiuwenswarm/gateway/app_gateway.py:L3197–L3203](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L3197-L3203), [jiuwenswarm/gateway/app_gateway.py:L3229–L3239](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L3229-L3239)
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":3203,"path":"jiuwenswarm/gateway/app_gateway.py","sha256":"af4716de28938728523a66fd27acbe6c49039898652356adceb577391c25afdb","start":3197},{"end":3239,"path":"jiuwenswarm/gateway/app_gateway.py","sha256":"4c956d424ce9c4bed12e56342a2e77d4bd1142e697234c8bf6b9b550e79135c0","start":3229}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=im-channel-hot-reconfig facet=flow pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=4969f178a0ec4a2adc0170d656a956a43d6508efa5f9688f0bd2ddf11ee115ac -->
+**_stop_channel cancels the channel task, awaits it with a 5s timeout (or in background), stops the channel with a 10s timeout, then unregisters it**
+在 app_gateway.py 的 _stop_channel 中：若 task 非空则 task.cancel()，非 background_wait 分支用 asyncio.wait_for(task, timeout=5.0) 等待，TimeoutError/CancelledError/其他异常均只记 warning 或 pass；随后对非空 channel 调 channel.stop()（timeout=10.0，超时或异常仅记日志），最后 channel_manager.unregister_channel(channel.channel_id)。该本地分支不保证停止一定成功——超时后仅记录日志并继续注销。
+
+来源：[jiuwenswarm/gateway/app_gateway.py:L2475–L2517](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2475-L2517)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":2517,"path":"jiuwenswarm/gateway/app_gateway.py","sha256":"0df23083451998c5ac1f776a8864a26bea75702fa439a373fa18ba643751d1c4","start":2475}],"trace":[]} -->
 <!-- /kb:depth -->

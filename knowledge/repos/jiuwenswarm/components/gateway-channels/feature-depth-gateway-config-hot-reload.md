@@ -4,7 +4,7 @@ created: 2026-10-06
 updated: 2026-10-06
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3205-L3254, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3205-L3242, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3211-L3241, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3211-L3242, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3197-L3216]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3205-L3254, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3205-L3242, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3211-L3241, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3211-L3242, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3197-L3216, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/gateway/test_app_gateway_acp.py:L175-L191]
 feature: "gateway-config-hot-reload"
 entry_points: ["jiuwenswarm/gateway/app_gateway.py"]
 source_globs: ["jiuwenswarm/gateway/app_gateway.py"]
@@ -59,4 +59,13 @@ revision 不匹配时记 info 日志并 return（放弃重试）；set_conf 抛�
 来源：[jiuwenswarm/gateway/app_gateway.py:L3197–L3216](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L3197-L3216)
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":3216,"path":"jiuwenswarm/gateway/app_gateway.py","sha256":"0c6ff32de634f3bd440d8c837eb7ae7c72add7a1af8c86e883c859bd47bc8a5c","start":3197}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=gateway-config-hot-reload facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=e408452cc86af6836b36a6b3114d4027bd49120dfecab03ccd351e85ee3af5c4 -->
+**helper_unit test: _schedule_gateway_restart sets request event without execv**
+In tests/unit_tests/gateway/test_app_gateway_acp.py, the async test test_schedule_gateway_restart_sets_event_without_execv monkeypatches os.execv to record calls, constructs a GatewayRestartRequest, calls _schedule_gateway_restart(restart_request, delay=0.0), then awaits restart_request.ready_event within 1.0s and asserts restart_request.requested is True and execv_calls == []. Coverage is limited to the restart-scheduling helper, not the agent.reload_config retry loop.
+
+来源：[tests/unit_tests/gateway/test_app_gateway_acp.py:L175–L191](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/gateway/test_app_gateway_acp.py#L175-L191)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":191,"path":"tests/unit_tests/gateway/test_app_gateway_acp.py","sha256":"b9e8c07c15de7508d2a41d62f13b0ecce99c7f2b6f950986d3309b72f643e743","start":175}],"trace":[],"validation_kind":"helper_unit"} -->
 <!-- /kb:depth -->

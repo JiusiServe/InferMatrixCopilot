@@ -4,7 +4,7 @@ created: 2026-10-06
 updated: 2026-10-06
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L943-L977, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/gateway/test_app_gateway_acp.py:L656-L668, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L644-L663, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L785-L806, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L900-L925]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L943-L977, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/gateway/test_app_gateway_acp.py:L656-L668, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L644-L663, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L785-L806, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L900-L925, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L656-L663, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/routing/keys.py:L34-L44, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L901-L925, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L1227-L1246]
 feature: "gateway-server-multi-route-ws"
 entry_points: ["jiuwenswarm/gateway/app_gateway.py"]
 source_globs: ["jiuwenswarm/gateway/app_gateway.py", "jiuwenswarm/gateway/channel_manager/channel_manager.py", "jiuwenswarm/gateway/routing/route_binding.py", "jiuwenswarm/gateway/channel_manager/base.py", "jiuwenswarm/gateway/routing/keys.py"]
@@ -59,4 +59,22 @@ test_gateway_server_promotes_pending_session_client_after_stale_owner_cleanup �
 来源：[tests/unit_tests/gateway/test_app_gateway_acp.py:L656–L668](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/gateway/test_app_gateway_acp.py#L656-L668)
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":668,"path":"tests/unit_tests/gateway/test_app_gateway_acp.py","sha256":"6fa4a84776b10b11a7ba5f3dc19acad1db9b30f3ff59191d82b3877a2e679d8a","start":656}],"trace":[],"validation_kind":"automated_runtime"} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=gateway-server-multi-route-ws facet=dependencies pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=d3b1785da6724105122a9bd45f6c5d6863d6268adf49143007220a4e5129c237 -->
+**RouteConfig 可选委托字段 ws_channel/session_bind_handler（默认 None）及注释所述的 Channel 委托耦合**
+RouteConfig 声明 session_bind_handler 与 ws_channel 两个可选字段，默认均为 None（app_gateway.py:656,662）。随字段注释说明：ws_channel 非 None 时 GatewayServer 仍作 ws 宿主与入站帧解析，但把 ws 与 RoutingKey 委托注册进该外部 Channel 的五维索引（_clients_by_key/_ws_by_id），出站按 delivery.ws_id 由 ChannelManager 派发到该 Channel.send；RoutingKey 即 (user_id, channel_id, app_id, agent_ref, session_id) 五维不可变键。该耦合为注释声明，非本段可执行代码。
+
+来源：[jiuwenswarm/gateway/app_gateway.py:L656–L663](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L656-L663), [jiuwenswarm/gateway/routing/keys.py:L34–L44](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/routing/keys.py#L34-L44)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":663,"path":"jiuwenswarm/gateway/app_gateway.py","sha256":"dfbe7d212d331221a872023720f8dc8a12095dd58512ea4486e6058bc4ccdf32","start":656},{"end":44,"path":"jiuwenswarm/gateway/routing/keys.py","sha256":"00c2d403b104b1701c23d513c9524b11961b4a08daa8162d29a49038b378396c","start":34}],"trace":[]} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=gateway-server-multi-route-ws facet=failure_modes pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=364ba714df79e8402a889f7fd9035fb402efbb5abd22b9a8854fac9c9be20f8f -->
+**发送帧的受守卫失败返回 False；无路由 session_id 的 msg 走 elif 广播回退否则记 dropped 警告**
+_send_frame_to_ws 先用 _ws_is_open（ws 非 None 且 closed 属性为假）守卫，不开放则返回 False；ws.send 抛 ConnectionClosed 时记 info 日志并同样返回 False，不向上抛出（app_gateway.py:901-925）。出站路径中，在一个未展示前置分支的 elif 里，若 _extract_routing_session_id(msg, include_top_level=True) 取不到 session_id 且该 channel 有已注册 clients，则以 gather(..., return_exceptions=True) 广播后 return；否则继续落到 "message dropped: no WebSocket client found" 的 warning 日志（条件取自 msg 而非 frame，后续动作未在摘录中展示）。
+
+来源：[jiuwenswarm/gateway/app_gateway.py:L901–L925](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L901-L925), [jiuwenswarm/gateway/app_gateway.py:L1227–L1246](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L1227-L1246)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":925,"path":"jiuwenswarm/gateway/app_gateway.py","sha256":"1429416d526a64fbf0b55a85f79981e592228d4e720b340693468dcd68346d34","start":901},{"end":1246,"path":"jiuwenswarm/gateway/app_gateway.py","sha256":"dff932c27bca0ad7b11d81a11b9e595e2f880ffb766254f6fb918ee84baffe74","start":1227}],"trace":[]} -->
 <!-- /kb:depth -->

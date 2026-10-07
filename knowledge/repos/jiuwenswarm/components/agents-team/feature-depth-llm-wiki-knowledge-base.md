@@ -4,7 +4,7 @@ created: 2026-10-06
 updated: 2026-10-06
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L536-L556, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L398-L415, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L42-L43, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L445-L459, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L20-L21, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L539-L558, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L569-L591, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agents/test_wiki_tools_runtime_config.py:L30-L74, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L530-L558]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L536-L556, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L398-L415, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L42-L43, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L445-L459, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L20-L21, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L539-L558, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L569-L591, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/agents/test_wiki_tools_runtime_config.py:L30-L74, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L530-L558, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L313-L325, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L462-L466]
 feature: "llm-wiki-knowledge-base"
 entry_points: ["jiuwenswarm/agents/harness/common/tools/wiki_tools.py"]
 source_globs: ["jiuwenswarm/agents/harness/common/tools/wiki_tools.py"]
@@ -66,4 +66,15 @@ test_create_llm_wiki_propagates_runtime_policy_and_parent_lineage 用 monkeypatc
 来源：[tests/unit_tests/agents/test_wiki_tools_runtime_config.py:L30–L74](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/agents/test_wiki_tools_runtime_config.py#L30-L74)
 
 <!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":74,"path":"tests/unit_tests/agents/test_wiki_tools_runtime_config.py","sha256":"300e739f57e2ae8aa0818820082a4a09bce1b02b1eeea3016e9ae179d4ff9930","start":30}],"trace":[],"validation_kind":"helper_unit"} -->
+<!-- /kb:depth -->
+
+<!-- kb:depth feature=llm-wiki-knowledge-base facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b sha256=885977b5c4ea1a9826bc2acad4c2ed0194cef3f291597d2cc213df42553a8614 -->
+**ingest 默认 force=False：已知 SHA-256 直接跳过，需显式 force=True 才重新摄取**
+设计推断（非作者历史意图）：
+
+默认 force=False 时，若 manifest 已识别该文件的 SHA-256，ingest 记 warning 并返回 skipped 结果而不重新处理（推断）收益是相同内容不重复摄取，代价是调用方必须显式传 force=True 才会重跑。
+
+来源：[jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L313–L325](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/wiki_tools.py#L313-L325), [jiuwenswarm/agents/harness/common/tools/wiki_tools.py:L462–L466](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/wiki_tools.py#L462-L466)
+
+<!-- kb:depth-proof {"acceptance_mode":"lightweight","basis":"supported","evidence":[{"end":325,"path":"jiuwenswarm/agents/harness/common/tools/wiki_tools.py","sha256":"20f4f0e1eb17b460f4143df856789c31ddefd81a5ac3f132831c9549c37e01a5","start":313},{"end":466,"path":"jiuwenswarm/agents/harness/common/tools/wiki_tools.py","sha256":"9d1a1d2c5f7eaca7f486375596aaf1592d44898ab023129857d0cf5ae3cc96d4","start":462}],"trace":[]} -->
 <!-- /kb:depth -->
