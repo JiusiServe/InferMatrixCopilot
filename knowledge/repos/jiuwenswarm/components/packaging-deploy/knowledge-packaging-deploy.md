@@ -1,10 +1,10 @@
 ---
 title: "packaging-deploy：冻结入口、容器与 yuanrong 部署链路"
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/jiuwenswarm_exe_entry.py:L126-L164, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/jiuwenswarm_exe_entry.py:L628-L653, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/args_handler.sh:L46-L67, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:Makefile:L125-L155, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/web_handler.sh:L126-L152, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/web_handler.sh:L184-L197, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-runtimes.sh:L3-L7, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/jiuwenswarm_exe_entry.py:L599-L655, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/jiuwenswarm_exe_entry.py:L328-L342, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:Dockerfile.claw:L26-L84, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/args_handler.sh:L46-L56, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/web_handler.sh:L5-L18, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/web_handler.sh:L205-L217, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:Dockerfile.claw:L89-L100]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/jiuwenswarm_exe_entry.py:L126-L164, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/jiuwenswarm_exe_entry.py:L628-L653, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/args_handler.sh:L46-L67, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:Makefile:L125-L155, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/web_handler.sh:L126-L152, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/web_handler.sh:L184-L197, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-runtimes.sh:L3-L7, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/jiuwenswarm_exe_entry.py:L599-L655, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/jiuwenswarm_exe_entry.py:L328-L342, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:Dockerfile.claw:L26-L84, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/args_handler.sh:L46-L56, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/web_handler.sh:L5-L18, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:deploy/yuanrong/web_handler.sh:L205-L217, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:Dockerfile.claw:L89-L100, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-runtimes.psm1:L15-L26, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:scripts/build-runtimes.sh:L11-L13]
 ---
 
 # packaging-deploy：冻结入口、容器与 yuanrong 部署链路
@@ -40,4 +40,12 @@ Sources / 来源：[scripts/jiuwenswarm_exe_entry.py:L599–L655](https://github
 yuanrong deploy.sh 支持 `up|down|restart` 命令与 `jiuwenswarm|gateway|web` 三个模块（缺省全选），web 模块经 `jiuwenswarm-web` 提供 frontend/dist 静态服务并把 /ws 代理到 gateway 的 WebChannel 端口，systemd 优先、nohup 回退，且服务已运行时跳过重复部署以免重启在途连接。容器最终镜像以 `jiuwenswarm-start` 启动、暴露 5173 端口，并通过 FRONTEND_HOST 让前端绑定容器外可访问的地址，而不改动源码/桌面安装使用的默认本机绑定。
 
 Sources / 来源：[deploy/yuanrong/args_handler.sh:L46–L56](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/deploy/yuanrong/args_handler.sh#L46-L56), [deploy/yuanrong/web_handler.sh:L5–L18](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/deploy/yuanrong/web_handler.sh#L5-L18), [deploy/yuanrong/web_handler.sh:L205–L217](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/deploy/yuanrong/web_handler.sh#L205-L217), [Dockerfile.claw:L89–L100](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/Dockerfile.claw#L89-L100)
+
+<!-- kb:knowledge owner=packaging-deploy facet=configuration pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**Node/uv 捆绑的构建常量与默认值**
+
+Windows 打包链的运行时捆绑开关集中在一个函数中：BUNDLE_NODE、BUNDLE_UV 默认 "1"，NODE_VERSION 默认 "v22.11.0"，三者均可被同名环境变量覆盖，且这些默认值在模块中只出现一次、由两条打包脚本通过该函数读取。macOS 侧的 build-runtimes.sh 定义同样的默认：NODE_VERSION 默认 v22.11.0、BUNDLE_NODE 默认 1（0 跳过内置 node），也可用环境变量覆盖。
+
+Sources / 来源：[scripts/build-runtimes.psm1:L15–L26](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/scripts/build-runtimes.psm1#L15-L26), [scripts/build-runtimes.sh:L11–L13](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/scripts/build-runtimes.sh#L11-L13)
 

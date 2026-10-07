@@ -292,10 +292,14 @@ class InitRuntime:
         traces = TraceStore(state_dir / INIT_DIR / "traces")
         clone = Path(os.environ.get(CLONE_ENV) or state_dir / INIT_DIR / "knowledge-repo")
         ensure_knowledge_clone(clone)
+        from .model_dispatch import SharedModelDispatch
+
+        gateway = ModelGateway(settings, recorder=trace_recorder(traces))
+        gateway.configure_dispatch(SharedModelDispatch())
         return cls(
             settings=settings, state_dir=state_dir,
             registry=load_registry(Path(os.environ.get("ADAPTERS_DIR") or adapters_root())),
-            gateway=ModelGateway(settings, recorder=trace_recorder(traces)),
+            gateway=gateway,
             generator=generator, judge=judge,
             knowledge=KnowledgeRepo(clone), github=GitHubReader(),
         )

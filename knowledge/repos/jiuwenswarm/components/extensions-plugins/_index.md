@@ -54,3 +54,11 @@ sources: []
 - [YuanRong FaaS 函数调用（非流式 + SSE 流式）](feature-yuanrong-faas-invocation.md)
 - [jiuwenswarm 扩展与插件：video_duplex 实时音视频 RPC 与 AgentOS Router 客户端](knowledge.md)
 - [YuanRong Agent 容器文件传输（上传/下载/列举/建目录）](feature-yuanrong-agent-file-transfer.md)
+
+- [AgentOS 沙箱创建与幂等对账：实现深读](feature-depth-agentos-sandbox-create-lifecycle.md)
+
+- [Voice/Video Duplex Managed Agent Task Service (Durable Queue, Concurrency, Uncertainty Semantics)：实现深读](feature-depth-video-agent-managed-task-service.md)
+
+- [YuanRong Agent 容器文件上传/下载/列举/建目录：实现深读](feature-depth-yuanrong-agent-file-transfer.md)
+
+- [YuanRong FaaS 函数调用（非流式 + SSE 流式）：实现深读](feature-depth-yuanrong-faas-invocation.md)

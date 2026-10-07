@@ -58,3 +58,5 @@ sources: []
 
 - [Skill 自演进：实现深读](feature-depth-skill-evolution.md)
 - [Workspace Git Diff 聚合（get_git_diff）与实时监控](feature-workspace-git-diff.md)
+
+- [Workspace Git Diff Aggregation (get_git_diff)：实现深读](feature-depth-workspace-git-diff.md)

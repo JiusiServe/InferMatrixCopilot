@@ -29,6 +29,7 @@ import hashlib
 import json
 import re
 import subprocess
+from threading import RLock
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Mapping
@@ -64,6 +65,13 @@ class PinnedObserver:
         self.pin = pin
         self._pull = pull or _gh_pull
         self._commits: set[str] = set()
+        # Successful immutable Git reads can be reused within this observer.
+        # A fresh observer starts empty; read failures and live PR metadata
+        # are never cached. Locking also avoids duplicate concurrent reads.
+        self._read_lock = RLock()
+        self._entries: dict[tuple[str, str], tuple[str, str] | None] = {}
+        self._texts: dict[tuple[str, str], str] = {}
+        self._top_levels: dict[str, frozenset[str]] = {}
         self._require_commit(pin)
 
     def _git(self, *args: str, input: bytes | None = None) -> subprocess.CompletedProcess:
@@ -84,30 +92,52 @@ class PinnedObserver:
     def head(self) -> str:
         return self.pin
 
-    def top_level(self, sha: str) -> set[str]:
+    def _immutable_commit(self, sha: str) -> str:
+        if not isinstance(sha, str) or not sha:
+            raise FactsError("a commit identity is required")
+        if not _SHA.fullmatch(sha):
+            proc = self._git("rev-parse", "--verify", "--end-of-options", sha)
+            resolved = proc.stdout.decode().strip()
+            if proc.returncode != 0 or not _SHA.fullmatch(resolved):
+                raise FactsError(f"cannot resolve commit {sha!r}: {proc.stderr.decode()[:300]}")
+            sha = resolved
         self._require_commit(sha)
-        proc = self._git("ls-tree", "--name-only", sha)
-        if proc.returncode != 0:
-            raise FactsError(f"cannot list {sha[:12]}: {proc.stderr.decode()[:300]}")
-        return {line for line in proc.stdout.decode("utf-8", "replace").splitlines() if line}
+        return sha
+
+    def top_level(self, sha: str) -> set[str]:
+        with self._read_lock:
+            sha = self._immutable_commit(sha)
+            if sha not in self._top_levels:
+                proc = self._git("ls-tree", "--name-only", sha)
+                if proc.returncode != 0:
+                    raise FactsError(f"cannot list {sha[:12]}: {proc.stderr.decode()[:300]}")
+                self._top_levels[sha] = frozenset(line for line in proc.stdout.decode("utf-8", "replace").splitlines() if line)
+            return set(self._top_levels[sha])  # callers cannot mutate the cache
 
     def _entry(self, sha: str, path: str) -> tuple[str, str] | None:
         """``(type, object id)`` of ``path`` in ``sha``'s tree; None when the
         tree has no such entry. Any git failure (unreadable tree, failed lazy
         fetch) raises: it is not evidence that the path is absent."""
-        self._require_commit(sha)
-        path = path.strip("/")
-        if not path:
-            return None
-        proc = self._git("ls-tree", "-z", sha, "--", path)
-        if proc.returncode != 0:
-            raise FactsError(f"cannot list {path} at {sha[:12]}: {proc.stderr.decode()[:300]}")
-        for record in proc.stdout.decode("utf-8", "replace").split("\0"):
-            meta, _, name = record.partition("\t")
-            parts = meta.split()
-            if name == path and len(parts) == 3:
-                return parts[1], parts[2]
-        return None
+        with self._read_lock:
+            sha = self._immutable_commit(sha)
+            path = path.strip("/")
+            if not path:
+                return None
+            key = (sha, path)
+            if key in self._entries:
+                return self._entries[key]
+            proc = self._git("ls-tree", "-z", sha, "--", path)
+            if proc.returncode != 0:
+                raise FactsError(f"cannot list {path} at {sha[:12]}: {proc.stderr.decode()[:300]}")
+            for record in proc.stdout.decode("utf-8", "replace").split("\0"):
+                meta, _, name = record.partition("\t")
+                parts = meta.split()
+                if name == path and len(parts) == 3:
+                    self._entries[key] = (parts[1], parts[2])
+                    return self._entries[key]
+            if not proc.stdout:
+                self._entries[key] = None  # an empty successful lookup is immutable
+            return None  # unexpected output is not cached
 
     def path_exists(self, sha: str, path: str) -> bool:
         return self._entry(sha, path) is not None
@@ -115,13 +145,19 @@ class PinnedObserver:
     def file_text(self, sha: str, path: str) -> str | None:
         """The file's text at ``sha``; None unless ``path`` is a file (blob).
         An entry that exists but cannot be read raises ``FactsError``."""
-        entry = self._entry(sha, path)
-        if entry is None or entry[0] != "blob":
-            return None  # missing, or a directory / submodule: no file text
-        proc = self._git("cat-file", "blob", entry[1])
-        if proc.returncode != 0:
-            raise FactsError(f"cannot read {path} at {sha[:12]}: {proc.stderr.decode()[:300]}")
-        return proc.stdout.decode("utf-8", "replace")
+        with self._read_lock:
+            sha = self._immutable_commit(sha)
+            key = (sha, path)
+            if key in self._texts:
+                return self._texts[key]
+            entry = self._entry(sha, path)
+            if entry is None or entry[0] != "blob":
+                return None  # missing, or a directory / submodule: no file text
+            proc = self._git("cat-file", "blob", entry[1])
+            if proc.returncode != 0:
+                raise FactsError(f"cannot read {path} at {sha[:12]}: {proc.stderr.decode()[:300]}")
+            self._texts[key] = proc.stdout.decode("utf-8", "replace")
+            return self._texts[key]
 
     def pull(self, number: int) -> dict:
         """The PR as GitHub reports it. Every lookup failure (no ``gh``, a

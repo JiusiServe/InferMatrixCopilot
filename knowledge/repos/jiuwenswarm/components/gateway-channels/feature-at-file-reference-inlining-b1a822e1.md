@@ -1,10 +1,10 @@
 ---
 title: "@path 文件引用内联与 @agent 提及解析（MessageHandler）"
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2873-L2915, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2917-L2944, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2882-L2889, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2950-L2987, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L3007-L3039, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2878-L2913, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2928-L2935, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2891-L2913, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/gateway/test_agent_mentions.py:L75-L77, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2917-L2924]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2873-L2915, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2917-L2944, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2882-L2889, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2950-L2987, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L3007-L3039, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2878-L2913, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2928-L2935, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2891-L2913, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:tests/unit_tests/gateway/test_agent_mentions.py:L75-L77, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2917-L2924, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2846-L2866, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/message_handler/message_handler.py:L2895-L2908]
 feature: "at-file-reference-inlining-b1a822e1"
 entry_points: ["jiuwenswarm/gateway/message_handler/message_handler.py"]
 source_globs: ["jiuwenswarm/gateway/message_handler/message_handler.py"]
@@ -53,4 +53,12 @@ Sources / 来源：[jiuwenswarm/gateway/message_handler/message_handler.py:L2891
 `tests/unit_tests/gateway/test_agent_mentions.py` 直接针对该特性，其中 `test_empty` 调用 `MessageHandler.extract_agent_mentions("no mentions here")` 并断言返回空列表，验证无提及时的安全返回（该方法对空/无匹配内容返回 `[]`，见 L2923–L2924）。该文件共 88 行，覆盖 `extract_agent_mentions` 的解析行为；但所示片段未包含针对 `resolve_at_file_references`、截断或附件合并路径的测试，这些行为在所示输入中的验证情况未知。
 
 Sources / 来源：[tests/unit_tests/gateway/test_agent_mentions.py:L75–L77](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/tests/unit_tests/gateway/test_agent_mentions.py#L75-L77), [jiuwenswarm/gateway/message_handler/message_handler.py:L2917–L2924](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/message_handler/message_handler.py#L2917-L2924)
+
+<!-- kb:knowledge owner=feature-at-file-reference-inlining-b1a822e1 facet=configuration pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**内联行为的可调参数与默认值**
+
+`resolve_at_file_references` 没有读取外部配置文件，其行为由两个调用参数控制：`cwd`（默认 `None`，回退 `os.getcwd()` 作为相对路径基准）与 `max_file_size`（默认取模块常量 `_DEFAULT_INLINE_FILE_SIZE_LIMIT`）。当 `max_file_size` 传 `None` 时跳过截断逻辑，直接 `read_text` 读入整个文件；有上限时按 `max_file_size + 1` 读取并在超限时截断，附 `... (truncated, original_size=N bytes)` 后缀。常量本身的具体数值与调用方是否覆盖默认值未在所示片段中出现。
+
+Sources / 来源：[jiuwenswarm/gateway/message_handler/message_handler.py:L2846–L2866](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/message_handler/message_handler.py#L2846-L2866), [jiuwenswarm/gateway/message_handler/message_handler.py:L2895–L2908](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/message_handler/message_handler.py#L2895-L2908)
 

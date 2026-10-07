@@ -1,10 +1,10 @@
 ---
 title: "Gateway Config-Save Hot Reload（_on_config_saved：agent.reload_config 重试、重启兜底与副作用）"
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2065-L2072, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2113-L2124, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2032-L2086, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2119-L2125, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2057-L2058, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2090-L2135, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2039-L2058, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2137-L2159, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2080-L2084, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2102-L2125]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2065-L2072, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2113-L2124, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2032-L2086, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2119-L2125, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2057-L2058, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2090-L2135, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2039-L2058, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2137-L2159, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2080-L2084, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2102-L2125, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2090-L2117, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2065-L2077]
 feature: "gateway-config-hot-reload"
 entry_points: ["jiuwenswarm/gateway/app_gateway.py"]
 source_globs: ["jiuwenswarm/gateway/app_gateway.py"]
@@ -51,4 +51,14 @@ Sources / 来源：[jiuwenswarm/gateway/app_gateway.py:L2039–L2058](https://gi
 功能包括：(1) 配置保存后的全局热重载，向 AgentServer 传完整 config 快照与增量 env；(2) 校验错误短路——错误文本匹配三个子串之一时记 warning 并返回 False，不重试、不重启；(3) 重试耗尽后的网关重启兜底；(4) 成功后的条件副作用——browser runtime 重启仅在 browser 相关 env 键变更时触发且失败仅记 warning（非致命），proactive.tick 任务同步仅在 `proactive_recommendation_enabled` 变更时触发且失败不阻断配置保存。
 
 Sources / 来源：[jiuwenswarm/gateway/app_gateway.py:L2080–L2084](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2080-L2084), [jiuwenswarm/gateway/app_gateway.py:L2102–L2125](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2102-L2125), [jiuwenswarm/gateway/app_gateway.py:L2137–L2159](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2137-L2159)
+
+<!-- kb:knowledge owner=feature-gateway-config-hot-reload facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**重试退避与固定用户的取舍**
+
+Inference / 设计推断（非作者历史意图）：
+
+重载采用最多 4 次尝试加指数退避（2、4、8 秒 sleep，不含每次请求本身的耗时），换取对瞬时失败的容忍；代价是被持续拒绝的保存需累计 14 秒退避后才会走 `_schedule_gateway_restart` 兜底并返回 False（推断：取舍分析基于所示控制流）。校验错误通过子串匹配（"ValidationError"/"validation error"/"Field required"）短路，避免对格式错误做无意义重试，但也意味着错误文案变化会使匹配失效。重载信封硬编码 user_id="agentos_test"：代码注释记载这是为了让 faas 沙箱按 user_id 命中带完整工作区的 warm instance，避免空 user 的 60s invocation 超时与非配置用户的 80004 建沙箱失败；代价是重载依赖该部署默认用户存在（此历史动因来自 L2065–L2072 的维护者注释，非外部文档）。
+
+Sources / 来源：[jiuwenswarm/gateway/app_gateway.py:L2057–L2058](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2057-L2058), [jiuwenswarm/gateway/app_gateway.py:L2090–L2117](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2090-L2117), [jiuwenswarm/gateway/app_gateway.py:L2119–L2125](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2119-L2125), [jiuwenswarm/gateway/app_gateway.py:L2065–L2077](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2065-L2077)
 

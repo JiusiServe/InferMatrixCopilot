@@ -318,10 +318,12 @@ def assemble(root: Path, state: Path, source: Path, *, retirement_reports=(),
                             "checkpoint_accepted_sha256": accepted_sha, "assembled_sha256": digest(proposed),
                             "baseline_sha256": digest(old) if old is not None else None, "new_facets": added})
     # Add only missing depth-page routes; never copy regenerated worker indexes.
+    # Retained proof-checked baseline pages may intentionally precede their
+    # navigation publication in a new batch with immutable foundation indexes.
     indexes, new_links = {}, []
-    for page in proposals:
-        if page in baseline_pages:
-            continue
+    routed_pages = {page for page, blocks in old_blocks.items() if blocks}
+    routed_pages.update(page for page in proposals if DEPTH_BLOCK.search(proposals[page]))
+    for page in sorted(routed_pages):
         feature = by_page[page]
         directory = PurePosixPath(page).parent
         index = str(directory / "_index.md")

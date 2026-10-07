@@ -48,3 +48,7 @@ sources: []
 - [共享 Agent 运行时（jiuwenswarm/runtime/service.py AgentRuntime）](knowledge.md)
 - [声明式 root Agent 定义执行（invoke_agent/stream_agent）](feature-runtime-agent-definition-execution.md)
 - [会话输入通道（steer/follow_up）与执行绑定 — 知识页](feature-session-input-steering.md)
+
+- [声明式 root Agent 定义执行（invoke_agent/stream_agent）：实现深读](feature-depth-runtime-agent-definition-execution.md)
+
+- [Session Input Lane (steer/follow_up) and Execution Binding：实现深读](feature-depth-session-input-steering.md)

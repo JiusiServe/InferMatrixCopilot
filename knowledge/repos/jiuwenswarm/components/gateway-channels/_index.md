@@ -78,3 +78,21 @@ sources: []
 - [3rdagent.list / 3rdagent.switch 第三方智能体切换](feature-thirdagent-list-switch.md)
 - [@path 文件引用内联与 @agent 提及解析（MessageHandler）](feature-at-file-reference-inlining-b1a822e1.md)
 - [scripts](scripts/_index.md)
+
+- [@path 文件引用内联与 @agent 提及解析：实现深读](feature-depth-at-file-reference-inlining-b1a822e1.md)
+
+- [/security-review 安全审查斜杠命令与 git 预执行：实现深读](feature-depth-channel-security-review-slash-command.md)
+
+- [Gateway Config-Save Hot Reload (agent.reload_config retry, restart fallback, browser/proactive side effects)：实现深读](feature-depth-gateway-config-hot-reload.md)
+
+- [Gateway HealthCheck 周期探活服务：实现深读](feature-depth-gateway-health-check.md)
+
+- [GatewayServer 多路由 WebSocket 宿主与会话/请求路由表：实现深读](feature-depth-gateway-server-multi-route-ws.md)
+
+- [IM Attachment Persist Hook (E2A + HTTP Bridge)：实现深读](feature-depth-im-attachment-persist-hook-969909e1.md)
+
+- [IM Channel Hot Reconfiguration (_apply_channel_config lifecycle across 11 channels)：实现深读](feature-depth-im-channel-hot-reconfig.md)
+
+- [界面语言配置 RPC（preferred_language）：实现深读](feature-depth-locale-conf-rpc.md)
+
+- [3rdagent.list / 3rdagent.switch 第三方智能体切换：实现深读](feature-depth-thirdagent-list-switch.md)

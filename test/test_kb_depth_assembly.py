@@ -157,6 +157,27 @@ def test_thirteen_worker_assembly_keeps_unique_ownership_and_full_policy(assembl
     assert report["source_verified_facets"] == 3
 
 
+def test_retained_seed_navigation_is_restored_without_a_new_worker_approval(assembler, world):
+    _write(world.root, "knowledge/" + world.index, "Immutable foundation navigation.\n")
+    baseline = _commit(world.root)
+    world.campaign["baseline"] = baseline
+    (world.state / "campaign.json").write_text(json.dumps(world.campaign))
+    world.records[0]["depth"]["accepted"] = {}
+    world.records[0]["verdicts"] = {}
+    for number, record in enumerate(world.records):
+        record["kb_base_sha"] = baseline
+        _save(world, number)
+
+    report, writes = assembler.assemble(world.root, world.state, world.source)
+    retained_page = depth_page(world.policy.features[0])
+    assert retained_page not in writes
+    assert (world.root / "knowledge" / retained_page).read_text() == world.old
+    assert writes[world.index].startswith("Immutable foundation navigation.\n")
+    assert writes[world.index].count("](feature-depth-f0.md)") == 1
+    assert report["baseline_facets"] == 1
+    assert report["new_receipt_bound_facets"] == 1
+
+
 @pytest.mark.parametrize("key", ["pin", "kb_base_sha", "repo", "stage"])
 def test_checkpoint_identity_mismatch_fails(assembler, world, key):
     world.records[0][key] = "different"

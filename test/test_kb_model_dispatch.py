@@ -113,6 +113,20 @@ def test_default_host_namespace_shared_across_batch_state_directories(tmp_path):
     assert SharedModelDispatch(environ={"KB_INIT_DISPATCH_DIR": str(tmp_path / "explicit")}).limit == 13
 
 
+def test_adapter_init_batches_share_dispatch_with_portable_batches(tmp_path, monkeypatch):
+    from infermatrix_copilot.kb_service.init_support import InitRuntime
+
+    monkeypatch.setenv("KB_INIT_DISPATCH_DIR", str(tmp_path / "dispatch"))
+    monkeypatch.setenv("KB_INIT_GLOBAL_CONCURRENCY", "3")
+    monkeypatch.setenv("KB_INIT_KNOWLEDGE_CLONE", str(tmp_path / "knowledge"))
+    monkeypatch.setattr("infermatrix_copilot.kb_service.init_support.ensure_knowledge_clone", lambda _: None)
+    first = InitRuntime.from_env(SimpleNamespace(), state_dir=tmp_path / "foundation")
+    second = InitRuntime.from_env(SimpleNamespace(), state_dir=tmp_path / "depth")
+    portable = SharedModelDispatch()
+    assert first.gateway._dispatch.directory == second.gateway._dispatch.directory == portable.directory
+    assert first.gateway._dispatch.limit == second.gateway._dispatch.limit == portable.limit == 3
+
+
 def test_native_gateway_fallbacks_and_judges_use_same_slots_and_keep_recording(tmp_path):
     active = maximum = 0
     mutex = threading.Lock()

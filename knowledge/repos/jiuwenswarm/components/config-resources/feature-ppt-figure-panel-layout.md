@@ -1,10 +1,10 @@
 ---
 title: "PPT 图表面板布局引擎（figure-panel.js）"
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L82-L104, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L34-L37, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L1-L8, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L82-L92, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L10-L21, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L93-L98, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L23-L41]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L82-L104, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L34-L37, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L1-L8, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L82-L92, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L10-L21, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L93-L98, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L23-L41, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L42-L57, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L82-L98, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L26-L37, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L82-L87]
 feature: "ppt-figure-panel-layout"
 entry_points: ["jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js"]
 source_globs: ["jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js"]
@@ -43,4 +43,20 @@ Sources / 来源：[jiuwenswarm/resources/agent/workspace/skills/ppt-creation/sc
 L6–L7 注释明确说明：slides.js 顺序调用组件，因此本文件刻意全部同步，无法使用异步的 sharp 读图。由此 `pngSize` 只能用同步 fs 手工解析 PNG IHDR 头（读取前 24 字节，L26–L36），这把输入限制为 PNG 一种格式，非 PNG 或缺 IHDR 直接抛错。另一取舍是标签与间距保持绝对尺寸、仅图片缩放（L39–L41），保证排版再紧标签也可读，代价是极小区域中图片占比被进一步压缩。`LABEL_FONT`/`LABEL_COLOR` 复制而非导入，注释归因于 components.js 反向依赖本模块会形成循环（L17–L19）。
 
 Sources / 来源：[jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L1–L8](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js#L1-L8), [jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L23–L41](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js#L23-L41)
+
+<!-- kb:knowledge owner=feature-ppt-figure-panel-layout facet=features pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**支持的布局行为**
+
+引擎按宽高比分行：ar ≥ WIDE_AR(2.5) 的宽图独占一行，较方的图与相邻的方图两两并排（L44–L48）。行内按可用高度统一缩放（scale ≤ 1，仅缩图片，标签与间距保持绝对尺寸），整块内容在 bounds 内垂直居中，行内图片在行高中垂直居中（L55–L57、L88、L68）。渲染时每张图通过 slide.addImage 原样贴入（无边框无填充），若 figure 带 label 则在其下方绘制居中、fit:shrink 的中文说明文字（L90–L98）。
+
+Sources / 来源：[jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L42–L57](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js#L42-L57), [jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L82–L98](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js#L82-L98)
+
+<!-- kb:knowledge owner=feature-ppt-figure-panel-layout facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**验证入口：运行时守卫（非测试）**
+
+所示文件不含任何测试入口点或断言辅助函数，唯一的验证机制是 `pngSize` 内的运行时守卫（runtime guard，属于检查而非测试执行）：读取文件前 24 字节后，先校验 PNG 签名（`0x89504e47`），再校验第 12–16 字节为 `IHDR`，任一不满足即抛出包含文件路径的 Error（如 `not a PNG: <path>`）。这两个守卫在 `renderFigurePanel` 读取每张图尺寸时被调用，是渲染路径上实际执行的输入校验。
+
+Sources / 来源：[jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L26–L37](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js#L26-L37), [jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js:L82–L87](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/resources/agent/workspace/skills/ppt-creation/scripts/figure-panel.js#L82-L87)
 

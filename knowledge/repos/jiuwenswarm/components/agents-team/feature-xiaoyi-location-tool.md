@@ -1,10 +1,10 @@
 ---
 title: "设备定位工具 get_user_location（feature-xiaoyi-location-tool）"
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L19-L31, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L68-L86, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L33-L68, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L19-L26, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L41-L54, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L68-L73, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L67-L73]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L19-L31, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L68-L86, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L33-L68, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L19-L26, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L41-L54, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L68-L73, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L67-L73, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L14-L17]
 feature: "xiaoyi-location-tool"
 entry_points: ["jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py"]
 source_globs: ["jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py"]
@@ -53,4 +53,12 @@ Sources / 来源：[jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/l
 `get_user_location` 是注册名为 `get_user_location` 的零参数异步工具，声明返回用户当前位置的 WGS84 经纬度坐标，且需要设备授权位置访问权限；描述还要求调用方遵守 60 秒操作超时、失败后最多重试一次。功能实现上，它构造 `Common/Action` 协议命令（`intentName: GetCurrentLocation`、`bundleName: com.huawei.hmos.aidispatchservice`、`executeMode: background`），并通过 `intentParam.isNeedGeoAddress: True` 请求逆地理地址，随后交由共享的 `execute_device_command` 等待设备返回，定位能力本身由设备端服务提供。
 
 Sources / 来源：[jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L19–L26](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py#L19-L26), [jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L41–L54](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py#L41-L54), [jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L67–L73](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py#L67-L73)
+
+<!-- kb:knowledge owner=feature-xiaoyi-location-tool facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**验证与运行时防护**
+
+所示输入不含任何自动化测试：location_tool.py 是纯工具实现文件，整个文件（L1–L86）没有测试函数或测试入口，也未展示针对该工具的测试文件。代码中实际存在的校验是运行时防护而非测试：L70–L71 将非 dict 的设备返回归一化为 {"value": outputs}，随后 L73 调用共享辅助函数 raise_if_device_error(outputs, "获取位置失败") 做设备错误检查。该辅助函数与 execute_device_command 的内部校验/超时行为在所示代码中不可见（仅 L16 导入），因此无法断言完整错误处理范围。
+
+Sources / 来源：[jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L68–L73](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py#L68-L73), [jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py:L14–L17](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/agents/harness/common/tools/xiaoyi_phone_tools/location_tool.py#L14-L17)
 

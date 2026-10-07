@@ -1,10 +1,10 @@
 ---
 title: "IM Channel Hot Reconfiguration (_apply_channel_config lifecycle across 11 channels)"
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2466-L2517, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2576-L2643, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2552-L2564, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2591-L2643, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2669-L2721, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py:L4023-L4046, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py:L4277-L4288, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py:L4490-L4503]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2466-L2517, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2576-L2643, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2552-L2564, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2591-L2643, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2669-L2721, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py:L4023-L4046, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py:L4277-L4288, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py:L4490-L4503, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2528-L2538, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3112-L3112, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2519-L2526, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L3001-L3024, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/gateway/app_gateway.py:L2922-L2926]
 feature: "im-channel-hot-reconfig"
 entry_points: ["jiuwenswarm/gateway/app_gateway.py"]
 source_globs: ["jiuwenswarm/gateway/app_gateway.py", "jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py"]
@@ -35,4 +35,20 @@ Sources / 来源：[jiuwenswarm/gateway/app_gateway.py:L2552–L2564](https://gi
 Web 处理器在写配置前做输入校验：非 dict 的 params 返回 `BAD_REQUEST`（如 feishu set_conf、whatsapp/discord/slack/wecom/wechat set_conf，app_web_handlers.py:4023-4031, 4277-4285）。wechat set_conf 额外调用 `_validate_wechat_numeric_params`，在 `set_conf` 之前拒绝负数/0/极大值/浮点越界/非数字的数值参数并返回 `BAD_REQUEST`（app_web_handlers.py:4490-4500）。feishu set_conf 在持久化前先 `_normalize_feishu_conf` 归一化 apps（app_web_handlers.py:4040-4046）。
 
 Sources / 来源：[jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py:L4023–L4046](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py#L4023-L4046), [jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py:L4277–L4288](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py#L4277-L4288), [jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py:L4490–L4503](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/channel_manager/web/app_web_handlers.py#L4490-L4503)
+
+<!-- kb:knowledge owner=feature-im-channel-hot-reconfig facet=api pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**_apply_channel_config 回调契约**
+
+`_apply_channel_config(conf: dict)` 由 `_run` 协程定义并通过 `channel_manager.set_config_callback` 注册（app_gateway.py:3112），频道实例与 `_last_channels_conf` 等状态是 `_run` 的局部变量，经 nonlocal 声明修改（L2528-L2538），不是模块级状态。停止路径 `_stop_channel(channel, task, channel_name, background_wait=False)` 默认同步 `await asyncio.wait_for(task, timeout=5.0)` 等待取消、`channel.stop()` 以 10 秒超时（L2495, L2512）；`background_wait=True` 时改为 `asyncio.create_task(wait_cancel())` 后台等待，取消无需在 stop/unregister 之前完成（L2478-L2492, L2510-L2517）。
+
+Sources / 来源：[jiuwenswarm/gateway/app_gateway.py:L2466–L2517](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2466-L2517), [jiuwenswarm/gateway/app_gateway.py:L2528–L2538](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2528-L2538), [jiuwenswarm/gateway/app_gateway.py:L3112–L3112](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L3112-L3112)
+
+<!-- kb:knowledge owner=feature-im-channel-hot-reconfig facet=configuration pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**频道启用判定与 Wechat 默认值**
+
+`_is_channel_enabled(conf, required_fields)` 在 `enabled` 键存在时以其布尔值为准；键值为 None（如显式 enabled: null）时退化为检查必填字段是否全部非空（app_gateway.py:2519-2526）。WeChat 块使用空的 required_fields 列表并填充默认值，如 `base_url` 默认 `https://ilinkai.weixin.qq.com`、`auto_login` 默认 True、`qrcode_poll_interval_sec` 2.0、`long_poll_timeout_sec` 45、backoff 1.0–30.0 秒、credential_file 默认 `~/.wx-ai-bridge/credentials.json`（L3008-3024）。注意 WhatsApp 不走 `_is_channel_enabled`，在 L2922-2926 内联判定（enabled 缺省时以 bridge_ws_url 非空为准）。
+
+Sources / 来源：[jiuwenswarm/gateway/app_gateway.py:L2519–L2526](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2519-L2526), [jiuwenswarm/gateway/app_gateway.py:L3001–L3024](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L3001-L3024), [jiuwenswarm/gateway/app_gateway.py:L2922–L2926](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/gateway/app_gateway.py#L2922-L2926)
 
