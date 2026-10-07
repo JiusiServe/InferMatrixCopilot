@@ -15,6 +15,11 @@
     }
   },
   "artifacts": {
+    "completed_legacy_serving_probes": {
+      "bytes": 3025237,
+      "path": ".kb-jiuwenswarm-finish-20261007/final-audit/serving-final/legacy-all-features.json",
+      "sha256": "3e1e03224894d85438bfdb3284d983fbf5285dd5cbef1e724f5f782457fc3c18"
+    },
     "depth_archive_with_zero_task_declarations": {
       "bytes": 2994812,
       "path": ".kb-jiuwenswarm-finish-20261007/final-audit/depth-native-archive-manifest.json",
@@ -24,6 +29,16 @@
       "bytes": 1259586,
       "path": ".kb-jiuwenswarm-finish-20261007/final-audit/native-approvals-1178.json",
       "sha256": "13548385cecd19fe76e37155ac864ada93bb22bf4cbcda17f89feba691bb2ad1"
+    },
+    "final_frozen_full_suite_log": {
+      "bytes": 5108,
+      "path": ".kb-jiuwenswarm-finish-20261007/audit/full-pytest-final-frozen.log",
+      "sha256": "7b3d8e41824cdfd955388570f27c7bc92787f32b2fa3f546a44f31340f55b9f7"
+    },
+    "final_serving_acceptance_reconciliation": {
+      "bytes": 138251,
+      "path": ".kb-jiuwenswarm-finish-20261007/final-audit/serving-final/summary-reconciled.json",
+      "sha256": "c5902c243b171d05de4332a691b804a562f15f87aeaf43ef167e2aa8fd23a8ab"
     },
     "foundation_last_attempt_unknowns": {
       "bytes": 139540,
@@ -76,7 +91,7 @@
   },
   "catalog_features": 173,
   "catalog_sha256": "e6c37a346cccdaff5404c26a21b5a88f733150b1e0835c4a533a332d20df68ed",
-  "created_at": "2026-10-07T11:27:54.963822+00:00",
+  "created_at": "2026-10-07T11:46:27.074615+00:00",
   "current": {
     "all_seven_complete_features": 143,
     "depth": {
@@ -318,11 +333,27 @@
     }
   },
   "fresh_pr_review_experiments": 0,
-  "knowledge_checkout_base_sha": "2d54c48fe31f83df298dec94a26e8fea30d8c95d",
+  "knowledge_checkout_base_sha": "465f3515ca350e4c5926240f0e405294c6d0913b",
   "knowledge_target_met": true,
   "knowledge_tool_validation": {
-    "CI": "see_pull_request",
-    "final_full_suite": "frozen_candidate_rerun_pending_at_report",
+    "CI": {
+      "claim_passed_at_report": false,
+      "status_reference": "pull_request_checks",
+      "url": "https://github.com/JiusiServe/InferMatrixCopilot/pull/327"
+    },
+    "final_full_suite": {
+      "knowledge_tree_frozen": true,
+      "log": {
+        "bytes": 5108,
+        "path": ".kb-jiuwenswarm-finish-20261007/audit/full-pytest-final-frozen.log",
+        "sha256": "7b3d8e41824cdfd955388570f27c7bc92787f32b2fa3f546a44f31340f55b9f7"
+      },
+      "passed": 3935,
+      "seconds": 941.09,
+      "skipped": 18,
+      "status": "passed",
+      "warnings": 4
+    },
     "fresh_SDK_related_rerun": {
       "passed": 35
     },
@@ -497,10 +528,84 @@
     }
   },
   "previous_catalog_features": 79,
+  "pull_request": {
+    "number": 327,
+    "url": "https://github.com/JiusiServe/InferMatrixCopilot/pull/327"
+  },
   "release_note": "本报告核对已审计候选；知识工具测试、CI及合并状态以本次PR记录为准。",
   "runtime_tests_executed": false,
   "schema": "jiuwenswarm-init-completion-public-v1",
   "scope_interpretation": "声明范围已处理不等于所有功能均已发现。原79项功能552/553；本轮固定173项，使用1211分母。",
+  "serving_acceptance": {
+    "SDK_MCP_parity_scenarios": 5,
+    "actual_packet_count": 15,
+    "code_binding_files": 287,
+    "code_bindings_sha256": "0edd0fa124f422d6dd3eb6c5c06d1f653e704c6b9297ade267733a7d9d4429c3",
+    "consumer_budget_checks": {
+      "assertion_origin": "Already executed by original helper before its line235 final assertion; successful packets/expansion reconstructed and verified separately.",
+      "direct_related_mcp_expand": true,
+      "initial_budget": 24000,
+      "max_budget": 64000,
+      "mcp_read_sdk_restart": true,
+      "path_boundary_enforced": true,
+      "sdk_search_mcp_cached_search": true,
+      "source_output_reserves_enforced": true
+    },
+    "document_deliveries_including_repeats": 73,
+    "formal_changes": 0,
+    "ignored_nonserved_cache_additions": 4,
+    "intact_facet_deliveries_including_repeats": 151,
+    "interpretation": "依据已执行调用的持久化回执、注入内容哈希和忽略规则作确定性核对；不是把原始exit1改成exit0。保守UTF8预算记账不是服务端实测tokens。",
+    "legacy_cases": 519,
+    "legacy_probes": {
+      "description_and_paths": {
+        "cases": 173,
+        "depth_hits": 173,
+        "feature_hits": 173,
+        "max_content_chars": 5991,
+        "max_documents": 2,
+        "target_feature_injection": {
+          "full": 585,
+          "not_injected": 626,
+          "partial": 0
+        }
+      },
+      "paths_only": {
+        "cases": 173,
+        "depth_hits": 168,
+        "feature_hits": 168,
+        "max_content_chars": 5991,
+        "max_documents": 2,
+        "target_feature_injection": {
+          "full": 569,
+          "not_injected": 642,
+          "partial": 0
+        }
+      },
+      "query_only": {
+        "cases": 173,
+        "depth_hits": 173,
+        "feature_hits": 173,
+        "max_content_chars": 5873,
+        "max_documents": 2,
+        "target_feature_injection": {
+          "full": 614,
+          "not_injected": 597,
+          "partial": 0
+        }
+      }
+    },
+    "new_model_or_MCP_calls_in_reconciliation": 0,
+    "not_model_or_PR_review_latency": true,
+    "original_failure_preserved": true,
+    "original_helper_exit_code": 1,
+    "paths_only_miss_interpretation": "共享入口和两页预算造成诊断性缺口；不是PR评审召回率。",
+    "paths_only_misses": 5,
+    "persistent_context_receipts_verified": 32,
+    "rerun_legacy_probes": 0,
+    "status": "passed_after_nonserved_cache_reconciliation",
+    "workload_seconds_until_legacy_report": 1571.55
+  },
   "shared_inventory_unknowns": {
     "binary_text_read_failures": 4,
     "counted_as_absence": false,

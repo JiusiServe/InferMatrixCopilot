@@ -1,8 +1,8 @@
 # knowledge_service/pinned_claims.py —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-07 -->
 
-`LOC ~200 · 在钉住的上游 SHA 上核验规则声明与代码证据（kb init §9.1） · refactor-status: new`
+`LOC ~280 · 在钉住的上游 SHA 上核验规则声明与代码证据（kb init §9.1） · refactor-status: new`
 
 ## 职责
 - `PinnedObserver(repo_dir, repository, pin, pull=)`：在本地 git 仓库（bare 或非 bare）上实现
@@ -21,6 +21,11 @@
 哈希口径：`str.splitlines()` 切行（`\n`、`\r\n`、缺末尾换行视为相同），取 `start..end` 行以
 `\n` 连接再补一个 `\n`，UTF-8 编码后 SHA-256。`Evidence.to_dict()/from_dict()` 用于 init 记录。
 
+同一 observer 复用成功的树项、文件正文和顶层目录读取，缓存键绑定完整提交 SHA 与路径。
+`HEAD`、分支等可变引用每次先解析为完整提交，再选缓存键；新 observer 从空缓存开始。
+成功的空树项查询可以缓存，读取失败不缓存；实时 PR 元数据仍逐次查询。
+并发读取使用实例锁，顶层目录集合返回副本，不允许调用方改写缓存。缓存不改变证据正文或哈希口径。
+
 ## 不变量
 - 与服务端 `facts.attest` 的声明抽取完全一致（同一 `claims_in`），只是观测点从上游 head 换成钉点。
 - 不修改 `facts.Observer` 协议，不影响服务与发布器。
@@ -35,3 +40,5 @@
 ## 测试
 `test_kb_pinned_claims.py`（临时 git 仓库：钉点前后文件、符号、PR 合并先后与未合并、证据区间与
 哈希、换行风格无关、非法钉点）。
+`test_kb_pinned_observer_cache.py`（真实 Git 对象的重复读取、不同提交、并发复用、错误恢复、
+返回集合隔离、实时 PR 查询及移动 HEAD/分支的回归检查）。
