@@ -32,3 +32,7 @@ sources: []
 - [IDE 端代理文件编辑直接应用（DiffApplier）](feature-ide-file-edit-diff-apply.md)
 - [IDE 单轮文件快照与回退（Rewind）](feature-ide-turn-rewind-snapshot.md)
 - [shared-webview](shared-webview/_index.md)
+
+- [IDE 端代理文件编辑直接应用（DiffApplier）：实现深读](feature-depth-ide-file-edit-diff-apply.md)
+
+- [IDE 单轮文件快照与回退（Rewind）：实现深读](feature-depth-ide-turn-rewind-snapshot.md)

@@ -1,10 +1,10 @@
 ---
 title: "JiuwenSwarm browser-client（Chromium 扩展）背景服务与内容脚本"
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/index.ts:L1-L13, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/index.ts:L70-L93, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/ToolDispatcher.ts:L48-L104, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/WsClient.ts:L89-L99, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/content/Extractor.ts:L33-L56, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/ContextMenu.ts:L91-L111, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/eslint.config.js:L3-L13, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/scripts/pack.js:L19-L29, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/scripts/pack.js:L44-L48]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/index.ts:L1-L13, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/index.ts:L70-L93, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/ToolDispatcher.ts:L48-L104, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/WsClient.ts:L89-L99, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/content/Extractor.ts:L33-L56, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/ContextMenu.ts:L91-L111, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/eslint.config.js:L3-L13, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/scripts/pack.js:L19-L29, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/scripts/pack.js:L44-L48, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/PanelManager.ts:L1-L10, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/PanelManager.ts:L33-L39, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/browser/frontend/src/background/PanelManager.ts:L54-L75]
 ---
 
 # JiuwenSwarm browser-client（Chromium 扩展）背景服务与内容脚本
@@ -40,4 +40,14 @@ Sources / 来源：[jiuwenswarm/channels/browser/frontend/src/content/Extractor.
 eslint.config.js 基于 typescript-eslint recommended，忽略 dist/、node_modules/、src/webview/，并将 no-explicit-any 与 no-unused-vars（argsIgnorePattern ^_）设为 warn 级提示。scripts/pack.js 在打包阶段校验构建产物存在：dist/ 缺失时报错并以退出码 1 终止（提示先 npm run build），否则将 dist/ 以 zip 压缩级别 9 归档为 jiuwenswarm-browser-<version>.zip 并输出体积日志。所列输入不含扩展运行时的测试文件。
 
 Sources / 来源：[jiuwenswarm/channels/browser/frontend/eslint.config.js:L3–L13](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/browser/frontend/eslint.config.js#L3-L13), [jiuwenswarm/channels/browser/frontend/scripts/pack.js:L19–L29](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/browser/frontend/scripts/pack.js#L19-L29), [jiuwenswarm/channels/browser/frontend/scripts/pack.js:L44–L48](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/browser/frontend/scripts/pack.js#L44-L48)
+
+<!-- kb:knowledge owner=browser-client facet=tradeoffs pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**Side Panel 能力检测与弹窗回退的取舍**
+
+Inference / 设计推断（非作者历史意图）：
+
+PanelManager 以运行时检测 chrome.sidePanel 是否存在来分支（推断：这是为兼容不支持 Side Panel API 的 Chromium 系浏览器而保留的降级路径，文件头注释点名 360/QQ/搜狗浏览器）。原生分支仅在调用方传入 windowId 时才调用 chrome.sidePanel.open，否则直接返回不打开；回退分支以 420×700 的初始尺寸新建 popup，已打开时仅聚焦复用，窗口关闭时通过 onRemoved 清理记录的 ID。
+
+Sources / 来源：[jiuwenswarm/channels/browser/frontend/src/background/PanelManager.ts:L1–L10](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/browser/frontend/src/background/PanelManager.ts#L1-L10), [jiuwenswarm/channels/browser/frontend/src/background/PanelManager.ts:L33–L39](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/browser/frontend/src/background/PanelManager.ts#L33-L39), [jiuwenswarm/channels/browser/frontend/src/background/PanelManager.ts:L54–L75](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/browser/frontend/src/background/PanelManager.ts#L54-L75)
 

@@ -1,0 +1,1392 @@
+{
+  "amount": {
+    "current": {
+      "markdown_bytes": 6803739,
+      "markdown_files": 958
+    },
+    "interpretation": "Markdown文件体积包括元数据、引用与证明；不是模型实际收到的上下文量。",
+    "preview": {
+      "markdown_bytes": 6321054,
+      "markdown_files": 957
+    },
+    "published": {
+      "markdown_bytes": 5346963,
+      "markdown_files": 864
+    }
+  },
+  "artifacts": {
+    "depth_archive_with_zero_task_declarations": {
+      "bytes": 2994812,
+      "path": ".kb-jiuwenswarm-finish-20261007/final-audit/depth-native-archive-manifest.json",
+      "sha256": "bad89a62a30fc5de4b1a7fb944269f17f39a8df3578647d3eaaef86f7a577763"
+    },
+    "depth_native_audit": {
+      "bytes": 1259586,
+      "path": ".kb-jiuwenswarm-finish-20261007/final-audit/native-approvals-1178.json",
+      "sha256": "13548385cecd19fe76e37155ac864ada93bb22bf4cbcda17f89feba691bb2ad1"
+    },
+    "foundation_last_attempt_unknowns": {
+      "bytes": 139540,
+      "path": ".kb-jiuwenswarm-finish-20261007/foundation/foundation-unknown-33-20261007-v3.json",
+      "sha256": "c1953d712992e6d303c0fc12b94718359ca255d22a39d18adf11945435502f5c"
+    },
+    "foundation_native_audit": {
+      "bytes": 816287,
+      "path": ".kb-jiuwenswarm-finish-20261007/foundation/foundation-final-audit-20261007.json",
+      "sha256": "73f4a59ad06647229db9d388c1477e86146bd8fa9a94b4fd31e53944710822ab"
+    },
+    "knowledge_files_manifest": {
+      "bytes": 142811,
+      "path": ".kb-jiuwenswarm-finish-20261007/final-audit/final-acceptance/candidate-files-manifest.json",
+      "sha256": "ff959e125a84271cf9513a9a9d327086dd8f22b7ba3d7c2a67e91070f502704c"
+    },
+    "local_source_replay_benchmark": {
+      "bytes": 9869,
+      "path": ".kb-jiuwenswarm-finish-20261007/foundation/cache-proposal/local-replay-benchmark-final-candidate.json",
+      "sha256": "b245b55933e18db907162b984a626749ed714f535433fcfa13ef117c064fc861"
+    },
+    "source_and_recognition_audit": {
+      "bytes": 638127,
+      "path": ".kb-jiuwenswarm-finish-20261007/final-audit/final-acceptance/source-and-recognition-audit.json",
+      "sha256": "fa9dff67776d8ebe8914fe81ad882e2cef252aff572cdbaed56b702f430da14e"
+    }
+  },
+  "baseline": {
+    "depth_original_79": {
+      "denominator": 553,
+      "ratio": 0.9981916817359855,
+      "recognized": 552
+    },
+    "depth_rebased_to_173": {
+      "denominator": 1211,
+      "ratio": 0.4558216350123865,
+      "recognized": 552
+    },
+    "foundation": {
+      "complete_features": 108,
+      "denominator": 1038,
+      "recognized": 927,
+      "unknown_cells": 111
+    },
+    "unpublished_preview": {
+      "denominator": 1211,
+      "feature_count": 172,
+      "recognized": 1047
+    }
+  },
+  "catalog_features": 173,
+  "catalog_sha256": "e6c37a346cccdaff5404c26a21b5a88f733150b1e0835c4a533a332d20df68ed",
+  "created_at": "2026-10-07T11:27:54.963822+00:00",
+  "current": {
+    "all_seven_complete_features": 143,
+    "depth": {
+      "acceptance_mode": "lightweight",
+      "facet_counts": {
+        "api": {
+          "eligible_ratio": 0.976878612716763,
+          "eligible_recognized": 169,
+          "lightweight_recognized": 134,
+          "ratio": 0.976878612716763,
+          "recognized": 169,
+          "strict_recognized": 35,
+          "supported": 169,
+          "target_met": true,
+          "unknown": 4,
+          "verified_absent": 0
+        },
+        "configuration": {
+          "eligible_ratio": 0.9942196531791907,
+          "eligible_recognized": 172,
+          "lightweight_recognized": 121,
+          "ratio": 0.9942196531791907,
+          "recognized": 172,
+          "strict_recognized": 51,
+          "supported": 172,
+          "target_met": true,
+          "unknown": 1,
+          "verified_absent": 0
+        },
+        "dependencies": {
+          "eligible_ratio": 0.9710982658959537,
+          "eligible_recognized": 168,
+          "lightweight_recognized": 145,
+          "ratio": 0.9710982658959537,
+          "recognized": 168,
+          "strict_recognized": 23,
+          "supported": 168,
+          "target_met": true,
+          "unknown": 5,
+          "verified_absent": 0
+        },
+        "failure_modes": {
+          "eligible_ratio": 0.9710982658959537,
+          "eligible_recognized": 168,
+          "lightweight_recognized": 144,
+          "ratio": 0.9710982658959537,
+          "recognized": 168,
+          "strict_recognized": 24,
+          "supported": 168,
+          "target_met": true,
+          "unknown": 5,
+          "verified_absent": 0
+        },
+        "flow": {
+          "eligible_ratio": 0.9942196531791907,
+          "eligible_recognized": 172,
+          "lightweight_recognized": 150,
+          "ratio": 0.9942196531791907,
+          "recognized": 172,
+          "strict_recognized": 22,
+          "supported": 172,
+          "target_met": true,
+          "unknown": 1,
+          "verified_absent": 0
+        },
+        "tradeoffs": {
+          "eligible_ratio": 0.9884393063583815,
+          "eligible_recognized": 171,
+          "lightweight_recognized": 147,
+          "ratio": 0.9884393063583815,
+          "recognized": 171,
+          "strict_recognized": 24,
+          "supported": 171,
+          "target_met": true,
+          "unknown": 2,
+          "verified_absent": 0
+        },
+        "validation": {
+          "eligible_ratio": 0.9132947976878613,
+          "eligible_recognized": 158,
+          "lightweight_recognized": 130,
+          "ratio": 0.9132947976878613,
+          "recognized": 158,
+          "strict_recognized": 28,
+          "supported": 158,
+          "target_met": true,
+          "unknown": 15,
+          "verified_absent": 0
+        }
+      },
+      "lightweight_recognized_facets": 971,
+      "per_facet_gt": 0.9,
+      "recognized_complete_features": 143,
+      "recognized_facet_ratio": 0.9727497935590421,
+      "recognized_facets": 1178,
+      "recognized_feature_count": 173,
+      "strict_recognized_facets": 207,
+      "target_met": true,
+      "total_facets": 1211,
+      "total_features": 173,
+      "validation_kind_counts": {
+        "automated_runtime": 52,
+        "automated_source_text": 1,
+        "documented_manual": 51,
+        "helper_unit": 26,
+        "unclassified": 28
+      }
+    },
+    "depth_evidence_file_ratio": 0.16462028194633924,
+    "depth_evidence_production_files": 362,
+    "dimensions": [
+      {
+        "eligible_ratio": 0.976878612716763,
+        "eligible_recognized": 169,
+        "facet": "api",
+        "lightweight_recognized": 134,
+        "name": "API 契约",
+        "ratio": 0.976878612716763,
+        "recognized": 169,
+        "strict_recognized": 35,
+        "supported": 169,
+        "target_met": true,
+        "unknown": 4,
+        "verified_absent": 0
+      },
+      {
+        "eligible_ratio": 0.9942196531791907,
+        "eligible_recognized": 172,
+        "facet": "configuration",
+        "lightweight_recognized": 121,
+        "name": "配置与默认行为",
+        "ratio": 0.9942196531791907,
+        "recognized": 172,
+        "strict_recognized": 51,
+        "supported": 172,
+        "target_met": true,
+        "unknown": 1,
+        "verified_absent": 0
+      },
+      {
+        "eligible_ratio": 0.9710982658959537,
+        "eligible_recognized": 168,
+        "facet": "dependencies",
+        "lightweight_recognized": 145,
+        "name": "依赖与关联功能",
+        "ratio": 0.9710982658959537,
+        "recognized": 168,
+        "strict_recognized": 23,
+        "supported": 168,
+        "target_met": true,
+        "unknown": 5,
+        "verified_absent": 0
+      },
+      {
+        "eligible_ratio": 0.9710982658959537,
+        "eligible_recognized": 168,
+        "facet": "failure_modes",
+        "lightweight_recognized": 144,
+        "name": "失败与降级行为",
+        "ratio": 0.9710982658959537,
+        "recognized": 168,
+        "strict_recognized": 24,
+        "supported": 168,
+        "target_met": true,
+        "unknown": 5,
+        "verified_absent": 0
+      },
+      {
+        "eligible_ratio": 0.9942196531791907,
+        "eligible_recognized": 172,
+        "facet": "flow",
+        "lightweight_recognized": 150,
+        "name": "执行流程",
+        "ratio": 0.9942196531791907,
+        "recognized": 172,
+        "strict_recognized": 22,
+        "supported": 172,
+        "target_met": true,
+        "unknown": 1,
+        "verified_absent": 0
+      },
+      {
+        "eligible_ratio": 0.9884393063583815,
+        "eligible_recognized": 171,
+        "facet": "tradeoffs",
+        "lightweight_recognized": 147,
+        "name": "设计取舍",
+        "ratio": 0.9884393063583815,
+        "recognized": 171,
+        "strict_recognized": 24,
+        "supported": 171,
+        "target_met": true,
+        "unknown": 2,
+        "verified_absent": 0
+      },
+      {
+        "eligible_ratio": 0.9132947976878613,
+        "eligible_recognized": 158,
+        "facet": "validation",
+        "lightweight_recognized": 130,
+        "name": "验证与测试入口",
+        "ratio": 0.9132947976878613,
+        "recognized": 158,
+        "strict_recognized": 28,
+        "supported": 158,
+        "target_met": true,
+        "unknown": 15,
+        "verified_absent": 0
+      }
+    ],
+    "foundation": {
+      "complete_features": 142,
+      "denominator": 1038,
+      "entry_evidence_missing_features": [
+        "context-usage-indicator",
+        "ide-file-edit-diff-apply"
+      ],
+      "facet_complete_features": 144,
+      "incomplete_features": 31,
+      "missing_by_facet": {
+        "api": 4,
+        "architecture": 6,
+        "configuration": 3,
+        "features": 3,
+        "tradeoffs": 12,
+        "validation": 5
+      },
+      "ratio": 0.9682080924855492,
+      "recognized": 1005,
+      "unknown_cells": 33,
+      "unknown_features": 29
+    },
+    "structure": {
+      "covered": 2058,
+      "ratio": 0.9358799454297408,
+      "stale_contracts": [],
+      "target": 0.85,
+      "total": 2199
+    }
+  },
+  "fresh_pr_review_experiments": 0,
+  "knowledge_checkout_base_sha": "2d54c48fe31f83df298dec94a26e8fea30d8c95d",
+  "knowledge_target_met": true,
+  "knowledge_tool_validation": {
+    "CI": "see_pull_request",
+    "final_full_suite": "frozen_candidate_rerun_pending_at_report",
+    "fresh_SDK_related_rerun": {
+      "passed": 35
+    },
+    "initial_full_suite": {
+      "failed": 6,
+      "passed": 3929,
+      "reason": "运行中组装基础知识引发资源版本变化；资源修订校验按设计拒绝过期上下文。该结果保留。",
+      "skipped": 18
+    },
+    "pinned_cache_tests": {
+      "passed": 26
+    },
+    "post_integration_knowledge_tests": {
+      "passed": 140
+    },
+    "supplemental_pure_tests": {
+      "passed": 6
+    },
+    "wheel_and_installed_SDK_smoke": "passed"
+  },
+  "local_source_read_reuse": {
+    "cache_hits": 9849,
+    "successful_reads": 374
+  },
+  "local_source_replay_benchmark": {
+    "claims": {
+      "frozen_runtime_modified": false,
+      "full_returned_hashes_equal": true,
+      "model_calls": 0,
+      "model_review_accuracy_measured": false,
+      "pr_review_speed_measured": false
+    },
+    "files": {
+      "benchmark_script_sha256": "c578580fb232c0951611e066b007af9967801fbcd6ae3485f8de6cc129e759d5",
+      "original_sha256": "e10007edd42072bee0b4ee415a9581e5c7a30d96f32e2a704f6d2f687337a6ee",
+      "proposal_sha256": "aa7fcbfca6f6a616a05dd697a9517c422050e1785e0c58baa9440f6276b646e5"
+    },
+    "measured_at": "2026-10-07T11:24:42.641248+00:00",
+    "median_local_replay_reduction_pct": 89.68950424563796,
+    "scope": {
+      "distinct_real_feature_evidence_paths": 20,
+      "repetitions_per_path": 10,
+      "runs_per_group": 3
+    },
+    "source_sha": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+    "summary": {
+      "original": {
+        "median_wall_time_s": 7.002177724614739,
+        "subprocesses_per_run": [
+          401,
+          401,
+          401
+        ],
+        "total_subprocesses": 1203
+      },
+      "proposed": {
+        "median_wall_time_s": 0.7219592370092869,
+        "subprocesses_per_run": [
+          41,
+          41,
+          41
+        ],
+        "total_subprocesses": 123
+      }
+    }
+  },
+  "native": {
+    "archive": {
+      "actual_physical_directories": 73,
+      "bytes": 1698429131,
+      "files": 11959,
+      "historical_status_note": "历史归档中的失败、取消和未结算调用保留；不能据此称当前终态批次未完成。",
+      "manifest": {
+        "bytes": 3921872,
+        "path": ".kb-jiuwenswarm-finish-20261007/final-audit/final-acceptance/native-archive-manifest.json",
+        "sha256": "ff3efc1878589e9ace5d656e5847d66f5bfd2207f02af235e29f830d821b4a19"
+      }
+    },
+    "audit_new_model_calls": 0,
+    "fees": "unknown",
+    "phases": [
+      {
+        "elapsed_seconds": 4602.618827,
+        "exit_code": 0,
+        "fees": "unknown",
+        "finished_at": "2026-10-07T11:02:08.774850+00:00",
+        "phase": "foundation",
+        "record": {
+          "bytes": 932,
+          "path": ".kb-jiuwenswarm-finish-20261007/foundation-process.json",
+          "sha256": "81e7bf46eba1da1e937ad06ccfdc84a44df58a2cbfbb27da1499892a0a167cf0"
+        },
+        "started_at": "2026-10-07T09:45:26.156023+00:00"
+      },
+      {
+        "elapsed_seconds": 1858.018482,
+        "exit_code": 0,
+        "fees": "unknown",
+        "finished_at": "2026-10-07T10:16:24.265941+00:00",
+        "phase": "depth",
+        "record": {
+          "bytes": 1870,
+          "path": ".kb-jiuwenswarm-finish-20261007/depth-process.json",
+          "sha256": "e3c1d94a8e9550cb36a49f3fc686c0d2b9ff6de5aca7bab6ab02940b04432ed0"
+        },
+        "started_at": "2026-10-07T09:45:26.247459+00:00"
+      },
+      {
+        "elapsed_seconds": 257.586395,
+        "exit_code": 0,
+        "fees": "unknown",
+        "finished_at": "2026-10-07T10:35:05.586541+00:00",
+        "phase": "validation-evidence-revision",
+        "record": {
+          "bytes": 1101,
+          "path": ".kb-jiuwenswarm-finish-20261007/validation-revision-process.json",
+          "sha256": "58f3e5c0dff804771e88a0e3dd5609a9cf92d2a13f262d44977f95bbdec46eec"
+        },
+        "started_at": "2026-10-07T10:30:48.000146+00:00"
+      }
+    ],
+    "supplemental": {
+      "automatic_corrections": 0,
+      "calls_by_role": {
+        "generator": 16,
+        "judge": 16
+      },
+      "cumulative_rounds": 9,
+      "historical_rounds": 4,
+      "new_logical_round_limit": 1,
+      "outcomes": {
+        "fail": 4,
+        "pass": 10,
+        "unsure": 2
+      },
+      "preceding_rounds": 4,
+      "served_model_counts": {
+        "GLM-5.3": 16,
+        "unreported": 16
+      },
+      "tasks": 16,
+      "uncreated_empty_partitions": [
+        9,
+        10,
+        11
+      ]
+    }
+  },
+  "pr_accuracy_gain": "not_measured",
+  "pr_review_speed_gain": "not_measured",
+  "preservation": {
+    "published_depth": {
+      "checked": 552,
+      "edited": [],
+      "missing": [],
+      "passed": true,
+      "unchanged": 552
+    },
+    "published_foundation": {
+      "checked": 930,
+      "edited": [],
+      "missing": [],
+      "passed": true,
+      "unchanged": 930
+    },
+    "retained_preview_depth": {
+      "checked": 1047,
+      "edited": [],
+      "missing": [],
+      "passed": true,
+      "unchanged": 1047
+    }
+  },
+  "previous_catalog_features": 79,
+  "release_note": "本报告核对已审计候选；知识工具测试、CI及合并状态以本次PR记录为准。",
+  "runtime_tests_executed": false,
+  "schema": "jiuwenswarm-init-completion-public-v1",
+  "scope_interpretation": "声明范围已处理不等于所有功能均已发现。原79项功能552/553；本轮固定173项，使用1211分母。",
+  "shared_inventory_unknowns": {
+    "binary_text_read_failures": 4,
+    "counted_as_absence": false,
+    "test_parse_failures": 2
+  },
+  "source_audit_at": "2026-10-07T11:09:53.113528+00:00",
+  "source_sha": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+  "status": "independently_audited_candidate",
+  "unknown": {
+    "depth": [
+      {
+        "attempts": 4,
+        "facet": "dependencies",
+        "feature": "a2x-registry-client-sdk",
+        "latest_attempt_status": "fail",
+        "native_trace_id": "1791367945483-e477c95267b0",
+        "reason": "The constructor wiring and delete_dataset cleanup calls are supported by async_client.py:L39–L57 and L106–L114. However, the body unconditionally describes remove_dataset as popping the dataset and calling _save_locked; ownership.py:L139–L140 returns immediately when the dataset is absent, so persistence occurs only when an entry exists. The no-file return and OSError-to-RuntimeWarning handling are supported by L172–L184. This facet neither contradicts the supplied existing knowledge nor weakens an existing requirement or warning.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "failure_modes",
+        "feature": "ascend-trace-preprocessor",
+        "latest_attempt_status": "invalid",
+        "native_trace_id": null,
+        "reason": "duplicate or unrequested depth facet",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 9,
+        "facet": "validation",
+        "feature": "code-mode-branch-selector",
+        "latest_attempt_status": "fail",
+        "native_trace_id": "1791369217052-9ee74fd8b4e3",
+        "reason": "L231 and L392–L394 exercise ProjectGitService.create_branch/switch_branch with mocked Git and status helpers; L233–L238 and L396–L397 support the stated backend assertions. However, no supplied evidence connects those service methods to CodeBranchSelector's callbacks or establishes them as its scoped helper, so these tests do not establish validation of the requested feature. The helper_unit classification and statement that tests were not executed are appropriately limited. The proposal does not contradict existing knowledge and retains the frontend coverage gap by explicitly excluding component rendering and callback execution.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 9,
+        "facet": "validation",
+        "feature": "code-mode-commit-push",
+        "latest_attempt_status": "unsure",
+        "native_trace_id": "1791369237491-fac7a72f155d",
+        "reason": "tests/gitPublishState.test.mjs:L5–L22 展示了三个辅助函数的具体断言，包括 0/1/3 文件文案、远程去重与空列表回退、三个错误码的中文片段、非空 Error.message 和 null fallback；CodeCommitPushControl.tsx:L6 确认组件导入这些函数，helper_unit 分类与标题相符。但提供的测试片段未展示 test/assert 的导入，无法确认所称 node:test 框架。其余描述明确限定为辅助函数测试，未宣称组件集成、实际提交推送或本批测试通过；与既有知识中组件测试用例未确认的缺口一致，也未弱化该限制。",
+        "reason_stage": "independent_review",
+        "verdict": "unsure"
+      },
+      {
+        "attempts": 4,
+        "facet": "dependencies",
+        "feature": "context-usage-indicator",
+        "latest_attempt_reason": "duplicate or unrequested depth facet",
+        "latest_attempt_status": "invalid",
+        "native_trace_id": "1791367666694-61603bafafbf",
+        "reason": "ContextUsageIndicator.tsx:62–66 establishes a component without props, activeSessionId from useChatStore, and the session runtime snapshot lookup with null fallback. sessionStore.ts:935–940 establishes updating runtimes[sessionId].contextUsageSnapshot while spreading existing runtimes and runtime fields. However, lines 932–934 show only the end of an unspecified condition returning state; neither the shallow-comparison condition nor the enclosing set call is shown. Those claims therefore lack sufficient supplied evidence. The facet is consistent with existing knowledge and does not soften its rendering guards or failure warnings.",
+        "reason_stage": "independent_review",
+        "verdict": "unsure"
+      },
+      {
+        "attempts": 4,
+        "facet": "api",
+        "feature": "dev-ws-traffic-logger",
+        "latest_attempt_reason": "duplicate or unrequested depth facet",
+        "latest_attempt_status": "invalid",
+        "native_trace_id": "1791367297550-ab5c75aedd0f",
+        "reason": "GET 被概括为返回 200，未保留 L369–L381 的异常分支：ENOENT 返回 200 空列表，其他读取错误返回 500 read_failed。既有 api 和 failure_modes 明确记录这一限制，拟议表述弱化了该警告。其余所述行为有据：L366–L367 默认 limit 为 300；L383–L397 处理尾部条目；L409–L439 接受空体或非 JSON 文本、脱敏后追加并在成功时返回 200；L402–L405 返回 405。",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "dev-ws-traffic-logger",
+        "latest_attempt_status": "unknown",
+        "native_trace_id": null,
+        "reason": "提供的 vite.config.ts 片段只含插件实现，无任何测试文件、断言或文档化手动验证程序；无法给出 validation_kind 对应的真实证据。",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "dependencies",
+        "feature": "dynamic-memory-cli",
+        "latest_attempt_status": "unsure",
+        "native_trace_id": "1791368050986-acf9661fcf7f",
+        "reason": "L49–L52 establish the missing-script exception in the shown initialization branch; L66–L71 establish command construction and UTF-8 environment overrides; L92–L100 establish JSON decoding, audit, and RuntimeError on JSONDecodeError. However, the shown lines do not connect VENDORED_SKILL to self.script, execute the subprocess with that command/environment, or establish that text comes from stdout. Those claims remain unverified by the supplied source excerpts. The facet agrees with existing gateway knowledge and does not soften its requirements or warnings.",
+        "reason_stage": "independent_review",
+        "verdict": "unsure"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "frontend-incremental-lint-gate",
+        "latest_attempt_status": "unknown",
+        "native_trace_id": null,
+        "reason": "提供的证据仅含 lint-changed.mjs 的 L11–14 与 L36–45 两段源码，没有任何测试文件、断言或既有文档化手工验证程序；源码中的参数校验 throw 与 git show 错误分支只是被实现的防御逻辑，不构成 validation_kind 任一类别所需的验证引用行。",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "api",
+        "feature": "gateway-config-hot-reload",
+        "latest_attempt_status": "unknown",
+        "native_trace_id": null,
+        "reason": "No offered span shows the agent.reload_config handler, _on_config_saved, or the config-save input/output contract; shown lines only cover channel_manager.get_conf_revision and the WS initial-channel-retry cancellation path (app_gateway.py:3205-3219, 3243-3252, 3299-3306), a neighboring channel-retry mechanism, so no api claim for this feature is supportable.",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "github-issue-feedback-script",
+        "latest_attempt_status": "unknown",
+        "native_trace_id": null,
+        "reason": "提供的行仅是 open_github_issue.py 的 main() 解析与创建逻辑（L18–L37、L48–L55），不含任何测试、断言或文档化的验证步骤；existing_knowledge 中关于手动执行的描述来自知识库文档而非本次 offered spans，且索引不证明测试缺失，故无可支持的验证断言。",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "dependencies",
+        "feature": "huawei-maas-apikey-creation",
+        "latest_attempt_status": "invalid",
+        "native_trace_id": null,
+        "reason": "duplicate or unrequested depth facet",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "flow",
+        "feature": "huawei-realname-account-check",
+        "latest_attempt_status": "fail",
+        "native_trace_id": "1791367931492-0beede6aea9a",
+        "reason": "The shown lines support the fixed 15,000ms connection timeout, 2s sleep, popup loop, 8,000ms detection call, JS/DOM decisions, timeout False, make_success, and guarded pw.stop(). However, '接管已有 page' is not established by the shown connect_page call; check_account.py:L53 is a docstring, and connect_page's implementation is not supplied. Existing dependencies knowledge explicitly records a new-page fallback when no page exists, conflicting with the unqualified existing-page description. The facet preserves the whitespace polling and timeout-to-False limitations and makes no test-execution claim.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "ide-terminal-command-mirror",
+        "latest_attempt_reason": "提供的两段文档（VSCode插件指南 L324-L328、JetBrains插件指南 L330-L336）仅描述终端创建/复用行为与设置开关的作用，不包含任何可执行的验证命令、操作步骤或验收预期，不足以支撑 automated_runtime、automated_source_text、helper_unit 或 documented_manual 任一类别；前次按 documented_manual 的表述已被拒绝，且本包未提供源码或测试文件。",
+        "latest_attempt_status": "unknown",
+        "native_trace_id": "1791367699338-ecb5f81324d2",
+        "reason": "The cited VS Code lines 326–328 and JetBrains lines 332–336 document terminal behavior and configuration, but provide no manual verification instructions or acceptance procedure. The title and body therefore overstate the evidence as documented_manual acceptance steps; the proposed steps are synthesized from behavioral descriptions. The expected behavior is consistent with existing knowledge, and the explicit statements that these steps were not executed assert no passed tests or broader test-absence guarantee. The existing gap concerning tests elsewhere in the repository remains unresolved.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "dependencies",
+        "feature": "im-attachment-persist-hook-969909e1",
+        "latest_attempt_reason": "The offered spans omit the hook's upload dispatch and the enclosing function of agent_http_bridge.py:92-100, so the production coupling between the persist hook and upload_file_bytes/fetch_agent_unary cannot be established from contiguous shown lines; the test span (test_attachment_persist.py:185-195) shows only a monkeypatch setup, not the hook invocation, and e2a_proxy.py:84-91/225-264 belong to neighboring routing helpers.",
+        "latest_attempt_status": "unknown",
+        "native_trace_id": "1791367743881-fc22709e5f30",
+        "reason": "Test lines 185–195 show the threshold import, fake failure tuple and monkeypatch target, but no oversized payload, hook invocation or assertion establishing that the fake uploader drives the hook. The title therefore overstates the demonstrated dependency despite the body's production-dispatch caveat. Bridge lines 92–100 establish failure-tuple propagation and missing-path rejection, but do not identify the enclosing function or called uploader, so describing these as consumption of the uploader's tuple is unsupported. The facet is consistent with existing HTTP-bridge knowledge and does not soften its fail-hard or routing warnings.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "im-channel-hot-reconfig",
+        "latest_attempt_status": "invalid",
+        "native_trace_id": null,
+        "reason": "depth prose contains machine-specific information",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "locale-conf-rpc",
+        "latest_attempt_status": "unknown",
+        "native_trace_id": null,
+        "reason": "The offered spans contain no test or documented procedure for locale.get_conf / locale.set_conf / preferred_language: tests/unit_tests/gateway/test_app_web_handlers.py:2938-2939 uses {\"preferred_language\": \"zh\"} only as monkeypatched background for get_config_raw in test_config_set_returns_bad_request_when_team_payload_is_invalid, whose assertions (L2959-2965) target BAD_REQUEST for an invalid team payload; the other spans cover heartbeat, session.list forwarding, and the FakeWebChannel helper, none asserting locale RPC behavior.",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "opc-add-slide",
+        "latest_attempt_status": "unsure",
+        "native_trace_id": "1791367810642-582a42efee38",
+        "reason": "Pinned lines 4–5 document both commands and their expected effects: duplicating slide2 and creating a blank page on slideLayout2. These support unexecuted documented_manual checks, not automated tests or a passing result. However, the supplied evidence contains no excerpts from test_a2ui_system_flow.py or test-a2ui-action-defaults.mjs, so their asserted scope and relationship to this script cannot be verified. The proposal is consistent with existing knowledge and retains the limited gap concerning tests in the shown material without claiming repository-wide absence.",
+        "reason_stage": "independent_review",
+        "verdict": "unsure"
+      },
+      {
+        "attempts": 9,
+        "facet": "validation",
+        "feature": "ppt-figure-panel-layout",
+        "latest_attempt_status": "fail",
+        "native_trace_id": "1791369180127-0a7b0cc79c8c",
+        "reason": "quality-gates.md L32–L41 requires clearing every qa_geometry error and forbids replacing that check with thumbnail inspection; L51–L57 supports manual readability and image-distortion checks, and L113–L123 supplies QA/rendering commands. pptxgenjs.md L102–L114 documents addFigurePanel inputs and proportional layout. These support unexecuted documented_manual acceptance steps, not feature-specific automated validation. The title's categorical claim that no panel-layout automated assertions exist is unsupported: no test evidence or bounded verified_absent certificate is supplied. The cited lines also do not explicitly instruct thumbnail inspection. The facet otherwise agrees with existing knowledge and retains the mandatory zero-error requirement.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "failure_modes",
+        "feature": "ppt-system-diagram-renderer",
+        "latest_attempt_status": "invalid",
+        "native_trace_id": null,
+        "reason": "duplicate or unrequested depth facet",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 9,
+        "facet": "validation",
+        "feature": "ppt-system-diagram-renderer",
+        "latest_attempt_status": "fail",
+        "native_trace_id": "1791369210349-2df9083944ae",
+        "reason": "The repository-wide claim that no renderSystemDiagram test files or named assertions exist is unsupported by the supplied excerpts; no bounded verified_absent certificate is provided. L113–L123 documents QA commands and rasterization, but does not establish the claimed single-page high-resolution human confirmation step. L114 establishes error exit code 1 for qa_geometry.py, not qa_density.py. The documented_manual classification and NOT EXECUTED qualification are appropriate for the cited deck-level checks, whose observable criteria include geometry hard errors and the density threshold. L832–L840 supports runtime overlap warnings, consistent with existing knowledge; the proposal neither contradicts nor explicitly relaxes the existing structural checks or warnings.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 9,
+        "facet": "validation",
+        "feature": "rsi-experiment-ui",
+        "latest_attempt_status": "fail",
+        "native_trace_id": "1791369186446-e87e237f8020",
+        "reason": "StageTree L5–L26 and L41–L58 support the baseline, iteration and node-update assertions. Polling L61–L80 exercises useRsiStore.refreshDetail and asserts shared Promise identity, four calls during overlap, eight after a subsequent refresh, and RUNNING status. However, L28–L51 only bundles and imports RsiDetail; the shown test never renders or invokes it, so the title's RsiDetail polling coverage and body's component-logic validation claim are overstated. The shown lines also omit the mocks mapping and StageTree import, leaving the exact rsiApi mock boundary and real-store provenance incompletely established. automated_runtime fits the displayed store assertions, but does not establish component integration or execution in this batch. The explicit unexecuted and backend/UI limitations remain intact, and there is no conflict with existing knowledge.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "user-todos-tool",
+        "latest_attempt_status": "unknown",
+        "native_trace_id": null,
+        "reason": "No test asserting user_todos behavior is offered. The only shown test (tests/unit_tests/agentserver/test_code_adapter_runtime_config.py:21-67) monkeypatches user_todo_tool.set_global_workspace_dir/set_global_channel_id and stubs get_decorated_tools to return [] (lines 50-52), and its assertions (lines 64-67) cover only adapter rail behavior, never the tool itself. No docs are offered either.",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "failure_modes",
+        "feature": "video-coarse-scan-frame-extraction",
+        "latest_attempt_status": "fail",
+        "native_trace_id": "1791368124396-aae0a760ccbc",
+        "reason": "标题将 RuntimeError 条件限定为状态缺失或 OSError/JSONDecodeError，但 L241–L245 明确在 batch_size 不匹配时也抛 RuntimeError，遗漏了该失败分支。正文关于缺失文件（L232–L235）、读取异常转换（L236–L239）、非法 UTF-8 和非对象 JSON 不被该 except 捕获的说明成立；列表会在 L241 的 state.get 调用处触发 AttributeError。与现有知识无冲突，也未弱化现有要求或警告。",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "failure_modes",
+        "feature": "workspace-git-diff",
+        "latest_attempt_status": "invalid",
+        "native_trace_id": null,
+        "reason": "duplicate or unrequested depth facet",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "workspace-git-diff",
+        "latest_attempt_status": "invalid",
+        "native_trace_id": null,
+        "reason": "duplicate or unrequested depth facet",
+        "reason_stage": "extraction_or_structural_check",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "failure_modes",
+        "feature": "xiaoyi-alarm-crud",
+        "latest_attempt_reason": "duplicate or unrequested depth facet",
+        "latest_attempt_status": "invalid",
+        "native_trace_id": "1791367601584-9aa256d2f7f2",
+        "reason": "标题的 dict 限制、非 dict 直接返回及 from None 均符合 L210–L228，但正文混淆两个错误分支：code 失败时才按 errorMsg、errMsg、\"未知错误\" 的顺序取非假值；retErrCode 分支仅使用 outputs.get(\"errMsg\", \"未知错误\")，不会读取 errorMsg，且已存在的空值不会触发默认值。L224 还要求 retErrCode 非 None，不能仅表述为字段存在且字符串不为 \"0\"。L53–L55 显示 status=400，但未显示所属类；本次所示源码也未包含闹钟工具调用该共享 helper 的位置。提案与现有知识无明确冲突，也未削弱现有要求或验证证据缺口。",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "api",
+        "feature": "xiaoyi-calendar-tools",
+        "latest_attempt_reason": "duplicate or unrequested depth facet",
+        "latest_attempt_status": "invalid",
+        "native_trace_id": "1791367163649-9a364a3c4b43",
+        "reason": "L91–L95、L113–L129 支持三个必填参数、假值检查及按指定 strptime 格式解析，解析产生的 ValueError 转为 ToolInputError；L198–L202 支持 search 的 title 默认 None。但 L170–L173 仅证明包含 title/dt_start/dt_end/result 的字典被传入 format_success_response，未展示该辅助函数的实现，不能确认最终返回字典的结构。标题的格式说明可作为解析格式契约，但不能据此保证严格的固定宽度字符校验。与现有知识一致，未削弱既有要求或警告。",
+        "reason_stage": "independent_review",
+        "verdict": "unsure"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "xiaoyi-location-tool",
+        "latest_attempt_status": "fail",
+        "native_trace_id": "1791368150693-6a9a3e03fd5a",
+        "reason": "L26 supports the zero-argument entry and L41–L54 supports hardcoded protocol fields. However, the supplied excerpts do not show the complete L26–L86 function or execute_device_command internals. L23 establishes descriptive timeout/retry instructions, not exclusive model-side enforcement. The claimed lack of code-enforced timeout/retry overstates the evidence and conflicts with existing knowledge that shared-command timeout is separately determined. Omitting the existing explicit caveat that shared-helper timeout/retry behavior is unknown weakens that limitation.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "api",
+        "feature": "xiaoyi-pushdata-store-and-viewer",
+        "latest_attempt_reason": "duplicate or unrequested depth facet",
+        "latest_attempt_status": "invalid",
+        "native_trace_id": "1791366799544-4861c222671b",
+        "reason": "pushdata_manager.py L81–L100 supports UUID generation and return after writing. push_result_tool.py L50–L58 supports the limit formula and keyword dispatch, and L71–L92/L114–L134 supports success:true JSON for successful branches. However, the proposed return contract states success:true without restricting it to those branches; existing knowledge records an Exception branch returning success:false and error. It also drops the existing warning that negative limits are not clamped and are applied through slicing (shown at L68). Qualify the successful return contract and retain these exception and limit limitations.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 9,
+        "facet": "validation",
+        "feature": "xiaoyi-save-to-phone-tools",
+        "latest_attempt_status": "unsure",
+        "native_trace_id": "1791369189424-4934a3289750",
+        "reason": "L1872–L1880 directly supports the existing helper test’s enabled-count and empty-config assertions; L461–L469 supports the configuration gate and use of _XIAOYI_PHONE_TOOLS. However, L144–L145 shows only the two symbol names, without the enclosing tuple definition, so their membership in _XIAOYI_PHONE_TOOLS and resulting indirect registration coverage remain unconfirmed. helper_unit accurately describes the scoped builder test. The proposal explicitly says it was not run and preserves the limitations concerning individual identities, uploads, and device interaction. Existing knowledge’s statement that its input contained no test files is scoped to that earlier input and does not contradict this evidence.",
+        "reason_stage": "independent_review",
+        "verdict": "unsure"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "xlsx-reader-structural-diff",
+        "latest_attempt_status": "fail",
+        "native_trace_id": "1791368025234-d6e605a99bed",
+        "reason": "L81–L99 establish default sampling of 50 worksheets and 200 non-empty cells per sheet; L128–L136 compare only shared sampled sheets and old sampled refs, retaining at most 100 changes. The title’s 'can miss' is supported, but 'changes beyond those caps or on unsampled sheets go unreported' is too absolute: an old sampled ref excluded from the new sample is reported as '<removed>' (L132–L135). Existing architecture knowledge also describes a separate structural comparison, so sampling limits do not establish that all changes on unsampled sheets go unreported. The facet preserves the sampling warning and does not soften an existing requirement.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "configuration",
+        "feature": "yuanrong-agent-file-transfer",
+        "latest_attempt_status": "fail",
+        "native_trace_id": "1791368029753-2ae48c051be0",
+        "reason": "Lines 924–934 establish keyword-only mkdir_agent_dir defaults mode=None and recursive=False. Test lines 1147–1168 exercise mkdir_agent_dir and assert omission of mode= and inclusion of recursive=false; they do not establish execution in this batch. Neither citation establishes download defaults offset=0/limit=65536. The title attributes those defaults to download_agent_dir, while the body names download_agent_file, so the title and body are inconsistent. The supported mkdir claims remain consistent with existing knowledge and do not soften its validation requirements or warnings.",
+        "reason_stage": "independent_review",
+        "verdict": "fail"
+      }
+    ],
+    "foundation": [
+      {
+        "attempts": 4,
+        "facet": "architecture",
+        "feature": "a2x-registry-client-sdk",
+        "generator_trace_ids": [
+          "1791370671275-f62e82f82fb6"
+        ],
+        "judge_trace_ids": [],
+        "last_input_sha256": "4ef39de0ff92798a34c5bfc3748580eb1161e063bfa6c5a766afdc50f8e54742",
+        "last_result_sha256": "22cc3c8a502fdce4df7bc80804c48e91b2d82a7202f0b095b83af1abf78fa863",
+        "reason": "ModelUnavailable: zcode:GLM-5.3 reply failed its schema: ValueError('a facet may appear only once')",
+        "reason_category": "generator_structure",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "features",
+        "feature": "agent-template-layered-validation",
+        "generator_trace_ids": [
+          "1791370691424-851ad0dd67d6"
+        ],
+        "judge_trace_ids": [
+          "1791370721257-60d6b0a48c10"
+        ],
+        "last_input_sha256": "c53bc3d337e2ff9ec196f2fb960f51d63ae242af92ba9da2c1db48b4681aeaf2",
+        "last_result_sha256": "7102671d45ca032a522cd23c587cab440a4f440a62976ab607ebaab0621cb1a6",
+        "reason": "“rails[] 只检查继承 Rail 基类和无参构造”不准确：validate_template.py:L767–L770 还检查展示字段、加载声明的类并检查运行时路径策略。其余主要声明得到 L738–L761、L524–L538 及 validate_hot_load_worker.py:L57–L133、L239–L252 支持。",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "agentos-sandbox-create-lifecycle",
+        "generator_trace_ids": [
+          "1791370748485-9f35e74fb4ab"
+        ],
+        "judge_trace_ids": [],
+        "last_input_sha256": "381d4996de5d2d2f15982b74290feb245dcfe15bf45dd778365571ff1c67ceac",
+        "last_result_sha256": "5f206ba3df090f0d08765e9ce7a24042cc2c011a83cf772f7007863edcfd219b",
+        "reason": "ModelUnavailable: zcode:GLM-5.3 reply failed its schema: ValueError('a facet may appear only once')",
+        "reason_category": "generator_structure",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "ascend-trace-analysis-pipeline",
+        "generator_trace_ids": [
+          "1791370664540-3124e60434d9"
+        ],
+        "judge_trace_ids": [
+          "1791370688816-61dcd3fc8ef7"
+        ],
+        "last_input_sha256": "9d4471a27dde1d134bd8f043678b8c8686870aefe53bf4949030c9449ab2e504",
+        "last_result_sha256": "e077d75006f5c6d87c376315c2f15adde9b5c1e0913510193a29341b702eaa98",
+        "reason": "The unconditional claim that non-ok status produces a warning is inaccurate: llm_analysis.py:L231–L237 returns disabled, while app.py:L303–L307 warns only when args.llm_analysis is enabled. The claim of independence from any LLM availability also overstates the guarantees: llm_analysis.py:L188–L208 catches FileNotFoundError and TimeoutExpired, but other subprocess launch errors can propagate before CSV/report saving at app.py:L263–L298. Union-based overlap and bubble calculations are supported by metrics.py:L460–L494 and L538–L544.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "ascend-trace-compile-safety-checker",
+        "generator_trace_ids": [
+          "1791370627257-80651e44a0ea"
+        ],
+        "judge_trace_ids": [
+          "1791370657053-276b206d3652"
+        ],
+        "last_input_sha256": "c717bedb0bded2b1930a3a65aa070bbda8f162c86ed96c11050c752125ef4438",
+        "last_result_sha256": "a8c0c9a6b45f91bf41a25a1d964251516d9830cbf81f7aafcb1965172e64c332",
+        "reason": "check_compile_safety.py:L5-L16、L47-L97 支持无需编译器的文本/正则检查；L31-L44、L265、L292-L301 支持 errors/warnings 分级及 --strict 的退出行为。但“在严格性与误报噪声之间取得平衡”这一设计动机未被证据明确说明。",
+        "reason_category": "unsupported_assertion",
+        "verdict": "unsure"
+      },
+      {
+        "attempts": 4,
+        "facet": "api",
+        "feature": "audit-integrity-hmac-signing",
+        "generator_trace_ids": [
+          "1791370660633-8d908f5c820a"
+        ],
+        "judge_trace_ids": [
+          "1791370689252-619205999d44"
+        ],
+        "last_input_sha256": "65497be9597e15fdc33302ff2a4a765fdafa6a04485cccec713f9b918a8c5d06",
+        "last_result_sha256": "e77711ac5603cbdc646a384753bd4058a403a088d0b190db802ec8bf6cb041da",
+        "reason": "The claim that report always returns 0 is false: audit_integrity.py:L625–L626 returns 0 only after successful report processing; L522 can raise AuditIntegrityError for missing or malformed JSON (L74–L82), which main catches and returns 1 (L709–L711). Also, not every invalid_agent_audit yields exit 1: a missing batch produces that result (L456–L458), but does not set invalid_seen (L556) or satisfy the exit-1 conditions (L627–L628).",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "features",
+        "feature": "command-execution-tool",
+        "generator_trace_ids": [
+          "1791370644519-975b7ae575c6"
+        ],
+        "judge_trace_ids": [],
+        "last_input_sha256": "6fbc81e91c6f595c4cc3a51981b9349626c28f361d80873ca83166b86067f772",
+        "last_result_sha256": "3191c6c8babe96b9d62bf029fe72d2e976a3eae9593ea2c6ce8c793413cd00f6",
+        "reason": "evidence outside shown input",
+        "reason_category": "invalid_source_reference",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "api",
+        "feature": "daily-report-skill",
+        "generator_trace_ids": [
+          "1791370705250-4c410c0611bf"
+        ],
+        "judge_trace_ids": [
+          "1791370732941-791a684e993e"
+        ],
+        "last_input_sha256": "845eb5f0eee596ed4bb578d54ec56ce23747e0e452522658d6c40dd53aa160bf",
+        "last_result_sha256": "1b62fd72054e14d7df62d725e1e6e9f68dfeb28d5776fe8a3ef8f1dd364f316c",
+        "reason": "The claim that saving only prints REPORT_FILE:<path> omits the INFO message printed to stderr for daily reports with AI enabled (run_report.py:L761–L762, L777–L790). The blanket claim that AI failures produce report comments also overstates the behavior: model invocation exceptions are swallowed and trigger fallback output (ai_analyzer.py:L187–L191, L246–L247); only exceptions reaching generate_daily_report's handler produce comments (run_report.py:L600–L603).",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "daily-report-skill",
+        "generator_trace_ids": [
+          "1791370705250-4c410c0611bf"
+        ],
+        "judge_trace_ids": [
+          "1791370765349-1c56f913053b"
+        ],
+        "last_input_sha256": "845eb5f0eee596ed4bb578d54ec56ce23747e0e452522658d6c40dd53aa160bf",
+        "last_result_sha256": "1b62fd72054e14d7df62d725e1e6e9f68dfeb28d5776fe8a3ef8f1dd364f316c",
+        "reason": "The implementation facts are supported: run_report.py:L764-L768 delegates weekly to daily; L391 and L501-L546 enable AI by default; report_generator.py:L113-L140 aggregates a seven-day range without analyzer calls; L420-L438 and L461-L479 contain static narrative text. However, these facts do not establish that daily compatibility or aggregation is gained by sacrificing weekly semantics or analysis. That tradeoff remains an explicitly labeled inference.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "unsure"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "deepsearch-research-pipeline",
+        "generator_trace_ids": [
+          "1791370659296-f48eba725bc1"
+        ],
+        "judge_trace_ids": [
+          "1791370697438-f3ce1fe035e4"
+        ],
+        "last_input_sha256": "1b8bcddb931bdbc95839323ac8e6e56002d96630bf6d835fdd71b2dc565910a2",
+        "last_result_sha256": "22a5ba3729ba56fa4f23581d50446fc4b64276ac7cf655667ed231cfee145073",
+        "reason": "main.py:L233–L290 supports argument stripping, the environment guard, detached spawning, PID.info, and parent exit; L323–L329 supports default background execution; L216 supports synchronous Agent execution. However, the exclusive claim that CLI callers can track progress only through PID.info and persisted reports/logs is not established. DEVNULL applies only to the non-Windows branch (L275–L283), and --foreground is available (L315–L325).",
+        "reason_category": "unsupported_assertion",
+        "verdict": "unsure"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "deepsearch-research-pipeline",
+        "generator_trace_ids": [
+          "1791370659296-f48eba725bc1"
+        ],
+        "judge_trace_ids": [],
+        "last_input_sha256": "1b8bcddb931bdbc95839323ac8e6e56002d96630bf6d835fdd71b2dc565910a2",
+        "last_result_sha256": "22a5ba3729ba56fa4f23581d50446fc4b64276ac7cf655667ed231cfee145073",
+        "reason": "knowledge:feature-deepsearch-research-pipeline:validation: scripts/main.py does not exist at openJiuwen-ai/jiuwenswarm@f0a69728c96b",
+        "reason_category": "invalid_source_reference",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "configuration",
+        "feature": "docx-pro-cli",
+        "generator_trace_ids": [
+          "1791370682866-1734ed8b16d5"
+        ],
+        "judge_trace_ids": [
+          "1791370709103-1c403524aa33"
+        ],
+        "last_input_sha256": "09864451ab9ec0c4da6bf1a796ae3952ca6eaa144e24046114c32b9c4afb904d",
+        "last_result_sha256": "1c785519ac08ec4c2fdd9e56710337ce9a1ad091b45adff185529ed1a7d0c325",
+        "reason": "The overrides, boolean parsing and title fallback match docx_pro.py:L69–L77 and L113–L115; CLI defaults match L375–L399; module defaults match docx_replace.py:L228–L231 and renderer.py:L671–L673. However, the absolute claim that configuration uses no external configuration files or environment variables is not settled: docx_pro.py:L38–L41 imports modules whose complete configuration behavior is not supplied.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "unsure"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "huawei-maas-apikey-creation",
+        "generator_trace_ids": [
+          "1791370678143-a74b5ff98e96"
+        ],
+        "judge_trace_ids": [],
+        "last_input_sha256": "a974aaed362f4c891aea55f1df8bc228eef312777c9d3e10a97c1b777858cf2d",
+        "last_result_sha256": "07f6ff2f8ba2769c9d45e1613957227aab405a3c922826c742ef32d68be71a62",
+        "reason": "ModelUnavailable: zcode:GLM-5.3 reply failed its schema: ValueError('a facet may appear only once')",
+        "reason_category": "generator_structure",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "ide-turn-rewind-snapshot",
+        "generator_trace_ids": [
+          "1791370723445-47346164dd10"
+        ],
+        "judge_trace_ids": [
+          "1791370755329-a3114ae17903"
+        ],
+        "last_input_sha256": "809e5b5c8837c0f83e2369ced50dd141c0dcbfe0b0db22f10ae4f65cc73b7e21",
+        "last_result_sha256": "9db7953f88d6aebd8c20ca0a1175b0e975e4a5afa13430e580765e978f9c0698",
+        "reason": "The claim that switching sessions loses snapshots overgeneralizes new_session behavior. ChatToolWindow.kt:L355-L357 clears snapshots for new_session, but switch_session at L363-L379 and onSessionChange at L569-L574 do not clear them. The whitelist, path extraction, ReadAction read, and enabled default are supported by ChatToolWindow.kt:L627-L649 and JiuwenSwarmSettings.kt:L36-L37.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "im-channel-hot-reconfig",
+        "generator_trace_ids": [
+          "1791370726969-e3fbdd335b37"
+        ],
+        "judge_trace_ids": [
+          "1791370757534-c83ed88471eb"
+        ],
+        "last_input_sha256": "841eec024eb8ab5287f0a578f6c6b28755dcc75bf01682fbbf71f5d27997fe5f",
+        "last_result_sha256": "f309d21c47e34026989f8b4e4506055ba2f0da76bc92b1203642eb4d270d59ee",
+        "reason": "DingTalk teardown does not return immediately: background_wait detaches only the task cancellation wait (app_gateway.py:L2478–L2492); channel.stop() is still awaited with timeout=10.0 before unregistering (L2510–L2517, L2791). Rebuilding is also conditional: disabled or missing DingTalk configuration leaves the channel stopped (L2794–L2814), contrary to the unconditional rebuild claim.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "architecture",
+        "feature": "maas-auto-open-models",
+        "generator_trace_ids": [
+          "1791370699268-19ed260ef48b"
+        ],
+        "judge_trace_ids": [
+          "1791370728510-116fceaa3d54"
+        ],
+        "last_input_sha256": "ec6e1df20024cd8a29b3be0b967bea745953107f5440a9d07c55db34f345c01e",
+        "last_result_sha256": "47fafcafafff918dc7eb68e312f50d729b1f667c979f51c600240970630f7a6b",
+        "reason": "“各段失败均写入 per-model failed 而非中断整体流程”不符合证据：auto_open_model.py:L696–L697 的刷新失败仅记日志，L761–L762 的未预期异常直接返回 make_failure。回读验证也仅在 success 分支中针对 checked_models 执行（L686–L698），并非无条件逐模型验证。L524 仅证明调用 connect_page，未证明外部已登录态或其为脚本唯一控制面。",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "ppt-execution-lock-validator",
+        "generator_trace_ids": [
+          "1791370734910-da76af1693d9"
+        ],
+        "judge_trace_ids": [
+          "1791370764327-142fbaf29975"
+        ],
+        "last_input_sha256": "b8c8601b99983521e9155f3ed328ad66f757b1a8e97ec658389b21fa1b08d9b3",
+        "last_result_sha256": "0cc7fc2ad2b822edcbe074d61bd5072dd872db57831d6b178b45a5d2bd65e4b5",
+        "reason": "validate-execution-lock.js:L9 imports ./validate-evidence-plan.js, contradicting the claim of a single-file script depending only on fs/path. L191–L194 and L235–L240 implement cross-file semantic validation, contradicting the blanket claim that it cannot validate cross-file semantics. L25–L33 also restrict workspace placement, so '任意技能工作区' overstates portability.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "architecture",
+        "feature": "ppt-system-diagram-renderer",
+        "generator_trace_ids": [
+          "1791370721196-41cf731eab5b"
+        ],
+        "judge_trace_ids": [],
+        "last_input_sha256": "6b5f16fc2c8a90edb3e3d4ef018da0c3465c7673df2e6a80aafe4ad6fef41a14",
+        "last_result_sha256": "eb9b7e6c2d1348c51a8ebf34633b4e9228a35ab49bd22b762090444691dcee2a",
+        "reason": "ModelUnavailable: reply is not a JSON object",
+        "reason_category": "generator_structure",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "configuration",
+        "feature": "ppt-system-diagram-renderer",
+        "generator_trace_ids": [
+          "1791370721196-41cf731eab5b"
+        ],
+        "judge_trace_ids": [],
+        "last_input_sha256": "6b5f16fc2c8a90edb3e3d4ef018da0c3465c7673df2e6a80aafe4ad6fef41a14",
+        "last_result_sha256": "eb9b7e6c2d1348c51a8ebf34633b4e9228a35ab49bd22b762090444691dcee2a",
+        "reason": "ModelUnavailable: reply is not a JSON object",
+        "reason_category": "generator_structure",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "architecture",
+        "feature": "rsi-dataset-folder-check",
+        "generator_trace_ids": [
+          "1791370735852-80d66c9a85e3"
+        ],
+        "judge_trace_ids": [
+          "1791370767561-b834f95d5cb4"
+        ],
+        "last_input_sha256": "2c0e5afe5a08fd96141c4061df0b48649302d93a2f5cc727eb653fa18ee295ee",
+        "last_result_sha256": "e19f6e541164bf2e6dfbdf347dcac6644b3f940cec9b350268f99bfe2ffd3db1",
+        "reason": "The stated control flow is inaccurate: check_folder.py:L79–L98 checks task.json existence, keys, and cross-manifest values before enumerating seed/. Enumeration and files_in_seed/artifact_path checks (L99–L125) occur only when task.json exists, rather than unconditionally first.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "share-image-export",
+        "generator_trace_ids": [
+          "1791370756162-1a38d14e781c"
+        ],
+        "judge_trace_ids": [],
+        "last_input_sha256": "11c04ab30a1a5080b8c312a845fd2e4d67d862024fef926f9af8cefb9143cc24",
+        "last_result_sha256": "5df1e5c42d9eb99f52624cf3c9c8c469dbe0934314be4d21ba7459a1eead347b",
+        "reason": "ModelUnavailable: zcode:GLM-5.3 reply failed its schema: ValueError('a facet may appear only once')",
+        "reason_category": "generator_structure",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "skill-generator-cli",
+        "generator_trace_ids": [
+          "1791370772032-b4d7a80d58bd"
+        ],
+        "judge_trace_ids": [
+          "1791370808668-ab25de664a5c"
+        ],
+        "last_input_sha256": "6318b2c3854a31fb15e17960eff5e53962e62e8fa027832bd2ce18f02ceb09c1",
+        "last_result_sha256": "55145acc17865f4cce23768c6cbe23d0786299e6f9bb3225ac81af6b6b87e964",
+        "reason": "“每次只加载所需路径”超出证据：handler 内延迟导入属实（skill_generator_cli.py:L67、L82），但 url_ingest/__init__.py:L13–L16 同时导入 router、url_safety 和两个抓取后端，router.py:L15–L16 也同时导入两个后端。SSRF 包装入口被绕过的描述有支持（CLI:L81–L88；__init__.py:L34–L51）。",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "architecture",
+        "feature": "video-agent-managed-task-service",
+        "generator_trace_ids": [
+          "1791370797765-5bd12b3af76e"
+        ],
+        "judge_trace_ids": [
+          "1791370830513-8570bc417cc8"
+        ],
+        "last_input_sha256": "0d2ca3bee1def42c609be39e3ee970a86427cef6363d57096c699757d66d0c02",
+        "last_result_sha256": "78b217aad7c6e3d4141af259c4fb2377cb3c29e64c48af6557f2b307438d260a",
+        "reason": "The prose misstates three conditions. service.py:L128–L135 checks independent on the candidate, not on other same-scope tasks; independent peers can still block a non-independent candidate. L86–L98 excludes settled waiting_user tasks from capacity, but does not exclude settled running/cancelling tasks. L336–L374 shows cancel schedules _cancel and notifies without calling kick; reorder persists an idempotent receipt only when command_id is provided (L413–L428, L463–L465). Thus the universal command sequence is inaccurate.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "api",
+        "feature": "video-generation-tools",
+        "generator_trace_ids": [
+          "1791370783397-571df71ad24d"
+        ],
+        "judge_trace_ids": [
+          "1791370818783-f656ccdcf019"
+        ],
+        "last_input_sha256": "83486f877ac5f54e05c766eb0f2e9dd75c7274be415ccb6ff9537fd6fb6d1e18",
+        "last_result_sha256": "757113f9dc2eeb0017a7440a689c1134bfb4255495ee49a91b51f0c073ad7056",
+        "reason": "The unconditional claim that generate_video always returns a string is false: video_gen_tools.py:L100 calls path.read_bytes() without catching OSError, and L250–L254 invokes that helper before the try block at L285. An unreadable first-frame file can therefore raise. The parameter defaults, validation order, and OpenRouter status handling are supported by L199–L207, L240–L248, L341–L349, and L366–L375.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "architecture",
+        "feature": "video-generation-tools",
+        "generator_trace_ids": [
+          "1791370783397-571df71ad24d"
+        ],
+        "judge_trace_ids": [],
+        "last_input_sha256": "83486f877ac5f54e05c766eb0f2e9dd75c7274be415ccb6ff9537fd6fb6d1e18",
+        "last_result_sha256": "757113f9dc2eeb0017a7440a689c1134bfb4255495ee49a91b51f0c073ad7056",
+        "reason": "Archived source fixture placeholder was redacted, so original full-packet prompt identity could not be replayed. Remains unknown.",
+        "reason_category": "native_approval_binding",
+        "verdict": "unjudged"
+      },
+      {
+        "attempts": 4,
+        "facet": "configuration",
+        "feature": "web-search-tools",
+        "generator_trace_ids": [
+          "1791370792312-eeb7166fd378"
+        ],
+        "judge_trace_ids": [
+          "1791370817137-440a68c2e0e4"
+        ],
+        "last_input_sha256": "b3721ed41b725413636a9ce891ec74296929f8d68907aeaf3bdf63e8b10b3298",
+        "last_result_sha256": "265a2c21066586efef7b5108242f9770f08467ff340839d03c47cff6b9305121",
+        "reason": "“将任意输入夹取到 1–20”过度概括：search_tools.py:L36–L39 接受 int，直接调用 min/max，并不处理任意类型输入。其余配置描述有依据：L31–L33、L43–L65、L302–L318、L372–L390、L461–L469。",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "features",
+        "feature": "workspace-git-diff",
+        "generator_trace_ids": [
+          "1791370783147-c6746521be3c"
+        ],
+        "judge_trace_ids": [
+          "1791370813842-13355dfd18f0"
+        ],
+        "last_input_sha256": "28b8cd49933f16dfd9e3ced8def645fd1f9f0604cf428d442a99f4338a3ee334",
+        "last_result_sha256": "8ea209d5ddabc1620a9bce0ce256ead1f8c73917dbafad0e498f5ada42e0aedd",
+        "reason": "The claim of aggregating all changes and generating whole-file hunks for untracked files omits material limits. diff_service.py:L2127-L2154 and L2186-L2228 count untracked lines only for selected preview files; L2087-L2101 returns early for excessive tracked changes without counting untracked lines. L1914-L1930 and L1953-L1973 suppress hunks for symlinks, binary files and oversized files. Thus the unconditional wording overstates the implementation.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "xiaoyi-collection-tools",
+        "generator_trace_ids": [
+          "1791370804953-d716a11a8df3"
+        ],
+        "judge_trace_ids": [
+          "1791370831157-585e108560c9"
+        ],
+        "last_input_sha256": "2464d5a235b254c5220a04e973e4fd4321b4a819982ca16cfa44833115538d8e",
+        "last_result_sha256": "7fc54ff052d4effc8d49d67aa8420aeeb89addb8ce0fd8bedbfa9309282ae015",
+        "reason": "xiaoyi_collection_tool.py:L317–L325 reads configurable upload settings, contradicting '本文件内无任何可调项'. L75–L99, L187–L213 and L342–L366 independently duplicate command dictionaries, so a shared template reducing repetition is not established. L126–L146 and L202–L204 establish unchecked list elements being forwarded, but do not establish device-side validation or that element validation was previously removed.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "xiaoyi-contact-search",
+        "generator_trace_ids": [
+          "1791370812987-3fda7826d1bc"
+        ],
+        "judge_trace_ids": [
+          "1791370839513-2a587d444280"
+        ],
+        "last_input_sha256": "764570512e42feb98a69d0c54aedef7c5a9cf30a481305bfd7df74dad7f0e85f",
+        "last_result_sha256": "ef7c1a2f9cb8d88b59078b261133129a53dcda8d7d09756a4ec0651af47afd5c",
+        "reason": "contact_tools.py:L64–L73 hardcodes several parameters, but L71 sets intentParam.name dynamically from name_clean, contradicting '意图参数全部硬编码'. L84–L90 checks outputs/result types but does not normalize items; it also does not establish that stronger validation is impossible. The tradeoff claims are labeled as inference, but these factual overstatements remain.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "tradeoffs",
+        "feature": "xiaoyi-photo-gallery-tools",
+        "generator_trace_ids": [
+          "1791370791939-12b3f57cb958"
+        ],
+        "judge_trace_ids": [
+          "1791370826200-94490a250263"
+        ],
+        "last_input_sha256": "f75a4a370f0b5e830d15725dc2d8fc1e660e75ee2cbe0b08f275d632bae38305",
+        "last_result_sha256": "e0e4b844b419d9eba1e2425fbd201c11395e11bfc3d30e31061350b6b87b06f9",
+        "reason": "photo_tools.py:L36–L37、L166、L192–L195 支持缩略图优先及最多 5 条限制；L58、L170 支持描述中的 60 秒和最多重试一次；L62–L130、L173–L281 显示两个工具函数各只有一次 execute_device_command 调用。但 L97、L217 仅给出 timeOut: 5，没有说明单位、语义或与 60 秒的关系，因此无法确认“超时上限还体现在”该字段的推断；也未提供被调用函数的实现以确认底层超时和重试行为。",
+        "reason_category": "unsupported_assertion",
+        "verdict": "unsure"
+      },
+      {
+        "attempts": 4,
+        "facet": "api",
+        "feature": "xiaoyi-save-to-phone-tools",
+        "generator_trace_ids": [
+          "1791370794224-e4a23f0b0e98"
+        ],
+        "judge_trace_ids": [
+          "1791370816973-9ddcfb1ecabe"
+        ],
+        "last_input_sha256": "a24218cec56b1f178c9b5253f6bb7fe35ee6ce8d8a77076a338ba88df00d69bd",
+        "last_result_sha256": "c6283b3dfe0946cbd7c3286283763e8fecdb48369603c4b0b95790ace6ac21ba",
+        "reason": "The file_name claim omits required conditions: save_tools.py:L97–L100 strips a suffix only for a truthy string whose last dot has index > 0. A truthy value such as '.env' remains unchanged, contrary to the proposed wording.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "yuanrong-agent-file-transfer",
+        "generator_trace_ids": [
+          "1791370849857-1125247313a9"
+        ],
+        "judge_trace_ids": [],
+        "last_input_sha256": "e44d361f8b85faee07709ef0c666e02b0f22cb5cf52af443efae78d12abe15cc",
+        "last_result_sha256": "ade90ff3d7962649034be729b47a3339f6e13e3d2f2ec2fa10b94c70bf0f780d",
+        "reason": "evidence outside shown input",
+        "reason_category": "invalid_source_reference",
+        "verdict": "unknown"
+      },
+      {
+        "attempts": 4,
+        "facet": "validation",
+        "feature": "yuanrong-faas-invocation",
+        "generator_trace_ids": [
+          "1791370827709-765e7a29765a"
+        ],
+        "judge_trace_ids": [
+          "1791370852100-e0686c392747"
+        ],
+        "last_input_sha256": "f7e498708c110f20f48634aa383f74edd33f9ecaf05b2cbf345a81d567f14368",
+        "last_result_sha256": "ab06c96c2924b42f053eecca72f0cfdb747945d24c3e31c1f2b59d25df9ffc35",
+        "reason": "The claimed absent-header test is ineffective: test_yuanrong_frontend_client.py:L224 checks mixed-case \"X-session-context\" against lowercased keys, so it passes even when the header exists. The prose overstates what this test verifies. The other described assertions are supported by L192–L196, L533–L552 and L648–L659.",
+        "reason_category": "unsupported_assertion",
+        "verdict": "fail"
+      }
+    ],
+    "foundation_entry_binding_gaps": [
+      {
+        "feature": "context-usage-indicator",
+        "reason": "六维正文齐全，但尚未满足冻结目录全部入口的源码引用要求；未计入基础说明达标功能。"
+      },
+      {
+        "feature": "ide-file-edit-diff-apply",
+        "reason": "六维正文齐全，但尚未满足冻结目录全部入口的源码引用要求；未计入基础说明达标功能。"
+      }
+    ],
+    "foundation_last_attempt_categories": {
+      "generator_structure": 6,
+      "invalid_source_reference": 3,
+      "native_approval_binding": 1,
+      "unsupported_assertion": 23
+    }
+  },
+  "upstream_freshness": {
+    "checked_at": "2026-10-07T11:14:38.351141+00:00",
+    "commit_date": "2026-09-30T09:01:50Z",
+    "commit_gap": 0,
+    "pin": "f0a69728c96b5961d993449f1a901cbd2f4dac5b",
+    "record": {
+      "bytes": 225,
+      "path": ".kb-jiuwenswarm-finish-20261007/audit/upstream-freshness-final.json",
+      "sha256": "b105aaf743c12fd36620ca14b84f48acc4d5a4eded6104fa55ee430f9b0b66c2"
+    },
+    "same_as_pin": true,
+    "sha": "f0a69728c96b5961d993449f1a901cbd2f4dac5b"
+  }
+}

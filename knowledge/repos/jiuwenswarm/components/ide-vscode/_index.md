@@ -22,3 +22,5 @@ sources: []
 
 - [ide-vscode：VS Code 聊天面板与终端命令镜像](knowledge.md)
 - [IDE 终端命令镜像执行（VS Code 扩展与 JetBrains 插件）](feature-ide-terminal-command-mirror.md)
+
+- [IDE 终端命令镜像执行：实现深读](feature-depth-ide-terminal-command-mirror.md)

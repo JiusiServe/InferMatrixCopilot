@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-07 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 

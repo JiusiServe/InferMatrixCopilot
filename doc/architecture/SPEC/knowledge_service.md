@@ -1,10 +1,18 @@
 # knowledge_service/ — provider curation components
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-07 -->
 
 Pinned source identities and depth markers accept full SHA-1 or SHA-256 Git
 commits. Evidence bodies, stored hashes and native approval semantics remain
 unchanged; accepting a wider object identity never renews an old approval.
+
+`PinnedObserver` reuses successful Git tree and blob reads by full commit SHA
+and path within one observer. Concurrent readers share its lock and cache;
+mutable references are resolved on each call before choosing a cache key, and
+returned top-level sets cannot mutate cached values. A fresh observer reads
+again, read failures are never cached, and live PR metadata is always fetched.
+This avoids repeated Git subprocesses during checkpoint evidence replay while
+preserving the same source text and evidence hashes.
 
 The provider owns knowledge curation beneath the public SDK v1 facade.
 `KnowledgeCurator` composes four domain components over one explicit work

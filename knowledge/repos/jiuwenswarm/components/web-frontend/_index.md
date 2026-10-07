@@ -116,3 +116,25 @@ sources: []
 - [Web 资产发布流程（prepare/commit/轮询/提交锁）](feature-web-asset-publish-flow.md)
 - [Web 前端中英双语 i18n 初始化（jiuwenswarm/channels/web/frontend）](feature-web-i18n-zh-en.md)
 - [RSI 自我改进实验页（创建/列表/配置回显）](feature-rsi-experiment-ui.md)
+
+- [Chat Session Stats Bar and Per-Turn Mini Charts：实现深读](feature-depth-chat-session-stats-dashboard.md)
+
+- [代码模式分支选择器（初始化/切换/创建分支）：实现深读](feature-depth-code-mode-branch-selector.md)
+
+- [提交/推送对话框（commit、push、commit_push）：实现深读](feature-depth-code-mode-commit-push.md)
+
+- [上下文占用指示器（环形/悬浮提示/明细弹层）：实现深读](feature-depth-context-usage-indicator.md)
+
+- [Vite Dev WS Traffic Logger (/__dev/ws-log)：实现深读](feature-depth-dev-ws-traffic-logger.md)
+
+- [增量 ESLint 门禁（相对基线只报新增诊断）：实现深读](feature-depth-frontend-incremental-lint-gate.md)
+
+- [RSI 自我改进实验页（创建/列表/配置回显）：实现深读](feature-depth-rsi-experiment-ui.md)
+
+- [Session Share-Image Export (Job Registry + Headless Renderer)：实现深读](feature-depth-share-image-export.md)
+
+- [Web 资产发布流程（prepare/commit/轮询/提交锁）：实现深读](feature-depth-web-asset-publish-flow.md)
+
+- [Web 前端中英双语 i18n 初始化：实现深读](feature-depth-web-i18n-zh-en.md)
+
+- [Web 通道本机目录/可执行文件选择器（跨平台后端链）：实现深读](feature-depth-web-native-directory-picker.md)

@@ -1,10 +1,10 @@
 ---
 title: "Web 前端中英双语 i18n 初始化（jiuwenswarm/channels/web/frontend）"
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 type: architecture
 tags: [jiuwenswarm]
-sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L1-L30, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L2114-L2125, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L15-L28, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L1-L18, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L1878-L1898, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L12-L30, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L17-L27]
+sources: [openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L1-L30, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L2114-L2125, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L15-L28, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L1-L18, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/App.tsx:L1878-L1898, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L12-L30, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L17-L27, openJiuwen-ai/jiuwenswarm@f0a69728c96b5961d993449f1a901cbd2f4dac5b:jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L12-L28]
 feature: "web-i18n-zh-en"
 entry_points: ["jiuwenswarm/channels/web/frontend/src/i18n/index.ts"]
 source_globs: ["jiuwenswarm/channels/web/frontend/src/i18n/index.ts", "jiuwenswarm/channels/web/frontend/src/App.tsx"]
@@ -51,4 +51,12 @@ Sources / 来源：[jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L12–L3
 检测顺序与缓存均只含 `localStorage`，且 `fallbackLng: 'zh'`：源码注释明确意图——未手动选择语言时默认中文（与后端 `preferred_language` 默认值一致），不跟随 navigator，因为桌面 WebView2 常为 en-US 会导致启动初期显示英文；代价是非中文浏览器用户在首次手动选择或后端同步之前先看到中文。另一取舍是后端同步的健壮性：`locale.get_conf` 返回非 zh/en 值时静默忽略、请求失败时静默吞掉，换取语言同步失败不阻塞连接后的主流程。
 
 Sources / 来源：[jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L17–L27](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/i18n/index.ts#L17-L27), [jiuwenswarm/channels/web/frontend/src/App.tsx:L2114–L2125](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/App.tsx#L2114-L2125)
+
+<!-- kb:knowledge owner=feature-web-i18n-zh-en facet=validation pin=f0a69728c96b5961d993449f1a901cbd2f4dac5b verdict=pass -->
+
+**语言同步的运行时防护（非自动化测试）**
+
+所示代码中该功能的健壮性保障是运行时防护而非测试：连接后同步 `locale.get_conf` 的 effect 只在后端 `preferred_language` 严格等于 `'zh'` 或 `'en'` 时才调用 `i18n.changeLanguage`，其余值被忽略；请求失败由空的 `.catch(() => {})` 静默吞掉，保证语言同步失败不阻塞连接后的主流程。所展示的文件片段中未包含针对 i18n 初始化或语言同步的自动化测试入口，此处仅描述运行时守卫，不构成测试执行证据。
+
+Sources / 来源：[jiuwenswarm/channels/web/frontend/src/App.tsx:L2114–L2125](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/App.tsx#L2114-L2125), [jiuwenswarm/channels/web/frontend/src/i18n/index.ts:L12–L28](https://github.com/openJiuwen-ai/jiuwenswarm/blob/f0a69728c96b5961d993449f1a901cbd2f4dac5b/jiuwenswarm/channels/web/frontend/src/i18n/index.ts#L12-L28)
 
