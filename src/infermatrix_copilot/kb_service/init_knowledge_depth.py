@@ -19,7 +19,7 @@ from .depth_judge import review_facets
 from .init_budget import BudgetExhausted
 from .init_coverage import Owner
 from .init_history import _CheckpointBudget
-from .init_knowledge import MAX_DOC_BYTES, _Knowledge
+from .init_knowledge import MAX_DOC_BYTES, _Knowledge, _MARKER
 from .init_stages import _one_line, _page_frontmatter
 from .init_support import InitError, InitRecord, generate
 from .knowledge_coverage import audit_coverage, coverage_targets_met, feature_metadata, inventory
@@ -182,6 +182,12 @@ class _KnowledgeDepth(_Knowledge):
                 if problems:
                     return self._blocked(problems + ["refresh stale/edited depth explicitly before extending it"])
                 self._block_cache[feature.id] = blocks
+                # A new batch may retain independently approved depth pages
+                # while its frozen foundation navigation stays unchanged.
+                # Reconnect those verified pages even when no facet needs a
+                # fresh extraction; do not rewrite their accepted blocks.
+                if blocks:
+                    self._link_page(page, _one_line(feature.title) + "：实现深读")
         initial = audit_depth(self.head, tree, policy, self.record.pin)
         if initial["problems"]:
             return self._blocked(initial["problems"])
@@ -500,6 +506,41 @@ class _KnowledgeDepth(_Knowledge):
                             "kind": "upstream_text", "text": [f"{n}: {lines[n - 1]}" for n in range(start, end + 1)]})
         return out
 
+    def _feature_existing_context(self, feature, requested, background):
+        """Keep this feature's supported foundation before owner background.
+
+        Complete foundation sections are context, never evidence. In particular,
+        a late validation section must not disappear behind frontmatter, indexes
+        or another feature in the same component's alphabetic page order.
+        """
+        current = self.head.get(feature.page, "")
+        markers = list(_MARKER.finditer(current))
+        facets = {"flow": "architecture", "dependencies": "features",
+                  "failure_modes": "api"}
+        wanted = list(dict.fromkeys(facets.get(f, f) for f in requested))
+        sections = []
+        for number, marker in enumerate(markers):
+            owner, facet, pin, verdict = marker.groups()
+            if owner != "feature-" + feature.id or pin != self.record.pin or verdict not in (None, "pass"):
+                continue
+            end = markers[number + 1].start() if number + 1 < len(markers) else len(current)
+            for boundary in ("<!-- kb:file ", "<!-- kb:depth "):
+                found = current.find(boundary, marker.end(), end)
+                if found != -1:
+                    end = found
+            sections.append((wanted.index(facet) if facet in wanted else len(wanted),
+                             number, current[marker.start():end]))
+        text = ""
+        for _, _, section in sorted(sections):
+            if len((text + section).encode()) <= 4000:
+                text += section
+        if not markers:
+            text = current
+        ordered = {feature.page: text} if text else {}
+        ordered.update({p: t for p, t in self._bounded_context(background).items()
+                        if p != feature.page and t != current})
+        return self._bounded_texts(ordered, 4000)
+
     def _attempt(self, tree, context, feature, entry):
         page = depth_page(feature)
         old = self.head.get(page, "")
@@ -515,10 +556,12 @@ class _KnowledgeDepth(_Knowledge):
         docs = [] if guidance else self._docs(tree, feature, owner, context=context,
                     facets=requested, previous_review=entry.get("reason"),
                     evidence_round=entry.get("evidence_round", 0))
-        existing = self._bounded_context(self._existing_knowledge(owner, self.head.get(feature.page, "")))
+        existing = self._existing_knowledge(owner, self.head.get(feature.page, ""))
         if lightweight:
             docs = self._bounded_slices(docs, 8000)
-            existing = self._bounded_texts(existing, 4000)
+            existing = self._feature_existing_context(feature, requested, existing)
+        else:
+            existing = self._bounded_context(existing)
         retrieval = context.guided(feature, requested, guidance) if guidance else context.build(
             feature, self.head.get(feature.page, ""), docs, facets=requested,
             previous_review=entry.get("reason"), evidence_round=entry.get("evidence_round", 0))

@@ -58,16 +58,31 @@ than saying there are no tests, no validation, or no failures. Representative
 paths are useful; explicitly labeled design inferences must fit the evidence.
 """
 
+SYSTEM_KNOWLEDGE_V5 = SYSTEM_KNOWLEDGE_V4 + """
+
+This completion pass requests only missing facets. Prefer ONE narrow useful
+claim per facet; do not retain unsupported qualifiers from earlier drafts.
+Configuration may describe an implemented constant or branch default when no
+external setting is shown. API may describe a CLI or a callable module contract.
+For validation distinguish existing runtime tests, helper unit tests,
+source assertions/validator entry points, and documented manual checks.
+State the category and precise check present. A runtime guard is not a test,
+source inspection is not test execution, and a manual guide is not an automated
+test. Never claim that a test was run or passed. Do not invent checks to fill a
+facet. Existing pinned citations only locate inputs; read the shown code before
+making a new claim, and cite exact shown intervals without bridging gaps.
+"""
+
 
 def knowledge_system(payload: dict) -> str:
     """Historical jobs retain their exact native system and evidence protocol."""
     version = payload.get("foundation_prompt_version")
     if version is None:
         return SYSTEM_KNOWLEDGE
-    if version != 4:
+    if version not in (4, 5):
         from .init_support import InitError
         raise InitError("unsupported foundation prompt version")
-    return SYSTEM_KNOWLEDGE_V4
+    return SYSTEM_KNOWLEDGE_V5 if version == 5 else SYSTEM_KNOWLEDGE_V4
 
 
 def foundation_evidence(stage, payload: dict) -> list[dict]:

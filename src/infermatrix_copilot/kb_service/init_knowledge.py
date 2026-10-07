@@ -121,11 +121,12 @@ class _Knowledge(_Stage):
         return []
 
     def _input_options(self) -> dict:
+        from .foundation_context import context_version
         path = self._coverage_policy_path()
         text = self.overlay.get(path) or self.rt.knowledge.show(self._base_sha, path) or ""
         options = {"knowledge_policy": hashlib.sha256(text.encode()).hexdigest(),
                    "from_existing": self.from_existing,
-                   "knowledge_prompt_version": 4 if self.rt.unlimited_subscription else 3}
+                   "knowledge_prompt_version": context_version(self.rt) if self.rt.unlimited_subscription else 3}
         if self.rt.unlimited_subscription:
             options["foundation_parallel"] = {"version": 1, "workers": parallelism(self.rt),
                                                "zcode_start_interval_s": start_interval(self.rt)}
@@ -310,7 +311,8 @@ class _Knowledge(_Stage):
                        "related_owners": [{"owner": o.owner, "scope_prefixes": list(o.prefixes)}
                                           for o in self.owners]}
             if self.rt.unlimited_subscription:
-                payload["foundation_prompt_version"] = 4
+                from .foundation_context import context_version
+                payload["foundation_prompt_version"] = context_version(self.rt)
                 owner_jobs.append({"owner": owner, "page": page, "payload": payload,
                                    "offered": offered, "requested": requested})
                 continue
@@ -400,6 +402,11 @@ class _Knowledge(_Stage):
                         return self._blocked([f"discovery evidence handoff: {exc}"])
                     source = bounded_spans([s for s in spans if s["kind"] != "doc"] + source, MAX_SOURCE_BYTES)
                     docs = bounded_spans([s for s in spans if s["kind"] == "doc"] + docs, MAX_DOC_BYTES)
+                if self.rt.unlimited_subscription:
+                    from .foundation_context import context_version, feature_context
+                    if context_version(self.rt) == 5:
+                        source, docs = feature_context(self, feature, source, docs,
+                            source_limit=MAX_SOURCE_BYTES, doc_limit=MAX_DOC_BYTES)
                 if not source:
                     self.record.unfinished.append(f"feature {feature.id}: missing readable source")
                     continue
@@ -411,7 +418,7 @@ class _Knowledge(_Stage):
                            "existing_knowledge": self._bounded_context({feature.page: self.head.get(feature.page, "")}),
                            "language_sample": self._language_sample()}
                 if self.rt.unlimited_subscription:
-                    payload["foundation_prompt_version"] = 4
+                    payload["foundation_prompt_version"] = context_version(self.rt)
                     feature_jobs.append({"owner": Owner("feature-" + feature.id, feature.page, ()),
                                          "page": feature.page, "payload": payload,
                                          "offered": offered, "requested": missing_facets})
@@ -602,7 +609,7 @@ class _Knowledge(_Stage):
 
     def _judge_evidence(self, entries):
         payload = getattr(self, "_foundation_payload", {})
-        if self.rt.unlimited_subscription and payload.get("foundation_prompt_version") == 4:
+        if self.rt.unlimited_subscription and payload.get("foundation_prompt_version") in (4, 5):
             return foundation_evidence(self, payload)
         return super()._judge_evidence(entries)
 

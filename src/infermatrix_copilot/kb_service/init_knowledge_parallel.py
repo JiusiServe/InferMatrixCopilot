@@ -248,7 +248,7 @@ def _worker(stage, job):
     artifacts = []
     error = ""
     try:
-        if job["payload"].get("foundation_prompt_version") == 4:
+        if job["payload"].get("foundation_prompt_version") in (4, 5):
             foundation_evidence(worker, job["payload"])
         data = generate(worker.rt, worker.budget, worker.lifecycle.init, system=knowledge_system(job["payload"]),
                         prompt=knowledge_prompt(job["payload"]), validate=validate_sections).data
@@ -295,7 +295,7 @@ def _validate_result(stage, result):
         raise InitError("foundation shown input or requested facets differ from generator payload")
     from .init_knowledge_inputs import foundation_evidence, knowledge_system
     knowledge_system(result["payload"])
-    if result["payload"].get("foundation_prompt_version") == 4:
+    if result["payload"].get("foundation_prompt_version") in (4, 5):
         if not stage.rt.unlimited_subscription:
             raise InitError("foundation full packet requires unlimited subscription")
         foundation_evidence(stage, result["payload"])
@@ -381,7 +381,7 @@ def _validate_native(stage, artifact, result):
                  and payload["change"]["after"] == _page_frontmatter(artifact["title"], kind="architecture",
                        today=artifact["approved_today"], tags=stage.tags) + "\n" + artifact["text"]
                  and payload["evidence"] == (foundation_evidence(stage, result["payload"])
-                     if result["payload"].get("foundation_prompt_version") == 4 else
+                     if result["payload"].get("foundation_prompt_version") in (4, 5) else
                      _Stage._judge_evidence(stage, [Evidence.from_dict(e) for e in artifact["evidence"]]))
                  and all(reply["dimensions"].get(d) == "yes" for d in
                          ("faithful", "does_not_weaken", "non_contradictory")))
@@ -489,10 +489,10 @@ def _validate_fresh(stage, result):
 
 
 def _with_review_feedback(stage, jobs, saved):
-    """Only a same-batch v4 resume gets advisory, per-facet correction history."""
+    """Same-version native resumes get advisory, per-facet correction history."""
     for original in jobs:
         if (not stage.rt.unlimited_subscription
-                or original["payload"].get("foundation_prompt_version") != 4):
+                or original["payload"].get("foundation_prompt_version") not in (4, 5)):
             yield original
             continue
         if saved.get("tasks") and saved.get("binding") != stage.record.inputs_digest:
@@ -501,7 +501,7 @@ def _with_review_feedback(stage, jobs, saved):
         for prior in saved.get("tasks", {}).values():
             if (prior.get("owner") != original["owner"].owner or prior.get("page") != original["page"]
                     or prior.get("payload", {}).get("owner") != original["owner"].owner
-                    or prior.get("payload", {}).get("foundation_prompt_version") != 4
+                    or prior.get("payload", {}).get("foundation_prompt_version") != original["payload"]["foundation_prompt_version"]
                     or not set(prior.get("requested", [])) & set(original["requested"])):
                 continue
             if prior.get("result_sha256") != _hash({k: v for k, v in prior.items() if k != "result_sha256"}):
