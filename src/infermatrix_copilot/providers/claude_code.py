@@ -23,18 +23,18 @@ from __future__ import annotations
 
 import json
 import math
-import subprocess
-import sys
 from decimal import Decimal
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
-from ..llm import Block, Reply
+from ..llm import Reply
 from .base import (
     AgentSessionRequest,
     HarnessTransport,
     SessionUsage,
+    bridge_server,
     flatten_messages,
+    run_cli,
     sanitized_env,
 )
 from .registry import PROVIDERS
@@ -86,18 +86,9 @@ class ClaudeCodeTransport(HarnessTransport):
         if mcp_config is not None:
             cmd += ["--mcp-config", str(mcp_config), "--strict-mcp-config",
                     "--allowedTools", f"mcp__{_BRIDGE_SERVER}"]
-        try:
-            proc = subprocess.run(
-                cmd, input=prompt_text, cwd=cwd, env=sanitized_env(),
-                capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=timeout_s, check=False)
-            stdout = proc.stdout or ""
-        except subprocess.TimeoutExpired as exc:
-            raw = exc.stdout or b""
-            stdout = raw.decode("utf-8", "replace") if isinstance(raw, bytes) \
-                else str(raw)
-            return self._parse(stdout), True
-        return self._parse(stdout), False
+        stdout, _, _, timed_out = run_cli(cmd, input=prompt_text, cwd=cwd,
+                                          env=sanitized_env(), timeout_s=timeout_s)
+        return self._parse(stdout), timed_out
 
     @staticmethod
     def _parse(stdout: str) -> dict:
@@ -133,14 +124,9 @@ class ClaudeCodeTransport(HarnessTransport):
         """The --mcp-config file, next to the bridge spec (never in the
         worktree — claude takes the config by flag, so nothing litters the
         session tree)."""
-        package_root = Path(__file__).resolve().parents[2]
         config = spec_path.with_suffix(".mcp.json")
-        config.write_text(json.dumps({"mcpServers": {_BRIDGE_SERVER: {
-            "command": sys.executable,
-            "args": ["-m", "infermatrix_copilot.tool_bridge",
-                     "--spec", str(spec_path)],
-            "env": {"PYTHONPATH": str(package_root)},
-        }}}, indent=2), encoding="utf-8")
+        config.write_text(json.dumps({"mcpServers": {_BRIDGE_SERVER: bridge_server(spec_path)}},
+                                     indent=2), encoding="utf-8")
         return config
 
     @staticmethod
@@ -185,15 +171,11 @@ class ClaudeCodeTransport(HarnessTransport):
                 timed_out=timed_out, cost_usd=usage.cost_usd,
                 bridge_tool_calls=tool_calls,
                 served_model=usage.served_model)
-        return AgentOutcome(
-            text=str(data.get("result") or ""),
+        return usage.outcome(str(data.get("result") or ""),
             iterations=int(data.get("num_turns") or 0),
-            tool_calls=tool_calls,
+            tool_calls=tool_calls, tools_used=tools_used,
             truncated=timed_out or data.get("stop_reason") == "max_turns",
-            refusals=[],
-            input_tokens=usage.input_tokens,
-            output_tokens=usage.output_tokens,
-            tools_used=tools_used[:40])
+        )
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
@@ -222,8 +204,7 @@ class ClaudeCodeTransport(HarnessTransport):
         over_budget = "budget" in str(data.get("subtype") or "")
         text = "" if over_budget else str(data.get("result") or "")
         extra = {} if usage.cost_usd is None else {"cost_usd": usage.cost_usd}
-        return Reply(
-            blocks=[Block(type="text", text=text)] if text else [],
+        return usage.reply(text,
             stop_reason=("max_tokens" if timed_out
                          else "max_budget" if over_budget else "end_turn"),
             usage={"input_tokens": usage.input_tokens,
@@ -234,5 +215,4 @@ class ClaudeCodeTransport(HarnessTransport):
                    "cache_creation_input_tokens": int(
                        (data.get("usage") or {}).get(
                            "cache_creation_input_tokens") or 0),
-                   **extra},
-            model=usage.served_model)
+                   **extra})

@@ -17,6 +17,7 @@ nothing is written to any repository here.
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 from typing import Any
@@ -25,7 +26,7 @@ import yaml
 
 from ..knowledge_service.lifecycle import LifecycleError, Page
 from ..knowledge_service.ops import (
-    KnowledgeOperation, OperationsResult, apply_operations, page_over_capacity,
+    KnowledgeOperation, OperationsResult, apply_operations, model_operations, page_over_capacity,
 )
 from .models import ModelGateway, ModelRole, ModelUnavailable
 
@@ -142,69 +143,74 @@ def draft_prompt(repo: str, evidence: dict, files: dict[str, str], repo_dir: str
     )
 
 
-_STRING_FIELDS = ("page", "rule_id", "section_markdown", "new_rule_id", "new_page",
-                  "reason", "evidence", "page_title")
-
-
 def _validate_reply(data: dict, max_operations: int = MAX_OPS_PER_EVENT) -> None:
-    operations = data.get("operations")
-    if not isinstance(operations, list) or len(operations) > max_operations:
-        raise ValueError(f"operations must be a list of at most {max_operations}")
-    for item in operations:
-        if not isinstance(item, dict) or item.get("kind") not in INTAKE_KINDS:
-            raise ValueError(f"operation kind must be one of {INTAKE_KINDS}")
-        if item.get("allow_protected"):
-            raise ValueError("the generator may not request the human path")
-        if not item.get("page") or not item.get("rule_id"):
-            raise ValueError("every operation needs page and rule_id")
-        for key in _STRING_FIELDS:
-            if key in item and not isinstance(item[key], str):
-                raise ValueError(f"{key} must be a string")
-        KnowledgeOperation.from_dict(item)  # unknown fields raise here, inside validation
+    model_operations(data, kinds=INTAKE_KINDS, limit=max_operations, strings=True)
+
+
+def prepare_operations(reply, files, *, release, today, scope_error, application_repair):
+    """Apply a schema-checked candidate, retaining each lane's rejection wording."""
+    operations = [KnowledgeOperation.from_dict(item) for item in reply.data["operations"]]
+    feedback = scope_error(operations)
+    if feedback:
+        return None, feedback, feedback.strip()
+    try:
+        result = apply_operations(files, operations, release=release, today=today) if operations else None
+    except LifecycleError as exc:
+        return None, application_repair(str(exc)), str(exc)
+    return (operations, result), "", ""
+
+
+def draft_operations(gateway, generator, *, system, prompt, prepare, validate=None,
+                     max_repairs=MAX_REPAIRS, schema_repair=None, traced=True):
+    """Bounded candidate loop; prepare returns (accepted, feedback, receipt error).
+
+    Domain scope, application and repair wording stay with each caller. With no
+    schema repair callback, model/schema failures propagate without redispatch.
+    """
+    from ..trace_store import accept_attempt, trace_context
+
+    feedback, attempts = "", []
+    for attempt in range(max_repairs + 1):
+        try:
+            with trace_context(attempt=attempt) if traced else nullcontext():
+                reply = gateway.call_json(generator, system=system, prompt=prompt + feedback,
+                                          **({"validate": validate} if validate is not None else {}))
+        except ModelUnavailable as exc:
+            if schema_repair is None or "failed its schema" not in str(exc):
+                raise
+            feedback, error = schema_repair(str(exc)), str(exc)
+        else:
+            accepted, feedback, error = prepare(reply)
+            if accepted is not None:
+                if traced and accepted[0]:
+                    accept_attempt(attempt)
+                return reply, accepted, attempts
+        attempts.append({"attempt": attempt, "error": error})
+    return None, None, attempts
 
 
 def draft_changes(*, repo: str, repo_dir: str, event_id: int, evidence: dict,
                   files: dict[str, str], gateway: ModelGateway, generator: ModelRole,
                   release: str, today: str, max_operations: int = MAX_OPS_PER_EVENT) -> Draft:
     prompt = draft_prompt(repo, evidence, files, repo_dir)
-    attempts: list[dict] = []
-    feedback = ""
-    from ..trace_store import accept_attempt, trace_context
-
-    for attempt in range(MAX_REPAIRS + 1):
-        try:
-            with trace_context(attempt=attempt):
-                reply = gateway.call_json(generator, system=SYSTEM, prompt=prompt + feedback,
-                                          validate=lambda data: _validate_reply(data, max_operations))
-        except ModelUnavailable as exc:
-            if "failed its schema" not in str(exc):
-                raise  # the model itself is unavailable: the event waits
-            feedback = (f"\n\nYour previous answer did not match the required JSON shape: {exc}. "
-                        "Answer again with exactly the documented JSON object.")
-            attempts.append({"attempt": attempt, "error": str(exc)})
-            continue
-        operations = [KnowledgeOperation.from_dict(item) for item in reply.data["operations"]]
+    def scope_error(operations):
         for op in operations:
             outside = [page for page in destinations(op) if not page.startswith(repo_dir + "/")]
             if outside:
-                feedback = (f"\n\nYour previous answer was rejected: {outside[0]} is outside "
-                            f"{repo_dir}/; every page and new_page must be in this repository.")
-                break
-        else:
-            if not operations:
-                return Draft([event_id], [], None, str(reply.data.get("rationale") or ""), attempts,
-                             generator=reply.role.label())
-            try:
-                result = apply_operations(files, operations, release=release, today=today)
-            except LifecycleError as exc:
-                feedback = (f"\n\nYour previous answer was rejected by the knowledge base: {exc}. "
-                            "Fix exactly that and answer again with the full JSON object.")
-                attempts.append({"attempt": attempt, "error": str(exc)})
-                continue
-            accept_attempt(attempt)  # only this call's reply became the change
-            return Draft([event_id], operations, result, str(reply.data.get("rationale") or ""), attempts,
-                         generator=reply.role.label())
-        attempts.append({"attempt": attempt, "error": feedback.strip()})
+                return (f"\n\nYour previous answer was rejected: {outside[0]} is outside "
+                        f"{repo_dir}/; every page and new_page must be in this repository.")
+        return ""
+
+    reply, accepted, attempts = draft_operations(gateway, generator, system=SYSTEM, prompt=prompt,
+        prepare=lambda reply: prepare_operations(reply, files, release=release, today=today, scope_error=scope_error,
+            application_repair=lambda error: (f"\n\nYour previous answer was rejected by the knowledge base: {error}. "
+                                               "Fix exactly that and answer again with the full JSON object.")),
+        validate=lambda data: _validate_reply(data, max_operations),
+        schema_repair=lambda error: (f"\n\nYour previous answer did not match the required JSON shape: {error}. "
+                                     "Answer again with exactly the documented JSON object."))
+    if accepted is not None:
+        return Draft([event_id], *accepted, str(reply.data.get("rationale") or ""), attempts,
+                     generator=reply.role.label())
     return Draft([event_id], [], None, "rejected after repairs", attempts, rejected=True)
 
 

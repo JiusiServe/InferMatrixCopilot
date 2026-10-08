@@ -59,21 +59,22 @@ import re
 import selectors
 import signal
 import time
-import shutil
 import subprocess
-import sys
 import tempfile
 from functools import cached_property
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
-from ..llm import Block, ModelMismatchError, Reply
+from ..llm import ModelMismatchError, Reply
 from .audit import contained_in
 from .base import (
     AgentSessionRequest,
     HarnessTransport,
     SessionUsage,
+    bridge_server,
     flatten_messages,
+    json_events,
+    run_cli,
     sanitized_env,
 )
 from .registry import PROVIDERS
@@ -162,17 +163,11 @@ class ZCodeTransport(HarnessTransport):
     # -- process plumbing ----------------------------------------------------
     @staticmethod
     def _write_mcp_config(session: Path, spec_path: Path) -> None:
-        package_root = Path(__file__).resolve().parents[2]
         config = session / ".zcode" / "config.json"
         config.parent.mkdir()
         config.write_text(json.dumps({"features": {"memory": False}, "memory": {"use": False},
                                      "mcp": {"servers": {_BRIDGE_SERVER: {
-            "type": "stdio",
-            "command": sys.executable,
-            "args": ["-m", "infermatrix_copilot.tool_bridge",
-                     "--spec", str(spec_path)],
-            "env": {"PYTHONPATH": str(package_root)},
-        }}}}, indent=2), encoding="utf-8")
+                                         "type": "stdio", **bridge_server(spec_path)}}}}, indent=2), encoding="utf-8")
 
     @staticmethod
     def _write_oneshot_config(session: Path) -> None:
@@ -284,30 +279,9 @@ class ZCodeTransport(HarnessTransport):
             env[_PERSONAL_CONFIG_ENV] = str(self._write_model_config(session, model))
         if native_event_sink is not None:
             return self._stream_run(cmd, session, env, timeout_s, native_event_sink)
-        timed_out = False
-        returncode, stderr = 0, ""
-        try:
-            proc = subprocess.run(
-                cmd, cwd=str(session), env=env,
-                stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                encoding="utf-8", errors="replace", timeout=timeout_s,
-                check=False)
-            stdout = proc.stdout or ""
-            returncode, stderr = proc.returncode, proc.stderr or ""
-        except subprocess.TimeoutExpired as exc:
-            timed_out = True
-            raw = exc.stdout or b""
-            stdout = raw.decode("utf-8", "replace") if isinstance(raw, bytes) \
-                else str(raw)
-        events: list[dict] = []
-        for line in stdout.splitlines():
-            line = line.strip()
-            if not line.startswith("{"):
-                continue
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
+        stdout, stderr, returncode, timed_out = run_cli(cmd, cwd=str(session), env=env,
+                                                      stdin=subprocess.DEVNULL, timeout_s=timeout_s)
+        events = json_events(stdout)
         if not timed_out and (returncode != 0 or not any(
                 e.get("type") == "result" for e in events)):
             # A failed run (expired login, bad flag, crashed runtime) must not
@@ -508,8 +482,8 @@ class ZCodeTransport(HarnessTransport):
 
     # -- transport contract --------------------------------------------------
     def run_session(self, req: AgentSessionRequest) -> AgentOutcome:
-        session = Path(tempfile.mkdtemp(prefix="imc-zcode-session-"))
-        try:
+        with tempfile.TemporaryDirectory(prefix="imc-zcode-session-", ignore_cleanup_errors=True) as scratch:
+            session = Path(scratch)
             if req.bridge_spec_path is not None:
                 self._write_mcp_config(session, req.bridge_spec_path)
             header = ""
@@ -522,8 +496,6 @@ class ZCodeTransport(HarnessTransport):
                 f"{header}{req.system}\n\n{req.prompt}", session=session,
                 timeout_s=req.timeout_s,
                 model=req.model or self.settings.strict_backend_model)
-        finally:
-            shutil.rmtree(session, ignore_errors=True)
         usage = self._usage(events)
         calls = self._tool_calls(events)
         used = [name for name, _ in calls]
@@ -541,15 +513,9 @@ class ZCodeTransport(HarnessTransport):
                 served_model=usage.served_model)
         self._check_model(req.model or self.settings.strict_backend_model,
                           usage.served_model, req.trace)
-        return AgentOutcome(
-            text=self._final_text(events),
-            iterations=0,  # zcode does not expose a turn budget
-            tool_calls=len(used),
-            truncated=timed_out,
-            refusals=[f"audit: {v}" for v in violations],
-            input_tokens=usage.input_tokens,
-            output_tokens=usage.output_tokens,
-            tools_used=used[:40])
+        # Zcode does not expose a turn budget.
+        return usage.outcome(self._final_text(events), tool_calls=len(used), tools_used=used,
+                             truncated=timed_out, refusals=[f"audit: {v}" for v in violations])
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
@@ -559,16 +525,14 @@ class ZCodeTransport(HarnessTransport):
         native read is removed, except `Read` when the prompt is too big for
         argv and rides an attachment — then any read outside the scratch dir
         (the input here can be untrusted text) fails the call."""
-        session = Path(tempfile.mkdtemp(prefix="imc-zcode-oneshot-"))
-        try:
+        with tempfile.TemporaryDirectory(prefix="imc-zcode-oneshot-", ignore_cleanup_errors=True) as scratch:
+            session = Path(scratch)
             self._write_oneshot_config(session)
             events, timed_out = self._run(
                 flatten_messages(system, messages), session=session,
                 timeout_s=self.settings.strict_backend_timeout_s,
                 tool_less=True, model=model or self.settings.strict_backend_model,
                 **({"native_event_sink": native_event_sink} if native_event_sink is not None else {}))
-        finally:
-            shutil.rmtree(session, ignore_errors=True)
         violations = self._audit(self._tool_calls(events),
                                  roots=(str(session),), cwd=str(session))
         if violations:
@@ -577,9 +541,5 @@ class ZCodeTransport(HarnessTransport):
         usage = self._usage(events)
         self._check_model(model or self.settings.strict_backend_model,
                           usage.served_model)
-        text = self._final_text(events)
-        return Reply(
-            blocks=[Block(type="text", text=text)] if text else [],
-            stop_reason="max_tokens" if timed_out else "end_turn",
-            usage=self.native_snapshot(events)["usage"],
-            model=usage.served_model)
+        return usage.reply(self._final_text(events), stop_reason="max_tokens" if timed_out else "end_turn",
+                           usage=self.native_snapshot(events)["usage"])

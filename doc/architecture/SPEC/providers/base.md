@@ -1,6 +1,6 @@
 # providers/base.py —— 规范
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~161 · provider 层契约 + 子进程环境白名单 · refactor-status: ok`
 
@@ -18,6 +18,11 @@
 `ProviderSpec`、`AgentSessionRequest`、`SessionUsage`、`HarnessTransport`
 （`cli_path`、`require_cli`、`auth_gap`、`run_session`、`complete`）、
 `sanitized_env()`、`flatten_messages()`。
+
+`run_cli` 共用缓冲子进程与超时输出保留，`json_events` 读取容错 JSONL，
+`bridge_server` 构造既有 stdio 桥接配置。Transport 仍自行选择命令、环境、
+工作目录、认证、隔离和结果校验。`SessionUsage` 的原字段与默认值保持不变；
+新增方法统一构造 Reply 和 AgentOutcome。
 
 ## 不变量（**C1**、**C4**、**E2**）
 - **环境是白名单，不是黑名单**（`_ENV_KEEP` + `LC_`/`XDG_` 前缀）。厂商 CLI 必须保住

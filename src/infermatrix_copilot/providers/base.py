@@ -19,8 +19,11 @@ auth inside the vendor CLI's own state and this codebase never sees it.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
+import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -40,6 +43,40 @@ def sanitized_env() -> dict[str, str]:
     """The allowlisted environment for spawning a harness CLI."""
     return {k: v for k, v in os.environ.items()
             if k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIXES)}
+
+
+def run_cli(cmd, *, cwd, env, timeout_s, input=None, stdin=None):
+    """Capture one buffered invocation, retaining partial stdout on timeout."""
+    try:
+        proc = subprocess.run(cmd, input=input, stdin=stdin, cwd=cwd, env=env,
+                              capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=timeout_s, check=False)
+    except subprocess.TimeoutExpired as exc:
+        raw = exc.stdout or b""
+        stdout = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else str(raw)
+        return stdout, "", 0, True
+    return proc.stdout or "", proc.stderr or "", proc.returncode, False
+
+
+def json_events(stdout):
+    """Read the existing newline JSON protocol, ignoring warnings and bad lines."""
+    events = []
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return events
+
+
+def bridge_server(spec_path):
+    """The stdio command entry; each provider owns its enclosing config policy."""
+    return {"command": sys.executable,
+            "args": ["-m", "infermatrix_copilot.tool_bridge", "--spec", str(spec_path)],
+            "env": {"PYTHONPATH": str(Path(__file__).resolve().parents[2])}}
 
 
 @dataclass(frozen=True)
@@ -98,6 +135,26 @@ class SessionUsage:
     cost_usd: float | None = None
     served_model: str = ""
     tools_used: list[str] = field(default_factory=list)
+
+    def reply(self, text: str, *, stop_reason="end_turn", usage=None):
+        """Normalize a tool-less result; native usage may replace the default counters."""
+        from ..llm import Block, Reply
+
+        return Reply(blocks=[Block(type="text", text=text)] if text else [],
+                     stop_reason=stop_reason, model=self.served_model,
+                     usage=usage if usage is not None else {
+                         "input_tokens": self.input_tokens, "output_tokens": self.output_tokens,
+                         "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0})
+
+    def outcome(self, text: str, *, tool_calls: int, tools_used=(),
+                truncated=False, refusals=(), iterations=0):
+        """Normalize a session after its provider's containment checks."""
+        from ..agent_loop import AgentOutcome
+
+        return AgentOutcome(text=text, iterations=iterations, tool_calls=tool_calls,
+                            truncated=truncated, refusals=list(refusals),
+                            input_tokens=self.input_tokens, output_tokens=self.output_tokens,
+                            tools_used=list(tools_used)[:40])
 
 
 class HarnessTransport:

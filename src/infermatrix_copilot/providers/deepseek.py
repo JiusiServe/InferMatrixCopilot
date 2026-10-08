@@ -48,14 +48,13 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import sys
 import tempfile
 import threading
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
-from ..llm import Block, Reply
+from ..llm import Reply
 from .base import (
     AgentSessionRequest,
     HarnessTransport,
@@ -450,15 +449,9 @@ class DeepSeekHarnessTransport(HarnessTransport):
                 event_kinds=sorted({str(e.get("kind") or e.get("type") or "?")
                                     for e in events
                                     if isinstance(e, dict)})[:20])
-        return AgentOutcome(
-            text=text,
-            iterations=0,  # the harness does not expose its round count
-            tool_calls=calls,
-            truncated=truncated,
-            refusals=refusals,
-            input_tokens=usage.input_tokens,
-            output_tokens=usage.output_tokens,
-            tools_used=tools[:40])
+        # The harness does not expose its round count.
+        return usage.outcome(text, tool_calls=calls, tools_used=tools,
+                             truncated=truncated, refusals=refusals)
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
@@ -471,38 +464,30 @@ class DeepSeekHarnessTransport(HarnessTransport):
         self.require_cli()
         from deepseek_harness import DeepSeekHarness
 
-        scratch = Path(tempfile.mkdtemp(prefix="imc-dsh-oneshot-"))
         key, base_url = self._credential()
         selected = (model or self.settings.strict_backend_model
                     or self.spec.default_model)
         text, finish = "", ""
         try:
-            cordis = self._composition(
-                run_dir=scratch, step_name="oneshot", cwd=scratch,
-                read_only=True, bridge_spec_path=None)
-            with DeepSeekHarness(
-                    provider="deepseek-official", model=selected,
-                    cwd=str(scratch), session_root=str(scratch / "sessions"),
-                    cordis=str(cordis), api_key=key,
-                    base_url=base_url or None,
-                    env=self._env(cwd=scratch, model=selected, system=system,
-                                  session_root=scratch / "sessions"),
-                    request_timeout_seconds=(
-                        self.settings.strict_backend_timeout_s)) as harness:
-                result = harness.run(flatten_messages(system, messages))
-            text = str(getattr(result, "final_response", "") or "").strip()
-            finish = str(getattr(result, "finish_reason", "") or "")
-            _, _, usage = self._activity(
-                list(getattr(result, "events", None) or []))
+            with tempfile.TemporaryDirectory(prefix="imc-dsh-oneshot-", ignore_cleanup_errors=True) as directory:
+                scratch = Path(directory)
+                cordis = self._composition(
+                    run_dir=scratch, step_name="oneshot", cwd=scratch,
+                    read_only=True, bridge_spec_path=None)
+                with DeepSeekHarness(
+                        provider="deepseek-official", model=selected,
+                        cwd=str(scratch), session_root=str(scratch / "sessions"),
+                        cordis=str(cordis), api_key=key,
+                        base_url=base_url or None,
+                        env=self._env(cwd=scratch, model=selected, system=system,
+                                      session_root=scratch / "sessions"),
+                        request_timeout_seconds=(
+                            self.settings.strict_backend_timeout_s)) as harness:
+                    result = harness.run(flatten_messages(system, messages))
+                text = str(getattr(result, "final_response", "") or "").strip()
+                finish = str(getattr(result, "finish_reason", "") or "")
+                _, _, usage = self._activity(
+                    list(getattr(result, "events", None) or []))
         except Exception:  # noqa: BLE001 — mirror cursor: empty reply, no raise
             usage = SessionUsage()
-        finally:
-            shutil.rmtree(scratch, ignore_errors=True)
-        return Reply(
-            blocks=[Block(type="text", text=text)] if text else [],
-            stop_reason="max_tokens" if finish == "max-tokens" else "end_turn",
-            usage={"input_tokens": usage.input_tokens,
-                   "output_tokens": usage.output_tokens,
-                   "cache_read_input_tokens": 0,
-                   "cache_creation_input_tokens": 0},
-            model=usage.served_model)
+        return usage.reply(text, stop_reason="max_tokens" if finish == "max-tokens" else "end_turn")

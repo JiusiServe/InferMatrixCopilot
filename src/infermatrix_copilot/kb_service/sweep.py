@@ -27,10 +27,9 @@ from types import SimpleNamespace
 from ..knowledge_service.l1 import check_tree
 from ..knowledge_service.lifecycle import LifecycleError, Page
 from ..knowledge_service.ops import (
-    INDEX_NAME, KnowledgeOperation, apply_operations, page_over_capacity,
+    INDEX_NAME, KnowledgeOperation, apply_operations, model_operations, page_over_capacity,
 )
-from .intake import routes_for
-from .models import ModelUnavailable
+from .intake import draft_operations, prepare_operations, routes_for
 
 MAX_DIFF_BYTES = 16 * 1024
 MAX_REPAIRS = 2
@@ -208,51 +207,28 @@ def sweep_page(rt, lifecycle, *, page: str, files: dict[str, str], diff: str, hi
                "rules": active, "release_diff": diff, "audit_hints": hints}
     prompt = "<untrusted_data>\n" + json.dumps(payload, ensure_ascii=False, indent=1).replace(
         "<", "\\u003c") + "\n</untrusted_data>\n"
-    feedback = ""
-    last_error = ""
-    from ..trace_store import accept_attempt, trace_context
+    def scope_error(operations):
+        return f"\n\nEvery operation must target {page} only." if any(
+            op.page != page or (op.new_page and op.new_page != page) for op in operations) else ""
 
-    for attempt in range(MAX_REPAIRS + 1):
-        try:
-            with trace_context(attempt=attempt):
-                reply = rt.gateway.call_json(rt.generator, system=SWEEP_SYSTEM, prompt=prompt + feedback,
-                                             validate=_validate_sweep)
-        except ModelUnavailable as exc:
-            if "failed its schema" not in str(exc):
-                raise
-            feedback = f"\n\nYour previous answer did not match the JSON shape: {exc}."
-            last_error = str(exc)
-            continue
-        operations = [KnowledgeOperation.from_dict(item) for item in reply.data["operations"]]
-        if not operations:
-            return None
-        bad = [op for op in operations if op.page != page or (op.new_page and op.new_page != page)]
-        if bad:
-            feedback = f"\n\nEvery operation must target {page} only."
-            last_error = feedback.strip()
-            continue
-        try:
-            result = apply_operations(files, operations, release=release, today=today)
-            accept_attempt(attempt)
-            if generated_by is not None:
-                generated_by[page] = reply.role.label()
-            return operations, result
-        except LifecycleError as exc:
-            feedback = f"\n\nYour previous answer was rejected by the knowledge base: {exc}. Fix exactly that."
-            last_error = str(exc)
-    raise SweepPageFailed(f"{page}: {last_error}")
+    reply, accepted, attempts = draft_operations(rt.gateway, rt.generator, system=SWEEP_SYSTEM,
+        prompt=prompt, prepare=lambda reply: prepare_operations(reply, files, release=release, today=today,
+            scope_error=scope_error, application_repair=lambda error:
+                f"\n\nYour previous answer was rejected by the knowledge base: {error}. Fix exactly that."),
+        validate=_validate_sweep, max_repairs=MAX_REPAIRS,
+        schema_repair=lambda error: f"\n\nYour previous answer did not match the JSON shape: {error}.")
+    if accepted is None:
+        raise SweepPageFailed(f"{page}: {attempts[-1]['error']}")
+    if accepted[0]:
+        if generated_by is not None:
+            generated_by[page] = reply.role.label()
+        return accepted
+    return None
 
 
 def _validate_sweep(data: dict) -> None:
-    operations = data.get("operations")
-    if not isinstance(operations, list):
-        raise ValueError("operations must be a list")
-    for item in operations:
-        if not isinstance(item, dict) or item.get("kind") not in ("edit_same_meaning", "replace", "retire"):
-            raise ValueError("sweep operations are edit_same_meaning, replace or retire")
-        if item.get("allow_protected"):
-            raise ValueError("the generator may not request the human path")
-        KnowledgeOperation.from_dict(item)
+    model_operations(data, kinds=("edit_same_meaning", "replace", "retire"),
+                     kind_error="sweep operations are edit_same_meaning, replace or retire")
 
 
 def _active(section) -> bool:
