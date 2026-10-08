@@ -12,6 +12,9 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
 from typing import Any
+from ...knowledge_service.containment import (
+    ContainmentError, configured, configuration, _issue_usage, knowledge_availability_check, with_containment,
+)
 
 from ... import __version__
 from .._resources import adapters_root
@@ -122,6 +125,7 @@ class _IssuedContext:
     resource_revision: str
     carried_findings: tuple[dict, ...] = ()
     knowledge_view: Any = None
+    knowledge_usage: dict | None = None
 
 
 class DirectClient:
@@ -134,7 +138,8 @@ class DirectClient:
 
     def __init__(self, *, max_issued_contexts: int = _DEFAULT_CONTEXT_LIMIT,
                  knowledge_context_path: str | Path | None = None,
-                 allowed_knowledge_repositories: tuple[str, ...] = ()) -> None:
+                 allowed_knowledge_repositories: tuple[str, ...] = (),
+                 knowledge_maintenance: dict | None = None) -> None:
         if max_issued_contexts < 1:
             raise InvalidRequestError("max_issued_contexts must be >= 1")
         self._adapters = adapters_root()
@@ -145,6 +150,7 @@ class DirectClient:
             Path.home() / ".infermatrix-copilot" / "knowledge-context.sqlite"
         self._knowledge_context_services: dict[str, Any] = {}
         self._allowed_knowledge_repositories = tuple(allowed_knowledge_repositories)
+        self._knowledge_maintenance = knowledge_maintenance
 
     @staticmethod
     def _view():
@@ -214,6 +220,7 @@ class DirectClient:
             truncated=len(data) > len(excerpt_data),
         )
 
+    @with_containment
     def read_document(
         self,
         document_id: str,
@@ -235,6 +242,8 @@ class DirectClient:
             )
         view = None
         context_id = str(review_context_id).strip().casefold()
+        if configuration()["enabled"] and not context_id:
+            raise ContainmentError("enforced Direct document reads require a provider-issued review_context_id")
         if context_id:
             with self._context_lock:
                 issued = self._issued_contexts.get(context_id)
@@ -243,16 +252,24 @@ class DirectClient:
                     "review_context_id was not issued by this DirectClient"
                 )
             view = issued.knowledge_view
+        else:
+            view = self._view()
         data = self._served_bytes(self._document_path(document_id, view))
         page = data[offset:offset + max_bytes]
         next_offset = offset + len(page) if offset + len(page) < len(data) else None
-        return DocumentPage(
+        result = DocumentPage(
             document_id=document_id,
             sha256=_sha256(data),
             offset=offset,
             content=page.decode("utf-8", errors="replace"),
             next_offset=next_offset,
+            review_context_id=context_id if configuration()["enabled"] else "",
         )
+        session = issued.knowledge_usage.get("delivery_session") if context_id and issued.knowledge_usage else None
+        if configuration()["enabled"] and not session:
+            raise ContainmentError("enforced Direct document reads require a bound review delivery session")
+        _issue_usage(result.to_dict(), view=view, session_id=session)
+        return result
 
     def _request_values(self, request: DirectReviewRequest, *, allow_sha256: bool = False) -> tuple[str, list[str]]:
         alias = request.repository.alias.strip()
@@ -285,13 +302,15 @@ class DirectClient:
             changed_files.append(path.as_posix())
         return alias, changed_files
 
+    @with_containment
     def open_knowledge_context(self, request: DirectReviewRequest, *, budget=None) -> dict:
         """Opt into the cumulative adaptive protocol; the v1 plan stays unchanged."""
         from ...knowledge_context import KnowledgeContextService
         alias, _ = self._request_values(request, allow_sha256=True)
         view = self._view()
         service = KnowledgeContextService(view, self._knowledge_context_path,
-                                          allowed_repositories=self._allowed_knowledge_repositories)
+                                          allowed_repositories=self._allowed_knowledge_repositories,
+                                          knowledge_maintenance=self._knowledge_maintenance)
         status = service.open_session(alias, source_pin=request.expected_head_sha.casefold(),
                                       review_id=request.review_id, budget=budget)
         self._knowledge_context_services[status["session_id"]] = service
@@ -316,11 +335,13 @@ class DirectClient:
             else:
                 view = KnowledgeView(root, identity["snapshot"])
             service = KnowledgeContextService(view, self._knowledge_context_path,
-                                              allowed_repositories=self._allowed_knowledge_repositories)
+                                              allowed_repositories=self._allowed_knowledge_repositories,
+                                              knowledge_maintenance=self._knowledge_maintenance)
             service.status(session_id)  # validate pinned bytes before resuming
             self._knowledge_context_services[session_id] = service
         return service
 
+    @with_containment
     def plan_adaptive(self, request: DirectReviewRequest, *, budget=None) -> dict:
         """Return one budgeted model packet, with references instead of SDK excerpts."""
         from ...direct_routing import direct_review_plan
@@ -338,9 +359,7 @@ class DirectClient:
         content = guide_packet["model_content"] + related["model_content"]
         context_id = _sha256(json.dumps({"session_id": session_id, "request": request.to_dict()},
                                        sort_keys=True).encode())
-        self._remember_context(context_id, request.expected_head_sha.casefold(),
-                               tuple(row.to_dict() for row in request.carried_findings), service.view)
-        return {"protocol_version": "knowledge-context-1", "session_id": session_id,
+        packet = {"protocol_version": "knowledge-context-1", "session_id": session_id,
                 "review_context_id": context_id,
                 "expected_head_sha": request.expected_head_sha.casefold(),
                 "model_content": content, "model_content_sha256": hashlib.sha256(content.encode()).hexdigest(),
@@ -351,6 +370,10 @@ class DirectClient:
                 "progress_update": raw["progress_update"], "completion_gate": raw["completion_gate"],
                 "guidance": related.get("guidance", ""),
                 "truncated": guide_packet["truncated"] or related["truncated"]}
+        usage = _issue_usage(packet, view=service.view, session_id=session_id)
+        self._remember_context(context_id, request.expected_head_sha.casefold(),
+                               tuple(row.to_dict() for row in request.carried_findings), service.view, usage)
+        return packet
 
     def read_knowledge_context(self, session_id: str, document_id: str, *, offset: int = 0,
                                repository: str | None = None) -> dict:
@@ -367,7 +390,7 @@ class DirectClient:
         return self._knowledge_context(session_id).expand(session_id, target_tokens=target_tokens, reason=reason)
 
     def _remember_context(
-        self, context_id: str, expected_head_sha: str, carried=(), view=None,
+        self, context_id: str, expected_head_sha: str, carried=(), view=None, usage=None,
     ) -> None:
         view = view if view is not None else self._view()
         with self._context_lock:
@@ -376,11 +399,13 @@ class DirectClient:
                 resource_revision=self._revision(view.root),
                 carried_findings=tuple(carried),
                 knowledge_view=view,
+                knowledge_usage=usage,
             )
             self._issued_contexts.move_to_end(context_id)
             while len(self._issued_contexts) > self._max_issued_contexts:
                 self._issued_contexts.popitem(last=False)
 
+    @with_containment
     def plan(self, request: DirectReviewRequest) -> DirectReviewPlan:
         # Lazy provider import is load-bearing: importing the public SDK models
         # must not import server/config modules or initialize provider runtime.
@@ -433,6 +458,10 @@ class DirectClient:
             "carried_findings": carried,
             "resource_revision": revision,
         }
+        if configuration()["enabled"]:
+            from ...knowledge_service.containment import knowledge_maintenance_status
+            current = knowledge_maintenance_status()
+            context_payload["containment"] = {k:current[k] for k in ("generation", "policy_digest")}
         review_context_id = _sha256(json.dumps(
             context_payload, sort_keys=True, separators=(",", ":"),
             ensure_ascii=False,
@@ -477,9 +506,11 @@ class DirectClient:
             untested_public_api=dict(raw.get("untested_public_api") or {}),
             related_knowledge=related,
         )
-        self._remember_context(review_context_id, expected_head, carried, view)
+        usage = _issue_usage(plan.to_dict(), view=view, session_id=review_context_id.removeprefix("sha256:"))
+        self._remember_context(review_context_id, expected_head, carried, view, usage)
         return plan
 
+    @with_containment
     def validate(
         self, request: DirectCompletionRequest
     ) -> DirectCompletionDecision:
@@ -498,6 +529,9 @@ class DirectClient:
         if issued is None:
             missing.append("review_context_id was not issued by this DirectClient")
         else:
+            availability = knowledge_availability_check(issued.knowledge_usage)
+            if not availability["allowed"]:
+                raise ContainmentError("knowledge containment requires reassessment")
             if expected_head != issued.expected_head_sha:
                 missing.append(
                     "expected_head_sha does not match the issued review context"
@@ -530,6 +564,7 @@ class DirectClient:
             evidence_head_sha=evidence_head,
             existing_feedback_status=request.existing_feedback_status,
             finding_dispositions=list(request.finding_dispositions),
+            knowledge_usage=issued.knowledge_usage if issued else None,
         )
         from .rechecks import checked_rechecks
 

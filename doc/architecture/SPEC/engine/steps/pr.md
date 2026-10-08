@@ -1,6 +1,6 @@
 # engine/steps/pr/ —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~1988（6 个文件） · step 库（PR） · refactor-status: ok`
 
@@ -82,6 +82,9 @@ rebase，不修改配置 checkout 的分支或文件，不推送。该树是一�
 - `pr.fetch_ci_failures` 经 profile 选定的 CI provider 富化日志，否则记一条
   `capability_gap`（**E2**）；`pr.group_failures` 按**归一化后**的签名分组。
 - `pr.post_review` 是**双闸**的（**C5**）。
+- 启用知识撤回协议后，`pr.post_review` 在实际 GitHub 写入处持有消费端发布锁，
+  复查本次固定知识回执的可用性。缺失、失效或命中撤回的回执会阻止发布并要求重评；
+  策略安装与发布共用该锁，确认回执不能越过尚未结束的旧代际写入。
 - `pr.harvest_debug_knowledge` **只在真实推送后落盘**（push 输出存在且非 dry-run，
   且至少一组修复同时有 root_cause 与 verification —— 与 debug memory 同一门槛），
   投递到两个**彼此独立**的 sink：`settings.knowledge_intake_dir`（同主机落盘）与

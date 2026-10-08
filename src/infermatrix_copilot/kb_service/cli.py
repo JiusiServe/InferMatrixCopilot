@@ -233,6 +233,24 @@ def main(argv: list[str] | None = None) -> int:
     calibrate.add_argument("--repo", required=True)
     serve = sub.add_parser("serve")
     serve.add_argument("--once", action="store_true")
+    maintain = sub.add_parser("maintain", help="plan or queue durable nightly maintenance")
+    actions = maintain.add_subparsers(dest="maintenance_action", required=True)
+    for name in ("plan", "run", "status"):
+        action = actions.add_parser(name)
+        target = action.add_mutually_exclusive_group(required=True)
+        target.add_argument("--repo")
+        target.add_argument("--all", action="store_true")
+        if name == "run":
+            action.add_argument("--request-id", required=True, help="stable idempotent scheduler request identity")
+            extra = action.add_mutually_exclusive_group()
+            extra.add_argument("--calibrate", action="store_true")
+            extra.add_argument("--drill", action="store_true", help="queue an isolated SDK revocation drill")
+    correction = sub.add_parser("correction", help="resolve a maintenance finding through the scheduler")
+    resolve = correction.add_subparsers(dest="correction_action", required=True).add_parser("resolve")
+    resolve.add_argument("--id", required=True, help="immutable maintenance finding ID")
+    resolve.add_argument("--decision", required=True, choices=("confirm", "dismiss"))
+    resolve.add_argument("--evidence", required=True, help="JSON evidence object, or @path to a JSON file")
+    resolve.add_argument("--request-id", help="optional stable identity; default is a digest of the signed owner input")
     activation = sub.add_parser("activate")
     activation.add_argument("--snapshot", type=Path, help="verify and activate an explicitly selected portable snapshot")
     activation.add_argument("--allow-partial", action="store_true", help="explicitly serve an accepted foundation; initialization remains incomplete")
@@ -303,6 +321,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     supplied = sys.argv[1:] if argv is None else argv
     args.acceptance_mode_explicit = any(value == "--acceptance-mode" or value.startswith("--acceptance-mode=") for value in supplied)
+
+    if args.command in {"maintain", "correction"}:
+        from .maintenance_commands import command
+
+        try:
+            return command(args, _state_dir(args.state_dir))
+        except (ValueError, OSError, KeyError, RuntimeError, subprocess.SubprocessError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
     if args.command in {"onboard", "repo", "mirror", "update"}:
         from .portable_commands import command

@@ -45,8 +45,8 @@ def __getattr__(name: str):
     raise AttributeError(name)
 
 
-def _supported_repos() -> list[str]:
-    knowledge = KnowledgeView.current().root
+def _supported_repos(view: KnowledgeView | None = None) -> list[str]:
+    knowledge = (view or KnowledgeView.current()).root
     if not (knowledge / "repos").is_dir():
         return []
     return sorted(
@@ -55,9 +55,9 @@ def _supported_repos() -> list[str]:
     )
 
 
-def _docs(repo: str) -> KnowledgeDocs:
-    repo = _normalize_repo(repo)
-    view = KnowledgeView.current()
+def _docs(repo: str, view: KnowledgeView | None = None) -> KnowledgeDocs:
+    view = view or KnowledgeView.current()
+    repo = _normalize_repo(repo, view)
     repo_dir = view.root / "repos" / repo
     if not repo_dir.is_dir():
         raise KnowledgeDocsError(f"unsupported knowledge repo: {repo}")
@@ -70,6 +70,36 @@ def _guard(fn):
     except (KnowledgeDocsError, FileNotFoundError, PolicyError, TypeError,
             ValueError) as exc:
         return {"error": str(exc)}
+
+
+def _model_context_delivery(packet: dict) -> dict:
+    """Raw MCP responses are the host model's actual context delivery."""
+    from .knowledge_service.containment import configuration, knowledge_usage_record
+    if configuration()["enabled"] and packet.get("model_content"):
+        return {**packet, "knowledge_usage": knowledge_usage_record(packet, injected=True)}
+    return packet
+
+
+def _raw_document_delivery(result, receipt, session, view):
+    if session is None:
+        return result
+    from .knowledge_service.containment import _issue_usage
+    if result.get("path") or result.get("matches"):
+        receipt = _issue_usage({"session_id":session,"delivery":result}, view=view, session_id=session, injected=True)
+    return {**result, "knowledge_usage": receipt}
+
+
+def _legacy_plan_delivery(plan):
+    from .knowledge_service.containment import configuration, _usage_session_view, _issue_usage, digest
+    if not configuration()["enabled"]:
+        return plan
+    session, view = _usage_session_view(plan["knowledge_usage"])
+    context = {"raw_plan_sha256":digest(plan),
+               "documents":[{"document_id":row["path"]} for row in plan["knowledge_usage"]["pages"]],
+               "quick_maps":[{"path":view.relative(row["path"]),"content":row.get("quick_map","")}
+                             for row in plan["knowledge_routes"]],
+               "related_knowledge":plan["related_knowledge"]}
+    return {**plan,"knowledge_usage":_issue_usage(context,view=view,session_id=session,injected=True)}
 
 
 def _knowledge_entry(name: str) -> str:
@@ -239,8 +269,10 @@ def build_mcp(
             "evidence at the frozen head SHA; fetch the PR head ref when the "
             "local checkout holds another revision. Before treating a Direct "
             "review as complete or posting its only final comment, call "
-            "validate_direct_review with that evidence_head_sha. After source "
-            "findings are independently verified, fetch bounded PR discussion "
+            "validate_direct_review with that evidence_head_sha. "
+            "When containment is enabled, pass the plan's knowledge_usage "
+            "receipt to doc_read, doc_search, and final validation. "
+            "After source findings are independently verified, fetch bounded PR discussion "
             "and thread-aware review feedback, classify every candidate, and "
             "suppress duplicates. Pass existing_feedback_status=checked for "
             "that PR path, disabled only for PR_CONTEXT_MODE=no_discussion "
@@ -319,16 +351,16 @@ def build_mcp(
                     request = DirectReviewRequest(idempotency_key or f"direct:{target}", RepositoryRef(repo),
                                                   0, expected_head_sha, title, body,
                                                   tuple(ChangedPath(path) for path in changed_files or ()), diff=diff)
-                    return context_client.plan_adaptive(request)
+                    return _model_context_delivery(context_client.plan_adaptive(request))
                 if knowledge_profile != "legacy":
                     raise ValueError("knowledge_profile must be legacy or adaptive")
-                return direct_review_plan(
+                return _legacy_plan_delivery(direct_review_plan(
                     repo,
                     title=title,
                     body=body,
                     changed_files=changed_files,
                     diff=diff,
-                )
+                ))
 
             if post:
                 # Refused at the surface as well as in the policy, so the
@@ -377,6 +409,7 @@ def build_mcp(
         evidence_head_sha: str = "",
         existing_feedback_status: str = "",
         finding_dispositions: list[dict[str, str]] | None = None,
+        knowledge_usage: dict | None = None,
     ) -> dict:
         """Validate the Direct completion gate before the only final comment.
 
@@ -392,6 +425,8 @@ def build_mcp(
         and classify each candidate in ``finding_dispositions``. Duplicate and
         resolved/outdated findings must identify the existing thread and must
         not be emitted as new comments.
+        When containment is enabled, pass the plan's ``knowledge_usage`` receipt
+        unchanged; missing or newly held knowledge prevents completion.
         """
         started = time.perf_counter()
         result = _direct_completion_result(
@@ -402,6 +437,7 @@ def build_mcp(
             evidence_head_sha=evidence_head_sha,
             existing_feedback_status=existing_feedback_status,
             finding_dispositions=finding_dispositions,
+            knowledge_usage=knowledge_usage,
         )
         result.setdefault("diagnostics", {})["timing_ms"] = {
             "validate_direct_review": int(
@@ -450,20 +486,23 @@ def build_mcp(
         query: str,
         repo: str = "vllm-omni",
         limit: int = 20,
+        knowledge_usage: dict | None = None,
     ) -> dict:
-        """Search knowledge; repo accepts a short name or canonical owner/name."""
+        """Search knowledge; enforced reads require the review plan's knowledge_usage receipt."""
         def run() -> dict:
-            selected_repo = _normalize_repo(repo)
-            if selected_repo not in _supported_repos():
-                supported = ", ".join(_supported_repos()) or "(none)"
+            from .knowledge_service.containment import _usage_session_view
+            session, view = _usage_session_view(knowledge_usage)
+            selected_repo = _normalize_repo(repo, view)
+            if selected_repo not in _supported_repos(view):
+                supported = ", ".join(_supported_repos(view)) or "(none)"
                 return {
                     "error": (
                         f"unsupported knowledge repo: {repo}. "
                         f"Supported: {supported}."
                     )
                 }
-            matches = _docs(selected_repo).search(query, limit=limit)
-            return {
+            matches = _docs(selected_repo, view).search(query, limit=limit)
+            result = {
                 "query": query,
                 "repo": selected_repo,
                 "matches": matches,
@@ -473,6 +512,7 @@ def build_mcp(
                     "knowledge_entry."
                 )} if not matches else {}),
             }
+            return _raw_document_delivery(result, knowledge_usage, session, view)
 
         return _guard(run)
 
@@ -481,14 +521,18 @@ def build_mcp(
         path: str,
         repo: str = "vllm-omni",
         offset: int = 0,
+        knowledge_usage: dict | None = None,
     ) -> dict:
-        """Read a doc_search page; repo accepts a short or canonical owner/name."""
+        """Read a doc_search page; enforced reads require the review plan's knowledge_usage receipt."""
         def run() -> dict:
-            selected_repo = _normalize_repo(repo)
-            return {
+            from .knowledge_service.containment import _usage_session_view
+            session, view = _usage_session_view(knowledge_usage)
+            selected_repo = _normalize_repo(repo, view)
+            result = {
                 "repo": selected_repo,
-                **_docs(selected_repo).read(path, offset=offset),
+                **_docs(selected_repo, view).read(path, offset=offset),
             }
+            return _raw_document_delivery(result, knowledge_usage, session, view)
 
         return _guard(run)
 
@@ -510,22 +554,22 @@ def build_mcp(
     @mcp.tool(annotations=read_only)
     def read_knowledge_context(session_id: str, path: str, offset: int = 0, repository: str | None = None) -> dict:
         """Read source-pinned knowledge using the session's remaining cumulative budget."""
-        return _guard(lambda: context_client.read_knowledge_context(session_id, path, offset=offset, repository=repository))
+        return _guard(lambda: _model_context_delivery(context_client.read_knowledge_context(session_id, path, offset=offset, repository=repository)))
 
     @mcp.tool(annotations=read_only)
     def search_knowledge_context(session_id: str, query: str, repository: str | None = None) -> dict:
         """Search snippets consume the same budget as full knowledge reads."""
-        return _guard(lambda: context_client.search_knowledge_context(session_id, query, repository=repository))
+        return _guard(lambda: _model_context_delivery(context_client.search_knowledge_context(session_id, query, repository=repository)))
 
     @mcp.tool(annotations=read_only)
     def related_knowledge_context(session_id: str, changed_files: list[str], query: str = "", repository: str | None = None) -> dict:
         """Select additional intact feature contexts within the shared remaining budget."""
-        return _guard(lambda: context_client.related_knowledge_context(session_id, changed_files, query=query, repository=repository))
+        return _guard(lambda: _model_context_delivery(context_client.related_knowledge_context(session_id, changed_files, query=query, repository=repository)))
 
     @mcp.tool(annotations=read_only)
     def expand_knowledge_context(session_id: str, target_tokens: int, reason: str) -> dict:
         """Request more context, with a concrete unresolved contract; never consumes reserved source/output capacity."""
-        return _guard(lambda: context_client.expand_knowledge_context(session_id, target_tokens=target_tokens, reason=reason))
+        return _guard(lambda: _model_context_delivery(context_client.expand_knowledge_context(session_id, target_tokens=target_tokens, reason=reason)))
 
     return mcp
 

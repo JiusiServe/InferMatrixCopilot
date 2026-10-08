@@ -1,6 +1,6 @@
 # knowledge_context.py —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-08 -->
 
 ## 职责与公开契约
 
@@ -43,3 +43,10 @@ MCP 暴露同一 open/read/search/related/expand；Strict 在注册表快照默�
 
 `test_knowledge_context.py`、`test_knowledge_retrieval.py` 验证累计预算、并发、恢复、
 留白、跨仓库权限、缓存篡改、实际注入标签以及 SDK/Strict 的固定快照接入。
+
+
+## 2026-10-08 Signed containment
+
+With explicit `knowledge_maintenance` configuration, session/cache identity additionally binds current containment generation and policy digest. Every delivery rechecks this identity and verifies document admissibility before cached content is returned; old contexts require reassessment after containment changes. Disabled configuration preserves the previous session identity.
+
+Every nonempty adaptive delivery also enters the provider-private durable session issuance journal before it is returned, including cached reads and search/related continuations after a budget expansion. Earlier plan receipts resolve that complete journal during final availability checks; a newly held follow-up page therefore blocks completion even after SDK restart. Budget expansion alone delivers no source content and creates no injected-usage claim.

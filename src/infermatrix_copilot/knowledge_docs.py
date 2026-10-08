@@ -104,6 +104,10 @@ class KnowledgeDocs:
     def _checked(self, target: Path) -> None:
         if self._verify is not None:
             self._verify(target.relative_to(self.root).as_posix())
+        else:
+            from .knowledge_service.containment import assert_page_available
+            from .knowledge_view import KnowledgeView
+            assert_page_available(KnowledgeView(self.root, "unverified"), target.relative_to(self.root).as_posix())
 
     def read(self, path: str, *, offset: int = 0, limit: int = 24_000) -> dict:
         if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
@@ -137,7 +141,11 @@ class KnowledgeDocs:
                 if target in seen_files or not self._in_scope(target) or not target.is_file():
                     continue
                 seen_files.add(target)
-                self._checked(target)
+                from .knowledge_service.containment import HeldKnowledgeError
+                try:
+                    self._checked(target)
+                except HeldKnowledgeError:
+                    continue
                 rel = target.relative_to(self.root).as_posix()
                 served = visible_text(target.read_text(encoding="utf-8", errors="replace"))
                 for lineno, line in enumerate(served.splitlines(), 1):
@@ -185,7 +193,11 @@ class KnowledgeDocs:
             path = candidate.resolve()
             if not path.is_relative_to(self.repo_scope) or not path.is_file():
                 continue
-            self._checked(path)  # a corrupted activated snapshot must fail closed
+            from .knowledge_service.containment import HeldKnowledgeError
+            try:
+                self._checked(path)  # corruption/stale policy still fails closed
+            except HeldKnowledgeError:
+                continue
             if path.stat().st_size > 524288:
                 continue
             raw = path.read_text(encoding="utf-8")

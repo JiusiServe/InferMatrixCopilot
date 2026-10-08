@@ -153,7 +153,7 @@ class Outbox:
     def acks_dir(self) -> Path:
         return self.root / "inbox" / "acks"
 
-    def issue(self, repo: str, kind: str, body: dict) -> OutboxItem:
+    def issue(self, repo: str, kind: str, body: dict, *, ttl: float | None = None) -> OutboxItem:
         if kind not in ITEM_KINDS:
             raise OutboxError(f"unknown outbox item kind: {kind}")
         state = self._ledger.repo_state(repo)
@@ -162,7 +162,7 @@ class Outbox:
             id=f"{int(now)}-{uuid.uuid4().hex[:12]}", kind=kind, repo=repo,
             generation=int(state["generation"]),
             global_generation=int(self._ledger.repo_state("*")["generation"]),
-            issued_at=now, expires_at=now + ITEM_TTL[kind], body=body,
+            issued_at=now, expires_at=now + (ITEM_TTL[kind] if ttl is None else max(1, min(float(ttl), ITEM_TTL[kind]))), body=body,
         )
         envelope = sign("kb-outbox-item", item.to_payload(), self._key)
         digest = hashlib.sha256(canonical_json(envelope)).hexdigest()
@@ -209,7 +209,16 @@ class Outbox:
             return results
         for path in sorted(self.acks_dir.glob("*.json")):
             try:
-                payload = verify("kb-ack", json.loads(path.read_text(encoding="utf-8")), public_key)
+                envelope = json.loads(path.read_text(encoding="utf-8"))
+                payload = verify("kb-ack", envelope, public_key)
+                archive = self.root / "receipts" / "publisher"
+                archive.mkdir(parents=True, exist_ok=True)
+                identity = hashlib.sha256(canonical_json(envelope)).hexdigest()
+                retained = archive / f"{identity}.json"
+                if not retained.exists():
+                    atomic_write_json(retained, envelope)
+                elif retained.is_symlink() or json.loads(retained.read_text()) != envelope:
+                    raise OutboxError("verified publisher receipt conflicts")
                 item_id = str(payload["item_id"])
                 status = "acked" if payload.get("ok") else "rejected"
                 self._ledger.ack_outbox(item_id, status, payload)

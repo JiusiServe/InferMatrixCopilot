@@ -346,11 +346,23 @@ async def _post_review(ctx: StepContext) -> StepResult:
     payload_path = ctx.run_dir / "github_review_payload.json"
     payload_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    code, out = _gh([
-        "api", "--method", "POST",
-        f"repos/{full_name}/pulls/{int(pr)}/reviews",
-        "--input", str(payload_path),
-    ], cwd=repo)
+    from ....knowledge_service.containment import (
+        ContainmentError, configuration, knowledge_availability_check, knowledge_publication_guard,
+    )
+    try:
+        with knowledge_publication_guard():
+            if configuration()["enabled"]:
+                from ....app.run_service import read_knowledge_pin
+                usage = read_knowledge_pin(ctx.run_dir).get("knowledge_usage")
+                if not knowledge_availability_check(usage)["allowed"]:
+                    return StepResult(False, FailureKind.BLOCKED, "knowledge held; reassessment required")
+            code, out = _gh([
+                "api", "--method", "POST",
+                f"repos/{full_name}/pulls/{int(pr)}/reviews",
+                "--input", str(payload_path),
+            ], cwd=repo)
+    except ContainmentError:
+        return StepResult(False, FailureKind.BLOCKED, "knowledge policy unavailable; reassessment required")
     if code != 0:
         return StepResult(
             False,

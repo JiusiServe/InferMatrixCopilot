@@ -1,6 +1,6 @@
 # app/run_service.py —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-08 -->
 
 `RunService` is the durable application boundary shared by the embedded
 Strict SDK and MCP transport. It owns policy-checked reserve/start, a queue
@@ -46,6 +46,9 @@ run is pinned to this server's effective `knowledge_dir` (reported as `packaged`
 or `unverified` for a custom directory), with `KNOWLEDGE_ROOT` removed from the
 child's environment. Runs reserved before pinning
 existed have no record and use the process default.
+Containment repository resolution and the issued scope receipt use this same
+effective view, including a custom `knowledge_dir`; packaged bytes cannot stand
+in for the custom bytes that the child consumes.
 
 ## 2026-09-30 Concurrent workers
 `Settings.strict_max_workers` (`STRICT_MAX_WORKERS`, 1–32, default 1; embedded
@@ -76,3 +79,8 @@ services and the CLI as well. Not covered: two agent sessions *inside one run*
 (ensemble lenses, per-comment verification, bounded by
 `strict_backend_concurrency`) still share their run's own tree; that predates
 this change and is independent of the worker count.
+
+
+## 2026-10-08 Signed containment
+
+When containment is explicitly enabled, reservation issues a private provider receipt for the pinned repository/shared snapshot scope into `knowledge.json`. It identifies conservative publication dependencies; it does not claim every scoped unit was injected. Launch rechecks the receipt and forwards only explicit maintenance configuration to the child. Old reservations without issuance fail closed until reassessed.

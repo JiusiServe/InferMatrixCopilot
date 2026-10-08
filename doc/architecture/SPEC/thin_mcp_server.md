@@ -1,6 +1,6 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~490 · 默认 MCP：Direct 门面 + Strict 入口 · refactor-status: ok`
 
@@ -47,6 +47,11 @@
   `subtraction_signal` 的自洽性（`none` 不得附带证据；`triggered` 需要减法项或最小性
   证明）、以及证明本次评审读的是固定提交的 `evidence_head_sha`。
   **它不能也没有**去验证被引用的证据是否真实 —— 声称它能，比不声称更糟。
+  启用 containment 后，legacy 和 adaptive Direct 计划另带实际 provider 签发登记的
+  `knowledge_usage`；完成工具把该收据原样交给公开 `direct_completion_result`，
+  后者按当前签名策略重查知识可用性。缺失、伪造、过期或被 hold 的来源均返回
+  `partial_review` / `publish_ready=false`，要求重新取用可用知识并复核。
+  这项来源与可用性校验独立于评审结论的证据真伪；未启用时旧返回形状不变。
 - **路由绝不静默替换。** `title`/`body` 选 owner；`changed_files` 通常只做范围校验。
   它们只在**最后手段**下选路（当存活路由无一命中它们推导出的 owner 时），且该情况是
   **显式的**：`status="scope_fallback"`、`selected_by="title_body+changed_files"`，
@@ -93,3 +98,9 @@ stdlib + `mcp` extra + `.direct_routing`（下划线别名 re-import）+
 
 ## 2026-09-28 知识视图
 知识根改为每次调用经 `KnowledgeView.current()` 解析；`_KNOWLEDGE` 仅为惰性别名。
+
+## 2026-10-08 Adaptive containment delivery
+
+Raw adaptive MCP responses are actual host-model context delivery. Initial plans and nonempty read/search/related follow-ups record `injected=True` using the privately issued exact packet; JSON-fenced source text is decoded for unit attribution. Metadata-only budget expansion does not claim injected content. All deliveries are bound to the same durable provider-private session, so final validation of the original plan receipt includes later follow-up pages and fails closed if any become held.
+
+With enforcement enabled, raw `doc_read` and `doc_search` additionally require the optional `knowledge_usage` parameter carrying the original plan receipt. They resolve its protected issuance and pinned view, then register actual delivered content in the same journal before returning an updated receipt. Omitting provenance fails closed; activating another snapshot does not switch an existing review's follow-up root. Raw legacy initial delivery records only its actual quickmap/background fragments as injected at the MCP return boundary. Internal SDK calls to the raw planner do not claim injection. Disabled tool signatures remain backward compatible through the optional parameter.

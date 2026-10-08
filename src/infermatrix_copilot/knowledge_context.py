@@ -63,8 +63,10 @@ class KnowledgeContextService:
                  resolver: Callable | None = None,
                  tokenizer: Callable[[str], int] | None = None,
                  tokenizer_id: str = "utf8-byte-upper-bound-v1",
-                 allowed_repositories: tuple[str, ...] = ()):
+                 allowed_repositories: tuple[str, ...] = (),
+                 knowledge_maintenance: dict | None = None):
         self.view = view
+        self._knowledge_maintenance = knowledge_maintenance
         if resolver is None:
             from .kb_service.repo_spec import resolve_snapshot_repo
             resolver = resolve_snapshot_repo
@@ -107,14 +109,17 @@ class KnowledgeContextService:
     def _view_identity(self) -> dict:
         # Even an explicitly configured development tree is bound to its bytes;
         # verified snapshots additionally enforce their manifest on every read.
+        from .knowledge_service.containment import load_policy
+        _, policy = load_policy(self._knowledge_maintenance)
+        containment = {"generation": policy["generation"], "policy_digest": policy["policy_digest"]} if policy else None
         if self.view.verified:
             return {"snapshot": self.view.public_snapshot, "tree_sha256": self.view.tree_sha256,
-                    "root": str(self.view.root.resolve())}
+                    "root": str(self.view.root.resolve()), **({"containment": containment} if containment else {})}
         files = {p.relative_to(self.view.root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                  for p in sorted(self.view.root.rglob("*")) if p.is_file()}
         return {"snapshot": self.view.public_snapshot,
                 "tree_sha256": self.view.tree_sha256 or _digest(files),
-                "root": str(self.view.root.resolve())}
+                "root": str(self.view.root.resolve()), **({"containment": containment} if containment else {})}
 
     def open_session(self, repository: str, *, source_pin: str, review_id: str,
                      budget: ContextBudget | None = None) -> dict:
@@ -205,6 +210,14 @@ class KnowledgeContextService:
         return cost
 
     def _deliver(self, session_id: str, request: dict, build: Callable) -> dict:
+        from .knowledge_service.containment import configured, _issue_usage
+        with configured(self._knowledge_maintenance):
+            result = self._deliver_current(session_id, request, build)
+            if result.get("documents"):
+                _issue_usage(result, view=self.view, session_id=session_id)
+            return result
+
+    def _deliver_current(self, session_id: str, request: dict, build: Callable) -> dict:
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
             state = self._state(db, session_id)

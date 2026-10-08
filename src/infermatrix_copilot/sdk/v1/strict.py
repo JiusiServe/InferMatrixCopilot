@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Self
 
 from .direct import get_capabilities
+from ...knowledge_service.containment import configured, configuration, knowledge_availability_check, with_containment
 from .models import (
     Capabilities,
     QualityPollResult,
@@ -136,6 +137,8 @@ class StrictRuntime:
         else:
             settings = Settings(**overrides)
         self._core = RunService(settings)
+        self._knowledge_maintenance = config.knowledge_maintenance or None if config is not None else None
+        self._core.knowledge_maintenance = self._knowledge_maintenance
 
     def capabilities(self) -> Capabilities:
         raw = dict(self._core.capabilities())
@@ -147,6 +150,7 @@ class StrictRuntime:
     def readiness(self, repo: str, repo_path: str = "") -> tuple[str, ...]:
         return tuple(self._core.strict_readiness(repo, repo_path))
 
+    @with_containment
     def reserve_review(self, request: StrictReviewRequest) -> StrictRunHandle:
         from .rechecks import validate_carried
 
@@ -204,8 +208,20 @@ class StrictRuntime:
         state = str(status.get("state") or payload.get("state") or "unknown")
         return StrictPollResult(run_id=run_id, state=state, payload=payload)
 
+    @with_containment
     def get_result(self, run_id: str, *, offset: int = 0) -> StrictPollResult:
         payload = dict(self._core.get_result(run_id, offset=offset))
+        if configuration()["enabled"]:
+            from ...app.run_service import read_knowledge_pin
+            receipt = read_knowledge_pin(self._core.run_root / run_id).get("knowledge_usage")
+            payload["knowledge_usage"] = receipt
+            availability = knowledge_availability_check(receipt)
+            payload["knowledge_availability"] = availability
+            if not availability["allowed"]:
+                payload["knowledge_held"] = True
+                from ...run_status import TERMINAL
+                if payload.get("state") in TERMINAL:
+                    payload["state"] = "held"
         # The report content and structured result cross the SDK boundary; the
         # provider's private run-directory path does not.
         payload.pop("report_path", None)

@@ -371,4 +371,5 @@ zero（`vllm-omni`），可传任何已接入仓库的短名、别名或 owner/n
 其余：[发版漂移审计](doc/contributing/release-maintenance.md) ·
 [知识库贡献规范](doc/knowledge/CONTRIBUTING.md) ·
 [知识维护示例](doc/knowledge/maintainer-walkthrough.md) ·
+[夜间维护与撤回](doc/architecture/knowledge-maintenance.md) ·
 [评测结论](doc/evaluation/README.md)
