@@ -25,6 +25,7 @@ from typing import Any
 import yaml
 
 from ..knowledge_service.lifecycle import LifecycleError, Page
+from ..knowledge_service.drafting import bounded_attempts
 from ..knowledge_service.ops import (
     KnowledgeOperation, OperationsResult, apply_operations, model_operations, page_over_capacity,
 )
@@ -169,24 +170,23 @@ def draft_operations(gateway, generator, *, system, prompt, prepare, validate=No
     """
     from ..trace_store import accept_attempt, trace_context
 
-    feedback, attempts = "", []
-    for attempt in range(max_repairs + 1):
+    def attempt(feedback, index):
         try:
-            with trace_context(attempt=attempt) if traced else nullcontext():
+            with trace_context(attempt=index) if traced else nullcontext():
                 reply = gateway.call_json(generator, system=system, prompt=prompt + feedback,
                                           **({"validate": validate} if validate is not None else {}))
         except ModelUnavailable as exc:
             if schema_repair is None or "failed its schema" not in str(exc):
                 raise
-            feedback, error = schema_repair(str(exc)), str(exc)
+            return None, None, schema_repair(str(exc)), str(exc)
         else:
             accepted, feedback, error = prepare(reply)
             if accepted is not None:
                 if traced and accepted[0]:
-                    accept_attempt(attempt)
-                return reply, accepted, attempts
-        attempts.append({"attempt": attempt, "error": error})
-    return None, None, attempts
+                    accept_attempt(index)
+            return reply, accepted, feedback, error
+
+    return bounded_attempts(attempt, max_repairs=max_repairs)
 
 
 def draft_changes(*, repo: str, repo_dir: str, event_id: int, evidence: dict,

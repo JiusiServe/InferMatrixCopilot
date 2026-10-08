@@ -32,7 +32,7 @@ def policy_digest():
              "knowledge_*.py", "depth_*.py") for path in root.glob(pattern)}
     files.update(root / name for name in ("models.py", "model_dispatch.py", "gate.py",
         "../budgeting.py", "../persistence.py", "../git_objects.py", "../trace_store.py", "../providers/completion.py",
-        "../engine/executor.py", "../engine/step.py", "../app/workflow_execution.py",
+        "../engine/executor.py", "../engine/step.py", "../app/workflow_execution.py", "../improve/execution.py",
         "../knowledge_service/l1.py", "../knowledge_service/lifecycle.py", "../knowledge_service/ops.py",
         "../knowledge_service/facts.py", "../knowledge_service/pinned_claims.py"))
     files.update((root / "../providers").glob("*.py"))

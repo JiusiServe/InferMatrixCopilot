@@ -43,7 +43,7 @@ from ..knowledge_service.ops import (
 from ..knowledge_service.pinned_claims import Evidence, check_rules, evidence_for
 from .init_budget import Budget, BudgetExhausted, PriceError
 from .init_content import (
-    apply_rules, check_capacity_with_map, overflow_page, page_frontmatter as _page_frontmatter, place_rule,
+    apply_rules, page_frontmatter as _page_frontmatter, place_rule,
 )
 from .init_coverage import Owner, most_specific, owner_table, routes_file
 from .init_support import (
@@ -1006,15 +1006,6 @@ class _Stage:
                 self.record.checklist.append(note)
         return problems
 
-    def _map_inputs(self, page: str) -> tuple[list[str], list[str]]:
-        """What ``page``'s map is rendered with: its owner's signals and
-        prefixes in the routes file this stage will conclude with (head,
-        else base), or nothing when no routes name it yet."""
-        from .init_quick_maps import map_inputs
-
-        routes = f"{self.repo_dir}/{ROUTES_NAME}"
-        return map_inputs(self.head.get(routes, self.base.get(routes)), page)
-
     # -- model inputs and calls -----------------------------------------------------
     def _doc_payload(self) -> list[dict]:
         out, used = [], 0
@@ -1180,12 +1171,6 @@ class _Stage:
     def _default_page_title(self, page: str) -> str:
         return f"{self.lifecycle.repo} rules"
 
-    def _overflow_page(self, page: str, tree: Mapping[str, str]) -> str:
-        """Compatibility wrapper; the running tree does not reserve init-owned pages."""
-        sibling, title = overflow_page(page, base_paths=self.base, title=self._page_title(page))
-        self._titles.setdefault(sibling, title)
-        return sibling
-
     def _place(self, candidate: _Candidate, tree: dict[str, str]) -> dict[str, str] | None:
         """``tree`` with the candidate added; a full page moves it to a sibling
         page (as often as needed); any other refusal drops it (None)."""
@@ -1218,16 +1203,6 @@ class _Stage:
         return apply_rules(files, ops, titles=titles, tags=self.tags, today=self.today, release=self.release,
                            routes_text=self.head.get(routes, self.base.get(routes)),
                            include_quickmaps=self.route_source != "manifest")
-
-    def _check_capacity_with_map(self, work: Mapping[str, str], pages: set[str]) -> None:
-        """A rule page must stay under the format's capacity WITH the Direct
-        quick map init renders on it (one row per rule): ``apply_operations``
-        only measures the rules, so the map is counted here, and a page that
-        would overflow with it is reported as full — the same signal that
-        moves the next rule to a sibling page (``_place``)."""
-        routes = f"{self.repo_dir}/{ROUTES_NAME}"
-        check_capacity_with_map(work, pages, routes_text=self.head.get(routes, self.base.get(routes)),
-                                include_quickmaps=self.route_source != "manifest")
 
     def _write_rules(self, kept: list[_Candidate]) -> None:
         """The kept rules on their placed pages. Dropping failed rules only

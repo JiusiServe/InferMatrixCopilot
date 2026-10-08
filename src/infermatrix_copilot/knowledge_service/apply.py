@@ -5,7 +5,6 @@ from __future__ import annotations
 from ..persistence import atomic_write_bytes as _atomic_write
 
 import os
-import re
 import subprocess
 import sys
 from collections import defaultdict
@@ -21,13 +20,13 @@ from ..sdk.v1.models import (
 from . import common
 from .catalog import catalog, document_path
 from .common import (
-    KnowledgeValidatorError, _FRONTMATTER, _HEADING, _MAX_SECTION_CHARS,
-    _MAX_SOURCE_CHARS, _RULE_ID, _UPDATED, _VALIDATOR_IDS, _sha256,
+    KnowledgeValidatorError, _FRONTMATTER, _UPDATED, _VALIDATOR_IDS, _sha256,
 )
 from .proposals import (
-    _proposal_id, _repeated_section_rule_id, _rule_exists,
-    _section_rule_ids, existing_rule_ids,
+    _proposal_id, _repeated_section_rule_id,
+    _section_rule_ids, existing_rule_ids, section_error,
 )
+from .lifecycle import first_taken_rule_id
 
 
 def _updated_page(text: str, sections: list[str], updated_on: str) -> str:
@@ -114,77 +113,44 @@ def _validator_path(workspace: Path, validator_id: str) -> Path | None:
 def _run_validator(
     workspace: Path, validator_id: str, *, validator_timeout_seconds: int,
 ) -> KnowledgeValidatorResult:
-    path = _validator_path(workspace, validator_id)
-    if path is None:
-        return KnowledgeValidatorResult(
-            validator_id=validator_id,
-            passed=False,
-            status="missing",
-            returncode=None,
-            output="validator is missing or not a contained regular file",
-        )
-    try:
-        completed = subprocess.run(
-            [sys.executable, validator_id],
-            cwd=workspace,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            capture_output=True,
-            timeout=validator_timeout_seconds,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
-        return KnowledgeValidatorResult(
-            validator_id=validator_id,
-            passed=False,
-            status="timeout",
-            returncode=None,
-            output="validator timed out",
-        )
-    except OSError as exc:
-        return KnowledgeValidatorResult(
-            validator_id=validator_id,
-            passed=False,
-            status="error",
-            returncode=None,
-            output=f"validator could not run ({type(exc).__name__})",
-        )
-    output = (completed.stdout + completed.stderr).strip()
-    output = output.replace(str(workspace), "<workspace>")[-4000:]
+    code = None
+    if _validator_path(workspace, validator_id) is None:
+        status, output = "missing", "validator is missing or not a contained regular file"
+    else:
+        try:
+            completed = subprocess.run(
+                [sys.executable, validator_id], cwd=workspace,
+                text=True, encoding="utf-8", errors="replace", capture_output=True,
+                timeout=validator_timeout_seconds, check=False,
+            )
+        except subprocess.TimeoutExpired:
+            status, output = "timeout", "validator timed out"
+        except OSError as exc:
+            status, output = "error", f"validator could not run ({type(exc).__name__})"
+        else:
+            code = completed.returncode
+            status = "passed" if code == 0 else "failed"
+            output = (completed.stdout + completed.stderr).strip().replace(str(workspace), "<workspace>")[-4000:]
     return KnowledgeValidatorResult(
-        validator_id=validator_id,
-        passed=completed.returncode == 0,
-        status="passed" if completed.returncode == 0 else "failed",
-        returncode=completed.returncode,
-        output=output,
+        validator_id=validator_id, passed=status == "passed", status=status,
+        returncode=code, output=output,
     )
 
 
-def _failure(
-    *,
-    batch_id: str,
-    attempted: int,
-    document_ids: tuple[str, ...],
-    updated_on: str,
-    validators: tuple[KnowledgeValidatorResult, ...],
-    rolled_back: bool,
-    accepted_indexes: tuple[int, ...],
-    rejected_indexes: tuple[int, ...],
-) -> KnowledgeValidatorError:
-    result = KnowledgeApplyResult(
-        batch_id=batch_id,
-        success=False,
-        attempted=attempted,
-        applied=0,
-        accepted_indexes=accepted_indexes,
-        rejected_indexes=rejected_indexes,
-        updated_document_ids=document_ids,
-        updated_on=updated_on,
-        validators=validators,
-        rolled_back=rolled_back,
+def _result(validation, updated_on, *, document_ids=(), validators=(), applied=0, rolled_back=False):
+    """Project the same accepted/rejected identities for every transaction exit."""
+    return KnowledgeApplyResult(
+        batch_id=validation.batch_id, success=not any(not item.passed for item in validators),
+        attempted=len(validation.accepted) + len(validation.rejected), applied=applied,
+        accepted_indexes=tuple(item.input_index for item in validation.accepted),
+        rejected_indexes=tuple(item.index for item in validation.rejected),
+        updated_document_ids=document_ids, updated_on=updated_on,
+        validators=tuple(validators), rolled_back=rolled_back,
     )
-    failed = validators[-1]
+
+
+def _failure(result) -> KnowledgeValidatorError:
+    failed = result.validators[-1]
     return KnowledgeValidatorError(
         f"knowledge validator failed: {failed.validator_id} ({failed.status})",
         result,
@@ -199,59 +165,20 @@ def apply_proposals(
     """Append accepted sections, gate with both validators, rollback on fail."""
     applied_on = _normalize_date(updated_on)
     proposals = validation.accepted
-    accepted_indexes = tuple(proposal.input_index for proposal in proposals)
-    rejected_indexes = tuple(item.index for item in validation.rejected)
-    attempted = len(accepted_indexes) + len(rejected_indexes)
     if not proposals:
-        return KnowledgeApplyResult(
-            batch_id=validation.batch_id,
-            success=True,
-            attempted=attempted,
-            applied=0,
-            accepted_indexes=(),
-            rejected_indexes=rejected_indexes,
-            updated_document_ids=(),
-            updated_on=applied_on,
-            validators=(),
-            rolled_back=False,
-        )
+        return _result(validation, applied_on)
 
     grouped: dict[str, list[KnowledgeRuleProposal]] = defaultdict(list)
     allowed_catalog = set(catalog(workspace, validation.repository, max_catalog_pages=max_catalog_pages))
     seen_indexes: set[int] = set()
     for proposal in proposals:
-        heading = proposal.section_markdown.splitlines()[0]
-        heading_match = _HEADING.match(heading)
-        expected_proposal_id = _proposal_id(
-            batch_id=validation.batch_id,
-            repository=validation.repository,
-            input_index=proposal.input_index,
-            page=proposal.page_document_id,
-            rule_id=proposal.rule_id,
-            section=proposal.section_markdown,
-            sources=proposal.sources,
-            page_sha256=proposal.page_sha256,
-        )
         if (
             proposal.input_index < 0
             or proposal.input_index in seen_indexes
             or proposal.page_document_id not in allowed_catalog
-            or not _RULE_ID.fullmatch(proposal.rule_id)
-            or heading_match is None
-            or heading_match.group("rule") != proposal.rule_id
-            or len(re.findall(
-                r"^##\s+", proposal.section_markdown, re.MULTILINE
-            )) != 1
-            or not 80 <= len(proposal.section_markdown) <= _MAX_SECTION_CHARS
+            or section_error(proposal.rule_id, proposal.section_markdown, proposal.sources)
             or _repeated_section_rule_id(proposal.section_markdown)
-
-            or not proposal.sources
-            or len(proposal.sources) > 10
-            or any(
-                not source or len(source) > _MAX_SOURCE_CHARS
-                for source in proposal.sources
-            )
-            or proposal.proposal_id != expected_proposal_id
+            or proposal.proposal_id != _proposal_id(validation, proposal)
         ):
             raise KnowledgeCurationError(
                 "accepted proposal failed apply-time integrity validation"
@@ -267,16 +194,18 @@ def apply_proposals(
         # Re-check tree-wide under the lock, before any write; a
         # change to the target page itself is the hash check's job.
         existing_ids = existing_rule_ids(workspace, max_catalog_pages=max_catalog_pages)
+        introduced: set[str] = set()
         for proposal in proposals:
-            for heading_id in _section_rule_ids(
-                proposal.section_markdown
-            ):
-                owner = existing_ids.get(heading_id)
-                if owner is not None and owner != proposal.page_document_id:
-                    raise KnowledgeCurationError(
-                        f"rule_id {heading_id} already exists on {owner}; "
-                        "revalidate the batch against the current tree"
-                    )
+            ids = _section_rule_ids(proposal.section_markdown)
+            occupied = {rule_id: existing_ids[rule_id] for rule_id in ids
+                        if rule_id in existing_ids and existing_ids[rule_id] != proposal.page_document_id}
+            taken = first_taken_rule_id(ids, occupied, introduced)
+            if taken:
+                owner = occupied.get(taken)
+                if owner is not None:
+                    raise KnowledgeCurationError(f"rule_id {taken} already exists on {owner}; revalidate the batch against the current tree")
+                raise KnowledgeCurationError(f"proposal is no longer append-safe: {proposal.page_document_id}")
+            introduced.update(ids)
 
 
         snapshots: dict[str, bytes] = {}
@@ -293,25 +222,9 @@ def apply_proposals(
                 raise KnowledgeCurationError(
                     f"target page changed after validation: {document_id}"
                 )
-            seen_ids: set[str] = set()
-            page_text = original.decode("utf-8")
-            for proposal in proposals_for_page:
-                section_ids = _section_rule_ids(
-                    proposal.section_markdown
-                )
-                if (
-                    not _RULE_ID.fullmatch(proposal.rule_id)
-                    or any(
-                        heading_id in seen_ids
-                        or _rule_exists(page_text, heading_id)
-                        for heading_id in section_ids
-                    )
-                ):
-                    raise KnowledgeCurationError(
-                        f"proposal is no longer append-safe: {document_id}"
-                    )
-                seen_ids.update(section_ids)
-
+            if any(first_taken_rule_id(_section_rule_ids(proposal.section_markdown), existing_ids)
+                   for proposal in proposals_for_page):
+                raise KnowledgeCurationError(f"proposal is no longer append-safe: {document_id}")
             snapshots[document_id] = original
             rendered[document_id] = _updated_page(
                 original.decode("utf-8"),
@@ -325,16 +238,7 @@ def apply_proposals(
             if not (result := _run_validator_preflight(workspace, validator_id)).passed
         )
         if missing_results:
-            raise _failure(
-                batch_id=validation.batch_id,
-                attempted=attempted,
-                document_ids=document_ids,
-                updated_on=applied_on,
-                validators=missing_results,
-                rolled_back=False,
-                accepted_indexes=accepted_indexes,
-                rejected_indexes=rejected_indexes,
-            )
+            raise _failure(_result(validation, applied_on, document_ids=document_ids, validators=missing_results))
 
         try:
             for document_id in document_ids:
@@ -356,46 +260,19 @@ def apply_proposals(
             if not result.passed:
                 for document_id, original in snapshots.items():
                     _atomic_write(document_path(workspace, document_id), original)
-                raise _failure(
-                    batch_id=validation.batch_id,
-                    attempted=attempted,
-                    document_ids=document_ids,
-                    updated_on=applied_on,
-                    validators=tuple(validator_results),
-                    rolled_back=True,
-                    accepted_indexes=accepted_indexes,
-                    rejected_indexes=rejected_indexes,
-                )
+                raise _failure(_result(validation, applied_on, document_ids=document_ids,
+                                       validators=validator_results, rolled_back=True))
 
-        return KnowledgeApplyResult(
-            batch_id=validation.batch_id,
-            success=True,
-            attempted=attempted,
-            applied=len(proposals),
-            accepted_indexes=accepted_indexes,
-            rejected_indexes=rejected_indexes,
-            updated_document_ids=document_ids,
-            updated_on=applied_on,
-            validators=tuple(validator_results),
-            rolled_back=False,
-        )
+        return _result(validation, applied_on, document_ids=document_ids,
+                       applied=len(proposals), validators=validator_results)
 
 
 def _run_validator_preflight(
     workspace: Path, validator_id: str
 ) -> KnowledgeValidatorResult:
-    if _validator_path(workspace, validator_id) is None:
-        return KnowledgeValidatorResult(
-            validator_id=validator_id,
-            passed=False,
-            status="missing",
-            returncode=None,
-            output="validator is missing or not a contained regular file",
-        )
+    missing = _validator_path(workspace, validator_id) is None
     return KnowledgeValidatorResult(
-        validator_id=validator_id,
-        passed=True,
-        status="ready",
-        returncode=None,
-        output="",
+        validator_id=validator_id, passed=not missing,
+        status="missing" if missing else "ready", returncode=None,
+        output="validator is missing or not a contained regular file" if missing else "",
     )

@@ -120,6 +120,34 @@ _ATTR = re.compile(r'(?P<key>[a-z_]+)=(?:"(?P<quoted>[^"]*)"|(?P<bare>[^\s"]+))'
 FRONTMATTER = re.compile(r"\A---\r?\n(?P<body>.*?)\r?\n---(?:\r?\n|\Z)", re.DOTALL)
 CITATION = re.compile(r"\^\[(?P<ref>[^\]\n]{1,60})\]")
 
+
+def rule_heading_ids(text: str) -> tuple[str, ...]:
+    """Raw heading IDs, in order, including repeats and nested headings.
+
+    Callers decide which pages and fenced text belong to their contract.
+    """
+    return tuple(match.group("rule") for match in ANY_RULE_HEADING.finditer(text))
+
+
+def repeated_rule_id(text: str) -> str:
+    ids = rule_heading_ids(text)
+    seen: set[str] = set()
+    for rule_id in ids:
+        if rule_id in seen:
+            return rule_id
+        seen.add(rule_id)
+    return ""
+
+
+def first_taken_rule_id(ids, occupied, introduced=(), tombstoned=()) -> str:
+    """Check a whole candidate before reserving any of its rule identities."""
+    seen: set[str] = set()
+    for rule_id in ids:
+        if rule_id in occupied or rule_id in introduced or rule_id in tombstoned or rule_id in seen:
+            return rule_id
+        seen.add(rule_id)
+    return ""
+
 STATUSES = ("active", "retired")
 FOOTER_KEYS = (
     "status", "since", "retired_at", "reason", "evidence",
@@ -274,7 +302,7 @@ class Section:
 
     @property
     def nested_rule_ids(self) -> tuple[str, ...]:
-        return tuple(m.group("rule") for m in ANY_RULE_HEADING.finditer(self.text))
+        return rule_heading_ids(self.text)
 
     @property
     def citations(self) -> tuple[str, ...]:

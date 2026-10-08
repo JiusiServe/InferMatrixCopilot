@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from collections import defaultdict
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -14,39 +15,36 @@ from ..sdk.v1.models import (
 )
 from .catalog import _appended_size, catalog_entries, document_path
 from .common import (
-    _HEADING, _MAX_SECTION_CHARS, _MAX_SOURCE_CHARS, _RULE_HEADING_ID,
+    _HEADING, _MAX_SECTION_CHARS, _MAX_SOURCE_CHARS,
     _RULE_ID, _sha256,
 )
 from .prompt import validate_batch
+from .lifecycle import (
+    first_taken_rule_id, repeated_rule_id as _repeated_section_rule_id,
+    rule_heading_ids as _section_rule_ids,
+)
 
 
-def _section_rule_ids(section: str) -> tuple[str, ...]:
-    """The rule IDs every heading in a section carries, in order, the
-    declared one first: a nested ``###`` heading is a rule heading too.
-    Repeats are kept so callers can reject a section that heads one ID
-    twice (``## X-2`` over ``### X-2``, or two ``### X-3``)."""
-    return tuple(
-        match.group("rule") for match in _RULE_HEADING_ID.finditer(section)
-    )
+def section_error(rule_id: str, section: str, sources, *, allowed_sources=None) -> str:
+    """The v1 section contract, shared by preflight and locked apply.
 
-
-def _repeated_section_rule_id(section: str) -> str:
-    """The first rule ID a section heads more than once, else ''."""
-    seen: set[str] = set()
-    for heading_id in _section_rule_ids(section):
-        if heading_id in seen:
-            return heading_id
-        seen.add(heading_id)
+    This inspects supplied text without changing its bytes or synthesizing
+    lifecycle metadata. Repository scope and proposal receipts stay outside.
+    """
+    heading = _HEADING.match(section.splitlines()[0] if section else "")
+    if not _RULE_ID.fullmatch(rule_id):
+        return "rule_id has an invalid shape"
+    if heading is None or heading.group("rule") != rule_id or len(re.findall(r"^##\s+", section, re.MULTILINE)) != 1:
+        return "section must contain one matching level-two rule heading"
+    if not 80 <= len(section) <= _MAX_SECTION_CHARS:
+        return "section length is outside 80..16384 characters"
+    if not sources or len(sources) > 10 or any(not source or len(source) > _MAX_SOURCE_CHARS for source in sources):
+        return "sources must contain 1..10 bounded references"
+    if allowed_sources is not None and not set(sources).issubset(allowed_sources):
+        return "proposal cites evidence outside this batch"
+    if any(source not in section for source in sources):
+        return "every proposal source must be cited in the section"
     return ""
-
-
-def _rule_exists(page_text: str, rule_id: str) -> bool:
-
-    """Whether a heading at any level already carries this rule ID."""
-    return any(
-        match.group("rule") == rule_id
-        for match in _RULE_HEADING_ID.finditer(page_text)
-    )
 
 
 def existing_rule_ids(workspace: Path, *, max_catalog_pages: int) -> dict[str, str]:
@@ -61,31 +59,22 @@ def existing_rule_ids(workspace: Path, *, max_catalog_pages: int) -> dict[str, s
         text = document_path(workspace, entry.document_id).read_text(
             encoding="utf-8"
         )
-        for match in _RULE_HEADING_ID.finditer(text):
-            existing.setdefault(match.group("rule"), entry.document_id)
+        for rule_id in _section_rule_ids(text):
+            existing.setdefault(rule_id, entry.document_id)
     return existing
 
 
-def _proposal_id(
-    *,
-    batch_id: str,
-    repository: RepositoryRef,
-    input_index: int,
-    page: str,
-    rule_id: str,
-    section: str,
-    sources: tuple[str, ...],
-    page_sha256: str,
-) -> str:
+def _proposal_id(batch, proposal: KnowledgeRuleProposal) -> str:
+    """One canonical identity projection for initial validation and locked apply."""
     identity = json.dumps({
-        "batch_id": batch_id,
-        "repository": repository.to_dict(),
-        "input_index": input_index,
-        "page": page,
-        "rule_id": rule_id,
-        "section_markdown": section,
-        "sources": sources,
-        "page_sha256": page_sha256,
+        "batch_id": batch.batch_id,
+        "repository": batch.repository.to_dict(),
+        "input_index": proposal.input_index,
+        "page": proposal.page_document_id,
+        "rule_id": proposal.rule_id,
+        "section_markdown": proposal.section_markdown,
+        "sources": proposal.sources,
+        "page_sha256": proposal.page_sha256,
     }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return _sha256(identity.encode("utf-8"))
 
@@ -161,34 +150,11 @@ def validate_proposals(
                 rule_id = raw_rule_id.strip()
                 section = raw_section.strip()
                 sources = tuple(value.strip() for value in raw_sources)
-                heading = section.splitlines()[0] if section else ""
-                heading_match = _HEADING.match(heading)
                 if not reason and page not in catalog:
                     reason = "page is outside the repository rules catalog"
-                elif not reason and not _RULE_ID.fullmatch(rule_id):
-                    reason = "rule_id has an invalid shape"
-                elif not reason and (
-                    heading_match is None
-                    or heading_match.group("rule") != rule_id
-                    or len(re.findall(r"^##\s+", section, re.MULTILINE)) != 1
-                ):
-                    reason = "section must contain one matching level-two rule heading"
-                elif not reason and not 80 <= len(section) <= _MAX_SECTION_CHARS:
-                    reason = "section length is outside 80..16384 characters"
-                elif not reason and (
-                    not sources
-                    or len(sources) > 10
-                    or any(
-                        not source or len(source) > _MAX_SOURCE_CHARS
-                        for source in sources
-                    )
-                ):
-                    reason = "sources must contain 1..10 bounded references"
-                elif not reason and not set(sources).issubset(allowed_sources):
-                    reason = "proposal cites evidence outside this batch"
-                elif not reason and any(source not in section for source in sources):
-                    reason = "every proposal source must be cited in the section"
-                elif not reason and (page, rule_id) in seen:
+                if not reason:
+                    reason = section_error(rule_id, section, sources, allowed_sources=allowed_sources)
+                if not reason and (page, rule_id) in seen:
                     reason = "duplicate page/rule_id in proposal output"
                 elif not reason and rule_id in proposed_ids:
                     reason = (
@@ -205,24 +171,15 @@ def validate_proposals(
                     # Every rule heading the section introduces, not
                     # only the declared one: a nested heading carrying
                     # another page's ID would otherwise land unchecked.
-                    for heading_id in _section_rule_ids(section):
-
-                        owner = existing_ids.get(heading_id)
-                        nested = heading_id != rule_id
-                        if owner is None and nested and heading_id in proposed_ids:
-                            owner = proposed_ids[heading_id]
-                        if owner is None:
-                            continue
-                        if nested:
-                            reason = (
-                                f"nested rule heading {heading_id} already "
-                                f"exists on {owner}"
-                            )
+                    heading_id = first_taken_rule_id(_section_rule_ids(section), existing_ids, proposed_ids)
+                    if heading_id:
+                        owner = existing_ids.get(heading_id, proposed_ids.get(heading_id))
+                        if heading_id != rule_id:
+                            reason = f"nested rule heading {heading_id} already exists on {owner}"
                         elif owner == page:
                             reason = "rule_id already exists in the target page"
                         else:
                             reason = f"rule_id already exists on {owner}"
-                        break
 
 
 
@@ -259,24 +216,16 @@ def validate_proposals(
 
         page_data = document_path(workspace, page).read_bytes()
         page_sha256 = _sha256(page_data)
-        accepted.append(KnowledgeRuleProposal(
-            proposal_id=_proposal_id(
-                batch_id=batch.batch_id,
-                repository=batch.repository,
-                input_index=index,
-                page=page,
-                rule_id=rule_id,
-                section=section,
-                sources=sources,
-                page_sha256=page_sha256,
-            ),
+        proposal = KnowledgeRuleProposal(
+            proposal_id="",
             input_index=index,
             page_document_id=page,
             rule_id=rule_id,
             section_markdown=section,
             sources=sources,
             page_sha256=page_sha256,
-        ))
+        )
+        accepted.append(replace(proposal, proposal_id=_proposal_id(batch, proposal)))
         seen.add((page, rule_id))
         for heading_id in _section_rule_ids(section):
             proposed_ids.setdefault(heading_id, page)

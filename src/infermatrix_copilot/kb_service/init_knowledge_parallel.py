@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..knowledge_service.pinned_claims import Evidence, check_evidence
 from .init_support import InitError, InitRecord
 from .models import ModelGateway, ModelUnavailable
+from .evidence_bundle import merge_ranges
 
 
 def _hash(value):
@@ -117,12 +118,6 @@ def related_test_sources(stage, paths, limit=20_000):
         if not ranges:
             continue
         spans = [(n, min(len(lines), n + 20)) for n in imports] + ranges
-        merged = []
-        for start, end in sorted(spans):
-            if merged and start <= merged[-1][1] + 1:
-                merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
-            else:
-                merged.append((start, end))
         test_name = posixpath.basename(path).rsplit(".", 1)[0]
         test_name = re.sub(r"^test_|(?:_test|\.test|\.spec)$", "", test_name)
         # Broad entry modules can match many unrelated tests. Rank before the
@@ -131,7 +126,7 @@ def related_test_sources(stage, paths, limit=20_000):
         related_name = any(len(name) >= 5 and (name in test_name or test_name in name)
                            for name in basenames if len(test_name) >= 5)
         specificity = max((len(module.split(".")) for module in matched_modules), default=0)
-        candidates.append(((exact, related_name, specificity), path, entry, merged))
+        candidates.append(((exact, related_name, specificity), path, entry, merge_ranges(spans)))
     for _, path, entry, merged in sorted(candidates, key=lambda row: (tuple(-int(n) for n in row[0]), row[1])):
         lines = entry["lines"]
         for start, end in merged:

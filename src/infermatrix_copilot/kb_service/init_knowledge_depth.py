@@ -496,16 +496,12 @@ class _KnowledgeDepth(_Knowledge):
     def _judge_evidence(self, entries: list[Evidence]) -> list[dict]:
         # Supply every attested line, without the rule judge's 8KB truncation.
         # Merge overlaps so seven facets do not repeat the same large excerpt.
+        from .evidence_bundle import merge_ranges
+
         out = []
         for path in dict.fromkeys(e.path for e in entries):
-            spans = []
-            for start, end in sorted((e.start, e.end) for e in entries if e.path == path):
-                if spans and start <= spans[-1][1] + 1:
-                    spans[-1] = (spans[-1][0], max(end, spans[-1][1]))
-                else:
-                    spans.append((start, end))
             lines = (self.observer.file_text(self.record.pin, path) or "").splitlines()
-            for start, end in spans:
+            for start, end in merge_ranges((e.start, e.end) for e in entries if e.path == path):
                 out.append({"source_reference": f"{self.lifecycle.full_name}@{self.record.pin}:"
                                                  f"{path}:L{start}-L{end}",
                             "kind": "upstream_text", "text": [f"{n}: {lines[n - 1]}" for n in range(start, end + 1)]})

@@ -1,6 +1,6 @@
 # knowledge_service/lifecycle.py —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-08 -->
 
 深度区块的固定源码身份支持完整 SHA-1 或 SHA-256；旧区块正文、哈希及证明语义保持不变。
 
@@ -15,6 +15,10 @@
 reason、evidence、supersedes、superseded_by、protected）；无尾注即 active。
 
 ## 公开契约
+
+`rule_heading_ids` 扫描原始标题 ID（含嵌套与重复），`repeated_rule_id` 找首个重复；
+`first_taken_rule_id` 对整个候选检查已有、同期新增和墓碑 ID，不做部分预占。
+v1 append 与 ops 共用这些纯函数；ops 在全树扫描前保留原围栏过滤，v1 保留原始文本扫描。
 
 `DEPTH_FACETS`、`DEPTH_BLOCK` 和 `depth_sections` 是 init/audit 与检索共享的深读数据格式。
 后者只返回正文哈希完整、facet 唯一且 proof evidence 形状合法的段落，隐藏 proof 注释，

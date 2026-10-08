@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import re
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from typing import Any, Callable
 
@@ -183,18 +184,6 @@ class ModelGateway:
                    validate: Callable[[dict], None] | None = None,
                    max_budget_usd: float | None = None, record_payload: bool = True,
                    fallback_from: str = "") -> ModelReply:
-        kwargs = dict(system=system, prompt=prompt, validate=validate,
-                      max_budget_usd=max_budget_usd, record_payload=record_payload,
-                      fallback_from=fallback_from)
-        if self._dispatch is None:
-            return self._call_json_native(role, **kwargs)
-        with self._dispatch.slot():
-            return self._call_json_native(role, **kwargs)
-
-    def _call_json_native(self, role: ModelRole, *, system: str, prompt: str,
-                          validate: Callable[[dict], None] | None = None,
-                          max_budget_usd: float | None = None, record_payload: bool = True,
-                          fallback_from: str = "") -> ModelReply:
         from ..providers.completion import complete_native
 
         identity = {"role": role.name, "requested": role.label(), "provider": role.provider,
@@ -225,21 +214,21 @@ class ModelGateway:
                 except Exception as exc:
                     raise ModelUnavailable(f"{role.label()} reply failed its schema: {exc!r}",
                                            allow_fallback=False) from exc
-            return data
+            return data, text
 
         request = {"system": system, "messages": [{"role": "user", "content": prompt}],
                    "model": role.model, "effort": role.effort, "role": role.name}
         if max_budget_usd is not None:
             request["max_budget_usd"] = max_budget_usd
-        reply, data, record, receipt = complete_native(
-            transport, request=request, identity=identity,
-            payload={"system": system, "prompt": prompt}, recorder=self._recorder,
-            validate=validate_reply, record_payload=record_payload, pacer=pacer,
-            stop_file=getattr(self._zcode_pacer, "stop_file", None),
-            cancelled_errors=cancelled_errors, passthrough_errors=(ModelUnavailable,),
-            make_error=lambda message, fallback: ModelUnavailable(message, allow_fallback=fallback),
-        )
-        text = "".join(getattr(block, "text", "") or "" for block in getattr(reply, "blocks", []))
+        with self._dispatch.slot() if self._dispatch is not None else nullcontext():
+            _, (data, text), record, receipt = complete_native(
+                transport, request=request, identity=identity,
+                payload={"system": system, "prompt": prompt}, recorder=self._recorder,
+                validate=validate_reply, record_payload=record_payload, pacer=pacer,
+                stop_file=getattr(self._zcode_pacer, "stop_file", None),
+                cancelled_errors=cancelled_errors, passthrough_errors=(ModelUnavailable,),
+                make_error=lambda message, fallback: ModelUnavailable(message, allow_fallback=fallback),
+            )
         return ModelReply(role, data, text, record["served_model"], record["usage"],
                           record["seconds"], record["cost_usd"], receipt.get("id", ""),
                           receipt.get("outputs", {}).get("reply", "").removeprefix("sha256:"))

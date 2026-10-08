@@ -14,13 +14,6 @@ from ..sdk.v1.models import (
 
 _RULE_ID: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{1,40}")
 _HEADING: Final = re.compile(r"^##\s+(?P<rule>[A-Za-z0-9][A-Za-z0-9-]{1,40})\s+[—-]\s+\S")
-# Any rule heading on a page, by ID, at any heading level (owner pages
-# nest some rules under ``###``): the tree-wide uniqueness scan.
-_RULE_HEADING_ID: Final = re.compile(
-    r"^#{2,6}\s+(?P<rule>[A-Za-z0-9][A-Za-z0-9-]{1,40})(?=\s|$)", re.MULTILINE
-)
-
-
 _FRONTMATTER: Final = re.compile(
     r"\A---(?P<open>\r?\n)(?P<body>.*?)(?P<close>\r?\n)---(?P<after>\r?\n|\Z)",
     re.DOTALL,

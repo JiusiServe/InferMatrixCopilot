@@ -24,14 +24,16 @@ fixed validators and byte-exact rollback. `common` contains shared syntax,
 bounds, hashes, errors and lock capability.
 
 Workspace, limits and locks are explicit function inputs, not inherited shared
-attributes. The public curator signatures, proposal identities and byte-exact
-results remain unchanged. Successful SDK application is a local candidate,
+attributes. Existing public curator signatures, proposal identities and byte-exact
+results remain unchanged. The additive `curate` purpose entry uses the shared
+bounded attempt driver and read-only JSON session; its host supplies evidence,
+trusted backend settings and budget binding. Successful SDK application is a local candidate,
 not an independent semantic admission or publication. See
 [knowledge lifecycle layers](../knowledge-lifecycle.md).
 
-No component imports a CLI/MCP transport or ReviewBot, calls a model, clones,
-pushes, or publishes. The host owns evidence collection, model calls, retries,
-local commits and proposal export. The public `sdk.v1.knowledge` module only
+No component imports ReviewBot, clones, commits, pushes, or publishes. Curation
+owns only generation and bounded proposal/validator repairs inside an explicit
+checkout; the host owns scheduling, evidence, budgets and publication. The public `sdk.v1.knowledge` module only
 re-exports the curator and validator error. Existing proposal IDs, errors,
 wire projections, validator order and rollback behavior are compatibility
 contracts across the move.

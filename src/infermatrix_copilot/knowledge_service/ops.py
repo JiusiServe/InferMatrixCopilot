@@ -34,7 +34,8 @@ from typing import Iterable, Mapping
 import yaml
 
 from .lifecycle import (
-    ANY_RULE_HEADING, RETIRE_REASONS, Footer, LifecycleError, Page, Section, expected_sources,
+    RETIRE_REASONS, Footer, LifecycleError, Page, Section, expected_sources,
+    first_taken_rule_id, rule_heading_ids,
 )
 
 KNOWLEDGE_OPS_API_VERSION = "2.0.0"
@@ -160,8 +161,8 @@ def all_rule_ids(files: Mapping[str, str]) -> dict[str, int]:
     for path, text in files.items():
         if not path.endswith(".md"):
             continue
-        for match in ANY_RULE_HEADING.finditer(_without_fences(text)):
-            counts[match.group("rule")] = counts.get(match.group("rule"), 0) + 1
+        for rule_id in rule_heading_ids(_without_fences(text)):
+            counts[rule_id] = counts.get(rule_id, 0) + 1
     return counts
 
 
@@ -275,13 +276,6 @@ def apply_operations(
         touched_pages.setdefault(path, page.sources() if path not in created else [])
         return page
 
-    def fresh_id(rule_id: str) -> None:
-        if rule_id in original_ids or rule_id in added_ids:
-            raise LifecycleError(f"rule ID already exists in the tree: {rule_id}")
-        if rule_id in tombstoned:
-            raise LifecycleError(f"rule ID was purged and is reserved forever: {rule_id}")
-        added_ids.add(rule_id)
-
     def active(page: Page, rule_id: str, op: KnowledgeOperation) -> Section:
         section = page.rule(rule_id)
         footer = section.footer
@@ -293,10 +287,12 @@ def apply_operations(
 
     def fresh_section(markdown: str, rule_id: str) -> Section:
         section = _check_section(markdown, rule_id)
-        fresh_id(rule_id)
-        for nested in section.nested_rule_ids:
-            if nested != rule_id:
-                fresh_id(nested)
+        ids = (rule_id, *(nested for nested in section.nested_rule_ids if nested != rule_id))
+        taken = first_taken_rule_id(ids, original_ids, added_ids, tombstoned)
+        if taken:
+            reason = "was purged and is reserved forever" if taken in tombstoned else "already exists in the tree"
+            raise LifecycleError(f"rule ID {reason}: {taken}")
+        added_ids.update(ids)
         return section
 
     def retire(page: Page, old: Section, op: KnowledgeOperation, reason: str, successor: str = "") -> None:
