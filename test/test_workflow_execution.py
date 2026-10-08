@@ -30,6 +30,24 @@ def test_embedded_execution_uses_default_retry_bound_without_full_app_settings(t
     assert result.status == "done" and len(visits) == 1
 
 
+def test_current_authority_is_checked_before_cached_success(settings, tmp_path):
+    registry, visits = StepRegistry(), []
+
+    async def handler(ctx):
+        visits.append(True)
+        return StepResult(True)
+
+    registry.register(StepSpec("publish", "script", "push", handler))
+    plan = workflow("publish")
+    first = asyncio.run(WorkflowExecution(settings, registry).execute(plan, run_dir=tmp_path, state={}))
+    assert first.status == "done" and len(visits) == 1
+    state = {}
+    shadow = settings.model_copy(update={"improve_shadow": True})
+    resumed = asyncio.run(WorkflowExecution(shadow, registry).execute(plan, run_dir=tmp_path, state=state))
+    assert resumed.status == "blocked" and state["shadow_violation"]
+    assert len(visits) == 1
+
+
 def test_runtime_is_per_execution_and_never_checkpointed(settings, tmp_path):
     registry = StepRegistry()
     seen = []

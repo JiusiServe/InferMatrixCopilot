@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from .models import InvalidRequestError
+from .models import InvalidRequestError, ResultDecodeError
 
 
 def validate_carried(rows):
@@ -55,3 +55,68 @@ def checked_rechecks(carried, records, head_sha):
     answered = {row["finding_id"] for row in safe}
     missing.extend("missing finding recheck: " + identity for identity in sorted(expected - answered))
     return safe, missing
+
+
+# Dispositions the provider uses for a candidate it decided NOT to raise.
+# `over_budget` is deliberately absent: that candidate was publishable and
+# lost a slot to the comment budget, which is not a review decision.
+WITHHELD_DISPOSITIONS = frozenset({
+    "excluded", "duplicate", "resolved", "no_issue",
+})
+
+
+def _anchor_of(comment: dict) -> str:
+    """`file:line`, matching how the provider anchors its own records.
+
+    Only file-bearing comments are anchored here. The provider renders a
+    fileless finding as `general` or `PR description`, which several findings
+    can share, so an anchor match there would not identify one finding; those
+    are left to the provider's own finalization rather than guessed at.
+    """
+    file = str(comment.get("file") or "").strip()
+    if not file or file == "?":
+        return ""
+    line = comment.get("line")
+    return f"{file}:{line if line is not None else '?'}"
+
+
+def check_disposition_proof(comments: list, dispositions: object) -> None:
+    """Publish nothing the review itself decided not to raise.
+
+    The provider applies its own selection before answering, so this is the
+    second lock, not the first: it catches a result whose published list
+    disagrees with the finalized set it shipped alongside — the shape of
+    JiusiServe/InferMatrixCopilot#141, where a request the summary said to
+    drop was published inline anyway.
+
+    An older provider sends no dispositions and is published unchanged. An
+    anchor recorded BOTH ways is not a contradiction (two findings can share
+    one), so only anchors recorded exclusively as withheld refuse.
+    """
+    if not isinstance(dispositions, list) or not dispositions:
+        return
+    withheld: set[str] = set()
+    published: set[str] = set()
+    for record in dispositions:
+        if not isinstance(record, dict):
+            continue
+        anchor = str(record.get("anchor") or "")
+        if not anchor:
+            continue
+        if str(record.get("disposition") or "") in WITHHELD_DISPOSITIONS:
+            withheld.add(anchor)
+        else:
+            published.add(anchor)
+    refused = withheld - published
+    if not refused:
+        return
+    for comment in comments:
+        if not isinstance(comment, dict):
+            continue
+        anchor = _anchor_of(comment)
+        if anchor and anchor in refused:
+            raise ResultDecodeError(
+                f"result publishes {anchor}, which its own finalized set "
+                f"withheld; refusing to publish a review that contradicts "
+                f"itself"
+            )

@@ -51,8 +51,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", default="f17d8022")
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--bot-root", type=Path)
+    parser.add_argument("--bot-baseline", default="97afeca")
     args = parser.parse_args()
-    report = json.dumps(measure(Path(__file__).resolve().parents[1], args.baseline), ensure_ascii=False, indent=2) + "\n"
+    result = measure(Path(__file__).resolve().parents[1], args.baseline)
+    if args.bot_root:
+        bot_root = args.bot_root.resolve()
+        archive = subprocess.check_output(["git", "archive", args.bot_baseline, "src/omni_reviewbot"], cwd=bot_root)
+        with tarfile.open(fileobj=io.BytesIO(archive)) as source:
+            before = counts((entry.name, source.extractfile(entry).read()) for entry in source
+                            if entry.isfile() and entry.name.endswith((".py", ".yaml", ".yml", ".json")))["provider"]
+        after = counts((path.relative_to(bot_root).as_posix(), path.read_bytes())
+                       for path in sorted((bot_root / "src/omni_reviewbot").rglob("*"))
+                       if path.is_file() and path.suffix in (".py", ".yaml", ".yml", ".json"))["provider"]
+        result["bot"] = {"baseline": subprocess.check_output(["git", "rev-parse", args.bot_baseline], cwd=bot_root, text=True).strip(),
+                         "scope": "all bot production Python and runtime YAML/JSON under src; excludes tests, docs and scripts",
+                         "before": before, "after": after,
+                         "delta": {key: after[key] - before[key] for key in before}}
+        result["net_reduction_met"] &= all(result["bot"]["delta"][key] < 0 for key in ("lines", "statements"))
+    report = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(report)

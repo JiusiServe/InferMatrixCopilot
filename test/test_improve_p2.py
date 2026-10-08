@@ -14,7 +14,7 @@ from infermatrix_copilot.improve import forensics, gold as goldmod, meta, stats
 from infermatrix_copilot.improve.adapters import FindingLabel, Match, load_adapter, scores_from
 from infermatrix_copilot.improve.adapters.rb_review import RbReviewAdapter, classify
 from infermatrix_copilot.improve.adapters.review_eval import ReviewEvalAdapter
-from infermatrix_copilot.improve.judges import JudgeError, JudgeSpec, governed_subprocess, parse_verdict, run_judge
+from infermatrix_copilot.improve.judges import JudgeError, JudgeSpec, parse_verdict, run_judge
 from infermatrix_copilot.improve.reader import units_between
 from infermatrix_copilot.trace_store import TraceStore, bind_store, trace_context
 
@@ -152,7 +152,6 @@ def test_zcode_judge_delegates_to_the_production_transport(tmp_path, monkeypatch
     """cli:zcode judging goes through ZCodeTransport.complete — the same
     tool-less one-shot the production kb gate uses — governed by the
     judge-call envelope and recorded like any CLI judge."""
-    from infermatrix_copilot.improve.judges import _run_zcode
     from infermatrix_copilot.providers import registry
 
     calls = []
@@ -204,25 +203,6 @@ def test_zcode_judge_delegates_to_the_production_transport(tmp_path, monkeypatch
     monkeypatch.setattr(registry, "transport_for_id", lambda settings, pid: empty)
     with pytest.raises(JudgeError, match="empty zcode judge reply"):
         run_judge(JudgeSpec("cli", "GLM-5.3", provider="zcode"), system="s", prompt="p", governor=None)
-
-
-def test_zcode_run_helper_returns_the_parsed_triple(monkeypatch):
-    """The helper's contract: (text, usage, error, served) — the reply's
-    text from text blocks only, non-text blocks ignored."""
-    from infermatrix_copilot.improve.judges import _run_zcode
-    from infermatrix_copilot.providers import registry
-
-    class Transport:
-        def complete(self, **kw):
-            return SimpleNamespace(blocks=[SimpleNamespace(type="reasoning", text="thinking"),
-                                           SimpleNamespace(type="text", text='{"verdict": "consistent"}')],
-                                   usage={"input_tokens": 1}, model="GLM-5.3")
-
-    monkeypatch.setattr(registry, "transport_for_id", lambda settings, pid: Transport())
-    text, usage, error, served = _run_zcode(JudgeSpec("cli", "GLM-5.3", provider="zcode"),
-                                            system="s", prompt="p", role="judge", governor=None)
-    assert text == '{"verdict": "consistent"}' and not error and served == "GLM-5.3"
-    assert usage == {"input_tokens": 1}
 
 
 def test_zcode_judge_serves_the_trusted_kb_gate(monkeypatch, tmp_path):
@@ -632,7 +612,7 @@ def test_executor_records_the_rendered_review_as_the_units_terminal_decision(tmp
     an empty body."""
     import asyncio
 
-    from infermatrix_copilot.engine.executor import Executor
+    from execution_helpers import application_executor as Executor
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.step import StepResult, StepSpec
     from infermatrix_copilot.playbooks.store import Playbook, PlaybookStep

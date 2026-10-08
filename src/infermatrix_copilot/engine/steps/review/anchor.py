@@ -66,6 +66,8 @@ class FileIndex:
     right: list[list[tuple[int, str]]] = field(default_factory=list)
     old: list[list[tuple[str, bool]]] = field(default_factory=list)
     state: str = "no_clipping_detected"
+    starts: list[int] = field(default_factory=list)
+    added: list[tuple[int, str]] = field(default_factory=list)
 
 
 def diff_index(diff: str) -> dict[str, FileIndex]:
@@ -74,6 +76,7 @@ def diff_index(diff: str) -> dict[str, FileIndex]:
     path = ""
     new_line: int | None = None
     hunk_path = ""
+    start_new = 0
     declared_new = seen_new = declared_old = seen_old = 0
     seg_right: list[tuple[int, str]] = []
     seg_old: list[tuple[str, bool]] = []
@@ -85,6 +88,7 @@ def diff_index(diff: str) -> dict[str, FileIndex]:
             entry = files.setdefault(hunk_path, FileIndex())
             entry.right.append(seg_right)
             entry.old.append(seg_old)
+            entry.starts.append(start_new)
             if seen_new < declared_new or seen_old < declared_old:
                 entry.state = "incomplete"
         hunk_path = ""
@@ -104,12 +108,15 @@ def diff_index(diff: str) -> dict[str, FileIndex]:
         elif raw.startswith("@@"):
             close_hunk()
             match = _HUNK.match(raw)
-            if match and path:
-                new_line = int(match.group(2))
+            hint = re.search(r"\+(\d+)", raw)
+            if path and hint:
+                new_line = start_new = int(hint.group(1))
                 # an absent count means 1 line, per the unified-diff grammar
-                declared_old = int(match.group(1)) if match.group(1) is not None else 1
-                declared_new = int(match.group(3)) if match.group(3) is not None else 1
+                declared_old = (int(match.group(1)) if match.group(1) is not None else 1) if match else 0
+                declared_new = (int(match.group(3)) if match.group(3) is not None else 1) if match else 0
                 hunk_path, seen_new, seen_old = path, 0, 0
+                if not match:
+                    files[path].state = "incomplete"  # heuristic region only, never an anchor proof
             else:
                 new_line = None
         elif path and new_line is not None:
@@ -125,6 +132,8 @@ def diff_index(diff: str) -> dict[str, FileIndex]:
                 seg_old.append((content, True))
                 seen_old += 1
             else:
+                if marker == "+":
+                    files[path].added.append((new_line, content))
                 seg_right.append((new_line, content))
                 new_line += 1
                 seen_new += 1

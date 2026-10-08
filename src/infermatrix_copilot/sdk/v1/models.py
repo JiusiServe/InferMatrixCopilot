@@ -311,6 +311,20 @@ class StrictReviewRequest(_Serializable):
 
 
 @dataclass(frozen=True)
+class DirectReviewRunRequest(_Serializable):
+    """Frozen business input and explicit read-only model profile for one run."""
+
+    review: DirectReviewRequest
+    repo_path: str
+    idempotency_key: str
+    prompt: str
+    output_schema: dict[str, Any]
+    profile: dict[str, Any]
+    resource_revision: str = ""
+    business_context: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class StrictRunHandle(_Serializable):
     run_id: str
     created: bool
@@ -328,6 +342,14 @@ class StrictRuntimeConfig(_Serializable):
     # Runs this host executes at once; reported back as `max_strict_workers`.
     max_workers: int = 1
     knowledge_maintenance: dict[str, Any] = field(default_factory=dict)
+    # Deployment-owned transport profiles; repository/request data cannot register commands.
+    direct_profiles: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        result = super().to_dict()
+        if not self.direct_profiles:
+            result.pop("direct_profiles")
+        return result
 
     def __post_init__(self) -> None:
         if not self.repository.alias:
@@ -361,6 +383,18 @@ class StrictReviewResult(_Serializable):
     recheck_missing: tuple[str, ...]
     stale: bool
     diagnostics: dict[str, Any]
+    finding_dispositions: tuple[dict[str, Any], ...] = ()
+    expected_head_sha: str = ""
+    actual_head_sha: str = ""
+    direct_result: dict[str, Any] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        result = super().to_dict()
+        for name, default in (("finding_dispositions", ()), ("expected_head_sha", ""),
+                              ("actual_head_sha", ""), ("direct_result", None)):
+            if result[name] == default:
+                result.pop(name)
+        return result
 
 
 @dataclass(frozen=True)
@@ -369,6 +403,12 @@ class StrictPollResult(_Serializable):
     state: str
     payload: dict[str, Any]
     review: StrictReviewResult | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        result = super().to_dict()
+        if self.review is not None:
+            result["review"] = self.review.to_dict()
+        return result
 
     @property
     def terminal(self) -> bool:
@@ -413,3 +453,32 @@ class QualityPollResult(_Serializable):
     @property
     def terminal(self) -> bool:
         return self.state not in {"queued", "planning", "running"}
+
+
+ReviewRunHandle = StrictRunHandle
+ReviewRuntimeConfig = StrictRuntimeConfig
+ReviewPollResult = StrictPollResult
+
+
+@dataclass(frozen=True)
+class ReviewFinding(_Serializable):
+    severity: str
+    title: str
+    body: str
+    path: str
+    line: int | None = None
+
+
+@dataclass(frozen=True)
+class ReviewResult(_Serializable):
+    reviewed_head_sha: str
+    summary: str
+    findings: tuple[ReviewFinding, ...]
+    subtraction_signal: str
+    review_checks: dict[str, str]
+    subtraction: tuple[dict[str, str], ...] = ()
+    minimality_proof: dict[str, Any] | None = None
+    existing_feedback_status: str = "not_applicable"
+    finding_dispositions: tuple[dict[str, str], ...] = ()
+    finding_rechecks: tuple[dict[str, str], ...] = ()
+    review_complete: bool = True

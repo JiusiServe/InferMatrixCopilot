@@ -372,7 +372,7 @@ def test_publish_step_is_double_gated_and_hold_pauses_only_publication(tmp_path,
     out = asyncio.run(steps._publish(ctx(with_outbox.model_copy(update={"allow_post": True}), True)))
     assert out.ok and out.outputs["state_updates"]["improve_publish"]["held"] == {"pr-review.agent.review_diff": "maintainer: hold"}
     # rule 1: in a shadow run the executor refuses the push step before it runs
-    from infermatrix_copilot.engine.executor import Executor
+    from execution_helpers import application_executor as Executor
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.steps import register_builtin_steps
     from infermatrix_copilot.playbooks.store import PlaybookStore
@@ -618,7 +618,7 @@ def test_the_real_entry_accepts_the_shadow_childs_repo_alias(tmp_path):
 
 
 def test_meta_mode_runs_the_forensics_step_as_the_engines_own_unit(tmp_path, settings):
-    from infermatrix_copilot.engine.executor import Executor
+    from execution_helpers import application_executor as Executor
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.steps import register_builtin_steps
     from infermatrix_copilot.llm import Block, Reply

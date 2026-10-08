@@ -170,15 +170,8 @@ def _uncovered_hunks(diff: str, output: dict) -> list[str]:
     where test-integrity findings hide. Returns `path:start` entries."""
     import re as _re
 
-    regions: dict[str, list[int]] = {}
-    current = None
-    for line in str(diff or "").splitlines():
-        if line.startswith("+++ b/"):
-            current = line[6:]
-        elif line.startswith("@@") and current:
-            m = _re.search(r"\+(\d+)", line)
-            if m:
-                regions.setdefault(current, []).append(int(m.group(1)))
+    from .anchor import diff_index
+    regions = {path: entry.starts for path, entry in diff_index(diff).items() if entry.starts}
     comments = output.get("review_comments") or []
     cited: dict[str, list[int]] = {}
     for f in output.get("findings") or []:

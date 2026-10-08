@@ -1160,7 +1160,7 @@ def test_dir_fsync_swallow_is_scoped_to_unsupported(settings, trace, tmp_path,
     from infermatrix_copilot.engine.executor import Executor
     from infermatrix_copilot.engine.registry import StepRegistry
     ex = Executor(StepRegistry(), settings, run_dir=tmp_path / "r", trace=trace)
-    import infermatrix_copilot.engine.executor as exmod
+    import infermatrix_copilot.persistence as exmod
     real_open = exmod.os.open
 
     def raising_open(path, flags, *a, **k):

@@ -155,7 +155,7 @@ def test_shadow_env_is_an_allowlist_with_a_one_off_path(tmp_path, monkeypatch):
 # -- layer 2: the executor refuses non-read steps ------------------------------------
 
 def test_executor_refuses_non_read_steps_under_shadow(tmp_path, settings):
-    from infermatrix_copilot.engine.executor import Executor
+    from execution_helpers import application_executor as Executor
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.step import StepResult, StepSpec
     from infermatrix_copilot.playbooks.store import Playbook, PlaybookStep

@@ -104,13 +104,16 @@ def _locked_update(run_dir: str | Path,
 
 # ── writers ───────────────────────────────────────────────────────────────────
 def init_queued(run_dir: str | Path, *, run_id: str, owner_server_id: str,
-                owner_server_pid: int) -> dict:
+                owner_server_pid: int, request_fingerprint: str = "",
+                execution_mode: str = "") -> dict:
     """Server-side initial write (before the child exists): `queued` + the
     ownership stamps used later for reconciliation. `child_pid` starts null."""
     return _locked_update(run_dir, lambda _cur: {
         "run_id": run_id, "state": QUEUED,
         "owner_server_id": owner_server_id, "owner_server_pid": int(owner_server_pid),
         "child_pid": None, "note": "",
+        **({"request_fingerprint": request_fingerprint, "execution_mode": execution_mode}
+           if request_fingerprint else {}),
     })  # type: ignore[return-value]
 
 

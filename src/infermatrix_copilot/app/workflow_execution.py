@@ -57,12 +57,16 @@ class WorkflowExecution:
                 return RunOutcome("blocked", blocked_reason=str(exc))
         try:
             trace = trace if trace is not None else RunTrace(run_dir / "run_trace.jsonl")
-            executor = Executor(
-                self.registry, self.settings, run_dir=run_dir, trace=trace,
-                llm=llm, notifier=notifier, runtime=runtime,
-                fingerprint=fingerprint, validate_cached=validate_cached,
-            )
-            return await run_guarded(executor.run(playbook, state), run_dir)
+            from ..improve.execution import bind_execution
+
+            with bind_execution(self.settings, self.registry) as (registry, context_for, authorize):
+                executor = Executor(
+                    registry, self.settings, run_dir=run_dir, trace=trace,
+                    llm=llm, notifier=notifier, runtime=runtime,
+                    fingerprint=fingerprint, validate_cached=validate_cached,
+                    context_for=context_for, authorize=authorize,
+                )
+                return await run_guarded(executor.run(playbook, state), run_dir)
         finally:
             if held_lock is None:
                 lock.release()
