@@ -224,6 +224,10 @@ def collect_consumer_updates(rt, store=None, *, limit=100):
     directory = _directory(rt)
     if directory is None:
         return {"accepted":0,"rejected":0,"usage":0}
+    # Create/validate the authority before a child mkdir can inherit the umask.
+    # Release this lock before ACK import, which may lock the authority again.
+    with state_lock(directory):
+        pass
     with state_lock(directory/"consumer-import"):
         _assert_runtime_lease(rt)
         return _collect_consumer_updates(rt,store=store,limit=limit)
