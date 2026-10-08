@@ -66,6 +66,8 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   字节摘要及协议版本均须匹配；高水位/签发登记/协议 latch 放在 shared state，rollback 不清除。
   installer 与最终 review publication 共锁；Direct 区分 retrieved/injected，Strict 保留 provider
   receipt。失效上下文 held 并保留原 verdict 供复核，不剥离已消费断言，不发布 GitHub review。
+  首次导入 consumer 更新时先独立初始化并验证 authority 根目录（0700），再获取子目录锁；
+  已存在的组/其他用户可写根目录拒绝使用，不自动修复权限。
 
 操作、证据格式及默认关闭的部署步骤见 [nightly maintenance](../knowledge-maintenance.md)。
 测试：`test_kb_maintenance_store.py`、`test_kb_maintenance_flow.py`、`test_kb_maintenance_commands.py`。
