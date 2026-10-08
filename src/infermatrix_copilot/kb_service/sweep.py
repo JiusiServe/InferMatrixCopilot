@@ -90,22 +90,33 @@ class UpstreamRepo:
 
 # -- trigger ---------------------------------------------------------------------
 
-def detect_release(rt, lifecycle, upstream: UpstreamRepo) -> dict | None:
+def detect_release(rt, lifecycle, upstream: UpstreamRepo, *, observation: dict | None = None) -> dict | None:
     """The sweep to run now, or None. The first release seen only records the
-    baseline (there is nothing to compare it with)."""
+    baseline (there is nothing to compare it with).
+
+    ``observation`` optionally receives this call's release lookup evidence;
+    resuming saved work is not a fresh observation of the upstream release.
+    """
+    observation = observation if observation is not None else {}
+    observation.clear()
+    observation.update(status="disabled", tag="")
     release = lifecycle.release
+    unfinished = rt.ledger.get_cursor(lifecycle.repo, "sweep_progress")
+    if unfinished:
+        tag_, from_, to_ = json.loads(unfinished)["key"]
+        observation["status"] = "resuming_prior_sweep"
+        return {"tag": tag_, "from_sha": from_, "to_sha": to_,
+                "reason": "fallback" if from_ == to_ else "release"}
     tag = ""
     if release.trigger == "github_release":
         latest = rt.github.latest_release(lifecycle.full_name)
         tag = latest["tag"] if latest else ""
+        observation["status"] = "observed" if tag else "missing_release"
     elif release.trigger == "tag_pattern":
         tags = rt.github.tags(lifecycle.full_name, release.tag_pattern)
         tag = tags[0] if tags else ""
-    unfinished = rt.ledger.get_cursor(lifecycle.repo, "sweep_progress")
-    if unfinished:
-        tag_, from_, to_ = json.loads(unfinished)["key"]
-        return {"tag": tag_, "from_sha": from_, "to_sha": to_,
-                "reason": "fallback" if from_ == to_ else "release"}
+        observation["status"] = "observed" if tag else "missing_matching_tag"
+    observation["tag"] = tag
     baseline_tag = rt.ledger.get_cursor(lifecycle.repo, "release") or ""
     baseline_sha = rt.ledger.get_cursor(lifecycle.repo, "sweep_baseline") or ""
     last = float(rt.ledger.get_cursor(lifecycle.repo, "last_sweep_at") or 0)

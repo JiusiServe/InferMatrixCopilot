@@ -76,6 +76,13 @@ class DocumentPage(_Serializable):
     offset: int
     content: str
     next_offset: int | None
+    review_context_id: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        result = super().to_dict()
+        if not self.review_context_id:
+            result.pop("review_context_id")
+        return result
 
 
 @dataclass(frozen=True)

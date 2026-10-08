@@ -106,6 +106,9 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   T2/T3 按规则页让生成器对照发版 diff 逐条给出 keep/edit/replace/retire；purge；全局熔断强制 human。
 - `scheduler`（`kb serve`）：终身持有租约；每 tick 重签控制记录、处理回执、按仓库
   advance/intake/sweep（仓库间隔离）、main 变化即激活；24 小时内 2 个知识 PR 被人关闭 → 暂停该仓库。
+- `detect_release` 的可选 observation 输出只记录本次真实 release/tag 查询；缺少 release/tag、
+  关闭 observer 或恢复旧 sweep 均保持 `not_observed`，不能用缓存基线推断当天 `no_code_update`。
+  scheduler 分别记录观察状态、实际观察 tag 与基线比较，语义审计覆盖不由该状态替代。
 - CLI：`kb serve [--once]`、`kb activate`、`kb rollback --to SHA`；`kb pause`/`kb resume` 只改代际与暂停状态。
 - 每个变更集记录其待回执的 outbox 项（`pending_item`）：未过期时不重复签发；回执只作用于与之匹配的项和
   对应的前置状态，迟到的重复项回执不改变状态。

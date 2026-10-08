@@ -393,10 +393,11 @@ class RunService:
             # EFFECTIVE knowledge_dir (a deployment may configure its own), and
             # KNOWLEDGE_ROOT is cleared at launch, so a relaunch under a newly
             # configured root cannot review with a snapshot while reporting this
-            configured = Path(self.settings.knowledge_dir).resolve()
-            if configured != view.root.resolve():
-                snapshot = "unverified"
-            knowledge_dir = str(configured)
+            effective_root = Path(self.settings.knowledge_dir).resolve()
+            if effective_root != view.root.resolve():
+                view = KnowledgeView(effective_root, f"unverified:{effective_root}")
+                snapshot = view.public_snapshot
+            knowledge_dir = str(effective_root)
         pin = {"snapshot": snapshot, "tree_sha256": view.tree_sha256,
                "knowledge_dir": knowledge_dir, "knowledge_root": env_root}
         from ..knowledge_service.containment import configured, configuration, _issue_usage

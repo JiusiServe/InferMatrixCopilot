@@ -740,6 +740,7 @@ def direct_review_plan(
     }
     from .knowledge_service.containment import configuration, _issue_usage, digest
     if configuration()["enabled"]:
+        from secrets import token_hex
         # Raw MCP callers receive paths rather than SDK document references.
         # Bind their selected resources to private provider issuance as well.
         paths = {plan["knowledge_entry"], *mandatory_review_guides,
@@ -748,11 +749,12 @@ def direct_review_plan(
         context = {"knowledge_snapshot": view.public_snapshot,
                    "knowledge_tree_sha256": view.tree_sha256,
                    "plan_sha256": digest(plan),
+                   "session_id": token_hex(32),
                    "documents": [{"document_id": view.relative(view.root / path)}
                                  for path in sorted(paths)]}
-        plan["knowledge_usage"] = _issue_usage(context, view=view)
+        plan["knowledge_usage"] = _issue_usage(context, view=view, session_id=context["session_id"])
         plan["completion_gate"]["knowledge_usage"] = (
-            "Pass this plan's knowledge_usage unchanged to validate_direct_review; "
+            "Pass this plan's knowledge_usage unchanged to doc_read, doc_search, and validate_direct_review; "
             "the provider rechecks its issued resources against current containment."
         )
     return plan

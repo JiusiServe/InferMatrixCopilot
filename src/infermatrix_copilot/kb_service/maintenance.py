@@ -33,7 +33,8 @@ def policy_digest(rt, config=None):
 
 
 def _eligible(rt):
-    return sorted(lifecycle.repo for lifecycle in rt.registry.values() if lifecycle.enabled and lifecycle.publishes)
+    return sorted(lifecycle.repo for lifecycle in rt.registry.values()
+                  if lifecycle.enabled and lifecycle.publishes and lifecycle.full_name)
 
 
 def _units(rt, snapshot, repos=None):
@@ -365,9 +366,14 @@ def operational_status(rt, store, units):
         last = rt.ledger.get_cursor(lifecycle.repo, "last_sweep_at")
         baseline = rt.ledger.get_cursor(lifecycle.repo, "sweep_baseline")
         observed_today = bool(last and budget_date(float(last)) == budget_date(now))
+        observation = rt.ledger.get_cursor(lifecycle.repo, "maintenance_source_observation")
+        observation = json.loads(observation) if observation else None
+        source_status = observation["status"] if observation and budget_date(observation["checked_at"]) == budget_date(now) \
+            else "not_observed_this_day"
         repos.append({"repo": lifecycle.repo, "release": rt.ledger.get_cursor(lifecycle.repo, "release"),
                       "upstream_baseline": baseline, "last_release_sweep_at": float(last) if last else None,
-                      "code_update_status": "observed_by_release_sweep" if observed_today else "not_observed_this_day",
+                      "code_update_status": source_status, "source_observation": observation,
+                      "release_sweep_completed_today": observed_today,
                       "source_update_budget": "existing_configuration"})
         for cs in rt.ledger.changesets_of_kind(lifecycle.repo, "correction"):
             corrections.append({"changeset_id": cs["id"], "repo": cs["repo"], "status": cs["status"],

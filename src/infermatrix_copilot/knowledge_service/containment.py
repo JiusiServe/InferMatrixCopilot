@@ -369,12 +369,24 @@ def _injected_units(context, units):
     def walk(value):
         if isinstance(value,dict):
             document = value.get("document_id")
+            if not isinstance(document,str) and isinstance(value.get("path"),str) and value["path"].startswith(("repos/","general/")):
+                document = value["path"]
             if isinstance(document,str):
-                for field in ("excerpt","content"):
+                for field in ("excerpt","content","text"):
                     if isinstance(value.get(field),str):
                         fragments.setdefault(document,[]).append(normalize(value[field]))
             if isinstance(value.get("model_content"),str):
-                global_fragments.append(normalize(value["model_content"]))
+                rendered = value["model_content"]
+                global_fragments.append(normalize(rendered))
+                # Adaptive delivery serializes source text inside JSON fences.
+                # Decode those actual rendered fragments before attribution.
+                for block in re.findall(r"<untrusted_data>\s*(.*?)\s*</untrusted_data>", rendered, re.S):
+                    try:
+                        fragment = json.loads(block)
+                    except (ValueError, TypeError):
+                        continue
+                    if isinstance(fragment,dict) and isinstance(fragment.get("path"),str) and isinstance(fragment.get("content"),str):
+                        fragments.setdefault(fragment["path"],[]).append(normalize(fragment["content"]))
             for child in value.values():
                 walk(child)
         elif isinstance(value,(list,tuple)):
@@ -396,12 +408,14 @@ def _injected_units(context, units):
     return result
 
 
-def _issue_usage(context, *, injected=False, mode="direct", consumer=None, config=None, view=None):
+def _issue_usage(context, *, injected=False, mode="direct", consumer=None, config=None, view=None, session_id=None):
     cfg, policy = load_policy(config)
     if not cfg["enabled"]:
         return {"protocol": PROTOCOL, "enabled": False, "generation": 0, "retrieved_units": [], "injected_units": []}
     if not isinstance(context, dict) or type(injected) is not bool or mode not in {"direct", "strict"}:
         raise ContainmentError("knowledge usage context/mode is invalid")
+    if session_id is not None and (not isinstance(session_id, str) or not _HASH.fullmatch(session_id)):
+        raise ContainmentError("usage requires the provider's issued delivery session identity")
     if consumer and (not isinstance(consumer, dict) or consumer.get("consumer_id", cfg["consumer_id"]) != cfg["consumer_id"]):
         raise ContainmentError("knowledge usage identifies another consumer")
     if view is None:
@@ -431,15 +445,19 @@ def _issue_usage(context, *, injected=False, mode="direct", consumer=None, confi
             "retrieved_units": units if scope == "documents" else [],
             "injected_units": _injected_units(context,source_units) if injected and scope == "documents" else [],
             "scope_units": units,
-            "pages": [{"path": p, "sha256": hashlib.sha256((view.root / p).read_bytes()).hexdigest()} for p in sorted(paths)]}
+            "pages": [{"path": p, "sha256": hashlib.sha256((view.root / p).read_bytes()).hexdigest()} for p in sorted(paths)],
+            **({"delivery_session": session_id} if session_id else {})}
     receipt = {**body, "receipt_id": digest(body)}
     # Keep private physical provenance out of the public receipt/prompt.
     stored = {"receipt": receipt, "knowledge_root": str(view.root.resolve()),
-              "snapshot_root": str(view.root.parent) if view.verified else "", "snapshot": view.public_snapshot, "context": json.loads(canonical_json(context))}
+              "snapshot_root": str(view.root.parent) if view.verified else "", "snapshot": view.public_snapshot, "context": json.loads(canonical_json(context)),
+              **({"delivery_session": session_id} if session_id else {})}
     with state_lock(cfg["state_dir"]) as state:
         contexts = state / "contexts"
         contexts.mkdir(mode=0o700, exist_ok=True)
         provenance = {k: stored[k] for k in ("knowledge_root", "snapshot_root", "snapshot", "context")}
+        if session_id:
+            provenance["delivery_session"] = session_id
         context_path = contexts / f"{body['context_sha256']}.json"
         if context_path.exists() and json.loads(_regular(context_path).read_text()) != provenance:
             raise ContainmentError("knowledge context issuance conflicts")
@@ -450,6 +468,24 @@ def _issue_usage(context, *, injected=False, mode="direct", consumer=None, confi
         if path.exists() and json.loads(_regular(path).read_text()) != stored:
             raise ContainmentError("knowledge usage issuance conflicts")
         atomic_json(path, stored)
+        if session_id:
+            # A flat, bounded private journal binds all actual deliveries to
+            # earlier publication receipts, including after SDK restart.
+            sessions = state / "delivery-sessions"
+            sessions.mkdir(mode=0o700, exist_ok=True)
+            session_path = sessions / f"{session_id}.json"
+            binding = {"session_id": session_id, "knowledge_root": stored["knowledge_root"],
+                       "snapshot_root": stored["snapshot_root"], "snapshot": stored["snapshot"],
+                       "tree_sha256": body["tree_sha256"]}
+            journal = json.loads(_regular(session_path).read_text()) if session_path.exists() else {**binding, "receipts": []}
+            if any(journal.get(k) != v for k, v in binding.items()) or not isinstance(journal.get("receipts"), list):
+                raise ContainmentError("delivery session issuance conflicts")
+            identities = journal["receipts"]
+            if len(identities) >= 4096 and receipt["receipt_id"] not in identities:
+                raise ContainmentError("delivery session receipt limit exceeded")
+            if receipt["receipt_id"] not in identities:
+                identities.append(receipt["receipt_id"])
+            atomic_json(session_path, journal)
     return receipt
 
 
@@ -476,7 +512,7 @@ def knowledge_usage_record(context, *, injected=False, mode="direct", consumer=N
     if canonical_json(stored["context"]) != canonical_json(context):
         raise ContainmentError("knowledge context differs from provider issuance")
     return _issue_usage(context, injected=injected, mode=mode, consumer=consumer,
-                        config=cfg, view=_issued_view(stored))
+                        config=cfg, view=_issued_view(stored), session_id=stored.get("delivery_session"))
 
 
 def knowledge_usage_export(*, config=None, limit=100):
@@ -525,6 +561,39 @@ def knowledge_usage_export_ack(receipt_ids, *, config=None):
     return {"acknowledged": len(receipt_ids)}
 
 
+def _session_dependencies(state, stored):
+    """Resolve a private flat journal; caller-provided dependency graphs cannot enter."""
+    session = stored.get("delivery_session")
+    if session is None:
+        if "delivery_session" in stored["receipt"]:
+            raise ContainmentError("usage has no private delivery session binding")
+        return [stored]
+    if not isinstance(session,str) or not _HASH.fullmatch(session):
+        raise ContainmentError("delivery session identity is invalid")
+    journal = json.loads(_regular(state / "delivery-sessions" / f"{session}.json").read_text())
+    binding = {"session_id": session, **{k:stored[k] for k in ("knowledge_root","snapshot_root","snapshot")},
+               "tree_sha256":stored["receipt"]["tree_sha256"]}
+    identities = journal.get("receipts")
+    if any(journal.get(k)!=v for k,v in binding.items()) or not isinstance(identities,list) \
+            or not 1<=len(identities)<=4096 or any(not isinstance(i,str) or not _HASH.fullmatch(i) for i in identities) \
+            or len(set(identities))!=len(identities) or stored["receipt"]["receipt_id"] not in identities:
+        raise ContainmentError("delivery session journal is invalid")
+    records = []
+    for identity in identities:
+        record = json.loads(_regular(state / "usage" / f"{identity}.json").read_text())
+        receipt = record["receipt"]
+        # No nested/cyclic graph traversal: every member must be issued into
+        # this exact session and immutable view, with its own valid digest.
+        if record.get("delivery_session")!=session or receipt.get("delivery_session")!=session \
+                or any(record[k]!=stored[k] for k in ("knowledge_root","snapshot_root","snapshot")) \
+                or receipt["tree_sha256"]!=binding["tree_sha256"] or receipt["consumer_id"]!=stored["receipt"]["consumer_id"] \
+                or receipt.get("receipt_id")!=identity or digest({k:v for k,v in receipt.items() if k!="receipt_id"})!=identity \
+                or digest(record["context"])!=receipt["context_sha256"]:
+            raise ContainmentError("delivery session member provenance is invalid")
+        records.append(record)
+    return records
+
+
 def knowledge_availability_check(receipt, *, config=None):
     try:
         cfg, policy = load_policy(config)
@@ -537,6 +606,7 @@ def knowledge_availability_check(receipt, *, config=None):
             raise ContainmentError("knowledge usage receipt digest is invalid")
         with state_lock(cfg["state_dir"]) as state:
             stored = json.loads(_regular(state / "usage" / f"{identity}.json").read_text())
+            dependencies = _session_dependencies(state, stored)
         if stored["receipt"] != receipt or digest(stored["context"]) != receipt["context_sha256"]:
             raise ContainmentError("knowledge usage was not issued by this provider")
         from ..knowledge_view import KnowledgeView, _load_view
@@ -544,20 +614,41 @@ def knowledge_availability_check(receipt, *, config=None):
         if str(view.root.resolve()) != stored["knowledge_root"] or view.tree_sha256 != receipt["tree_sha256"]:
             raise ContainmentError("issued knowledge snapshot changed")
         affected = []
+        pages = {}
+        for dependency in dependencies:
+            for page in dependency["receipt"]["pages"]:
+                if page["path"] in pages and pages[page["path"]]!=page["sha256"]:
+                    raise ContainmentError("delivery session resources conflict")
+                pages[page["path"]] = page["sha256"]
         with configured(cfg):
-            for page in receipt["pages"]:
-                path = (view.root / _page(page["path"])).resolve()
+            for relative, expected in pages.items():
+                path = (view.root / _page(relative)).resolve()
                 if not path.is_relative_to(view.root.resolve()):
                     raise ContainmentError("issued knowledge path was redirected")
-                if hashlib.sha256(path.read_bytes()).hexdigest() != page["sha256"]:
+                if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
                     raise ContainmentError("issued knowledge bytes changed")
-                affected.extend(page_admissibility(view, page["path"], config=cfg, policy=policy))
+                affected.extend(page_admissibility(view, relative, config=cfg, policy=policy))
         return {"allowed": not affected, "enabled": True, "generation": policy["generation"],
                 "policy_digest": policy["policy_digest"], "reason": "held_knowledge" if affected else "available",
                 "affected_units": affected, "reassessment_required": bool(affected)}
     except (ValueError, OSError, KeyError, TypeError, RuntimeError) as exc:
         return {"allowed": False, "enabled": True, "generation": None, "policy_digest": "",
                 "reason": type(exc).__name__, "affected_units": [], "reassessment_required": True}
+
+
+def _usage_session_view(receipt, *, config=None):
+    """Resolve an existing protected issuance for a raw MCP follow-up."""
+    cfg = configuration(config)
+    if not cfg["enabled"]:
+        return None, None
+    if not knowledge_availability_check(receipt, config=cfg)["allowed"]:
+        raise ContainmentError("knowledge follow-up requires admissible provider-issued provenance")
+    with state_lock(cfg["state_dir"]) as state:
+        stored = json.loads(_regular(state / "usage" / f"{receipt['receipt_id']}.json").read_text())
+    session = stored.get("delivery_session")
+    if not isinstance(session,str) or not _HASH.fullmatch(session):
+        raise ContainmentError("knowledge follow-up requires a provider-bound review session")
+    return session, _issued_view(stored)
 
 
 @contextmanager

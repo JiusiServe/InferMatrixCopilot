@@ -242,6 +242,8 @@ class DirectClient:
             )
         view = None
         context_id = str(review_context_id).strip().casefold()
+        if configuration()["enabled"] and not context_id:
+            raise ContainmentError("enforced Direct document reads require a provider-issued review_context_id")
         if context_id:
             with self._context_lock:
                 issued = self._issued_contexts.get(context_id)
@@ -250,16 +252,24 @@ class DirectClient:
                     "review_context_id was not issued by this DirectClient"
                 )
             view = issued.knowledge_view
+        else:
+            view = self._view()
         data = self._served_bytes(self._document_path(document_id, view))
         page = data[offset:offset + max_bytes]
         next_offset = offset + len(page) if offset + len(page) < len(data) else None
-        return DocumentPage(
+        result = DocumentPage(
             document_id=document_id,
             sha256=_sha256(data),
             offset=offset,
             content=page.decode("utf-8", errors="replace"),
             next_offset=next_offset,
+            review_context_id=context_id if configuration()["enabled"] else "",
         )
+        session = issued.knowledge_usage.get("delivery_session") if context_id and issued.knowledge_usage else None
+        if configuration()["enabled"] and not session:
+            raise ContainmentError("enforced Direct document reads require a bound review delivery session")
+        _issue_usage(result.to_dict(), view=view, session_id=session)
+        return result
 
     def _request_values(self, request: DirectReviewRequest, *, allow_sha256: bool = False) -> tuple[str, list[str]]:
         alias = request.repository.alias.strip()
@@ -360,7 +370,7 @@ class DirectClient:
                 "progress_update": raw["progress_update"], "completion_gate": raw["completion_gate"],
                 "guidance": related.get("guidance", ""),
                 "truncated": guide_packet["truncated"] or related["truncated"]}
-        usage = _issue_usage(packet, view=service.view)
+        usage = _issue_usage(packet, view=service.view, session_id=session_id)
         self._remember_context(context_id, request.expected_head_sha.casefold(),
                                tuple(row.to_dict() for row in request.carried_findings), service.view, usage)
         return packet
@@ -496,7 +506,7 @@ class DirectClient:
             untested_public_api=dict(raw.get("untested_public_api") or {}),
             related_knowledge=related,
         )
-        usage = _issue_usage(plan.to_dict(), view=view)
+        usage = _issue_usage(plan.to_dict(), view=view, session_id=review_context_id.removeprefix("sha256:"))
         self._remember_context(review_context_id, expected_head, carried, view, usage)
         return plan
 

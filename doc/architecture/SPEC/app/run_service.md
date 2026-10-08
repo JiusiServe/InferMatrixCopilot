@@ -46,6 +46,9 @@ run is pinned to this server's effective `knowledge_dir` (reported as `packaged`
 or `unverified` for a custom directory), with `KNOWLEDGE_ROOT` removed from the
 child's environment. Runs reserved before pinning
 existed have no record and use the process default.
+Containment repository resolution and the issued scope receipt use this same
+effective view, including a custom `knowledge_dir`; packaged bytes cannot stand
+in for the custom bytes that the child consumes.
 
 ## 2026-09-30 Concurrent workers
 `Settings.strict_max_workers` (`STRICT_MAX_WORKERS`, 1–32, default 1; embedded

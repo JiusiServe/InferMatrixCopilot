@@ -588,6 +588,152 @@ def _install_policy(c, *, view=None):
         return native_ack(c.rt)
 
 
+@pytest.mark.parametrize("outcome,passed", [("contradicted", False), ("verified", False), ("unknown", True)])
+def test_owner_confirmed_unknown_cannot_calibrate_a_definitive_verdict(tmp_path, monkeypatch, outcome, passed):
+    from infermatrix_copilot.kb_service.maintenance_calibration import calibrate, current
+    from infermatrix_copilot.knowledge_service.signing import sign
+    c = _ready_fixture(tmp_path, monkeypatch)
+    origin = tmp_path / "origin"
+    path = "repos/demo/core/deployment.md"
+    text = ("---\ntitle: Deployment capacity\ncreated: 2026-09-01\nupdated: 2026-09-01\n"
+            f'type: guide\ntags: [demo]\nsources: ["{URL}"]\n---\n\n'
+            "# Deployment capacity\n\nThe deployed queue capacity is sixteen.\n")
+    (origin / "knowledge" / path).write_text(text)
+    _git(origin, "add", ".")
+    _git(origin, "-c", "user.name=owner", "-c", "user.email=owner@example.invalid", "commit", "-q", "-m", "ambiguous deployment claim")
+    snapshot = c.rt.knowledge.fetch()
+    unit = page_units(path, text, "demo", snapshot)[0]
+    case = {"id": "deployment-unknown", "actor": "fixture-owner", "unit": unit, "expected": "unknown",
+            "reason": "Pinned source establishes a code default, but contains no deployment configuration."}
+    (tmp_path / "human-cases/demo/cases/deployment-unknown.json").write_text(json.dumps(
+        sign("kb-maintenance-human-case", case, c.key)))
+    original_answer = c.rt.gateway.answer
+    def answer(role, prompt):
+        if role.name == "judge" and '"claim"' in prompt and "The deployed queue capacity" in prompt:
+            result = semantic(outcome)
+            result["reason"] = "Pinned default evidence is insufficient to identify deployed configuration." if outcome == "unknown" else "The code default alone decides deployment capacity."
+            if outcome != "unknown":
+                result["assessments"][0]["claim"] = "The deployed queue capacity is sixteen."
+            return result
+        return original_answer(role, prompt)
+    c.rt.gateway.answer = answer
+    record = calibrate(c.rt, c.store, c.rt.maintenance, run_id="unknown-oracle", policy_sha256=c.policy)
+    assert record["correction_passed"]
+    assert next(row for row in record["details"] if row["id"] == case["id"])["outcome"] == outcome
+    assert record["passed"] is passed
+    assert current(c.rt, c.policy) is passed
+    assert record["false_accepts"] == (0 if passed else 1)
+
+
+@pytest.mark.parametrize("rejected,passed", [(1, True), (2, False)])
+def test_verified_case_false_reject_tolerance_stays_twenty_percent(tmp_path, monkeypatch, rejected, passed):
+    from infermatrix_copilot.kb_service.maintenance_calibration import calibrate
+    from infermatrix_copilot.knowledge_service.signing import sign
+    c = _ready_fixture(tmp_path, monkeypatch)
+    for index in range(4):
+        case = {"id": f"good-audit-extra-{index}", "actor": "fixture-owner", "unit": c.good,
+                "expected": "verified", "reason": "Original assignment establishes an eight-item default."}
+        (tmp_path / f"human-cases/demo/cases/good-audit-extra-{index}.json").write_text(json.dumps(
+            sign("kb-maintenance-human-case", case, c.key)))
+    original_answer, reviewed = c.rt.gateway.answer, [0]
+    def answer(role, prompt):
+        if role.name == "judge" and '"claim"' in prompt and "## DEMO-3a" in prompt:
+            reviewed[0] += 1
+            if reviewed[0] <= rejected:
+                return {"outcome": "unknown", "reason": "This review declines a definitive assessment.",
+                        "witnesses": [0], "conflicts": [], "assessments": []}
+        return original_answer(role, prompt)
+    c.rt.gateway.answer = answer
+    record = calibrate(c.rt, c.store, c.rt.maintenance, run_id="false-reject-threshold", policy_sha256=c.policy)
+    assert reviewed[0] == 5 and record["correction_passed"]
+    assert record["passed"] is passed
+
+
+def test_general_scope_remains_auditable_without_changing_upstream_trial_roster(tmp_path, monkeypatch):
+    c = _ready_fixture(tmp_path, monkeypatch)
+    general = replace(c.lifecycle, repo="general", full_name="", knowledge_dir="general", mode="shadow")
+    c.rt.registry[general.repo] = general
+    c.rt.ledger.ensure_repo(general.repo, general.mode)
+    origin = tmp_path / "origin"
+    path = "general/explanation.md"
+    target = origin / "knowledge" / path
+    target.parent.mkdir()
+    target.write_text("---\ntitle: General explanation\ncreated: 2026-09-01\nupdated: 2026-09-01\n"
+                      "type: guide\ntags: [general]\nsources: []\n---\n\n# General explanation\n\n"
+                      "This cross-repository guidance has no original upstream pin.\n")
+    _git(origin, "add", ".")
+    _git(origin, "-c", "user.name=owner", "-c", "user.email=owner@example.invalid", "commit", "-q", "-m", "general guidance scope")
+    snapshot = c.rt.knowledge.fetch()
+    _, units = maintenance._units(c.rt, snapshot)
+    general_unit = next(unit for unit in units if unit["repo"] == "general")
+    with pytest.raises(ValueError, match="applicability pin"):
+        source_evidence(c.rt, general, general_unit)
+    assert maintenance._eligible(c.rt) == ["demo"]
+    assert c.store.report(policy_sha256=c.policy, eligible_repos=maintenance._eligible(c.rt))["seven_valid_nights_ready"]
+
+
+def _publisher_outbox_items(rt):
+    return [packet for path in (rt.state_dir / "outbox").glob("*.json")
+            if (packet := json.loads(path.read_text())).get("purpose") == "kb-outbox-item"]
+
+
+def test_private_contradiction_remains_internal_even_when_global_automatic_readiness_passes(tmp_path, monkeypatch):
+    from infermatrix_copilot.kb_service.maintenance_calibration import calibrate, current
+    from infermatrix_copilot.kb_service.containment import pending_holds
+    from infermatrix_copilot.kb_service.containment_drill import run_revocation_drill
+    c = _ready_fixture(tmp_path, monkeypatch)
+    rt = c.rt
+    assert calibrate(rt, c.store, rt.maintenance, run_id="owner-calibration", policy_sha256=c.policy)["passed"]
+    assert run_revocation_drill(rt, c.policy)["passed"]
+    _install_policy(c)
+    private = replace(c.lifecycle, upstream_visibility="private")
+    rt.registry[private.repo] = private
+    assert private.auto_merge and not private.publishes
+    # Other public repositories may have completed global readiness; private
+    # visibility must independently prevent enforcement and publication.
+    monkeypatch.setattr(maintenance, "readiness", lambda *args: True)
+    assert current(rt, c.policy, observed_model=rt.judge.model)
+    c.store.add_items(c.run["id"], [c.bad])
+    before_snapshot = rt.ledger.active_snapshot()
+    result = maintenance.tick(rt)
+    item = c.store.items(result["run_id"])[0]
+    assert item["outcome"] == "contradicted" and item["detail"]["original_source_checked"]
+    correction = item["detail"]["correction"]
+    assert correction["hold"]["status"] == "would_hold"
+    cs = rt.ledger.changeset(correction["changeset_id"])
+    assert cs["detail"]["decision"]["status"] == "pass"
+    assert cs["status"] == "shadow_recorded"
+    assert not pending_holds(rt)["holds"]
+    assert not list((rt.containment_policy_dir / "decisions").glob("*.json"))
+    assert not _publisher_outbox_items(rt)
+    assert rt.ledger.active_snapshot() == before_snapshot
+    assert list((rt.state_dir / "maintenance/regression-candidates").glob("*.json"))
+
+
+@pytest.mark.parametrize("scope", ["*", "demo"])
+def test_private_repository_respects_global_and_repository_breaker_pause(tmp_path, monkeypatch, scope):
+    c = _ready_fixture(tmp_path, monkeypatch)
+    rt = c.rt
+    private = replace(c.lifecycle, upstream_visibility="private")
+    rt.registry[private.repo] = private
+    monkeypatch.setattr(maintenance, "readiness", lambda *args: True)
+    c.store.add_items(c.run["id"], [c.bad])
+    rt.ledger.bump_generation(scope, pause=True, reason="breaker opened")
+    generation = rt.ledger.repo_state(scope)["generation"]
+    calls = len(rt.gateway.calls)
+    result = maintenance.tick(rt)
+    if scope == "*":
+        assert result is None
+    else:
+        assert result["status"] == "failed"
+    assert len(rt.gateway.calls) == calls
+    assert c.store.items(c.run["id"])[0]["outcome"] is None
+    assert rt.ledger.repo_state(scope)["paused"]
+    assert rt.ledger.repo_state(scope)["generation"] == generation
+    assert not list((rt.containment_policy_dir / "decisions").glob("*.json"))
+    assert not _publisher_outbox_items(rt)
+
+
 def test_automatic_correction_requires_real_seven_nights_calibration_drill_and_current_ack(tmp_path, monkeypatch):
     from infermatrix_copilot.kb_service.maintenance_calibration import calibrate, current
     from infermatrix_copilot.kb_service.containment_drill import run_revocation_drill

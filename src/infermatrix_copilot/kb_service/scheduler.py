@@ -208,7 +208,21 @@ class Scheduler:
                 self._record(lifecycle.repo, "intake", new_events=new, changeset=changeset_id, status=status)
         if lifecycle.full_name and self._due(f"release:{lifecycle.repo}", self.release_every):
             upstream = UpstreamRepo(rt.state_dir / "upstream" / f"{lifecycle.repo}.git", lifecycle.full_name)
-            sweep = detect_release(rt, lifecycle, upstream)
+            previous_baseline = rt.ledger.get_cursor(lifecycle.repo, "sweep_baseline") or ""
+            observation = {}
+            sweep = detect_release(rt, lifecycle, upstream, observation=observation)
+            target_baseline = (sweep or {}).get("to_sha") or rt.ledger.get_cursor(lifecycle.repo, "sweep_baseline") or ""
+            source_status = "not_observed"
+            if observation.get("status") == "observed" and previous_baseline and target_baseline:
+                source_status = "no_code_update" if previous_baseline == target_baseline else "code_update_detected"
+            elif observation.get("status") == "observed" and target_baseline and not previous_baseline:
+                source_status = "baseline_initialized"
+            rt.ledger.set_cursor(lifecycle.repo, "maintenance_source_observation", json.dumps({
+                "checked_at": rt.clock(), "scope": "release_baseline", "trigger": lifecycle.release.trigger,
+                "status": source_status, "from_sha": previous_baseline, "to_sha": target_baseline,
+                "observation_status": observation.get("status", "not_observed"),
+                "observed_tag": observation.get("tag", ""),
+            }, sort_keys=True))
             if sweep is not None:
                 # the release audit feeds the sweep hints; baseline drift becomes a
                 # companion PR that runs in parallel and never blocks the sweep

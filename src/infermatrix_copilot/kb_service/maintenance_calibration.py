@@ -113,13 +113,17 @@ def calibrate(rt, store, config, *, run_id, policy_sha256):
     correction_bad = [c for c in corrections if c["expected_gate"] != "pass"]
     correction_passed = bool(correction_good and correction_bad) and all(c["passed"] for c in correction_bad) \
         and sum(not c["passed"] for c in correction_good) / len(correction_good) <= .2
-    passed = correction_passed and bool(good and bad) and all(case["outcome"] != "verified" for case in bad) \
+    # An ambiguous owner oracle must stay unknown: a false contradiction can
+    # authorize correction just as a false verification can retain bad advice.
+    unsafe = [case for case in bad if case["expected"] == "unknown" and case["outcome"] != "unknown"]
+    unsafe += [case for case in bad if case["expected"] == "contradicted" and case["outcome"] == "verified"]
+    passed = correction_passed and bool(good and bad) and not unsafe \
         and sum(case["outcome"] != "verified" for case in good) / len(good) <= 0.2
     record = {"passed": passed, "policy_sha256": policy_sha256, "case_digest": cases_digest(rt),
               "judge": rt.judge.label(), "generator": rt.generator.label(), "correction_passed": correction_passed,
               "corrections": corrections, "observed_models": sorted(v for v in observed_models if v),
               "observed_generators": sorted(v for v in observed_generators if v),
-              "at": rt.clock(), "details": details, "false_accepts": sum(case["outcome"] == "verified" for case in bad)}
+              "at": rt.clock(), "details": details, "false_accepts": len(unsafe)}
     if rt.outbox is not None:
         atomic_write_json(rt.state_dir / "maintenance" / "calibration.json",
                           sign("kb-maintenance-calibration", record, rt.outbox._key))

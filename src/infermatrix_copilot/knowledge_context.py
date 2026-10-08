@@ -210,9 +210,12 @@ class KnowledgeContextService:
         return cost
 
     def _deliver(self, session_id: str, request: dict, build: Callable) -> dict:
-        from .knowledge_service.containment import configured
+        from .knowledge_service.containment import configured, _issue_usage
         with configured(self._knowledge_maintenance):
-            return self._deliver_current(session_id, request, build)
+            result = self._deliver_current(session_id, request, build)
+            if result.get("documents"):
+                _issue_usage(result, view=self.view, session_id=session_id)
+            return result
 
     def _deliver_current(self, session_id: str, request: dict, build: Callable) -> dict:
         with self._db() as db:

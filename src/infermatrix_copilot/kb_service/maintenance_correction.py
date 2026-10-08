@@ -58,6 +58,8 @@ def correct_prose(files, unit, replacement, *, today):
         rendered = parsed.frontmatter + replacement
     else:
         rendered = before.replace(unit["text"], replacement, 1)
+    if rendered == before:
+        raise LifecycleError("prose correction must change the page body")
     head = Page.parse(rendered)
     old_metadata, new_metadata = parsed.frontmatter_data(), head.frontmatter_data()
     if old_metadata != new_metadata:

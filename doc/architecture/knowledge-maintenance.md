@@ -39,6 +39,10 @@ reservation cannot dispatch the same call again. Missing source pins or missing
 original witnesses remain `unknown`; an execution error is recorded separately
 from a factual contradiction. Coverage and per-repository fairness use the
 frozen eligible denominator, not just the entries selected on a quiet night.
+The nightly per-repository acceptance roster includes actual public upstream
+repositories. An enabled cross-repository `general` slice remains in coverage
+and owner follow-up; unavailable original evidence remains `unknown` rather than
+being treated as a successful repository audit.
 
 ## Owner resolution and human cases
 
@@ -266,6 +270,13 @@ audit work while their separate ledger connection verifies the actual lease.
 
 Keep source updates, semantic audit coverage, proposed corrections, real merged
 and active bytes, and consumer propagation visible separately in `maintain status`.
+`no_code_update` refers to the observed immutable release baseline, with the
+compared commits and scope included; it does not assert that unobserved upstream
+main branches are unchanged. Repositories without a release observer retain
+`not_observed` while their independent knowledge audits still run.
+Missing releases, empty matching-tag results and resumed saved sweeps also retain
+`not_observed`; the report includes the lookup status and any freshly observed
+tag separately from the cached or resumed baseline.
 An unregistered reader is outside isolation coverage. A policy or implementation
 change invalidates readiness for the previous policy; failed owner requests are
 retained and routed for follow-up rather than counted as successful nights.

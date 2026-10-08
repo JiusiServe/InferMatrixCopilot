@@ -98,3 +98,9 @@ stdlib + `mcp` extra + `.direct_routing`（下划线别名 re-import）+
 
 ## 2026-09-28 知识视图
 知识根改为每次调用经 `KnowledgeView.current()` 解析；`_KNOWLEDGE` 仅为惰性别名。
+
+## 2026-10-08 Adaptive containment delivery
+
+Raw adaptive MCP responses are actual host-model context delivery. Initial plans and nonempty read/search/related follow-ups record `injected=True` using the privately issued exact packet; JSON-fenced source text is decoded for unit attribution. Metadata-only budget expansion does not claim injected content. All deliveries are bound to the same durable provider-private session, so final validation of the original plan receipt includes later follow-up pages and fails closed if any become held.
+
+With enforcement enabled, raw `doc_read` and `doc_search` additionally require the optional `knowledge_usage` parameter carrying the original plan receipt. They resolve its protected issuance and pinned view, then register actual delivered content in the same journal before returning an updated receipt. Omitting provenance fails closed; activating another snapshot does not switch an existing review's follow-up root. Raw legacy initial delivery records only its actual quickmap/background fragments as injected at the MCP return boundary. Internal SDK calls to the raw planner do not claim injection. Disabled tool signatures remain backward compatible through the optional parameter.

@@ -1,6 +1,6 @@
 # knowledge_service/ — provider curation components
 
-<!-- verified-against: 2026-10-07 -->
+<!-- verified-against: 2026-10-08 -->
 
 Pinned source identities and depth markers accept full SHA-1 or SHA-256 Git
 commits. Evidence bodies, stored hashes and native approval semantics remain
@@ -54,6 +54,16 @@ reconciliation receipt) never verifies for another. Plans use
 `kb-reviewed-reconciliation` purpose, and neither can be replayed as an
 automatic gate verdict or publisher action. It
 needs only `cryptography`.
+
+`containment` implements the opt-in consumer protocol independently of knowledge
+snapshots and physical releases: signed fresh policies, durable monotonic
+high-water state, private provider issuance and usage receipts, availability
+checks and a shared installation/publication fence. Invalid signatures, stale
+policy, replay or unavailable issued knowledge fail closed. It does not create
+authority decisions or model judgements. Signing also separates containment,
+authenticated transport, maintenance resolution, human case, calibration, drill
+and short-lived merge authorization purposes. See
+[containment.md](knowledge_service/containment.md).
 
 ## 2026-09-28 verdict
 `verdict` defines the signed gate verdict (`kb-gate-verdict/1`): identity
