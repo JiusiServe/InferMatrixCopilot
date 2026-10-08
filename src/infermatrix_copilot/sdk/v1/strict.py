@@ -1,4 +1,4 @@
-"""Public embedded facade for the durable Strict run lifecycle."""
+"""Public embedded owner of durable Direct and Strict review runs."""
 
 from __future__ import annotations
 
@@ -21,6 +21,9 @@ from .models import (
     StrictReviewRequest,
     StrictRunHandle,
     StrictRuntimeConfig,
+    DirectReviewRunRequest,
+    ReviewFinding,
+    ReviewResult,
 )
 
 
@@ -72,6 +75,10 @@ def _review_result(raw: Any) -> StrictReviewResult | None:
         recheck_missing=tuple(missing),
         stale=bool(raw.get("stale", False)),
         diagnostics=_diagnostics(raw.get("diagnostics")),
+        finding_dispositions=_object_rows(raw.get("finding_dispositions"), "finding_dispositions"),
+        expected_head_sha=str(raw.get("expected_head_sha") or ""),
+        actual_head_sha=str(raw.get("actual_head_sha") or ""),
+        direct_result=raw.get("direct_result"),
     )
 
 
@@ -92,8 +99,8 @@ def _quality_result(raw: Any) -> QualityReviewResult | None:
     )
 
 
-class StrictRuntime:
-    """Own a durable local Strict runtime without exposing MCP internals."""
+class ReviewRuntime:
+    """Own the reservation, execution and polling lifecycle for review modes."""
 
     def __init__(
         self, *, config: StrictRuntimeConfig | None = None,
@@ -137,6 +144,7 @@ class StrictRuntime:
         else:
             settings = Settings(**overrides)
         self._core = RunService(settings)
+        self._core.direct_profiles = config.direct_profiles if config is not None else {}
         self._knowledge_maintenance = config.knowledge_maintenance or None if config is not None else None
         self._core.knowledge_maintenance = self._knowledge_maintenance
 
@@ -172,6 +180,31 @@ class StrictRuntime:
     def start_review(self, request: StrictReviewRequest) -> StrictRunHandle:
         """Alias for hosts that name the reserve-and-enqueue operation start."""
         return self.reserve_review(request)
+
+    @with_containment
+    def reserve_direct_review(self, request: DirectReviewRunRequest) -> StrictRunHandle:
+        run_id, created = self._core.reserve_direct_review(request)
+        return StrictRunHandle(run_id=str(run_id), created=bool(created))
+
+    def find_review(self, idempotency_key, *, expected_head_sha):
+        run_id = self._core.find_review(idempotency_key, expected_head_sha)
+        return StrictRunHandle(run_id=run_id, created=False) if run_id else None
+
+    @staticmethod
+    def run_session(prompt, **kwargs):
+        """Run a bounded read-only classification or candidate session.
+
+        Reviews use ``reserve_direct_review`` for durable identity and recovery.
+        """
+        from ...providers.json_session import run_readonly_json
+
+        return run_readonly_json(prompt, **kwargs)
+
+    @staticmethod
+    def decode_session_json(text):
+        from ...providers.json_session import decode_object
+
+        return decode_object(text)
 
     def quality_readiness(self, repo: str, repo_path: str = "") -> tuple[str, ...]:
         """Return setup gaps for the dedicated review-readiness workflow."""
@@ -250,3 +283,89 @@ class StrictRuntime:
 
     def __exit__(self, *_exc: object) -> None:
         self.close()
+
+
+StrictRuntime = ReviewRuntime
+
+
+def decode_review_result(raw, *, expected_head_sha, required_checks=None, finding_decoder=None):
+    """Project either mode's wire result into the one host-facing result type."""
+    if not raw.get("contract_version"):
+        raise ResultDecodeError("result carries no contract_version")
+    reviewed = str(raw.get("reviewed_head_sha") or "")
+    if reviewed != expected_head_sha:
+        raise ResultDecodeError(f"reviewed head {reviewed[:12]} != attempt head {expected_head_sha[:12]}")
+    if isinstance(raw.get("direct_result"), dict):
+        from .review_result import parse_direct_result
+
+        proof = raw.get("diagnostics") or {}
+        references = frozenset(proof.get("thread_references") or ())
+        return parse_direct_result(raw["direct_result"],
+            required_checks=proof.get("required_checks", ()) if required_checks is None else required_checks,
+            normalize_reference=lambda value: value if value in references else "")
+    typed = _review_result(raw)
+    if not typed.summary_markdown.strip():
+        raise ResultDecodeError("result carries no summary_markdown")
+    if typed.verdict.strip().upper() not in {"REQUEST CHANGES", "COMMENT", "APPROVE"}:
+        raise ResultDecodeError(f"unknown verdict {typed.verdict!r}")
+    from .rechecks import check_disposition_proof
+
+    check_disposition_proof(list(typed.comments), list(typed.finding_dispositions))
+    return ReviewResult(reviewed_head_sha=reviewed, summary=typed.summary_markdown.strip(),
+        findings=tuple((finding_decoder or strict_finding)(comment) for comment in typed.comments),
+        subtraction_signal="none", review_checks={},
+        finding_rechecks=tuple(raw.get("finding_rechecks") or ()),
+        review_complete=raw.get("rechecks_complete", True) is True)
+
+
+def strict_finding(comment: object, *, title=None) -> ReviewFinding:
+    """One contract comment → one `Finding`.
+
+    The shapes differ deliberately: the contract carries
+    `file/comment/evidence/suggestion`, this repo renders
+    `severity/title/body/path/line`. Evidence and suggestion are folded into
+    the body rather than dropped — they are the part a maintainer acts on."""
+    if not isinstance(comment, dict):
+        raise ResultDecodeError("comment is not an object")
+    # A finding without a file is a GENERAL one — a concern about the change
+    # as a whole rather than a line of it, which the review taxonomy allows.
+    # Rejecting it discarded an entire completed review (a real 40-minute
+    # Strict run, over one such finding). It cannot anchor inline, so it
+    # renders in the body, which is exactly where a general finding belongs.
+    path = str(comment.get("file") or "").strip()
+    severity = {"blocker":"P0", "major":"P1", "minor":"P2", "nit":"P3"}.get(str(comment.get("severity") or "").lower())
+    if severity is None:
+        # Severity still fails closed: guessing one could silently demote a
+        # blocker, which is the opposite of a missing file's consequence.
+        raise ResultDecodeError(
+            f"unknown severity {comment.get('severity')!r} for "
+            f"{path or '(no file)'}"
+        )
+    text = str(comment.get("comment") or "").strip()
+    if not text:
+        raise ResultDecodeError(
+            f"comment for {path or '(no file)'} is empty"
+        )
+    line = comment.get("line")
+    if not path:
+        line = None          # a line number without a file anchors nothing
+    if line is not None:
+        try:
+            line = int(line)
+        except (TypeError, ValueError):
+            raise ResultDecodeError(
+                f"comment for {path or '(no file)'} has a non-numeric line"
+            ) from None
+        if line <= 0:
+            line = None
+    body = text
+    evidence = str(comment.get("evidence") or "").strip()
+    if evidence:
+        body += f"\n\n**Evidence:** {evidence}"
+    suggestion = str(comment.get("suggestion") or "").strip()
+    if suggestion:
+        body += f"\n\n**Suggestion:** {suggestion}"
+    return ReviewFinding(
+        severity=severity, title=title(text) if title else text, body=body,
+        path=path, line=line,
+    )

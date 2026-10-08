@@ -116,7 +116,7 @@ def test_codex_transport_pins_reasoning_effort(monkeypatch):
 
     def fake_run(cmd, **kwargs):
         captured["cmd"] = cmd
-        return SimpleNamespace(stdout="", returncode=0)
+        return SimpleNamespace(stdout="", stderr="", returncode=0)
 
     monkeypatch.setattr(codex.subprocess, "run", fake_run)
     transport = codex.CodexTransport.__new__(codex.CodexTransport)
@@ -609,7 +609,6 @@ def test_kb_run_uses_the_cli_state_dir(tmp_path, monkeypatch):
                      "--repo", "vllm-omni"]) == 1
     assert seen == {"state_dir": str(chosen)}
     assert os.environ["KB_STATE_DIR"] == str(tmp_path / "wrong")  # env untouched
-    knowledge_steps.use_state_dir(None)
 
 def test_lease_lost_during_judging_writes_nothing(tmp_path):
     """Deterministic takeover: while the judge is answering, the lease expires

@@ -1,6 +1,6 @@
 # providers/cursor.py —— 规范
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~207 · harness transport（Cursor 订阅） · refactor-status: ok`
 
@@ -62,3 +62,14 @@ worktree 物化失败而降级到 live checkout 的 PR run 都在这里。托管
 worktree（repo+PR+sha 分键，run queue 不会让同 PR 的两个 run 并发）与 run 自己的
 目录不加锁。等待上限为会话超时 + 60 s；超时则返回空文本、`truncated`、refusal，
 并记 `capability_gap`（`cursor.exclusive_cwd`），绝不在别人的配置下静默开跑。
+
+## 2026-10-08 共享机制
+缓冲执行、保留超时部分 stdout 与 JSONL 解码复用 `base.run_cli/json_events`，MCP stdio 入口复用 `base.bridge_server`。
+`SessionUsage.outcome/reply` 统一结果封装；无工具调用通过 `TemporaryDirectory` 管理空 cwd，清理错误仍可忽略。
+会话目录串行、桥配置所有权、环境白名单及事后审计继续由本 transport 控制。
+
+`complete()` 使用显式无工具 profile：`--mode ask --trust --workspace <空临时目录>`，
+不传 `--force` 或 `--approve-mcps`。解析后用 `audit.assert_tool_less` 拒绝工具活动、
+未知内容块和错误结果；普通带桥 `run_session` 的权限与事后容纳审计保持原契约。
+只读仓库 JSON 会话由 `json_session.run_readonly_json` 承载，不能用本空 cwd profile
+替代其源码读取与会话恢复协议。

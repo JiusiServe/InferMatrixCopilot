@@ -28,7 +28,7 @@ from .init_budget import BudgetExhausted
 from .init_coverage import Owner
 from .init_stages import _Chain, _Stage, _numbered, _one_line, _page_frontmatter, neutral_headings
 from .init_support import InitRecord, classify_verdict, generate, judge
-from .init_knowledge_inputs import SYSTEM_KNOWLEDGE, knowledge_prompt, source_owner, source_owners, foundation_evidence
+from .init_knowledge_inputs import SYSTEM_KNOWLEDGE, knowledge_prompt, knowledge_system, source_owner, source_owners, foundation_evidence
 from .models import ModelUnavailable
 from .init_knowledge_parallel import offered_ranges, parallelism, run_jobs, restore_jobs, preferred_sources, start_interval, range_is_offered, related_test_sources
 
@@ -160,8 +160,11 @@ class _Knowledge(_Stage):
         validate_checkpoint(self, previous, digest)
 
     def _restore_progress(self, previous: InitRecord | None) -> list[str]:
-        if self.STAGE == "knowledge" and self.foundation_mode == "partial" and previous is not None:
+        partial = self.STAGE == "knowledge" and self.foundation_mode == "partial"
+        if previous is not None and (partial or (
+                self.rt.unlimited_subscription and previous.coverage.get("foundation_jobs"))):
             self._validate_unpublished_checkpoint(previous, self.record.inputs_digest)
+        if partial and previous is not None:
             from .foundation_publication import validate_initial_scope
             validate_initial_scope(self, previous)
         if (self.rt.unlimited_subscription and previous is not None
@@ -176,7 +179,7 @@ class _Knowledge(_Stage):
             self.budget.spent_usd = previous.spent_usd
         return []
 
-    def _publish(self, changed: dict[str, str]) -> InitRecord:
+    def _prepare_publication(self, changed: dict[str, str]) -> InitRecord:
         targets = self.record.coverage.get("knowledge", {}).get("targets", {})
         if self.STAGE == "knowledge" and getattr(self.rt, "portable_spec", None):
             from .knowledge_coverage import coverage_targets_met
@@ -198,16 +201,16 @@ class _Knowledge(_Stage):
                          "it does not establish seven-facet final acceptance or executed tests."}
             self.record.notes.append("portable foundation preview: unsupported facets remain unknown; "
                                      "final semantic-depth and structural targets are unchanged")
-            return super()._publish(changed)
+            return super()._prepare_publication(changed)
         if self.STAGE == "knowledge" and self.foundation_mode == "partial":
             from .foundation_publication import freeze_receipt
             freeze_receipt(self, changed)
-            return super()._publish(changed)
+            return super()._prepare_publication(changed)
         if (self.rt.unlimited_subscription and not self.dry_run
                 and targets.get("required") is True and targets.get("met") is not True):
             return self._blocked(["foundation targets incomplete; native progress retained; "
                                   "resume this same pinned publication batch to fill missing knowledge"])
-        return super()._publish(changed)
+        return super()._prepare_publication(changed)
 
     def _resume(self, previous: InitRecord) -> InitRecord:
         if self.STAGE == "knowledge" and self.foundation_mode == "partial":
@@ -317,12 +320,7 @@ class _Knowledge(_Stage):
                                    "offered": offered, "requested": requested})
                 continue
             try:
-                data = generate(self.rt, self.budget, self.lifecycle.init, system=SYSTEM_KNOWLEDGE,
-                                prompt=knowledge_prompt(payload), validate=validate_sections).data
-                for section in data["sections"]:
-                    if section["facet"] not in requested:
-                        continue
-                    result = self._section(owner, page, data, section, offered)
+                for _, section, result in self._sections(owner, page, payload, offered, requested):
                     verdict = self.record.verdicts.get(f"knowledge:{name}:{section['facet']}", {})
                     if verdict.get("verdict") in ("unsure", "unjudged"):
                         report[name]["facets"][section["facet"]] = "needs_review"
@@ -424,13 +422,8 @@ class _Knowledge(_Stage):
                                          "offered": offered, "requested": missing_facets})
                     continue
                 try:
-                    data = generate(self.rt, self.budget, self.lifecycle.init, system=SYSTEM_KNOWLEDGE,
-                                    prompt=knowledge_prompt(payload), validate=validate_sections).data
                     owner = Owner("feature-" + feature.id, feature.page, ())
-                    for section in data["sections"]:
-                        if section["facet"] not in missing_facets:
-                            continue
-                        result = self._section(owner, feature.page, data, section, offered)
+                    for _, _, result in self._sections(owner, feature.page, payload, offered, missing_facets):
                         if result:
                             key, text, entries, _ = result
                             claims[key] = text
@@ -572,6 +565,14 @@ class _Knowledge(_Stage):
                 context[path] = excerpt
                 used += len(excerpt.encode("utf-8"))
         return context
+
+    def _sections(self, owner, page, payload, offered, requested):
+        """Review each requested section immediately, preserving native receipt order."""
+        data = generate(self.rt, self.budget, self.lifecycle.init, system=knowledge_system(payload),
+                        prompt=knowledge_prompt(payload), validate=validate_sections).data
+        for section in data["sections"]:
+            if section["facet"] in requested:
+                yield data, section, self._section(owner, page, data, section, offered)
 
     def _section(self, owner: Owner, page: str, data: dict, section: dict, offered: dict[str, int]):
         facet = section["facet"]

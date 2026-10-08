@@ -27,12 +27,15 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
-from ..llm import Block, Reply
+from ..llm import Reply
 from .base import (
     AgentSessionRequest,
     HarnessTransport,
     SessionUsage,
+    bridge_server,
     flatten_messages,
+    json_events,
+    run_cli,
     sanitized_env,
 )
 from .registry import PROVIDERS
@@ -128,40 +131,22 @@ class CursorTransport(HarnessTransport):
 
     # -- process plumbing ----------------------------------------------------
     def _run(self, text: str, *, cwd: str, timeout_s: float,
-             model: str = "") -> tuple[list[dict], bool]:
+             model: str = "", tool_less: bool = False) -> tuple[list[dict], bool]:
         """One CLI invocation → (parsed events, timed_out). A timeout kills
         the process but keeps the partial stream — a half-done investigation
         is salvage material, not garbage."""
         # --approve-mcps is load-bearing: headless runs do not auto-approve
         # configured MCP servers, and without it the tool bridge is silently
         # ignored (found in the live smoke — session ran on native tools only)
-        cmd = [self.require_cli(), "--print", "--force", "--approve-mcps",
-               "--output-format", "stream-json"]
+        cmd = [self.require_cli(), "--print", "--output-format", "stream-json"]
+        cmd += ["--mode", "ask", "--trust", "--workspace", cwd] if tool_less else ["--force", "--approve-mcps"]
         selected = model or self.settings.strict_backend_model
         if selected:
             cmd += ["--model", selected]
-        timed_out = False
-        try:
-            proc = subprocess.run(
-                cmd, input=text, cwd=cwd, env=sanitized_env(),
-                capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=timeout_s, check=False)
-            stdout = proc.stdout or ""
-        except subprocess.TimeoutExpired as exc:
-            timed_out = True
-            raw = exc.stdout or b""
-            stdout = raw.decode("utf-8", "replace") if isinstance(raw, bytes) \
-                else str(raw)
-        events: list[dict] = []
-        for line in stdout.splitlines():
-            line = line.strip()
-            if not line.startswith("{"):
-                continue
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-        return events, timed_out
+        stdout, _, _, timed_out = run_cli(cmd, input=text, cwd=cwd,
+                                          env=sanitized_env(), timeout_s=timeout_s,
+                                          runner=getattr(self, "runner", None))
+        return json_events(stdout), timed_out
 
     @staticmethod
     def _final_text(events: list[dict]) -> str:
@@ -208,8 +193,6 @@ class CursorTransport(HarnessTransport):
         tool bridge. Returns the paths WE created (and only those) so the
         session can restore the tree afterwards — the cwd is our detached
         PR-time worktree and must not accumulate config litter."""
-        import sys
-
         created: list[Path] = []
         cursor_dir = cwd / ".cursor"
         if not cursor_dir.exists():
@@ -224,13 +207,8 @@ class CursorTransport(HarnessTransport):
             # plan-gate prefix, and tool events appended to the old run's
             # bridge trace. Observed 2026-09-18, 27 minutes of a module run.
             return created
-        package_root = Path(__file__).resolve().parents[2]
-        config.write_text(json.dumps({"mcpServers": {"infermatrix-tools": {
-            "command": sys.executable,
-            "args": ["-m", "infermatrix_copilot.tool_bridge",
-                     "--spec", str(spec_path)],
-            "env": {"PYTHONPATH": str(package_root)},
-        }}}, indent=2), encoding="utf-8")
+        config.write_text(json.dumps({"mcpServers": {"infermatrix-tools": bridge_server(spec_path)}},
+                                     indent=2), encoding="utf-8")
         created.insert(0, config)
         return created
 
@@ -276,15 +254,10 @@ class CursorTransport(HarnessTransport):
                 file_reads=audit.file_reads, writes=audit.writes,
                 other_tool_calls=audit.other_tool_calls, timed_out=timed_out,
                 served_model=usage.served_model)
-        return AgentOutcome(
-            text=self._final_text(events),
-            iterations=0,  # the harness does not expose its round count
-            tool_calls=audit.tool_calls,
-            truncated=timed_out,
-            refusals=[f"audit: {v}" for v in audit.violations],
-            input_tokens=usage.input_tokens,
-            output_tokens=usage.output_tokens,
-            tools_used=audit.tools_used[:40])
+        # Cursor does not expose its round count.
+        return usage.outcome(self._final_text(events), tool_calls=audit.tool_calls,
+                             tools_used=audit.tools_used, truncated=timed_out,
+                             refusals=[f"audit: {v}" for v in audit.violations])
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
@@ -293,20 +266,15 @@ class CursorTransport(HarnessTransport):
         """Tool-less one-shot. Runs in an EMPTY scratch cwd so cursor-agent's
         native tools have nothing to read — the containment for calls that
         need no repo at all (intent, reducer, repair)."""
-        scratch = tempfile.mkdtemp(prefix="imc-cursor-oneshot-")
-        try:
+        with tempfile.TemporaryDirectory(prefix="imc-cursor-oneshot-", ignore_cleanup_errors=True) as scratch:
             events, timed_out = self._run(
                 flatten_messages(system, messages), cwd=scratch,
-                timeout_s=self.settings.strict_backend_timeout_s, model=model)
-        finally:
-            shutil.rmtree(scratch, ignore_errors=True)
+                timeout_s=self.settings.strict_backend_timeout_s, model=model, tool_less=True)
+        from .audit import assert_tool_less
+
+        assert_tool_less(events)
+        if any(event.get("is_error") for event in events if event.get("type") == "result"):
+            raise RuntimeError("cursor tool-less completion errored")
         usage = self._usage(events)
-        text = self._final_text(events)
-        return Reply(
-            blocks=[Block(type="text", text=text)] if text else [],
-            stop_reason="max_tokens" if timed_out else "end_turn",
-            usage={"input_tokens": usage.input_tokens,
-                   "output_tokens": usage.output_tokens,
-                   "cache_read_input_tokens": 0,
-                   "cache_creation_input_tokens": 0},
-            model=usage.served_model)
+        return usage.reply(self._final_text(events),
+                           stop_reason="max_tokens" if timed_out else "end_turn")

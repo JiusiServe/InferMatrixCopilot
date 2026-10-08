@@ -6,6 +6,9 @@ transport or CLI command implementation.
 
 from __future__ import annotations
 
+from ..persistence import atomic_write_bytes
+
+import hashlib
 import json
 import os
 import subprocess
@@ -282,8 +285,27 @@ class RunService:
                 "--execute-strict-reserved"
                 if strict_compat else "--execute-reserved"
             )
+            request_bytes = (run_dir / "request.json").read_bytes()
+            request = json.loads(request_bytes)
+            status = rs.read_status(run_dir) or {}
+            fingerprint = status.get("request_fingerprint")
+            if fingerprint and fingerprint != idem.spec_fingerprint(request):
+                raise PolicyError("reserved request changed before launch")
+            is_direct = status.get("execution_mode") == "direct_review"
+            direct = (request.get("params") or {}).get("direct_review") if is_direct else None
+            if direct is not None:
+                from ..engine.steps.review.direct_run import check_profile
+                trusted = check_profile(direct, getattr(self, "direct_profiles", {}))
+                entry = idem.read_entry(self.run_root, direct["idempotency_key"])
+                if not entry or entry.get("spec_fingerprint") != idem.spec_fingerprint(request):
+                    raise PolicyError("Direct request changed after reservation")
+                env["COPILOT_DIRECT_PROFILE"] = json.dumps(trusted)
+                env["COPILOT_DIRECT_REQUEST_SHA256"] = hashlib.sha256(request_bytes).hexdigest()
+            command = ([sys.executable, "-m", "infermatrix_copilot.engine.steps.review.direct_run", run_id]
+                       if is_direct else
+                       [sys.executable, "-m", "infermatrix_copilot", execute_arg, run_id])
             proc = subprocess.Popen(
-                [sys.executable, "-m", "infermatrix_copilot", execute_arg, run_id],
+                command,
                 stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                 cwd=str(self.run_root), env=env,
                 **popen_kwargs,
@@ -334,6 +356,47 @@ class RunService:
         if created and self._pin_or_fail(run_id):
             self._q.put((run_id, True))
         return run_id, created
+
+    def reserve_direct_review(self, request) -> tuple[str, bool]:
+        """Reserve trusted SDK input using the same identity and worker queue."""
+        from ..engine.steps.review.direct_run import check_profile
+
+        raw = request.to_dict()
+        check_profile(raw, getattr(self, "direct_profiles", {}))
+        review = raw["review"]
+        spec = enforce_strict_review_policy({
+            "kind": "pr_review", "repo": review["repository"]["alias"], "pr": review["pr_number"],
+            "post": False, "expected_head_sha": review["expected_head_sha"], "repo_path": raw["repo_path"],
+            "params": {"carried_findings": review["carried_findings"]},
+        }, allowed_repos=self.settings.mcp_allowed_repos, settings=self.settings)
+        # Only this typed SDK path may add execution input. The MCP allowlist
+        # still strips arbitrary params; Direct never grants write authority.
+        spec = spec.model_copy(update={"params": {**spec.params, "direct_review": raw}})
+        run_id, created = self.reservations.reserve(spec, owner_server_id=self.server_id,
+            owner_server_pid=self.pid, idempotency_key=raw["idempotency_key"])
+        if created and self._pin_or_fail(run_id):
+            self._q.put((run_id, False))
+        return run_id, created
+
+    def find_review(self, key, expected_head_sha):
+        """Recover the original frozen request after an uncertain reservation."""
+        entry = idem.read_entry(self.run_root, idem.validate_key(key))
+        if not entry:
+            return None
+        run_dir = self.reservations.contained_run_dir(str(entry.get("run_id") or ""))
+        spec = json.loads((run_dir / "request.json").read_text(encoding="utf-8"))
+        if entry.get("spec_fingerprint") != idem.spec_fingerprint(spec):
+            raise PolicyError("recovered review request changed after reservation")
+        if (spec.get("kind") != "pr_review" or spec.get("repo") != self.settings.default_repo
+                or spec.get("expected_head_sha") != expected_head_sha):
+            raise PolicyError("recovered review does not match repository and head")
+        with idem.key_lock(self.run_root, key):
+            rs.reconcile_if_dead(run_dir, self.run_root)
+            if idem.relaunchable(run_dir) and rs.reclaim_queued(run_dir,
+                    owner_server_id=self.server_id, owner_server_pid=self.pid):
+                if self._pin_or_fail(run_dir.name):
+                    self._q.put((run_dir.name, "direct_review" not in (spec.get("params") or {})))
+        return run_dir.name
 
     def start_quality_review(self, spec_dict: dict) -> str:
         """Reserve the dedicated, idempotent PR quality workflow."""
@@ -415,9 +478,7 @@ class RunService:
                     "knowledge_tree_sha256": view.tree_sha256}, mode="strict", view=view)
             pin["knowledge_usage"] = usage
         path = self.run_root / run_id / KNOWLEDGE_PIN
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(pin, sort_keys=True), encoding="utf-8")
-        os.replace(tmp, path)
+        atomic_write_bytes(path, json.dumps(pin, sort_keys=True).encode("utf-8"))
         return pin
 
     def strict_readiness(self, repo: str, repo_path: str = "") -> list[str]:
@@ -534,7 +595,12 @@ class RunService:
                                "note": status.get("note", "")}
         if state not in rs.TERMINAL:
             return out  # still queued/planning/running — poll again
-        out["result"] = contract.build_review_result(run_dir)
+        failure = run_dir / "direct-failure.json"
+        if failure.is_file():
+            out["execution_failure"] = json.loads(failure.read_text(encoding="utf-8"))
+        direct = run_dir / "direct-result.json"
+        out["result"] = (json.loads(direct.read_text(encoding="utf-8")) if direct.is_file()
+                         else contract.build_review_result(run_dir))
         report_path = run_dir / "RUN_REPORT.md"
         if state == rs.BLOCKED and (run_dir / "ESCALATION.md").exists():
             report_path = run_dir / "ESCALATION.md"

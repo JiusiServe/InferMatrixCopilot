@@ -110,5 +110,7 @@ class RunReservation:
         except OSError:
             pass
         rs.init_queued(run_dir, run_id=run_id, owner_server_id=owner_server_id,
-                       owner_server_pid=owner_server_pid)
+                       owner_server_pid=owner_server_pid,
+                       request_fingerprint=idem.spec_fingerprint(spec.model_dump()),
+                       execution_mode="direct_review" if "direct_review" in spec.params else "workflow")
         return run_id

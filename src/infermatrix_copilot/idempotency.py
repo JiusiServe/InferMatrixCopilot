@@ -30,6 +30,8 @@ collapse onto one key and an answer for issue #1 could return the run for #500.
 
 from __future__ import annotations
 
+from .persistence import atomic_write_bytes
+
 import hashlib
 import json
 import os
@@ -138,9 +140,7 @@ def write_entry(run_root: Path | str, key: str, run_id: str,
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"key": key, "run_id": run_id, "spec_fingerprint": fingerprint,
                "created": time.time()}
-    tmp = path.with_suffix(f".{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_write_bytes(path, json.dumps(payload, indent=2).encode("utf-8"))
 
 
 def relaunchable(run_dir: Path) -> bool:

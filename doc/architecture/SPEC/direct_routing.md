@@ -1,6 +1,6 @@
 # direct_routing.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~880 · Direct 模式完整策略包与仓库中立的知识路由 · refactor-status: stable`
 
@@ -67,7 +67,8 @@ Direct policy bundle）、`direct_knowledge_routes`、
 
 ## 依赖（允许）
 stdlib + PyYAML + `.adapters`（AdapterError / AdapterRegistry / RepoAdapter）+
-`.knowledge_view` + `.sdk._resources`。
+`.knowledge_view` + `.sdk._resources`；完成门复用 `.sdk.v1.review_result`
+的纯结果校验函数，处置、精简证明和 subtraction 不再维护第二套字段规则。
 位于 `contract.py` 和 `thin_mcp_server.py` 之下。
 
 ## 扩展点

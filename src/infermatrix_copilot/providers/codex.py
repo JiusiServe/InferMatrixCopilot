@@ -26,12 +26,14 @@ import tomllib
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
-from ..llm import Block, Reply
+from ..llm import Reply
 from .base import (
     AgentSessionRequest,
     HarnessTransport,
     SessionUsage,
     flatten_messages,
+    json_events,
+    run_cli,
     sanitized_env,
 )
 from .registry import PROVIDERS
@@ -120,28 +122,10 @@ class CodexTransport(HarnessTransport):
         if mcp_spec is not None:
             cmd += self._mcp_overrides(mcp_spec)
         cmd += ["-"]
-        timed_out = False
-        try:
-            proc = subprocess.run(
-                cmd, input=text, cwd=cwd, env=sanitized_env(),
-                capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=timeout_s, check=False)
-            stdout = proc.stdout or ""
-        except subprocess.TimeoutExpired as exc:
-            timed_out = True
-            raw = exc.stdout or b""
-            stdout = raw.decode("utf-8", "replace") if isinstance(raw, bytes) \
-                else str(raw)
-        events: list[dict] = []
-        for line in stdout.splitlines():
-            line = line.strip()
-            if not line.startswith("{"):
-                continue
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-        return events, timed_out
+        stdout, _, _, timed_out = run_cli(cmd, input=text, cwd=cwd,
+                                          env=sanitized_env(), timeout_s=timeout_s,
+                                          runner=getattr(self, "runner", None))
+        return json_events(stdout), timed_out
 
     @staticmethod
     def _final_text(events: list[dict]) -> str:
@@ -200,15 +184,9 @@ class CodexTransport(HarnessTransport):
                 "harness_session", provider=self.spec.id, step=req.step_name,
                 timed_out=timed_out, item_count=len(events),
                 tool_items=len(used), served_model=usage.served_model)
-        return AgentOutcome(
-            text=self._final_text(events),
-            iterations=0,  # codex does not expose a turn budget/counter
-            tool_calls=len(used),
-            truncated=timed_out,
-            refusals=[],
-            input_tokens=usage.input_tokens,
-            output_tokens=usage.output_tokens,
-            tools_used=used[:40])
+        # Codex does not expose a turn budget/counter.
+        return usage.outcome(self._final_text(events), tool_calls=len(used),
+                             tools_used=used, truncated=timed_out)
 
     def complete(self, *, system: str, messages: list[dict],
                  model: str = "", max_tokens: int | None = None,
@@ -228,13 +206,9 @@ class CodexTransport(HarnessTransport):
         if native_event_sink is not None:
             for event in events:
                 native_event_sink({"type": "native.codex.event", "payload": event})
+        from .audit import assert_tool_less
+
+        assert_tool_less(events)
         usage = self._usage(events)
-        text = self._final_text(events)
-        return Reply(
-            blocks=[Block(type="text", text=text)] if text else [],
-            stop_reason="max_tokens" if timed_out else "end_turn",
-            usage={"input_tokens": usage.input_tokens,
-                   "output_tokens": usage.output_tokens,
-                   "cache_read_input_tokens": 0,
-                   "cache_creation_input_tokens": 0},
-            model=usage.served_model)
+        return usage.reply(self._final_text(events),
+                           stop_reason="max_tokens" if timed_out else "end_turn")

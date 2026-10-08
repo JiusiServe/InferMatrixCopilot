@@ -1,6 +1,6 @@
 # rebase_engine/ —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~7500（26 个模块） · repo-rebase-v3 的原生 rebase 引擎 · refactor-status: ok`
 
@@ -64,6 +64,12 @@ runner/LLM/CI client 全部可注入 —— 每个模块都能离线测试。
   canonical 远端身份；分支缺失时创建走 absence-pinned lease。token 只走
   `http.extraheader`，URL 进 argv 前去凭证，有 token 时 SSH 改写 HTTPS；
   probe/push/WAL 身份共用**同一次**解析的 URL。
+- `push_wal`、`ci_loop` 与 `substate` 复用 `persistence.atomic_write_bytes`，
+  保留 JSON 字节格式、已有普通文件权限和各自 `_sync_directory` 错误策略。
+  目录 fsync 仅容忍原 `_DIR_FSYNC_TOLERATED` 集合；其他目录同步故障仍分别抛
+  `PushWalError`、`CIOpError`、`SubstateError`。文件写入、同步和替换错误仍直接传播，
+  不允许推送或 CI 创建继续。
+  共享 writer 只负责唯一临时文件、文件同步与原子替换，不决定授权、恢复或 WAL 状态。
 - 模式与闸（Rev 8 §2.1/§2.3）：可变模式**只能显式选取**，`report_only=True`
   + 可变模式、strict+with-failures 都 BLOCKED（narrowing 胜，绝不猜）；
   结构性失败总是阻断（除显式 `push_with_failures`，被记录），断言失败
@@ -109,7 +115,7 @@ runner/LLM/CI client 全部可注入 —— 每个模块都能离线测试。
 （`testing/`）；知识存储本体（`memory/`）。
 
 ## 依赖（允许）
-`..push`、`..tools`、`..scopes`、`..run_trace`、`..memory.debug_memory`
+`..push`、`..tools`、`..scopes`、`..run_trace`、`..memory.debug_memory`、`..persistence`
 （migrate 惰性用 `..memory.*`、`..adapters.base`、`..llm`）、
 `..testing.{runner,watchdog,env_plan,process_tree}`；`yaml`；stdlib。
 包内 import 单向。**绝不 import `engine/`**（A2 —— 叶子包）。

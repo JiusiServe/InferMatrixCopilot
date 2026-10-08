@@ -148,6 +148,8 @@ def test_complete_is_toolless_and_scratch(tmp_path):
         (tmp_path / "bin" / "capture.json").read_text(encoding="utf-8"))
     assert "imc-claude-oneshot-" in capture["cwd"]
     argv = capture["argv"]
-    assert "--mcp-config" not in argv  # no tools at all on one-shots
+    assert "--mcp-config" not in argv
+    assert "--strict-mcp-config" in argv
+    assert argv[argv.index("--allowedTools") + 1] == ""
     assert argv[argv.index("--system-prompt") + 1] == "CLASSIFY"
     assert "[USER]\nhi" in capture["stdin"]

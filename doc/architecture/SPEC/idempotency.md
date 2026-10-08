@@ -1,8 +1,8 @@
 # idempotency.py —— 规范
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-08 -->
 
-`LOC ~293 · 持久 idempotency 索引：每键一个 run、一次执行 · refactor-status: ok`
+`LOC ~298 · 持久 idempotency 索引：每键一个 run、一次执行 · refactor-status: ok`
 
 ## 职责
 三个分开解决的问题：(1) **每键一个 run** —— 持久的
@@ -22,7 +22,8 @@
 sha256 —— 之后新增的字段自动纳入，绝不把两个不同请求静默塌到一个键）；
 `index_dir`；`key_lock(run_root, key, timeout=30)`（**阻塞**式上下文管理器
 —— fail-fast 会把一次去重变成一个错误）；`read_entry`/`write_entry`
-（tmp + `os.replace` 原子写）；`relaunchable(run_dir)`；
+（复用 `persistence.atomic_write_bytes`：唯一同目录临时文件、文件 fsync、
+`os.replace`、平台支持时目录 fsync）；`relaunchable(run_dir)`；
 `resolvable(run_dir)`；`reap_stale(run_root, retention_days=30, ...) ->
 {"entries","worktrees","refs"}`。
 
@@ -42,13 +43,15 @@ sha256 —— 之后新增的字段自动纳入，绝不把两个不同请求静
 - ref 回收只限 `refs/imx/<run_id>/*` 前缀 —— 扫描永远不可能解钉一个
   活 run 的 base/head。
 - 无文件锁的平台 fail-closed（`lifecycle.require_file_locking`）。
+- 索引写入仍在原逐键锁下完成；JSON 字段及缩进不变。共享 writer 保留已有
+  普通文件权限，新文件按 `0666 & umask` 创建；存储失败传播，不得返回虚假命中。
 
 ## 边界 —— 不属于这里
 不决定什么被取键（`mcp_server`/`cli/copilot` 的调用方决定）；不执行评审；
 CAS 状态迁移住在 `run_status.py`（`claim_for_execution`/`reclaim_queued`）。
 
 ## 依赖（允许）
-`run_status`、`engine.lifecycle`；`_reap_worktrees`/`_reap_refs` 内部
+`run_status`、`engine.lifecycle`、`persistence`；`_reap_worktrees`/`_reap_refs` 内部
 **惰性** import `engine.worktrees` 与 `engine.steps._common.git`
 （保持模块可独立 import，不拖入整个 step 库）。
 

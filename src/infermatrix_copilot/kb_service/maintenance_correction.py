@@ -8,7 +8,8 @@ from dataclasses import dataclass, replace
 from pathlib import PurePosixPath
 
 from ..knowledge_service.lifecycle import LifecycleError, Page, expected_sources
-from ..knowledge_service.ops import KnowledgeOperation, OperationsResult, apply_operations, page_over_capacity
+from ..knowledge_service.ops import OperationsResult, apply_operations, model_operations, page_over_capacity
+from .intake import draft_operations
 from .maintenance_audit import BudgetGateway, digest, model_family
 from .runtime import gate_and_stage, publish
 
@@ -90,37 +91,41 @@ def propose_correction(rt, lifecycle, store, config, *, run_id, unit, finding, b
     payload = {"unit": unit, "original_source": finding["evidence"],
                "page": base[unit["page"]], "version": unit.get("upstream_pin"),
                "replacement_scope": "page body without frontmatter" if unit["kind"] == "legacy" else "exact supplied block"}
-    reply = gateway.call_json(rt.generator, system=CORRECTION_SYSTEM,
-                              prompt="<untrusted_data>\n" + json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c") + "\n</untrusted_data>")
-    if not reply.served_model:
-        from .models import ModelUnavailable
-        raise ModelUnavailable("correction generator did not report its served model identity", allow_fallback=False)
-    generator_family = model_family(reply.served_model)
-    reviewer_family = model_family(finding.get("reviewer") or "")
-    if not reviewer_family or generator_family == reviewer_family:
-        raise LifecycleError("correction generator and independent reviewer must be different observed model families")
-    if reply.data.get("human_reason"):
-        raise LifecycleError(str(reply.data["human_reason"]))
-    if unit["kind"] == "rule":
-        raw = reply.data.get("operation")
-        if not isinstance(raw, dict) or raw.get("kind") not in {"replace", "retire"}:
-            raise LifecycleError("correction must replace or retire the audited rule")
-        if raw.get("page") != unit["page"] or raw.get("rule_id") != unit["block_id"] or raw.get("new_page") or raw.get("allow_protected"):
-            raise LifecycleError("correction escaped the audited owner or rule")
-        raw = {**raw, "evidence": finding["evidence"][0]["source_reference"]}
-        if raw["kind"] == "retire":
-            raw["reason"] = "incorrect"
-        op = KnowledgeOperation.from_dict(raw)
-        result = apply_operations(base, [op], release=rt.release_for(lifecycle.repo), today=rt.today())
-    else:
-        op, result = correct_prose(base, unit, reply.data.get("replacement"), today=rt.today())
+    def prepare(reply):
+        if not reply.served_model:
+            from .models import ModelUnavailable
+            raise ModelUnavailable("correction generator did not report its served model identity", allow_fallback=False)
+        generator_family = model_family(reply.served_model)
+        reviewer_family = model_family(finding.get("reviewer") or "")
+        if not reviewer_family or generator_family == reviewer_family:
+            raise LifecycleError("correction generator and independent reviewer must be different observed model families")
+        if reply.data.get("human_reason"):
+            raise LifecycleError(str(reply.data["human_reason"]))
+        if unit["kind"] == "rule":
+            raw = reply.data.get("operation")
+            if not isinstance(raw, dict) or raw.get("kind") not in {"replace", "retire"}:
+                raise LifecycleError("correction must replace or retire the audited rule")
+            if raw.get("page") != unit["page"] or raw.get("rule_id") != unit["block_id"] or raw.get("new_page") or raw.get("allow_protected"):
+                raise LifecycleError("correction escaped the audited owner or rule")
+            raw = {**raw, "evidence": finding["evidence"][0]["source_reference"]}
+            if raw["kind"] == "retire":
+                raw["reason"] = "incorrect"
+            op = model_operations({"operations": [raw]}, kinds=("replace", "retire"))[0]
+            result = apply_operations(base, [op], release=rt.release_for(lifecycle.repo), today=rt.today())
+        else:
+            op, result = correct_prose(base, unit, reply.data.get("replacement"), today=rt.today())
+        return (op, result), "", ""
+
+    reply, (op, result), _ = draft_operations(gateway, rt.generator, system=CORRECTION_SYSTEM,
+        prompt="<untrusted_data>\n" + json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c") + "\n</untrusted_data>",
+        prepare=prepare, max_repairs=0, traced=False)
     observer = rt.upstream_facts(lifecycle)
     pin = finding["evidence"][0]["sha"]
     gated_rt = replace(rt, gateway=gateway,
                        upstream_facts=lambda _: PinnedObserver(observer, pin) if observer else None)
     # Full, separate L1/L2/consistency review. Draft rationale and old audit
     # verdicts are deliberately absent from the gate's evidence packet.
-    from .maintenance import policy_digest
+    from .maintenance_policy import policy_digest
     changeset = gate_and_stage(gated_rt, lifecycle, rt.lease_owner, kind="correction" if publish_result else "maintenance_calibration", base=base,
                               base_sha=base_sha, external=rt.knowledge.external_texts(base_sha),
                               operations=[op], result=result, evidence=finding["evidence"],

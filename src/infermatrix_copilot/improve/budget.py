@@ -48,6 +48,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from ..trace_store import current_store, file_lock
+from ..budgeting import bind_call_budget, request_cost_bound, reservation_fits, settlement_charge, usage_cost
+from ..persistence import atomic_write_bytes
 
 _GOVERNOR: contextvars.ContextVar["Governor | None"] = contextvars.ContextVar("improve_governor", default=None)
 
@@ -85,22 +87,17 @@ def worst_case_usd(model: str, req_bytes: int, max_tokens: int, settings: Any = 
     input_bound = max(req_bytes, limit)
     read_factor = float(getattr(settings, "cache_read_price_factor", 0) or 0) or CACHE_READ_FACTOR
     input_factor = max(1.0, CACHE_CREATE_FACTOR, read_factor)
-    return input_bound / 1e6 * pin * input_factor + max(0, int(max_tokens or 0)) / 1e6 * pout
+    return request_cost_bound(input_bound, pin, max(0, int(max_tokens or 0)), pout,
+                              cache_factor=input_factor)
 
 
-def actual_usd(model: str, usage: dict | None, settings: Any = None) -> float:
+def actual_usd(model: str, usage: dict | None, settings: Any = None) -> float | None:
     """The cache-aware cost of a call, as `metrics.cost_from_spans` prices it."""
     from ..metrics import CACHE_CREATE_FACTOR, CACHE_READ_FACTOR, model_price
 
     pin, pout = model_price(model, settings)
     read_f = float(getattr(settings, "cache_read_price_factor", 0) or 0) or CACHE_READ_FACTOR
-    u = usage or {}
-    tin = int(u.get("input_tokens") or 0)
-    tout = int(u.get("output_tokens") or 0)
-    cread = int(u.get("cache_read_input_tokens") or u.get("cache_read_tokens") or 0)
-    ccreate = int(u.get("cache_creation_input_tokens") or u.get("cache_creation_tokens") or 0)
-    return (tin / 1e6 * pin + tout / 1e6 * pout + cread / 1e6 * pin * read_f
-            + ccreate / 1e6 * pin * CACHE_CREATE_FACTOR)
+    return usage_cost(usage, pin, pout, cache_read_factor=read_f, cache_create_factor=CACHE_CREATE_FACTOR)
 
 
 class Governor:
@@ -130,9 +127,7 @@ class Governor:
 
     def _save(self, week: str, state: dict) -> None:
         path = self._path(week)
-        tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex[:6]}.tmp")
-        tmp.write_text(json.dumps(state, indent=1), encoding="utf-8")
-        tmp.replace(path)
+        atomic_write_bytes(path, json.dumps(state, indent=1).encode("utf-8"))
 
     @contextmanager
     def _locked(self, week: str) -> Iterator[dict]:
@@ -175,7 +170,7 @@ class Governor:
         week = self.week()
         with self._locked(week) as state:
             self._stop_if_breached(state)
-            if state["usd_settled"] + self._reserved(state) + est > self.usd_week + 1e-12:
+            if not reservation_fits(self.usd_week, state["usd_settled"], self._reserved(state), est):
                 state["refused"] += 1
                 raise BudgetRefused(
                     f"reserving ${est:.4f} for {model} would exceed the weekly envelope "
@@ -188,40 +183,49 @@ class Governor:
     def _week_of(reservation_id: str) -> str:
         return reservation_id.split("|", 1)[0]
 
-    def settle_call(self, reservation_id: str, usage: dict | None, model: str) -> float:
-        """Replace the reservation by the actual cache-aware cost, in the
-        reservation's week; a cost above the reservation is a breach
-        (persisted, governor marked, exception)."""
-        actual = actual_usd(model, usage, self.settings)
+    def _finish_call(self, reservation_id, actual, model, outcome):
         week = self._week_of(reservation_id)
         breached = False
         with self._locked(week) as state:
-            reservation = state["reservations"].pop(reservation_id, None)
-            state["usd_settled"] += actual
-            if reservation is not None and actual > float(reservation["usd"]) + 1e-9:
+            receipts = state.setdefault("settlements", {})
+            identity = {"actual": actual, "model": model, "outcome": outcome}
+            previous = receipts.get(reservation_id)
+            if previous is not None:
+                if any(previous[key] != value for key, value in identity.items()):
+                    raise BudgetRefused("reservation already has a different settlement")
+                if previous["breached"]:
+                    raise BudgetBreach("settlement exceeded its reservation: cycle aborted")
+                return previous["charged"]
+            reservation = state["reservations"].get(reservation_id)
+            if reservation is None:
+                raise BudgetRefused("unknown reservation: no settlement authority")
+            if model and model != reservation["model"]:
+                raise BudgetRefused("settlement model differs from reservation")
+            charged = 0.0 if outcome == "released" else settlement_charge(reservation["usd"], actual, outcome=outcome)
+            breached = charged > float(reservation["usd"]) + 1e-9
+            receipts[reservation_id] = {**identity, "charged": charged, "breached": breached}
+            del state["reservations"][reservation_id]
+            state["usd_settled"] += charged
+            if breached:
                 state["breaches"].append({"reservation": reservation_id, "reserved": reservation["usd"],
-                                          "actual": actual, "model": model, "at": self._clock()})
-                breached = True
+                                          "actual": charged, "model": model, "at": self._clock()})
         if breached:
             self.breached = True
-            self._record_breach(reservation_id, model, actual)
-            raise BudgetBreach(f"settlement ${actual:.4f} exceeded its reservation for {model}: cycle aborted")
-        return actual
+            self._record_breach(reservation_id, model, charged)
+            raise BudgetBreach(f"settlement ${charged:.4f} exceeded its reservation for {model}: cycle aborted")
+        return charged
+
+    def settle_call(self, reservation_id: str, usage: dict | None, model: str) -> float:
+        """Settle once in the reserved week; absent usage retains the full amount."""
+        return self._finish_call(reservation_id, actual_usd(model, usage, self.settings), model, "completed")
 
     def release_call(self, reservation_id: str) -> None:
         """Drop a reservation for a call that failed BEFORE it was sent."""
-        with self._locked(self._week_of(reservation_id)) as state:
-            state["reservations"].pop(reservation_id, None)
+        self._finish_call(reservation_id, None, "", "released")
 
     def forfeit_call(self, reservation_id: str) -> float:
-        """A call that was sent but whose usage is unknown (an interrupted
-        stream, a transport error after billing may have happened): the whole
-        reservation is charged as spent — the conservative side."""
-        with self._locked(self._week_of(reservation_id)) as state:
-            reservation = state["reservations"].pop(reservation_id, None)
-            charged = float(reservation["usd"]) if reservation else 0.0
-            state["usd_settled"] += charged
-        return charged
+        """Retain the whole reservation when dispatch may have been billed."""
+        return self._finish_call(reservation_id, None, "", "unknown")
 
     # -- named (planned) reservations -----------------------------------------------------
     def reserve_named(self, name: str, usd: float) -> None:
@@ -231,7 +235,7 @@ class Governor:
         with self._locked(week) as state:
             self._stop_if_breached(state)
             already = float(state["named"].get(name, 0.0))
-            if state["usd_settled"] + self._reserved(state) - already + float(usd) > self.usd_week + 1e-12:
+            if not reservation_fits(self.usd_week, state["usd_settled"], max(0, self._reserved(state) - already), float(usd)):
                 state["refused"] += 1
                 raise BudgetRefused(f"holding ${float(usd):.2f} for {name} would exceed the weekly envelope")
             state["named"][name] = float(usd)
@@ -243,22 +247,35 @@ class Governor:
 
     # -- judge calls ----------------------------------------------------------------------
     def reserve_judge_call(self) -> str:
-        """Reserve one judge call in the current week; returns a token that
-        pins the week, so a call crossing the boundary settles where it was
-        reserved."""
+        """Reserve one judge call; the token retains its original ISO week."""
         week = self.week()
+        token = f"{week}|judge|{uuid.uuid4().hex[:8]}"
         with self._locked(week) as state:
             self._stop_if_breached(state)
-            if state["judge_calls"] + state["judge_reserved"] + 1 > self.judge_calls_week:
+            if not reservation_fits(self.judge_calls_week, state["judge_calls"], state["judge_reserved"], 1, tolerance=0):
                 state["refused"] += 1
                 raise BudgetRefused(f"the weekly judge-call envelope ({self.judge_calls_week}) is exhausted")
             state["judge_reserved"] += 1
-        return f"{week}|judge|{uuid.uuid4().hex[:8]}"
+            state.setdefault("judge_tokens", {})[token] = "reserved"
+        return token
 
     def settle_judge_call(self, token: str | None = None) -> None:
         week = self._week_of(token) if token else self.week()
         with self._locked(week) as state:
-            state["judge_reserved"] = max(0, state["judge_reserved"] - 1)
+            tokens = state.setdefault("judge_tokens", {})
+            if token is None:
+                token = next((key for key, value in tokens.items() if value == "reserved"), None)
+                if token is None and state["judge_reserved"] > 0:
+                    # Legacy files recorded only the count, without token identities.
+                    state["judge_reserved"] -= 1
+                    state["judge_calls"] += 1
+                    return
+            if token not in tokens:
+                raise BudgetRefused("unknown judge reservation")
+            if tokens[token] == "settled":
+                return
+            tokens[token] = "settled"
+            state["judge_reserved"] -= 1
             state["judge_calls"] += 1
 
     def clear_breach(self, week: str | None = None) -> None:
@@ -281,9 +298,32 @@ class Governor:
 
 @contextmanager
 def governed(governor: "Governor | None") -> Iterator["Governor | None"]:
+    def acquire(request):
+        # Subscription sessions retain their separate judge-call policy. Only
+        # bounded API round trips draw against this dollar envelope.
+        if request.get("kind", "api") != "api":
+            return None
+        model = request["model"]
+        return (governor.reserve_call(model, request_bytes(request),
+                                      int(request.get("max_tokens") or 0),
+                                      purpose=request.get("role") or ""), model)
+
+    def finish(ticket, facts):
+        if ticket is None:
+            return
+        reservation, model = ticket
+        usage = facts["usage"]
+        if usage is not None:
+            governor.settle_call(reservation, usage, model)
+        elif facts["sent"]:
+            governor.forfeit_call(reservation)
+        else:
+            governor.release_call(reservation)
+
     token = _GOVERNOR.set(governor)
     try:
-        yield governor
+        with bind_call_budget("improve-weekly", acquire if governor else None, finish):
+            yield governor
     finally:
         _GOVERNOR.reset(token)
 

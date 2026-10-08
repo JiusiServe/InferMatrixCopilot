@@ -59,7 +59,6 @@ CALIBRATION_DIR = "kb-calibration"
 MIN_TRUSTED_BAD = 5
 RULE_STAGES = tuple(s for s in STAGES if s not in ("feature-discovery", "knowledge", "harvest-calibration"))
 MUTATIONS = ("broken_path", "shifted_range", "negated", "sibling_evidence")
-_HEADER = re.compile(r"^knowledge_lifecycle:\s*(?:#.*)?$")
 _CALIBRATION_LINE = re.compile(r"^(?P<indent>[ \t]+)calibration_set:(?P<space>[ \t]*)(?P<value>[^#\n]*?)"
                                r"(?P<comment>[ \t]+#[^\n]*)?(?P<eol>\r?\n|)$")
 _CASE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
@@ -98,18 +97,8 @@ def set_calibration_set(text: str, value: str = CALIBRATION_DIR) -> str:
     edited in place: one line changes or is appended to the block; every
     other line is kept byte for byte. Raises ``InitError`` when the manifest
     names another calibration set (init only writes ``kb-calibration``)."""
-    lines = text.splitlines(keepends=True)
-    header = next((i for i, line in enumerate(lines) if _HEADER.match(line.rstrip("\r\n"))), None)
-    if header is None:
-        raise InitError("the adapter manifest has no top-level knowledge_lifecycle block")
-    end = header + 1
-    while end < len(lines):
-        line = lines[end]
-        if line.strip() and not line[:1].isspace() and not line.lstrip().startswith("#"):
-            break
-        end += 1
-    indent = next((m.group(1) for line in lines[header + 1:end]
-                   for m in [re.match(r"^([ \t]+)\S", line)] if m and not line.lstrip().startswith("#")), "  ")
+    from .init_deepen import _lifecycle_block
+    lines, header, end, indent = _lifecycle_block(text)
     for i in range(header + 1, end):
         match = _CALIBRATION_LINE.match(lines[i])
         if not match or match.group("indent") != indent:

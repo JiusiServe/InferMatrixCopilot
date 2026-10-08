@@ -45,12 +45,7 @@ CONFIG_MERGE = ("must allow a direct merge",)
 # a refused local-gate merge that is about the moment, not the change: sign again
 TRANSIENT_MERGE = ("main kept moving", "not merging:", "head of PR", "head moved", "git ", "gh ",
                    "did not merge", "is not open", "verdict: ")
-KNOWLEDGE_REPO_ENV = "KB_KNOWLEDGE_REPOSITORY"
-DEFAULT_KNOWLEDGE_REPOSITORY = "JiusiServe/InferMatrixCopilot"
-
-
-def knowledge_repository() -> str:
-    return os.environ.get(KNOWLEDGE_REPO_ENV, DEFAULT_KNOWLEDGE_REPOSITORY)
+from .config import KNOWLEDGE_REPO_ENV, DEFAULT_KNOWLEDGE_REPOSITORY, knowledge_repository
 
 
 # the transition each outbox item kind drives: (state before, state after)
@@ -497,14 +492,14 @@ def advance(rt, lifecycle) -> list[str]:
                 continue  # one merge in flight per repository
             maintenance = {}
             if changeset["kind"] == "correction":
-                from .maintenance import correction_publishable, _required_ci
+                from .maintenance_policy import correction_publishable, required_ci
                 from .containment import merge_authorization
                 try:
                     reason = correction_publishable(rt, changeset)
                     if reason:
                         events.append(f"correction_held {changeset['id']}: {reason}")
                         continue
-                    _required_ci(rt, changeset)
+                    required_ci(rt, changeset)
                     maintenance = {"maintenance_required": True, "maintenance": merge_authorization(rt, changeset)}
                 except (ValueError, RuntimeError, OSError) as exc:
                     events.append(f"correction_held {changeset['id']}: {exc}")

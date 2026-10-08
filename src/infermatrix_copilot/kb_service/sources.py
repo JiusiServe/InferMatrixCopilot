@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from ..git_objects import checked_read, raw_changes, tree_entries, tree_texts
+
 KNOWLEDGE_SUFFIXES = (".md", ".yaml")
 EXTERNAL_REF_DIRS = ("skills/", "plugins/", "adapters/", "doc/", "playbooks/")
 MAX_BODY_CHARS = 3000
@@ -49,34 +51,7 @@ class KnowledgeRepo:
         return self._git("rev-parse", f"{self.remote}/{self.branch}").decode().strip()
 
     def _texts(self, rev: str, prefixes: tuple[str, ...], suffixes: tuple[str, ...] | None) -> dict[str, str]:
-        listing = self._git("ls-tree", "-r", "-z", "--full-tree", rev).split(b"\0")
-        wanted: list[tuple[str, str]] = []
-        for entry in listing:
-            if not entry:
-                continue
-            meta, _, path = entry.partition(b"\t")
-            mode, kind, oid = meta.decode().split()
-            name = path.decode("utf-8", "replace")
-            if kind != "blob" or mode != "100644":
-                continue
-            if not name.startswith(prefixes) or (suffixes and not name.endswith(suffixes)):
-                continue
-            wanted.append((name, oid))
-        if not wanted:
-            return {}
-        out = self._git("cat-file", "--batch", input="".join(f"{oid}\n" for _, oid in wanted).encode())
-        texts: dict[str, str] = {}
-        cursor = 0
-        for name, _oid in wanted:
-            header_end = out.index(b"\n", cursor)
-            size = int(out[cursor:header_end].split()[2])
-            body = out[header_end + 1: header_end + 1 + size]
-            cursor = header_end + 1 + size + 1
-            try:
-                texts[name] = body.decode("utf-8")
-            except UnicodeDecodeError:
-                continue
-        return texts
+        return checked_read(SourceError, tree_texts, self._git, rev, prefixes, suffixes or None)
 
     def fetch_pull(self, number: int) -> str:
         """Fetch a pull request's head as data (never checked out); its SHA."""
@@ -124,17 +99,8 @@ class KnowledgeRepo:
     def raw_manifest(self, old: str, new: str) -> list[dict]:
         """Every changed path as a verdict manifest entry (renames are D + A),
         the exact form the verifier recomputes."""
-        out = self._git("diff", "--raw", "-z", "--no-renames", "--no-abbrev", old, new).split(b"\0")
-        entries, zero = [], "0" * 40
-        for index in range(0, len(out) - 1, 2):
-            old_mode, new_mode, old_blob, new_blob, status = out[index].decode()[1:].split()
-            entries.append({
-                "path": out[index + 1].decode("utf-8", "replace"), "status": status[0],
-                "old_blob": "" if old_blob == zero else old_blob, "new_blob": "" if new_blob == zero else new_blob,
-                "old_mode": "" if old_mode == "000000" else old_mode,
-                "new_mode": "" if new_mode == "000000" else new_mode,
-            })
-        return entries
+        return checked_read(SourceError, lambda: raw_changes(
+            self._git("diff", "--raw", "-z", "--no-renames", "--no-abbrev", old, new)))
 
     def first_parent_commits(self, old: str, new: str) -> list[tuple[str, list[str], float, str]]:
         """(sha, parents, commit time, message) on new's first-parent chain
@@ -156,12 +122,8 @@ class KnowledgeRepo:
         the mode is part of the identity (an executable bit is a change)."""
         if not paths:
             return {}
-        out = self._git("ls-tree", "-z", "--full-tree", rev, "--", *paths).split(b"\0")
-        found = {}
-        for entry in out:
-            if entry:
-                meta, _, name = entry.partition(b"\t")
-                found[name.decode("utf-8", "replace")] = meta.decode()
+        found = {name.decode("utf-8", "replace"): f"{mode} {kind} {oid}"
+                 for mode, kind, oid, name in tree_entries(self._git("ls-tree", "-z", "--full-tree", rev, "--", *paths))}
         return {path: found.get(path, "") for path in paths}
 
     def changed_names(self, old: str, new: str) -> list[str]:

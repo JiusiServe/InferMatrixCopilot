@@ -1,8 +1,12 @@
 # improve/ —— 规范（元改进引擎）
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `设计：/data/zhoutaichang/copilot/meta-improvement-engine-design.md v1（GPT-6 sol 批准 2026-09-29） · refactor-status: building (P0–P4 已落地)`
+
+周预算复用公共金额规则与显式 dispatch 预算绑定，保留周 JSON 与跨周 ID。
+未知或不可信用量按完整预留结算；追加结算回执使同一 token 的重复结算幂等，
+不同结算内容被拒绝。旧待结算额度继续占用，持久化失败继续传播。
 
 ## 职责
 面向任意 trace/1 工作流的"取证—候选—可信目标实验—自动采用—上线观察／自动回滚"循环。使用入口和数据契约见 [自进化使用指南](../../guide/self-evolution.md)。引擎的写权限限于追加自己的 trace/1 记录、
@@ -29,9 +33,9 @@
 | `lints.py` | P1 | Tier 1 的 17 条确定性 lint（L01–L17，每条带版本与出处）；`Baseline` 稳健 z（MAD 下限 = 中位数的 10%）；L13 隔离 |
 | `ledger.py` | P1 | 每工作流 JSON 账本：周期统计、基线样本、提案状态机（open → experiment-registered → supported/neutral/refuted/underpowered → landed/closed；30 天无人触碰 → stale）、hold、通道活性；每次变更同时写 `decision` |
 | `cycle.py` | P1 | 周期：preflight（`improve_enabled` 是 kill switch）→ lints + 基线 → 账本 + Tier 1 提案（lint 恶化 ≥1.5× 且 ≥3 单元）→ stale 清扫 → 报告（`reports/cycle-*.md/json`）+ `decision(type=cycle)`；`is_due`/`maybe_run_weekly` 是周度槽位 |
-| `adapters/__init__.py` | P2 | 结果适配器契约：金标矩阵（`match()` → recall 与阶段归因）与 finding 级有效性（`findings()` → precision）两个数据模型不混用；评审级判官分数（`review_scores()`）原样保留；`scores_from` 给每个数字标来源 |
+| `adapters/__init__.py` | P2 | 结果适配器契约：金标矩阵（`match()` → recall 与阶段归因）与 finding 级有效性（`findings()` → precision）两个数据模型不混用；`scores_from` 标来源；`collect_gold_votes/record_gold_match/gold_matches` 共用逐字引用验证、多数投票、记录及回放，领域 prompt 与空输入政策仍归各 adapter |
 | `gold.py` | P2 | 策展金标集：`gold_id = sha256(item+path+规范化 concern)[:12]`，`draft` 由原始评论生成、只有 `curated` 才被使用，改措辞即新条目，文件 sha 即版本 |
-| `judges.py` | P2 | `run_judge`：API 判官走 `LLM.create`，CLI 判官走 `governed_subprocess`（预留判官次数、无工具、空工作区、流中出现工具调用即作废），都写 `model_call` |
+| `judges.py` | P2 | `run_judge`：API 判官走 `LLM.create`；CLI 判官复用注册表 transport 与 `complete_native`（显式绑定判官次数、无工具 profile、空工作区；Cursor/Codex/Claude 工具事件或未知内容块即作废，ZCode 保留超大 prompt 附件读取与 scratch 容纳审计）；删除独立 CLI 执行与归档主体，统一写 `model_call` |
 | `stats.py` | P2 | 配对、按 item 聚类的 t 区间（移植 `paired_analysis.py`）、所需 item 数、五种标签、Cohen κ |
 | `adapters/review_eval.py` | P2 | eval 评审适配器：导入 `judge_val` 配对 verdict 为 `judge_verdict` outcome；`gold_match` 判官（3 票多数、hit 须逐字引用）写 `gold_match` outcome；`match()` 只读记录 |
 | `adapters/rb_review.py` | P2 | RB 生产适配器：PR 线程代理标签（accepted/disputed/silent）→ finding 级有效性，`descriptive_only`，无金标、不注册实验 |
@@ -39,7 +43,8 @@
 | `workflows/kb-intake.yaml` | P2+ | 起草步骤的声明：static/step_call，item `{repo}#{pr}`，指纹覆盖 `kb_service/intake.py`、`KB_GENERATOR`/`KB_DRAFT_STRATEGY`、`zcode_reasoning_level`、copilot_sha；`kb_service.runtime` 为每次起草盖上 workflow/unit_id/item/fingerprint |
 | `forensics.py` | P2 | 覆盖矩阵（确定性）、S0–S10 阶段分类法、取证 agent（只读 trace 工具、全部输出围栏为不可信数据、必须引用记录 id）、双家族交叉复核（不一致 = disputed）、整改清单、测量健康 |
 | `meta.py` | P2 | 冻结元基准：`eval/dataset/meta/cases`（trace + 人工阶段标签）与 `meta/lints`（注入缺陷样本）的导出与加载 |
-| `budget.py` | P3 | 周包络（美元 + 判官次数，按 ISO 周持久化、跨进程加锁）：每次模型调用发出前按最坏情况预留（输入 = 可见请求字节数与精确模型上下文上限的较大值，按最高输入／缓存单价计；输出 = `max_tokens`；无价格即拒绝）、返回后按实际用量结算；`结算 > 预留` 记 `budget_breach` 并中止；`governed()`/`current_governor()` 供 `LLM.create` 与 `run_judge` 使用 |
+| `budget.py` | P3 | 周包络（美元 + 判官次数，按 ISO 周持久化、跨进程加锁）：最坏情况预留（输入为可见请求字节数与精确模型上下文上限的较大值，按最高输入／缓存单价计；输出为 `max_tokens`；无价格拒绝），超额记 `budget_breach` 并中止；`governed()` 绑定公共 `call_budget` 的 API 账户，`current_governor()` 兼容既有领域入口；CLI judge 单独绑定判官次数，存储和结算政策不移入 transport |
+| `execution.py` | P4 | 应用装配：复制 registry 并绑定工作流 runtime settings、review 制品 hook、声明指纹和 shadow risk gate；周账户通过可组合 context manager 安装，Executor 不导入 improve 领域 |
 | `experiments.py` | P3 | 预注册（Tier 2 且非 descriptive-only、API 后端、指纹 diff 非空且不触及元基准、每个 item 有金标、按历史 sd 算 `n_required`、成本预留）→ 影子运行（stage → 每 item×replicate×臂 一个子进程、`PR_SNAPSHOT_FILE` 交接、指纹核对、L13/预算/崩溃隔离）→ 配对判定（`n_retained` 重算功效、五种标签、`experiment_verdict` 记录、提案状态推进） |
 | `publish.py` | P4 | 提案发布：引用只以记录 id + blob 哈希（`excerpt_for` 逐字摘录 ≤20 行、脱敏、`verify_excerpt` 可由哈希复原）；`lint_proposal` 拒绝任何不可解析引用（Tier 1 ≥3 条记录，Tier 2 S1–S9 + 损失量）；固定 issue 模板（主张/阶段/损失/证据/建议预注册/账本/marker）；`ProposalOutbox` 文件协议 `improve-outbox/1`（`actions/` 引擎写、`acks/` 与 `inbox/` maintainer routine 写）；`plan`/`publish`（open/update/close，hold 暂停发布、待 ack 不重发）；`sync`（ack → issue 与已发布状态；inbox → 人类触碰、`maintainer: hold`、合并 PR → landed、GitHub 关闭 → closed；Tier 1 landed 在后一周期 lint 率低于开单时才 close） |
 | `adapters/meta_bench.py` | P4 | 引擎自身的结果适配器（§11.2）：金标 = 元基准 case 的人工阶段标签；outcome = `meta_eval` 记录；hit = 标签一致、disputed = 双家族不一致、S0 = unlabeled；`review_scores` = κ、lint 召回；`human_labelled`（无判官） |
@@ -47,14 +52,23 @@
 | `cli.py` | P0–P4 | `improve migrate-index|rebuild-index|rollback-index|compare-index|verify-index|cycle|ledger|lints|gold draft/check|meta lint-check/bench|budget|experiment register/run/list|publish [--dry-run]|sync` |
 
 ## 接入点
-- 执行器：`settings.trace_store_root` 非空时绑定 store 并为每步绑定单元上下文；`settings.improve_shadow` 下拒绝非 read/report 步骤。
+- `execution` 在应用边界装配登记步骤的配置、活动制品、预算绑定和 shadow 权限；Executor 只接收通用回调。`coordinator.run_async` 以同一 `WorkflowExecution.execute` 推进业务阶段，旧同步 `run` 兼容 CLI。coordinator 账本持有周度事实和付费意图；不同 workflow/repo 的 forensics 使用不同 trace unit_id。已发送但结果未知的取证阶段不自动重派。
+- 应用执行装配：`WorkflowExecution.execute` 使用 `bind_execution` 绑定工作流指纹、制品 hook 与 shadow risk gate；Executor 仅消费上下文和授权 callback，并在缓存重放前执行授权。`settings.trace_store_root` 非空时仍绑定 store。
 - `tools.dispatch` / `LLM.create` / `HarnessLLM.create` / `run_harness_step` / MCP bridge：全保真采集。
 - `kb serve` 调度器：每 tick 调 `_improve_cycle()`，周度槽位到达即跑一次周期（与知识服务同一租约、异常隔离）。
 - 任务种类 `workflow_improve`（L2，READ_ONLY_KINDS）；playbook `workflow-improve`（mode → preflight → sync → lint → experiments → forensics → ledger → publish → report）；`improve.publish` 是唯一 `risk=push` 步骤，与 `pr.post_review` 同样过"TaskSpec `post` 且 ALLOW_POST=1"双门，否则 dry-run 打印将写的 outbox 动作。
-- `LLM.create`：绑定了 governor 时先预留再发请求，失败释放、成功结算；`improve.experiments` 与 `improve.forensics` 都在 `governed()` 内运行。
+- `LLM.create`：绑定 governor 后先持久预留；未派发的失败释放，已派发但无可信用量的调用按完整预留结算，可信用量按实际费用结算；`improve.experiments` 与 `improve.forensics` 都在 `governed()` 内运行。
 - `improve.forensics` 步骤：对每个有结果适配器的工作流建覆盖矩阵、用两个模型家族归因每个 miss、产出整改清单并按阶段各开一条 Tier 2 提案（`cycle.open_tier2_proposals`，带建议预注册；descriptive-only 工作流的提案标 proxy、无建议）；单元数低于 `tier2_min_items` 或无 LLM 时跳过并说明。`--task-param meta_case=<case>` 时（`improve.mode` 发布 `improve_meta`）只跑取证步骤：对一个冻结 case 归因并写 `meta_eval` outcome——这就是自实验的影子单元（`experiments.meta_run_unit` / `_meta_stage` 只把 case 与 lint 样本复制进影子目录，不带任何叙述材料）。
 - `improve.sync`（read）读回 acks/inbox；`improve.publish`（**`risk="push"`**，唯一外向写）：无 `post` 意图只预览、有意图但 `ALLOW_POST=0` 为 dry-run、二者俱备才写 `improve_outbox_dir` 下的动作文件（`improve_proposal_repo` 必填）；影子运行被执行器在步骤前拒绝。
 - 自实验：`experiments.run` 对 `human_labelled` 适配器不要求判官；`_find_unit` 优先取声明工作流的单元。
+- 周 coordinator 保留周槽位、跨进程 lease、领域完成记录和付费前中断意图；
+  lint/experiments/forensics/evolve 由 `WorkflowExecution.execute` 驱动，步骤关闭通用缓存，
+  不以第二份 checkpoint 覆盖付费恢复事实。不同 workflow/repo 的取证有独立 unit_id。
+
+公共投票内核仍按全部投票数（包括错误票）计算多数门槛；无结论不缓存。
+空 review 保持 unknown，空知识提案保持确定性 miss；各自 quote 提示和 trace 字段不变。
+Native judge 的 capture 复用 production completion 的 messages/1 请求形状，
+CLI 订阅计数与实际未知美元费用分别理解，不以订阅字段宣称实测免费。
 
 ## 不变量
 - 既有提案的外向写是 `improve.publish`，代码候选另由 `improve.evolve_publish` 经 post/push 双门写独立 outbox；引擎不持有 GitHub 令牌，issue 的开/改/关由 maintainer routine 执行并以 ack 回报。

@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -9,7 +9,10 @@
   `portable_init` 创建本地受审工作区，`portable_commands` 提供 onboard、register、
   目录接受、发布和增量批次准备，不伪造已合并 PR。见 [通用知识库流程](../portable-kb.md)。
 - 功能发现：文档轮、源码轮、独立评审、最多两轮残留补查；共享完整库存和入口/契约单元，
-  单项最多三次修正，失败保持未知。`evidence_bundle` 将固定哈希行段传给后续阶段。
+  单项最多三次修正，失败保持未知。`evidence_bundle` 将固定哈希行段传给后续阶段；
+  `merge_ranges/selected_spans` 复用闭区间合并，保留路径顺序、精确行文本与未读缺口，
+  不扩大源码证据。发现评审与两类目录补审共用有界批次收集，仍分别绑定原审批身份，
+  每批完成即保存；预算耗尽保留已完成结果，未知项不能转为支持。
 - 存储与接受：`knowledge_store` 单一主存储加只读镜像；`portable_publication` 区分 foundation
   与 final，默认只激活真实最终回执，显式 partial 仍为未完成。最终复核完整生产库存、
   七维分别 >90%、每功能认可和 ≥85% 结构覆盖，原生认可由 `native_depth_audit` 重放。
@@ -40,6 +43,14 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 `test_kb_service_core.py`。
 
 ## 2026-10-08 持久夜间维护与撤回
+
+- 分层见 [知识初始化与维护](../knowledge-lifecycle.md)。`maintenance.plan/status` 只读，
+  `request` 只入队，`run_due` 验证既有租约并保持先纠错后复查和即时纠错事件记录。
+  `maintenance_policy` 集中策略指纹、就绪、发布资格和精确提交 CI；
+  `maintenance_resolution` 负责持租约的处置验证及追加，调度不依赖 CLI 实现。
+- `init_content` 从 `_Stage` 提取纯规则放置与容量处理，显式返回 `PlacementResult`；
+  阶段继续负责 pin、前置条件、记录、恢复、审核与发布。`init_budget.Budget` 通过可选
+  检查点回调替代重复包装，原有记录／journal 格式、恢复总额和协调器写入所有权不变。
 
 - `maintenance` 在现有 scheduler 租约内运行 Shanghai 01:00 的可恢复周期；
   `maintenance_units` 对不变的规则和说明文本也重新质疑，快照、策略与公平分母在周期开始时固定。
@@ -92,6 +103,9 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   `apply_operations` 必须接受，最多两轮带精确错误的修复；多事件合并为一个变更集。
   系统提示明确操作字段的字符串类型；未用可选字段省略或为空字符串，`new_page` 是目标路径而非布尔标志。
   原生起草与 `kb-intake.draft` 共用 `draft_changes` 的提示，严格 schema 校验保持不变。
+  `draft_operations` 与 SDK curator 复用 `knowledge_service.drafting.bounded_attempts`；
+  操作集合、schema 修复、接受条件与 trace 仍由各领域入口决定。空接受结果不同于拒绝，
+  异常不隐式重派，终止反馈不触发下一轮调用。
 - `gate`：L1 → 逐块 L2（每类块只问适用维度）→ 按 owner 目录的一致性检查；
   外部引用、protected、熔断（按仓库计算）、任何不确定 → human；L1 失败不调用模型。
 - `runtime`：collect → intake → gate → publish；shadow 只记录；变更集文件存 `changesets/<id>.json`。
@@ -849,7 +863,7 @@ Direct 的产品就是内嵌地图：知识侧 `_routes.yaml` 路由到的每个
   推导 owner 时跳过 briefing 文档（清单），`_owners_with_room` 把没有容量放地图的既有 owner 页改指到本阶段承接了
   它溢出规则的页（`_place` 记录的 `_spilled_from`；同目录的其他新页——比如种子页——装的是别的知识，不算），没有这样的页就
   丢弃该 owner 并记入清单。
-- 容量：`_apply` 在 `apply_operations` 之后把每个写入的规则页连同渲染出的地图（按 routes 文件里该页 owner 的真实触发词与前缀，`_map_inputs`）一起过 `page_over_capacity`（`_check_capacity_with_map`），超出即报 page full，由 `_place` 溢出到同级页——地图每条规则一行，只量规则会让页面
+- 容量：`_apply` 在 `apply_operations` 之后把每个写入的规则页连同渲染出的地图（按 routes 文件里该页 owner 的真实触发词与前缀，由 `init_quick_maps.map_inputs` 读取）一起过 `page_over_capacity`（`init_content.check_capacity_with_map`），超出即报 page full，由 `_place` 溢出到同级页——地图每条规则一行，只量规则会让页面
   在加地图后越界；manifest 路由的仓库不写地图，也就不按地图量（否则装得下的规则会被溢出到 manifest 不路由的页面，
   Direct 看不到它）。
 - 阻断检查：`validate_change(..., quick_map_pages=owner_pages(routes_text))` → `quick_map_problems`

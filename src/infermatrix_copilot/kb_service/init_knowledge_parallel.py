@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..knowledge_service.pinned_claims import Evidence, check_evidence
 from .init_support import InitError, InitRecord
 from .models import ModelGateway, ModelUnavailable
+from .evidence_bundle import merge_ranges
 
 
 def _hash(value):
@@ -117,12 +118,6 @@ def related_test_sources(stage, paths, limit=20_000):
         if not ranges:
             continue
         spans = [(n, min(len(lines), n + 20)) for n in imports] + ranges
-        merged = []
-        for start, end in sorted(spans):
-            if merged and start <= merged[-1][1] + 1:
-                merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
-            else:
-                merged.append((start, end))
         test_name = posixpath.basename(path).rsplit(".", 1)[0]
         test_name = re.sub(r"^test_|(?:_test|\.test|\.spec)$", "", test_name)
         # Broad entry modules can match many unrelated tests. Rank before the
@@ -131,7 +126,7 @@ def related_test_sources(stage, paths, limit=20_000):
         related_name = any(len(name) >= 5 and (name in test_name or test_name in name)
                            for name in basenames if len(test_name) >= 5)
         specificity = max((len(module.split(".")) for module in matched_modules), default=0)
-        candidates.append(((exact, related_name, specificity), path, entry, merged))
+        candidates.append(((exact, related_name, specificity), path, entry, merge_ranges(spans)))
     for _, path, entry, merged in sorted(candidates, key=lambda row: (tuple(-int(n) for n in row[0]), row[1])):
         lines = entry["lines"]
         for start, end in merged:
@@ -235,9 +230,7 @@ class _CaptureGateway:
 
 
 def _worker(stage, job):
-    from .init_knowledge import knowledge_prompt, validate_sections
-    from .init_knowledge_inputs import foundation_evidence, knowledge_system
-    from .init_support import generate
+    from .init_knowledge_inputs import foundation_evidence
     from .init_stages import _one_line
     worker = copy.copy(stage)
     worker.head = dict(stage.head)
@@ -250,12 +243,8 @@ def _worker(stage, job):
     try:
         if job["payload"].get("foundation_prompt_version") in (4, 5):
             foundation_evidence(worker, job["payload"])
-        data = generate(worker.rt, worker.budget, worker.lifecycle.init, system=knowledge_system(job["payload"]),
-                        prompt=knowledge_prompt(job["payload"]), validate=validate_sections).data
-        for section in data["sections"]:
-            if section["facet"] not in job["requested"]:
-                continue
-            result = worker._section(job["owner"], job["page"], data, section, job["offered"])
+        for data, section, result in worker._sections(job["owner"], job["page"], job["payload"],
+                                                     job["offered"], job["requested"]):
             if result:
                 key, text, entries, label = result
                 receipt = worker.rt.gateway.last.get("judge", {})
@@ -585,9 +574,7 @@ def run_jobs(stage, jobs):
                 result["result_sha256"] = _hash({k: v for k, v in result.items() if k != "result_sha256"})
             completed[n] = result
             key = jobs[n]["owner"].owner + ":" + result["input_sha256"]
-            saved["tasks"][key] = result
-            stage.record.spent_usd = round(stage.budget.spent_usd, 6)
-            stage.record.save(stage.rt.state_dir)  # only this coordinator writes checkpoints
+            stage.budget.checkpoint_now(lambda: saved["tasks"].__setitem__(key, result))
     # Completion order never affects pages, navigation or approval assembly.
     for n, job in enumerate(jobs):
         result = completed[n]

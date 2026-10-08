@@ -15,6 +15,15 @@ require explicit prices and an enforceable transport upper bound; merely
 setting prices cannot authorize an unbounded API call. The durable daily ceiling
 is $50 with a $10 fairness reserve. `KB_MAINTENANCE_MAX_UNITS` bounds a cycle.
 
+See [knowledge lifecycle layers](knowledge-lifecycle.md) for the relationship
+between initialization, maintenance, the existing Copilot executor, and review
+bot consumers. The internal `maintenance.plan/status/request/run_due` functions
+are the entry points; policy admission and signed owner disposition live in
+`maintenance_policy` and `maintenance_resolution`. They preserve the existing
+CLI wire output, stores and publication authority. Extracted maintenance code
+joins the implementation fingerprint: historical trial nights and calibration
+remain recorded but cannot authorize a changed policy.
+
 ## Operator commands
 
 Use an adapter repository ID for `--repo`, or `--all` for all eligible repositories:

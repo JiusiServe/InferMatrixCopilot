@@ -1,8 +1,8 @@
 # run_status.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-10-09 -->
 
-`LOC ~309 · 持久化的单写者 run 生命周期记录 · refactor-status: ok`
+`LOC ~323 · 持久化的单写者 run 生命周期记录 · refactor-status: ok`
 
 ## 职责
 `run_status.json` —— 一次 Strict run 的**持久、无歧义**的生命周期记录，可跨进程观测。
@@ -23,6 +23,10 @@ owner_server_pid)`（`interrupted → queued` 重新武装）、
 `register_server`/`unregister_server`/`server_alive`，以及状态常量
 （`QUEUED`/`PLANNING`/`RUNNING`/`TERMINAL`/`INTERRUPTED`/`FAILED`）。
 
+`init_queued` 可在同一次初始写入中附加 `request_fingerprint` 和
+`execution_mode` 预约事实；默认空参数不增加旧状态字段。reclaim/mark/reconcile
+保留这些事实，不从可变请求文件重建执行权限。它们不增加新的生命周期状态。
+
 ## 不变量（**C3**、**E1**）
 - **单写者。** `init_queued`（server，在子进程存在之前）写下 `queued`；一旦拉起，
   **子进程就是运行期唯一的写者**：预约 run 的子进程第一件事是
@@ -30,6 +34,9 @@ owner_server_pid)`（`interrupted → queued` 重新武装）、
   `mark_child_started`），然后 `planning → running → 终态`。父进程
   **只在 `.wait()` 之后**对账 —— 也就是在子进程已确认死亡之后。
 - **跨进程对账只发生在写者被确认死亡之后**，持 `flock` 进行，并保留 owner 字段。
+- 锁内状态写入复用 `persistence.atomic_write_bytes`：唯一同目录临时文件、文件
+  fsync、原子替换和平台支持时目录 fsync；保留 JSON 格式及已有普通文件权限。
+  写入失败传播，原有 CAS、属主判断和状态迁移仍由本模块裁决。
 - **按属主对账**（`owner_server_id` / `owner_server_pid` / `child_pid`）：只有**属主**
   server 被确认死亡，才可以把一个非终态 run 标记为 `interrupted`。在多 server 模型下
   （Claude Code 和 Codex 各自拉起一个 server），正是这一条阻止了某个 server 去抢另一个
@@ -51,7 +58,7 @@ owner_server_pid)`（`interrupted → queued` 重新武装）、
 不拉起进程（那是 `mcp_server`）；不含策略；不渲染报告。
 
 ## 依赖（允许）
-仅 stdlib（`json`、`os`、`fcntl`/`flock`、`pathlib`）。
+`persistence`；仅 stdlib（`json`、`os`、`fcntl`/`flock`、`pathlib`）。
 
 ## 测试
 `test_mcp.py`（单写者对账、属主判定）；`test_idempotency.py`

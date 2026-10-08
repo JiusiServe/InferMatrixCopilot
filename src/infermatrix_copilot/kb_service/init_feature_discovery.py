@@ -5,9 +5,10 @@ bounded packets cover the entire declared inventory; unknowns remain explicit.
 """
 from __future__ import annotations
 
+from ..persistence import atomic_write_bytes, immutable_write_bytes
+
 from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, replace
 import hashlib
@@ -16,13 +17,11 @@ import math
 import os
 from pathlib import Path
 import re
-import tempfile
-import threading
 import unicodedata
 
 import yaml
 
-from .init_budget import BudgetExhausted
+from .init_budget import Budget, BudgetExhausted
 from .init_stages import _Stage
 from .init_support import InitError, InitRecord, generate, inputs_digest
 from .models import ModelUnavailable
@@ -150,20 +149,10 @@ def write_full_discovery_report(state_dir, report):
     root = _report_archive_root(state_dir)
     root.mkdir(parents=True, exist_ok=True)
     path = root / (digest + ".json")
-    with tempfile.NamedTemporaryFile(dir=root, delete=False) as handle:
-        temporary = Path(handle.name)
-        handle.write(data)
-        handle.flush()
-        os.fsync(handle.fileno())
     try:
-        try:
-            os.link(temporary, path)  # Exclusive atomic creation, never replacement.
-        except FileExistsError:
-            pass
-        if path.is_symlink() or path.read_bytes() != data:
-            raise InitError("immutable discovery report artifact differs; restore its original bytes")
-    finally:
-        temporary.unlink()
+        immutable_write_bytes(path, data, exist_ok=True)
+    except FileExistsError as exc:
+        raise InitError("immutable discovery report artifact differs; restore its original bytes") from exc
     return {"path": str(path), "sha256": digest, "size_bytes": len(data)}
 
 
@@ -442,33 +431,16 @@ def _offered_reference(index, chunks, ref):
     return True
 
 
-class _ConcurrentBudget:
-    """Protect reservation accounting without serializing model execution."""
-    def __init__(self, budget, journal=None, identity=""):
-        self.budget, self.lock = budget, threading.Lock()
-        self.journal, self.identity = journal, identity
-
-    def _persist(self):
-        if self.journal is None:
+def _discovery_budget(budget: Budget, journal: Path | None = None, identity: str = "") -> Budget:
+    """Keep discovery's existing journal format with the shared budget lock."""
+    def checkpoint(spent: float, reserved: float) -> None:
+        if journal is None:
             return
-        self.journal.parent.mkdir(parents=True, exist_ok=True)
-        temp = self.journal.with_suffix(".tmp")
-        temp.write_text(_json({"identity": self.identity, "spent_usd": self.budget.spent_usd,
-                              "reserved_usd": self.budget._reserved}))
-        temp.replace(self.journal)
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_bytes(journal, _json({"identity": identity, "spent_usd": spent,
+                                          "reserved_usd": reserved}).encode())
 
-    @contextmanager
-    def reserve(self, amount):
-        cm = self.budget.reserve(amount)
-        with self.lock:
-            reservation = cm.__enter__()
-            self._persist()
-        try:
-            yield reservation
-        finally:
-            with self.lock:
-                cm.__exit__(None, None, None)
-                self._persist()
+    return Budget(budget.limit_usd, spent_usd=budget.spent_usd, checkpoint=checkpoint)
 
 
 class DiscoveryEngine:
@@ -753,11 +725,23 @@ class DiscoveryEngine:
                        self.state["reviews"][key]["candidate_sha256"] != _hash(row))
                    and self.state["review_attempts"].get(key, 0) < MAX_ATTEMPTS]
         baseline = self._baseline()
+
+        def accept(row, result):
+            result["attempts"] = self.state["review_attempts"].get(row["id"], 0) + 1
+            self.state["review_attempts"][row["id"]] = result["attempts"]
+            self.state["reviews"][row["id"]] = result
+
+        if not self._review_batches(pending, lambda rows: self._review(rows, baseline), accept):
+            return False
+        return self._repair_parallel(baseline)
+
+    def _review_batches(self, pending, review, accept):
+        """Drain each bounded tranche and durably retain all completed decisions."""
         batches = [pending[n:n + 12] for n in range(0, len(pending), 12)]
-        stopped = False
         with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
             for start in range(0, len(batches), self.concurrency):
-                jobs = {pool.submit(self._review, rows, baseline): rows for rows in batches[start:start + self.concurrency]}
+                jobs = {pool.submit(review, rows): rows for rows in batches[start:start + self.concurrency]}
+                stopped = False
                 for future in as_completed(jobs):
                     rows = jobs[future]
                     try:
@@ -768,14 +752,11 @@ class DiscoveryEngine:
                     except (ModelUnavailable, ValueError) as exc:
                         decisions = {r["id"]: {"supported": "unsure", "relation": "unknown", "related_id": "", "reason": str(exc), "repair_blocked": True} for r in rows}
                     for row in rows:
-                        result = decisions[row["id"]]
-                        result["attempts"] = self.state["review_attempts"].get(row["id"], 0) + 1
-                        self.state["review_attempts"][row["id"]] = result["attempts"]
-                        self.state["reviews"][row["id"]] = result
+                        accept(row, decisions[row["id"]])
                     self.save()
                 if stopped:
                     return False
-        return self._repair_parallel(baseline)
+        return True
 
     def _repair_extract(self, key, original, decision, baseline):
         """One immutable extraction result; only the coordinator checkpoints it."""
@@ -1006,43 +987,35 @@ class DiscoveryEngine:
                 if self.state["reviews"].get(key, {}).get("relation") == "new"
                 and self._implemented_approval(row, self.state["reviews"][key])]
         identity = _boundary_identity(self.seeds, self.state, repository=self.repository, pin=self.pin)
+        baseline = self._baseline()
+        return self._audit_catalog(rows, name="boundary", identity=identity, source="reviews",
+            current=_boundary_current,
+            order=lambda r: (re.sub(r"-[a-f0-9]{8}$", "", r["id"]), r["id"]),
+            review=lambda batch, marker: self._review(batch, baseline, audit=_boundary_context(marker)))
+
+    def _audit_catalog(self, rows, *, name, identity, source, current, order, review):
+        """Persist one supplemental audit, retaining successful batches on budget exhaustion."""
         marker = {"identity": identity, "candidate_ids": [r["id"] for r in rows], "done": False}
-        previous = self.state.get("catalog_boundary_audit", {})
+        audit_key, reviews_key = f"catalog_{name}_audit", f"{name}_reviews"
+        previous = self.state.get(audit_key, {})
         if previous.get("identity") != identity or previous.get("candidate_ids") != marker["candidate_ids"]:
             if previous:
-                self.state.setdefault("boundary_history", []).append({"audit": deepcopy(previous),
-                    "reviews": deepcopy(self.state.get("boundary_reviews", {}))})
-            self.state["boundary_reviews"] = {}
-        self.state["catalog_boundary_audit"] = marker
-        decisions = self.state.setdefault("boundary_reviews", {})
-        pending = [r for r in rows if not _boundary_current(r, self.state["reviews"][r["id"]], decisions.get(r["id"], {}))]
-        # Collision families stay adjacent so the reviewer can classify aliases
-        # against one another, while the complete formal baseline remains visible.
-        pending.sort(key=lambda r: (re.sub(r"-[a-f0-9]{8}$", "", r["id"]), r["id"]))
-        batches = [pending[n:n + 12] for n in range(0, len(pending), 12)]
-        baseline = self._baseline()
+                self.state.setdefault(f"{name}_history", []).append({"audit": deepcopy(previous),
+                    "reviews": deepcopy(self.state.get(reviews_key, {}))})
+            self.state[reviews_key] = {}
+        self.state[audit_key] = marker
+        decisions = self.state.setdefault(reviews_key, {})
+        pending = sorted((r for r in rows if not current(r, self.state[source][r["id"]],
+                          decisions.get(r["id"], {}))), key=order)
+
+        def accept(row, result):
+            decisions[row["id"]] = {**result, "candidate_sha256": _hash(row),
+                ("primary_review_sha256" if source == "reviews" else "boundary_review_sha256"):
+                    _hash(self.state[source][row["id"]])}
+
         self.save()
-        with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
-            for start in range(0, len(batches), self.concurrency):
-                jobs = {pool.submit(self._review, batch, baseline, audit=_boundary_context(marker)): batch
-                        for batch in batches[start:start + self.concurrency]}
-                stopped = False
-                for future in as_completed(jobs):
-                    batch = jobs[future]
-                    try:
-                        results = future.result()
-                    except BudgetExhausted:
-                        stopped = True
-                        continue
-                    except (ModelUnavailable, ValueError) as exc:
-                        results = {r["id"]: {"supported": "unsure", "relation": "unknown", "related_id": "",
-                            "reason": str(exc), "repair_blocked": True} for r in batch}
-                    for row in batch:
-                        decisions[row["id"]] = {**results[row["id"]], "candidate_sha256": _hash(row),
-                            "primary_review_sha256": _hash(self.state["reviews"][row["id"]])}
-                    self.save()
-                if stopped:
-                    return False
+        if not self._review_batches(pending, lambda batch: review(batch, marker), accept):
+            return False
         marker["done"] = True
         self.save()
         return True
@@ -1110,19 +1083,15 @@ class DiscoveryEngine:
         bridges.sort(key=lambda item: (-item[0], item[1]["path"], item[1]["start"]))
         unique = {_json(excerpt): excerpt for _, excerpt in bridges}
         def merged(items):
+            from .evidence_bundle import merge_ranges
+
             ranges = {}
             for item in items:
                 ranges.setdefault(item["path"], []).append((item["start"], item["end"]))
             result = []
             for path, intervals in sorted(ranges.items()):
-                combined = []
-                for start, end in sorted(intervals):
-                    if combined and start <= combined[-1][1] + 1:
-                        combined[-1] = (combined[-1][0], max(end, combined[-1][1]))
-                    else:
-                        combined.append((start, end))
                 result.extend(evidence_excerpt(self.index, {"path": path, "start": start, "end": end})
-                              for start, end in combined)
+                              for start, end in merge_ranges(intervals))
             return result
         excerpts = merged(excerpts)
         consumers = []
@@ -1170,45 +1139,11 @@ class DiscoveryEngine:
     def audit_catalog_consolidation(self, features):
         identity = _consolidation_identity(self.seeds, self.state, features, repository=self.repository, pin=self.pin)
         keys = [r["id"] for r in _consolidation_summaries(self.state, features, self.seeds)]
-        marker = {"identity": identity, "candidate_ids": keys, "done": False}
-        previous = self.state.get("catalog_consolidation_audit", {})
-        if previous.get("identity") != identity or previous.get("candidate_ids") != keys:
-            if previous:
-                self.state.setdefault("consolidation_history", []).append({"audit": deepcopy(previous),
-                    "reviews": deepcopy(self.state.get("consolidation_reviews", {}))})
-            self.state["consolidation_reviews"] = {}
-        self.state["catalog_consolidation_audit"] = marker
-        reviews = self.state.setdefault("consolidation_reviews", {})
-        pending = [self.state["candidates"][k] for k in keys if not _consolidation_current(
-            self.state["candidates"][k], self.state["boundary_reviews"][k], reviews.get(k, {}))]
-        pending.sort(key=lambda r: (r["owner"], re.sub(r"-[a-f0-9]{8}$", "", r["id"]), r["id"]))
-        batches = [pending[n:n + 12] for n in range(0, len(pending), 12)]
         self._prepare_consolidation_context(features)
-        self.save()
-        with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
-            for start in range(0, len(batches), self.concurrency):
-                jobs = {pool.submit(self._review_consolidation, b, features, marker): b
-                        for b in batches[start:start + self.concurrency]}
-                stopped = False
-                for future in as_completed(jobs):
-                    batch = jobs[future]
-                    try:
-                        results = future.result()
-                    except BudgetExhausted:
-                        stopped = True
-                        continue
-                    except (ModelUnavailable, ValueError) as exc:
-                        results = {r["id"]: {"supported": "unsure", "relation": "unknown", "related_id": "",
-                            "reason": str(exc), "repair_blocked": True} for r in batch}
-                    for row in batch:
-                        reviews[row["id"]] = {**results[row["id"]], "candidate_sha256": _hash(row),
-                            "boundary_review_sha256": _hash(self.state["boundary_reviews"][row["id"]])}
-                    self.save()
-                if stopped:
-                    return False
-        marker["done"] = True
-        self.save()
-        return True
+        return self._audit_catalog([self.state["candidates"][k] for k in keys],
+            name="consolidation", identity=identity, source="boundary_reviews", current=_consolidation_current,
+            order=lambda r: (r["owner"], re.sub(r"-[a-f0-9]{8}$", "", r["id"]), r["id"]),
+            review=lambda batch, marker: self._review_consolidation(batch, features, marker))
 
     def catalog(self, repo_dir, *, require_boundary=False, consolidation_features=None):
         from .feature_discovery_index import validate_evidence
@@ -1322,26 +1257,6 @@ class _FeatureDiscovery(_Stage):
     STAGE = "feature-discovery"
     retry_unfinished: bool = False
 
-    def run(self):
-        """Hold the batch lease before reading or replacing any checkpoint.
-
-        A competing invocation must leave the active writer's record and
-        reservation journal intact, including when it is a cached preview.
-        """
-        import fcntl
-
-        lock_path = Path(self.rt.state_dir) / "init" / self.lifecycle.repo / "feature-discovery.lock"
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with lock_path.open("a+b") as lock:
-            try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError as exc:
-                raise InitError("this discovery batch is already running; checkpoint left unchanged") from exc
-            try:
-                return super().run()
-            finally:
-                fcntl.flock(lock, fcntl.LOCK_UN)
-
     def _refresh_quick_maps(self):
         return []  # Catalog publication never changes knowledge pages.
 
@@ -1396,14 +1311,14 @@ class _FeatureDiscovery(_Stage):
             raise InitError("discovery compact report identity differs")
         return verify_full_discovery_report(self.rt.state_dir, report, record.discovery)
 
-    def _publish(self, changed):
+    def _prepare_publication(self, changed):
         try:
             self._verify_report_record(self.record, changed)
             if self.record.discovery.get("catalog_renderer_version") != CATALOG_RENDERER_VERSION:
                 raise InitError("discovery catalog requires the current renderer before publication")
         except InitError as exc:
             return self._blocked([str(exc)])
-        return super()._publish(changed)
+        return super()._prepare_publication(changed)
 
     def _boundary_record_ready(self, previous):
         state = previous.discovery
@@ -1568,17 +1483,13 @@ class _FeatureDiscovery(_Stage):
             if len(offered) != 1 or _hash(offered[0]) != checked.get("candidate_sha256") \
                     or checked.get("candidate_sha256") != _hash(row):
                 raise ValueError("native independent review did not assess this candidate content")
+            return payload
         except (KeyError, IndexError, TypeError, AttributeError, ValueError, OSError) as exc:
             raise ModelUnavailable(f"native approval binding differs: {exc}") from exc
 
     def _verify_boundary_approval(self, key, row, checked, state):
-        self._verify_saved_approval(key, row, checked)
-        from ..trace_store import TraceStore
+        payload = self._verify_saved_approval(key, row, checked)
         try:
-            store = TraceStore(Path(self.rt.state_dir) / "init" / "traces")
-            record = store.get(checked["judge_receipt"]["trace_id"])
-            prompt = store.blob(record["inputs"]["prompt"])
-            payload = json.loads(prompt.split("<untrusted_data>\n", 1)[1].rsplit("\n</untrusted_data>", 1)[0])
             marker = state["catalog_boundary_audit"]
             if payload.get("catalog_boundary_audit") != _boundary_context(marker):
                 raise ValueError("native catalog boundary audit identity differs")
@@ -1618,27 +1529,18 @@ class _FeatureDiscovery(_Stage):
                     "related_id": "", "reason": str(exc), "attempts": MAX_ATTEMPTS}
                 state.get("repair_drafts", {}).pop(key, None)
                 failures.append(key)
-        for key, checked in state.get("boundary_reviews", {}).items():
-            if checked.get("supported") != "yes":
-                continue
-            try:
-                self._verify_archived_receipt(checked["judge_receipt"], self.rt.judge)
-                self._verify_boundary_approval(key, state["candidates"][key], checked, state)
-            except (ModelUnavailable, KeyError) as exc:
-                checked.update(supported="unsure", relation="unknown", related_id="", reason=str(exc),
-                               repair_blocked=True)
-                state.get("catalog_boundary_audit", {})["done"] = False
-                # Keep the valid primary proof and scan; this candidate simply
-                # cannot promote without a usable supplemental approval.
-        for key, checked in state.get("consolidation_reviews", {}).items():
-            if checked.get("supported") != "yes":
-                continue
-            try:
-                self._verify_archived_receipt(checked["judge_receipt"], self.rt.judge)
-                self._verify_consolidation_approval(key, state["candidates"][key], checked, state)
-            except (ModelUnavailable, KeyError) as exc:
-                checked.update(supported="unsure", relation="unknown", related_id="", reason=str(exc), repair_blocked=True)
-                state.get("catalog_consolidation_audit", {})["done"] = False
+        for name, verify in (("boundary", self._verify_boundary_approval),
+                             ("consolidation", self._verify_consolidation_approval)):
+            for key, checked in state.get(f"{name}_reviews", {}).items():
+                if checked.get("supported") != "yes":
+                    continue
+                try:
+                    self._verify_archived_receipt(checked["judge_receipt"], self.rt.judge)
+                    verify(key, state["candidates"][key], checked, state)
+                except (ModelUnavailable, KeyError) as exc:
+                    checked.update(supported="unsure", relation="unknown", related_id="", reason=str(exc),
+                                   repair_blocked=True)
+                    state.get(f"catalog_{name}_audit", {})["done"] = False
         return failures
 
     def _verify_consolidation_approval(self, key, row, checked, state):
@@ -1755,7 +1657,8 @@ class _FeatureDiscovery(_Stage):
                 # Content rejections retain their cumulative attempt count.
                 # Only a blocked native channel resumes; exhausted content does
                 # not acquire three more repairs on every explicit retry.
-        budget = _ConcurrentBudget(self.budget, Path(self.rt.state_dir) / "init" / self.lifecycle.repo / "discovery-budget.json", identity)
+        self.budget = _discovery_budget(self.budget, Path(self.rt.state_dir) / "init" / self.lifecycle.repo / "discovery-budget.json", identity)
+        budget = self.budget
         if hasattr(self.rt.gateway, "configure_zcode_pacing") and self.rt.generator.provider == "zcode":
             from .depth_pacing import SharedZcodePacer
             pacer = SharedZcodePacer(Path(self.rt.state_dir) / "init" / "discovery-zcode-pacing.json",
@@ -1898,17 +1801,23 @@ class _FeatureDiscovery(_Stage):
                      report_sha256=hashlib.sha256(report_text.encode()).hexdigest())
         other = {path: (original_text, rendered), report_path: (self.rt.knowledge.show(self._base_sha, report_path), report_text)}
 
-        def check_other(changed, before, after):
-            if changed not in other or after is None:
-                return ["discovery may only write its own catalog and compact report"]
-            if changed == path:
-                a, b = yaml.safe_load(before) if before else raw, yaml.safe_load(after)
-                if {k: v for k, v in a.items() if k not in ("features", "catalog_sources")} != \
-                        {k: v for k, v in b.items() if k not in ("features", "catalog_sources")}:
-                    return ["discovery must not alter production scope, targets or permissions"]
-                load_policy(after, self.repo_dir)
-            elif hashlib.sha256(after.encode()).hexdigest() != state["report_sha256"]:
-                return ["discovery report hash mismatch"]
-            return []
+        self._check_context = {"catalog_base": raw}
         self.record.coverage["feature_discovery"] = {"feature_count": len(features), "counts": dict(counts)}
-        return self._conclude({}, [], other=other, check_other=check_other)
+        return self._conclude({}, [], other=other, check_other=self._check_other)
+
+    def _check_other(self, changed, before, after):
+        from .knowledge_coverage import load_policy
+
+        path = self._coverage_policy_path()
+        if changed not in (path, self.record.discovery["report_path"]) or after is None:
+            return ["discovery may only write its own catalog and compact report"]
+        if changed == path:
+            a = yaml.safe_load(before) if before else self._draft["check_context"]["catalog_base"]
+            b = yaml.safe_load(after)
+            if {k: v for k, v in a.items() if k not in ("features", "catalog_sources")} != \
+                    {k: v for k, v in b.items() if k not in ("features", "catalog_sources")}:
+                return ["discovery must not alter production scope, targets or permissions"]
+            load_policy(after, self.repo_dir)
+        elif hashlib.sha256(after.encode()).hexdigest() != self.record.discovery["report_sha256"]:
+            return ["discovery report hash mismatch"]
+        return []

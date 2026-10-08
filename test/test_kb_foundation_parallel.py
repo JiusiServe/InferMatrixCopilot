@@ -15,7 +15,7 @@ from infermatrix_copilot.kb_service.init_budget import Budget, BudgetExhausted
 from infermatrix_copilot.kb_service.init_coverage import Owner
 from infermatrix_copilot.kb_service.init_knowledge import _Knowledge
 from infermatrix_copilot.kb_service.init_stages import run_stage
-from infermatrix_copilot.kb_service.init_support import InitError, InitRecord
+from infermatrix_copilot.kb_service.init_support import InitError, InitRecord, checkpoint_budget
 from infermatrix_copilot.kb_service.models import ModelGateway, ModelRole
 from infermatrix_copilot.kb_service.runtime import trace_recorder
 from infermatrix_copilot.llm import Block, Reply
@@ -31,6 +31,7 @@ def test_pool_shared_cap_deterministic_assembly_and_single_failure(tmp_path, mon
     completed, applied, saves = [], [], []
     stage = SimpleNamespace(rt=SimpleNamespace(unlimited_subscription=True, environ={}, state_dir=tmp_path, gateway=None),
         record=InitRecord(stage="knowledge", repo="toy", inputs_digest="identity"), budget=Budget(None))
+    stage.budget = checkpoint_budget(None, stage.record, tmp_path)
     jobs = [{"owner": Owner(f"owner-{i}", "same-page", ()), "payload": {}, "offered": {}} for i in range(32)]
 
     def worker(stage, job):
@@ -55,7 +56,9 @@ def test_pool_shared_cap_deterministic_assembly_and_single_failure(tmp_path, mon
     list(parallel.run_jobs(stage, jobs))
     assert 1 < peak <= 13 and stage.budget.spent_usd == 32 and stage.budget._reserved == 0
     assert completed != list(range(32)) and applied == list(range(32))
-    assert len(saves) == 32 and set(saves) == {threading.current_thread().name}
+    # Workers persist budget reservations; only the coordinator adds domain
+    # results, once for each completed job.
+    assert saves.count(threading.current_thread().name) == 32
     assert any("owner-4" in item for item in stage.record.unfinished)
 
 

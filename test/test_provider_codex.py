@@ -223,6 +223,9 @@ def test_run_session_timeout_is_truncated(tmp_path):
 
 def test_complete_runs_in_scratch(tmp_path):
     transport = _transport(tmp_path)
+    cli = tmp_path / "bin" / "codex"
+    cli.write_text(_FAKE_CLI.replace(
+        'print(json.dumps({"type": "item.completed", "item": {\n    "item_type": "command_execution", "command": "ls"}}))\n', ""))
 
     reply = transport.complete(
         system="CLASSIFY", messages=[{"role": "user", "content": "hi"}])
@@ -234,13 +237,14 @@ def test_complete_runs_in_scratch(tmp_path):
     assert "CLASSIFY" in capture["stdin"] and "[USER]\nhi" in capture["stdin"]
 
 
-def test_complete_archives_all_buffered_native_events_without_changing_reply(tmp_path):
+def test_complete_archives_tool_events_before_rejecting_the_reply(tmp_path):
     transport = _transport(tmp_path)
     events = []
 
-    reply = transport.complete(
-        system="CLASSIFY", messages=[{"role": "user", "content": "hi"}],
-        native_event_sink=events.append)
+    with pytest.raises(RuntimeError, match="command_execution"):
+        transport.complete(
+            system="CLASSIFY", messages=[{"role": "user", "content": "hi"}],
+            native_event_sink=events.append)
 
     assert transport.supports_native_events
     assert [event["type"] for event in events] == ["native.codex.event"] * 5
@@ -249,7 +253,4 @@ def test_complete_archives_all_buffered_native_events_without_changing_reply(tmp
         "item.completed", "turn.completed"]
     assert events[1]["payload"]["item"] == {
         "item_type": "command_execution", "command": "ls"}
-    assert events[3]["payload"]["item"]["text"] == reply.text == "REVIEW"
-    assert reply.stop_reason == "end_turn"
-    assert reply.usage["input_tokens"] == 50
-    assert reply.usage["output_tokens"] == 9
+    assert events[3]["payload"]["item"]["text"] == "REVIEW"

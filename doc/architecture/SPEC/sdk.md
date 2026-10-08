@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
@@ -47,9 +47,9 @@
   `get_quality_result`；机械信号只是 bounded hints，结果固定绑定 expected head。
   `QualityPollResult.review` 投影类型化质量结果；非法结构触发 `ResultDecodeError`。
 - Knowledge：宿主把不可信输入投影成 `KnowledgeEvidenceEvent` / `KnowledgeEvidenceBatch`，
-  再依次调用 `KnowledgeCurator.build_prompt()`、自己的 model adapter、
-  `validate_proposals()` 与 `apply()`。返回值为 typed
-  `KnowledgeProposalValidation` / `KnowledgeApplyResult`；validator 失败以
+  可调用 `KnowledgeCurator.curate()` 共用有界生成、校验、本地应用及修复；旧的
+  `build_prompt()`、`validate_proposals()` 与 `apply()` 独立调用接口保持可用。后两个方法返回 typed
+  `KnowledgeProposalValidation` / `KnowledgeApplyResult`，`curate` 返回包含这两者与尝试记录的字典；validator 失败以
   `KnowledgeValidatorError.result` 携带完整、可序列化的失败结果。
 - 所有公开 dataclass 皆 frozen，并有 lossless `to_dict()`。
 
@@ -100,9 +100,11 @@
   validator 缺失则写前 fail closed，执行失败/超时则逐 byte rollback 全部目标页。
   同一 work checkout 的 writer 以 process 内 mutex 与位于系统临时目录的
   `flock` 串行化；等待后的 SHA 复核让第二个 stale writer 失败，不会覆盖首个结果。
-- **知识出版 orchestration 留在宿主**：SDK 不 clone、调用 model、管理出版 ledger、commit、
-  push、开 PR 或 schedule。ReviewBot 必须向 `KnowledgeCurator` 传 dedicated work
-  checkout，并继续拥有重试、artifact 与本地补丁导出；SDK 也绝不写 packaged
+- **知识出版 orchestration 留在宿主**：SDK 不 clone、管理出版 ledger、commit、
+  push、开 PR 或 schedule。`curate` 通过 provider 的只读模型会话，或显式注入的
+  `generate(prompt, schema)` 调用模型。ReviewBot 必须向 `KnowledgeCurator` 传 dedicated work
+  checkout，并继续拥有任务调度、失败处置、artifact 与本地补丁导出；有界候选与
+  validator 修复由 `curate` 唯一执行。SDK 也绝不写 packaged
   knowledge tree。自适应 DirectClient 仅管理知识上下文的运行账本，不代替知识出版治理。
 - SDK、Quality API 版本常量为 `1.0.0`；Direct 为 `1.1.0`，Strict 为 `1.4.0`
   （1.1 新增 `finding_dispositions`；1.2 新增 `findings`；1.3 新增显式 recheck；
@@ -120,8 +122,45 @@
 函数调用时才向下进入 `direct_routing`；`strict` 构造时才向下进入
 headless `app.RunService`。`sdk.v1.knowledge` 是兼容导出，实际实现位于
 `knowledge_service.curation`；后者只依赖 stdlib、公开模型和显式 work checkout，
-并以 subprocess 运行上述两个固定 validator。任何 server 都不得被 SDK package
+并以 subprocess 运行上述两个固定 validator；`curate` 调用时才进入共享 provider
+JSON transport。任何 server 都不得被 SDK package
 initializer 反向 import，provider domain 也不得反向依赖 ReviewBot。
+
+`ReviewRuntime` 与旧 `StrictRuntime` 名称指向同一实现。新增 typed
+`DirectReviewRunRequest` 经现有 RunService 预留、幂等键、队列和查询运行；Direct 的知识
+计划、注入、模型会话和完成验证由共享执行器内的领域步骤执行。请求固定 head、模型配置、
+输出 schema 及业务上下文，模型子进程不持有 GitHub 发布凭据。`decode_review_result`
+投影两种 wire 结果为共用 `ReviewResult`；原 Strict typed poll 和 serializer 保持兼容。
+聚合入口延迟加载实现，DTO 类身份仍由 `sdk.v1.models` 唯一拥有。`ReviewFinding` /
+`ReviewResult` 是生成结果领域记录；Strict 原 wire assembler 和 typed decoder 继续承担
+各自的产出／读取职责。不同 Markdown 发布格式不合为一个 renderer。
+
+新 Strict 结果证明字段和 `direct_profiles` 在默认空值时不改变旧 `to_dict()` 的
+字段集合；嵌套的 `StrictPollResult.review` 使用同一投影。非空新证明与配置完整保留。
+`ReviewRuntime.run_session` 是无耐久运行身份的受限分类／候选 transport；评审调用
+`reserve_direct_review`，bot 不保留绕过该入口的旧评审循环。
+
+Direct 的执行命令、provider、model、idle/absolute/wrap-up 超时来自宿主部署配置
+`ReviewRuntimeConfig.direct_profiles`；请求不能注册执行权限。预留与 launch 都将请求
+transport 字段同独立 registry 比对。初次预留在原 queued 状态中原子保存请求 fingerprint
+与执行模式；launch 在读取模式参数前验证原 fingerprint，并按预留模式选择 child。
+删除 Direct marker 也不能切到另一工作流。恢复独立校验原幂等记录中的请求 fingerprint。
+父进程把授权后的完整请求 byte SHA 和可信 profile 传给隔离子进程；子进程在解析请求及
+启动模型前再次校验，保存请求的前后篡改均拒绝执行。恢复沿用当前部署 registry，不能
+从旧 `request.json` 反推或授权命令。测试替身 CLI 也必须通过显式可信 profile 登记。
+
+`find_review(idempotency_key, expected_head_sha=...)` 找回 provider 保存的原请求，避免
+不确定提交窗口重新冻结不同业务输入；不会重跑已执行的模型步骤。宿主在 reserve 前
+记录 dispatch intent，返回后保存 provider run ID；丢失 reply 后仍用同一个 key 恢复。
+Direct 输入包含完整冻结 diff，原始 GitHub patch 证据仍保留其缺失与截断标记。
+`execution_failure` 使用明确的 `backend` / `invalid_result` 分类；完成门禁拒绝与
+知识隔离不是模型执行失败，宿主不能据此自动换评审策略。
+准备阶段只报告检索；模型成功返回后记录实际注入，执行失败保留注入未知。
+完成门禁拒绝或撤回后的原结论继续保存在 provider 产物与宿主拒绝归档中。
+
+`KnowledgeCurator.curate` 的 `on_attempt` 是可选诊断 observer：validation 后、apply 前
+通知，validator rollback 后更新同一 attempt ID；observer 异常传播并停止下一次 dispatch
+或本次 apply。宿主保留 Git/workspace guard、artifact、count、ledger 和最终发布。
 
 ## 测试
 

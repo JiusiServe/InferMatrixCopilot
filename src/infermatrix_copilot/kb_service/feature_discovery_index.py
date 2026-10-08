@@ -5,6 +5,8 @@ identity depends on source and scanning scope, not the eventual feature list.
 """
 from __future__ import annotations
 
+from ..persistence import atomic_write_bytes
+
 import ast
 from dataclasses import dataclass
 import fnmatch
@@ -14,7 +16,6 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
-import uuid
 
 INDEX_VERSION = "feature-discovery-index-v2"
 CONTRACT_UNIT_VERSION = "contract-units-v1"
@@ -273,12 +274,7 @@ def build_discovery_index(tree, *, pin, scope, doc_globs=(), cache_path=None):
     if cache_path is not None:
         destination = Path(cache_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        temporary = destination.with_name(destination.name + "." + uuid.uuid4().hex + ".tmp")
-        try:
-            temporary.write_text(json.dumps({"data": data, "sha256": index.sha256}, ensure_ascii=False), encoding="utf-8")
-            os.replace(temporary, destination)
-        finally:
-            if temporary.exists(): temporary.unlink()
+        atomic_write_bytes(destination, json.dumps({"data": data, "sha256": index.sha256}, ensure_ascii=False).encode("utf-8"))
     return index
 
 

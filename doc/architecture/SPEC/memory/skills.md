@@ -1,8 +1,8 @@
 # memory/skills.py —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-10-08 -->
 
-`LOC ~384 · 记忆（程序性知识） · refactor-status: ok`
+`LOC ~370 · 记忆（程序性知识） · refactor-status: ok`
 
 ## 职责
 程序性知识，门禁比 debug memory 更严。
@@ -23,6 +23,9 @@
   计数之上（使用先验，round-2 F8）。
 - **候选写入是崩溃可幸存的**：`_write_durable`（tmp + fsync + replace + 目录
   fsync），candidates 文件在 store flock 下互斥更新。
+- `_write_durable` 复用 `persistence.atomic_write_bytes`，仍显式使用 `0600`。
+  唯一同目录临时文件、文件 fsync 和原子替换失败继续传播；目录同步仍交给本模块
+  的 `_fsync_dir` 尽力完成，目录不支持同步或目录句柄关闭失败不把已落地的写入报告成失败。
 - `touch` 只在本 store 拥有该 skill 时返回 True —— 调用方据此把 seed 使用
   路由到 journal。
 
@@ -30,7 +33,7 @@
 不做按仓库的命名空间隔离（由 `_ScopedKnowledge` 施加）；不含 LLM；不是策展 UI。
 
 ## 依赖（允许）
-`pyyaml`；stdlib。
+`pyyaml`、`persistence`；stdlib。
 
 ## 测试
 `test_memory.py`。

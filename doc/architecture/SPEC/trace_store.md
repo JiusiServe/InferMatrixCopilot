@@ -1,8 +1,8 @@
 # trace_store.py —— 规范
 
-<!-- verified-against: 2026-10-05 -->
+<!-- verified-against: 2026-10-08 -->
 
-`LOC ~500 · trace/1：Copilot 与 RB 共用的模型调用/工具调用/判定/结果记录 · refactor-status: stable`
+`LOC ~787 · trace/1：Copilot 与 RB 共用的模型调用/工具调用/判定/结果记录 · refactor-status: stable`
 
 ## 职责
 - `TraceStore(root)`：追加式 `records/<日期>.jsonl`（事实来源）+ 内容寻址 blob
@@ -43,7 +43,12 @@
 ## 不变量
 - 写入前统一脱敏：已知令牌形态（GitHub、Anthropic、OpenAI、AWS、Slack、Bearer、私钥块）以及名字表明是
   密钥的环境变量的值（路径形式的值除外）。脱敏发生在哈希之前，blob 与 JSONL 中都不会出现密钥。
+- blob 与 `attempt.json` 复用 `persistence.atomic_write_bytes`：保留 gzip `mtime=0`、
+  JSON 字节格式、末尾换行及已有普通文件权限；唯一同目录临时文件、文件 fsync、
+  原子替换和平台支持时目录 fsync 的真实写入失败继续传播。追加记录与原生事件的
+  append/fsync 协议不变，回执仍只有一次；未知用量及费用不因写入复用变成零。
 - 只依赖标准库；经 `sdk.v1` 导出（`TraceStore`、`TRACE_SCHEMA`、`trace_context`、`redact`）时不加载私有模块。
+  共享 `persistence` 也仅依赖标准库，不引入知识服务或模型 provider。
 
 ## 测试
 `test_improve_p0.py`（tool_call、版本化索引与兼容模式、门控迁移与回滚、锁互斥与陈旧接管、回填与查询等价、

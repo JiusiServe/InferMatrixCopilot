@@ -1,12 +1,7 @@
 """InferMatrixCopilot embedded SDK v1 public surface."""
 
-from .direct import DirectClient, get_capabilities
-from ...knowledge_context import ContextBudget
-from .knowledge import KnowledgeCurator, KnowledgeValidatorError
-from ...knowledge_service.containment import (
-    ContainmentError, knowledge_maintenance_status, knowledge_usage_record,
-    knowledge_availability_check, knowledge_publication_guard, knowledge_policy_install,
-)
+from importlib import import_module
+
 from .models import (
     DIRECT_API_VERSION,
     KNOWLEDGE_API_VERSION,
@@ -21,6 +16,7 @@ from .models import (
     DirectCompletionRequest,
     DirectReviewPlan,
     DirectReviewRequest,
+    DirectReviewRunRequest,
     DocumentNotFoundError,
     DocumentPage,
     DocumentRef,
@@ -48,10 +44,49 @@ from .models import (
     StrictReviewRequest,
     StrictRunHandle,
     StrictRuntimeConfig,
+    ReviewRuntimeConfig,
+    ReviewRunHandle,
+    ReviewPollResult,
+    ReviewFinding,
+    ReviewResult,
     UnsupportedRepositoryError,
 )
-from .strict import StrictRuntime
-from ...trace_store import SCHEMA as TRACE_SCHEMA, TraceStore, redact, trace_context
+# Data contracts remain cold. Implementation imports occur only when a host
+# requests that capability, so a knowledge worker can import shared DTOs while
+# its own modules are still initializing.
+_LAZY = {
+    "DirectClient": (".direct", "DirectClient"),
+    "get_capabilities": (".direct", "get_capabilities"),
+    "StrictRuntime": (".strict", "StrictRuntime"),
+    "ReviewRuntime": (".strict", "ReviewRuntime"),
+    **{name: (".strict", name) for name in ("decode_review_result", "strict_finding")},
+    "JSONSessionError": ("...providers.json_session", "JSONSessionError"),
+    **{name: (".review_result", name) for name in ("parse_direct_result", "ReviewParseError", "normalize_direct_evidence", "review_summary_errors")},
+    **{name: (".rechecks", name) for name in ("checked_rechecks", "check_disposition_proof")},
+    "ContextBudget": ("...knowledge_context", "ContextBudget"),
+    "KnowledgeCurator": (".knowledge", "KnowledgeCurator"),
+    "KnowledgeValidatorError": (".knowledge", "KnowledgeValidatorError"),
+    **{name: ("...knowledge_service.containment", name) for name in (
+        "ContainmentError", "knowledge_maintenance_status", "knowledge_usage_record",
+        "knowledge_availability_check", "knowledge_publication_guard", "knowledge_policy_install",
+    )},
+    "TRACE_SCHEMA": ("...trace_store", "SCHEMA"),
+    **{name: ("...trace_store", name) for name in ("TraceStore", "redact", "trace_context")},
+}
+
+
+def __getattr__(name):
+    if name not in _LAZY:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module, attribute = _LAZY[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__))
+
 
 __all__ = [
     "DIRECT_API_VERSION",
@@ -76,6 +111,7 @@ __all__ = [
     "DirectCompletionRequest",
     "DirectReviewPlan",
     "DirectReviewRequest",
+    "DirectReviewRunRequest",
     "DocumentNotFoundError",
     "DocumentPage",
     "DocumentRef",
@@ -106,6 +142,21 @@ __all__ = [
     "StrictRunHandle",
     "StrictRuntimeConfig",
     "StrictRuntime",
+    "ReviewRuntime",
+    "decode_review_result",
+    "strict_finding",
+    "JSONSessionError",
+    "ReviewFinding",
+    "ReviewResult",
+    "ReviewParseError",
+    "parse_direct_result",
+    "normalize_direct_evidence",
+    "review_summary_errors",
+    "checked_rechecks",
+    "check_disposition_proof",
+    "ReviewRuntimeConfig",
+    "ReviewRunHandle",
+    "ReviewPollResult",
     "TraceStore",
     "UnsupportedRepositoryError",
     "get_capabilities",

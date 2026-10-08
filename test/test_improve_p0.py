@@ -544,7 +544,7 @@ def test_incomplete_fingerprint_names_the_missing_cover(settings):
 def test_executor_binds_store_and_unit_context_per_step(tmp_path, settings):
     import asyncio
 
-    from infermatrix_copilot.engine.executor import Executor
+    from execution_helpers import application_executor as Executor
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.step import StepResult, StepSpec
     from infermatrix_copilot.playbooks.store import Playbook, PlaybookStep

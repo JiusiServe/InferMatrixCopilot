@@ -1,6 +1,6 @@
 # providers/deepseek.py —— 规范
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~502 · harness transport（dsh，API-keyed） · refactor-status: oversized`
 
@@ -62,3 +62,7 @@ stdlib + `.base` + `.registry` + `..agent_loop` + `..llm` 的类型 + dsh SDK（
 
 ## 2026-09-30
 `complete()` 接受并忽略 `max_budget_usd`；`stops_at_spend` 为 False。
+
+## 2026-10-08 共享机制
+`SessionUsage.outcome/reply` 统一会话和无工具回复的结果封装；一次性调用的空目录改由 `TemporaryDirectory` 管理，清理错误仍可忽略。
+调用继续经过 `DeepSeekHarness` SDK，composition、凭据解析、模型选择、步数与超时控制均保留在本 transport。

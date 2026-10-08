@@ -1,6 +1,6 @@
 # providers/claude_code.py —— 规范
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~205 · harness transport（Claude 订阅） · refactor-status: ok`
 
@@ -50,3 +50,13 @@ x 必须为正。CLI 在每个 API 请求完成**之后**检查预算：它阻�
 `total_cost_usd` 以 `usage["cost_usd"]` 返回。
 阈值参数由 `budget_arg()` 精确生成：浮点数的最短往返十进制、普通（非科学）记数法；非正、非有限值 → `ValueError`。
 固定精度格式会移动边界（`.4f` 把 0.00001 变成 "0.0000" 即没有阈值，把 0.12345 变成 "0.1235" 即更高的阈值），所以不允许。
+
+## 2026-10-08 共享机制
+缓冲子进程调用复用 `base.run_cli`，超时仍保留部分 stdout，单对象 JSON 解析由 `_parse` 完成。
+MCP stdio 入口复用 `base.bridge_server`，`SessionUsage.outcome/reply` 统一结果封装与工具名上限。
+内置工具拒绝、独立 system 通道、回合上限、预算停机与实际 cache/cost 字段仍由本 transport 控制。
+
+无 MCP 配置的一次性调用显式传 `--allowedTools "" --strict-mcp-config`，
+并用 `audit.assert_tool_less` 拒绝工具事件及未知内容块。普通 `is_error` 回复拒绝；
+预算 subtype 的 `is_error` 保留原 `max_budget` 空正文和已报告费用，供调用方结算，
+不能当作成功知识。`test_kb_spend_cap.py` 覆盖该终止语义。

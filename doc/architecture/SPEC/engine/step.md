@@ -1,6 +1,6 @@
 # engine/step.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~67 · 引擎基础词汇 · refactor-status: ok`
 
@@ -17,6 +17,10 @@
 `StepSpec(name, kind, risk, handler, description)`。`Kind ∈ {deterministic,
 script, agent, validation, report}`；`Risk ∈ {read, write_workspace, push,
 knowledge, report}`。
+
+追加的可选字段：`StepContext.runtime=None` 注入调用方资源，不进入检查点；
+`StepSpec.checkpoint=True` 控制是否复用和保存完成记录；
+`StepResult.checkpoint=True` 控制本次成功是否完整到足以缓存。
 
 ## 不变量
 - 与仓库、任务无关；`StepSpec` 是 frozen 的。
@@ -41,5 +45,5 @@ executor 的路由和 `_CONSTRAINTS` 一起更新。
 
 ## 重构备注
 地基性文件 —— 把依赖集合**精确**保持在 {run_trace}。在这里多加一个 import，就会把
-整个引擎耦合到它上面。如果 `StepContext` 长出更多可选字段，那是**某个 step 越权**的
-信号，而不是这个文件需要重构的信号。
+整个引擎耦合到它上面。运行对象使用无领域依赖的 `runtime` 字段传递；
+不为初始化、维护或评审单独增加上下文字段。

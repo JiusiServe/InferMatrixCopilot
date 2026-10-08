@@ -14,6 +14,27 @@
 > `run_session()` 而不是 `LLM.create()`、为什么工具治理分预防/侦测两级——
 > 至今仍在约束这块代码。
 
+## 当前共享机制（2026-10-08）
+
+模型目标仍由 `ResolvedTarget` 与 `LLM.for_target` 解析；MoA 的 API 成员也走这条路径，
+不再套第二种预算客户端。`budgeting.bind_call_budget/call_budget` 仅共享真实 dispatch
+的预留及完成事实，周预算、MoA、知识维护的额度、账本、恢复和结算政策各自保留。
+缺失用量与订阅标记不能证明费用为零；DeepSeek harness 为 API-keyed，目前没有受支持的
+MoA 单次美元核算上界，不把它纳入 API 成员花费上限的保证。
+
+无工具调用与 judge 复用 `complete_native`；Cursor/Codex/Claude 严格拒绝工具事件，
+ZCode 保留其超大 prompt 附件读取及 scratch 容纳审计。允许读取固定源码目录的
+Direct/知识 JSON 会话复用 `json_session.run_readonly_json`，保留 Codex 只读沙箱、Cursor
+ask profile、凭据隔离、会话修复及各自截止时间。Strict 的桥权限和运行后审计仍由各
+transport 决定。两种调用的权限契约不能互换。双管道读取、超时、尾部保留和进程树清理
+复用 `base.stream_cli`；命令、环境、模型验证、归档和业务审核仍显式装配。
+
+本轮相关离线回归为 **442 passed**，覆盖 API/native、预算、MoA、judge、自改进 adapter、
+只读 JSON 会话和进程生命周期；日志为 `/tmp/copilot-abstraction-audit-focused.log`。
+测试使用假 CLI 与 stub，不构成新增原生认证或实网成功证据。各模块的精确契约见
+[`SPEC/budgeting.md`](../architecture/SPEC/budgeting.md) 与
+[`SPEC/providers/`](../architecture/SPEC/providers/)。以下 RFC 保留原决策时的实现描述。
+
 ---
 
 ## 原始 RFC

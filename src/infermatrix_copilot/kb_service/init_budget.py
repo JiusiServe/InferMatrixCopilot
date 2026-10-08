@@ -31,7 +31,9 @@ import os
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator, Mapping
+from typing import Callable, Iterator, Mapping
+
+from ..budgeting import request_cost_bound, reservation_fits, reserved_call, settlement_charge
 
 PRICES_ENV = "KB_INIT_PRICES"
 CACHE_WRITE_FACTOR = 1.25
@@ -102,8 +104,8 @@ def worst_request_usd(price: Price, input_bytes: int) -> float:
     cache-write rate) plus a full-length reply."""
     if input_bytes < 0:
         raise ValueError("input_bytes must be >= 0")
-    return (input_bytes * CACHE_WRITE_FACTOR * price.in_usd_per_mtok
-            + price.max_output_tokens * price.out_usd_per_mtok) / 1_000_000
+    return request_cost_bound(input_bytes, price.in_usd_per_mtok, price.max_output_tokens,
+                              price.out_usd_per_mtok, cache_factor=CACHE_WRITE_FACTOR)
 
 
 def generator_reservation(price: Price, threshold_usd: float, input_bytes: int) -> float:
@@ -120,18 +122,22 @@ class Reservation:
     def charge(self, actual: float | None) -> None:
         """Record the call's cost; None (unknown) charges the full reservation.
         A reported cost above the reservation is charged as reported."""
-        if actual is None or isinstance(actual, bool) or not isinstance(actual, (int, float)) \
-                or not math.isfinite(actual) or actual < 0:
-            self.charged = self.amount
-        else:
-            self.charged = float(actual)
+        self.charged = settlement_charge(self.amount, actual)
 
 
 class Budget:
     """A finite stage ceiling, or explicit None for uncapped accounting.
-    Reservations are atomic; independent native calls may share one budget."""
+    Reservations and optional checkpoints share one lock; model calls do not.
 
-    def __init__(self, limit_usd: float | None, *, spent_usd: float = 0.0):
+    The checkpoint receives settled spend and outstanding reservations before
+    dispatch and after settlement. A checkpoint failure propagates and charges
+    the affected reservation conservatively, so an outer record save cannot
+    erase a reservation that the failing callback may already have persisted.
+    Further dispatch requires recovery into a new budget instance.
+    """
+
+    def __init__(self, limit_usd: float | None, *, spent_usd: float = 0.0,
+                 checkpoint: Callable[[float, float], None] | None = None):
         if limit_usd is not None and (not math.isfinite(limit_usd) or limit_usd <= 0):
             raise ValueError("limit_usd must be a finite number > 0")
         if not math.isfinite(spent_usd) or spent_usd < 0:
@@ -140,6 +146,8 @@ class Budget:
         self.spent_usd = float(spent_usd)
         self._reserved = 0.0
         self._lock = threading.RLock()
+        self._checkpoint = checkpoint
+        self._checkpoint_failed = False
 
     @property
     def remaining_usd(self) -> float | None:
@@ -150,8 +158,22 @@ class Budget:
         """An explicit None ceiling keeps accounting without limiting calls."""
         if not math.isfinite(amount) or amount < 0:
             raise ValueError("a reservation must be a finite number >= 0")
-        remaining = self.remaining_usd
-        return remaining is None or amount <= remaining + 1e-12
+        with self._lock:
+            return reservation_fits(self.limit_usd, self.spent_usd, max(0, self._reserved), amount)
+
+    def checkpoint_now(self, update: Callable[[], None] | None = None) -> None:
+        """Apply and save domain state under the reservation checkpoint lock."""
+        with self._lock:
+            if self._checkpoint_failed:
+                raise RuntimeError("budget checkpoint failed; recover durable state before dispatch")
+            try:
+                if update is not None:
+                    update()
+                if self._checkpoint is not None:
+                    self._checkpoint(self.spent_usd, self._reserved)
+            except BaseException:
+                self._checkpoint_failed = True
+                raise
 
     @contextmanager
     def reserve(self, amount: float) -> Iterator[Reservation]:
@@ -159,16 +181,37 @@ class Budget:
         call when it does not fit. On exit the charge (or, when the block did
         not charge, e.g. because the call raised, the whole reservation) is
         added to what was spent."""
-        with self._lock:
-            if not self.can_reserve(amount):
-                raise BudgetExhausted(
-                    f"reserving ${amount:.4f} would exceed the budget "
-                    f"(spent ${self.spent_usd:.4f} of ${self.limit_usd:.2f})")
-            reservation = Reservation(amount)
-            self._reserved += amount
-        try:
-            yield reservation
-        finally:
+        def acquire():
+            with self._lock:
+                if self._checkpoint_failed:
+                    raise RuntimeError("budget checkpoint failed; recover durable state before dispatch")
+                if not self.can_reserve(amount):
+                    raise BudgetExhausted(
+                        f"reserving ${amount:.4f} would exceed the budget "
+                        f"(spent ${self.spent_usd:.4f} of ${self.limit_usd:.2f})")
+                self._reserved += amount
+                try:
+                    if self._checkpoint is not None:
+                        self._checkpoint(self.spent_usd, self._reserved)
+                except BaseException:
+                    self._reserved -= amount
+                    self.spent_usd += amount
+                    self._checkpoint_failed = True
+                    raise
+                return Reservation(amount)
+
+        def finish(call):
             with self._lock:
                 self._reserved -= amount
-                self.spent_usd += reservation.charged if reservation.charged is not None else amount
+                charged = settlement_charge(amount, call["reservation"].charged)
+                self.spent_usd += charged
+                try:
+                    if self._checkpoint is not None:
+                        self._checkpoint(self.spent_usd, self._reserved)
+                except BaseException:
+                    self.spent_usd += max(amount - charged, 0.0)
+                    self._checkpoint_failed = True
+                    raise
+
+        with reserved_call(acquire, finish) as call:
+            yield call["reservation"]

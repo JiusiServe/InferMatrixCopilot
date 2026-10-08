@@ -592,21 +592,35 @@ def test_child_launch_never_opens_the_post_gate(
     core.close()
 
 
-def test_subprocess_tamper_defense(settings):
-    """Full child-subprocess path: `python -m infermatrix_copilot --execute-reserved`
-    re-enforces policy on a rewritten request.json and terminalizes to failed,
-    with its stdout isolated to console.log."""
+@pytest.mark.parametrize("legacy", [False, True])
+def test_subprocess_tamper_defense(settings, monkeypatch, legacy):
+    """New reservations refuse tampering before launch; old ones retain the child gate."""
     core = _core(settings)
     run_id, _ = core.copilot.reserve_run(
         TaskSpec(kind="pr_review", repo="vllm-omni", pr=3),
         owner_server_id=core.server_id, owner_server_pid=core.pid)
     rd = settings.run_root / run_id
+    if legacy:
+        status = rs.read_status(rd)
+        status.pop("request_fingerprint")
+        status.pop("execution_mode")
+        rs.status_path(rd).write_text(json.dumps(status), encoding="utf-8")
     (rd / "request.json").write_text(json.dumps(
         {"kind": "pr_rebase", "repo": "evil", "pr": 3, "post": True,
          "params": {"force_push": True}}))
-    core._launch(run_id)  # real subprocess; blocks until it exits
+    if legacy:
+        core._launch(run_id)  # real subprocess; blocks until it exits
+    else:
+        from infermatrix_copilot import mcp_server
+
+        def forbidden_launch(*_args, **_kwargs):
+            pytest.fail("tampered reservation must not launch a child")
+
+        monkeypatch.setattr(mcp_server.subprocess, "Popen", forbidden_launch)
+        with pytest.raises(PolicyError, match="changed before launch"):
+            core._launch(run_id)
     st = rs.read_status(rd)
-    assert st["state"] == rs.FAILED
+    assert st["state"] == (rs.FAILED if legacy else rs.QUEUED)
     assert st["owner_server_id"] == core.server_id
     assert (rd / "console.log").exists()
     core.close()
@@ -619,7 +633,12 @@ def _reserve_created(core, monkeypatch, run_id="run-20260928-120000-aaaaaa"):
     rs.init_queued(core.run_root / run_id, run_id=run_id, owner_server_id=core.server_id,
                    owner_server_pid=core.pid)
     monkeypatch.setattr(core._q, "put", lambda item: None)
-    monkeypatch.setattr(core.reservations, "reserve", lambda *_a, **_k: (run_id, True))
+    def reserve(spec, **_kwargs):
+        (core.run_root / run_id / "request.json").write_text(
+            json.dumps(spec.model_dump()), encoding="utf-8")
+        return run_id, True
+
+    monkeypatch.setattr(core.reservations, "reserve", reserve)
     return core.reserve_strict_review({
         "kind": "pr_review", "repo": "vllm-omni", "pr": 7, "post": False,
         "params": {"review_depth": "standard"}, "expected_head_sha": "a" * 40,
