@@ -18,7 +18,7 @@
 | 审核与准入 | `gate`、`maintenance_policy`、`maintenance_resolution` | 确定性验证、独立审核、纠错资格及带证据的负责人处置。 |
 | 分发与撤回 | `InitPublisher`、`Publisher`、`activate`、`containment` | 各自权限内发布；独立于快照的签名撤回和恢复确认。 |
 | 消费 | `KnowledgeView`、`KnowledgeDocs`、`KnowledgeContextService`、SDK v1 | 固定任务快照、限定读取、累计会话预算、交付与使用回执。 |
-| Review bot | `ReviewPipeline`、`KnowledgeCurationCycle`、`KnowledgeMaintenance`、`ReviewPublisher` | PR 评审、候选学习、消费侧防护及共同的 GitHub 发布边界。 |
+| Review bot | `ReviewPipeline`、`KnowledgeDistiller`、`KnowledgeMaintenance`、`ReviewPublisher` | PR 输入、候选交接、消费侧防护及共同的 GitHub 发布边界；模型执行由 SDK 统一管理。 |
 
 模型／Git transport、账本、签名和预算支撑各层。初始化记录、维护 SQLite、
 improve 周预算、发布 outbox、消费会话及撤回高水位保持各自存储和恢复范围。
@@ -105,13 +105,16 @@ Intake、版本巡检和纠错复用有界操作生成与修复循环，保护�
 
 ## 与 review bot 的连接
 
-候选学习保持 `KnowledgeDistiller → KnowledgeCurationCycle → SDK KnowledgeCurator`，
+候选学习使用 `KnowledgeDistiller → SDK KnowledgeCurator.curate`，
 然后由 bot 的账本和 Git 交接记录导出，经负责人提升和现有 provider 门禁进入正式知识。
 
 消费保持两条现有路径：
 
-- Direct：bot 适配器调用 SDK `DirectClient`，使用任务固定的知识视图，分别记录检索和实际注入。
-- Strict：隔离 Host 调用 SDK `StrictRuntime`，经过 `RunService` 和现有执行底座，传回 provider 签发的使用记录。
+- Direct：隔离 Host 通过 SDK `ReviewRuntime` 提交耐久请求，由 provider 调用 `DirectClient.plan/validate`、共享原生模型 transport 和执行底座，分别记录检索和实际注入。
+- Strict：同一隔离 Host 调用 SDK `ReviewRuntime`（兼容名 `StrictRuntime`），经过 `RunService` 和现有执行底座，传回 provider 签发的使用记录。
+
+bot 不再保留完整的旧 Direct 分支、候选模型循环或 Codex/Cursor 评审执行入口。
+远程 worker 也消费公开 SDK；它持有远程任务与容量，SDK 持有实际模型运行及其恢复身份。
 
 两者共同经过 `ReviewPublisher`。公开边界始终为 `infermatrix_copilot.sdk.v1`；
 `init_execution`、领域账本和模型适配器不成为 bot 的私有调用入口。

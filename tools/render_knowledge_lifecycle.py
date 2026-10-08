@@ -250,10 +250,10 @@ def render_svg(inventory: dict[str, Any]) -> str:
     card(180, 949, 185, "任务知识与版本化 SDK v1", [
         ("KnowledgeView · KnowledgeDocs", True),
         ("KnowledgeContextService", True),
-        ("DirectClient / StrictRuntime", True),
+        ("ReviewRuntime / KnowledgeCurator", True),
         ("固定快照、限定读取、会话预算和使用回执", False)], blue)
     card(830, 949, 185, "Review bot：经 SDK 读取与消费", [
-        ("ReviewPipeline · KnowledgeCurationCycle", True),
+        ("ReviewPipeline · KnowledgeDistiller", True),
         ("KnowledgeMaintenance · ReviewPublisher", True),
         ("公开边界仅 SDK v1；候选交权威维护审核", False),
         ("Direct / Strict 共用发布前可用性检查", False)], green)

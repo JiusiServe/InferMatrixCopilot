@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" id="lifecycle-svg" width="1600" height="1350" viewBox="0 0 1600 1350" role="img" aria-labelledby="diagram-title diagram-desc">
 <title id="diagram-title">Copilot 知识初始化与维护：五层职责图</title>
-<desc id="diagram-desc">初始化五阶段与维护两步骤共用 WorkflowExecution.execute；领域记录各自持有业务事实和预算。复用内容、证据和审核，经发布及撤回到公开 SDK v1 与 review bot。主图是职责图；完整 390 个 Python 类在配套 HTML 和 JSON 中。源码摘要 e0cff5ce3e09f491d3d225788b4586aeeb5068a6444d431fade6b08b2cb63ff2。</desc>
+<desc id="diagram-desc">初始化五阶段与维护两步骤共用 WorkflowExecution.execute；领域记录各自持有业务事实和预算。复用内容、证据和审核，经发布及撤回到公开 SDK v1 与 review bot。主图是职责图；完整 393 个 Python 类在配套 HTML 和 JSON 中。源码摘要 d33216d221d50abf3929cda2ac08c01994f1ea1773039eb9bed471c86cda5b8a。</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#9baabd"/></marker></defs>
 <style>text{font-family:Arial,"Droid Sans Fallback",sans-serif} .code{font-family:ui-monospace,"DejaVu Sans Mono",monospace}</style>
 <rect width="1600" height="1350" fill="#f3f6fa"/>
 <text x="60" y="55" font-size="36" fill="#1e3046" font-weight="700">知识初始化与维护</text>
 <text x="60" y="89" font-size="20" fill="#60728b" font-weight="400">同一执行底座；领域记录各自持有事实与预算；每个 Python 类在展开视图中列出</text>
-<text x="60" y="124" font-size="17" fill="#526a89" font-weight="400" class="code">124 个核心类 = 97 kb_service + 27 knowledge_service   ·   390 个 provider 类完整清单</text>
+<text x="60" y="124" font-size="17" fill="#526a89" font-weight="400" class="code">124 个核心类 = 97 kb_service + 27 knowledge_service   ·   393 个 provider 类完整清单</text>
 <text x="58" y="189" font-size="26" fill="#9aaac0" font-weight="700">01</text>
 <text x="58" y="220" font-size="18" fill="#52657f" font-weight="700">执行入口</text>
 <text x="58" y="361" font-size="26" fill="#9aaac0" font-weight="700">02</text>
@@ -80,12 +80,12 @@
 <text x="204" y="986" font-size="23" fill="#245fc7" font-weight="700">任务知识与版本化 SDK v1</text>
 <text x="204" y="1021" font-size="17" fill="#4d6179" font-weight="400" class="code">KnowledgeView · KnowledgeDocs</text>
 <text x="204" y="1050" font-size="17" fill="#4d6179" font-weight="400" class="code">KnowledgeContextService</text>
-<text x="204" y="1079" font-size="17" fill="#4d6179" font-weight="400" class="code">DirectClient / StrictRuntime</text>
+<text x="204" y="1079" font-size="17" fill="#4d6179" font-weight="400" class="code">ReviewRuntime / KnowledgeCurator</text>
 <text x="204" y="1108" font-size="19" fill="#4d6179" font-weight="400">固定快照、限定读取、会话预算和使用回执</text>
 <rect x="830" y="949" width="620" height="185" rx="14" fill="#ffffff" stroke="#dbe4ef"/>
 <rect x="830" y="961" width="5" height="161" rx="2" fill="#087c72"/>
 <text x="854" y="986" font-size="23" fill="#087c72" font-weight="700">Review bot：经 SDK 读取与消费</text>
-<text x="854" y="1021" font-size="17" fill="#4d6179" font-weight="400" class="code">ReviewPipeline · KnowledgeCurationCycle</text>
+<text x="854" y="1021" font-size="17" fill="#4d6179" font-weight="400" class="code">ReviewPipeline · KnowledgeDistiller</text>
 <text x="854" y="1050" font-size="17" fill="#4d6179" font-weight="400" class="code">KnowledgeMaintenance · ReviewPublisher</text>
 <text x="854" y="1079" font-size="19" fill="#4d6179" font-weight="400">公开边界仅 SDK v1；候选交权威维护审核</text>
 <text x="854" y="1108" font-size="19" fill="#4d6179" font-weight="400">Direct / Strict 共用发布前可用性检查</text>
@@ -93,5 +93,5 @@
 <text x="202" y="1198" font-size="21" fill="#334f73" font-weight="700">共享底座：执行锁与恢复 · 预留与结算 · 原生模型回执 · Git 对象 · 原子写入</text>
 <text x="202" y="1232" font-size="19" fill="#52657f" font-weight="400">单所有者：InitRecord｜维护 SQLite｜improve 周预算｜发布 outbox｜消费会话｜撤回高水位</text>
 <text x="60" y="1311" font-size="16" fill="#64758b" font-weight="400">箭头表达职责与交付关系，不是逐函数调用图。执行内核不反向依赖知识流程；bot 运行代码仅依赖 SDK v1。</text>
-<text x="60" y="1336" font-size="14" fill="#71829a" font-weight="400">源码树摘要：e0cff5ce3e09f491  ·  完整源路径、嵌套／局部类与文件摘要见 HTML / JSON</text>
+<text x="60" y="1336" font-size="14" fill="#71829a" font-weight="400">源码树摘要：d33216d221d50abf  ·  完整源路径、嵌套／局部类与文件摘要见 HTML / JSON</text>
 </svg>

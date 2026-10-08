@@ -110,7 +110,7 @@ bind_call_budget(key, acquire, finish)
 call_budget(request)
 ```
 
-`acquire(request)` 返回领域 reservation；`finish(reservation, facts)` 接收是否发送、可信用量和结束状态。`LLM.create` 与原生 completion 在真实发送位置使用它。共享层传递事实，账户适配器负责估价、持久预留和结算。同一账户按绑定键去重，线程与子进程边界显式传递绑定。
+`acquire(request)` 返回领域 reservation；`finish(reservation, facts)` 接收是否发送、可信用量和结束状态。`LLM.create` 与原生 completion 在真实发送位置使用它。共享层传递事实，账户适配器负责估价、持久预留和结算。同一账户按绑定键去重。绑定与 Python 回调只在当前进程生效；线程显式传递上下文，跨进程由执行侧根据领域账户重新建立绑定，不自动传递 `ContextVar` 或回调。
 
 具体删除目标：
 
@@ -158,6 +158,6 @@ CI 增加依赖边界检查：bot 只导入公开 SDK，不直接启动评审或
 
 最终按固定基线检查知识模块、全部 provider、bot 的生产代码分别净减少。新增公共代码、兼容代码和运行配置全部计入，测试与文档排除；结合 AST 与实际删除的重复函数体核验。迁目录、删注释、压缩排版不计作收敛，类数仅作辅助指标。
 
-当前知识模块与 bot 已净减少，但全部 provider 生产代码仍净增长；三项门禁尚未全部通过，继续保持草稿。部署配置、预算配置、模型配置和发布权限保持现状。最终数量、执行快照和测试限制见[验收记录](copilot-reviewbot-refactor-validation.md)。
+当前知识模块已净减少；纳入新主线功能后，全部 provider 与 bot 相对原定固定基线仍净增长，三项门禁尚未全部通过，继续保持草稿。部署配置、预算配置、模型配置和发布权限保持现状。最终数量、执行快照和测试限制见[验收记录](copilot-reviewbot-refactor-validation.md)。
 
 新公共实现纳入维护策略指纹。旧校准、观察周期和撤回演练结果保留，但不能授权新策略。自动维护启用仍须重新校准、完成七个有效夜间观察周期，并通过受审配置 PR；运行任务不自行修改启用配置。
