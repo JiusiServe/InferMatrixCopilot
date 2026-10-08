@@ -1,8 +1,8 @@
 # playbooks/*.yaml —— 规范
 
-<!-- verified-against: 2026-10-05 -->
+<!-- verified-against: 2026-10-08 -->
 
-`9 个文件 · 声明式编排数据 · refactor-status: ok`
+`16 个 YAML 文件 · 声明式编排数据 · refactor-status: ok`
 
 > 当前集合：`pr-review`@6、`pr-quality`@1、`pr-debug`@2、`pr-rebase`@2、`issue-answer`@2、
 > `issue-triage`@2、`repo-profile`@1（active）；`repo-rebase-v3`@1（**locked**）；
@@ -59,7 +59,8 @@ success, steps[]`。
 知识服务的合并推进、发版巡检与快照激活；candidate 状态，由 `kb serve` 调度或 `kb run` 手动运行。
 
 ## kb-init（candidate）
-为一个仓库建知识库：单步 `knowledge.init`，每次运行一个阶段（skeleton → feature-discovery（显式启用）→ modules → knowledge（解释性知识）→ deepen + 生命周期开关 →
+保留单步 `knowledge.init` 兼容入口；它等待与 CLI 相同的初始化执行入口。
+每次运行一个业务阶段（skeleton → feature-discovery（显式启用）→ modules → knowledge（解释性知识）→ deepen + 生命周期开关 →
 pr-history → harvest-calibration），每阶段一个由人合并的 PR。只由 `kb init REPO --stage S` 运行，不经 `kb serve`，不写服务账本。
 `feature-discovery` 先提取文档功能基线，再遍历固定源码与测试库存；独立评审后的目录 PR
 合并后冻结，下游核对目录哈希与源码版本。新初始化模板启用发现；旧仓库保持兼容。
@@ -74,6 +75,15 @@ pr-history → harvest-calibration），每阶段一个由人合并的 PR。只�
 可显式传 `subscription_generator` 使用声明订阅计费的生成器；未报告的订阅费用不伪造为 USD。
 独立 knowledge-deepen 可传 `unlimited_subscription`，同时检查生成与裁判订阅；不兼容
 budget_usd，固定记账仍可观察。启用语义政策时 partial 预览不能当作阶段成功。
+
+## kb-init-stage（candidate）
+
+版本 2，内部绑定计划，`task_kinds: []`；不参与普通任务选择。
+取得业务批次锁并绑定输入后，由 `WorkflowExecution.execute` 运行
+`prepare → draft → validate → prepare_publication → publish`。
+`when: init_draft` 控制中间三步，允许原 prepared 直接恢复发布；prepare 和 publish
+仍检查当前业务事实。阶段进度由 Executor 管理，证据、已接受单元、预算和发布回执
+留在原有领域记录中，未完成的 partial 不写步骤成功标记。
 
 ## 自进化接入（2026-10-04）
 

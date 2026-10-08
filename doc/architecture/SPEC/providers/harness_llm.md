@@ -1,6 +1,6 @@
 # providers/harness_llm.py —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~66 · 套在 harness 之上的 LLM 形状适配器（仅限无工具） · refactor-status: ok`
 
@@ -33,7 +33,7 @@ CLI 调用。
 不做 agent step 委托（那是 `run_session`）；不做工具桥接。
 
 ## 依赖（允许）
-`.base` + `..llm` 的类型。
+`.base` + `.completion`；trace 记录由共享 completion 调用 `..llm.capture_model_call`。
 
 ## 测试
 `test_providers.py`。
@@ -45,3 +45,7 @@ CLI 调用。
 ## 自进化接入（2026-10-04）
 
 无工具 `create` 在绑定 store 时调用 `capture_model_call` 记录成功或异常的 trace/1；模型仍来自 harness 路由，工具请求仍拒绝。
+
+## 2026-10-08 共享机制
+`create()` 通过 `completion.complete_native(capture=True)` 统一原生调用与成功/失败记录，返回原 `Reply` 后再调用 `on_text`。
+公开签名、拒绝 tools、`_harness_model` 路由与 `for_member` 的 API 委托保持上述契约。

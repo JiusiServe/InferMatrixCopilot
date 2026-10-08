@@ -307,10 +307,7 @@ class _KnowledgeDepth(_Knowledge):
         self.record.save(self.rt.state_dir)
         claims = {page: text for page, text in accepted.items()}
         entries = [Evidence.from_dict(e) for group in self.record.evidence.values() for e in group]
-        result = self._conclude(claims, entries)
-        if policy.semantic_depth_per_facet_gt is not None and not depth["target_met"] and result.status == "empty":
-            return self._blocked(["semantic depth target is unmet; retained checkpoint is incomplete"])
-        return result
+        return self._conclude(claims, entries)
 
     def _begin_light_round(self, entry, requested):
         """Charge a durable logical round before dispatch, including interrupted reviews."""
@@ -370,13 +367,21 @@ class _KnowledgeDepth(_Knowledge):
             if not attempted:
                 return False
 
-    def _publish(self, changed):
+    def _prepare_publication(self, changed):
         depth = self.record.coverage.get("semantic_depth", {})
         unmet = self.coverage_policy.semantic_depth_per_facet_gt is not None and (
             not depth.get("target_met") or not coverage_targets_met(self.record.coverage.get("breadth", {}), self.foundation_mode))
         if unmet and not self.dry_run:
             return self._blocked(["semantic depth target is unmet; publication is blocked, checkpoint retained"])
-        result = super()._publish(changed)
+        return super()._prepare_publication(changed)
+
+    def _publish(self):
+        if not self.dry_run:
+            return super()._publish()
+        result = super()._publish()
+        depth = self.record.coverage.get("semantic_depth", {})
+        unmet = self.coverage_policy.semantic_depth_per_facet_gt is not None and (
+            not depth.get("target_met") or not coverage_targets_met(self.record.coverage.get("breadth", {}), self.foundation_mode))
         if unmet and result.status == "dry_run":
             result.status = "partial"
             result.notes.append("reviewable partial preview; semantic depth target is not met")
@@ -541,6 +546,19 @@ class _KnowledgeDepth(_Knowledge):
                         if p != feature.page and t != current})
         return self._bounded_texts(ordered, 4000)
 
+    def _block_evidence(self, blocks):
+        evidence = []
+        for block in blocks.values():
+            proof = json.loads(re.search(r"<!-- kb:depth-proof (.*?) -->", block, re.S).group(1))
+            evidence += [evidence_for(self.observer, e["path"], e["start"], e["end"]) for e in proof["evidence"]]
+        return evidence
+
+    def _depth_content(self, prefix, blocks):
+        text = prefix + "\n\n".join(blocks[f] for f in FACETS if f in blocks) + "\n"
+        evidence = self._block_evidence(blocks)
+        sources = [f"{self.lifecycle.full_name}@{self.record.pin}:{e.path}:L{e.start}-L{e.end}" for e in evidence]
+        return Page.parse(text).with_sources(list(dict.fromkeys(sources))).render(), evidence
+
     def _attempt(self, tree, context, feature, entry):
         page = depth_page(feature)
         old = self.head.get(page, "")
@@ -680,14 +698,8 @@ class _KnowledgeDepth(_Knowledge):
         related = f"[功能概览]({Path(feature.page).name}) · [owner 入口](_index.md)\n\n"
         if self.foundation_mode == "partial" and feature.page not in self.head:
             related = "[owner 入口](_index.md)\n\n"
-        proposed = front + related + "\n\n".join(blocks[f] for f in FACETS if f in blocks) + "\n"
         # Retrieve exactly the attested spans, including retained prior facets.
-        evidence = []
-        for block in blocks.values():
-            proof = json.loads(re.search(r"<!-- kb:depth-proof (.*?) -->", block, re.S).group(1))
-            evidence += [evidence_for(self.observer, e["path"], e["start"], e["end"]) for e in proof["evidence"]]
-        sources = [f"{self.lifecycle.full_name}@{self.record.pin}:{e.path}:L{e.start}-L{e.end}" for e in evidence]
-        proposed = Page.parse(proposed).with_sources(list(dict.fromkeys(sources))).render()
+        proposed, evidence = self._depth_content(front + related, blocks)
         issues = check_rules({feature.id: proposed}, self.observer)
         if issues or page_over_capacity(proposed):
             raise ValueError("; ".join(issues) or "depth page exceeds capacity")
@@ -700,11 +712,7 @@ class _KnowledgeDepth(_Knowledge):
             if lightweight and entry.get("review_dispatched"):
                 raise ModelUnavailable("dispatched review has no matching durable receipt; start a bounded correction round")
             if lightweight:
-                new_evidence = []
-                for block in new.values():
-                    proof = json.loads(re.search(r"<!-- kb:depth-proof (.*?) -->", block, re.S).group(1))
-                    new_evidence += [evidence_for(self.observer, e["path"], e["start"], e["end"]) for e in proof["evidence"]]
-                shown = self._judge_evidence(new_evidence)
+                shown = self._judge_evidence(self._block_evidence(new))
             else:
                 shown = self._judge_evidence(evidence)
             for block in new.values():
@@ -747,13 +755,7 @@ class _KnowledgeDepth(_Knowledge):
         if label != "pass":
             return
         blocks = {f: block for f, block in blocks.items() if f in old_blocks or f in passed}
-        proposed = front + related + "\n\n".join(blocks[f] for f in FACETS if f in blocks) + "\n"
-        kept_evidence = []
-        for block in blocks.values():
-            proof = json.loads(re.search(r"<!-- kb:depth-proof (.*?) -->", block, re.S).group(1))
-            kept_evidence += [evidence_for(self.observer, e["path"], e["start"], e["end"]) for e in proof["evidence"]]
-        sources = [f"{self.lifecycle.full_name}@{self.record.pin}:{e.path}:L{e.start}-L{e.end}" for e in kept_evidence]
-        proposed = Page.parse(proposed).with_sources(list(dict.fromkeys(sources))).render()
+        proposed, kept_evidence = self._depth_content(front + related, blocks)
         self.head[page] = proposed
         if lightweight:
             self._block_cache[feature.id] = blocks

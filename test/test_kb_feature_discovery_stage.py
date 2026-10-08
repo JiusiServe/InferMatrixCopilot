@@ -1,7 +1,9 @@
 """Real discovery stage publication with offline native transport and archives."""
+import asyncio
 from dataclasses import replace
 import hashlib
 import json
+import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -89,6 +91,17 @@ def _setup(world, *, adapter="toy", policy=None, script=None, archived=True):
 def _run(rt, lifecycle):
     return run_stage(rt, lifecycle, "feature-discovery", dry_run=True, from_existing=True,
                      unlimited_subscription=True)
+
+
+def _save_legacy_record(rt, record):
+    """Old runtimes retain native proofs, without executor phase artifacts."""
+    from infermatrix_copilot.kb_service.init_support import InitRecord
+
+    for key in ("validation", "validation_pending", "prepared"):
+        record.pr.pop(key, None)
+    root = InitRecord.path(rt.state_dir, record.repo, "feature-discovery").parent
+    shutil.rmtree(root / "executions" / "feature-discovery")
+    record.save(rt.state_dir)
 
 
 def _report(record):
@@ -403,7 +416,6 @@ def test_busy_discovery_batch_preserves_active_checkpoint_before_parent_run(worl
 def test_discovery_lease_is_released_when_parent_run_fails(world, monkeypatch):
     import fcntl
     from infermatrix_copilot.kb_service.init_feature_discovery import _FeatureDiscovery
-    from infermatrix_copilot.kb_service.init_stages import _Stage
     from infermatrix_copilot.kb_service.init_support import InitError
 
     rt, lifecycle, _, _ = _setup(world)
@@ -411,10 +423,11 @@ def test_discovery_lease_is_released_when_parent_run_fails(world, monkeypatch):
     def fail(stage):
         raise InitError("parent input failure")
 
-    monkeypatch.setattr(_Stage, "run", fail)
+    from infermatrix_copilot.kb_service import init_execution
+    monkeypatch.setattr(init_execution, "bind", fail)
     stage = _FeatureDiscovery(rt, lifecycle, dry_run=True, pin=None)
     with pytest.raises(InitError, match="parent input failure"):
-        stage.run()
+        asyncio.run(init_execution.execute_init(stage))
     lock_path = rt.state_dir / "init" / "toy" / "feature-discovery.lock"
     with lock_path.open("a+b") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -540,7 +553,7 @@ def test_completed_legacy_preview_rerenders_without_new_native_calls(world, monk
     (Path(first.pr['dry_run_dir']) / 'tree' / path).write_text(old_text)
     first.discovery.pop('report_format'); first.discovery.pop('full_artifact')
     first.discovery['report_sha256'] = hashlib.sha256(old_text.encode()).hexdigest()
-    first.save(rt.state_dir)
+    _save_legacy_record(rt, first)
     receipts = json.dumps(first.discovery['reviews'], sort_keys=True)
     calls = len(script.calls)
     monkeypatch.setattr(script, 'complete', lambda **kwargs: pytest.fail('legacy report rerender called a model'))

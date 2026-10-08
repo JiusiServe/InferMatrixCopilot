@@ -11,10 +11,11 @@ import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from .step import FailureKind, StepContext, StepResult
 from .registry import StepRegistry
+from ..persistence import atomic_write_bytes, fsync_directory
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..config import Settings
@@ -22,6 +23,16 @@ if TYPE_CHECKING:  # pragma: no cover
     from ..notify import Notifier
     from ..playbooks.store import Playbook
     from ..run_trace import RunTrace
+
+
+def _checkpoint_directory(directory):
+    try:
+        fsync_directory(directory)
+    except OSError as exc:
+        import errno
+        if exc.errno not in (errno.EINVAL, errno.ENOTSUP, errno.EACCES,
+                             errno.EPERM, errno.EISDIR, errno.EBADF):
+            raise
 
 
 @dataclass
@@ -49,6 +60,9 @@ class Executor:
         trace: "RunTrace",
         llm: Optional["LLM"] = None,
         notifier: Optional["Notifier"] = None,
+        runtime=None,
+        fingerprint: str = "",
+        validate_cached: Callable[[str, dict], None] | None = None,
     ):
         """Wire the executor to its `registry` (step lookups), `settings`
         (retry bounds, post gates), the `run_dir` where progress.json is
@@ -60,6 +74,9 @@ class Executor:
         self.trace = trace
         self.llm = llm
         self.notifier = notifier
+        self.runtime = runtime
+        self.fingerprint = fingerprint
+        self.validate_cached = validate_cached
         self.progress_file = self.run_dir / "progress.json"
 
     # -- checkpoint / resume ------------------------------------------------
@@ -67,8 +84,22 @@ class Executor:
         """Read the run's checkpoint (a `{"completed": {step_id: ...}}` map) from
         progress.json, or the empty checkpoint when this is a fresh run."""
         if self.progress_file.exists():
-            return json.loads(self.progress_file.read_text(encoding="utf-8"))
-        return {"completed": {}}
+            progress = json.loads(self.progress_file.read_text(encoding="utf-8"))
+            if self.fingerprint and progress.get("fingerprint") != self.fingerprint:
+                raise ValueError("checkpoint fingerprint differs from this execution")
+            if not isinstance(progress.get("completed"), dict):
+                raise ValueError("checkpoint has no completed-step map")
+            for cached in progress["completed"].values():
+                if not isinstance(cached, dict):
+                    raise ValueError("checkpoint contains an invalid step result")
+                outputs = cached.get("outputs")
+                if outputs is not None and not isinstance(outputs, dict):
+                    raise ValueError("checkpoint contains invalid outputs")
+                updates = (outputs or {}).get("state_updates")
+                if updates is not None and not isinstance(updates, dict):
+                    raise ValueError("checkpoint contains invalid state updates")
+            return progress
+        return {"completed": {}, **({"fingerprint": self.fingerprint} if self.fingerprint else {})}
 
     def _save_progress(self, progress: dict) -> None:
         """Persist the checkpoint to progress.json (creating run_dir), so a later
@@ -78,28 +109,7 @@ class Executor:
         survive a crash at any point during the write."""
         self.run_dir.mkdir(parents=True, exist_ok=True)
         data = json.dumps(progress, indent=2, default=str)
-        tmp = self.progress_file.with_name(self.progress_file.name + ".tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            f.write(data)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, self.progress_file)
-        try:
-            # directory fsync makes the rename itself durable
-            dir_fd = os.open(self.run_dir, os.O_RDONLY)
-            try:
-                os.fsync(dir_fd)
-            finally:
-                os.close(dir_fd)
-        except OSError as exc:
-            # opening/fsyncing a directory is unsupported on some platforms
-            # (Windows) and filesystems — those degrade to rename atomicity.
-            # Real storage failures (EIO) mean the durability guarantee is
-            # gone and MUST propagate rather than continue on a bad disk.
-            import errno
-            if exc.errno not in (errno.EINVAL, errno.ENOTSUP, errno.EACCES,
-                                 errno.EPERM, errno.EISDIR, errno.EBADF):
-                raise
+        atomic_write_bytes(self.progress_file, data.encode("utf-8"), directory_fsync=_checkpoint_directory)
 
     # -- execution ------------------------------------------------------------
     async def run(self, playbook: "Playbook", state: dict) -> RunOutcome:
@@ -135,8 +145,13 @@ class Executor:
             return await self._run_steps(playbook, state)
 
     async def _run_steps(self, playbook: "Playbook", state: dict) -> RunOutcome:
-        progress = self._load_progress()
         outcome = RunOutcome(status="done")
+        try:
+            progress = self._load_progress()
+        except (OSError, ValueError, TypeError, AttributeError) as exc:
+            outcome.status = "blocked"
+            outcome.blocked_reason = f"checkpoint refused: {exc}"
+            return outcome
         state.setdefault("playbook", playbook.name)
         # Run-scoped params (CLI `--task-param`, or intent-derived) reach every
         # step. Without this a step's `ctx.params.get(...)` only ever saw the
@@ -145,6 +160,7 @@ class Executor:
         task_params = (state.get("task_spec") or {}).get("params") or {}
 
         for pstep in playbook.steps:
+            spec = self.registry.get(pstep.step)
             if pstep.when:
                 try:
                     applies = _eval_when(pstep.when, state)
@@ -159,9 +175,16 @@ class Executor:
                     outcome.step_results[pstep.id] = StepResult(
                         True, summary=f"skipped (when: {pstep.when})")
                     continue
-            if pstep.id in progress["completed"]:
+            if spec.checkpoint and pstep.id in progress["completed"]:
                 cached = progress["completed"][pstep.id]
                 cached_outputs = cached.get("outputs", {}) or {}
+                if self.validate_cached is not None:
+                    try:
+                        self.validate_cached(pstep.id, cached_outputs)
+                    except Exception as exc:
+                        outcome.status = "blocked"
+                        outcome.blocked_reason = f"step '{pstep.id}': cached result refused: {exc}"
+                        return outcome
                 # steps may publish JSON-simple state keys via outputs.state_updates
                 # so resumed runs recover them without re-running the step
                 state.update(cached_outputs.get("state_updates") or {})
@@ -172,7 +195,6 @@ class Executor:
                 )
                 continue
 
-            spec = self.registry.get(pstep.step)
             if getattr(self.settings, "improve_shadow", False) and spec.risk not in ("read", "report"):
                 # a shadow (experiment) run may never reach a writing or
                 # posting step, whatever the playbook says: refused at the
@@ -214,10 +236,11 @@ class Executor:
             )
 
             if result.ok:
-                progress["completed"][pstep.id] = {
-                    "summary": result.summary, "outputs": result.outputs,
-                }
-                self._save_progress(progress)
+                if spec.checkpoint and result.checkpoint:
+                    progress["completed"][pstep.id] = {
+                        "summary": result.summary, "outputs": result.outputs,
+                    }
+                    self._save_progress(progress)
                 state.update((result.outputs or {}).get("state_updates") or {})
                 state.setdefault("outputs", {})[pstep.id] = result.outputs
                 continue
@@ -264,8 +287,9 @@ class Executor:
         ctx = StepContext(
             settings=effective_settings, state=state, params=params or {},
             run_dir=self.run_dir, trace=self.trace, llm=step_llm, item=item,
+            runtime=self.runtime,
         )
-        attempts = 1 + max(0, self.settings.max_step_retries)
+        attempts = 1 + max(0, getattr(self.settings, "max_step_retries", 1))
         last: StepResult | None = None
         # `step` alone cannot identify the work: a playbook may run the same spec
         # twice (repo-rebase-v3 runs its module-rebase spec for both waves) and
@@ -429,4 +453,5 @@ def _merge(results: list[StepResult]) -> StepResult:
         return StepResult(False, worst.failure,
                           f"{len(failed)}/{len(results)} items failed: {worst.summary}",
                           merged_outputs, changed)
-    return StepResult(True, None, f"all {len(results)} items ok", merged_outputs, changed)
+    return StepResult(True, None, f"all {len(results)} items ok", merged_outputs, changed,
+                      checkpoint=all(r.checkpoint for r in results))

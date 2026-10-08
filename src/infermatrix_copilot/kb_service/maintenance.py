@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from dataclasses import replace
@@ -88,17 +89,59 @@ def request(rt, request_id, repos=None, *, options=None):
     return store.enqueue_request(request_id, repo, detail, now=rt.clock())
 
 
-def run_due(rt, *, on_correction=None):
-    """Run the existing correction-then-audit sequence under the caller's lease."""
+async def run_due_async(rt, *, on_correction=None):
+    """Govern correction then audit; SQLite remains the domain checkpoint."""
+    from ..app.workflow_execution import WorkflowExecution
+    from ..config import Settings
+    from ..engine.registry import StepRegistry
+    from ..engine.step import StepResult, StepSpec
+    from ..playbooks.store import Playbook, PlaybookStep
+    from .maintenance_store import cycle_date
+
     if rt.lease_owner is None:
         raise ValueError("maintenance execution requires the scheduler lease")
     with rt.ledger.fenced(rt.lease_owner):
-        pass  # refuse a stale caller before correction progression can have effects
-    corrections = advance_corrections(rt)
-    if on_correction is not None:
-        for event in corrections:
-            on_correction(event)
-    return {"corrections": corrections, "maintenance": tick(rt)}
+        pass
+    identity = {"cycle_date": cycle_date(rt.clock()), "policy_sha256": policy_digest(rt)}
+    fingerprint = digest(json.dumps(identity, sort_keys=True))
+    run_dir = rt.state_dir / "runs" / "knowledge-maintenance" / fingerprint
+    resources = {"rt": rt, "on_correction": on_correction, "results": {}}
+
+    async def handle(ctx):
+        active = ctx.runtime["rt"]
+        phase = ctx.params["phase"]
+        try:
+            with active.ledger.fenced(active.lease_owner):
+                pass  # every phase revalidates authority; no outer cached success
+            result = advance_corrections(active) if phase == "corrections" else tick(active)
+            if phase == "corrections" and ctx.runtime["on_correction"] is not None:
+                for event in result:
+                    ctx.runtime["on_correction"](event)
+            ctx.runtime["results"][phase] = result
+            return StepResult(True, summary=f"maintenance {phase}", checkpoint=False)
+        except Exception as exc:
+            ctx.runtime["error"] = exc
+            raise
+
+    registry, steps = StepRegistry(), []
+    for phase, operation in (("corrections", "correction"), ("maintenance", "nightly_audit")):
+        name = f"knowledge.maintain.{operation}"
+        registry.register(StepSpec(name, "deterministic", "knowledge", handle, checkpoint=False))
+        steps.append(PlaybookStep(phase, name, params={"phase": phase}))
+    playbook = Playbook("knowledge-maintain", 1, "locked", [], [], steps)
+    execution = WorkflowExecution(getattr(rt, "settings", None) or Settings(_env_file=None), registry)
+    outcome = await execution.execute(playbook, run_dir=run_dir, state=identity,
+                                      runtime=resources, fingerprint=fingerprint)
+    if "error" in resources:
+        raise resources["error"]
+    if outcome.status != "done":
+        raise RuntimeError(outcome.blocked_reason or "maintenance workflow failed")
+    return resources["results"]
+
+
+def run_due(rt, *, on_correction=None):
+    """Synchronous compatibility entry; async schedulers await run_due_async."""
+    return asyncio.run(run_due_async(rt, on_correction=on_correction))
 
 
 def _human(rt, unit, reason, finding=None):

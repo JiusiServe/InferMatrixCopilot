@@ -5,6 +5,8 @@ bounded packets cover the entire declared inventory; unknowns remain explicit.
 """
 from __future__ import annotations
 
+from ..persistence import atomic_write_bytes, immutable_write_bytes
+
 from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from copy import deepcopy
@@ -15,7 +17,6 @@ import math
 import os
 from pathlib import Path
 import re
-import tempfile
 import unicodedata
 
 import yaml
@@ -148,20 +149,10 @@ def write_full_discovery_report(state_dir, report):
     root = _report_archive_root(state_dir)
     root.mkdir(parents=True, exist_ok=True)
     path = root / (digest + ".json")
-    with tempfile.NamedTemporaryFile(dir=root, delete=False) as handle:
-        temporary = Path(handle.name)
-        handle.write(data)
-        handle.flush()
-        os.fsync(handle.fileno())
     try:
-        try:
-            os.link(temporary, path)  # Exclusive atomic creation, never replacement.
-        except FileExistsError:
-            pass
-        if path.is_symlink() or path.read_bytes() != data:
-            raise InitError("immutable discovery report artifact differs; restore its original bytes")
-    finally:
-        temporary.unlink()
+        immutable_write_bytes(path, data, exist_ok=True)
+    except FileExistsError as exc:
+        raise InitError("immutable discovery report artifact differs; restore its original bytes") from exc
     return {"path": str(path), "sha256": digest, "size_bytes": len(data)}
 
 
@@ -446,9 +437,8 @@ def _discovery_budget(budget: Budget, journal: Path | None = None, identity: str
         if journal is None:
             return
         journal.parent.mkdir(parents=True, exist_ok=True)
-        temp = journal.with_suffix(".tmp")
-        temp.write_text(_json({"identity": identity, "spent_usd": spent, "reserved_usd": reserved}))
-        temp.replace(journal)
+        atomic_write_bytes(journal, _json({"identity": identity, "spent_usd": spent,
+                                          "reserved_usd": reserved}).encode())
 
     return Budget(budget.limit_usd, spent_usd=budget.spent_usd, checkpoint=checkpoint)
 
@@ -1304,26 +1294,6 @@ class _FeatureDiscovery(_Stage):
     STAGE = "feature-discovery"
     retry_unfinished: bool = False
 
-    def run(self):
-        """Hold the batch lease before reading or replacing any checkpoint.
-
-        A competing invocation must leave the active writer's record and
-        reservation journal intact, including when it is a cached preview.
-        """
-        import fcntl
-
-        lock_path = Path(self.rt.state_dir) / "init" / self.lifecycle.repo / "feature-discovery.lock"
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with lock_path.open("a+b") as lock:
-            try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError as exc:
-                raise InitError("this discovery batch is already running; checkpoint left unchanged") from exc
-            try:
-                return super().run()
-            finally:
-                fcntl.flock(lock, fcntl.LOCK_UN)
-
     def _refresh_quick_maps(self):
         return []  # Catalog publication never changes knowledge pages.
 
@@ -1378,14 +1348,14 @@ class _FeatureDiscovery(_Stage):
             raise InitError("discovery compact report identity differs")
         return verify_full_discovery_report(self.rt.state_dir, report, record.discovery)
 
-    def _publish(self, changed):
+    def _prepare_publication(self, changed):
         try:
             self._verify_report_record(self.record, changed)
             if self.record.discovery.get("catalog_renderer_version") != CATALOG_RENDERER_VERSION:
                 raise InitError("discovery catalog requires the current renderer before publication")
         except InitError as exc:
             return self._blocked([str(exc)])
-        return super()._publish(changed)
+        return super()._prepare_publication(changed)
 
     def _boundary_record_ready(self, previous):
         state = previous.discovery
@@ -1881,17 +1851,23 @@ class _FeatureDiscovery(_Stage):
                      report_sha256=hashlib.sha256(report_text.encode()).hexdigest())
         other = {path: (original_text, rendered), report_path: (self.rt.knowledge.show(self._base_sha, report_path), report_text)}
 
-        def check_other(changed, before, after):
-            if changed not in other or after is None:
-                return ["discovery may only write its own catalog and compact report"]
-            if changed == path:
-                a, b = yaml.safe_load(before) if before else raw, yaml.safe_load(after)
-                if {k: v for k, v in a.items() if k not in ("features", "catalog_sources")} != \
-                        {k: v for k, v in b.items() if k not in ("features", "catalog_sources")}:
-                    return ["discovery must not alter production scope, targets or permissions"]
-                load_policy(after, self.repo_dir)
-            elif hashlib.sha256(after.encode()).hexdigest() != state["report_sha256"]:
-                return ["discovery report hash mismatch"]
-            return []
+        self._check_context = {"catalog_base": raw}
         self.record.coverage["feature_discovery"] = {"feature_count": len(features), "counts": dict(counts)}
-        return self._conclude({}, [], other=other, check_other=check_other)
+        return self._conclude({}, [], other=other, check_other=self._check_other)
+
+    def _check_other(self, changed, before, after):
+        from .knowledge_coverage import load_policy
+
+        path = self._coverage_policy_path()
+        if changed not in (path, self.record.discovery["report_path"]) or after is None:
+            return ["discovery may only write its own catalog and compact report"]
+        if changed == path:
+            a = yaml.safe_load(before) if before else self._draft["check_context"]["catalog_base"]
+            b = yaml.safe_load(after)
+            if {k: v for k, v in a.items() if k not in ("features", "catalog_sources")} != \
+                    {k: v for k, v in b.items() if k not in ("features", "catalog_sources")}:
+                return ["discovery must not alter production scope, targets or permissions"]
+            load_policy(after, self.repo_dir)
+        elif hashlib.sha256(after.encode()).hexdigest() != self.record.discovery["report_sha256"]:
+            return ["discovery report hash mismatch"]
+        return []

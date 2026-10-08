@@ -151,51 +151,24 @@ def _init_command(args, state_dir: Path) -> int:
     from .runner import run_playbook
 
     params = {"stage": args.stage, "dry_run": "true" if args.dry_run else "false", "pin": args.pin or ""}
-    foundation_mode = getattr(args, "foundation_mode", "strict")
-    foundation_record = getattr(args, "foundation_record", None)
-    if foundation_mode != "strict" or foundation_record is not None:
-        if foundation_mode != "partial" or args.stage not in ("knowledge", "knowledge-deepen") or not args.unlimited_subscription:
-            print("--foundation-mode partial requires unlimited knowledge or knowledge-deepen", file=sys.stderr)
-            return 2
-        if bool(foundation_record) != (args.stage == "knowledge-deepen"):
-            print("--foundation-record is required only for partial knowledge-deepen", file=sys.stderr)
-            return 2
-        params["foundation_mode"] = foundation_mode
-        if foundation_record is not None:
-            params["foundation_record"] = str(foundation_record)
-    if getattr(args, "acceptance_mode", "strict") != "strict":
-        if args.stage != "knowledge-deepen":
-            print("--acceptance-mode is for knowledge-deepen only", file=sys.stderr)
-            return 2
-        params["acceptance_mode"] = args.acceptance_mode
-    if args.from_existing:
-        if args.stage not in ("feature-discovery", "modules", "knowledge", "knowledge-deepen"):
-            print("--from-existing is for feature-discovery, modules, knowledge or knowledge-deepen only", file=sys.stderr)
-            return 2
-        params["from_existing"] = "true"
-    if args.subscription_generator:
-        params["subscription_generator"] = "true"
-    if args.unlimited_subscription:
-        params["unlimited_subscription"] = "true"
-    if args.retry_unfinished:
-        if args.stage not in ("feature-discovery", "knowledge-deepen"):
-            print("--retry-unfinished is for feature-discovery or knowledge-deepen only", file=sys.stderr)
-            return 2
-        params["retry_unfinished"] = "true"
-    if args.pr_count is not None:
-        if args.stage != "pr-history" or args.pr_count < 1:
-            print("--pr-count is a positive integer for --stage pr-history only", file=sys.stderr)
-            return 2
-        params["pr_count"] = str(args.pr_count)
-    if args.budget_usd is not None:
-        import math
+    from ..engine.steps.knowledge import init_options
+    from .init_stages import validate_options
+    from .init_support import InitError
 
-        if args.stage not in ("feature-discovery", "pr-history", "knowledge-deepen") or not math.isfinite(args.budget_usd) or args.budget_usd <= 0:
-            print("--budget-usd is a finite positive ceiling for feature-discovery, pr-history or knowledge-deepen", file=sys.stderr)
-            return 2
-        params["budget_usd"] = str(args.budget_usd)
+    for name in ("foundation_mode", "foundation_record", "acceptance_mode", "from_existing",
+                 "subscription_generator", "unlimited_subscription", "retry_unfinished", "pr_count", "budget_usd"):
+        value = getattr(args, name, None)
+        if value is not None and value is not False and value != "strict":
+            params[name] = str(value).lower() if isinstance(value, bool) else str(value)
+    try:
+        validate_options(args.stage, init_options(params))
+    except InitError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     outcome, run_dir = run_playbook(Settings(), "kb-init", args.repo, state_dir=state_dir, params=params)
     print(f"kb init {args.repo} {args.stage}: {outcome.status} ({run_dir})")
+    if getattr(outcome, "blocked_reason", ""):
+        print(outcome.blocked_reason, file=sys.stderr)
     return 0 if outcome.status == "done" else 1
 
 

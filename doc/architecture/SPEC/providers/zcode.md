@@ -1,6 +1,6 @@
 # providers/zcode.py —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~400 · harness transport（Z.AI / GLM 订阅） · refactor-status: ok`
 
@@ -65,3 +65,8 @@ stdlib + `.base` + `..agent_loop.AgentOutcome` + `..llm` 的类型与 `ModelMism
 `subscription_billing` 仅在实际选中的 provider 为已知 OAuth coding plan 时为 True；自定义 provider
 或 settings 中的 API provider override 返回 False。它描述计费模式，不声称调用花费为零。
 `kb init --subscription-generator` 通过此声明显式使用订阅生成器，保留未报告的 USD 与 token 用量。
+
+## 2026-10-08 共享机制
+无事件 sink 的缓冲调用复用 `base.run_cli/json_events`，保留超时部分 stdout、事件顺序与原退出码检查；有 sink 时继续走 `_stream_run`。
+MCP stdio 入口复用 `base.bridge_server`，自有会话目录由 `TemporaryDirectory` 管理，清理错误仍可忽略。
+`SessionUsage.outcome/reply` 统一结果封装；无工具回复仍使用 `native_snapshot()` 的原生用量，模型验证与工具容纳审计继续由本 transport 执行。

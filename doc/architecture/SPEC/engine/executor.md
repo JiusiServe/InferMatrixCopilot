@@ -1,6 +1,6 @@
 # engine/executor.py —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~293 · 引擎底座（那个循环） · refactor-status: ok`
 
@@ -17,6 +17,12 @@
 `Executor(registry, settings, run_dir, trace, llm?, notifier?)`；
 `run(playbook, state) -> RunOutcome(status, step_results, blocked_reason)`。
 helper：`_eval_when`、`_merge`。
+
+可选 `runtime` 只注入上下文；`fingerprint` 不匹配即拒绝恢复；
+`validate_cached(step_id, outputs)` 在重放输出前验证业务产物。
+`StepSpec.checkpoint=False` 不读写该步骤完成标记；
+`StepResult.checkpoint=False` 允许传递 partial 输出而不标记成功进度。
+未设置这些选项时保持原行为。
 
 ## 不变量
 - **B2**：resume 在跳过之前先恢复 `outputs.state_updates`；成功后

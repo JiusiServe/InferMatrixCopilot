@@ -235,9 +235,7 @@ class _CaptureGateway:
 
 
 def _worker(stage, job):
-    from .init_knowledge import knowledge_prompt, validate_sections
-    from .init_knowledge_inputs import foundation_evidence, knowledge_system
-    from .init_support import generate
+    from .init_knowledge_inputs import foundation_evidence
     from .init_stages import _one_line
     worker = copy.copy(stage)
     worker.head = dict(stage.head)
@@ -250,12 +248,8 @@ def _worker(stage, job):
     try:
         if job["payload"].get("foundation_prompt_version") in (4, 5):
             foundation_evidence(worker, job["payload"])
-        data = generate(worker.rt, worker.budget, worker.lifecycle.init, system=knowledge_system(job["payload"]),
-                        prompt=knowledge_prompt(job["payload"]), validate=validate_sections).data
-        for section in data["sections"]:
-            if section["facet"] not in job["requested"]:
-                continue
-            result = worker._section(job["owner"], job["page"], data, section, job["offered"])
+        for data, section, result in worker._sections(job["owner"], job["page"], job["payload"],
+                                                     job["offered"], job["requested"]):
             if result:
                 key, text, entries, label = result
                 receipt = worker.rt.gateway.last.get("judge", {})

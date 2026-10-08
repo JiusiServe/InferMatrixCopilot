@@ -146,18 +146,20 @@ def _init_branch_suffix(rt: InitRuntime) -> str:
     return suffix
 
 
-def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str | None = None,
-              pr_count: int | None = None, budget_usd: float | None = None,
-              from_existing: bool = False, subscription_generator: bool = False,
-              retry_unfinished: bool = False, unlimited_subscription: bool = False,
-              feature_ids: tuple[str, ...] = (), acceptance_mode: str = "strict",
-              depth_index_path: Path | None = None, stop_file: Path | None = None,
-              foundation_mode: str = "strict", foundation_record_path: Path | None = None) -> InitRecord:
-    """Run one ``kb init`` stage for ``lifecycle``'s repository and return its
-    record (also saved under ``<state_dir>/init/<repo>/<stage>.json``)."""
+def validate_options(stage, options, *, portable=False):
+    """Shared domain validation for Python, CLI and portable initialization."""
+    import math
+
+    from_existing = options.get("from_existing", False)
+    retry_unfinished = options.get("retry_unfinished", False)
+    unlimited_subscription = options.get("unlimited_subscription", False)
+    acceptance_mode = options.get("acceptance_mode", "strict")
+    depth_index_path, stop_file = options.get("depth_index_path"), options.get("stop_file")
+    foundation_mode = options.get("foundation_mode", "strict")
+    foundation_record_path = options.get("foundation_record_path")
+    feature_ids, pr_count, budget_usd = options.get("feature_ids", ()), options.get("pr_count"), options.get("budget_usd")
     if stage not in STAGES + INDEPENDENT_STAGES:
         raise InitError(f"unknown stage {stage!r}; one of {STAGES + INDEPENDENT_STAGES}")
-    _init_branch_suffix(rt)  # publication configuration is refused before any model call
     if from_existing and stage not in ("feature-discovery", "modules", "knowledge", "knowledge-deepen"):
         raise InitError("--from-existing is for feature-discovery, modules or explanatory knowledge stages only")
     if retry_unfinished and stage not in ("feature-discovery", "knowledge-deepen"):
@@ -169,8 +171,8 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
             foundation_mode == "strict" and foundation_record_path is not None):
         raise InitError("foundation_mode must be strict or partial; a foundation record requires partial mode")
     if foundation_mode == "partial" and (
-            stage not in ("knowledge", "knowledge-deepen") or (not unlimited_subscription and not getattr(rt, "portable_spec", None))
-            or (bool(foundation_record_path) != (stage == "knowledge-deepen") and not getattr(rt, "portable_spec", None))):
+            stage not in ("knowledge", "knowledge-deepen") or (not unlimited_subscription and not portable)
+            or (bool(foundation_record_path) != (stage == "knowledge-deepen") and not portable)):
         raise InitError("partial foundation requires unlimited knowledge, or knowledge-deepen with its published foundation record")
     if feature_ids and (stage != "knowledge-deepen" or not isinstance(feature_ids, tuple)
                         or any(not isinstance(f, str) or not f for f in feature_ids)):
@@ -179,6 +181,25 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
         raise InitError("unlimited_subscription must be a boolean")
     if unlimited_subscription and (stage not in ("feature-discovery", "modules", "knowledge", "knowledge-deepen") or budget_usd is not None):
         raise InitError("--unlimited-subscription is for feature-discovery, modules, knowledge or knowledge-deepen only and conflicts with --budget-usd")
+    if pr_count is not None:
+        if stage != "pr-history" or isinstance(pr_count, bool) or not isinstance(pr_count, int) or pr_count < 1:
+            raise InitError("--pr-count is a positive integer for the pr-history stage only")
+    if budget_usd is not None:
+        if stage not in ("feature-discovery", "pr-history", "knowledge-deepen") or isinstance(budget_usd, bool) \
+                or not math.isfinite(budget_usd) or budget_usd <= 0:
+            raise InitError("--budget-usd is a finite positive ceiling for feature-discovery, pr-history or knowledge-deepen only")
+
+
+def _make_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str | None = None,
+              pr_count: int | None = None, budget_usd: float | None = None,
+              from_existing: bool = False, subscription_generator: bool = False,
+              retry_unfinished: bool = False, unlimited_subscription: bool = False,
+              feature_ids: tuple[str, ...] = (), acceptance_mode: str = "strict",
+              depth_index_path: Path | None = None, stop_file: Path | None = None,
+              foundation_mode: str = "strict", foundation_record_path: Path | None = None) -> _Stage:
+    """Bind domain options; execution belongs to the shared workflow kernel."""
+    validate_options(stage, locals(), portable=bool(getattr(rt, "portable_spec", None)))
+    _init_branch_suffix(rt)
     if stage == "feature-discovery":
         from dataclasses import replace
         from .models import ModelRole
@@ -207,16 +228,10 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
     if pr_count is not None:
         from dataclasses import replace
 
-        if stage != "pr-history" or isinstance(pr_count, bool) or not isinstance(pr_count, int) or pr_count < 1:
-            raise InitError("--pr-count is a positive integer for the pr-history stage only")
         lifecycle = replace(lifecycle, init=replace(lifecycle.init, pr_history_count=pr_count))
     if budget_usd is not None:
-        import math
         from dataclasses import replace
 
-        if stage not in ("feature-discovery", "pr-history", "knowledge-deepen") or isinstance(budget_usd, bool) \
-                or not math.isfinite(budget_usd) or budget_usd <= 0:
-            raise InitError("--budget-usd is a finite positive ceiling for feature-discovery, pr-history or knowledge-deepen only")
         lifecycle = replace(lifecycle, init=replace(lifecycle.init, budget_usd=budget_usd))
     notes = []
     if lifecycle.upstream_visibility == "private" and not dry_run:
@@ -257,7 +272,29 @@ def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str
         if stage == "knowledge-deepen":
             options["foundation_record_path"] = foundation_record_path
     return stage_class(rt, lifecycle, dry_run=dry_run, pin=pin, notes=notes, author=author,
-                       from_existing=from_existing, **options).run()
+                       from_existing=from_existing, **options)
+
+
+async def run_stage_async(rt: InitRuntime, lifecycle, stage: str, **options) -> InitRecord:
+    from .init_execution import execute_init
+
+    work = _make_stage(rt, lifecycle, stage, **options)
+    await execute_init(work)
+    return work.record
+
+
+def run_stage(rt: InitRuntime, lifecycle, stage: str, *, dry_run: bool, pin: str | None = None,
+              pr_count: int | None = None, budget_usd: float | None = None,
+              from_existing: bool = False, subscription_generator: bool = False,
+              retry_unfinished: bool = False, unlimited_subscription: bool = False,
+              feature_ids: tuple[str, ...] = (), acceptance_mode: str = "strict",
+              depth_index_path: Path | None = None, stop_file: Path | None = None,
+              foundation_mode: str = "strict", foundation_record_path: Path | None = None) -> InitRecord:
+    """Synchronous compatibility API; async callers use ``run_stage_async``."""
+    options = locals()
+    import asyncio
+
+    return asyncio.run(run_stage_async(**options))
 
 
 def adapter_missing(path: str) -> str:
@@ -479,99 +516,6 @@ class _Stage:
     # the adapter's briefing docs, read from the manifest by run(); a stage built
     # bare (tests) has none
     briefing_docs: frozenset[str] = frozenset()
-
-    def run(self) -> InitRecord:
-        rt, lc, stage = self.rt, self.lifecycle, self.STAGE
-        init = lc.init
-        self._branch_suffix = _init_branch_suffix(rt)
-        self.repo_dir = lc.knowledge_dir
-        base_sha = self._base_for_run(rt.knowledge.fetch())
-        self._base_sha = base_sha
-        main = rt.knowledge.knowledge_files(base_sha)
-        chain = self._chain()
-        self.overlay = dict(chain.repo_files)
-        # every stage reads the adapter here (language, the flips); an unmerged
-        # adapter PR must block, never degrade to "no language" — and never be
-        # papered over by a record cached from a run before this check
-        adapter_missing_problem = adapter_missing(self._manifest_path()) if self._manifest_text() is None else ""
-        upstream = rt.upstream(lc.repo, lc.full_name)
-        upstream.sync()
-        pin = upstream.resolve(self.pin or chain.pin or "HEAD")
-        if getattr(rt, "portable_spec", None) and pin != rt.portable_spec.source_pin:
-            raise InitError("portable source pin differs from the accepted batch; create a new batch")
-        self._discovery_gate(chain, pin)
-        self.overlay = dict(chain.repo_files)
-        input_options = dict(self._input_options())
-        if self._branch_suffix:
-            # Leave legacy checkpoint identities unchanged when the option is
-            # unset, but bind an explicit batch name before extracting anything.
-            input_options["publication_branch_suffix"] = self._branch_suffix
-        digest = inputs_digest(stage=stage, repo=lc.repo, pin=pin, kb=base_sha, init=self._init_identity(),
-                               generator=rt.generator.label(), judge=rt.judge.label(), dry_run=self._mode_identity(),
-                               chain=chain.key, **input_options)
-        record_path = InitRecord.path(rt.state_dir, lc.repo, stage)
-        previous = InitRecord.load(rt.state_dir, lc.repo, stage)
-        if previous is not None and previous.pr.get("prepared") and previous.status in ("publishing", "blocked"):
-            # pushed (or about to be) but not confirmed: finish THAT publication, never re-run the stage
-            if self.dry_run:
-                raise InitError("a publication of this stage is pending (pushed, PR not confirmed); re-run "
-                                f"without --dry-run to finish it, or remove {record_path} to start over")
-            if chain.problems:
-                self.record = previous
-                return self._blocked(chain.problems)
-            problems = self._resume_input_problems(previous, digest)
-            if load_prepared(previous.pr["prepared"]).get("branch") != self._publication_branch():
-                problems.append("prepared publication belongs to a different branch suffix; "
-                                f"restore {BRANCH_SUFFIX_ENV} to its original value to resume")
-            if self._frozen_discovery and previous.discovery.get("catalog_binding") != self._discovery_binding():
-                problems.append("prepared publication belongs to a different discovery catalog; preserve it and start a new batch")
-            if problems:
-                self.record = previous
-                return self._blocked(problems)
-            return self._resume(previous)
-        if previous is not None and previous.inputs_digest == digest and not adapter_missing_problem \
-                and not chain.problems and previous.status in ("dry_run", "published", "empty") \
-                and (previous.dry_run == self.dry_run or previous.status == "published") \
-                and self._cache_reusable(previous):
-            return previous
-        if previous is not None and previous.pr.get("number") and previous.inputs_digest != digest:
-            raise InitError(f"a published {stage} record exists (PR #{previous.pr['number']}); remove "
-                            f"{record_path} to start over")
-        self.record = InitRecord(stage=stage, repo=lc.repo, pin=pin, kb_base_sha=base_sha,
-                                 inputs_digest=digest, started_at=float(int(rt.clock())),
-                                 dry_run=self.dry_run, notes=list(self.notes))
-        if self._frozen_discovery:
-            self.record.discovery["catalog_binding"] = self._discovery_binding()
-        if chain.pin and pin != chain.pin:
-            self.record.notes.append(f"pinned at {pin[:12]}, not at the earlier stages' {chain.pin[:12]}")
-        self.budget = Budget(None if rt.unlimited_subscription else init.budget_usd)
-        self.base = {**main, **chain.knowledge}
-        problems = chain.problems + self._restore_progress(previous) + self._precheck()
-        if adapter_missing_problem:
-            problems.append(adapter_missing_problem)
-        if problems:
-            return self._blocked(problems)
-        schema = rt.knowledge.show(base_sha, "doc/knowledge/SCHEMA.md")
-        if lc.repo not in _schema_tags(schema):
-            return self._blocked([f"tag {lc.repo!r} is not in the doc/knowledge/SCHEMA.md taxonomy; add it "
-                                  "(with the adapter PR) before running kb init"])
-        self.tags = [lc.repo]
-        self.today = rt.today()
-        self.release = f"init-{pin[:12]}"
-        try:
-            self.observer = upstream.observer(pin, pull=rt.pull)
-            self.upstream = upstream
-            with tempfile.TemporaryDirectory(prefix="kb-init-") as scratch:
-                tree = upstream.export(pin, Path(scratch) / "tree")
-                self._inputs(tree)
-                if self.route_problem:
-                    return self._blocked([self.route_problem])
-                return self._build(tree)
-        except (ModelUnavailable, PriceError, FactsError) as exc:
-            return self._blocked([f"{type(exc).__name__}: {exc}"])
-        finally:
-            self.record.spent_usd = round(self.budget.spent_usd, 6)
-            self.record.save(rt.state_dir)
 
     def _chain(self) -> _Chain:
         """Every earlier stage must be merged, or (for a dry run of this one)
@@ -1036,37 +980,15 @@ class _Stage:
     def _conclude(self, rules: Mapping[str, str], evidence: list[Evidence],
                   other: Mapping[str, tuple[str | None, str | None]] | None = None,
                   check_other=None) -> InitRecord:
-        """The deterministic checks of the change (design §9.3), then the
-        publication. ``other`` are repository paths outside ``knowledge/``
-        (before, after) that ``check_other`` must accept. Every owner page of
-        a knowledge-side routes file first gets init's Direct quick map and
-        must then yield one (``init_quick_maps``)."""
-        from .init_quick_maps import owner_pages
-
-        problems = self._refresh_quick_maps()
-        try:
-            routed = owner_pages(self.head.get(f"{self.repo_dir}/{ROUTES_NAME}"))
-        except (ValueError, yaml.YAMLError):
-            routed = []   # the routes file itself is reported by the validators
-        problems += validate_change(self.base, self.head, observer=self.observer, rules=rules,
-                                    evidence=evidence, other=other, check_other=check_other,
-                                    quick_map_pages=routed)
-        changed: dict[str, str] = {KNOWLEDGE_PREFIX + p: t for p, t in self.head.items() if self.base.get(p) != t}
-        for path, (before, after) in (other or {}).items():
-            if after is not None and after != before:
-                changed[path] = after
-        self.record.files = sorted(changed)
-        if not changed and not problems:
-            self.record.status = "empty"
-            self.record.notes.append(f"the {self.STAGE} stage found nothing to change")
-            self.record.save(self.rt.state_dir)
-            return self.record
-        if not problems:
-            problems = run_knowledge_validators(self.rt.knowledge, self.record.kb_base_sha,
-                                                {**self.overlay, **changed})
-        if problems:
-            return self._blocked(problems)
-        return self._publish(changed)
+        """Finish candidate assembly; the executor owns validation and publication."""
+        self._draft = {"head": self.head, "rules": dict(rules),
+                       "evidence": [entry.to_dict() for entry in evidence],
+                       "other": dict(other or {}), "check_context": getattr(self, "_check_context", {}),
+                       "check_other": check_other.__name__ if check_other else "",
+                       "problems": self._refresh_quick_maps()}
+        # refresh may replace head rather than mutating it.
+        self._draft["head"] = self.head
+        return self.record
 
     def _refresh_quick_maps(self) -> list[str]:
         """Init's Direct quick map on every owner page of the knowledge-side
@@ -1108,7 +1030,7 @@ class _Stage:
         sample = self.existing.get(f"{self.repo_dir}/{INDEX_NAME}") or self.base.get(REPOS_INDEX) or ""
         return sample[:1500]
 
-    def _rules_call(self, payload: dict) -> dict:
+    def _rules_call(self, payload: dict, *, system: str = SYSTEM_RULES) -> dict:
         def validate(data: dict) -> None:
             rules = data.get("rules")
             if not isinstance(rules, list):
@@ -1118,7 +1040,7 @@ class _Stage:
                         or not isinstance(rule.get("body"), str) or not isinstance(rule.get("evidence"), list):
                     raise ValueError("each rule needs title, body and evidence")
 
-        return generate(self.rt, self.budget, self.lifecycle.init, system=SYSTEM_RULES,
+        return generate(self.rt, self.budget, self.lifecycle.init, system=system,
                         prompt=_fence(payload), validate=validate).data
 
     def _id_source(self):
@@ -1333,7 +1255,7 @@ class _Stage:
         suffix = getattr(self, "_branch_suffix", "")
         return f"kb/init-{self.lifecycle.repo}-{self.STAGE}" + (f"-{suffix}" if suffix else "")
 
-    def _publish(self, changed: dict[str, str]) -> InitRecord:
+    def _prepare_publication(self, changed: dict[str, str]) -> InitRecord:
         rt, lc, record = self.rt, self.lifecycle, self.record
         stage = self.STAGE
         title = f"kb init({lc.repo}): {stage}"
@@ -1342,24 +1264,28 @@ class _Stage:
         publisher = self._publisher()
         if stage == "feature-discovery" and set(changed) - set(publisher.allowed_paths):
             return self._blocked(["feature-discovery may publish only its adapter catalog and compact report"])
-        if self.dry_run:
-            dest = InitRecord.path(rt.state_dir, lc.repo, stage).with_name(f"{stage}-dryrun")
-            InitPublisher.dry_run(dest, changed, title=title, body=body)
-            record.pr = {"dry_run_dir": str(dest)}
-            if getattr(rt, "portable_spec", None):
-                record.pr["checked_files_sha256"] = {p: hashlib.sha256(t.encode()).hexdigest()
-                    for p, t in sorted(changed.items())}
-            record.status = "dry_run"
-        else:
-            prepared = save_prepared(
-                InitRecord.path(rt.state_dir, lc.repo, stage).with_name(f"{stage}-publish.json"),
-                base_sha=record.kb_base_sha, branch=self._publication_branch(), files=changed,
-                title=title, body=body, author=self.author, when=record.started_at)
-            record.status = "publishing"
-            record.pr = {"prepared": str(prepared)}
-            record.save(rt.state_dir)
-            return self._finish(record, publisher)
+        prepared = save_prepared(
+            InitRecord.path(rt.state_dir, lc.repo, stage).with_name(f"{stage}-publish.json"),
+            base_sha=record.kb_base_sha, branch=self._publication_branch(), files=changed,
+            title=title, body=body, author=self.author or ("KB init preview", "kb-init@example.invalid"), when=record.started_at)
+        record.status = "publishing"
+        record.pr = {"prepared": str(prepared), "validation_pending": True}
         record.save(rt.state_dir)
+        return record
+
+    def _publish(self) -> InitRecord:
+        record = self.record
+        if not self.dry_run:
+            return self._resume(record)
+        prepared = load_prepared(record.pr["prepared"])
+        dest = InitRecord.path(self.rt.state_dir, record.repo, self.STAGE).with_name(f"{self.STAGE}-dryrun")
+        InitPublisher.dry_run(dest, prepared["files"], title=prepared["title"], body=prepared["body"])
+        record.pr = {"dry_run_dir": str(dest)}
+        if getattr(self.rt, "portable_spec", None):
+            record.pr["checked_files_sha256"] = {p: hashlib.sha256(t.encode()).hexdigest()
+                for p, t in sorted(prepared["files"].items())}
+        record.status = "dry_run"
+        record.save(self.rt.state_dir)
         return record
 
     def _finish(self, record: InitRecord, publisher: InitPublisher) -> InitRecord:

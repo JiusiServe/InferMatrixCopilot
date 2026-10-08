@@ -159,7 +159,9 @@ def test_failed_codex_preview_resumes_review_without_reextracting(world):
     rt = _runtime(world, gateway, github=source)
     first = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=True)
     assert first.status == "blocked" and "Codex unavailable" in first.problems[0]
-    assert "prepared" not in first.pr and "number" not in first.pr
+    # Preview publication is now frozen before the exact-head review. It
+    # remains a local dry run and never gains a GitHub PR number.
+    assert "prepared" in first.pr and "number" not in first.pr
     resumed = run_stage(rt, _modules_lifecycle(), "pr-history", dry_run=True)
     assert resumed.status == "dry_run", resumed.problems
     assert gateway.extract_calls == [101, 102, 103] and len(gateway.review_calls) == 2
@@ -271,6 +273,8 @@ def test_publish_recovers_create_failure_and_reviews_one_aggregate_pr(world):
     assert gateway.review_calls == [] and fake.ready_calls == []
     # A checkpoint produced by an older writer may have a GitHub-sized body
     # failure after pushing. Rebuild presentation without changing the series.
+    first.pr.pop("validation", None)  # simulate the legacy prepared format
+    first.save(rt.state_dir)
     prepared = Path(first.pr["prepared"])
     data = json.loads(prepared.read_text())
     data["body"] = "x" * 70_000

@@ -1,6 +1,6 @@
 # app/workflow_execution.py — workflow execution boundary
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-10-08 -->
 
 `WorkflowExecution` runs an already selected playbook with the caller's
 current LLM dependency. It rechecks the repository context before starting,
@@ -19,3 +19,11 @@ not belong in this module.
 `Copilot._execute` remains the compatibility entry point and records
 `last_run_dir`/`last_blocked_reason` from the returned result. Existing run
 state keys, traces, exit codes, and checkpoint behavior stay stable.
+
+The asynchronous `execute(...) -> RunOutcome` is the shared bound-workflow
+kernel for application runs, knowledge initialization and maintenance. It owns
+a newly acquired run lock, Executor and guarded cleanup; an injected lock stays
+with its caller. Optional runtime injection is never serialized. Fingerprints
+and cached-output validation are forwarded to Executor. `run` retains repository
+authorization, knowledge locks, notifications, UI and exit-code conversion.
+This entry point grants no additional RunService or SDK publication authority.

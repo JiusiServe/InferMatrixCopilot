@@ -181,7 +181,7 @@ def render_svg(inventory: dict[str, Any]) -> str:
     counts = inventory["counts"]
     svg = [f'<svg xmlns="http://www.w3.org/2000/svg" id="lifecycle-svg" width="{WIDTH}" height="{HEIGHT}" viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-labelledby="diagram-title diagram-desc">',
            '<title id="diagram-title">Copilot 知识初始化与维护：五层职责图</title>',
-           f'<desc id="diagram-desc">上层执行入口进入初始化或维护编排，复用内容、证据和审核，经发布及撤回到 SDK 和 review bot。主图是职责图；完整 {counts["provider"]} 个 Python 类在配套 HTML 和 JSON 中。源码摘要 {inventory["source_tree_sha256"]}。</desc>',
+           f'<desc id="diagram-desc">初始化五阶段与维护两步骤共用 WorkflowExecution.execute；领域记录各自持有业务事实和预算。复用内容、证据和审核，经发布及撤回到公开 SDK v1 与 review bot。主图是职责图；完整 {counts["provider"]} 个 Python 类在配套 HTML 和 JSON 中。源码摘要 {inventory["source_tree_sha256"]}。</desc>',
            '<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#9baabd"/></marker></defs>',
            '<style>text{font-family:Arial,"Droid Sans Fallback",sans-serif} .code{font-family:ui-monospace,"DejaVu Sans Mono",monospace}</style>',
            f'<rect width="{WIDTH}" height="{HEIGHT}" fill="#f3f6fa"/>']
@@ -201,7 +201,7 @@ def render_svg(inventory: dict[str, Any]) -> str:
             text(x + 24, y + 72 + index * 29, value, 17 if code else 19, "#4d6179", code=code)
 
     text(60, 55, "知识初始化与维护", 36, weight=700)
-    text(60, 89, "复用 Copilot 执行设施与知识领域能力；类、记录、异常和协议在展开视图中逐一列出", 20, "#60728b")
+    text(60, 89, "同一执行底座；领域记录各自持有事实与预算；每个 Python 类在展开视图中列出", 20, "#60728b")
     text(60, 124, f"{counts['core']} 个核心类 = {counts['kb_service']} kb_service + {counts['knowledge_service']} knowledge_service   ·   {counts['provider']} 个 provider 类完整清单", 17, "#526a89", code=True)
 
     rows = [(155, 140, "01", "执行入口"), (327, 185, "02", "流程编排"), (544, 185, "03", "共享领域"), (761, 156, "04", "发布恢复"), (949, 185, "05", "知识消费")]
@@ -214,26 +214,26 @@ def render_svg(inventory: dict[str, Any]) -> str:
 
     blue, green, purple = "#245fc7", "#087c72", "#7251ae"
     card(180, 155, 140, "Copilot 执行入口", [
-        ("Copilot → WorkflowExecution → Executor", True),
-        ("knowledge.init 受治理步骤与外层任务进度", False)], blue)
+        ("Copilot / kb init / knowledge.init", True),
+        ("绑定范围与版本；提交同一初始化计划", False)], blue)
     card(830, 155, 140, "维护调度入口", [
-        ("Scheduler → KbRuntime", True),
-        ("同一租约承载 intake、版本巡检与夜间维护", False)], green)
+        ("Scheduler / kb serve → KbRuntime", True),
+        ("原有调度顺序与租约；提交维护计划", False)], green)
     card(180, 327, 185, "初始化：建立可验收的知识基线", [
-        ("run_stage(...) → InitRecord", True),
-        ("_Stage：阶段依赖、pin、恢复、预算和发布", False),
-        ("骨架／功能发现／基础知识／深度／验收", False),
-        ("init_content → PlacementResult（确定性）", True)], blue)
+        ("init_execution → WorkflowExecution.execute", True),
+        ("prepare → draft → validate", True),
+        ("prepare_publication → publish", True),
+        ("InitRecord：pin、正文、证据、费用与发布事实", False)], blue)
     card(830, 327, 185, "维护：更新 · 主动复查 · 纠错", [
-        ("plan / status / request / run_due", True),
-        ("MaintenanceStore：周期、预留、发现与处置", False),
-        ("maintenance_policy / maintenance_resolution", True),
-        ("沿用函数入口；不新增流程门面类", False)], green)
+        ("run_due → WorkflowExecution.execute", True),
+        ("correction → nightly_audit（两步均重验）", True),
+        ("MaintenanceStore：周期、请求、预留与发现", False),
+        ("领域 SQLite 持有进度；执行器不复制业务账本", False)], green)
     card(180, 544, 185, "内容与原始证据", [
         ("Page · Section · Footer · KnowledgeOperation", True),
         ("Claim · Evidence · 适用版本与正文身份", False),
-        ("KnowledgeCurator 委托领域模块函数", False),
-        ("catalog / prompt / proposals / apply", True)], purple)
+        ("init_content · git_objects（共用机制）", True),
+        ("候选有界生成／修复；各入口保留范围约束", False)], purple)
     card(830, 544, 185, "审核与准入", [
         ("gate · maintenance_policy", True),
         ("确定性验证 · 独立语义审核 · 一致性", False),
@@ -255,12 +255,12 @@ def render_svg(inventory: dict[str, Any]) -> str:
     card(830, 949, 185, "Review bot：经 SDK 读取与消费", [
         ("ReviewPipeline · KnowledgeCurationCycle", True),
         ("KnowledgeMaintenance · ReviewPublisher", True),
-        ("候选学习提交审核；消费侧不做权威纠错", False),
+        ("公开边界仅 SDK v1；候选交权威维护审核", False),
         ("Direct / Strict 共用发布前可用性检查", False)], green)
     rect(180, 1165, 1270, 109, "#eaf0f8", "#d6e0ee")
-    text(202, 1198, "支撑设施：模型 / Git transport · 签名 · 预算 · 检查点 · 账本", 21, "#334f73", 700)
-    text(202, 1232, "存储与恢复边界：初始化记录｜维护 SQLite｜发布 outbox｜消费会话｜撤回高水位", 19, "#52657f")
-    text(60, 1311, "箭头表达职责与交付关系，不是逐函数调用图。引擎不反向依赖知识流程；bot 运行代码仅依赖 SDK v1。", 16, "#64758b")
+    text(202, 1198, "共享底座：执行锁与恢复 · 预留与结算 · 原生模型回执 · Git 对象 · 原子写入", 21, "#334f73", 700)
+    text(202, 1232, "单所有者：InitRecord｜维护 SQLite｜improve 周预算｜发布 outbox｜消费会话｜撤回高水位", 19, "#52657f")
+    text(60, 1311, "箭头表达职责与交付关系，不是逐函数调用图。执行内核不反向依赖知识流程；bot 运行代码仅依赖 SDK v1。", 16, "#64758b")
     text(60, 1336, f"源码树摘要：{inventory['source_tree_sha256'][:16]}  ·  完整源路径、嵌套／局部类与文件摘要见 HTML / JSON", 14, "#71829a")
     return "\n".join(svg) + "\n</svg>\n"
 
@@ -293,7 +293,7 @@ input.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();if(input.
 document.getElementById('expand').onclick=()=>groups.forEach(e=>e.open=true);
 document.getElementById('collapse').onclick=()=>{groups.forEach(e=>e.open=false);cards.forEach(e=>e.open=false)};
 document.getElementById('reset').onclick=()=>{input.value='';search();groups.forEach(e=>e.open=false);cards.forEach(e=>e.open=false);fit();diagram.scrollTop=0;window.scrollTo({top:0})};
-window.addEventListener('resize',()=>{if(fitMode)fit()});requestAnimationFrame(fit);
+window.addEventListener('resize',()=>{if(fitMode)fit()});fit();requestAnimationFrame(fit);
 })();
 </script></body></html>
 """
@@ -304,7 +304,7 @@ def render_html(repo: Path, inventory: dict[str, Any], svg: str) -> str:
     esc = html.escape
     body = [HTML_HEAD,
             '<header><h1>知识初始化与维护 · 分层与完整类清单</h1>',
-            '<p>主图展示五层职责；展开视图列出实际源码中的每个 Python 类。记录、异常、协议与私有／嵌套／函数局部类均保留。</p>',
+            '<p>主图展示五层职责：初始化五阶段和维护两步骤共用执行底座，领域账本各自持有事实与预算，bot 只经公开 SDK v1 消费。展开视图列出实际源码中的每个 Python 类，包括记录、异常、协议和私有／嵌套／函数局部类。</p>',
             '<div class="badges">',
             f'<span class="badge">核心 {counts["core"]} = kb_service {counts["kb_service"]} + knowledge_service {counts["knowledge_service"]}</span>',
             f'<span class="badge">Provider 全量 {counts["provider"]}</span>',

@@ -1,6 +1,6 @@
 # engine/steps/_common.py —— 规范
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~300 · step 库基础设施 · refactor-status: ok`
 
@@ -15,8 +15,9 @@ helper：`repo_path`、`require_repo`、`task_spec`、`from_state`、`published`
 `no_llm_gap`、`gh`、`git`、`gh_read_tools`、`post_step`、`record_debug_memory`。
 
 ## 公开契约
-`step(name, kind, risk, description)`；`register_step(StepSpec)`；`collected()`；
+`step(name, kind, risk, description, checkpoint=True)`；`register_step(StepSpec)`；`collected()`；
 以及上述 helper（含 K3/K4/K7 的守卫 helper）。
+`checkpoint=False` 传递给 StepSpec，使每次执行重新检查当前业务事实，既不读取也不写入步骤完成标记。
 
 ## 不变量
 - step 名重复 → **在显式装配期间加载 step 模块时抛错**（**A4**）。

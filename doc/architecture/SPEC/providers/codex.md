@@ -1,6 +1,6 @@
 # providers/codex.py —— 规范
 
-<!-- verified-against: 2026-10-05 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~197 · harness transport（ChatGPT 订阅） · refactor-status: ok`
 
@@ -52,3 +52,8 @@ OS 级控制可用的后端；把两者混同，会模糊掉"当前实际生效�
 
 ## 2026-09-30
 `complete()` 接受并忽略 `max_budget_usd`；`stops_at_spend` 为 False（CLI 无花费阈值）。
+
+## 2026-10-08 共享机制
+缓冲执行和 JSONL 解码复用 `base.run_cli/json_events`：保留超时前 stdout，忽略警告或无效 JSON 行，保留事件顺序。
+`SessionUsage.outcome/reply` 统一结果封装；原生事件仍在退出后按顺序批量转发。
+只读沙箱、MCP overrides、认证上下文、模型选择与 effort 校验继续由本 transport 控制。

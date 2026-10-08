@@ -45,6 +45,7 @@ class StepResult:
     summary: str = ""
     outputs: dict = field(default_factory=dict)
     changed_files: list[str] = field(default_factory=list)
+    checkpoint: bool = True          # False: useful output, unfinished work
 
 
 @dataclass
@@ -58,6 +59,7 @@ class StepContext:
     trace: RunTrace
     llm: Optional["LLM"] = None
     item: Any = None                 # current foreach item, if any
+    runtime: Any = None              # injected resources; never checkpointed
 
 
 Risk = Literal["read", "write_workspace", "push", "knowledge", "report"]
@@ -77,3 +79,4 @@ class StepSpec:
     risk: Risk                       # enforced: planner bars write/push in generate
     handler: Callable[[StepContext], Awaitable[StepResult]]
     description: str = ""
+    checkpoint: bool = True          # False: always execute, including on resume

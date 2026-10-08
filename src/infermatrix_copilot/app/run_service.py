@@ -6,6 +6,8 @@ transport or CLI command implementation.
 
 from __future__ import annotations
 
+from ..persistence import atomic_write_bytes
+
 import json
 import os
 import subprocess
@@ -415,9 +417,7 @@ class RunService:
                     "knowledge_tree_sha256": view.tree_sha256}, mode="strict", view=view)
             pin["knowledge_usage"] = usage
         path = self.run_root / run_id / KNOWLEDGE_PIN
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(pin, sort_keys=True), encoding="utf-8")
-        os.replace(tmp, path)
+        atomic_write_bytes(path, json.dumps(pin, sort_keys=True).encode("utf-8"))
         return pin
 
     def strict_readiness(self, repo: str, repo_path: str = "") -> list[str]:

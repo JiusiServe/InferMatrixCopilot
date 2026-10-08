@@ -8,7 +8,7 @@ from pathlib import Path
 
 from ..adapters.base import AdapterError
 from ..config import Settings
-from ..engine.executor import Executor
+from ..engine.executor import Executor, RunOutcome
 from ..engine.lifecycle import RunLock, RunLockHeld, run_guarded
 from ..engine.registry import StepRegistry
 from ..metrics import format_metrics_line
@@ -31,11 +31,41 @@ class WorkflowExecution:
 
     def __init__(
         self, settings: Settings, registry: StepRegistry,
-        repository_context: RepositoryContextResolver,
+        repository_context: RepositoryContextResolver | None = None,
     ) -> None:
         self.settings = settings
         self.registry = registry
         self.repository_context = repository_context
+
+    async def execute(
+        self, playbook, *, run_dir: Path, state: dict, runtime=None,
+        llm=None, trace=None, notifier=None, held_lock: RunLock | None = None,
+        fingerprint: str = "", validate_cached=None,
+    ) -> RunOutcome:
+        """Execute a bound workflow without planning or application authority.
+
+        Callers own repository, publication and domain leases. This kernel owns
+        only a newly acquired run lock and injects resources without persisting
+        them. An existing lock remains the caller's to release.
+        """
+        run_dir = Path(run_dir)
+        lock = held_lock
+        if lock is None:
+            try:
+                lock = RunLock(run_dir).acquire()
+            except RunLockHeld as exc:
+                return RunOutcome("blocked", blocked_reason=str(exc))
+        try:
+            trace = trace if trace is not None else RunTrace(run_dir / "run_trace.jsonl")
+            executor = Executor(
+                self.registry, self.settings, run_dir=run_dir, trace=trace,
+                llm=llm, notifier=notifier, runtime=runtime,
+                fingerprint=fingerprint, validate_cached=validate_cached,
+            )
+            return await run_guarded(executor.run(playbook, state), run_dir)
+        finally:
+            if held_lock is None:
+                lock.release()
 
     def run(
         self, playbook, spec: TaskSpec, run_dir: Path, *, llm,
@@ -119,13 +149,9 @@ class WorkflowExecution:
             }
             if repo_context.high_risk_modules:
                 state["high_risk_modules"] = list(repo_context.high_risk_modules)
-            executor = Executor(self.registry, self.settings, run_dir=run_dir,
-                                trace=trace, llm=llm, notifier=notifier)
-            # run_guarded finalizes inside the event loop: playbooks that
-            # register run finalizers (lifecycle.register_finalizer) get
-            # teardown on every exit path. Nothing registered == no-op.
             outcome = asyncio.run(
-                run_guarded(executor.run(playbook, state), run_dir))
+                self.execute(playbook, run_dir=run_dir, state=state,
+                             trace=trace, llm=llm, notifier=notifier, held_lock=lock))
 
             if outcome.status == "done":
                 notifier.resolve()

@@ -1,8 +1,8 @@
 # llm.py —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-08 -->
 
-`LOC ~452 · 引擎底座（传输层） · refactor-status: ok`
+`LOC ~540 · 引擎底座（传输层） · refactor-status: ok`
 
 ## 职责
 provider 中立的 LLM 客户端封装。它支持 Anthropic Messages 和 OpenAI Chat Completions，
@@ -34,7 +34,7 @@ max_tokens?, on_text?) -> Reply`；以及 `Reply`、`Block`、`parse_json_reply`
 不含 prompt、不含策略、除传输层外不做重试。**不是放任务/仓库逻辑的地方。**
 
 ## 依赖（允许）
-`anthropic` SDK；`openai` SDK；`config.py`。
+`anthropic` SDK；`openai` SDK；`config.py`、`budgeting.py`；改进预算 governor 按需加载。
 
 ## 扩展点
 新 provider/端点 → 藏在本封装的构造函数之后；保持 `Reply`/`Block` 稳定，
@@ -49,3 +49,9 @@ provider 选择与 OpenAI 工具翻译有单元测试；step/agent 测试使用 
 ## 自进化接入（2026-10-04）
 
 绑定改进预算 governor 时，每次 API 请求先按最坏用量预留预算，再派发并结算；拒绝不会发出模型请求。成功、失败、模型不匹配均采集 trace/1，输入输出以脱敏 blob 引用保存；未绑定 store 或 governor 时保留原调用行为。
+
+预留生命周期复用 `budgeting.reserved_call`，在 `finally` 中结算，包括中断退出。
+派发前失败释放预留；已派发但费用未知时扣完整预留。缺失、空或无效 token 用量
+不能当作零费用；可信用量已获得后，即使回调失败仍按真实费用结算。周账本按
+reservation 身份幂等结算，真实超额先记账再 fail-closed，既有 `Reply.usage=None`
+未知语义及 provider 传输、served-model 守卫保持不变。

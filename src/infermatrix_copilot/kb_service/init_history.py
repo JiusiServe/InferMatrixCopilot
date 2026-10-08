@@ -30,7 +30,7 @@ from .init_stages import (
 )
 from .init_support import (
     KNOWLEDGE_PREFIX, InitError, InitPublisher, InitRecord, generate,
-    load_prepared, run_knowledge_validators, save_prepared,
+    load_prepared, run_knowledge_validators, save_prepared, checkpoint_budget as _checkpoint_budget,
 )
 from .models import DEFAULT_JUDGE, ModelRole, ModelUnavailable
 from .sources import SourceError
@@ -80,17 +80,6 @@ just the last commit. Use only the supplied complete packet; do not call tools
 or discover repositories. The caller binds this verdict to the exact base/head."""
 
 
-def _checkpoint_budget(limit: float | None, record: InitRecord, state_dir: Path) -> Budget:
-    """Use the init-record format for the shared budget's durable checkpoints."""
-    def checkpoint(spent: float, reserved: float) -> None:
-        # A killed call's final cost is unknown; recovery charges its whole
-        # outstanding reservation, without introducing a new record format.
-        record.spent_usd = spent + reserved
-        record.save(state_dir)
-
-    return Budget(limit, spent_usd=record.spent_usd, checkpoint=checkpoint)
-
-
 def _validate_extraction(data: dict) -> None:
     if not isinstance(data.get("rules"), list) or len(data["rules"]) > 12:
         raise ValueError("rules must be a list of at most 12 rules")
@@ -127,14 +116,13 @@ def _body_key(body: str) -> str:
 class _PrHistory(_Stage):
     STAGE = "pr-history"
 
-    def run(self) -> InitRecord:
+    def _bind_options(self) -> None:
         try:
             self.reviewer = ModelRole.parse("pr-reviewer", self.rt.environ.get(REVIEWER_ENV, DEFAULT_JUDGE))
         except ValueError as exc:
             raise InitError(str(exc)) from exc
         if self.reviewer.provider != "codex":
             raise InitError(f"{REVIEWER_ENV} must select the codex provider; no reviewer fallback")
-        return super().run()
 
     def _input_options(self) -> dict:
         return {"pr_reviewer": self.reviewer.label(), "upstream_repository": self.lifecycle.full_name,
@@ -239,12 +227,7 @@ class _PrHistory(_Stage):
                 self.record.status = "empty"
                 self.record.notes.append("no upstream PR yielded a current, executable knowledge upgrade")
                 return self.record
-            changed = {KNOWLEDGE_PREFIX + p: t for p, t in self.head.items() if self.base.get(p) != t}
-            problems = run_knowledge_validators(self.rt.knowledge, self.record.kb_base_sha,
-                                                {**self.overlay, **changed})
-            if problems:
-                return self._blocked(problems)
-            return self._publish(changed)
+            return self._conclude({}, [])
         except (BudgetExhausted, ModelUnavailable, SourceError, InitError, FactsError) as exc:
             done = {item["number"] for item in history.get("completed", [])}
             self.record.unfinished = [f"upstream PR #{p['number']}" for p in history.get("selected", [])
@@ -387,37 +370,43 @@ class _PrHistory(_Stage):
 
         return most_specific(path, self.owners)
 
-    def _publish(self, changed: dict[str, str]) -> InitRecord:
+    def _prepare_publication(self, changed: dict[str, str]) -> InitRecord:
         record, rt = self.record, self.rt
         record.files = sorted(changed)
         record.spent_usd = self.budget.spent_usd
         title = f"kb init({self.lifecycle.repo}): pr-history"
         commits = [{"title": c["title"], "files": c["files"]} for c in record.history["commits"]]
         author = self.author or ("KB init preview", "kb-init@example.invalid")
-        publisher = InitPublisher(rt.knowledge.path, _knowledge_repository(), run=rt.gh_run)
-        if self.dry_run:
-            base = record.kb_base_sha
-            if self.overlay:
-                base = publisher.build_commit(base, self.overlay, title="kb init preview baseline",
-                                               author=author, when=record.started_at)
-            record.history["series_base_sha"] = base
-            head = publisher.build_series(base, commits, author=author, when=record.started_at)
-            self._review(publisher, head)
-            dest = InitRecord.path(rt.state_dir, record.repo, self.STAGE).with_name("pr-history-dryrun")
-            InitPublisher.dry_run(dest, changed, title=title, body=self._body())
-            (dest / "COMMITS.json").write_text(json.dumps(record.history["commits"], ensure_ascii=False, indent=1),
-                                               encoding="utf-8")
-            record.pr = {"dry_run_dir": str(dest), "head_sha": head}
-            record.status = "dry_run"
-            return record
         prepared = save_prepared(
             InitRecord.path(rt.state_dir, record.repo, self.STAGE).with_name("pr-history-publish.json"),
             base_sha=record.kb_base_sha, branch=self._publication_branch(), files=changed,
             commits=commits, draft=True, title=title, body=self._body(), author=author, when=record.started_at)
-        record.pr = {"prepared": str(prepared)}
+        record.pr = {"prepared": str(prepared), "validation_pending": True}
         record.status = "publishing"
         record.save(rt.state_dir)
-        return self._finish(record, publisher)
+        return record
+
+    def _publish(self) -> InitRecord:
+        record, rt = self.record, self.rt
+        if not self.dry_run:
+            return self._resume(record)
+        prepared = load_prepared(record.pr["prepared"])
+        changed, title, commits, author = (prepared[k] for k in ("files", "title", "commits", "author"))
+        publisher = InitPublisher(rt.knowledge.path, _knowledge_repository(), run=rt.gh_run)
+        base = record.kb_base_sha
+        if self.overlay:
+            base = publisher.build_commit(base, self.overlay, title="kb init preview baseline",
+                                           author=author, when=record.started_at)
+        record.history["series_base_sha"] = base
+        head = publisher.build_series(base, commits, author=author, when=record.started_at)
+        self._review(publisher, head)
+        dest = InitRecord.path(rt.state_dir, record.repo, self.STAGE).with_name("pr-history-dryrun")
+        InitPublisher.dry_run(dest, changed, title=title, body=self._body())
+        (dest / "COMMITS.json").write_text(json.dumps(record.history["commits"], ensure_ascii=False, indent=1),
+                                           encoding="utf-8")
+        record.pr = {"dry_run_dir": str(dest), "head_sha": head}
+        record.status = "dry_run"
+        return record
 
     def _body(self) -> str:
         record, history = self.record, self.record.history
