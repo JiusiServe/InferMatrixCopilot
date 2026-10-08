@@ -16,8 +16,9 @@ Proposal states::
 
 from __future__ import annotations
 
+from ..persistence import atomic_write_bytes
+
 import json
-import os
 import re
 import time
 import uuid
@@ -128,12 +129,8 @@ class Ledger:
 
     def save(self, ledger: WorkflowLedger) -> None:
         data = asdict(ledger)
-        # a per-process temp name: two writers must never share one (the
-        # rename of one would steal the other's contents)
-        tmp = self._path(ledger.workflow).with_name(
-            f".{self._path(ledger.workflow).name}.{os.getpid()}.{uuid.uuid4().hex[:6]}.tmp")
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
-        tmp.replace(self._path(ledger.workflow))
+        atomic_write_bytes(self._path(ledger.workflow),
+                           json.dumps(data, ensure_ascii=False, indent=1, default=str).encode("utf-8"))
 
     @contextmanager
     def locked(self, workflow: str) -> Iterator[None]:

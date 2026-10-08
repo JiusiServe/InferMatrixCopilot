@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from ..persistence import atomic_write_bytes as _atomic_write
+
 import os
 import re
 import subprocess
 import sys
-import uuid
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import UTC, date, datetime
@@ -68,15 +69,6 @@ def _normalize_date(updated_on: str | date | None) -> str:
     if parsed.isoformat() != value:
         raise InvalidRequestError("updated_on must be an ISO YYYY-MM-DD date")
     return value
-
-
-def _atomic_write(path: Path, data: bytes) -> None:
-    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
-    try:
-        temporary.write_bytes(data)
-        os.replace(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
 
 
 @contextmanager

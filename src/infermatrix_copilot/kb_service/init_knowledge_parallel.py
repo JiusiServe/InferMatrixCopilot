@@ -585,9 +585,7 @@ def run_jobs(stage, jobs):
                 result["result_sha256"] = _hash({k: v for k, v in result.items() if k != "result_sha256"})
             completed[n] = result
             key = jobs[n]["owner"].owner + ":" + result["input_sha256"]
-            saved["tasks"][key] = result
-            stage.record.spent_usd = round(stage.budget.spent_usd, 6)
-            stage.record.save(stage.rt.state_dir)  # only this coordinator writes checkpoints
+            stage.budget.checkpoint_now(lambda: saved["tasks"].__setitem__(key, result))
     # Completion order never affects pages, navigation or approval assembly.
     for n, job in enumerate(jobs):
         result = completed[n]

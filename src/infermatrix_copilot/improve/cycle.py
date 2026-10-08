@@ -13,6 +13,8 @@ never on GitHub.
 
 from __future__ import annotations
 
+from ..persistence import atomic_write_bytes
+
 import datetime as dt
 import json
 import time
@@ -79,9 +81,7 @@ def _cursor(ledger_dir: Path) -> dict:
 def _save_cursor(ledger_dir: Path, data: dict) -> None:
     path = cursor_path(ledger_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
-    tmp.replace(path)
+    atomic_write_bytes(path, json.dumps(data, indent=1).encode("utf-8"))
 
 
 def is_due(now: float, last_run_at: float, *, weekday: int, hour: int, tz: dt.tzinfo | None = None) -> bool:

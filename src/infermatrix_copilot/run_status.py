@@ -27,6 +27,8 @@ Code and Codex each launch their own server):
 
 from __future__ import annotations
 
+from .persistence import atomic_write_bytes
+
 import json
 import os
 import time
@@ -93,9 +95,7 @@ def _locked_update(run_dir: str | Path,
             now = time.time()
             new = {**cur, **updates, "updated": now}
             new.setdefault("created", now)
-            tmp = run_dir / f".{STATUS_NAME}.{os.getpid()}.tmp"
-            tmp.write_text(json.dumps(new, indent=2, default=str), encoding="utf-8")
-            os.replace(tmp, status_path(run_dir))
+            atomic_write_bytes(status_path(run_dir), json.dumps(new, indent=2, default=str).encode("utf-8"))
             return new
         finally:
             if fcntl is not None:

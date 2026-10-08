@@ -192,16 +192,17 @@ def test_discovery_resume_rejects_another_batch_journal(tmp_path):
 def test_discovery_failed_settlement_preserves_durable_outstanding_amount(tmp_path, monkeypatch):
     journal = tmp_path / "discovery-budget.json"
     budget = _discovery_budget(Budget(1), journal, "batch")
-    original_replace = Path.replace
+    from infermatrix_copilot.kb_service import init_feature_discovery
+    original_write = init_feature_discovery.atomic_write_bytes
     writes = []
 
-    def fail_second_replace(path, target):
-        writes.append(target)
+    def fail_second_write(path, data):
+        writes.append(path)
         if len(writes) == 2:
             raise OSError("journal unavailable")
-        return original_replace(path, target)
+        return original_write(path, data)
 
-    monkeypatch.setattr(Path, "replace", fail_second_replace)
+    monkeypatch.setattr(init_feature_discovery, "atomic_write_bytes", fail_second_write)
     with pytest.raises(OSError, match="journal unavailable"):
         with budget.reserve(.5) as reservation:
             reservation.charge(.125)

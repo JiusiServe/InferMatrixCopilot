@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 from . import trace_store
 from .config import Settings
+from .budgeting import reserved_call, valid_token_counts
 
 logger = logging.getLogger("infermatrix_copilot")
 
@@ -210,77 +211,72 @@ class LLM:
         # the weekly envelope (design §10): the worst case is reserved BEFORE
         # the request leaves the process; a refusal never sends it
         governor = current_governor()
-        reservation = None
-        if governor is not None:
-            from .improve.budget import request_bytes
+        usage = None
 
-            reservation = governor.reserve_call(kwargs["model"], request_bytes(kwargs),
-                                                int(kwargs["max_tokens"] or 0), purpose=role or "")
-        sent = False          # once True, a failure may already have been billed
-        usage = None          # set as soon as the provider's usage is known
-        try:
-            with tracing.span("llm", model=kwargs["model"],
-                              n_tools=len(kwargs["tools"]),
-                              **({"role": role} if role else {})) as _sp:
-                tracing.event("llm.request", span=_sp, model=kwargs["model"],
-                              n_tools=len(kwargs["tools"]), role=role or "",
-                              system=kwargs.get("system", ""),
-                              payload=tracing.summarize_messages(kwargs["messages"]))
-                sent = True
-                if provider == "anthropic" and on_text is not None:
-                    with self._client.messages.stream(**kwargs) as stream:
-                        for delta in stream.text_stream:
-                            _sp.mark_ttft()  # first streamed token = prefill done
-                            on_text(delta)
-                        resp = stream.get_final_message()
-                    blocks, stop_reason, usage, served, request_id = \
-                        self._normalize_anthropic(resp)
-                elif provider == "openai":
-                    resp = self._create_openai(**kwargs)
-                    blocks, stop_reason, usage, served, request_id = \
-                        self._normalize_openai(resp)
-                    if on_text is not None:
-                        _sp.mark_ttft()
-                        text = "".join(
-                            b.text for b in blocks if b.type == "text")
-                        if text:
-                            on_text(text)
-                else:
-                    resp = self._client.messages.create(**kwargs)
-                    blocks, stop_reason, usage, served, request_id = \
-                        self._normalize_anthropic(resp)
-                tracing.set_usage(_sp, usage, stop_reason=stop_reason)
-        except Exception as exc:
-            if governor is not None and reservation is not None:
+        def acquire():
+            from .improve.budget import request_bytes
+            return governor.reserve_call(kwargs["model"], request_bytes(kwargs),
+                                         int(kwargs["max_tokens"] or 0), purpose=role or "") if governor else None
+
+        def finish(call):
+            token = call["reservation"]
+            if governor is not None:
                 if usage is not None:
-                    # the provider answered (usage known) and something after
-                    # that failed, e.g. on_text: real spend, settled as such
-                    governor.settle_call(reservation, usage, kwargs["model"])
-                elif sent:
-                    # sent, no usage: billing may have happened — charge the
-                    # whole reservation rather than discard real spend
-                    governor.forfeit_call(reservation)
+                    governor.settle_call(token, usage, kwargs["model"])
+                elif call["sent"]:
+                    governor.forfeit_call(token)
                 else:
-                    governor.release_call(reservation)
-            # a failed provider call is still a model_call record (error set):
-            # forensics must see the request that never got a reply
-            capture_model_call(kwargs, role, provider, None,
-                               time.monotonic() - started, error=str(exc))
-            raise
-        tracing.event("llm.response", span=_sp,
-                      stop_reason=stop_reason,
-                      text="".join(b.text for b in blocks if b.type == "text"),
-                      tool_calls=[{"name": b.name, "id": b.id, "input": b.input}
-                                  for b in blocks if b.type == "tool_use"],
-                      # the endpoint exposes no token ids, so the replayable
-                      # record is this text plus the counts for the same call
-                      **tracing.usage_counts(usage))
-        reply = Reply(blocks=blocks, stop_reason=stop_reason,
-                      usage=usage, model=served, request_id=request_id)
-        capture_model_call(kwargs, role, provider, reply,
-                           time.monotonic() - started)
-        if governor is not None and reservation is not None:
-            governor.settle_call(reservation, usage, kwargs["model"])  # a breach raises: fail closed
+                    governor.release_call(token)
+
+        with reserved_call(acquire, finish) as call:
+            try:
+                with tracing.span("llm", model=kwargs["model"],
+                                  n_tools=len(kwargs["tools"]),
+                                  **({"role": role} if role else {})) as _sp:
+                    tracing.event("llm.request", span=_sp, model=kwargs["model"],
+                                  n_tools=len(kwargs["tools"]), role=role or "",
+                                  system=kwargs.get("system", ""),
+                                  payload=tracing.summarize_messages(kwargs["messages"]))
+                    call["sent"] = True
+                    if provider == "anthropic" and on_text is not None:
+                        with self._client.messages.stream(**kwargs) as stream:
+                            for delta in stream.text_stream:
+                                _sp.mark_ttft()  # first streamed token = prefill done
+                                on_text(delta)
+                            resp = stream.get_final_message()
+                        blocks, stop_reason, usage, served, request_id = \
+                            self._normalize_anthropic(resp)
+                    elif provider == "openai":
+                        resp = self._create_openai(**kwargs)
+                        blocks, stop_reason, usage, served, request_id = \
+                            self._normalize_openai(resp)
+                        if on_text is not None:
+                            _sp.mark_ttft()
+                            text = "".join(
+                                b.text for b in blocks if b.type == "text")
+                            if text:
+                                on_text(text)
+                    else:
+                        resp = self._client.messages.create(**kwargs)
+                        blocks, stop_reason, usage, served, request_id = \
+                            self._normalize_anthropic(resp)
+                    tracing.set_usage(_sp, usage, stop_reason=stop_reason)
+            except Exception as exc:
+                capture_model_call(kwargs, role, provider, None,
+                                   time.monotonic() - started, error=str(exc))
+                raise
+            tracing.event("llm.response", span=_sp,
+                          stop_reason=stop_reason,
+                          text="".join(b.text for b in blocks if b.type == "text"),
+                          tool_calls=[{"name": b.name, "id": b.id, "input": b.input}
+                                      for b in blocks if b.type == "tool_use"],
+                          # the endpoint exposes no token ids, so the replayable
+                          # record is this text plus the counts for the same call
+                          **tracing.usage_counts(usage))
+            reply = Reply(blocks=blocks, stop_reason=stop_reason,
+                          usage=usage, model=served, request_id=request_id)
+            capture_model_call(kwargs, role, provider, reply,
+                               time.monotonic() - started)
         self._guard_served_model(kwargs["model"], reply, _sp)
         return reply
 
@@ -297,7 +293,8 @@ class LLM:
                     type="tool_use", id=b.id, name=b.name,
                     input=dict(b.input)))
         usage = None
-        if getattr(resp, "usage", None) is not None:
+        if valid_token_counts(getattr(getattr(resp, "usage", None), "input_tokens", None),
+                              getattr(getattr(resp, "usage", None), "output_tokens", None)):
             usage = {
                 "input_tokens": getattr(resp.usage, "input_tokens", 0),
                 "output_tokens": getattr(resp.usage, "output_tokens", 0),
@@ -414,7 +411,8 @@ class LLM:
         }.get(raw_stop, raw_stop or "end_turn")
         raw_usage = getattr(resp, "usage", None)
         usage = None
-        if raw_usage is not None:
+        if valid_token_counts(getattr(raw_usage, "prompt_tokens", None),
+                              getattr(raw_usage, "completion_tokens", None)):
             details = getattr(raw_usage, "prompt_tokens_details", None)
             usage = {
                 "input_tokens": getattr(raw_usage, "prompt_tokens", 0) or 0,

@@ -58,6 +58,8 @@ Standard library only; importing it loads nothing else from the package.
 
 from __future__ import annotations
 
+from .persistence import atomic_write_bytes
+
 import contextvars
 import datetime as dt
 import gzip
@@ -321,12 +323,7 @@ class TraceStore:
         path = self.root / "blobs" / digest[:2] / f"{digest}.gz"
         if not path.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
-            with tmp.open("wb") as handle:
-                handle.write(gzip.compress(data, mtime=0))
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(tmp, path)
+            atomic_write_bytes(path, gzip.compress(data, mtime=0))
         return f"sha256:{digest}"
 
     def blob(self, ref: str) -> str:
@@ -721,13 +718,8 @@ class NativeCallArchive:
 
     def _save(self):
         data = _redact_obj(self.meta, self.store._environ)
-        temporary = self.path / (uuid.uuid4().hex + ".tmp")
-        with temporary.open("w", encoding="utf-8") as handle:
-            json.dump(data, handle, ensure_ascii=False, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, self.path / "attempt.json")
+        atomic_write_bytes(self.path / "attempt.json",
+                           (json.dumps(data, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
 
     def event(self, event: Mapping[str, Any]):
         event = _redact_native(dict(event), self.store._environ)

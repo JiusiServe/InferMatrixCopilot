@@ -1,6 +1,8 @@
 """Immutable, content-addressed engine versions; no candidate code is imported here."""
 from __future__ import annotations
 
+from ..persistence import atomic_write_bytes
+
 import fnmatch
 import hashlib
 import json
@@ -12,6 +14,9 @@ from pathlib import Path, PurePosixPath
 PROTECTED = ("eval/", "test/", "knowledge/", ".github/", "pyproject.toml", "src/infermatrix_copilot/improve/",
              "src/infermatrix_copilot/trace_store.py", "src/infermatrix_copilot/scopes.py",
              "src/infermatrix_copilot/config.py", "src/infermatrix_copilot/llm.py",
+             "src/infermatrix_copilot/budgeting.py", "src/infermatrix_copilot/persistence.py",
+             "src/infermatrix_copilot/git_objects.py", "src/infermatrix_copilot/app/workflow_execution.py",
+             "src/infermatrix_copilot/kb_service/init_execution.py",
              "playbooks/workflow-improve.yaml", "playbooks/evolution-overrides.json",
              "src/infermatrix_copilot/engine/executor.py", "src/infermatrix_copilot/engine/steps/improve.py",
              "src/infermatrix_copilot/kb_service/gate.py", "src/infermatrix_copilot/kb_service/models.py",
@@ -24,17 +29,8 @@ class ArtifactError(ValueError):
     pass
 
 def atomic_json(path: Path, data: dict) -> None:
-    import uuid
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
-    import os
-    with tmp.open("w", encoding="utf-8") as fh:
-        fh.write(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True))
-        fh.flush(); os.fsync(fh.fileno())
-    tmp.replace(path)
-    fd = os.open(path.parent, os.O_RDONLY)
-    try: os.fsync(fd)
-    finally: os.close(fd)
+    atomic_write_bytes(path, json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8"))
 
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()

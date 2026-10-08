@@ -1,8 +1,12 @@
 # improve/ —— 规范（元改进引擎）
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-08 -->
 
 `设计：/data/zhoutaichang/copilot/meta-improvement-engine-design.md v1（GPT-6 sol 批准 2026-09-29） · refactor-status: building (P0–P4 已落地)`
+
+周预算复用公共金额规则和预留调用生命周期，保留周 JSON 与跨周 ID。
+未知或不可信用量按完整预留结算；追加结算回执使同一 token 的重复结算幂等，
+不同结算内容被拒绝。旧待结算额度继续占用，持久化失败继续传播。
 
 ## 职责
 面向任意 trace/1 工作流的"取证—候选—可信目标实验—自动采用—上线观察／自动回滚"循环。使用入口和数据契约见 [自进化使用指南](../../guide/self-evolution.md)。引擎的写权限限于追加自己的 trace/1 记录、
@@ -51,7 +55,7 @@
 - `tools.dispatch` / `LLM.create` / `HarnessLLM.create` / `run_harness_step` / MCP bridge：全保真采集。
 - `kb serve` 调度器：每 tick 调 `_improve_cycle()`，周度槽位到达即跑一次周期（与知识服务同一租约、异常隔离）。
 - 任务种类 `workflow_improve`（L2，READ_ONLY_KINDS）；playbook `workflow-improve`（mode → preflight → sync → lint → experiments → forensics → ledger → publish → report）；`improve.publish` 是唯一 `risk=push` 步骤，与 `pr.post_review` 同样过"TaskSpec `post` 且 ALLOW_POST=1"双门，否则 dry-run 打印将写的 outbox 动作。
-- `LLM.create`：绑定了 governor 时先预留再发请求，失败释放、成功结算；`improve.experiments` 与 `improve.forensics` 都在 `governed()` 内运行。
+- `LLM.create`：绑定 governor 后先持久预留；未派发的失败释放，已派发但无可信用量的调用按完整预留结算，可信用量按实际费用结算；`improve.experiments` 与 `improve.forensics` 都在 `governed()` 内运行。
 - `improve.forensics` 步骤：对每个有结果适配器的工作流建覆盖矩阵、用两个模型家族归因每个 miss、产出整改清单并按阶段各开一条 Tier 2 提案（`cycle.open_tier2_proposals`，带建议预注册；descriptive-only 工作流的提案标 proxy、无建议）；单元数低于 `tier2_min_items` 或无 LLM 时跳过并说明。`--task-param meta_case=<case>` 时（`improve.mode` 发布 `improve_meta`）只跑取证步骤：对一个冻结 case 归因并写 `meta_eval` outcome——这就是自实验的影子单元（`experiments.meta_run_unit` / `_meta_stage` 只把 case 与 lint 样本复制进影子目录，不带任何叙述材料）。
 - `improve.sync`（read）读回 acks/inbox；`improve.publish`（**`risk="push"`**，唯一外向写）：无 `post` 意图只预览、有意图但 `ALLOW_POST=0` 为 dry-run、二者俱备才写 `improve_outbox_dir` 下的动作文件（`improve_proposal_repo` 必填）；影子运行被执行器在步骤前拒绝。
 - 自实验：`experiments.run` 对 `human_labelled` 适配器不要求判官；`_find_unit` 优先取声明工作流的单元。

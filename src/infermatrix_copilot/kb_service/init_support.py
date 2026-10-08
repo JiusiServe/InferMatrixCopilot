@@ -106,11 +106,10 @@ class InitRecord:
 
     def save(self, state_dir: Path) -> Path:
         path = self.path(state_dir, self.repo, self.stage)
+        from ..persistence import atomic_write_bytes
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(asdict(self), ensure_ascii=False, indent=1, sort_keys=True),
-                       encoding="utf-8")
-        os.replace(tmp, path)
+        atomic_write_bytes(path, json.dumps(asdict(self), ensure_ascii=False, indent=1,
+                                            sort_keys=True).encode("utf-8"))
         return path
 
     @classmethod
@@ -123,6 +122,17 @@ class InitRecord:
             return cls(**data)
         except (OSError, ValueError, TypeError) as exc:
             raise InitError(f"init record {path} is unreadable: {exc}") from exc
+
+
+def checkpoint_budget(limit: float | None, record: InitRecord, state_dir: Path) -> Budget:
+    """Use the init-record format for the shared budget's durable checkpoints."""
+    def checkpoint(spent: float, reserved: float) -> None:
+        # A killed call's final cost is unknown; recovery charges its whole
+        # outstanding reservation, without introducing a new record format.
+        record.spent_usd = spent + reserved
+        record.save(state_dir)
+
+    return Budget(limit, spent_usd=record.spent_usd, checkpoint=checkpoint)
 
 
 def inputs_digest(**parts: Any) -> str:
@@ -618,11 +628,10 @@ def save_prepared(path: Path, **publication: Any) -> Path:
     if not set(PREPARED_KEYS).issubset(publication) or set(publication) - set(PREPARED_KEYS) - PREPARED_OPTIONAL:
         raise ValueError(f"a prepared publication needs exactly {PREPARED_KEYS}")
     path = Path(path)
+    from ..persistence import atomic_write_bytes
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps({**publication, "author": list(publication["author"])}, ensure_ascii=False),
-                   encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_write_bytes(path, json.dumps({**publication, "author": list(publication["author"])},
+                                       ensure_ascii=False).encode("utf-8"))
     return path
 
 

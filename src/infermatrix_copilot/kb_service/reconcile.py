@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
@@ -17,6 +16,7 @@ import tempfile
 from pathlib import Path
 
 from ..knowledge_service.signing import canonical_json, sign, verify
+from ..persistence import immutable_write_bytes
 from .activate import activation_lock, build_snapshot, verify_snapshot
 
 PLAN_PURPOSE = "kb-reconciliation-plan"
@@ -225,20 +225,7 @@ def apply_plan(rt, envelope: dict, key) -> Path:
         path = directory / f"{_digest(receipt)}.json"
         # Plans have a separate signature purpose and cannot be installed as
         # receipts. A successfully applied receipt is never replaced in place.
-        fd, temporary = tempfile.mkstemp(prefix=".receipt-", dir=directory)
-        try:
-            with os.fdopen(fd, "wb") as handle:
-                handle.write(canonical_json(receipt))
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.link(temporary, path)  # atomic publication, refuses replacement
-            directory_fd = os.open(directory, os.O_RDONLY)
-            try:
-                os.fsync(directory_fd)
-            finally:
-                os.close(directory_fd)
-        finally:
-            os.unlink(temporary)
+        immutable_write_bytes(path, canonical_json(receipt))
         rt.trace("outcome", context={"playbook": "kb-reconcile-reviewed", "repo": fresh["repository"]},
                  result={"outcome": "supervised_admission", "target": fresh["target"], "receipt": path.name,
                          "actor": fresh["actor"], "commits": len(fresh["commits"])})
