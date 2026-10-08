@@ -15,8 +15,10 @@ week whose envelope it never checked.
 The reservation is a true upper bound: output tokens are the request's
 ``max_tokens`` (the API enforces it); input tokens — including cache reads
 and cache writes, which are prompt tokens billed at their own rates — are
-bounded by the request's UTF-8 byte count (every BPE-family token is at
-least one byte) priced at the cache-write rate (the dearest of the three).
+bounded by the request's UTF-8 byte count for the visible payload. Gateways
+can inject hidden prompts; configure their exact models in
+``improve_input_context_limits`` with the provider's full context ceiling.
+The larger bound is priced at the dearest configured input/cache rate.
 Settlement charges the cache-aware cost exactly as `metrics.cost_from_spans`
 does. Prices come from the metrics price table; a model with no price cannot
 be reserved and is refused, never priced at zero. If a settlement ever
@@ -71,12 +73,19 @@ def request_bytes(kwargs: dict) -> int:
 
 
 def worst_case_usd(model: str, req_bytes: int, max_tokens: int, settings: Any = None) -> float:
-    from ..metrics import CACHE_CREATE_FACTOR, model_price, model_price_known
+    from ..metrics import CACHE_CREATE_FACTOR, CACHE_READ_FACTOR, model_price, model_price_known
 
     if not model_price_known(model, settings):
         raise BudgetRefused(f"no price for model {model!r}: it cannot be reserved (never priced at zero)")
     pin, pout = model_price(model, settings)
-    return req_bytes / 1e6 * pin * CACHE_CREATE_FACTOR + max(0, int(max_tokens or 0)) / 1e6 * pout
+    limits = getattr(settings, "improve_input_context_limits", {}) or {}
+    limit = limits.get(model, 0)
+    if type(limit) is not int or limit < 0:
+        raise BudgetRefused(f"invalid input context ceiling for model {model!r}")
+    input_bound = max(req_bytes, limit)
+    read_factor = float(getattr(settings, "cache_read_price_factor", 0) or 0) or CACHE_READ_FACTOR
+    input_factor = max(1.0, CACHE_CREATE_FACTOR, read_factor)
+    return input_bound / 1e6 * pin * input_factor + max(0, int(max_tokens or 0)) / 1e6 * pout
 
 
 def actual_usd(model: str, usage: dict | None, settings: Any = None) -> float:
