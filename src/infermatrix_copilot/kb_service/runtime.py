@@ -45,12 +45,13 @@ class KbRuntime:
     lease_owner: str | None = None  # set by `kb serve`, which holds the lease for its lifetime
     publisher_public_key: object | None = None
     traces: object | None = None  # trace_store.TraceStore: decisions and outcomes (model calls via the gateway)
+    maintenance: object | None = None  # opt-in durable nightly lane
     release_label: Callable[[str], str] = field(default=lambda repo: "")
     # the repository's upstream as the gate observes it (None: no facts attested)
     upstream_facts: Callable[[RepoLifecycle], object | None] = field(default=lambda lifecycle: None)
 
     @classmethod
-    def from_env(cls, settings, *, state_dir: Path | None = None) -> "KbRuntime":
+    def from_env(cls, settings, *, state_dir: Path | None = None, sync_repos: bool = True) -> "KbRuntime":
         from ..sdk._resources import adapters_root
         from .cli import DEFAULT_STATE_DIR
 
@@ -59,7 +60,7 @@ class KbRuntime:
                                     mode=os.environ.get("KB_GENERAL_MODE", "shadow"))
         registry = load_registry(Path(os.environ.get("ADAPTERS_DIR") or adapters_root()), general=general)
         ledger = Ledger(state_dir / "kb.db")
-        for lifecycle in registry.values():
+        for lifecycle in registry.values() if sync_repos else ():
             ledger.ensure_repo(lifecycle.repo, lifecycle.mode if lifecycle.enabled else "disabled")
         generator, judge = roles_from_env()
         outbox = None
@@ -74,6 +75,7 @@ class KbRuntime:
 
             publisher_key = load_public_key(Path(os.environ["KB_PUBLISHER_PUBKEY"]).read_text(encoding="utf-8"))
         from ..trace_store import TraceStore
+        from .maintenance_settings import MaintenanceConfig
 
         traces = TraceStore(state_dir / "traces")
         github = GitHubReader()
@@ -84,7 +86,7 @@ class KbRuntime:
             gateway=ModelGateway(settings, recorder=trace_recorder(traces)),
             generator=generator, judge=judge,
             knowledge=KnowledgeRepo(Path(os.environ.get("KB_KNOWLEDGE_CLONE") or state_dir / "knowledge-repo")),
-            github=github, outbox=outbox,
+            github=github, outbox=outbox, maintenance=MaintenanceConfig.from_env(),
         )
 
     # -- helpers -------------------------------------------------------------
@@ -374,7 +376,7 @@ def gate_and_stage(rt: KbRuntime, lifecycle: RepoLifecycle, owner: str, *, kind:
                      "l1_issues": [i.to_dict() for i in decision.l1.issues]})
     from .companion import needs_companion, stage_companion
 
-    if needs_companion(decision) and not hold and not force_human and operations:
+    if needs_companion(decision) and kind not in {"correction", "maintenance_calibration"} and not hold and not force_human and operations:
         # the change is fine except for citations outside knowledge/: draft the
         # companion PR that updates them; this change waits for it
         stage_companion(rt, lifecycle, owner, changeset_id, operations, decision, external, base_sha)
@@ -389,6 +391,8 @@ def publish(rt: KbRuntime, lifecycle: RepoLifecycle, changeset_id: str) -> str:
     (verdict signing, the merge item, activation) is driven by the scheduler once the
     publisher reports the PR."""
     changeset = rt.ledger.changeset(changeset_id)
+    if changeset["kind"] == "maintenance_calibration":
+        return "maintenance_calibration"
     if changeset["status"] != "gated":
         return changeset["status"]
     state = rt.ledger.repo_state(lifecycle.repo)
@@ -397,6 +401,12 @@ def publish(rt: KbRuntime, lifecycle: RepoLifecycle, changeset_id: str) -> str:
             or rt.outbox is None:
         rt.ledger.update_changeset(changeset_id, status="shadow_recorded")
         return "shadow_recorded"
+    if changeset["kind"] == "correction":
+        from .maintenance import correction_publishable
+        reason = correction_publishable(rt, changeset)
+        if reason:
+            rt.ledger.update_changeset(changeset_id, status="maintenance_held", detail={**changeset["detail"], "maintenance_hold": reason})
+            return "maintenance_held"
     if not calibration_current(rt, lifecycle):
         # auto_merge is only as good as the judge: no current passing
         # calibration for THIS judge and THIS case set, no publication
@@ -413,7 +423,7 @@ def publish(rt: KbRuntime, lifecycle: RepoLifecycle, changeset_id: str) -> str:
         "branch": f"kb/{lifecycle.repo}/{changeset_id}",
         "files": {f"knowledge/{rel}": text for rel, text in data["files"].items()},
         "deleted": [f"knowledge/{rel}" for rel in data.get("deleted", [])],
-        "title": f"knowledge({lifecycle.repo}): {len(detail['operations'])} change(s) from intake",
+        "title": f"knowledge({lifecycle.repo}): {len(detail['operations'])} change(s) from {changeset['kind']}",
         "body": _pr_body(changeset_id, detail),
     })
     rt.ledger.update_changeset(changeset_id, status="pr_requested")

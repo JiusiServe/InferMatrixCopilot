@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-08 -->
 
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
@@ -156,3 +156,8 @@ Direct 1.1 / Strict 1.3 accept typed `CarriedFinding` inputs (unique IDs, source
 ## 2026-09-29 未测公开函数候选
 `DirectReviewRequest` 新增可选 `diff`（冻结 head 的 unified diff），`DirectReviewPlan` 新增
 `untested_public_api`（`direct_routing` 的同名块，默认空字典）。两者都是可选增量字段，旧调用方不受影响（#164）。
+
+
+## 2026-10-08 Signed containment
+
+Opt-in protocol 1 exports `knowledge_maintenance_status`, `knowledge_usage_record`, `knowledge_availability_check`, `knowledge_publication_guard` and `knowledge_policy_install`. DirectClient and StrictRuntimeConfig accept explicit maintenance configuration. Usage accepts an exact privately issued provider context; arbitrary caller hashes cannot mint provenance. Retrieved and actually injected units are separate from conservative Strict snapshot scope. Current generation is checked at Direct validation and Strict polling; held Strict results retain the original result with top-level state `held`. Hosts hold the publication guard around final admissibility and the external write; the installer drains that same lock before signed policy publication and ACK. ACK includes actual current knowledge snapshot/tree and corrected-content observations, separately from protocol readiness. No service private key crosses this SDK boundary.

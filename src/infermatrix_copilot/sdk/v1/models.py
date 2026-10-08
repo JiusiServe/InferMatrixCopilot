@@ -197,6 +197,8 @@ class Capabilities(_Serializable):
     supports_quality_review: bool
     supports_knowledge_curation: bool
     max_strict_workers: int
+    knowledge_maintenance_protocol_version: int = 1
+    supports_knowledge_containment: bool = True
 
 
 @dataclass(frozen=True)
@@ -318,6 +320,7 @@ class StrictRuntimeConfig(_Serializable):
     run_root: str = ""
     # Runs this host executes at once; reported back as `max_strict_workers`.
     max_workers: int = 1
+    knowledge_maintenance: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.repository.alias:

@@ -3,6 +3,10 @@
 from .direct import DirectClient, get_capabilities
 from ...knowledge_context import ContextBudget
 from .knowledge import KnowledgeCurator, KnowledgeValidatorError
+from ...knowledge_service.containment import (
+    ContainmentError, knowledge_maintenance_status, knowledge_usage_record,
+    knowledge_availability_check, knowledge_publication_guard, knowledge_policy_install,
+)
 from .models import (
     DIRECT_API_VERSION,
     KNOWLEDGE_API_VERSION,
@@ -57,6 +61,12 @@ __all__ = [
     "STRICT_API_VERSION",
     "TRACE_SCHEMA",
     "Capabilities",
+    "ContainmentError",
+    "knowledge_maintenance_status",
+    "knowledge_usage_record",
+    "knowledge_availability_check",
+    "knowledge_publication_guard",
+    "knowledge_policy_install",
     "ContextBudget",
     "ChangedPath",
     "CarriedFinding",

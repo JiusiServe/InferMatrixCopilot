@@ -108,6 +108,10 @@ class KnowledgeView:
 
     def path(self, relative_path: str) -> Path:
         """Resolve one knowledge-relative file, refusing escapes and tampering."""
+        return self._integrity_path(relative_path, containment=True)
+
+    def _integrity_path(self, relative_path: str, *, containment=False) -> Path:
+        """Validate navigation targets without reading their serving content."""
         value = str(relative_path).strip().replace("\\", "/")
         pure = PurePosixPath(value)
         if not value or pure.is_absolute() or ".." in pure.parts:
@@ -131,6 +135,9 @@ class KnowledgeView:
                 raise KnowledgeViewError(f"file is not in snapshot manifest: {rel}")
             if _file_sha256(path) != expected:
                 raise KnowledgeViewError(f"snapshot file does not match manifest: {rel}")
+        if containment:
+            from .knowledge_service.containment import assert_page_available
+            assert_page_available(self, rel)
         return path
 
     def read_text(self, relative_path: str) -> str:

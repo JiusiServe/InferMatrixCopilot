@@ -1,6 +1,6 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~490 · 默认 MCP：Direct 门面 + Strict 入口 · refactor-status: ok`
 
@@ -47,6 +47,11 @@
   `subtraction_signal` 的自洽性（`none` 不得附带证据；`triggered` 需要减法项或最小性
   证明）、以及证明本次评审读的是固定提交的 `evidence_head_sha`。
   **它不能也没有**去验证被引用的证据是否真实 —— 声称它能，比不声称更糟。
+  启用 containment 后，legacy 和 adaptive Direct 计划另带实际 provider 签发登记的
+  `knowledge_usage`；完成工具把该收据原样交给公开 `direct_completion_result`，
+  后者按当前签名策略重查知识可用性。缺失、伪造、过期或被 hold 的来源均返回
+  `partial_review` / `publish_ready=false`，要求重新取用可用知识并复核。
+  这项来源与可用性校验独立于评审结论的证据真伪；未启用时旧返回形状不变。
 - **路由绝不静默替换。** `title`/`body` 选 owner；`changed_files` 通常只做范围校验。
   它们只在**最后手段**下选路（当存活路由无一命中它们推导出的 owner 时），且该情况是
   **显式的**：`status="scope_fallback"`、`selected_by="title_body+changed_files"`，

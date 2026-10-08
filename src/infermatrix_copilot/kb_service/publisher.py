@@ -88,6 +88,7 @@ class Transport(Protocol):
     def read(self, rel: str) -> bytes: ...
     def write_ack(self, item_id: str, data: bytes) -> None: ...
     def list_archives(self) -> list[str]: ...
+    def write_containment(self, identity: str, data: bytes) -> None: ...
 
 
 @dataclass
@@ -116,6 +117,14 @@ class LocalTransport:
         tmp = folder / f".{item_id}.tmp"
         tmp.write_bytes(data)
         tmp.replace(folder / f"{item_id}.json")
+
+    def write_containment(self, identity: str, data: bytes) -> None:
+        if not re.fullmatch(r"[0-9a-f]{64}", identity):
+            raise OutboxError("invalid containment envelope identity")
+        folder = self.root / "inbox" / "containment"
+        folder.mkdir(parents=True, exist_ok=True)
+        from ..knowledge_service.containment import atomic_json
+        atomic_json(folder / f"{identity}.json", json.loads(data))
 
 
 @dataclass
@@ -157,6 +166,14 @@ class SshTransport:
         tmp, final = shlex.quote(f"{self.root}/inbox/acks/.{item_id}.tmp"), \
             shlex.quote(f"{self.root}/inbox/acks/{item_id}.json")
         self._ssh(f"mkdir -p {folder} && cat > {tmp} && mv {tmp} {final}", data)
+
+    def write_containment(self, identity: str, data: bytes) -> None:
+        if not re.fullmatch(r"[0-9a-f]{64}", identity):
+            raise OutboxError("invalid containment envelope identity")
+        folder = shlex.quote(self.root + "/inbox/containment")
+        tmp = shlex.quote(f"{self.root}/inbox/containment/.{identity}.tmp")
+        final = shlex.quote(f"{self.root}/inbox/containment/{identity}.json")
+        self._ssh(f"umask 077 && mkdir -p {folder} && cat > {tmp} && mv {tmp} {final}", data)
 
 
 # -- GitHub through the owner's gh login ------------------------------------------
@@ -201,6 +218,13 @@ class Publisher:
     log: list[dict] = field(default_factory=list)
     upstreams: Mapping[str, str] = field(default_factory=dict)  # repo -> public upstream, from OUR config
     observer: Callable[[str, str], Any] | None = None           # (repo, upstream) -> facts observer
+
+    containment_targets: Mapping[str, dict] | None = None
+    containment_run: Callable[..., subprocess.CompletedProcess] = subprocess.run
+
+    def sync_containment(self) -> dict:
+        from .containment_transport import sync
+        return sync(self)
 
     # local records -------------------------------------------------------------
     def _done_path(self, item_id: str) -> Path:
@@ -272,6 +296,7 @@ class Publisher:
                 self._trace(event="locked", detail="another publisher is running")
                 return {**summary, "locked": 1}
             try:
+                self.sync_containment()
                 self._recover_merges()
                 return self._round(summary)
             finally:
@@ -552,6 +577,42 @@ class Publisher:
         return MirrorObserver(self.state_dir / "upstream" / f"{repo}.git", upstream,
                               lambda number: json.loads(self.github.gh("api", f"repos/{upstream}/pulls/{number}")))
 
+    def _recheck_maintenance(self, item: OutboxItem) -> None:
+        body = item.body
+        if not body.get("maintenance_required") and "maintenance" not in body:
+            return
+        from ..knowledge_service.containment import MAX_AGE, MAX_RUNTIME_AGE, policy_identity
+        from ..knowledge_service.signing import verify
+        try:
+            proof = verify("kb-maintenance-merge", body.get("maintenance"), self.service_public_key)
+            policy = verify("kb-containment-policy", json.loads(self.transport.read("outbox/containment-policy.json")), self.service_public_key)
+            now = self.clock()
+            if proof.get("schema_version") != 1 or proof.get("changeset_id") != body["changeset_id"] \
+                    or proof.get("head_sha") != body["head_sha"] \
+                    or not re.fullmatch(r"[0-9a-f]{64}", proof.get("policy_sha256", "")) \
+                    or not proof["issued_at"] <= now < proof["expires_at"] \
+                    or not 0 < proof["expires_at"] - proof["issued_at"] <= 60 \
+                    or proof["generation"] != policy["generation"] \
+                    or proof["policy_digest"] != policy_identity(policy) \
+                    or not policy["issued_at"] <= now < policy["expires_at"] \
+                    or not 0 < policy["expires_at"] - policy["issued_at"] <= MAX_AGE:
+                raise ValueError("expired or changed correction policy")
+            acks = proof["acks"]
+            if not isinstance(acks, list) or not policy["consumers"] \
+                    or sorted(a["consumer_id"] for a in acks) != sorted(policy["consumers"]):
+                raise ValueError("correction consumer roster is incomplete")
+            for ack in acks:
+                if ack.get("protocol") != 1 or ack.get("ready") is not True or not ack.get("release_id") \
+                        or ack.get("generation") != proof["generation"] \
+                        or ack.get("policy_digest") != proof["policy_digest"] \
+                        or ack.get("runtime_ready") is not True \
+                        or not re.fullmatch(r"[0-9a-f]{64}",ack.get("runtime_config_sha256", "")) \
+                        or not 0 <= now-ack["runtime_checked_at"] < MAX_RUNTIME_AGE \
+                        or not 0 <= now - ack["checked_at"] < MAX_AGE:
+                    raise ValueError("correction consumer ACK is stale")
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            raise PublishError("not merging: maintenance authorization unavailable or expired") from exc
+
     def _do_merge(self, item: OutboxItem) -> dict:
         """The local gate on the exact merged tree, then the merge (design v8 §8.2)."""
         from . import local_gate
@@ -596,6 +657,7 @@ class Publisher:
             raise PublishError(f"main kept moving while PR #{number} was checked; retried next round")
         self._recheck_facts(item.repo, verdict)
         self._recheck_control()
+        self._recheck_maintenance(item)
         intent = self._intent_path(item.id)
         intent.parent.mkdir(parents=True, exist_ok=True)
         intent.write_text(json.dumps({"pr": number, "head_sha": head, "changeset_id": body["changeset_id"],
@@ -765,6 +827,24 @@ class Publisher:
         import threading
 
         stop = stop or threading.Event()
-        while not stop.is_set():
-            self._trace(event="round", **self.run_once(), **self.sync_archives())
-            stop.wait(interval)
+        from .containment_transport import targets
+        round_interval = min(interval,30) if targets(self) else interval
+        # The policy heartbeat is independent of a slow GitHub gate round.
+        # Default targets are empty, so existing installations stay inert.
+        def heartbeat():
+            while not stop.is_set():
+                started = time.monotonic()
+                try:
+                    self.sync_containment()
+                except (RuntimeError, OSError, ValueError, KeyError, TypeError):
+                    self._trace(event="containment_sync_failed")
+                stop.wait(max(1,45-(time.monotonic()-started)))
+        worker = threading.Thread(target=heartbeat, name="kb-containment-sync", daemon=True)
+        worker.start()
+        try:
+            while not stop.is_set():
+                self._trace(event="round", **self.run_once(), **self.sync_archives())
+                stop.wait(round_interval)
+        finally:
+            stop.set()
+            worker.join(timeout=25)

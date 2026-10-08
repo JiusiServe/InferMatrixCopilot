@@ -95,7 +95,9 @@ def verify_snapshot(snapshot: Path) -> KnowledgeView:
     # every consumer reads through KnowledgeView.path
     for rel in view.files or {}:
         try:
-            view.path(rel)
+            # Authority verification checks immutable bytes, not whether a
+            # reader may serve them before a correction restoration completes.
+            view._integrity_path(rel, containment=False)
         except (KnowledgeViewError, FileNotFoundError, ValueError) as exc:
             raise ActivationError(f"snapshot content does not match its manifest: {exc}") from exc
     from ..knowledge_view import SUPPORTED_FORMATS, knowledge_format

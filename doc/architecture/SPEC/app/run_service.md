@@ -1,6 +1,6 @@
 # app/run_service.py —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-08 -->
 
 `RunService` is the durable application boundary shared by the embedded
 Strict SDK and MCP transport. It owns policy-checked reserve/start, a queue
@@ -76,3 +76,8 @@ services and the CLI as well. Not covered: two agent sessions *inside one run*
 (ensemble lenses, per-comment verification, bounded by
 `strict_backend_concurrency`) still share their run's own tree; that predates
 this change and is independent of the worker count.
+
+
+## 2026-10-08 Signed containment
+
+When containment is explicitly enabled, reservation issues a private provider receipt for the pinned repository/shared snapshot scope into `knowledge.json`. It identifies conservative publication dependencies; it does not claim every scoped unit was injected. Launch rechecks the receipt and forwards only explicit maintenance configuration to the child. Old reservations without issuance fail closed until reassessed.

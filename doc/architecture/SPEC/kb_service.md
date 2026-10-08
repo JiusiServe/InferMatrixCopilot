@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-10-07 -->
+<!-- verified-against: 2026-10-08 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -38,6 +38,37 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 
 ## 测试
 `test_kb_service_core.py`。
+
+## 2026-10-08 持久夜间维护与撤回
+
+- `maintenance` 在现有 scheduler 租约内运行 Shanghai 01:00 的可恢复周期；
+  `maintenance_units` 对不变的规则和说明文本也重新质疑，快照、策略与公平分母在周期开始时固定。
+  `maintenance_audit` 读取原始版本的源码行段、校验 pin/span/hash，缺失证据保持 unknown，
+  execution_error 与 contradicted 分开。不能以旧 verdict 或最新 HEAD 代替原始证据。
+- `maintenance_store` 以附加表保存 runs/items/findings/usage/budget/requests/resolutions，
+  不改写原 intake、verdict、pin、激活和 reviewed 回执。所有执行写入受现有租约栅栏保护，
+  CLI 只可并发入队请求；每次模型调用先记不可重复派发的预算预留，恢复不能重发已预留调用。
+  每日 $50 上限含 $10 公平保留；未知价格或 API transport 不能证明硬上界时拒绝调用。
+- `maintenance_correction` 复用 owner-scoped retire/replace、保护字段与普通质量门；
+  提案不等于已修正，原始 verdict、退役与应用历史均保留。`maintenance_calibration`
+  只消费具明确人工标签和原始证据的签名案例；校准调用也纳入预算和模型记录。
+- `maintenance_commands` 提供 `kb maintain plan|run|status (--repo ID|--all)`；
+  plan/status 不调用模型，run 必须带稳定 `--request-id` 且只入队，可额外选择
+  `--calibrate` 或 `--drill`。`kb correction resolve --id ID --decision confirm|dismiss
+  --evidence JSON|@FILE` 用实际 gh 登录并检查 `KB_MAINTENANCE_OWNERS`，签名请求由持租约
+  scheduler 重新验证。confirm 必须明确 expected 及可重读原始行段；只由 scheduler 签名人工案例。
+  correction_oracle 只保存负责人显式提供的预期，dismiss 不造案例，所有人工请求不计有效夜次。
+- 默认关闭 `KB_MAINTENANCE_ENABLED`。显式成本、模型、提示词和 consumer roster 组成策略；
+  校准变化或策略变化不能复用旧就绪声明。有效夜次按冻结公开仓库分母、语义审计、真实消费者
+  撤回演练等证据判定，安静/no-op 夜次不自动构成新鲜度。
+- operational containment 签名代际独立于 active snapshot 和 paired release；现有 owner
+  SSH publisher 安装签名策略并收集真实 consumer ACK。60 秒心跳、10 分钟新鲜度、实际 release
+  字节摘要及协议版本均须匹配；高水位/签发登记/协议 latch 放在 shared state，rollback 不清除。
+  installer 与最终 review publication 共锁；Direct 区分 retrieved/injected，Strict 保留 provider
+  receipt。失效上下文 held 并保留原 verdict 供复核，不剥离已消费断言，不发布 GitHub review。
+
+操作、证据格式及默认关闭的部署步骤见 [nightly maintenance](../knowledge-maintenance.md)。
+测试：`test_kb_maintenance_store.py`、`test_kb_maintenance_flow.py`、`test_kb_maintenance_commands.py`。
 
 ## 2026-09-28 intake 与质量门
 - `models`：生成与评审模型按 (provider, model, effort) 钉死（默认 `claude-code:claude-opus-5-5`

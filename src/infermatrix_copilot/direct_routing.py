@@ -116,7 +116,7 @@ def _validate_routes(data: object, relative: str, view: KnowledgeView) -> dict:
             raise ValueError(f"{relative}: owners[{index}] needs a unique owner")
         if not isinstance(signals, list) or not isinstance(prefixes, list):
             raise ValueError(f"{relative}: owners[{index}] signals/scope_prefixes must be lists")
-        view.path(path)  # fail closed on a route to a missing page
+        view._integrity_path(path)  # validate unused navigation; selected reads enforce containment
         seen.add(owner)
         normalized.append({
             "owner": owner,
@@ -312,7 +312,8 @@ def _direct_quick_map_text(text: str, max_chars: int = 3500) -> tuple[str, str]:
     A partial map presented as whole is the same lie as a missing one, just harder
     to notice.
     """
-    lines = text.splitlines()
+    from .knowledge_service.lifecycle import visible_text
+    lines = visible_text(text).splitlines()
     start = next(
         (
             index for index, line in enumerate(lines)
@@ -657,7 +658,7 @@ def direct_review_plan(
     )
     budget_ms = int((time.perf_counter() - budget_started) * 1000)
     untested = _direct_untested_public_api(repo, diff)
-    return {
+    plan = {
         "mode": "direct",
         "knowledge_entry": (
             knowledge_routes[0]["path"]
@@ -737,6 +738,24 @@ def direct_review_plan(
             }
         },
     }
+    from .knowledge_service.containment import configuration, _issue_usage, digest
+    if configuration()["enabled"]:
+        # Raw MCP callers receive paths rather than SDK document references.
+        # Bind their selected resources to private provider issuance as well.
+        paths = {plan["knowledge_entry"], *mandatory_review_guides,
+                 *(route["path"] for route in knowledge_routes),
+                 *(document["path"] for document in related["documents"])}
+        context = {"knowledge_snapshot": view.public_snapshot,
+                   "knowledge_tree_sha256": view.tree_sha256,
+                   "plan_sha256": digest(plan),
+                   "documents": [{"document_id": view.relative(view.root / path)}
+                                 for path in sorted(paths)]}
+        plan["knowledge_usage"] = _issue_usage(context, view=view)
+        plan["completion_gate"]["knowledge_usage"] = (
+            "Pass this plan's knowledge_usage unchanged to validate_direct_review; "
+            "the provider rechecks its issued resources against current containment."
+        )
+    return plan
 
 
 def _direct_untested_public_api(repo: str, diff: str) -> dict:
@@ -762,6 +781,7 @@ def _direct_completion_result(
     evidence_head_sha: str = "",
     existing_feedback_status: str = "not_applicable",
     finding_dispositions: list[dict[str, str]] | None = None,
+    knowledge_usage: dict | None = None,
 ) -> dict:
     """Mechanically gate Direct completion on subtraction classification.
 
@@ -780,6 +800,10 @@ def _direct_completion_result(
     existing_feedback_status = str(existing_feedback_status).strip().casefold()
     finding_dispositions = finding_dispositions or []
     missing: list[str] = []
+    from .knowledge_service.containment import knowledge_availability_check
+    availability = knowledge_availability_check(knowledge_usage)
+    if not availability["allowed"]:
+        missing.append("knowledge_usage requires current, admissible provider-issued provenance")
 
     if final_comment_count != 1:
         missing.append("final_comment_count must be exactly 1")
@@ -888,7 +912,7 @@ def _direct_completion_result(
         )
 
     complete = not missing
-    return {
+    result = {
         "status": "complete" if complete else "partial_review",
         "publish_ready": complete,
         "final_comment_count": final_comment_count,
@@ -930,6 +954,11 @@ def _direct_completion_result(
             else "Classify the subtraction signal; only a triggered diff needs one bounded subtraction pass using the existing evidence packet."
         ),
     }
+    if availability["enabled"]:
+        result["knowledge_availability"] = availability
+        if not availability["allowed"]:
+            result["next_action"] = "Retrieve admissible knowledge and reassess the review before completion."
+    return result
 
 
 # ── public names ──────────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ PRs) when people close two of its auto-generated PRs unmerged within 24 hours.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import traceback
@@ -100,6 +101,14 @@ class Scheduler:
             rt.outbox.transition(lambda: None)
             if rt.publisher_public_key is not None:
                 merge.apply_acks(rt, rt.outbox.collect_acks(rt.publisher_public_key))
+        try:
+            from .containment import collect_consumer_updates, refresh_policy, native_ack
+            from .maintenance_store import MaintenanceStore
+            collect_consumer_updates(rt, store=MaintenanceStore(rt.ledger, lease_owner=rt.lease_owner))
+            refresh_policy(rt)  # freshness continues during an intake pause
+            native_ack(rt)  # readiness of this lease-owning consumer, not an installer
+        except Exception as exc:
+            self._record("*", "containment_error", error=repr(exc))
         for lifecycle in rt.registry.values():
             if not lifecycle.enabled:
                 continue
@@ -160,6 +169,16 @@ class Scheduler:
             self._record("*", "activation_refused", error=str(exc))
         except Exception as exc:  # a fetch failure etc. must not stop the service
             self._record("*", "activation_error", error=repr(exc))
+
+        try:
+            from .maintenance import advance_corrections, tick
+            for event in advance_corrections(rt):
+                self._record("*", "correction", **event)
+            report = tick(rt)  # persisted Shanghai slot; independent of releases
+            if report is not None:
+                self._record("*", "maintenance", **report)
+        except Exception as exc:
+            self._record("*", "maintenance_error", error=repr(exc), trace=traceback.format_exc()[-2000:])
 
     def _repo_tick(self, lifecycle) -> None:
         rt = self.rt
@@ -242,10 +261,43 @@ class Scheduler:
         rt.ledger.enqueue_human(repo if repo != "*" else next(iter(rt.registry)), reason)
         self._record(repo, "paused", reason=reason)
 
+    def _containment_heartbeat(self, stop, owner):
+        """A separate SQLite connection keeps freshness independent of models."""
+        from types import SimpleNamespace
+        from .ledger import Ledger
+        from .containment import collect_consumer_updates, refresh_policy, native_ack
+        from .maintenance_store import MaintenanceStore
+        ledger = Ledger(self.rt.ledger.path, clock=self.rt.clock)
+        heartbeat_rt = SimpleNamespace(**{**vars(self.rt), "ledger": ledger, "lease_owner": owner})
+        try:
+            while not stop.is_set():
+                started = time.monotonic()
+                try:
+                    ledger.heartbeat(owner)  # refuses a lost scheduler lease
+                    store = MaintenanceStore(ledger, lease_owner=owner)
+                    collect_consumer_updates(heartbeat_rt, store=store)
+                    if stop.is_set():
+                        break
+                    refresh_policy(heartbeat_rt)
+                    if stop.is_set():
+                        break
+                    native_ack(heartbeat_rt)
+                except Exception as exc:
+                    self._record("*", "containment_heartbeat_error", error=repr(exc))
+                stop.wait(max(1, 45 - (time.monotonic() - started)))
+        finally:
+            ledger.close()
+
     def serve(self, stop: threading.Event | None = None, *, once: bool = False) -> None:
         stop = stop or threading.Event()
+        heartbeat_stop = threading.Event()
         with self.rt.ledger.lease() as owner:
             self.rt.lease_owner = owner
+            heartbeat = None
+            if getattr(self.rt, "containment_policy_dir", None) or os.environ.get("KB_CONTAINMENT_POLICY_DIR"):
+                heartbeat = threading.Thread(target=self._containment_heartbeat, args=(heartbeat_stop, owner),
+                                             name="kb-containment-heartbeat", daemon=True)
+                heartbeat.start()
             try:
                 while not stop.is_set():
                     started = time.monotonic()
@@ -254,4 +306,7 @@ class Scheduler:
                         return
                     stop.wait(max(1.0, self.tick_seconds - (time.monotonic() - started)))
             finally:
+                heartbeat_stop.set()
+                if heartbeat is not None:
+                    heartbeat.join(timeout=45)
                 self.rt.lease_owner = None

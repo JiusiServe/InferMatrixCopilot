@@ -74,7 +74,7 @@ def issue_once(rt, repo: str, changeset: dict, kind: str, body: dict) -> bool:
     pending = changeset.get("pending_item")
     if pending and pending.get("kind") == kind and float(pending.get("expires_at", 0)) > rt.clock():
         return False
-    item = rt.outbox.issue(repo, kind, body)
+    item = rt.outbox.issue(repo, kind, body, **({"ttl": 60} if body.get("maintenance_required") else {}))
     rt.ledger.update_changeset(changeset["id"], pending_item={
         "id": item.id, "kind": kind, "expires_at": item.expires_at, "issued_at": item.issued_at})
     return True
@@ -302,6 +302,10 @@ def rebuild(rt, lifecycle, changeset: dict, why: str) -> str | None:
     open. Needs the scheduler's lease; returns the new change set id or None."""
     from ..knowledge_service.lifecycle import LifecycleError
     from ..knowledge_service.ops import KnowledgeOperation, apply_operations
+    if changeset["kind"] in {"correction", "maintenance_calibration"} or changeset["detail"].get("maintenance_run"):
+        rt.ledger.update_changeset(changeset["id"], status="human", pending_item=None)
+        rt.ledger.enqueue_human(lifecycle.repo, "maintenance correction requires fresh budgeted source review; automatic generic rebuild refused", changeset["id"])
+        return None
     from .runtime import gate_and_stage, publish
 
     owner = getattr(rt, "lease_owner", None)
@@ -475,6 +479,10 @@ def advance(rt, lifecycle) -> list[str]:
                 events.append(f"merge_expired {changeset['id']}")
             continue
         if changeset["status"] == "rebuild_needed":
+            if changeset["kind"] == "correction":
+                rt.ledger.update_changeset(changeset["id"], status="human", pending_item=None)
+                rt.ledger.enqueue_human(lifecycle.repo, "correction context changed; fresh source audit and budgeted correction required", changeset["id"])
+                continue
             if changeset["kind"] == "external":
                 # nothing of ours to rebuild: judge the PR again on current main
                 rt.ledger.update_changeset(changeset["id"], status="stale_context", pending_item=None)
@@ -487,10 +495,24 @@ def advance(rt, lifecycle) -> list[str]:
         if changeset["status"] == "pr_open":
             if merging:
                 continue  # one merge in flight per repository
+            maintenance = {}
+            if changeset["kind"] == "correction":
+                from .maintenance import correction_publishable, _required_ci
+                from .containment import merge_authorization
+                try:
+                    reason = correction_publishable(rt, changeset)
+                    if reason:
+                        events.append(f"correction_held {changeset['id']}: {reason}")
+                        continue
+                    _required_ci(rt, changeset)
+                    maintenance = {"maintenance_required": True, "maintenance": merge_authorization(rt, changeset)}
+                except (ValueError, RuntimeError, OSError) as exc:
+                    events.append(f"correction_held {changeset['id']}: {exc}")
+                    continue
             envelope = sign_verdict(rt, changeset)
             if issue_once(rt, lifecycle.repo, changeset, "merge", {
                     "changeset_id": changeset["id"], "pr": int(number), "head_sha": changeset["head_sha"],
-                    "verdict": envelope}):
+                    "verdict": envelope, **maintenance}):
                 current = rt.ledger.changeset(changeset["id"])
                 rt.ledger.update_changeset(changeset["id"], status="merge_requested", detail={
                     **current["detail"], "verdict_issued_at": envelope["payload"]["issued_at"]})

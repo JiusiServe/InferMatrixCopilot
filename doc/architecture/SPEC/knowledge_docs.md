@@ -1,6 +1,6 @@
 # knowledge_docs.py —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~280 · 供 Direct 与 Agent 共用的只读知识检索 · refactor-status: ok`
 
@@ -69,3 +69,8 @@ stdlib 与 `knowledge_service.lifecycle` 的页面/完整深读正文解析；�
 仍由 `KnowledgeContextService` 累计预算裁剪。这些是字符限制，不是模型实际 token 用量。
 纯解析缓存按原文内容寻址，所有命中仍先验证固定快照的真实字节；不缓存路径读取以绕过
 完整性检查。此读取器没有累计补读账本；累计预算由显式会话服务负责。
+
+
+## 2026-10-08 Signed containment
+
+Every read checks opt-in containment even when no manifest verifier was supplied. Explicit reads of held pages refuse; search and related retrieval omit held pages before reading their text. Corrupt snapshots and stale, forged or replayed policy fail the request closed rather than appearing as an empty valid search.

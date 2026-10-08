@@ -1,6 +1,6 @@
 # knowledge_view.py —— 规范
 
-<!-- verified-against: 2026-09-29 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~170 · 每请求的知识树视图（打包知识或激活快照） · refactor-status: stable`
 
@@ -40,3 +40,8 @@ stdlib + `.sdk._resources`。叶子模块。
 知识树在顶层 `knowledge/_format.yaml` 声明其格式（`format_version`；当前为 2：规则生命周期尾注、类型化操作、
 `_routes.yaml`、`_tombstones.yaml`）。`knowledge_format(root)` 读取它，`build_manifest` 把它记入 `MANIFEST.json` 的
 `knowledge_format`。该文件位于自动合并白名单之外，改动它需要人工。
+
+
+## 2026-10-08 Signed containment
+
+Opt-in containment checks follow manifest integrity on every serving `path`/`read_text`. The signed policy lives outside snapshots; freshness and durable generation highwater survive active-snapshot rollback. `_integrity_path` only validates navigation metadata; selected content still uses the serving path. Held evidence raises `HeldKnowledgeError`; a stale or invalid policy raises `ContainmentError`.

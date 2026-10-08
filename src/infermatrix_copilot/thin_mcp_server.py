@@ -319,7 +319,11 @@ def build_mcp(
                     request = DirectReviewRequest(idempotency_key or f"direct:{target}", RepositoryRef(repo),
                                                   0, expected_head_sha, title, body,
                                                   tuple(ChangedPath(path) for path in changed_files or ()), diff=diff)
-                    return context_client.plan_adaptive(request)
+                    packet = context_client.plan_adaptive(request)
+                    from .knowledge_service.containment import configuration, knowledge_usage_record
+                    if configuration()["enabled"]:
+                        return {**packet, "knowledge_usage": knowledge_usage_record(packet)}
+                    return packet
                 if knowledge_profile != "legacy":
                     raise ValueError("knowledge_profile must be legacy or adaptive")
                 return direct_review_plan(
@@ -377,6 +381,7 @@ def build_mcp(
         evidence_head_sha: str = "",
         existing_feedback_status: str = "",
         finding_dispositions: list[dict[str, str]] | None = None,
+        knowledge_usage: dict | None = None,
     ) -> dict:
         """Validate the Direct completion gate before the only final comment.
 
@@ -392,6 +397,8 @@ def build_mcp(
         and classify each candidate in ``finding_dispositions``. Duplicate and
         resolved/outdated findings must identify the existing thread and must
         not be emitted as new comments.
+        When containment is enabled, pass the plan's ``knowledge_usage`` receipt
+        unchanged; missing or newly held knowledge prevents completion.
         """
         started = time.perf_counter()
         result = _direct_completion_result(
@@ -402,6 +409,7 @@ def build_mcp(
             evidence_head_sha=evidence_head_sha,
             existing_feedback_status=existing_feedback_status,
             finding_dispositions=finding_dispositions,
+            knowledge_usage=knowledge_usage,
         )
         result.setdefault("diagnostics", {})["timing_ms"] = {
             "validate_direct_review": int(

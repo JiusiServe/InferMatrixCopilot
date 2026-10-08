@@ -1,6 +1,6 @@
 # direct_routing.py —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~880 · Direct 模式完整策略包与仓库中立的知识路由 · refactor-status: stable`
 
@@ -87,3 +87,10 @@ SDK 完成校验钉住计划时快照、模块源码不含仓库名）；`test_c
 ## 重构备注
 原 `_DIRECT_OWNER_ROUTES`/`_REPO_ALIASES` 已外置（`known-debt` 清零），
 `test_v2_p0.py` 与 `test_repo_vocabulary.py` 中本模块的泄漏上限随之移除。
+
+
+## 2026-10-08 Signed containment
+
+Route-table validation checks unused navigation targets for integrity without serving their content. Selected owner/model reads pass `KnowledgeView.path` and current containment. Quickmap extraction first removes retired rules. Related retrieval excludes specifically held pages; invalid or stale policy still fails the request closed.
+
+With containment enabled, the raw `direct_review_plan` also returns a private-registry-backed `knowledge_usage` receipt for its selected route, procedure, and related-document dependencies. The public `direct_completion_result` requires that receipt and rechecks the issued resources against the current policy. Missing, forged, stale, or held provenance returns `partial_review` with `publish_ready=false`; the original structural evidence checks remain in force. The SDK forwards its own issued context receipt to the same gate. Disabled deployments retain the existing bundle and completion result shape.
