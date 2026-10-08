@@ -610,6 +610,20 @@ class Settings(BaseSettings):
     # the hard weekly envelope (P3 enforces it per model call)
     improve_budget_usd_week: float = 20.0
     improve_budget_judge_calls_week: int = 300
+    # Exact requested model -> provider context ceiling. Reserve this many
+    # input tokens when gateways add hidden prompts beyond the visible bytes.
+    improve_input_context_limits: dict[str, int] = {}
+
+    @field_validator("improve_input_context_limits", mode="before")
+    @classmethod
+    def _valid_improve_input_context_limits(cls, value):
+        if not isinstance(value, dict) or any(
+            not isinstance(model, str) or not model.strip() or type(limit) is not int or limit <= 0
+            for model, limit in value.items()
+        ):
+            raise ValueError("improve input context limits require exact model names and positive integer ceilings")
+        return value
+
     # the eval review adapter's inputs (design §6.1): the GT directory holding
     # gt/curated/<item>.gold.json, the judgment sets, and the arm name whose
     # verdicts belong to this copilot's units

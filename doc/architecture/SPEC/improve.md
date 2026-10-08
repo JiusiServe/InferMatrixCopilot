@@ -1,6 +1,6 @@
 # improve/ —— 规范（元改进引擎）
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-08 -->
 
 `设计：/data/zhoutaichang/copilot/meta-improvement-engine-design.md v1（GPT-6 sol 批准 2026-09-29） · refactor-status: building (P0–P4 已落地)`
 
@@ -39,7 +39,7 @@
 | `workflows/kb-intake.yaml` | P2+ | 起草步骤的声明：static/step_call，item `{repo}#{pr}`，指纹覆盖 `kb_service/intake.py`、`KB_GENERATOR`/`KB_DRAFT_STRATEGY`、`zcode_reasoning_level`、copilot_sha；`kb_service.runtime` 为每次起草盖上 workflow/unit_id/item/fingerprint |
 | `forensics.py` | P2 | 覆盖矩阵（确定性）、S0–S10 阶段分类法、取证 agent（只读 trace 工具、全部输出围栏为不可信数据、必须引用记录 id）、双家族交叉复核（不一致 = disputed）、整改清单、测量健康 |
 | `meta.py` | P2 | 冻结元基准：`eval/dataset/meta/cases`（trace + 人工阶段标签）与 `meta/lints`（注入缺陷样本）的导出与加载 |
-| `budget.py` | P3 | 周包络（美元 + 判官次数，按 ISO 周持久化、跨进程加锁）：每次模型调用发出前按最坏情况预留（输入 = 请求字节数 ≥ token 数、输出 = `max_tokens`、无价格即拒绝）、返回后结算；`结算 > 预留` 记 `budget_breach` 并中止；`governed()`/`current_governor()` 供 `LLM.create` 与 `run_judge` 使用 |
+| `budget.py` | P3 | 周包络（美元 + 判官次数，按 ISO 周持久化、跨进程加锁）：每次模型调用发出前按最坏情况预留（输入 = 可见请求字节数与精确模型上下文上限的较大值，按最高输入／缓存单价计；输出 = `max_tokens`；无价格即拒绝）、返回后按实际用量结算；`结算 > 预留` 记 `budget_breach` 并中止；`governed()`/`current_governor()` 供 `LLM.create` 与 `run_judge` 使用 |
 | `experiments.py` | P3 | 预注册（Tier 2 且非 descriptive-only、API 后端、指纹 diff 非空且不触及元基准、每个 item 有金标、按历史 sd 算 `n_required`、成本预留）→ 影子运行（stage → 每 item×replicate×臂 一个子进程、`PR_SNAPSHOT_FILE` 交接、指纹核对、L13/预算/崩溃隔离）→ 配对判定（`n_retained` 重算功效、五种标签、`experiment_verdict` 记录、提案状态推进） |
 | `publish.py` | P4 | 提案发布：引用只以记录 id + blob 哈希（`excerpt_for` 逐字摘录 ≤20 行、脱敏、`verify_excerpt` 可由哈希复原）；`lint_proposal` 拒绝任何不可解析引用（Tier 1 ≥3 条记录，Tier 2 S1–S9 + 损失量）；固定 issue 模板（主张/阶段/损失/证据/建议预注册/账本/marker）；`ProposalOutbox` 文件协议 `improve-outbox/1`（`actions/` 引擎写、`acks/` 与 `inbox/` maintainer routine 写）；`plan`/`publish`（open/update/close，hold 暂停发布、待 ack 不重发）；`sync`（ack → issue 与已发布状态；inbox → 人类触碰、`maintainer: hold`、合并 PR → landed、GitHub 关闭 → closed；Tier 1 landed 在后一周期 lint 率低于开单时才 close） |
 | `adapters/meta_bench.py` | P4 | 引擎自身的结果适配器（§11.2）：金标 = 元基准 case 的人工阶段标签；outcome = `meta_eval` 记录；hit = 标签一致、disputed = 双家族不一致、S0 = unlabeled；`review_scores` = κ、lint 召回；`human_labelled`（无判官） |
@@ -60,8 +60,9 @@
 - 既有提案的外向写是 `improve.publish`，代码候选另由 `improve.evolve_publish` 经 post/push 双门写独立 outbox；引擎不持有 GitHub 令牌，issue 的开/改/关由 maintainer routine 执行并以 ack 回报。
 - 未通过 `lint_proposal` 的提案永不发布（记 `proposal_lint_failed`）；hold 只暂停发布，lint 与实验照常。
 - 元基准只读：任何触及 `eval/dataset/meta` 的指纹 diff 或 `IMPROVE_*` 覆盖在注册时被拒。
+- 实验子进程的周预算、账本目录和 `IMPROVE_INPUT_CONTEXT_LIMITS` 由父 governor 固定，不接受候选或运行臂自己的配置覆盖。修复估算后操作员可归档并清除已核对的预留故障，实际结算金额不回退。
 - 引擎自身的记录（`playbook=workflow-improve`）是下一周期的 Tier 1 单元（自登记）。
 - lint 只读 trace，不调模型；无证据形态的 lint 不猜。
 
 ## 测试
-`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`、`test_improve_p3.py`、`test_improve_p4.py`、`test_improve_kb_intake_adapter.py`、`test_evolution.py`、`test_autonomous_evolution.py`。
+`test_improve_p0.py`、`test_improve_p0b.py`、`test_improve_p1.py`、`test_improve_p2.py`、`test_improve_p3.py`、`test_improve_p4.py`、`test_improve_gateway_budget.py`、`test_improve_kb_intake_adapter.py`、`test_evolution.py`、`test_autonomous_evolution.py`。
