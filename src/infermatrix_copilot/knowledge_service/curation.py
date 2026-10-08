@@ -4,22 +4,23 @@ from __future__ import annotations
 
 import hashlib
 import threading
+from datetime import date
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Any
 
-from ..sdk.v1.models import InvalidRequestError, KnowledgeCurationError
-from .apply import ApplyMixin
-from .catalog import CatalogMixin
-from .common import KnowledgeValidatorError, _RULE_ID, _apply_supported
-from .prompt import PromptMixin
-from .proposals import ProposalMixin
+from ..sdk.v1.models import (
+    InvalidRequestError, KnowledgeApplyResult, KnowledgeCatalogEntry, KnowledgeCurationError,
+    KnowledgeEvidenceBatch, KnowledgeProposalValidation, RepositoryRef,
+)
+from . import apply as application, catalog, prompt, proposals
+from .common import KnowledgeValidatorError, _apply_supported
 
 
 __all__ = ["KnowledgeCurator", "KnowledgeValidatorError", "_apply_supported"]
 
 
-class KnowledgeCurator(ApplyMixin, ProposalMixin, PromptMixin, CatalogMixin):
+class KnowledgeCurator:
     @staticmethod
     def reviewed_rule_evidence(page_text: str, *, rule_id: str, source_reference: str) -> dict[str, str]:
         """Verify one active, source-citing rule and return its exact block digest."""
@@ -86,41 +87,53 @@ class KnowledgeCurator(ApplyMixin, ProposalMixin, PromptMixin, CatalogMixin):
             / f"{lock_key}.lock"
         )
 
+    def catalog(self, repository: RepositoryRef | None = None) -> tuple[str, ...]:
+        """Return sorted IDs for the allowed owner rule pages."""
+        return catalog.catalog(
+            self._workspace, repository, max_catalog_pages=self.max_catalog_pages,
+        )
+
+    def catalog_entries(
+        self, repository: RepositoryRef | None = None,
+    ) -> tuple[KnowledgeCatalogEntry, ...]:
+        """Return allowed rule pages and their remaining capacity."""
+        return catalog.catalog_entries(
+            self._workspace, repository, max_catalog_pages=self.max_catalog_pages,
+        )
+
+    def build_prompt(self, batch: KnowledgeEvidenceBatch) -> str:
+        """Build the catalog-constrained prompt with evidence fenced as data."""
+        return prompt.build_prompt(
+            self._workspace, batch, max_rules=self.max_rules, max_events=self.max_events,
+            max_catalog_pages=self.max_catalog_pages,
+        )
+
+    def validate_proposals(
+        self, document: dict[str, Any], batch: KnowledgeEvidenceBatch,
+    ) -> KnowledgeProposalValidation:
+        """Project untrusted model JSON onto valid, evidence-bound proposals."""
+        return proposals.validate_proposals(
+            self._workspace, document, batch, max_rules=self.max_rules, max_events=self.max_events,
+            max_catalog_pages=self.max_catalog_pages,
+        )
+
+    def apply(
+        self, validation: KnowledgeProposalValidation, *, updated_on: str | date | None = None,
+    ) -> KnowledgeApplyResult:
+        """Append accepted sections, run validators and restore originals on failure."""
+        return application.apply_proposals(
+            self._workspace, validation, max_catalog_pages=self.max_catalog_pages,
+            validator_timeout_seconds=self.validator_timeout_seconds,
+            lock_timeout_seconds=self.lock_timeout_seconds,
+            apply_lock=self._apply_lock, lock_path=self._lock_path, updated_on=updated_on,
+        )
+
     @staticmethod
     def proposal_schema(*, max_rules: int = 8) -> dict[str, Any]:
         """JSON Schema for the untrusted model response."""
-        if not 1 <= max_rules <= 32:
-            raise InvalidRequestError("max_rules must be within 1..32")
-        return {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["rules"],
-            "properties": {
-                "rules": {
-                    "type": "array",
-                    "maxItems": max_rules,
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": [
-                            "page", "rule_id", "section_markdown", "sources"
-                        ],
-                        "properties": {
-                            "page": {"type": "string"},
-                            "rule_id": {
-                                "type": "string",
-                                "pattern": f"^{_RULE_ID.pattern}$",
-                            },
-                            "section_markdown": {"type": "string"},
-                            "sources": {
-                                "type": "array",
-                                "minItems": 1,
-                                "maxItems": 10,
-                                "items": {"type": "string"},
-                            },
-                        },
-                    },
-                }
-            },
-        }
+        return prompt.proposal_schema(max_rules=max_rules)
+
+    @staticmethod
+    def _bounded_diffs(batch: KnowledgeEvidenceBatch) -> list[str]:
+        """Compatibility forwarding for existing callers of the bounded helper."""
+        return prompt.bounded_diffs(batch)

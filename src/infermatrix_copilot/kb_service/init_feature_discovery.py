@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, replace
 import hashlib
@@ -17,12 +16,11 @@ import os
 from pathlib import Path
 import re
 import tempfile
-import threading
 import unicodedata
 
 import yaml
 
-from .init_budget import BudgetExhausted
+from .init_budget import Budget, BudgetExhausted
 from .init_stages import _Stage
 from .init_support import InitError, InitRecord, generate, inputs_digest
 from .models import ModelUnavailable
@@ -442,33 +440,17 @@ def _offered_reference(index, chunks, ref):
     return True
 
 
-class _ConcurrentBudget:
-    """Protect reservation accounting without serializing model execution."""
-    def __init__(self, budget, journal=None, identity=""):
-        self.budget, self.lock = budget, threading.Lock()
-        self.journal, self.identity = journal, identity
-
-    def _persist(self):
-        if self.journal is None:
+def _discovery_budget(budget: Budget, journal: Path | None = None, identity: str = "") -> Budget:
+    """Keep discovery's existing journal format with the shared budget lock."""
+    def checkpoint(spent: float, reserved: float) -> None:
+        if journal is None:
             return
-        self.journal.parent.mkdir(parents=True, exist_ok=True)
-        temp = self.journal.with_suffix(".tmp")
-        temp.write_text(_json({"identity": self.identity, "spent_usd": self.budget.spent_usd,
-                              "reserved_usd": self.budget._reserved}))
-        temp.replace(self.journal)
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        temp = journal.with_suffix(".tmp")
+        temp.write_text(_json({"identity": identity, "spent_usd": spent, "reserved_usd": reserved}))
+        temp.replace(journal)
 
-    @contextmanager
-    def reserve(self, amount):
-        cm = self.budget.reserve(amount)
-        with self.lock:
-            reservation = cm.__enter__()
-            self._persist()
-        try:
-            yield reservation
-        finally:
-            with self.lock:
-                cm.__exit__(None, None, None)
-                self._persist()
+    return Budget(budget.limit_usd, spent_usd=budget.spent_usd, checkpoint=checkpoint)
 
 
 class DiscoveryEngine:
@@ -1755,7 +1737,8 @@ class _FeatureDiscovery(_Stage):
                 # Content rejections retain their cumulative attempt count.
                 # Only a blocked native channel resumes; exhausted content does
                 # not acquire three more repairs on every explicit retry.
-        budget = _ConcurrentBudget(self.budget, Path(self.rt.state_dir) / "init" / self.lifecycle.repo / "discovery-budget.json", identity)
+        self.budget = _discovery_budget(self.budget, Path(self.rt.state_dir) / "init" / self.lifecycle.repo / "discovery-budget.json", identity)
+        budget = self.budget
         if hasattr(self.rt.gateway, "configure_zcode_pacing") and self.rt.generator.provider == "zcode":
             from .depth_pacing import SharedZcodePacer
             pacer = SharedZcodePacer(Path(self.rt.state_dir) / "init" / "discovery-zcode-pacing.json",

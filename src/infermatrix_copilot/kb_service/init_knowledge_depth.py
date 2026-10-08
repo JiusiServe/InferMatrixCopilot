@@ -18,7 +18,7 @@ from .depth_inputs import DepthContext, SYSTEM_DEPTH, prompt
 from .depth_judge import review_facets
 from .init_budget import BudgetExhausted
 from .init_coverage import Owner
-from .init_history import _CheckpointBudget
+from .init_history import _checkpoint_budget
 from .init_knowledge import MAX_DOC_BYTES, _Knowledge, _MARKER
 from .init_stages import _one_line, _page_frontmatter
 from .init_support import InitError, InitRecord, generate
@@ -129,7 +129,7 @@ class _KnowledgeDepth(_Knowledge):
             self.record.status = "started"
             self.record.problems = []
             self.record.dry_run = self.dry_run
-        self.budget = _CheckpointBudget(None if getattr(self.rt, "unlimited_subscription", False)
+        self.budget = _checkpoint_budget(None if getattr(self.rt, "unlimited_subscription", False)
                                        else self.lifecycle.init.budget_usd, self.record, self.rt.state_dir)
         return []
 

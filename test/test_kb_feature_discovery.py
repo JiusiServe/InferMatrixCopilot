@@ -234,10 +234,10 @@ def test_successful_repair_survives_checkpoint_resume_without_calls(tmp_path):
 
 
 def test_inflight_budget_reservations_are_journaled(tmp_path):
-    from infermatrix_copilot.kb_service.init_feature_discovery import _ConcurrentBudget
+    from infermatrix_copilot.kb_service.init_feature_discovery import _discovery_budget
     from infermatrix_copilot.kb_service.init_budget import Budget
     journal = tmp_path / 'reservation.json'
-    wrapper = _ConcurrentBudget(Budget(1), journal, 'batch')
+    wrapper = _discovery_budget(Budget(1), journal, 'batch')
     with wrapper.reserve(.5) as reservation:
         saved = json.loads(journal.read_text())
         assert saved == {'identity': 'batch', 'reserved_usd': .5, 'spent_usd': 0}

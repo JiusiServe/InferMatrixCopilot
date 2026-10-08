@@ -31,7 +31,7 @@ import os
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator, Mapping
+from typing import Callable, Iterator, Mapping
 
 PRICES_ENV = "KB_INIT_PRICES"
 CACHE_WRITE_FACTOR = 1.25
@@ -129,9 +129,17 @@ class Reservation:
 
 class Budget:
     """A finite stage ceiling, or explicit None for uncapped accounting.
-    Reservations are atomic; independent native calls may share one budget."""
+    Reservations and optional checkpoints share one lock; model calls do not.
 
-    def __init__(self, limit_usd: float | None, *, spent_usd: float = 0.0):
+    The checkpoint receives settled spend and outstanding reservations before
+    dispatch and after settlement. A checkpoint failure propagates and charges
+    the affected reservation conservatively, so an outer record save cannot
+    erase a reservation that the failing callback may already have persisted.
+    Further dispatch requires recovery into a new budget instance.
+    """
+
+    def __init__(self, limit_usd: float | None, *, spent_usd: float = 0.0,
+                 checkpoint: Callable[[float, float], None] | None = None):
         if limit_usd is not None and (not math.isfinite(limit_usd) or limit_usd <= 0):
             raise ValueError("limit_usd must be a finite number > 0")
         if not math.isfinite(spent_usd) or spent_usd < 0:
@@ -140,6 +148,8 @@ class Budget:
         self.spent_usd = float(spent_usd)
         self._reserved = 0.0
         self._lock = threading.RLock()
+        self._checkpoint = checkpoint
+        self._checkpoint_failed = False
 
     @property
     def remaining_usd(self) -> float | None:
@@ -160,15 +170,37 @@ class Budget:
         not charge, e.g. because the call raised, the whole reservation) is
         added to what was spent."""
         with self._lock:
+            if self._checkpoint_failed:
+                raise RuntimeError("budget checkpoint failed; recover durable state before dispatch")
             if not self.can_reserve(amount):
                 raise BudgetExhausted(
                     f"reserving ${amount:.4f} would exceed the budget "
                     f"(spent ${self.spent_usd:.4f} of ${self.limit_usd:.2f})")
             reservation = Reservation(amount)
             self._reserved += amount
+            try:
+                if self._checkpoint is not None:
+                    self._checkpoint(self.spent_usd, self._reserved)
+            except BaseException:
+                # The checkpoint may have written before raising. Do not free
+                # that allowance or dispatch an unjournaled model call.
+                self._reserved -= amount
+                self.spent_usd += amount
+                self._checkpoint_failed = True
+                raise
         try:
             yield reservation
         finally:
             with self._lock:
                 self._reserved -= amount
-                self.spent_usd += reservation.charged if reservation.charged is not None else amount
+                charged = reservation.charged if reservation.charged is not None else amount
+                self.spent_usd += charged
+                try:
+                    if self._checkpoint is not None:
+                        self._checkpoint(self.spent_usd, self._reserved)
+                except BaseException:
+                    # Keep at least the pre-dispatch reservation accounted if
+                    # settlement could not be persisted. Actual overruns stay.
+                    self.spent_usd += max(amount - charged, 0.0)
+                    self._checkpoint_failed = True
+                    raise

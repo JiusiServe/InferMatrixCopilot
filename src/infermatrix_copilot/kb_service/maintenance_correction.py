@@ -120,7 +120,7 @@ def propose_correction(rt, lifecycle, store, config, *, run_id, unit, finding, b
                        upstream_facts=lambda _: PinnedObserver(observer, pin) if observer else None)
     # Full, separate L1/L2/consistency review. Draft rationale and old audit
     # verdicts are deliberately absent from the gate's evidence packet.
-    from .maintenance import policy_digest
+    from .maintenance_policy import policy_digest
     changeset = gate_and_stage(gated_rt, lifecycle, rt.lease_owner, kind="correction" if publish_result else "maintenance_calibration", base=base,
                               base_sha=base_sha, external=rt.knowledge.external_texts(base_sha),
                               operations=[op], result=result, evidence=finding["evidence"],

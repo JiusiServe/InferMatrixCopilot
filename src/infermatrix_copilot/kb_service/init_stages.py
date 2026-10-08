@@ -38,11 +38,13 @@ from ..knowledge_service.facts import FactsError
 from ..knowledge_service.l1 import Block
 from ..knowledge_service.lifecycle import LifecycleError, Page
 from ..knowledge_service.ops import (
-    INDEX_NAME, KnowledgeOperation, all_rule_ids, all_tombstoned_ids, apply_operations, index_line,
-    page_over_capacity,
+    INDEX_NAME, KnowledgeOperation, all_rule_ids, all_tombstoned_ids, index_line,
 )
 from ..knowledge_service.pinned_claims import Evidence, check_rules, evidence_for
 from .init_budget import Budget, BudgetExhausted, PriceError
+from .init_content import (
+    apply_rules, check_capacity_with_map, overflow_page, page_frontmatter as _page_frontmatter, place_rule,
+)
 from .init_coverage import Owner, most_specific, owner_table, routes_file
 from .init_support import (
     AUTHOR_ENV, INDEPENDENT_STAGES, KNOWLEDGE_PREFIX, STAGES, InitError, InitPublisher, InitRecord, InitRuntime, claim_problems, classify_verdict,
@@ -328,11 +330,6 @@ def _one_line(value: object, limit: int = 120) -> str:
 def _slug(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:40].strip("-")
     return slug or "page"
-
-
-def _page_frontmatter(title: str, *, kind: str, today: str, tags: list[str]) -> str:
-    return (f'---\ntitle: "{title}"\ncreated: {today}\nupdated: {today}\ntype: {kind}\n'
-            f"tags: [{', '.join(tags)}]\nsources: []\n---\n\n# {title}\n\n")
 
 
 def _schema_tags(text: str | None) -> set[str]:
@@ -1262,67 +1259,43 @@ class _Stage:
         return f"{self.lifecycle.repo} rules"
 
     def _overflow_page(self, page: str, tree: Mapping[str, str]) -> str:
-        """The sibling page that takes rules once ``page`` is full: the next
-        ``<stem>-<n>.md`` that does not exist yet or is still being filled by
-        init (the repository rule page's first sibling is ``rules-doc-invariants.md``)."""
-        path = PurePosixPath(page)
-        stem = "rules-doc-invariants" if path.name == "rules.md" else path.stem
-        for n in range(1, 10):
-            name = f"{stem}.md" if n == 1 and path.name == "rules.md" else f"{stem}-{n + 1}.md"
-            sibling = str(path.with_name(name))
-            if sibling not in self.base:   # init's own page (new or still filling) or a fresh one
-                self._titles.setdefault(sibling, f"{self._page_title(page)} ({n + 1})")
-                return sibling
-        raise LifecycleError(f"no free sibling page for {page}")
+        """Compatibility wrapper; the running tree does not reserve init-owned pages."""
+        sibling, title = overflow_page(page, base_paths=self.base, title=self._page_title(page))
+        self._titles.setdefault(sibling, title)
+        return sibling
 
     def _place(self, candidate: _Candidate, tree: dict[str, str]) -> dict[str, str] | None:
         """``tree`` with the candidate added; a full page moves it to a sibling
         page (as often as needed); any other refusal drops it (None)."""
-        for _ in range(10):
-            try:
-                return self._apply([candidate], tree)
-            except LifecycleError as exc:
-                if "page full" not in str(exc):
-                    self._drop(candidate, f"refused by the knowledge format: {exc}")
-                    return None
-                previous = candidate.page
-                try:
-                    candidate.page = self._overflow_page(candidate.page, tree)
-                except LifecycleError as full:
-                    self._drop(candidate, str(full))
-                    return None
-                if candidate.page == previous:
-                    self._drop(candidate, f"refused by the knowledge format: {exc}")
-                    return None
-                spilled = self.__dict__.setdefault("_spilled_from", {}).setdefault(previous, [])
-                if candidate.page not in spilled:
-                    spilled.append(candidate.page)   # the pages that took this page's overflow, in order
-                self.record.notes.append(f"{previous} is full: {candidate.rule_id} goes to {candidate.page}")
-        self._drop(candidate, "no page could take it")
-        return None
+        routes = f"{self.repo_dir}/{ROUTES_NAME}"
+        result = place_rule(tree, KnowledgeOperation(kind="add", page=candidate.page,
+                            rule_id=candidate.rule_id, section_markdown=candidate.section),
+                            base_paths=self.base, titles=self._titles, title=self._page_title(candidate.page),
+                            tags=self.tags, today=self.today, release=self.release,
+                            routes_text=self.head.get(routes, self.base.get(routes)),
+                            include_quickmaps=self.route_source != "manifest")
+        candidate.page = result.page
+        self._titles.update(result.titles)
+        for previous, pages in result.spills.items():
+            spilled = self.__dict__.setdefault("_spilled_from", {}).setdefault(previous, [])
+            spilled.extend(page for page in pages if page not in spilled)
+        self.record.notes.extend(result.notes)
+        if result.reason:
+            self._drop(candidate, result.reason)
+        return result.files
 
     def _apply(self, candidates: list[_Candidate], files: dict[str, str]) -> dict[str, str]:
         """``files`` with the candidates added through ``apply_operations``
         (new pages created as shells first, each linked from its index).
         Raises ``LifecycleError`` when an operation is refused."""
-        work = dict(files)
-        for page in dict.fromkeys(c.page for c in candidates):
-            if page in work:
-                continue
-            index = str(PurePosixPath(page).with_name(INDEX_NAME))
-            if index not in work:
-                # the entry page does not exist yet (empty KB): a stand-in so the
-                # rules can be applied; _write_map renders the real one
-                work[index] = _page_frontmatter("index", kind="index", today=self.today, tags=self.tags)
-            title = self._page_title(page)
-            work[page] = _page_frontmatter(title, kind="rule", today=self.today, tags=self.tags)
-            work[index] = work[index].rstrip("\n") + "\n" + index_line(page, title)
         ops = [KnowledgeOperation(kind="add", page=c.page, rule_id=c.rule_id, section_markdown=c.section)
                for c in candidates]
-        result = apply_operations(work, ops, release=self.release, today=self.today)
-        work.update(result.files)
-        self._check_capacity_with_map(work, {c.page for c in candidates})
-        return work
+        titles = {page: self._page_title(page) for page in dict.fromkeys(c.page for c in candidates)
+                  if page not in files}
+        routes = f"{self.repo_dir}/{ROUTES_NAME}"
+        return apply_rules(files, ops, titles=titles, tags=self.tags, today=self.today, release=self.release,
+                           routes_text=self.head.get(routes, self.base.get(routes)),
+                           include_quickmaps=self.route_source != "manifest")
 
     def _check_capacity_with_map(self, work: Mapping[str, str], pages: set[str]) -> None:
         """A rule page must stay under the format's capacity WITH the Direct
@@ -1330,19 +1303,9 @@ class _Stage:
         only measures the rules, so the map is counted here, and a page that
         would overflow with it is reported as full — the same signal that
         moves the next rule to a sibling page (``_place``)."""
-        from .init_quick_maps import has_hand_written_map, render_quick_map, with_quick_map
-
-        if self.route_source == "manifest":
-            return   # no routes file, no map written: the format's own measure is the whole truth
-        for page in sorted(pages):
-            text = work.get(page)
-            if text is None or has_hand_written_map(text):
-                continue
-            signals, prefixes = self._map_inputs(page)   # the map as it will really be rendered
-            with_map = with_quick_map(text, render_quick_map(text, signals=signals, prefixes=prefixes))
-            over = page_over_capacity(with_map)
-            if over:
-                raise LifecycleError(f"{page}: page full once its Direct quick map is counted ({over})")
+        routes = f"{self.repo_dir}/{ROUTES_NAME}"
+        check_capacity_with_map(work, pages, routes_text=self.head.get(routes, self.base.get(routes)),
+                                include_quickmaps=self.route_source != "manifest")
 
     def _write_rules(self, kept: list[_Candidate]) -> None:
         """The kept rules on their placed pages. Dropping failed rules only

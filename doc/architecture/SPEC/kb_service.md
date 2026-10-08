@@ -41,6 +41,14 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
 
 ## 2026-10-08 持久夜间维护与撤回
 
+- 分层见 [知识初始化与维护](../knowledge-lifecycle.md)。`maintenance.plan/status` 只读，
+  `request` 只入队，`run_due` 验证既有租约并保持先纠错后复查和即时纠错事件记录。
+  `maintenance_policy` 集中策略指纹、就绪、发布资格和精确提交 CI；
+  `maintenance_resolution` 负责持租约的处置验证及追加，调度不依赖 CLI 实现。
+- `init_content` 从 `_Stage` 提取纯规则放置与容量处理，显式返回 `PlacementResult`；
+  阶段继续负责 pin、前置条件、记录、恢复、审核与发布。`init_budget.Budget` 通过可选
+  检查点回调替代重复包装，原有记录／journal 格式、恢复总额和协调器写入所有权不变。
+
 - `maintenance` 在现有 scheduler 租约内运行 Shanghai 01:00 的可恢复周期；
   `maintenance_units` 对不变的规则和说明文本也重新质疑，快照、策略与公平分母在周期开始时固定。
   `maintenance_audit` 读取原始版本的源码行段、校验 pin/span/hash，缺失证据保持 unknown，

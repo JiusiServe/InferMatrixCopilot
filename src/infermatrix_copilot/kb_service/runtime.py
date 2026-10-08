@@ -402,7 +402,7 @@ def publish(rt: KbRuntime, lifecycle: RepoLifecycle, changeset_id: str) -> str:
         rt.ledger.update_changeset(changeset_id, status="shadow_recorded")
         return "shadow_recorded"
     if changeset["kind"] == "correction":
-        from .maintenance import correction_publishable
+        from .maintenance_policy import correction_publishable
         reason = correction_publishable(rt, changeset)
         if reason:
             rt.ledger.update_changeset(changeset_id, status="maintenance_held", detail={**changeset["detail"], "maintenance_hold": reason})

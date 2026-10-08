@@ -15,13 +15,19 @@ This avoids repeated Git subprocesses during checkpoint evidence replay while
 preserving the same source text and evidence hashes.
 
 The provider owns knowledge curation beneath the public SDK v1 facade.
-`KnowledgeCurator` composes four domain components over one explicit work
-checkout: `CatalogMixin` discovers contained owner rule pages and their
-capacity; `PromptMixin` validates and bounds evidence and fences it as data;
-`ProposalMixin` validates source/page/rule identity and binds accepted
-proposals to page digests; `ApplyMixin` performs locked append-only writes,
+`KnowledgeCurator` delegates to four function modules over one explicit work
+checkout: `catalog` discovers contained owner rule pages and their
+capacity; `prompt` validates and bounds evidence and fences it as data;
+`proposals` validates source/page/rule identity and binds accepted
+proposals to page digests; `apply` performs locked append-only writes,
 fixed validators and byte-exact rollback. `common` contains shared syntax,
 bounds, hashes, errors and lock capability.
+
+Workspace, limits and locks are explicit function inputs, not inherited shared
+attributes. The public curator signatures, proposal identities and byte-exact
+results remain unchanged. Successful SDK application is a local candidate,
+not an independent semantic admission or publication. See
+[knowledge lifecycle layers](../knowledge-lifecycle.md).
 
 No component imports a CLI/MCP transport or ReviewBot, calls a model, clones,
 pushes, or publishes. The host owns evidence collection, model calls, retries,

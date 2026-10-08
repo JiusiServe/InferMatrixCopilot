@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="lifecycle-svg" width="1600" height="1350" viewBox="0 0 1600 1350" role="img" aria-labelledby="diagram-title diagram-desc">
+<title id="diagram-title">Copilot 知识初始化与维护：五层职责图</title>
+<desc id="diagram-desc">上层执行入口进入初始化或维护编排，复用内容、证据和审核，经发布及撤回到 SDK 和 review bot。主图是职责图；完整 390 个 Python 类在配套 HTML 和 JSON 中。源码摘要 29548997857ae90c917b3802198172a35b590de16b5dc1f4de6078b217257141。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#9baabd"/></marker></defs>
+<style>text{font-family:Arial,"Droid Sans Fallback",sans-serif} .code{font-family:ui-monospace,"DejaVu Sans Mono",monospace}</style>
+<rect width="1600" height="1350" fill="#f3f6fa"/>
+<text x="60" y="55" font-size="36" fill="#1e3046" font-weight="700">知识初始化与维护</text>
+<text x="60" y="89" font-size="20" fill="#60728b" font-weight="400">复用 Copilot 执行设施与知识领域能力；类、记录、异常和协议在展开视图中逐一列出</text>
+<text x="60" y="124" font-size="17" fill="#526a89" font-weight="400" class="code">124 个核心类 = 97 kb_service + 27 knowledge_service   ·   390 个 provider 类完整清单</text>
+<text x="58" y="189" font-size="26" fill="#9aaac0" font-weight="700">01</text>
+<text x="58" y="220" font-size="18" fill="#52657f" font-weight="700">执行入口</text>
+<text x="58" y="361" font-size="26" fill="#9aaac0" font-weight="700">02</text>
+<text x="58" y="392" font-size="18" fill="#52657f" font-weight="700">流程编排</text>
+<text x="58" y="578" font-size="26" fill="#9aaac0" font-weight="700">03</text>
+<text x="58" y="609" font-size="18" fill="#52657f" font-weight="700">共享领域</text>
+<text x="58" y="795" font-size="26" fill="#9aaac0" font-weight="700">04</text>
+<text x="58" y="826" font-size="18" fill="#52657f" font-weight="700">发布恢复</text>
+<text x="58" y="983" font-size="26" fill="#9aaac0" font-weight="700">05</text>
+<text x="58" y="1014" font-size="18" fill="#52657f" font-weight="700">知识消费</text>
+<path d="M 490 299 V 319" stroke="#9baabd" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 1140 299 V 319" stroke="#9baabd" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 490 516 V 536" stroke="#9baabd" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 1140 516 V 536" stroke="#9baabd" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 490 733 V 753" stroke="#9baabd" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 1140 733 V 753" stroke="#9baabd" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 490 921 V 941" stroke="#9baabd" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 1140 921 V 941" stroke="#9baabd" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="180" y="155" width="620" height="140" rx="14" fill="#ffffff" stroke="#dbe4ef"/>
+<rect x="180" y="167" width="5" height="116" rx="2" fill="#245fc7"/>
+<text x="204" y="192" font-size="23" fill="#245fc7" font-weight="700">Copilot 执行入口</text>
+<text x="204" y="227" font-size="17" fill="#4d6179" font-weight="400" class="code">Copilot → WorkflowExecution → Executor</text>
+<text x="204" y="256" font-size="19" fill="#4d6179" font-weight="400">knowledge.init 受治理步骤与外层任务进度</text>
+<rect x="830" y="155" width="620" height="140" rx="14" fill="#ffffff" stroke="#dbe4ef"/>
+<rect x="830" y="167" width="5" height="116" rx="2" fill="#087c72"/>
+<text x="854" y="192" font-size="23" fill="#087c72" font-weight="700">维护调度入口</text>
+<text x="854" y="227" font-size="17" fill="#4d6179" font-weight="400" class="code">Scheduler → KbRuntime</text>
+<text x="854" y="256" font-size="19" fill="#4d6179" font-weight="400">同一租约承载 intake、版本巡检与夜间维护</text>
+<rect x="180" y="327" width="620" height="185" rx="14" fill="#ffffff" stroke="#dbe4ef"/>
+<rect x="180" y="339" width="5" height="161" rx="2" fill="#245fc7"/>
+<text x="204" y="364" font-size="23" fill="#245fc7" font-weight="700">初始化：建立可验收的知识基线</text>
+<text x="204" y="399" font-size="17" fill="#4d6179" font-weight="400" class="code">run_stage(...) → InitRecord</text>
+<text x="204" y="428" font-size="19" fill="#4d6179" font-weight="400">_Stage：阶段依赖、pin、恢复、预算和发布</text>
+<text x="204" y="457" font-size="19" fill="#4d6179" font-weight="400">骨架／功能发现／基础知识／深度／验收</text>
+<text x="204" y="486" font-size="17" fill="#4d6179" font-weight="400" class="code">init_content → PlacementResult（确定性）</text>
+<rect x="830" y="327" width="620" height="185" rx="14" fill="#ffffff" stroke="#dbe4ef"/>
+<rect x="830" y="339" width="5" height="161" rx="2" fill="#087c72"/>
+<text x="854" y="364" font-size="23" fill="#087c72" font-weight="700">维护：更新 · 主动复查 · 纠错</text>
+<text x="854" y="399" font-size="17" fill="#4d6179" font-weight="400" class="code">plan / status / request / run_due</text>
+<text x="854" y="428" font-size="19" fill="#4d6179" font-weight="400">MaintenanceStore：周期、预留、发现与处置</text>
+<text x="854" y="457" font-size="17" fill="#4d6179" font-weight="400" class="code">maintenance_policy / maintenance_resolution</text>
+<text x="854" y="486" font-size="19" fill="#4d6179" font-weight="400">沿用函数入口；不新增流程门面类</text>
+<rect x="180" y="544" width="620" height="185" rx="14" fill="#ffffff" stroke="#dbe4ef"/>
+<rect x="180" y="556" width="5" height="161" rx="2" fill="#7251ae"/>
+<text x="204" y="581" font-size="23" fill="#7251ae" font-weight="700">内容与原始证据</text>
+<text x="204" y="616" font-size="17" fill="#4d6179" font-weight="400" class="code">Page · Section · Footer · KnowledgeOperation</text>
+<text x="204" y="645" font-size="19" fill="#4d6179" font-weight="400">Claim · Evidence · 适用版本与正文身份</text>
+<text x="204" y="674" font-size="19" fill="#4d6179" font-weight="400">KnowledgeCurator 委托领域模块函数</text>
+<text x="204" y="703" font-size="17" fill="#4d6179" font-weight="400" class="code">catalog / prompt / proposals / apply</text>
+<rect x="830" y="544" width="620" height="185" rx="14" fill="#ffffff" stroke="#dbe4ef"/>
+<rect x="830" y="556" width="5" height="161" rx="2" fill="#7251ae"/>
+<text x="854" y="581" font-size="23" fill="#7251ae" font-weight="700">审核与准入</text>
+<text x="854" y="616" font-size="17" fill="#4d6179" font-weight="400" class="code">gate · maintenance_policy</text>
+<text x="854" y="645" font-size="19" fill="#4d6179" font-weight="400">确定性验证 · 独立语义审核 · 一致性</text>
+<text x="854" y="674" font-size="19" fill="#4d6179" font-weight="400">受保护约束 · 纠错资格 · 当前证据复验</text>
+<text x="854" y="703" font-size="17" fill="#4d6179" font-weight="400" class="code">maintenance_resolution 追加负责人处置</text>
+<rect x="180" y="761" width="620" height="156" rx="14" fill="#ffffff" stroke="#dbe4ef"/>
+<rect x="180" y="773" width="5" height="132" rx="2" fill="#245fc7"/>
+<text x="204" y="798" font-size="23" fill="#245fc7" font-weight="700">各自权限内的受治理发布</text>
+<text x="204" y="833" font-size="17" fill="#4d6179" font-weight="400" class="code">InitPublisher · Publisher · activate</text>
+<text x="204" y="862" font-size="19" fill="#4d6179" font-weight="400">签名 → Git 交接 → 合并 → 快照激活</text>
+<text x="204" y="891" font-size="19" fill="#4d6179" font-weight="400">候选成功应用仍不等于正式发布</text>
+<rect x="830" y="761" width="620" height="156" rx="14" fill="#ffffff" stroke="#dbe4ef"/>
+<rect x="830" y="773" width="5" height="132" rx="2" fill="#087c72"/>
+<text x="854" y="798" font-size="23" fill="#087c72" font-weight="700">撤回、传播与恢复</text>
+<text x="854" y="833" font-size="19" fill="#4d6179" font-weight="400">containment · 签名代际 · 消费者 ACK</text>
+<text x="854" y="862" font-size="19" fill="#4d6179" font-weight="400">撤回独立于快照；回滚不能清除禁用</text>
+<text x="854" y="891" font-size="19" fill="#4d6179" font-weight="400">仅恢复获准新内容；历史回执保持完整</text>
+<rect x="180" y="949" width="620" height="185" rx="14" fill="#ffffff" stroke="#dbe4ef"/>
+<rect x="180" y="961" width="5" height="161" rx="2" fill="#245fc7"/>
+<text x="204" y="986" font-size="23" fill="#245fc7" font-weight="700">任务知识与版本化 SDK v1</text>
+<text x="204" y="1021" font-size="17" fill="#4d6179" font-weight="400" class="code">KnowledgeView · KnowledgeDocs</text>
+<text x="204" y="1050" font-size="17" fill="#4d6179" font-weight="400" class="code">KnowledgeContextService</text>
+<text x="204" y="1079" font-size="17" fill="#4d6179" font-weight="400" class="code">DirectClient / StrictRuntime</text>
+<text x="204" y="1108" font-size="19" fill="#4d6179" font-weight="400">固定快照、限定读取、会话预算和使用回执</text>
+<rect x="830" y="949" width="620" height="185" rx="14" fill="#ffffff" stroke="#dbe4ef"/>
+<rect x="830" y="961" width="5" height="161" rx="2" fill="#087c72"/>
+<text x="854" y="986" font-size="23" fill="#087c72" font-weight="700">Review bot：经 SDK 读取与消费</text>
+<text x="854" y="1021" font-size="17" fill="#4d6179" font-weight="400" class="code">ReviewPipeline · KnowledgeCurationCycle</text>
+<text x="854" y="1050" font-size="17" fill="#4d6179" font-weight="400" class="code">KnowledgeMaintenance · ReviewPublisher</text>
+<text x="854" y="1079" font-size="19" fill="#4d6179" font-weight="400">候选学习提交审核；消费侧不做权威纠错</text>
+<text x="854" y="1108" font-size="19" fill="#4d6179" font-weight="400">Direct / Strict 共用发布前可用性检查</text>
+<rect x="180" y="1165" width="1270" height="109" rx="14" fill="#eaf0f8" stroke="#d6e0ee"/>
+<text x="202" y="1198" font-size="21" fill="#334f73" font-weight="700">支撑设施：模型 / Git transport · 签名 · 预算 · 检查点 · 账本</text>
+<text x="202" y="1232" font-size="19" fill="#52657f" font-weight="400">存储与恢复边界：初始化记录｜维护 SQLite｜发布 outbox｜消费会话｜撤回高水位</text>
+<text x="60" y="1311" font-size="16" fill="#64758b" font-weight="400">箭头表达职责与交付关系，不是逐函数调用图。引擎不反向依赖知识流程；bot 运行代码仅依赖 SDK v1。</text>
+<text x="60" y="1336" font-size="14" fill="#71829a" font-weight="400">源码树摘要：29548997857ae90c  ·  完整源路径、嵌套／局部类与文件摘要见 HTML / JSON</text>
+</svg>

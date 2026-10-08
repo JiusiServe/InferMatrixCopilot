@@ -1,6 +1,6 @@
 # knowledge_service/curation.py — provider curation contract
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-08 -->
 
 `KnowledgeCurator.reviewed_rule_evidence(page_text, rule_id=..., source_reference=...)`
 uses the canonical parser to verify one active, source-citing rule and returns
@@ -9,13 +9,19 @@ its exact UTF-8 section SHA256. `installed_knowledge_file(path)` reads canonical
 of workspaces and environment overrides. Consumers can prove reviewed coverage
 without copying domain parsing or importing provider-private modules.
 
-`KnowledgeCurator` composes provider-owned catalog, bounded evidence prompt,
+`KnowledgeCurator` delegates to provider-owned catalog, bounded evidence prompt,
 proposal validation, append-only apply, fixed validator execution, and byte-exact
 rollback for an explicit work checkout. It imports only SDK contract models and
 standard-library services; it never imports a CLI/MCP transport, calls a model,
 clones a repository, pushes, or publishes a PR. The public
 `sdk.v1.knowledge` module re-exports the class and `KnowledgeValidatorError`
 without owning a second implementation.
+
+The four components are module functions with explicit workspace, limit and
+lock inputs, rather than mixin classes sharing attributes. The facade preserves
+all public signatures and results, including schema and evidence helpers; its
+successful append is still a local candidate rather than semantic admission.
+See [knowledge lifecycle layers](../../knowledge-lifecycle.md).
 
 Catalog targets are contained, non-symlink owner rule pages. Evidence is fenced
 and byte-bounded. Proposal validation binds every accepted rule to its source,

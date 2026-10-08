@@ -11,7 +11,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -81,25 +80,15 @@ just the last commit. Use only the supplied complete packet; do not call tools
 or discover repositories. The caller binds this verdict to the exact base/head."""
 
 
-class _CheckpointBudget(Budget):
-    """Persist an outstanding reservation before dispatch (crash-safe spend)."""
+def _checkpoint_budget(limit: float | None, record: InitRecord, state_dir: Path) -> Budget:
+    """Use the init-record format for the shared budget's durable checkpoints."""
+    def checkpoint(spent: float, reserved: float) -> None:
+        # A killed call's final cost is unknown; recovery charges its whole
+        # outstanding reservation, without introducing a new record format.
+        record.spent_usd = spent + reserved
+        record.save(state_dir)
 
-    def __init__(self, limit: float | None, record: InitRecord, state_dir: Path):
-        super().__init__(limit, spent_usd=record.spent_usd)
-        self.record, self.state_dir = record, state_dir
-
-    @contextmanager
-    def reserve(self, amount: float):
-        try:
-            with super().reserve(amount) as reservation:
-                # A killed call's final cost is unknown, so conservatively
-                # restore its entire reservation on the next invocation.
-                self.record.spent_usd = self.spent_usd + self._reserved
-                self.record.save(self.state_dir)
-                yield reservation
-        finally:
-            self.record.spent_usd = self.spent_usd
-            self.record.save(self.state_dir)
+    return Budget(limit, spent_usd=record.spent_usd, checkpoint=checkpoint)
 
 
 def _validate_extraction(data: dict) -> None:
@@ -196,7 +185,7 @@ class _PrHistory(_Stage):
                     self.record.notes.append(note)
             if not self.dry_run:
                 self.record.history.pop("series_base_sha", None)
-        self.budget = _CheckpointBudget(self.lifecycle.init.budget_usd, self.record, self.rt.state_dir)
+        self.budget = _checkpoint_budget(self.lifecycle.init.budget_usd, self.record, self.rt.state_dir)
         return []
 
     def _resume_input_problems(self, previous: InitRecord, digest: str) -> list[str]:
@@ -512,7 +501,7 @@ class _PrHistory(_Stage):
 
     def _finish(self, record: InitRecord, publisher: InitPublisher) -> InitRecord:
         self.record = record
-        self.budget = _CheckpointBudget(self.lifecycle.init.budget_usd, record, self.rt.state_dir)
+        self.budget = _checkpoint_budget(self.lifecycle.init.budget_usd, record, self.rt.state_dir)
         try:
             prepared = load_prepared(record.pr["prepared"])
             if len(prepared["body"].encode()) > MAX_PR_BODY_BYTES:
