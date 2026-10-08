@@ -33,8 +33,8 @@ on_line=None, termination_grace_s=0)` 返回 stdout、stderr、退出码和超�
 ZCode 流式归档和只读 JSON 会话复用它，事件协议仍由各调用方解析。
 
 ## 不变量（**C1**、**C4**、**E2**）
-- **环境是白名单，不是黑名单**（`_ENV_KEEP` + `LC_`/`XDG_` 前缀）。厂商 CLI 必须保住
-  自己的订阅认证（HOME 状态），但**绝不能继承我们的模型端点**：在这类机器上，被继承的
+- **环境是白名单，不是黑名单**（`_ENV_KEEP` + `LC_`/`XDG_` 前缀）。订阅 CLI 保留
+  HOME 认证；API-keyed harness 遵循各自显式凭据政策。CLI **绝不能继承我们的模型端点**：在这类机器上，被继承的
   `ANTHROPIC_BASE_URL` 指向一个网关，会**悄悄把厂商流量改道**。API key、gh token 和
   `CLAUDECODE` 这类宿主标记，出于同样理由一并丢弃。
 - **绝不编造成本。** harness 报用量的方式参差不齐；缺失的数字保持 `0`，`cost_usd`

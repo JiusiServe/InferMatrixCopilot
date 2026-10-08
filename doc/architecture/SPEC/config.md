@@ -1,6 +1,6 @@
 # config.py —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~658 · 配置 · refactor-status: oversized`
 
@@ -100,6 +100,8 @@ provider 的缺省模型必须在**这一处**解析，否则 `ResolvedTarget.mo
 ## 自进化接入（2026-10-04）
 
 `TRACE_STORE_ROOT` 控制 trace/1 全量采集。`IMPROVE_ENABLED=false` 是总停止开关，`IMPROVE_EVOLVE_ENABLED=false` 控制代码进化；源码、数据和发布 outbox 各有独立目录。周预算默认 20 美元，周度槽位默认周一 05:00 UTC。`PR_CONTEXT_SOURCE=snapshot` 与 `IMPROVE_SHADOW` 由可信实验控制器设置；`KB_DRAFT_MAX_OPERATIONS` 默认 6。
+
+`IMPROVE_INPUT_CONTEXT_LIMITS` 默认 `{}`，按精确请求模型名配置正整数输入上下文上限；空模型名、布尔值及非正整数均拒绝。网关可能补充不可见输入时，每次调用按该上限与可见请求字节数的较大值预留，实验子进程继承父 governor 的映射，候选覆盖无效。美元及判官周预算、实际用量结算与超预留中止门不变。
 
 ## 自主进化接入
 

@@ -530,15 +530,18 @@ def _run_locked(store, settings, ledger_dir: Path, exp: Experiment, *, run_unit,
     scores: dict[str, dict[str, dict[int, float]]] = {}   # item -> side -> replicate -> metric value
     units_by_key: dict[str, str] = {}
     produced: dict[str, dict[str, dict[int, Unit]]] = {}     # item -> side -> replicate -> unit
+    input_limits = getattr(governor.settings, "improve_input_context_limits", {}) or {}
     budget_env = {"IMPROVE_LEDGER_DIR": str(governor.dir.parent), "IMPROVE_BUDGET_USD_WEEK": str(governor.usd_week),
-                  "IMPROVE_BUDGET_JUDGE_CALLS_WEEK": str(governor.judge_calls_week)}
+                  "IMPROVE_BUDGET_JUDGE_CALLS_WEEK": str(governor.judge_calls_week),
+                  "IMPROVE_INPUT_CONTEXT_LIMITS": json.dumps(input_limits, sort_keys=True)}
     for item, snap in staged.items():
         repo, pr = snap["repo"], int(snap["pr"])
         for side, overrides, expected_fp in (("arm", exp.arm_overrides, exp.arm_fingerprint),
                                              ("incumbent", exp.incumbent_overrides, exp.incumbent_fingerprint)):
             env = shadow_env(shadow_dir=snap["shadow_dir"], run_dir=run_root, trace_root=shadow_store.root,
                              executables_dir=exe_dir, repo_name=repo, ledger_dir=governor.dir.parent,
-                             usd_week=governor.usd_week, judge_calls_week=governor.judge_calls_week)
+                             usd_week=governor.usd_week, judge_calls_week=governor.judge_calls_week,
+                             input_context_limits=input_limits)
             env.update({k: str(v) for k, v in overrides.items()})
             problems = assert_boundaries(env, expected=budget_env)
             if problems:

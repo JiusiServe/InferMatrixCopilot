@@ -423,7 +423,9 @@ def test_experiment_runs_shadow_units_and_adjudicates_supported(tmp_path, settin
     assert len(verdicts) == 48 and {v["result"]["blinded_as"] for v in verdicts} == {"X", "Y"}
     # the child's budget is pinned to the governor even when settings name another directory
     other = TraceStore(tmp_path / "shadow-2", environ={})
-    st2 = st.model_copy(update={"improve_ledger_dir": str(tmp_path / "elsewhere")})
+    holder.settings = st.model_copy(update={"improve_input_context_limits": {"mimo-v2.5": 1048576}})
+    st2 = st.model_copy(update={"improve_ledger_dir": str(tmp_path / "elsewhere"),
+                                "improve_input_context_limits": {"mimo-v2.5": 1}})
     seen_env: list[dict] = []
 
     def spy(**kw):
@@ -434,6 +436,7 @@ def test_experiment_runs_shadow_units_and_adjudicates_supported(tmp_path, settin
              now=T0 + 200, judge_llm=PairedJudge(0.8, 0.6), governor=holder)
     assert seen_env and all(e["IMPROVE_LEDGER_DIR"] == str(holder.dir.parent) and e["IMPROVE_BUDGET_USD_WEEK"] == "50.0"
                             for e in seen_env)
+    assert all(json.loads(e["IMPROVE_INPUT_CONTEXT_LIMITS"]) == {"mimo-v2.5": 1048576} for e in seen_env)
     # an arm that tries to override the engine's own configuration is refused at registration
     with pytest.raises(exps.ExperimentError, match="engine's own configuration"):
         exps.register(store, st, tmp_path / "ledger", workflow="pr-review.agent.review_diff", hypothesis="h",
