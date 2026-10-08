@@ -1,12 +1,16 @@
 # engine/steps/improve.py —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-09 -->
 
 ## 职责
 
 将工作流改进服务接入 StepRegistry。算法、评估及持久化契约见 [改进引擎规范](../../improve.md)；操作入口见 [中文使用指南](../../../../guide/self-evolution.md)。
 
 ## 公开契约
+
+`improve.coordinate` 直接 await 共用 `coordinator.run_async`，其余业务阶段由
+`WorkflowExecution.execute` 驱动；旧同步 coordinator 入口继续供 CLI 使用。
+周槽位、付费意图与恢复事实仍由领域账本保存，不由第二份通用缓存覆盖。
 
 `improve.stage_items` 准备冻结输入；`improve.mode` 区分周度周期、进化协调器和元基准 case。`improve.preflight/sync/lint/experiments/forensics/ledger/report` 保留 P0–P4 周期。`improve.coordinate` 调用 CLI 和调度器共用的可续跑协调器。
 

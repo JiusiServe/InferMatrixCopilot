@@ -1,6 +1,6 @@
 # knowledge_service/curation.py — provider curation contract
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `KnowledgeCurator.reviewed_rule_evidence(page_text, rule_id=..., source_reference=...)`
 uses the canonical parser to verify one active, source-citing rule and returns
@@ -37,8 +37,10 @@ the v1 path retains its existing fenced-text scan and append renderer. Locked
 apply checks every declared and nested new ID across the entire candidate,
 including proposals assembled from separately validated pages, before writing.
 
-`curate` returns validation/apply results, attempt observations and a terminal
-error. An initial all-rejected proposal may be repaired once; an empty repair
+`curate` returns a dictionary with typed `validation` and `apply_result`
+(or `None` when refused), `attempts` observations, and a terminal `error` string.
+The existing separate validation/apply methods retain their typed return values.
+An initial all-rejected proposal may be repaired once; an empty repair
 cannot hide rejected rules. Validator failures permit at most two repairs only
 after successful byte-exact rollback. Such repairs preserve all accepted rule
 IDs, owner pages and source references. Repairs reuse the original bounded

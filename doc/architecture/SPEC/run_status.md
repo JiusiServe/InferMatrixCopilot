@@ -1,6 +1,6 @@
 # run_status.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~323 · 持久化的单写者 run 生命周期记录 · refactor-status: ok`
 
@@ -22,6 +22,10 @@ owner_server_pid)`（`interrupted → queued` 重新武装）、
 `reconcile_after_wait`/`reconcile_if_dead`/`startup_reconcile`、
 `register_server`/`unregister_server`/`server_alive`，以及状态常量
 （`QUEUED`/`PLANNING`/`RUNNING`/`TERMINAL`/`INTERRUPTED`/`FAILED`）。
+
+`init_queued` 可在同一次初始写入中附加 `request_fingerprint` 和
+`execution_mode` 预约事实；默认空参数不增加旧状态字段。reclaim/mark/reconcile
+保留这些事实，不从可变请求文件重建执行权限。它们不增加新的生命周期状态。
 
 ## 不变量（**C3**、**E1**）
 - **单写者。** `init_queued`（server，在子进程存在之前）写下 `queued`；一旦拉起，

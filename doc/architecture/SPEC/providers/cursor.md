@@ -1,6 +1,6 @@
 # providers/cursor.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~207 · harness transport（Cursor 订阅） · refactor-status: ok`
 

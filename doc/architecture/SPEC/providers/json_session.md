@@ -1,6 +1,6 @@
 # providers/json_session.py — 只读 JSON 会话
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `run_readonly_json` 为 Direct 评审、知识候选生成及 bot 分类复用 Codex/Cursor 会话。
 调用方提供 cwd、完整 command、模型、schema、结果验证器及时间上限；返回 payload、

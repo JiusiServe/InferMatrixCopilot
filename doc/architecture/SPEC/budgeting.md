@@ -1,6 +1,6 @@
 # budgeting.py — shared budget arithmetic and call lifetime
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `request_cost_bound`, `reservation_fits`, `settlement_charge`,
 `valid_token_counts` and `usage_cost` contain storage-independent amount rules.

@@ -1,6 +1,6 @@
 # providers/codex.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~197 · harness transport（ChatGPT 订阅） · refactor-status: ok`
 

@@ -1,6 +1,6 @@
 # providers/claude_code.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~205 · harness transport（Claude 订阅） · refactor-status: ok`
 

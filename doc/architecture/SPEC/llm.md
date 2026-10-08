@@ -1,6 +1,6 @@
 # llm.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~540 · 引擎底座（传输层） · refactor-status: ok`
 

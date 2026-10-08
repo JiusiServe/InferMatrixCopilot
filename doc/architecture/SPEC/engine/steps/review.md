@@ -1,8 +1,8 @@
 # engine/steps/review/ —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-09 -->
 
-`patch gate + PR review + quality（9 个源文件） · step 库（评审） · refactor-status: ok`
+`patch gate + PR review + quality（10 个源文件） · step 库（评审） · refactor-status: ok`
 
 ## 职责
 条件式 patch 门 + PR 评审 agent step + 有界的 PR review-readiness 质量 step，
@@ -29,6 +29,9 @@ agent、评审结果的有界精炼、评测调优过的 prompt 数据和确定�
   接受 handler 提供的 frozen diff、工具和 trace，不注册 step 或发布评论。
 - `anchor.py` —— 基于代码片段的评论锚定（2026-08 新增）。
 - `repo_tools.py` —— 只读的变更考古工具组（2026-08 新增）。
+- `direct_run.py` —— Direct 的已预留执行入口：可信 profile／请求 byte 校验后，
+  在同一 `WorkflowExecution` 注册 prepare、model、complete 三步；各步
+  `checkpoint=False`，恢复不把旧业务事实当成当前验证。宿主不再自建模型循环。
 - `quality.py` —— `agent.assess_pr_quality`：一次 tool-less、只读模型调用，
   把机械规则当可错提示，并输出 `ready|concerns|needs_rework` 的结构化结果。
 
@@ -87,6 +90,8 @@ agent、评审结果的有界精炼、评测调优过的 prompt 数据和确定�
   体量、文件数或没有测试修改任何一项都不得单独成为 needs-rework 理由；其中体量
   可以单独成为 `concerns` 依据（非测试新增超 1000 行的预算，排除项与已声明的
   拆分计划/豁免随 prompt 一起下发，因为该 step 读不到知识树）。
+- `anchor.diff_index` 共用 hunk 起点、实际新增行与完整性状态，供锚定、覆盖空洞
+  和 sweep hints 使用。残缺 hunk 仅提供启发式区域，不能升级成可发布锚点证明。
 - **要引用，不要行号**（`anchor.py`）。模型给错行号的频率高到发布时必须降级该发现；
   修法是**换一个问题** —— 让模型引用它在说的代码，位置由程序自己算。校验器**仍然最后
   跑**，所以"绝不发布错锚点"的保证不变；变的是**只有行号错**的发现能保住自己的 inline
@@ -138,3 +143,15 @@ Direct 1.1 / Strict 1.3 accept typed `CarriedFinding` inputs (unique IDs, source
 ## 自进化接入（2026-10-04）
 
 影子评审继承严格工具 scope；PR 文件、基础版本与历史工具只能读取冻结仓库，涉及生产写入的步骤由执行器拒绝。
+
+
+## 2026-10-08 Direct lifecycle
+
+Direct prepare 从预留的知识快照生成 plan，仅记录检索及当前可用性；model 使用
+provider 共有只读 JSON session 的权限、双管道清理、timeout 与受限格式修复。成功返回
+后才记录已确认注入；启动或执行失败保留 injection_status=unknown，不当成成功注入。complete
+复查 head、来源／处置证明及 completion 门禁，一份最终报告的 `final_comment_count`
+固定为 1，与 finding 数量无关。模型异常以 typed execution failure 记录，不能将执行
+失败、未知或预算不足当成审核成功。原始回复、业务上下文和知识来源记录绑定同一 run。
+Direct 和 Strict 共享领域结果记录、recheck／处置证明及最终知识可用性检查；Strict
+工具协议、Direct 原生 CLI 权限、模型 profile 和定时策略保持显式差异。

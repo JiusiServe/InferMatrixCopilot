@@ -1,6 +1,6 @@
 # knowledge_service/ — provider curation components
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 Pinned source identities and depth markers accept full SHA-1 or SHA-256 Git
 commits. Evidence bodies, stored hashes and native approval semantics remain

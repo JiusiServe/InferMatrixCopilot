@@ -1,6 +1,6 @@
 # knowledge_service/ops.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~360 · Knowledge Ops API 2.0（类型化知识变更） · refactor-status: stable`
 

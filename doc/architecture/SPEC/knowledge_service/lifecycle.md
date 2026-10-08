@@ -1,6 +1,6 @@
 # knowledge_service/lifecycle.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 深度区块的固定源码身份支持完整 SHA-1 或 SHA-256；旧区块正文、哈希及证明语义保持不变。
 

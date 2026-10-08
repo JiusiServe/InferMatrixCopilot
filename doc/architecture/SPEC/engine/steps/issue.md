@@ -1,6 +1,6 @@
 # engine/steps/issue.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~338 · step 库（issue） · refactor-status: ok`
 
@@ -22,6 +22,10 @@ issue 抓取、起草回答与分流两个 agent step，以及受门禁的发布
   实质性草稿也会**带着那条 caveat 交付** —— 因为把握不足就扣着真实工作不给，
   对谁都没有帮助。
 - `max_agent_iters` 给 grep 密集的分流留出余量。
+- MoA 仅用于 `agent.draft_issue_answer`：API proposer 与档位 aggregator 通过
+  `MoaBudget.bind` 绑定同一每 run 预算，不再包装 client。派发前拒绝跳过该成员，
+  已发送但用量未知按完整预留结算；harness 费用单独报告，后端名称不证明免费。没有成功提案时
+  只运行一次原档位草稿；aggregator 失败或无法预留时交付首个成功提案。
 
 ## 边界 —— 不属于这里
 不含 agent 治理内部机制；除 `post_step` 之外不含发布授权。

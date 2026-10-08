@@ -1,6 +1,6 @@
 # providers/base.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `provider 层契约 + 子进程机制 + 环境白名单 · refactor-status: ok`
 
@@ -53,7 +53,8 @@ ZCode 流式归档和只读 JSON 会话复用它，事件协议仍由各调用�
 （那是 `Settings`）。
 
 ## 依赖（允许）
-stdlib + `..scopes.ToolScope`。它是一个叶子契约模块。
+stdlib + `..scopes.ToolScope`；`SessionUsage.reply/outcome` 在结果封装时惰性
+引入 `..llm` / `..agent_loop` 的数据类型，不负责预算、模型或权限策略。
 
 ## 扩展点
 新的能力标志加进 `ProviderSpec.capabilities`；新的会话上限加进 `AgentSessionRequest`。

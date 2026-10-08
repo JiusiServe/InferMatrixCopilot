@@ -1,6 +1,6 @@
 # app/reservation.py — durable run reservation
 
-<!-- verified-against: 2026-09-26 -->
+<!-- verified-against: 2026-10-09 -->
 
 `RunReservation` owns run ID generation and containment, explicit checkout
 authorization, request persistence, initial queued status, and idempotent
@@ -18,3 +18,11 @@ request again before executing it.
 Polling may request `must_exist=False` to report a valid but unknown ID;
 execution requires an existing directory. `RunService` calls this service
 directly, and `Copilot` preserves its old reservation methods as delegates.
+
+
+The same initial queued record now optionally binds `request_fingerprint` and
+`execution_mode` to the authorized post-policy spec. `RunReservation` supplies
+both atomically before publishing the idempotency index entry. Direct launch
+identity comes from these reservation facts; deleting its marker from mutable
+request data cannot select a different workflow. Legacy `init_queued` callers
+without these arguments retain their old status shape.

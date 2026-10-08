@@ -1,9 +1,9 @@
 # app/run_service.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `RunService` is the durable application boundary shared by the embedded
-Strict SDK and MCP transport. It owns policy-checked reserve/start, a queue
+Direct/Strict SDK and MCP transport. It owns policy-checked reserve/start, a queue
 drained by `STRICT_MAX_WORKERS` workers (default 1), isolated child launch, startup/orphan reconciliation,
 readiness, bounded status/result polling, and repository-scoped knowledge
 reads. Construction and polling require no CLI or MCP module import.
@@ -34,7 +34,7 @@ tool registration and protocol error projection, while the SDK owns typed
 request/result projection. Neither transport owns the run queue.
 
 ## 2026-09-28 Knowledge snapshot pinning
-When `reserve_strict_review` / `reserve_quality_review` CREATE a reservation,
+When `reserve_direct_review` / `reserve_strict_review` / `reserve_quality_review` CREATE a reservation,
 they record the current `KnowledgeView` in `<run>/knowledge.json`: snapshot id,
 manifest tree hash, and resolved real paths (never the `active` symlink). An
 idempotent retry does not rewrite it. `_launch` sets the child's
@@ -84,3 +84,25 @@ this change and is independent of the worker count.
 ## 2026-10-08 Signed containment
 
 When containment is explicitly enabled, reservation issues a private provider receipt for the pinned repository/shared snapshot scope into `knowledge.json`. It identifies conservative publication dependencies; it does not claim every scoped unit was injected. Launch rechecks the receipt and forwards only explicit maintenance configuration to the child. Old reservations without issuance fail closed until reassessed.
+
+
+## 2026-10-08 Shared Direct execution
+
+`reserve_direct_review` accepts typed frozen review input only through the public
+SDK. It reuses `RunReservation`, the existing idempotency fingerprint, queue,
+knowledge pin, child lifetime and result polling; the MCP params allowlist still
+does not accept arbitrary execution input. The trusted deployment profile is
+supplied independently of request data, checked at reservation and launch, and
+bound with the verified request byte hash into the child environment. Before
+reading execution input, launch validates the original reservation fingerprint
+and selects Direct from its independent queued `execution_mode`; removing or
+replacing the request marker cannot route into a generic workflow. A missing
+or changed request never grants a replacement command.
+
+`find_review` adopts a matching repository/head/key using its original persisted
+request. A queued run abandoned before launch can be reclaimed under the key
+lock; executed work is reconciled, never replayed to repair a lost reply.
+Direct terminal results preserve the same `review.v1` wire envelope plus the
+canonical domain result, frozen business context, provenance receipt and
+explicit execution failure category. Direct children recheck the exact head
+before planning and completion. All GitHub publication remains with the host.

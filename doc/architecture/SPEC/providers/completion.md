@@ -1,6 +1,6 @@
 # providers/completion.py — one native completion
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `complete_native` shares transport invocation, stop thresholds, pacing,
 native events, partial failure snapshots, receipt finalization and optional

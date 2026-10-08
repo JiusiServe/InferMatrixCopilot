@@ -1,6 +1,6 @@
 # engine/agent_runtime/ —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~1690（7 个文件） · 引擎（受治理的 agent 运行时） · refactor-status: ok`
 
@@ -17,7 +17,9 @@
 路径，通过 `doc_related` 在首个模型调用前注入同一有界知识背景。内容放入 untrusted
 围栏并转义标签；`review_knowledge_context` 记录命中页面、状态和正文长度。
 关闭 briefing 时自动背景注入也关闭；无关路径不补入知识。Agent 可按需调用该只读工具。
-每个 `kind == "agent"` step 的**唯一**受治理入口，外加评审质量 ensemble。
+使用 Copilot 工具循环的 agent step 的受治理入口，外加评审质量 ensemble。
+预留的 `review.direct.model` 领域步骤使用 `providers.json_session` 的原生只读会话，
+由同一执行器管理生命周期；它不经本包重建一套工具循环。
 它是全库信息密度最高、杠杆最大的子系统 —— 曾经是一个 685 行的模块，
 现在是一个把底座（dispatch/knowledge/utils）与两个入口（runner/ensemble）分开的包。
 
@@ -44,8 +46,9 @@
 （`from ..agent_runtime import X`）保持不变。
 
 ## 不变量（**B4**）
-- **唯一入口**：agent step 只能经 `run_agent_step` 做 agentic 工作 ——
-  **不允许**为了调查而临时 `ctx.llm.create()`。
+- **工具循环唯一入口**：需要 Copilot 工具循环的 agent step 经 `run_agent_step`
+  做 agentic 工作；Direct 的受控原生只读会话由 `review.direct.model` 委托共享 provider
+  transport。**不允许**为了调查而临时 `ctx.llm.create()`。
 - 证据逐项封顶 + 归档 + `<untrusted_data>` 围栏（**C7**）。
 - `_ScopedKnowledge`：读取三层有序——runtime（已学得）→ adapter seed → 共享池，
   重名时 runtime 获胜；**写入只落 runtime 侧**（Rev 8 §10：adapter 树在运行时

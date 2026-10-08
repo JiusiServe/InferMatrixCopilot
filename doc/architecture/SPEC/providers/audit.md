@@ -1,6 +1,6 @@
 # providers/audit.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `运行后会话审计 + 无工具回复验证 · refactor-status: ok`
 

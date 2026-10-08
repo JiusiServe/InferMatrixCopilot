@@ -1,6 +1,6 @@
 # engine/executor.py —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `LOC ~293 · 引擎底座（那个循环） · refactor-status: ok`
 
@@ -20,6 +20,8 @@ helper：`_eval_when`、`_merge`。
 
 可选 `runtime` 只注入上下文；`fingerprint` 不匹配即拒绝恢复；
 `validate_cached(step_id, outputs)` 在重放输出前验证业务产物。
+`context_for(step, state, item)` 提供领域追踪字段；`authorize(spec, step_id, state)`
+在执行和缓存重放之前重新检查当前权限。两者由应用组装注入，内核不导入知识或自改进实现。
 `StepSpec.checkpoint=False` 不读写该步骤完成标记；
 `StepResult.checkpoint=False` 允许传递 partial 输出而不标记成功进度。
 未设置这些选项时保持原行为。
@@ -63,8 +65,8 @@ helper：`_eval_when`、`_merge`。
 
 ## 自进化接入（2026-10-04）
 
-配置 trace 根时为整次执行绑定 store，并为每步绑定工作流、item、unit_id 和配置指纹；终局 `step_result` 保存实际报告与发现。影子运行在进入步骤前拒绝非 read/report 风险。已采用的配置覆盖按工作流限定，同时复制 LLM 的 settings，采集指纹与实际执行配置一致。
+配置 trace 根时为整次执行绑定 store；已绑定同根 store 时复用原实例。内核生成 run、step、unit_id，应用注入工作流、item 和配置指纹；终局 `step_result` 保存实际报告与发现。自改进的影子权限、已采用配置及活动制品选择由应用层 `improve.execution` 组装，缓存成功记录不能绕过当前权限。
 
 ## 自主进化接入
 
-启用自主进化时，原生 PR 评审先捕获固定 Git 对象／知识快照；已采用的制品在可信代理的沙箱中执行。安全快照不可得时记录原因；活动制品自动恢复上一版并阻断本次调用。
+应用层为已登记步骤绑定自主进化策略。原生 PR 评审先捕获固定 Git 对象／知识快照；已采用的制品在可信代理的沙箱中执行。安全快照不可得时记录原因；活动制品自动恢复上一版并阻断本次调用。内核不根据步骤名称选择领域执行路径。
