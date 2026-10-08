@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 
 from . import trace_store
 from .config import Settings
-from .budgeting import reserved_call, valid_token_counts
+from .budgeting import call_budget, valid_token_counts
 
 logger = logging.getLogger("infermatrix_copilot")
 
@@ -139,19 +139,13 @@ class LLM:
         the member's model/base_url/api_key. The member's key/base_url never
         leave the client object — logs and traces render `member.label()`
         (model@host) only."""
-        clone = object.__new__(LLM)
-        clone.settings = self.settings
-        clone._client = None
-        clone._default_model = ""
-        clone._provider = getattr(self, "_provider",
-                                  self.settings.resolved_llm_provider)
-        api_key = getattr(member, "api_key", "") or self.settings.shared_api_key
-        base = getattr(member, "base_url", "") or self.settings.shared_base_url
-        clone._endpoint_host = urlparse(base).netloc if base \
-            else _default_host(clone._provider)
-        if api_key:
-            clone._client = _build_client(clone._provider, api_key, base)
-        return clone
+        from .config import ResolvedTarget
+
+        return self.for_target(ResolvedTarget(
+            "moa_member", getattr(member, "model", ""),
+            getattr(member, "base_url", "") or self.settings.shared_base_url,
+            getattr(member, "api_key", "") or self.settings.shared_api_key,
+            "mixture", getattr(self, "_provider", self.settings.resolved_llm_provider)))
 
     def for_target(self, target: Any) -> "LLM":
         """Per-`ResolvedTarget` client (dual-path split, plan v2): the target's
@@ -205,30 +199,9 @@ class LLM:
             max_tokens=max_tokens or self.settings.llm_max_tokens,
         )
         from . import tracing
-        from .improve.budget import current_governor
-
         started = time.monotonic()
-        # the weekly envelope (design §10): the worst case is reserved BEFORE
-        # the request leaves the process; a refusal never sends it
-        governor = current_governor()
         usage = None
-
-        def acquire():
-            from .improve.budget import request_bytes
-            return governor.reserve_call(kwargs["model"], request_bytes(kwargs),
-                                         int(kwargs["max_tokens"] or 0), purpose=role or "") if governor else None
-
-        def finish(call):
-            token = call["reservation"]
-            if governor is not None:
-                if usage is not None:
-                    governor.settle_call(token, usage, kwargs["model"])
-                elif call["sent"]:
-                    governor.forfeit_call(token)
-                else:
-                    governor.release_call(token)
-
-        with reserved_call(acquire, finish) as call:
+        with call_budget({**kwargs, "role": role, "kind": "api"}) as call:
             try:
                 with tracing.span("llm", model=kwargs["model"],
                                   n_tools=len(kwargs["tools"]),
@@ -250,6 +223,7 @@ class LLM:
                         resp = self._create_openai(**kwargs)
                         blocks, stop_reason, usage, served, request_id = \
                             self._normalize_openai(resp)
+                        call["usage"] = usage
                         if on_text is not None:
                             _sp.mark_ttft()
                             text = "".join(
@@ -260,6 +234,7 @@ class LLM:
                         resp = self._client.messages.create(**kwargs)
                         blocks, stop_reason, usage, served, request_id = \
                             self._normalize_anthropic(resp)
+                    call["usage"] = usage
                     tracing.set_usage(_sp, usage, stop_reason=stop_reason)
             except Exception as exc:
                 capture_model_call(kwargs, role, provider, None,
@@ -275,6 +250,7 @@ class LLM:
                           **tracing.usage_counts(usage))
             reply = Reply(blocks=blocks, stop_reason=stop_reason,
                           usage=usage, model=served, request_id=request_id)
+            call.update(reply=reply, outcome="completed")
             capture_model_call(kwargs, role, provider, reply,
                                time.monotonic() - started)
         self._guard_served_model(kwargs["model"], reply, _sp)

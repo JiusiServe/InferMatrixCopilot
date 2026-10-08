@@ -27,7 +27,9 @@ CLI 调用。
   它把拒绝**当作正文**从正常回复通道返回，于是上游只看到一句"回复无法解析"，真正的
   原因就此丢失。这正是签名保持不变（调用方无需知道后端）的代价必须在**这一层**付掉的
   地方。
-- `for_member` 是 MoA 的接缝（混合成员在 api 后端的 run 内部骑上某个 harness）。
+- `for_member` 委托既有 API `LLM.for_member`，后者构造 `ResolvedTarget` 并复用
+  `LLM.for_target`。MoA 的整步 harness 成员由 ensemble 的 harness 路由执行；
+  不在这里创建第二种预算客户端或工具循环。
 
 ## 边界 —— 不属于这里
 不做 agent step 委托（那是 `run_session`）；不做工具桥接。

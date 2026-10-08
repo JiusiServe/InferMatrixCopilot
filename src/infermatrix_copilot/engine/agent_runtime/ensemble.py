@@ -121,7 +121,7 @@ async def run_agent_step_ensemble(
     # verify-and-merge reducer stays on the tier model. Member failures fall
     # back per-lens to the tier model; a whole-mixture failure IS the existing
     # tier-model ensemble (nothing below can make the run worse than today).
-    from .moa import BudgetedLLM, MoaBudget, moa_eligible, resolve_members
+    from .moa import MoaBudget, moa_eligible, resolve_members
 
     spec0 = ctx.state.get("task_spec") or {}
     moa_members: list = []
@@ -134,10 +134,6 @@ async def run_agent_step_ensemble(
             moa_members = []
         else:
             moa_budget = MoaBudget.start(ctx.settings)
-            _fb_target = ctx.settings.tier_target(spec0.get("mode", "eco"))
-            fallback_model = _fb_target.model
-            fallback_llm = (ctx.llm.for_target(_fb_target)
-                            if hasattr(ctx.llm, "for_target") else ctx.llm)
             ctx.trace.record(
                 "moa_dispatch", step=step_name,
                 members=[m.label() for m in moa_members],
@@ -148,16 +144,8 @@ async def run_agent_step_ensemble(
     def _lens_overrides(lens_i: int, lens_name: str = "") -> dict:
         if moa_members:
             m = moa_members[lens_i % len(moa_members)]
-            if m.provider:
-                # harness member: the vendor CLI owns this lens's tool loop
-                # (same bridge/audit path as a harness backend); no
-                # BudgetedLLM — there is no per-token spend to reserve, the
-                # session rides its timeout
-                return {"harness_member": m, "model_override": m.model}
-            return {"llm_override": BudgetedLLM(
-                        m, ctx.llm.for_member(m), moa_budget,
-                        fallback=(fallback_llm, fallback_model)),
-                    "model_override": m.model}
+            return ({"harness_member": m, "model_override": m.model} if m.provider else
+                    {"llm_override": ctx.llm.for_member(m), "model_override": m.model})
         m = lens_backend_member(ctx.settings, lens_name)
         if m is not None:
             return {"harness_member": m, "model_override": m.model}
@@ -189,12 +177,17 @@ async def run_agent_step_ensemble(
         member = str(overrides.get("model_override") or "") if overrides else ""
 
         async def _attempt(step_suffix: str, guidance_text: str, route: dict):
-            return await run_agent_step(
-                ctx, step_name=f"{step_name}#{lens['name']}{suffix}{step_suffix}",
-                purpose=purpose,
-                evidence=evidence, guidance=guidance_text, expected=expected,
-                output_extension=output_extension, scope=scope,
-                extra_tools=extra_tools, max_iters=budget, **route)
+            from contextlib import nullcontext
+
+            account = (moa_budget.bind(moa_members[lens_i % len(moa_members)])
+                       if moa_members and route else nullcontext())
+            with account:
+                return await run_agent_step(
+                    ctx, step_name=f"{step_name}#{lens['name']}{suffix}{step_suffix}",
+                    purpose=purpose,
+                    evidence=evidence, guidance=guidance_text, expected=expected,
+                    output_extension=output_extension, scope=scope,
+                    extra_tools=extra_tools, max_iters=budget, **route)
 
         def _member_died(phase: str, reason: str) -> None:
             """Record a route change. NEVER silent: an arm mislabelled after

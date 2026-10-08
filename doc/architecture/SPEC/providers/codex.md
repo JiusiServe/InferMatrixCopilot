@@ -29,7 +29,8 @@ JSONL 事件按原顺序封装为 `{"type": "native.codex.event", "payload": 原
 - 经桥的工具调用仍然过 `tools.dispatch`；沙箱是**纵深防御，不是替代**。
 - `_tool_activity` 是尽力而为的活动日志，**明确不是审计** —— 强制点是沙箱。
   不要让调用方把它当审计用。
-- `complete()` 在一个空的临时 cwd 里无工具运行，所以一次性调用**根本够不到仓库**。
+- `complete()` 在空临时 cwd 和只读沙箱中运行，并以 `audit.assert_tool_less`
+  拒绝工具活动及未知内容块。空 cwd 本身不是禁止读取宿主路径的证明。
 - `auth_gap()` 如实报告当前认证缺口；离线测试不代表调用环境已经通过原生预检。
 
 ## 边界 —— 不属于这里
@@ -57,3 +58,4 @@ OS 级控制可用的后端；把两者混同，会模糊掉"当前实际生效�
 缓冲执行和 JSONL 解码复用 `base.run_cli/json_events`：保留超时前 stdout，忽略警告或无效 JSON 行，保留事件顺序。
 `SessionUsage.outcome/reply` 统一结果封装；原生事件仍在退出后按顺序批量转发。
 只读沙箱、MCP overrides、认证上下文、模型选择与 effort 校验继续由本 transport 控制。
+无工具验证前仍按原顺序归档全部原生事件，因此被拒绝的工具事件也保留证据。

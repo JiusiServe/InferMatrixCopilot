@@ -55,3 +55,8 @@ x 必须为正。CLI 在每个 API 请求完成**之后**检查预算：它阻�
 缓冲子进程调用复用 `base.run_cli`，超时仍保留部分 stdout，单对象 JSON 解析由 `_parse` 完成。
 MCP stdio 入口复用 `base.bridge_server`，`SessionUsage.outcome/reply` 统一结果封装与工具名上限。
 内置工具拒绝、独立 system 通道、回合上限、预算停机与实际 cache/cost 字段仍由本 transport 控制。
+
+无 MCP 配置的一次性调用显式传 `--allowedTools "" --strict-mcp-config`，
+并用 `audit.assert_tool_less` 拒绝工具事件及未知内容块。普通 `is_error` 回复拒绝；
+预算 subtype 的 `is_error` 保留原 `max_budget` 空正文和已报告费用，供调用方结算，
+不能当作成功知识。`test_kb_spend_cap.py` 覆盖该终止语义。

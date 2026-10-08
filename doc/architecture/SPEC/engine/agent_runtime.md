@@ -1,6 +1,6 @@
 # engine/agent_runtime/ —— 规范
 
-<!-- verified-against: 2026-10-06 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~1690（7 个文件） · 引擎（受治理的 agent 运行时） · refactor-status: ok`
 
@@ -61,10 +61,15 @@
   而不是整组重跑；lens 启动**错峰**（`ensemble_stagger_seconds`）。
 - **非空的最终答复会被抢救，绝不丢弃**：修复轮之后仍无法解析的输出，
   变成 `needs_review` + `_raw_text`。
-- **MoA 预算在代码里强制，不在 prompt 里**（`moa.py`）：每个成员请求先原子
-  `reserve()` 一个保守上界，结算时替换为实际用量，**已结算花费永不超过 `moa_max_usd`**
-  —— 预约失败就降级到档位模型或跳过该成员，因此**不可能出现不封顶的请求**。
-  成员身份是 `model@host`；**密钥只经 env 变量名引用，永不进入日志或 trace**。
+- **MoA API 成员调用先预留**（`moa.py`）：`MoaBudget.bind` 通过公共 dispatch
+  预算接缝绑定既有每 run 台账，输入按 UTF-8 请求字节数上界并预留 cache creation
+  和最大输出。未知已发送调用保留完整额度；未发送才释放。同一结算幂等，冲突拒绝。
+  实际超额完整记账并停止后续成员调用，不能截掉超额来声称已支付金额未超过上限。
+  `BudgetedLLM` 已删除，成员 client 复用 `LLM.for_member/for_target`。
+  预留拒绝或成员死亡由现有 lens 外层记录一次档位回退，issue 跳过该成员；
+  不在同一成员工具循环里静默更换模型。成员身份是 `model@host`，密钥不进日志。
+- MoA 总截止时间在每次预留前检查；既有 API 请求 timeout 仍归 SDK client。
+  `request_timeout` 的剩余量不构成正在执行请求会被总截止时间强制截断的保证。
 - **按 pass 的后端路由**（`review_lens_backends`）可以把某个 seat 放到另一个 provider 上。
   路由必须**在重试中保持**，无法履约时必须**大声回退** ——
   一个被静默改道的 seat，会让这条 arm **不再是它标签所声称的配置**。
@@ -84,6 +89,8 @@
   回退每处至多一次，档位模型自己再失败就按类型化失败返回，**不递归**。
 - MoA 成员本身也可以骑上 provider 注册表里的某个 harness（`transport_for_id`），
   与本次 run 自己的 `STRICT_BACKEND` 无关。
+  Harness 费用单独报告，不属于 API 成员美元上限；`deepseek` 是 API-keyed，
+  当前该 harness 路径没有受支持的 MoA 单次美元核算上界，不能标成免费。
 
 ## 内部依赖规则
 `runner`/`ensemble` 依赖 `dispatch`/`knowledge`/`utils`，**反向绝不允许**；
@@ -95,7 +102,7 @@ step 专属的 prompt/lens 住在各自的 step 文件里（例如 `steps/review
 
 ## 依赖（允许）
 `agent_loop`、`llm`、`memory/*`、`adapters/base`、`profiles/repo_map`、`scopes`、
-`tools`、`engine/step`。
+`tools`、`engine/step`、`budgeting`。
 
 ## 扩展点
 新的"列表输出型" agent step 通过传入 lenses + merge_guidance 来采用 ensemble；
@@ -104,7 +111,8 @@ step 专属的 prompt/lens 住在各自的 step 文件里（例如 `steps/review
 ## 测试
 `test_agent_runtime.py`（参数化 dispatch —— `kind=="agent"` ⇒ 受治理运行时；
 无法解析输出的抢救）、`test_agent_ensemble.py`（裁决校准、零产出重问、lens 后端路由）、
-`test_moa.py`（预算台账封顶；密钥永不进 trace）、`test_review_step.py`。
+`test_moa.py`（原子预留、未知费用、重复结算与实际超额；密钥不进 trace）、
+`test_tier_split.py`（已付费模型不匹配结算）、`test_review_step.py`。
 
 ## 重构备注
 拆分**已完成**（它曾是内聚性的头号目标）。那些内联的评测引用注释是**机构记忆** ——
@@ -118,4 +126,4 @@ cheap-seat 与按 pass 路由、MoA harness 成员、考古工具）。有两条
 
 ## 自进化接入（2026-10-04）
 
-影子 agent 使用严格只读 scope，知识检索与 repo map 受读根约束，拒绝知识写入工具。API 与 harness 调用均记录 trace/1；工作流的采集和配置指纹由执行器绑定，普通生产运行保持既有工具能力。
+影子 agent 使用严格只读 scope，知识检索与 repo map 受读根约束，拒绝知识写入工具。API 与 harness 调用均记录 trace/1；工作流的采集和配置指纹由应用在共享执行器的上下文接缝绑定，普通生产运行保持既有工具能力。

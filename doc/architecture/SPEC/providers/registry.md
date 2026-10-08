@@ -1,6 +1,6 @@
 # providers/registry.py —— 规范
 
-<!-- verified-against: 2026-09-30 -->
+<!-- verified-against: 2026-10-08 -->
 
 `LOC ~107 · 后端解析（唯一那张表） · refactor-status: ok`
 
@@ -33,6 +33,9 @@
   于是 `strict_readiness`/doctor 报"尚未发布"，而不是跑到一半失败。
 - `transport_for_id` 解析的是**显式** id，与本次 run 的 `STRICT_BACKEND` 无关 ——
   这正是 MoA harness 成员在 api 后端的 run 内部骑上某个 harness 所用的接缝。
+- `kind=harness` 描述整步执行接缝，不等于订阅计费。`deepseek` 声明 `api_keyed`；
+  不能凭 kind 推断零美元或已具备单次美元核算上界。MoA 的 API 成员预算保证
+  不覆盖该 harness 路径，未报告费用仍保持未知。
 
 ## 边界 —— 不属于这里
 不含 transport 实现（各自归 `providers/<id>.py`）；不处理凭据；不做模型选择

@@ -21,9 +21,13 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shutil
+import signal
 import subprocess
 import sys
+import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -45,10 +49,10 @@ def sanitized_env() -> dict[str, str]:
             if k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIXES)}
 
 
-def run_cli(cmd, *, cwd, env, timeout_s, input=None, stdin=None):
+def run_cli(cmd, *, cwd, env, timeout_s, input=None, stdin=None, runner=None):
     """Capture one buffered invocation, retaining partial stdout on timeout."""
     try:
-        proc = subprocess.run(cmd, input=input, stdin=stdin, cwd=cwd, env=env,
+        proc = (runner or subprocess.run)(cmd, input=input, stdin=stdin, cwd=cwd, env=env,
                               capture_output=True, text=True, encoding="utf-8",
                               errors="replace", timeout=timeout_s, check=False)
     except subprocess.TimeoutExpired as exc:
@@ -56,6 +60,125 @@ def run_cli(cmd, *, cwd, env, timeout_s, input=None, stdin=None):
         stdout = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else str(raw)
         return stdout, "", 0, True
     return proc.stdout or "", proc.stderr or "", proc.returncode, False
+
+
+def stream_cli(cmd, *, cwd, env, deadline, input=None, idle_timeout_s=None,
+               on_line=None, termination_grace_s=0):
+    """Drain both pipes with bounded stdin, deadlines and process-tree cleanup.
+
+    ``on_line(channel, text)`` sees decoded lines without the newline, including
+    partial tails. Idle time tracks nonempty stdout lines, including non-JSON.
+    Return raw stdout/stderr, exit status and ``idle``/``absolute``/None.
+    Protocol parsing, credentials and model accounting belong to callers.
+    """
+    proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE if input is not None else subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+                               if os.name == "nt" else {"start_new_session": True}))
+    received, buffers = {"stdout": [], "stderr": []}, {"stdout": b"", "stderr": b""}
+    pending, finished = queue.Queue(), set() if input is not None else {"stdin"}
+    timeout, stopped = None, False
+    idle_deadline = time.monotonic() + idle_timeout_s if idle_timeout_s is not None else float("inf")
+
+    def stop():
+        nonlocal stopped
+        if stopped:
+            return
+        stopped = True
+        if os.name == "nt":
+            try:
+                subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, check=False)
+            except OSError:
+                if proc.poll() is None:
+                    proc.kill()
+        else:
+            try:
+                if termination_grace_s and proc.poll() is None:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                    try:
+                        proc.wait(timeout=termination_grace_s)
+                    except subprocess.TimeoutExpired:
+                        pass
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        proc.wait()
+
+    def read(channel, stream):
+        try:
+            while chunk := os.read(stream.fileno(), 65536):
+                pending.put((channel, chunk))
+        except OSError as exc:
+            pending.put(("error", exc))
+        finally:
+            pending.put((channel, None))
+
+    def write():
+        try:
+            proc.stdin.write(input.encode("utf-8") if isinstance(input, str) else input)
+            proc.stdin.close()
+        except OSError as exc:
+            pending.put(("error", exc))
+        finally:
+            pending.put(("stdin", None))
+
+    def emit(channel, raw):
+        nonlocal idle_deadline
+        text = raw.decode("utf-8", "replace")
+        if channel == "stdout" and text.strip() and idle_timeout_s is not None:
+            idle_deadline = time.monotonic() + idle_timeout_s
+        if on_line is not None:
+            on_line(channel, text)
+
+    workers = [threading.Thread(target=read, args=(channel, getattr(proc, channel)), daemon=True)
+               for channel in received]
+    if input is not None:
+        workers.append(threading.Thread(target=write, daemon=True))
+    try:
+        for worker in workers:
+            worker.start()
+        while len(finished) < 3 or proc.poll() is None:
+            now = time.monotonic()
+            if timeout is None and (now >= deadline or now >= idle_deadline):
+                timeout = "absolute" if now >= deadline else "idle"
+                stop()
+            try:
+                channel, chunk = pending.get(timeout=.1 if timeout else min(.1, max(.001, min(deadline, idle_deadline) - now)))
+            except queue.Empty:
+                if proc.poll() is not None:
+                    stop()  # descendants may still hold a pipe open after the leader exited
+                continue
+            if channel == "error":
+                if timeout is not None:
+                    continue
+                raise chunk
+            if chunk is None:
+                finished.add(channel)
+                if channel in buffers and buffers[channel]:
+                    emit(channel, buffers.pop(channel))
+                continue
+            received[channel].append(chunk)
+            buffers[channel] += chunk
+            while b"\n" in buffers[channel]:
+                raw, buffers[channel] = buffers[channel].split(b"\n", 1)
+                emit(channel, raw)
+    except BaseException:
+        # Preserve tails already read if a journal callback itself failed.
+        for channel, raw in buffers.items():
+            for tail in raw.splitlines():
+                try:
+                    emit(channel, tail)
+                except BaseException:
+                    pass
+        raise
+    finally:
+        stop()
+        for worker in workers:
+            worker.join(timeout=1)
+        for stream in (proc.stdin, proc.stdout, proc.stderr):
+            if stream is not None:
+                stream.close()
+    return (*(b"".join(received[channel]).decode("utf-8", "replace") for channel in received), proc.returncode, timeout)
 
 
 def json_events(stdout):

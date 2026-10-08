@@ -76,7 +76,8 @@ def run_harness_step(ctx, target, *, step_name: str, system: str, prompt: str,
         repo=str(spec.get("repo") or ctx.settings.default_repo))
     import time
 
-    from ..llm import capture_model_call
+    from ..budgeting import call_budget
+    from ..llm import Block, Reply, capture_model_call
 
     # the session is one model_call record (a harness runs the whole loop
     # inside its CLI: the reply is the final answer, the usage the session's);
@@ -85,32 +86,28 @@ def run_harness_step(ctx, target, *, step_name: str, system: str, prompt: str,
               "model": model or target.model, "max_tokens": None, "tools": []}
     provider = f"harness:{getattr(getattr(transport, 'spec', None), 'id', provider_id or '')}"
     started = time.monotonic()
-    try:
-        outcome = transport.run_session(AgentSessionRequest(
-            system=system, prompt=prompt, scope=scope,
-            model=model or target.model,
-            max_iters=max_iters, timeout_s=ctx.settings.strict_backend_timeout_s,
-            run_dir=ctx.run_dir, step_name=step_name,
-            bridge_spec_path=bridge_spec, trace=ctx.trace))
-    except Exception as exc:
-        capture_model_call(kwargs, step_name, provider, None, time.monotonic() - started,
-                           error=str(exc), extra_result={"session": True})
-        raise
-    capture_model_call(kwargs, step_name, provider, _SessionReply(outcome), time.monotonic() - started,
-                       extra_result={"session": True, "iterations": outcome.iterations,
-                                     "tool_calls": outcome.tool_calls, "truncated": outcome.truncated,
-                                     "refusals": list(outcome.refusals),
-                                     "tools_used": list(outcome.tools_used)})
-    return outcome
-
-
-class _SessionReply:
-    """An AgentOutcome viewed as a reply for capture: final text, usage."""
-
-    def __init__(self, outcome):
-        from ..llm import Block
-
-        self.blocks = [Block(type="text", text=outcome.text or "")]
-        self.model = ""
-        self.stop_reason = "truncated" if outcome.truncated else "end_turn"
-        self.usage = {"input_tokens": outcome.input_tokens, "output_tokens": outcome.output_tokens}
+    reply, error, result = None, "", {"session": True}
+    with call_budget({**kwargs, "kind": "harness_session", "provider_id": transport.spec.id}) as facts:
+        try:
+            facts["sent"] = True
+            outcome = transport.run_session(AgentSessionRequest(
+                system=system, prompt=prompt, scope=scope, model=model or target.model,
+                max_iters=max_iters, timeout_s=ctx.settings.strict_backend_timeout_s,
+                run_dir=ctx.run_dir, step_name=step_name,
+                bridge_spec_path=bridge_spec, trace=ctx.trace))
+            reply = Reply(blocks=[Block(type="text", text=outcome.text or "")],
+                          stop_reason="truncated" if outcome.truncated else "end_turn",
+                          usage={"input_tokens": outcome.input_tokens, "output_tokens": outcome.output_tokens})
+            # Outcome's zero counters predate billing attestation; do not infer
+            # a known free call from them. Providers may supply explicit usage.
+            facts.update(reply=outcome, usage=getattr(outcome, "usage", None), outcome="completed")
+            result.update(iterations=outcome.iterations, tool_calls=outcome.tool_calls,
+                          truncated=outcome.truncated, refusals=list(outcome.refusals),
+                          tools_used=list(outcome.tools_used))
+            return outcome
+        except BaseException as exc:
+            error = str(exc) or type(exc).__name__
+            raise
+        finally:
+            capture_model_call(kwargs, step_name, provider, reply, time.monotonic() - started,
+                               error=error, extra_result=result)

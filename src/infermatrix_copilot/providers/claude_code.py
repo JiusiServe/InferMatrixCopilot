@@ -86,8 +86,11 @@ class ClaudeCodeTransport(HarnessTransport):
         if mcp_config is not None:
             cmd += ["--mcp-config", str(mcp_config), "--strict-mcp-config",
                     "--allowedTools", f"mcp__{_BRIDGE_SERVER}"]
+        else:
+            cmd += ["--allowedTools", "", "--strict-mcp-config"]
         stdout, _, _, timed_out = run_cli(cmd, input=prompt_text, cwd=cwd,
-                                          env=sanitized_env(), timeout_s=timeout_s)
+                                          env=sanitized_env(), timeout_s=timeout_s,
+                                          runner=getattr(self, "runner", None))
         return self._parse(stdout), timed_out
 
     @staticmethod
@@ -200,8 +203,13 @@ class ClaudeCodeTransport(HarnessTransport):
                 flatten_messages("", messages), system=system, cwd=td,
                 timeout_s=self.settings.strict_backend_timeout_s,
                 max_turns=2, model=model, max_budget_usd=max_budget_usd)
-        usage = self._usage(data)
+        from .audit import assert_tool_less
+
+        assert_tool_less([data])
         over_budget = "budget" in str(data.get("subtype") or "")
+        if data.get("is_error") and not over_budget:
+            raise RuntimeError("claude-code tool-less completion errored")
+        usage = self._usage(data)
         text = "" if over_budget else str(data.get("result") or "")
         extra = {} if usage.cost_usd is None else {"cost_usd": usage.cost_usd}
         return usage.reply(text,

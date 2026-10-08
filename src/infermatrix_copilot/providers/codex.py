@@ -123,7 +123,8 @@ class CodexTransport(HarnessTransport):
             cmd += self._mcp_overrides(mcp_spec)
         cmd += ["-"]
         stdout, _, _, timed_out = run_cli(cmd, input=text, cwd=cwd,
-                                          env=sanitized_env(), timeout_s=timeout_s)
+                                          env=sanitized_env(), timeout_s=timeout_s,
+                                          runner=getattr(self, "runner", None))
         return json_events(stdout), timed_out
 
     @staticmethod
@@ -205,6 +206,9 @@ class CodexTransport(HarnessTransport):
         if native_event_sink is not None:
             for event in events:
                 native_event_sink({"type": "native.codex.event", "payload": event})
+        from .audit import assert_tool_less
+
+        assert_tool_less(events)
         usage = self._usage(events)
         return usage.reply(self._final_text(events),
                            stop_reason="max_tokens" if timed_out else "end_turn")

@@ -5,11 +5,56 @@ from types import SimpleNamespace
 
 import pytest
 
-from infermatrix_copilot.budgeting import reserved_call, settlement_charge
+from infermatrix_copilot.budgeting import bind_call_budget, call_budget, reserved_call, settlement_charge
 from infermatrix_copilot.improve.budget import BudgetRefused, Governor, governed
 from infermatrix_copilot.llm import LLM
 
 NOW = 1782864000
+
+
+def test_call_bindings_replace_same_account_and_stack_independent_accounts():
+    events = []
+    def acquire(request):
+        events.append(("reserve", request["model"]))
+        return len(events)
+    def finish(ticket, facts):
+        events.append(("finish", ticket, facts["sent"], facts["usage"]))
+    with bind_call_budget("knowledge", acquire, finish), bind_call_budget("weekly", acquire, finish):
+        with bind_call_budget("knowledge", acquire, finish):
+            with call_budget({"model": "m"}) as facts:
+                assert events == [("reserve", "m"), ("reserve", "m")]
+                facts.update(sent=True, usage=None)
+        assert [event[0] for event in events] == ["reserve", "reserve", "finish", "finish"]
+        with bind_call_budget("weekly", None, None):
+            with call_budget({"model": "m"}):
+                assert len(events) == 5
+    before = len(events)
+    with call_budget({"model": "m"}):
+        pass
+    assert len(events) == before
+
+
+def test_later_account_refusal_finalizes_earlier_ticket_without_dispatch():
+    events = []
+    def refuse(request):
+        raise BudgetRefused("not affordable")
+    with bind_call_budget("one", lambda request: "ticket", lambda ticket, facts: events.append((ticket, facts["sent"]))):
+        with bind_call_budget("two", refuse, lambda *args: pytest.fail("not acquired")):
+            with pytest.raises(BudgetRefused), call_budget({}):
+                pytest.fail("refused call dispatched")
+    assert events == [("ticket", False)]
+
+
+def test_every_account_finalizes_when_one_settlement_fails():
+    events = []
+    def failed(ticket, facts):
+        events.append(ticket)
+        raise OSError("ledger unavailable")
+    with bind_call_budget("one", lambda request: "one", lambda ticket, facts: events.append(ticket)):
+        with bind_call_budget("two", lambda request: "two", failed):
+            with pytest.raises(OSError), call_budget({}):
+                pass
+    assert events == ["two", "one"]
 
 
 def governor(path):

@@ -11,6 +11,40 @@ from infermatrix_copilot.providers.completion import complete_native
 from infermatrix_copilot.trace_store import TraceStore
 
 
+@pytest.mark.parametrize("provider", ["cursor", "codex", "claude-code"])
+@pytest.mark.parametrize("event", [
+    {"type": "tool_call", "tool_call": {"readToolCall": {"args": {"path": "source.py"}}}},
+    {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read"}]}},
+    {"type": "assistant", "message": {"content": [{"type": "future_unknown_block"}]}},
+    {"type": "item.completed", "item": {"type": "future_unknown_item"}},
+])
+def test_native_tool_less_contract_rejects_read_tools_and_unknown_blocks(provider, event, monkeypatch):
+    from infermatrix_copilot.config import Settings
+    from infermatrix_copilot.providers.registry import transport_for_id
+
+    transport = transport_for_id(Settings(_env_file=None), provider)
+    data = event if provider == "claude-code" else [event]
+    monkeypatch.setattr(transport, "_run", lambda *args, **kwargs: (data, False))
+    with pytest.raises(RuntimeError, match="tool calls"):
+        transport.complete(system="blind judge", messages=[])
+
+
+def test_native_completion_budget_receives_paid_usage_after_validation_failure():
+    from infermatrix_copilot.budgeting import bind_call_budget
+
+    observed = []
+    paid = reply()
+    paid.usage = {"input_tokens": 8, "output_tokens": 2}
+    transport = SimpleNamespace(complete=lambda **kwargs: paid)
+    def reject(_):
+        raise ValueError("invalid conclusion")
+    with bind_call_budget("domain", lambda request: "ticket", lambda ticket, facts: observed.append(dict(facts))):
+        with pytest.raises(ValueError):
+            complete_native(lambda: transport, request={"system": "s", "messages": [], "model": "pinned-model"},
+                            validate=reject)
+    assert observed == [{"sent": True, "reply": paid, "usage": paid.usage, "outcome": "failed"}]
+
+
 def reply(text='{"ok":true}'):
     return SimpleNamespace(blocks=[SimpleNamespace(text=text)], model="pinned-model",
                            stop_reason="end_turn", usage={})

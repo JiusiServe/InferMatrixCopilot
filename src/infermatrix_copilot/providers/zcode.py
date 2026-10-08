@@ -56,8 +56,6 @@ import json
 import logging
 import os
 import re
-import selectors
-import signal
 import time
 import subprocess
 import tempfile
@@ -75,6 +73,7 @@ from .base import (
     flatten_messages,
     json_events,
     run_cli,
+    stream_cli,
     sanitized_env,
 )
 from .registry import PROVIDERS
@@ -295,15 +294,10 @@ class ZCodeTransport(HarnessTransport):
 
     @staticmethod
     def _stream_run(cmd, session, env, timeout_s, sink):
-        """Drain both native pipes while journaling, including failed runs."""
-        proc = subprocess.Popen(cmd, cwd=str(session), env=env, stdin=subprocess.DEVNULL,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
-        events, stderr, buffers = [], [], {"stdout": b"", "stderr": b""}
-        deadline = time.monotonic() + timeout_s
-        timed_out = False
+        """Retain native events and tails through the shared pipe lifecycle."""
+        events, stderr = [], []
 
-        def line(channel, raw):
-            text = raw.decode("utf-8", "replace")
+        def line(channel, text):
             if channel == "stdout":
                 try:
                     event = json.loads(text)
@@ -313,63 +307,17 @@ class ZCodeTransport(HarnessTransport):
                     events.append(event)
                     sink(event)
                     return
-            if channel == "stderr":
+            else:
                 stderr.append(text)
             sink({"type": "native." + channel, "text": text})
 
-        def kill():
-            try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-
-        try:
-            with selectors.DefaultSelector() as selector:
-                selector.register(proc.stdout, selectors.EVENT_READ, "stdout")
-                selector.register(proc.stderr, selectors.EVENT_READ, "stderr")
-                while selector.get_map():
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0 and not timed_out:
-                        timed_out = True
-                        kill()
-                    for key, _ in selector.select(0.25 if timed_out else min(1, max(0, remaining))):
-                        chunk = os.read(key.fileobj.fileno(), 65536)
-                        channel = key.data
-                        if not chunk:
-                            if buffers[channel]:
-                                line(channel, buffers[channel])
-                            buffers[channel] = b""
-                            selector.unregister(key.fileobj)
-                            continue
-                        buffers[channel] += chunk
-                        while b"\n" in buffers[channel]:
-                            raw, buffers[channel] = buffers[channel].split(b"\n", 1)
-                            line(channel, raw)
-            proc.wait()
-        except BaseException:
-            # A stream interruption can arrive between a pipe read and its
-            # next newline. Preserve every tail we already received, while
-            # retaining the original exception if the journal itself failed.
-            for channel, raw in buffers.items():
-                for tail in raw.splitlines():
-                    try:
-                        line(channel, tail)
-                    except BaseException:
-                        pass
-                buffers[channel] = b""
-            raise
-        finally:
-            # This group belongs only to this invocation, including children
-            # left after its CLI leader exits or our event writer is interrupted.
-            kill()
-            proc.wait()
-            proc.stdout.close()
-            proc.stderr.close()
-        if not timed_out and (proc.returncode != 0 or not any(e.get("type") == "result" for e in events)):
+        _, _, code, timeout = stream_cli(cmd, cwd=str(session), env=env,
+            deadline=time.monotonic() + timeout_s, on_line=line)
+        if timeout is None and (code != 0 or not any(e.get("type") == "result" for e in events)):
             detail = " ".join(stderr[-3:])[:400]
-            raise RuntimeError(f"zcode exited {proc.returncode} without a result event"
+            raise RuntimeError(f"zcode exited {code} without a result event"
                                + (f": {detail}" if detail else ""))
-        return events, timed_out
+        return events, timeout is not None
 
     @staticmethod
     def _final_text(events: list[dict]) -> str:

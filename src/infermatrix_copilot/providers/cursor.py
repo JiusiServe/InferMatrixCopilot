@@ -131,20 +131,21 @@ class CursorTransport(HarnessTransport):
 
     # -- process plumbing ----------------------------------------------------
     def _run(self, text: str, *, cwd: str, timeout_s: float,
-             model: str = "") -> tuple[list[dict], bool]:
+             model: str = "", tool_less: bool = False) -> tuple[list[dict], bool]:
         """One CLI invocation → (parsed events, timed_out). A timeout kills
         the process but keeps the partial stream — a half-done investigation
         is salvage material, not garbage."""
         # --approve-mcps is load-bearing: headless runs do not auto-approve
         # configured MCP servers, and without it the tool bridge is silently
         # ignored (found in the live smoke — session ran on native tools only)
-        cmd = [self.require_cli(), "--print", "--force", "--approve-mcps",
-               "--output-format", "stream-json"]
+        cmd = [self.require_cli(), "--print", "--output-format", "stream-json"]
+        cmd += ["--mode", "ask", "--trust", "--workspace", cwd] if tool_less else ["--force", "--approve-mcps"]
         selected = model or self.settings.strict_backend_model
         if selected:
             cmd += ["--model", selected]
         stdout, _, _, timed_out = run_cli(cmd, input=text, cwd=cwd,
-                                          env=sanitized_env(), timeout_s=timeout_s)
+                                          env=sanitized_env(), timeout_s=timeout_s,
+                                          runner=getattr(self, "runner", None))
         return json_events(stdout), timed_out
 
     @staticmethod
@@ -268,7 +269,12 @@ class CursorTransport(HarnessTransport):
         with tempfile.TemporaryDirectory(prefix="imc-cursor-oneshot-", ignore_cleanup_errors=True) as scratch:
             events, timed_out = self._run(
                 flatten_messages(system, messages), cwd=scratch,
-                timeout_s=self.settings.strict_backend_timeout_s, model=model)
+                timeout_s=self.settings.strict_backend_timeout_s, model=model, tool_less=True)
+        from .audit import assert_tool_less
+
+        assert_tool_less(events)
+        if any(event.get("is_error") for event in events if event.get("type") == "result"):
+            raise RuntimeError("cursor tool-less completion errored")
         usage = self._usage(events)
         return usage.reply(self._final_text(events),
                            stop_reason="max_tokens" if timed_out else "end_turn")

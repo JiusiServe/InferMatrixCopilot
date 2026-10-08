@@ -138,6 +138,8 @@ def test_run_session_timeout_is_truncated_not_a_crash(tmp_path):
 
 def test_complete_flattens_messages_and_runs_in_scratch_cwd(tmp_path):
     transport = _transport(tmp_path)
+    (tmp_path / "bin" / "events.jsonl").write_text(json.dumps({
+        "type": "result", "result": "REVIEW", "usage": {"inputTokens": 10, "outputTokens": 5}}))
 
     reply = transport.complete(
         system="CLASSIFY", messages=[{"role": "user", "content": "review pr 5"}])
@@ -150,6 +152,9 @@ def test_complete_flattens_messages_and_runs_in_scratch_cwd(tmp_path):
     # one-shots run in an empty scratch dir, never in a repo
     assert "imc-cursor-oneshot-" in capture["cwd"]
     assert reply.usage["input_tokens"] == 10
+    assert "--force" not in capture["argv"] and "--approve-mcps" not in capture["argv"]
+    assert capture["argv"][capture["argv"].index("--mode") + 1] == "ask"
+    assert capture["argv"][capture["argv"].index("--workspace") + 1] == capture["cwd"]
 
 
 def test_audit_checks_paths_on_all_native_tools(tmp_path):

@@ -1,8 +1,8 @@
 # providers/audit.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-10-08 -->
 
-`LOC ~109 · 侦测型控制（运行后会话审计） · refactor-status: ok`
+`运行后会话审计 + 无工具回复验证 · refactor-status: ok`
 
 ## 职责
 对已完成的 harness 会话做容纳性违规审计 —— 服务于那些**没有预防型控制可用**的后端。
@@ -13,7 +13,11 @@
 
 ## 公开契约
 `SessionAudit`（`ok`、`tool_calls`）、`contained_in(path, roots)`、
-`audit_events(events, *, roots, ...)`。
+`audit_events(events, *, roots, ...)`、`assert_tool_less(events)`。
+
+`assert_tool_less` 服务于一次性 completion 和独立 judge：任何工具事件、
+非文本消息 block、未知非 reasoning/agent_message item 都拒绝并丢弃回复。
+它不把有工具读取权限的 Direct JSON 会话当成无工具 completion。
 
 ## 不变量（**C1**、**C2**、**E2**）
 - **侦测型，不是预防型** —— 它是工具治理决策**公开声明的兜底**。它服务于内置工具无法
@@ -27,13 +31,15 @@
   方式，**不是外泄** —— 没有这条豁免，每个用了桥的会话都会被误报（实测发现）。
 
 ## 边界 —— 不属于这里
-不做强制；不调用厂商；不含评测专属规则。
+不调用厂商；不含评测专属规则。`audit_events` 返回 findings；
+`assert_tool_less` 验证无工具调用契约并在不满足时抛错。
 
 ## 依赖（允许）
 仅 stdlib。一个叶子分析模块。
 
 ## 测试
-经 `test_provider_cursor.py` 覆盖。
+经 `test_provider_cursor.py` 和 `test_provider_completion.py` 覆盖；后者对
+Cursor/Codex/Claude 的工具事件及未知内容块验证同一拒绝规则。
 
 ## 重构备注
 从 `eval/dataset/run_cursor_arm.py` 产品化而来 —— 当初正是这项检查抓到了一次真实的越界

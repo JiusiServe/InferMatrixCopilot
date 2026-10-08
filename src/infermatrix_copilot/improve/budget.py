@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from ..trace_store import current_store, file_lock
-from ..budgeting import request_cost_bound, reservation_fits, settlement_charge, valid_token_counts
+from ..budgeting import bind_call_budget, request_cost_bound, reservation_fits, settlement_charge, usage_cost
 from ..persistence import atomic_write_bytes
 
 _GOVERNOR: contextvars.ContextVar["Governor | None"] = contextvars.ContextVar("improve_governor", default=None)
@@ -86,20 +86,9 @@ def actual_usd(model: str, usage: dict | None, settings: Any = None) -> float | 
     """The cache-aware cost of a call, as `metrics.cost_from_spans` prices it."""
     from ..metrics import CACHE_CREATE_FACTOR, CACHE_READ_FACTOR, model_price
 
-    keys = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_read_tokens",
-            "cache_creation_input_tokens", "cache_creation_tokens")
-    if not isinstance(usage, dict) or not valid_token_counts(usage.get("input_tokens"), usage.get("output_tokens")) \
-            or not valid_token_counts(*(usage[key] for key in keys if key in usage)):
-        return None
     pin, pout = model_price(model, settings)
     read_f = float(getattr(settings, "cache_read_price_factor", 0) or 0) or CACHE_READ_FACTOR
-    u = usage or {}
-    tin = int(u.get("input_tokens") or 0)
-    tout = int(u.get("output_tokens") or 0)
-    cread = int(u.get("cache_read_input_tokens") or u.get("cache_read_tokens") or 0)
-    ccreate = int(u.get("cache_creation_input_tokens") or u.get("cache_creation_tokens") or 0)
-    return (tin / 1e6 * pin + tout / 1e6 * pout + cread / 1e6 * pin * read_f
-            + ccreate / 1e6 * pin * CACHE_CREATE_FACTOR)
+    return usage_cost(usage, pin, pout, cache_read_factor=read_f, cache_create_factor=CACHE_CREATE_FACTOR)
 
 
 class Governor:
@@ -300,9 +289,32 @@ class Governor:
 
 @contextmanager
 def governed(governor: "Governor | None") -> Iterator["Governor | None"]:
+    def acquire(request):
+        # Subscription sessions retain their separate judge-call policy. Only
+        # bounded API round trips draw against this dollar envelope.
+        if request.get("kind", "api") != "api":
+            return None
+        model = request["model"]
+        return (governor.reserve_call(model, request_bytes(request),
+                                      int(request.get("max_tokens") or 0),
+                                      purpose=request.get("role") or ""), model)
+
+    def finish(ticket, facts):
+        if ticket is None:
+            return
+        reservation, model = ticket
+        usage = facts["usage"]
+        if usage is not None:
+            governor.settle_call(reservation, usage, model)
+        elif facts["sent"]:
+            governor.forfeit_call(reservation)
+        else:
+            governor.release_call(reservation)
+
     token = _GOVERNOR.set(governor)
     try:
-        yield governor
+        with bind_call_budget("improve-weekly", acquire if governor else None, finish):
+            yield governor
     finally:
         _GOVERNOR.reset(token)
 
