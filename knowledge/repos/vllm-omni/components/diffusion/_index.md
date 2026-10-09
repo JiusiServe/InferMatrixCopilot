@@ -78,3 +78,7 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 shared RMSNorm 的empty-input与fused精度边界沿 tensor dtype rules 的DIFF-NORM-1a核对。
 
 - [registered video SHM 与 borrowed mapping ownership](rules-video-transport.md)。
+
+- [SageAttention3 FP4 dispatch 合同](rules-sage-attention.md)。
+
+- [Diffusion request batch 的 pipeline 合同](rules-request-batch.md)。

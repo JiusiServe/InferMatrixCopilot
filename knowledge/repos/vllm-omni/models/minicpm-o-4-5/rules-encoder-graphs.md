@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5 输入 encoder CUDA graph 合同"
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #8332", vllm_omni/model_executor/models/minicpmo_4_5/encoder_cuda_graph.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py]
+sources: ["PR #8332", vllm_omni/model_executor/models/minicpmo_4_5/encoder_cuda_graph.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, "PR #8430"]
 confidence: high
 ---
 
@@ -20,7 +20,7 @@ confidence: high
 - 强制：vision 只捕获 transformer stack；position/mask 的 host decisions 留在外面。
   audio 只捕获 stateless encoder、projection 与 pooling。CPU、training、grad/autocast、
   nested capture、padded FlashAttention vision、FP16 Whisper overflow guard、请求
-  intermediate audio layer 与 stateful streaming audio 保持 eager；`enforce_eager` 优先禁用。
+  intermediate audio layer 保持 eager；stateful streaming audio 不进入本 stateless adapter，专用路径见 MCPMO-ENCODER-1c；`enforce_eager` 优先禁用。
 - 禁止：用 padding 扩大 exact-shape 接纳范围；把下一次 replay 可覆盖的输出 buffer
   直接保留为历史 embedding；将 Code2Wav continuation cache 当作 stateless input。
 - 验收：变更同 shape 的内容/mask并保留前次 embedding，检查当前结果与历史值；比较
@@ -29,7 +29,7 @@ confidence: high
 
 ## MCPMO-ENCODER-1b — 输入图接纳预算与 capture 失败必须分别处理
 
-- 触发：修改 input encoder graph 的 admission、pool sharing、显存门限或失败恢复。
+- 触发：修改 `encoder_cuda_graph.py` stateless input encoder graph 的 admission、pool sharing、显存门限或失败恢复。
 - 强制：默认同 shape/stream 第二次调用才 capture，每 encoder 最多 4 图，admission
   history 也有界；`max_graphs=0` 禁用，不 eviction/自动重捕。默认 1 GiB free-memory
   floor 只阻止新 capture，低于 floor 时已存在图继续 replay。门限不是显存预留或 fit 保证。
@@ -47,3 +47,24 @@ confidence: high
 
 Code2Wav 的 resident attention 与 stateful continuation 图见
 [Whole-Euler 合同](rules-resident-graphs.md)。
+
+## MCPMO-ENCODER-1c — stage-0 streaming audio 与 packed vision 使用专用 upstream graph manager
+
+- 触发：修改 MiniCPM-o stage-0 的 streaming audio/vision capture、KV buffer 或 mel staging。
+- 强制：专用 adapter 实现 upstream SupportsEncoderCudaGraph，经 EncoderCudaGraphManager 管理；在权重加载后的 omni_post_load 阶段准备并捕获，保留 streaming audio 的持久 KV 与长度/mask 更新。mel 通过可复用 pinned host staging 传输；packed vision 仍按实际打包布局执行。此 startup 路径与 stateless adapter 的二次调用 admission 分开。
+- 禁止：把有状态 audio 当成 stateless replay；每块重建 host staging，或沿用其他 graph wrapper 的资格、容量和 failure policy。
+- 验收：比较多块 audio KV/输出及 packed vision eager parity，覆盖长度变化、reset 与输出 buffer lifetime；只有真实 CUDA capture/replay 能证明图路径。 ^[PR #8430]
+
+## MCPMO-ENCODER-1d — 增量 fbank 必须重算窗口边缘并保持 exact parity
+
+- 触发：修改 IncrementalFbank、流式窗口裁剪或 frame cache。
+- 强制：缓存可复用的内部帧，按 upstream extractor 重算右边缘，滑窗后同时重算新左边缘；每块输出与完整窗口提取逐位相同。
+- 禁止：只对未滑窗的短样本比较；缺 upstream processor 时用自制近似 oracle 宣称等价。
+- 验收：使用真实 StreamingMelProcessorExact oracle，随机 chunk 跨至少两次窗口滑动，torch.equal 比较增量结果与完整提取；缺模型缓存时明确 skip。 ^[PR #8430]
+
+## MCPMO-ENCODER-1e — duplex candidate sampling 保留逐行 RNG 且不读取 device scalar
+
+- 触发：修改 native duplex batched candidate selection、deferred sampling 或 fused residual LayerNorm。
+- 强制：候选采样在 GPU 上执行，逐行保持 token 和 generator state 与逐请求 reference 一致；deferred 模式保留相同 RNG 消耗。fused residual 与 LayerNorm 分别对独立 oracle 验数值。
+- 禁止：在采样热路径通过 item/float/bool 同步 device scalar；用 shape smoke 代替 ties、RNG state 和数值比较。
+- 验收：覆盖多行、ties 分布、deferred/non-deferred 对照和禁止 host reads 的 dispatch guard；CPU 与实际可用 CUDA 分别报告覆盖。 ^[PR #8430]

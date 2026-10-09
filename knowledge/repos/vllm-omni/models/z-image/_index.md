@@ -34,3 +34,5 @@ sources: [vllm_omni/diffusion/models/z_image/, vllm_omni/diffusion/registry.py]
 
 - 审查 z_image 的编码器加载或 CFG 路径改动。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。
+
+- [Z-Image TeaCache 校准合同](rules.md)。

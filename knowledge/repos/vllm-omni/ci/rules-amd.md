@@ -1,10 +1,10 @@
 ---
 title: "AMD/ROCm CI 规则"
 created: 2026-09-05
-updated: 2026-10-06
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234", "PR #6966", "PR #7395", "PR #6978", "PR #7398", "PR #8342", "PR #7935", "PR #7933", "PR #8527", "PR #8189", "PR #8520"]
+sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234", "PR #6966", "PR #7395", "PR #6978", "PR #7398", "PR #8342", "PR #7935", "PR #7933", "PR #8527", "PR #8189", "PR #8520", "PR #8570"]
 confidence: high
 ---
 
@@ -112,3 +112,10 @@ confidence: high
 - 验收：rendered argv覆盖完整file与两个backend；production config context下直接构造layer
   证明显式backend到达consumer，default backend仍命中平台默认；exact target jobs分别记录
   collection、cache复用和terminal结果。静态/缺依赖的local run不能宣称MI300 runtime pass。^[PR #8527]
+
+## OMNI-CI-OFFLOAD-1a — AMD offload lane 显式选择独立 diffusion backend
+
+- 触发：修改 AMD merge 的 diffusion offloader 测试命令或 backend env。
+- 强制：在两个 offloader pytest 命令之前 export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA，使 backend-independent offload 行为不被 AITER attention 构建依赖阻塞；其他 attention 专项 lane 维持自身 backend 目标。
+- 禁止：假定 VLLM_ROCM_USE_AITER 同时控制 diffusion attention；从 YAML 改动推断已获得某个运行时或耗时。
+- 验收：检查 export 顺序及两个命令的有效环境，确认 offload 断言仍保留；实际 lane 结果另报告。 ^[PR #8570]

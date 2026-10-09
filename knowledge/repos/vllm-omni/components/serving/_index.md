@@ -55,3 +55,7 @@ sources: []
 - [voice删除403/404与typedexceptions](rules-voice-management.md)。
 
 - [sleep/wakeup非空stage_ids与nonnegativelevel](rules-control-request-schema.md)。
+
+- [Realtime model-context 自动截断合同](rules-realtime-truncation.md)。
+
+- [多模态 processor cache 的 replica identity 合同](rules-multimodal-cache.md)。

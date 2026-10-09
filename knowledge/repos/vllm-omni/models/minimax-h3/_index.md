@@ -169,3 +169,5 @@ CPU-only validation limit 见 [encoder state rules](rules-encoder-state.md)。
 - [rules-quality](rules-quality.md) 新增核对：MMH3-4a2。
 
 - [latent upscaler、second-pass refinement 与容量门禁](rules-latent-refinement.md)
+
+- [MiniMax-H3 VDNH3 checkpoint 与请求合同](rules-vdnh3.md)。

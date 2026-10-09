@@ -66,3 +66,5 @@ sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", "PR #4322"
 
 | Thinker audio resampler 或 deepstack meta-device buffer | [Thinker 输入与 buffer 规则](rules-thinker-input.md) |
 - [MRv2 sampled handoff、first audio 与 decoder opt-in](rules-mrv2-audio.md)
+
+- [Qwen3-Omni layer-0 embedding capture 合同](rules-embedding-capture.md)。

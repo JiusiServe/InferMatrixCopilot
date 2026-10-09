@@ -1,10 +1,10 @@
 ---
 title: "Diffusion admission wait rules"
 created: 2026-08-10
-updated: 2026-08-10
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, components, diffusion, scheduler]
-sources: [docs/mkdocs/hooks/generate_argparse.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/sched/base_scheduler.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_rpc_routing.py, tests/diffusion/test_diffusion_scheduler.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5843"]
+sources: [docs/mkdocs/hooks/generate_argparse.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/sched/base_scheduler.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_rpc_routing.py, tests/diffusion/test_diffusion_scheduler.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5843", "PR #7685"]
 ---
 
 # Diffusion admission wait rules
@@ -54,3 +54,10 @@ sources: [docs/mkdocs/hooks/generate_argparse.py, vllm_omni/diffusion/data.py, v
   extraction 必须为自定义 type 提供安全 stub。当前私有 `_AdmissionWaitDecision` 自身没有
   `__post_init__` invariant validation，安全性依赖 only-in-tree scheduler producer；若重新导出或
   开放 extension，须补 deadline/stability/max-batch 非法值测试。^[PR #5843]
+
+## DIFFADM-1d — pause keep 关闭 scheduling gate 并完成全 rank barrier
+
+- 触发：修改 diffusion pause/resume RPC、admission wait 或输出排空。
+- 强制：仅 request-level execution 支持 mode=keep；enqueue pause 即关闭 engine scheduling gate并打断 admission wait，ACK 在已运行 batch 的全 rank synchronize_device barrier 后返回。暂停期间继续 RPC/abort，已结束请求仍发 terminal output；当前 batch 输出/D2H/SHM 完成排空后再处理 pause 后的后续控制。resume 先打开 scheduling，再恢复上游 admission；定向 replica RPC 保留隔离。
+- 禁止：暂停期间调度新 wave；只同步 rank0 或只关前端 admission 就 ACK；让 abort terminal 等到 resume。
+- 验收：覆盖 busy/idle/bootstrap pause、admission wait 竞态、RPC ordering、abort terminal、全 rank barrier 与 replica targeting；step execution/错误 mode 明确拒绝。 ^[PR #7685]
