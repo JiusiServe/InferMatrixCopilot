@@ -1,7 +1,7 @@
 ---
 title: "AFD execution platforms 入口"
 created: 2026-08-06
-updated: 2026-08-06
+updated: 2026-10-09
 type: index
 tags: [afd-plugin, components, execution-platforms]
 sources:
@@ -34,5 +34,6 @@ sources:
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | 理解 CUDA/Ascend、graph/DBO、MLA 和 native op | [architecture](architecture.md) | v0.26 当前平台矩阵 |
+| 核对版本化 MRV2 DBO 校验或 DSV4 本地 NPU E2E 环境 | [rules](rules.md) | v0.30 GPU 升级实现与 v0.26 基线分开；设备和 NIC 按场景校验 |
 | 调查 connector state 来源 | [connectors](../connectors/architecture.md) | control/data plane 和资源 owner |
 | 审查 Ascend global patch | [compatibility](../compatibility/rules.md) | upstream-first 与 non-AFD 回归 |

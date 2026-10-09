@@ -1,10 +1,13 @@
 ---
 title: "afd_plugin/v1/worker 审查规则：AFD 事务元数据、控制面发送与 runner 生命周期"
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-09
 type: rule
 tags: [afd-plugin]
-sources: []
+sources:
+  - "afd-plugin@4c98691501be37f21735725f7429715ae98b603b:afd_plugin/v1/worker/attention_model_runner_v2.py"
+  - "afd-plugin@4c98691501be37f21735725f7429715ae98b603b:afd_plugin/v1/worker/attention_metadata.py"
+  - "afd-plugin@4c98691501be37f21735725f7429715ae98b603b:tests/unit/v1/worker/test_model_runner_v2.py"
 ---
 
 # afd_plugin/v1/worker 审查规则：AFD 事务元数据、控制面发送与 runner 生命周期
@@ -63,9 +66,33 @@ sources: []
 
 - hook 只在 `cudagraph_mode == CUDAGraphMode.FULL_DECODE_ONLY` 且 `cudagraph_manager` 存在时启用。它用 `MethodType` 覆盖单个 manager 实例的 `run_fullgraph`，用 `_AFD_FULLGRAPH_HOOK_MARKER` 防止嵌套。退出时恢复之前的实例覆盖，或者 `del` 掉实例属性。不要改成修改类属性。
 - replay 的 metadata 先用真实的 `real_tokens`（`scheduler_output.total_num_scheduled_tokens`）构建，再把 `tokens_lens` 改成 padded 的 `desc.num_tokens`；DP 控制同样用 padded 数。`tokens_unpadded_lens` 保持真实值，两者不要合并成一个。
+  - 上述构建和发送描述适用于单 stage。v0.30 GPU MRV2 多 stage 的控制已经由 native prepare seam 发布，FULL replay 必须复用，按 [stage metadata 规则](#gpu-mrv2-dbo-stage-metadata--原生-stage-只附加隔离的-afd-元数据) 检查，不能再发送单 stage payload。
 - hook 自己只恢复 `_afd_is_graph_replaying`。`_afd_pending_metadata`、`_afd_suppress_metadata_send`、`_is_warmup`、`_afd_is_graph_capturing` 都靠外层 `_use_afd_execution_context` 的 `finally` 恢复，所以不能在这个作用域之外单独使用 hook。
 
 <!-- kb:rule status=active since=init-9cae2d2ddaae -->
+
+## gpu-mrv2-instance-seam — GPU MRV2 prepare 包装只覆盖当前实例并恢复方法
+
+- 触发：修改 v0.30 GPU MRV2 的 `_use_afd_ubatch_preparation` 或接入同一 native `UBatchRunner.prepare` 边界；本节适用于包含该升级实现的 checkout，不扩大 v0.26 基线的支持范围。
+- 必须：记录当前实例是否已有 `prepare` 覆盖及原覆盖值，在 `finally` 中恢复原覆盖或删除临时实例属性。委托原绑定方法完成 native 输入切片、Attention metadata 和线程/stream 准备；注释写明缺少回调的原因、上游签名、delegation 例外以及上游提供 prepared-state 回调后的移除条件。
+- 禁止：为此替换 runner 类或模块全局函数、复制重写 native 准备逻辑，或把恢复方法覆盖误写成恢复所有 runner 状态。pending metadata 和执行标志仍由外层 execution/capture 作用域恢复。
+- 验收：无预存覆盖、有预存覆盖和异常退出都恢复 `prepare`；native 准备仍调用一次，外层状态恢复测试覆盖 pending、suppress 和 capture/replay 标志。
+
+^[PR #424]
+
+<!-- kb:rule status=active since=r2026-10-09 -->
+
+## gpu-mrv2-dbo-stage-metadata — 原生 stage 只附加隔离的 AFD 元数据
+
+- 触发：修改 v0.30 GPU MRV2 的 stage 准备、`install_mrv2_ubatch_metadata`、capture 或多 stage FULL replay。
+- 必须：保留 native slices 的传输长度和全 batch 偏移；为每个 stage 克隆 metadata，保留 `stage_idx` 并只附加该 stage 的 `tokens_start_loc`、`requests_start_loc`、`tokens_lens`、`tokens_unpadded_lens`。未填充长度按 `max(0, min(stop, num_tokens_unpadded) - start)` 与真实输入求交。
+- 必须：由调用方在微批线程执行前发布完整控制；多 stage FULL replay 核对 pending metadata 存在且 stage 数等于 descriptor 的 `num_ubatches`，然后复用已发布控制。capture 按 `(num_reqs, num_tokens, num_ubatches)` 匹配事件，不匹配或事件数不完整必须报错。
+- 禁止：重新切片 native input views、Attention metadata 或 worker contexts；从微批线程发送控制；多 stage replay 再发送旧的单 stage payload。
+- 验收：stage metadata 修改互不污染；padding 范围之外的 stage 未填充长度为零；控制发送次数和 descriptor 三个维度的负例都有 focused tests，正常退出和异常退出保留外层状态恢复保证。
+
+^[PR #424]
+
+<!-- kb:rule status=active since=r2026-10-09 -->
 
 ## AFD-I43 — NPU Async CAM stage 构建必须把 builder 0 留给全批次，并保持单 stage 的 AFD 事务
 
