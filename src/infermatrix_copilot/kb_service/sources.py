@@ -199,6 +199,9 @@ class PullRequest:
     author: str
     changed_files: tuple[str, ...]
     diff_excerpt: str
+    base_ref: str = ""
+    head_ref: str = ""
+    head_sha: str = ""
 
     def evidence(self) -> dict:
         return {
@@ -207,6 +210,9 @@ class PullRequest:
             "body": self.body[:MAX_BODY_CHARS],
             "merged_at": self.merged_at,
             "merge_commit_sha": self.merge_commit_sha,
+            "base_ref": self.base_ref,
+            "head_ref": self.head_ref,
+            "head_sha": self.head_sha,
             "changed_files": list(self.changed_files[:MAX_CHANGED_PATHS]),
             "diff_excerpt": self.diff_excerpt,
         }
@@ -301,6 +307,9 @@ class GitHubReader:
             merge_commit_sha=str(pr.get("merge_commit_sha") or ""),
             author=str((pr.get("user") or {}).get("login") or ""),
             changed_files=tuple(paths), diff_excerpt="".join(excerpt),
+            base_ref=str((pr.get("base") or {}).get("ref") or ""),
+            head_ref=str((pr.get("head") or {}).get("ref") or ""),
+            head_sha=str((pr.get("head") or {}).get("sha") or ""),
         )
 
     def merged_pr_history(self, full_name: str, *, limit: int = 1000, before: str,

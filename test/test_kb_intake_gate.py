@@ -12,7 +12,7 @@ import pytest
 from infermatrix_copilot.kb_service.calibration import load_cases, run_calibration
 from infermatrix_copilot.kb_service.config import RepoLifecycle
 from infermatrix_copilot.kb_service.gate import changes_between, run_gate
-from infermatrix_copilot.kb_service.intake import draft_changes
+from infermatrix_copilot.kb_service.intake import draft_changes, draft_prompt
 from infermatrix_copilot.kb_service.ledger import Ledger
 from infermatrix_copilot.kb_service.models import (
     ModelGateway, ModelReply, ModelRole, ModelUnavailable, parse_json_object, roles_from_env,
@@ -236,6 +236,30 @@ def test_a_tuned_stricter_rubric_flows_through_the_gate(monkeypatch):
 
 
 # -- drafting and gate --------------------------------------------------------------
+
+def _draft_context(evidence, files=None, *, event_id=1):
+    prompt = draft_prompt("demo", evidence, files or _tree(), "repos/demo", event_id=event_id)
+    return json.loads(prompt.split("\n", 1)[1].split("\n\n<untrusted_data>", 1)[0])
+
+
+def test_draft_sees_ids_on_unrelated_pages_and_permanent_reservations():
+    files = {**_tree(), "repos/other/rules.md": _rule("OTHER-hidden"),
+             "repos/demo/_tombstones.yaml": "schema_version: 1\nids:\n  - id: DEMO-purged\n"}
+    context = _draft_context({"changed_files": ["demo/core/q.py"]}, files)
+    assert [page["page"] for page in context["related_pages"]] == [PAGE]
+    assert context["existing_rule_ids"] == ["DEMO-1a", "DEMO-purged", "OTHER-hidden"]
+
+
+def test_independent_pr_drafts_get_distinct_namespaces_and_refinement_keeps_all_sources():
+    first = _draft_context({"source_reference": "PR #6926"})
+    second = _draft_context({"source_reference": "PR #7777"})
+    assert first["new_rule_id_namespaces"] == ["DEMO-PR6926"]
+    assert second["new_rule_id_namespaces"] == ["DEMO-PR7777"]
+    refined = _draft_context({"evidence": [{"source_reference": "PR #7777"},
+                                           {"source_reference": "PR #6926"}]}, event_id=0)
+    assert refined["new_rule_id_namespaces"] == ["DEMO-PR6926", "DEMO-PR7777"]
+    assert _draft_context({"source_reference": "run r1"}, event_id=42)["new_rule_id_namespaces"] == ["DEMO-E42"]
+
 
 def test_draft_repairs_on_lifecycle_error():
     answers = iter([
