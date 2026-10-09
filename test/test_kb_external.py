@@ -5,8 +5,10 @@ from __future__ import annotations
 import subprocess
 import uuid
 
+import pytest
+
 from infermatrix_copilot.kb_service import merge
-from infermatrix_copilot.kb_service.external import poll_external
+from infermatrix_copilot.kb_service.external import poll_external, settle_closed_holds
 from infermatrix_copilot.knowledge_service.signing import load_public_key, public_key_text, verify
 from infermatrix_copilot.knowledge_service.ops import KnowledgeOperation as Op, apply_operations
 from test_kb_flow import KnowledgeGitHub, _flow_runtime, _items
@@ -121,6 +123,46 @@ def test_a_pr_branched_before_main_changed_the_same_page_must_be_rebased(tmp_pat
     _git(origin, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-q", "-m", "main moves")
     (event,) = _daily(rt)
     assert event.endswith("to people") and "rebased" in _findings(tmp_path, 10)[-1]
+
+
+@pytest.mark.parametrize("mismatch", [None, "open", "merged", "head", "repository", "identity"])
+def test_closed_external_head_resolves_its_hold_without_approving_it(tmp_path, mismatch):
+    rt, lifecycle, origin = _setup(tmp_path)
+    head = _open_human_pr(rt, origin, 10, _add_rule_files())
+    page = origin / "knowledge" / PAGE
+    page.write_text(page.read_text() + "\n<!-- main moved -->\n")
+    _git(origin, "add", "-A")
+    _git(origin, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-q", "-m", "main moves")
+    _daily(rt)
+    change = rt.ledger.changesets("demo", ("human",))[0]
+    rt.ledger.enqueue_human("demo", change["detail"]["reason"], change["id"])
+    hold = rt.ledger.human_queue()[0]
+    pr = {"number": 10, "state": "closed", "merged": False, "merged_at": None,
+          "closed_at": "2026-10-09T04:00:00Z", "head": {"sha": head},
+          "base": {"repo": {"full_name": REPO}}}
+    if mismatch == "open":
+        pr["state"] = "open"
+    elif mismatch == "merged":
+        pr["merged"] = True
+    elif mismatch == "head":
+        pr["head"]["sha"] = "f" * 40
+    elif mismatch == "repository":
+        pr["base"]["repo"]["full_name"] = "other/repo"
+    elif mismatch == "identity":
+        pr["number"] = 11
+    rt.github.prs[10] = pr
+    before = rt.ledger.verdicts(hold["changeset_id"])
+    assert settle_closed_holds(rt) == ([] if mismatch else [hold["id"]])
+    if mismatch:
+        assert rt.ledger.human_queue() == [hold]
+    else:
+        assert rt.ledger.human_queue() == []
+        assert rt.ledger.changeset(hold["changeset_id"])["status"] == "human"
+        assert settle_closed_holds(rt) == []
+        rt.github.prs[10]["state"] = "open"
+        assert _daily(rt)  # reopening this head still goes through the gate
+    assert rt.ledger.verdicts(hold["changeset_id"]) == before
+    assert not _items(tmp_path, "merge")
 
 
 def test_a_new_head_is_judged_again_and_drafts_and_our_own_prs_are_skipped(tmp_path):

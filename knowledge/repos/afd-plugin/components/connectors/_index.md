@@ -1,7 +1,7 @@
 ---
 title: "AFD connectors 入口"
 created: 2026-08-06
-updated: 2026-08-06
+updated: 2026-10-09
 type: index
 tags: [afd-plugin, components, connectors, distributed]
 sources:
@@ -36,4 +36,4 @@ sources:
 | 理解 factory、拓扑、payload 和生命周期 | [architecture](architecture.md) | 三类 connector 当前合同 |
 | 核对 role runtime 如何消费 control/work item | [Attention](../attention-runtime/architecture.md) / [FFN](../ffn-runtime/architecture.md) | caller 生命周期 |
 | 核对平台支持组合 | [execution-platforms](../execution-platforms/architecture.md) | graph/DBO/quantization 矩阵 |
-- [NPU connector（CAM async / CAMP2P）review 规则](rules.md)
+- [NPU connector（CAM async / CAMP2P）review 规则](rules.md)：含 Legacy DBO 物理计数与 opaque op 动态 padding 的分支限定合同。

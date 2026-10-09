@@ -1,7 +1,4 @@
-"""kb init pilot 2: the jiuwenswarm adapter is loadable and its init block
-parses with seeds that exist (design kb-init §12). kb init itself creates the
-knowledge tree and later flips the lifecycle to shadow, so neither state is
-pinned here: shadow-only is the invariant."""
+"""The initialized Jiuwen adapter retains valid init seeds and gated publication."""
 
 from __future__ import annotations
 
@@ -10,12 +7,13 @@ from infermatrix_copilot.kb_service.config import load_registry, validate_seeds
 from infermatrix_copilot.sdk._resources import adapters_root, knowledge_root
 
 
-def test_jiuwenswarm_adapter_is_a_shadow_only_pilot():
+def test_jiuwenswarm_adapter_retains_init_contract_after_publication_enablement():
     adapter = next(a for a in AdapterRegistry(adapters_root()).all() if a.name == "jiuwenswarm")
     assert adapter.manifest["repo"]["full_name"] == "openJiuwen-ai/jiuwenswarm"
     assert adapter.manifest["push"]["allowed"] is False
     lifecycle = load_registry(adapters_root())["jiuwenswarm"]
-    assert lifecycle.mode == "shadow" and not lifecycle.auto_merge   # kb init flips `enabled`
+    assert lifecycle.mode == "auto_merge" and lifecycle.auto_merge
+    assert lifecycle.calibration_set
     assert lifecycle.upstream_visibility == "public"
     init = lifecycle.init
     assert init is not None

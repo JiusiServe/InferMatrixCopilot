@@ -1,6 +1,6 @@
 # kb_service/ —— 规范
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `知识服务核心：仓库配置、账本、outbox、CLI · refactor-status: new`
 
@@ -27,6 +27,9 @@
 - `cli`：`infermatrix-copilot kb keygen|status|pause|resume|control`。
 - `reconcile`：负责人已合并的初始化/管理知识历史的显式接收；固定目标与 active、GitHub PR/merger/当前检查、
   完整 first-parent 提交清单、目标树的两个校验器及真实快照验证，签名计划经重新验证后才安装不可变回执。
+  scheduler 仅在签名回执重新验证且提交已进入 active ancestry 后解决对应历史 provenance 告警；
+  外部 PR 告警仅在 live API 证明同仓库、同 PR、同 head 已关闭且未合并时解决。
+  两类解决均由租约栅栏事务保留原告警与证据，不修改原模型判定或授予新知识信任。
 
 ## 不变量
 - 模块不出现任何仓库名；仓库差异只来自 adapter 配置。
@@ -88,6 +91,9 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   候选改动经 improve 引擎配对实验 + 生产校准集双重把关。
 - `sources`：知识仓库克隆的只读读取（`knowledge_files`、`external_texts`）、只读 GitHub 客户端
   （合并 PR、PR 证据有界摘录、release/tag）、本机 Copilot 运行经验收件目录。
+  PR 证据保留 base/head 分支与 head SHA；intake 区分分支能力与当前默认分支事实，
+  新规则上下文包含完整已占用 ID（含退役与 tombstone），建议按源 PR 和 owner/topic 命名，
+  最终唯一性仍由操作应用和批次合并校验强制保证。
 - `intake`：每个事件由生成器起草类型化操作（只允许 add/edit_same_meaning/replace/retire），
   `apply_operations` 必须接受，最多两轮带精确错误的修复；多事件合并为一个变更集。
   系统提示明确操作字段的字符串类型；未用可选字段省略或为空字符串，`new_page` 是目标路径而非布尔标志。

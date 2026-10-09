@@ -53,11 +53,14 @@ def _adapter(tmp_path: Path, section: dict, *, auditor: bool = False) -> RepoAda
 def test_shipped_adapters_register_with_repo_neutral_config():
     registry = load_registry(ROOT / "adapters", general=general_lifecycle(enabled=False))
     omni = registry["vllm-omni"]
-    assert omni.enabled and omni.mode == "shadow" and not omni.auto_merge
+    assert omni.enabled and omni.mode == "auto_merge" and omni.auto_merge
     assert omni.release.trigger == "github_release" and omni.release.auditor == "release_audit.py"
     assert (omni.adapter_dir / omni.release.auditor).is_file()
-    afd = registry["afd-plugin"]   # kb init flips `enabled`; shadow-only is the invariant
-    assert afd.mode == "shadow" and not afd.auto_merge
+    afd = registry["afd-plugin"]
+    assert afd.mode == "auto_merge" and afd.auto_merge
+    jiuwen = registry["jiuwenswarm"]
+    assert jiuwen.enabled and jiuwen.mode == "auto_merge" and jiuwen.auto_merge
+    assert all(registry[repo].calibration_set for repo in ("vllm-omni", "afd-plugin", "jiuwenswarm"))
     assert registry["general"].intake.merged_prs is False
 
 

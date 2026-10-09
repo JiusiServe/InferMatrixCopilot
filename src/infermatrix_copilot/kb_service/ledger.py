@@ -529,6 +529,32 @@ class Ledger:
             args = (repo,)
         return [dict(r) for r in self._conn.execute(sql + " ORDER BY id", args)]
 
+    def settle_reviewed_holds(self, owner: str, rows: list[dict]) -> None:
+        """Close exact reviewed alerts, retaining their evidence and original text.
+
+        The caller verifies the receipts. This transaction fences the scheduler
+        and refuses a changed queue row rather than resolving a different alert.
+        It grants no knowledge trust and never changes a model verdict.
+        """
+        now = self._clock()
+        with self.fenced(owner) as cur:
+            for item in rows:
+                source, resolution = item["hold"], item["resolution"]
+                row = cur.execute("SELECT * FROM human_queue WHERE id=?", (source["id"],)).fetchone()
+                if row is None or any(row[k] != source[k] for k in
+                                      ("repo", "changeset_id", "reason", "created_at")):
+                    raise ValueError("human alert changed before settlement")
+                name = f"human_resolution:{source['id']}"
+                value = json.dumps({**resolution, "hold": source}, sort_keys=True)
+                previous = cur.execute("SELECT value FROM cursors WHERE repo='*' AND name=?", (name,)).fetchone()
+                if row["resolved_at"] is not None:
+                    if previous is None or previous["value"] != value:
+                        raise ValueError("human alert was resolved by different evidence")
+                    continue
+                cur.execute("INSERT INTO cursors (repo, name, value, updated_at) VALUES ('*', ?, ?, ?)",
+                            (name, value, now))
+                cur.execute("UPDATE human_queue SET resolved_at=? WHERE id=?", (now, source["id"]))
+
     # -- retirements and activations ------------------------------------------
 
     def record_retirement(self, repo: str, rule_id: str, page: str, release: str) -> None:

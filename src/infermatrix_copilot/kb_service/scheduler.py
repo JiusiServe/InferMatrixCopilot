@@ -171,6 +171,15 @@ class Scheduler:
             self._record("*", "activation_error", error=repr(exc))
 
         try:
+            from .reconcile import settle_reconciled_holds
+            from .external import settle_closed_holds
+            resolved = settle_reconciled_holds(rt) + settle_closed_holds(rt)
+            if resolved:
+                self._record("*", "holds_resolved", ids=resolved)
+        except Exception as exc:
+            self._record("*", "hold_settlement_error", error=repr(exc))
+
+        try:
             from .maintenance import advance_corrections, tick
             for event in advance_corrections(rt):
                 self._record("*", "correction", **event)

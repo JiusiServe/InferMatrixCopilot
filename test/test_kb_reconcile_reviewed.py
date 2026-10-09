@@ -80,6 +80,34 @@ def test_supervised_admission_passes_real_activation_without_disposing_or_changi
     assert payload["actor"] == "owner" and payload["commits"][0]["pr"]["reviews"] == []
 
 
+def test_activated_reconciliation_settles_only_its_provenance_alerts(world):
+    w = world
+    provenance = w.rt.ledger.human_queue()
+    assert provenance
+    w.rt.ledger.enqueue_human("demo", "unrecorded knowledge change " + "f" * 12 + ": revert it by hand")
+    w.rt.ledger.enqueue_human("demo", f"L2 uncertain about {w.sha[:12]}", "held-candidate")
+    plan = reconcile.make_plan(w.rt, w.key, **w.options)
+    receipt = reconcile.apply_plan(w.rt, plan, w.key)
+    assert reconcile.settle_reconciled_holds(w.rt) == []  # admitted, not activated
+    activate(w.rt, w.sha)
+    assert reconcile.settle_reconciled_holds(w.rt) == [r["id"] for r in provenance]
+    assert len(w.rt.ledger.human_queue()) == 2
+    assert reconcile.settle_reconciled_holds(w.rt) == []
+    proof = json.loads(w.rt.ledger.get_cursor("*", f"human_resolution:{provenance[0]['id']}"))
+    assert proof["receipt"] == receipt.name and proof["commit"] == w.sha
+    assert w.rt.ledger.get_cursor("*", "disposed:" + w.sha) is None
+
+
+def test_corrupt_reconciliation_cannot_clear_provenance_alerts(world):
+    w = world
+    receipt = reconcile.apply_plan(w.rt, reconcile.make_plan(w.rt, w.key, **w.options), w.key)
+    activate(w.rt, w.sha)
+    receipt.write_text("{}")
+    with pytest.raises(reconcile.ReconciliationError):
+        reconcile.settle_reconciled_holds(w.rt)
+    assert w.rt.ledger.human_queue()
+
+
 @pytest.mark.parametrize("failure", ["missing_check", "pending_check", "failed_check", "wrong_head", "wrong_merge", "merger", "actor"])
 def test_unproven_github_evidence_cannot_create_receipts(world, failure):
     w = world

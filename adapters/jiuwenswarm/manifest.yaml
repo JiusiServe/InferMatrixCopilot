@@ -26,10 +26,10 @@ push:
   protected_branches: [develop, main, master]
   allowed: false
 
-# Knowledge service runs in shadow after reviewed initialization.
+# Owner-authorized automatic publication after reviewed initialization.
 knowledge_lifecycle:
   enabled: true
-  mode: shadow
+  mode: auto_merge
   knowledge_dir: repos/jiuwenswarm
   release:
     trigger: none

@@ -1,13 +1,33 @@
 ---
 title: "NPU connector（CAM async / CAMP2P）review 规则"
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-09
 type: rule
 tags: [afd-plugin]
-sources: []
+sources:
+  - "afd-plugin@036640618fc6df6f2c44c67979b91c5c66b0b5a0:afd_plugin/connectors/npu/camp2p.py"
+  - "afd-plugin@036640618fc6df6f2c44c67979b91c5c66b0b5a0:tests/unit/connectors/test_camp2p_connector.py"
 ---
 
 # NPU connector（CAM async / CAMP2P）review 规则
+
+## AFD-CAMP-430-counts — Legacy DBO 的真实 Attention 长度与物理 wire 长度必须分开
+
+- 触发：修改 `codex/v030-main-integration` 分支中 PR #430 引入的 Legacy NPU CAMP2p 多 stage、Attention ranks 大于 FFN ranks 的传输；该规则不声明此分支能力已经进入 main。
+- 强制：control plane 使用独立物理 payload，先将 DP counts 展开到 TP peers，再按 `(ratio, ffn_size)` 的 strided 接收组取每列最大值并重复；本地 connector state 与发送的 control payload 必须使用同一物理计数，原始 Attention payload 保持真实 query 长度。
+- 禁止：原地覆盖 Attention 元数据，或把各 rank 总体最大值当成每个 FFN 接收组的长度；ratio≤1 或单 stage 时保持原 payload 行为。
+- 验收：覆盖 2A1F、4A2F、DP→TP 展开和等量 ranks；逐 stage 核对发送与本地物理计数一致、输入 counts 不变。真实 native A2E/E2A 检查 wire rows 与 control counts 相符，返回前缀仍使用原始长度。 ^[PR #430]
+
+<!-- kb:rule status=active since=pr-430 -->
+
+## AFD-CAMP-430-padding — 动态 CAMP2p padding 必须在 opaque runtime op 内读取当前 stage
+
+- 触发：修改 PR #430 的 Legacy NPU CAMP2p split-stage send 路径；作用域为 `codex/v030-main-integration` 中该修复，GPU 与新 NPU MRV2 DBO 不在此规则范围。
+- 强制：仅在 `attn_size > ffn_size` 且 connector 有多个 stage 时，从当前 forward context 的 `ubatch_idx`、`additional_kwargs["afd_metadata"].connector` 读取本 rank 物理 token 数；在 opaque op 内按差值为 hidden states 补零，只有 expert IDs 存在且需要 padding 时才同时补齐 IDs/scales。进入该多 stage 路径后，即使 padding 为零，也必须把 transfer batch size 更新为物理计数。
+- 禁止：在 op 外按 profile/warmup 元数据预先 padding，让编译图冻结动态分支；禁止用物理长度替换 E2A 接收的原始长度 reference，或合并不同 stage 的 transfer state。
+- 验收：同一 runtime op 在切换实时 stage metadata 后正确处理无 padding 与有 padding，参数化覆盖 IDs 缺失/存在；断言 native send 张量与 batch size 的物理长度、原始前缀与零尾部，以及每 stage 独立状态。native 观测必须核对实际 wire rows，不能只检查 host 计数。 ^[PR #430]
+
+<!-- kb:rule status=active since=pr-430 -->
 
 ## AFD-I58 — async CAM FFN 侧：`token_nums_rankid_layeridx` 必须原样回传，真实层号和 token 数只来自 CAM 元数据
 
