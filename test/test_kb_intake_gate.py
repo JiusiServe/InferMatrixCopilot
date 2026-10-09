@@ -481,6 +481,65 @@ def test_calibration_scoring():
     assert strict.passed, strict.to_dict()
 
 
+@pytest.mark.parametrize("involves_new_rule", [False, True])
+def test_calibration_preserves_reasons_and_attributes_consistency_like_the_gate(tmp_path, involves_new_rule):
+    base = _tree()
+    base.update(apply_operations(base, [Op("add", PAGE, "DEMO-old", _rule("DEMO-old"))],
+                                 release="v1", today="2026-09-28").files)
+    head = {**base, **apply_operations(base, [Op("add", PAGE, "DEMO-new", _rule("DEMO-new"))],
+                                       release="v1", today="2026-09-28").files}
+    cases = tmp_path / "cases"
+    cases.mkdir()
+    (cases / "good.json").write_text(json.dumps({"id": "good", "expected": "pass", "base": base,
+                                                 "head": head, "evidence": []}))
+
+    def answer(role, prompt):
+        payload = json.loads(prompt.split("<untrusted_data>\n", 1)[1].split("\n</untrusted_data>", 1)[0])
+        if "directory" in payload:
+            assert payload["changed_rule_ids"] == ["DEMO-new"]
+            return {"verdict": "conflict", "conflicts": [
+                ["DEMO-new" if involves_new_rule else "DEMO-old", "DEMO-1a", "overlap"]]}
+        return {"dimensions": {d: "yes" for d in payload["dimensions_to_answer"]},
+                "reasons": {"faithful": "supported by pinned source"}}
+
+    report = run_calibration(tmp_path, gateway=ScriptedGateway(answer), judge=JUDGE)
+    detail = report.details[0]
+    assert detail["outcome"] == ("fail" if involves_new_rule else "pass")
+    assert detail["blocks"][0]["reasons"] == {"faithful": "supported by pinned source"}
+    assert bool(detail["consistency"][0]["preexisting"]) == (not involves_new_rule)
+
+
+def test_calibration_cli_records_replayable_calls_as_calibration(tmp_path, monkeypatch, capsys):
+    from infermatrix_copilot.kb_service import cli, models
+    from infermatrix_copilot.trace_store import TraceStore
+
+    class RecordedGateway(ScriptedGateway):
+        def __init__(self, settings, *, recorder):
+            super().__init__(_judge_all("yes"))
+            self.recorder = recorder
+
+        def call_json(self, role, *, system, prompt, validate=None):
+            reply = super().call_json(role, system=system, prompt=prompt, validate=validate)
+            self.recorder({"system": system, "prompt": prompt, "reply": reply.text,
+                           "role": role.name, "model": role.model})
+            return reply
+
+    lifecycle = RepoLifecycle(repo="demo", full_name="org/demo", enabled=True, mode="shadow",
+                              knowledge_dir="repos/demo", adapter_dir=ROOT / "adapters/vllm_omni",
+                              calibration_set="kb-calibration")
+    monkeypatch.setattr(cli, "_registry", lambda: {"demo": lifecycle})
+    monkeypatch.setattr(models, "ModelGateway", RecordedGateway)
+    monkeypatch.delenv("KB_SIGNING_KEY", raising=False)
+    state = tmp_path / "state"
+    assert cli.main(["--state-dir", str(state), "calibrate", "--repo", "demo"]) == 1
+    capsys.readouterr()
+    calls = TraceStore(state / "traces").query(kind="model_call", limit=100)
+    assert calls
+    assert all(c["context"]["playbook"] == "kb-calibrate" and c["context"]["repo"] == "demo"
+               and c["context"]["item"] for c in calls)
+    assert all(c["inputs"].get("prompt") and c["outputs"].get("reply") for c in calls)
+
+
 def test_kb_intake_playbook_is_registered_and_candidate():
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.steps import register_builtin_steps

@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..knowledge_service.l1 import check_changeset
-from .gate import changes_between, check_consistency, judge_block
+from .gate import _changed_rule_ids, changes_between, check_consistency, judge_block
 
 MAX_FALSE_REJECT = 0.20
 
@@ -75,21 +75,27 @@ def run_calibration(directory: str | Path, *, gateway, judge) -> CalibrationRepo
 
 
 def _run_calibration(directory: str | Path, *, gateway, judge) -> CalibrationReport:
+    from ..trace_store import trace_context
+
     details = []
     bad_total = bad_caught = good_total = good_rejected = 0
     for case in load_cases(directory):
         base, head = case.get("base") or {}, case["head"]
         l1 = check_changeset(base, head, changes_between(base, head))
-        verdicts = [judge_block(b, base=base, head=head, evidence=case.get("evidence") or [],
-                                gateway=gateway, judge=judge) for b in l1.blocks]
+        with trace_context(item=case["id"], step="judge"):
+            verdicts = [judge_block(b, base=base, head=head, evidence=case.get("evidence") or [],
+                                    gateway=gateway, judge=judge) for b in l1.blocks]
         outcome = "pass"
+        consistency = []
         if not l1.ok or any(v.verdict == "fail" for v in verdicts):
             outcome = "fail"
         elif any(v.verdict == "human" for v in verdicts):
             outcome = "human"
         else:
             dirs = sorted({str(Path(b.path).parent) for b in l1.blocks})
-            consistency = check_consistency(head, dirs, gateway=gateway, judge=judge)
+            with trace_context(item=case["id"], step="consistency"):
+                consistency = check_consistency(head, dirs, gateway=gateway, judge=judge,
+                                                changed=_changed_rule_ids(l1.blocks, base, head))
             if any(c["verdict"] == "conflict" for c in consistency):
                 outcome = "fail"
             elif any(c["verdict"] == "unsure" for c in consistency):
@@ -103,5 +109,7 @@ def _run_calibration(directory: str | Path, *, gateway, judge) -> CalibrationRep
         details.append({"id": case["id"], "expected": case["expected"], "outcome": outcome,
                         "l1": [i.code for i in l1.issues],
                         "blocks": [{"rule_id": v.block.rule_id, "op": v.block.op,
-                                    "verdict": v.verdict, "dimensions": v.dimensions} for v in verdicts]})
+                                    "verdict": v.verdict, "dimensions": v.dimensions,
+                                    "reasons": v.reasons} for v in verdicts],
+                        "consistency": consistency})
     return CalibrationReport(len(details), bad_total, bad_caught, good_total, good_rejected, tuple(details))
