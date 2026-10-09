@@ -256,16 +256,31 @@ def _run_intake_locked(rt: KbRuntime, lifecycle: RepoLifecycle, *, max_events: i
                 from ..improve import objectives
                 prediction = None
                 if objectives.enabled(draft_settings) and draft_settings.improve_enabled and draft_settings.improve_evolve_enabled and rt.traces is not None:
-                    from ..improve.runtime import execute
+                    from ..improve.runtime import active, execute
                     payload = {"repo": lifecycle.repo, "repo_dir": lifecycle.knowledge_dir, "event_id": event["id"],
                                "evidence": event["payload"], "files": base, "release": release, "today": today,
                                "external_texts": external, "generator_model": rt.generator.model}
-                    objectives.capture(rt.traces, "kb-intake.draft", f"{lifecycle.repo}#{event['id']}", payload)
-                    from ..llm import LLM
                     try:
-                        prediction = execute(draft_settings, rt.traces, "kb-intake.draft", payload, LLM(draft_settings))
-                    except Exception as exc:
-                        raise ModelUnavailable("autonomous draft rolled back: " + str(exc)) from exc
+                        objectives.capture(rt.traces, "kb-intake.draft", f"{lifecycle.repo}#{event['id']}", payload)
+                    except objectives.ReplayCaptureLimit as exc:
+                        # Ordinary pinned drafting does not require an evolution
+                        # replay. An active (even disabled) evolved workflow does.
+                        try:
+                            entry = active(draft_settings)
+                            workflows = entry.get("workflows", [])
+                            if not isinstance(workflows, list) or not all(isinstance(w, str) for w in workflows):
+                                raise ValueError("invalid active draft workflows")
+                            is_active = "kb-intake.draft" in workflows
+                        except Exception as registry_exc:
+                            raise ModelUnavailable("cannot verify active draft release: " + str(registry_exc)) from registry_exc
+                        if is_active:
+                            raise ModelUnavailable("active draft lacks a complete replay: " + str(exc)) from exc
+                    else:
+                        from ..llm import LLM
+                        try:
+                            prediction = execute(draft_settings, rt.traces, "kb-intake.draft", payload, LLM(draft_settings))
+                        except Exception as exc:
+                            raise ModelUnavailable("autonomous draft rolled back: " + str(exc)) from exc
                 if prediction is not None:
                     from .intake import Draft
                     from ..knowledge_service.ops import KnowledgeOperation

@@ -1,6 +1,6 @@
 # improve/ —— 规范（元改进引擎）
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 `设计：/data/zhoutaichang/copilot/meta-improvement-engine-design.md v1（GPT-6 sol 批准 2026-09-29） · refactor-status: building (P0–P4 已落地)`
 
@@ -13,6 +13,8 @@
 ## 自主目标与制品运行时
 
 `objectives.py` 是受保护的父进程目标控制器（`objective/1`）：自动导入可信 replay 输入、生成有因果见证的故障／负例、固定一个 API 模型、预注册三次配对及 item 聚类功效、核验实际源码与输入、独立计算分数及护栏。见证不传生成器或候选；候选数值分数无效。PR 与知识指标仅证明结构契约、产物保留与资源收益，`semantic_quality_claim=false`。引擎候选每次只修改归因或 lint；lint 既有正例及负例受保护。功效不足会存档并等待新鲜样本，不重放完成的付费调用。
+
+Replay envelope 保留完整文件与引用，由 TraceStore 脱敏、压缩和按内容寻址；未压缩 UTF-8 JSON 上限为 64,000,000 bytes。超限只记录 `replay_capture_deferred` 的大小、上限和摘要并抛出专用 `ReplayCaptureLimit`，不保存截断输入，也不进入 replay 数据集。知识起草无活动进化工作流时继续原生固定生成器；活动工作流（含已禁用项）缺少完整 replay 时保持事件 pending。其他捕获错误不能走此延期路径。
 
 `runtime.py` 重新应用补丁核验实际评估树，原子采用本地不可变 release，原生 PR 评审、知识草稿、lint 和归因在活动制品的沙箱中运行。宿主记录运行指纹才更新部署基线。首次八个不同 item 与上一版比较，七日缺证据自动恢复；保留后每周最多八个新 item 持续比较。契约、凭据／隔离／预算、指纹失败或资源显著退化自动恢复上一版；恢复制品不可验证则禁用执行。执行／切换锁及持久化激活、回滚意图支持重启恢复。
 
