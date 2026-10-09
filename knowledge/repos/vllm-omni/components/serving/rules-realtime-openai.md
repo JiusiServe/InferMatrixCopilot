@@ -4,7 +4,7 @@ created: 2026-10-06
 updated: 2026-10-09
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #7285", "PR #8279", "PR #8287", "PR #8294", "PR #8339"]
+sources: ["PR #7285", "PR #8279", "PR #8287", "PR #8294", "PR #8339", "PR #8566"]
 confidence: high
 ---
 
@@ -145,7 +145,7 @@ confidence: high
 - 验收：记录每次 `_preprocess_chat` 的 skip flag，并用实际 sender/receiver cache 行为
   覆盖重复 sizing、拒绝后重试与最终提交；检查 submitted prompt 包含取消后截短的历史。
   单测覆盖 invalid/超预算 replacement 不取消 active response，不能仅凭 fake renderer
-  计数宣称 cache-safe 或最终 prompt 长度无条件有保证。^[PR #8339]
+  计数宣称 cache-safe 或最终 prompt 长度无条件有保证。^[PR #8339] ^[PR #8566]
 
 ## SERV-RT-1i — 通用音频输出与 transcript truncate 必须使用实际输出时长
 
