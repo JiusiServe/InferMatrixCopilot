@@ -12,7 +12,7 @@ confidence: high
 
 ## MCPMO-ENCODER-1a — exact-shape 输入图必须保留 packed batch、mask 与输出所有权
 
-- 触发：修改 MiniCPM-o SigLIP 或 stateless Whisper/APM encoder 的 CUDA graph adapter。
+- 触发：修改 `encoder_cuda_graph.py` 中 MiniCPM-o SigLIP 或 stateless Whisper/APM 的 exact-shape CUDA graph adapter。
 - 强制：通过 upstream `SupportsEncoderCudaGraph` / `EncoderCudaGraphManager` 执行
   已完成 packing 的完整本地 batch，把它作为一个不可拆的 manager item；只 copy
   runner configuration，不改原配置或再做 manager-level DP。key 包含 CUDA stream
@@ -48,12 +48,12 @@ confidence: high
 Code2Wav 的 resident attention 与 stateful continuation 图见
 [Whole-Euler 合同](rules-resident-graphs.md)。
 
-## MCPMO-ENCODER-1c — stage-0 streaming audio 与 packed vision 使用专用 upstream graph manager
+## MCPMO-ENCODER-1c — streaming audio 使用独立 startup graph 与逐行 KV
 
-- 触发：修改 MiniCPM-o stage-0 的 streaming audio/vision capture、KV buffer 或 mel staging。
-- 强制：专用 adapter 实现 upstream SupportsEncoderCudaGraph，经 EncoderCudaGraphManager 管理；在权重加载后的 omni_post_load 阶段准备并捕获，保留 streaming audio 的持久 KV 与长度/mask 更新。mel 通过可复用 pinned host staging 传输；packed vision 仍按实际打包布局执行。此 startup 路径与 stateless adapter 的二次调用 admission 分开。
-- 禁止：把有状态 audio 当成 stateless replay；每块重建 host staging，或沿用其他 graph wrapper 的资格、容量和 failure policy。
-- 验收：比较多块 audio KV/输出及 packed vision eager parity，覆盖长度变化、reset 与输出 buffer lifetime；只有真实 CUDA capture/replay 能证明图路径。 ^[PR #8430]
+- 触发：修改 MiniCPM-o streaming_audio_encoder_graph.py、duplex build_audio_cuda_graph 或 mel/KV replay。
+- 强制：权重加载后由 build_audio_cuda_graph 探测真实 steady unit，再调用独立 StreamingAudioGraphEncoder 预捕 batch/cache buckets；它直接使用 torch.cuda.CUDAGraph。首次/非 steady unit、超出 cache bucket、未启用或不合资格走原 eager；startup capture 失败不安装 wrapper，保持 eager。replay 按每行 past offset 更新 mask、position 与 KV，输出 clone 后逐行 commit cache；pinned H2D 按实际开关启用。
+- 禁止：把此有状态 wrapper 当作 stateless EncoderCudaGraphManager adapter，或复用 stateless adapter 的 terminal-failure policy；假定 pin_memory 已消除所有 runtime host allocation。
+- 验收：比较跨块、不同 past、reset/overflow、非 steady 与部分 batch 的 eager parity及 retained output，验证 startup idempotence/失败不安装 wrapper；真实 CUDA capture/replay 单独报告。 ^[PR #8430]
 
 ## MCPMO-ENCODER-1d — 增量 fbank 必须重算窗口边缘并保持 exact parity
 
@@ -68,3 +68,10 @@ Code2Wav 的 resident attention 与 stateful continuation 图见
 - 强制：候选采样在 GPU 上执行，逐行保持 token 和 generator state 与逐请求 reference 一致；deferred 模式保留相同 RNG 消耗。fused residual 与 LayerNorm 分别对独立 oracle 验数值。
 - 禁止：在采样热路径通过 item/float/bool 同步 device scalar；用 shape smoke 代替 ties、RNG state 和数值比较。
 - 验收：覆盖多行、ties 分布、deferred/non-deferred 对照和禁止 host reads 的 dispatch guard；CPU 与实际可用 CUDA 分别报告覆盖。 ^[PR #8430]
+
+## MCPMO-ENCODER-1f — packed vision 使用 lazy manager、独立 bucket 与 eager failure
+
+- 触发：修改 vision_fused.py 的 VisionGraphEncoder、_PackedVisionAdapter 或 manager cache。
+- 强制：packed SigLIP+resampler 仅同 grid chunk 进入 _PackedVisionAdapter/EncoderCudaGraphManager，key 为 height/width/batch bucket；pixel 尾部补零并把输出裁回实际 count，adapter clone 输出。当前同 key 第三次 encode 才 capture；最多 16 managers，LRU eviction 时 clear。capture 中、超 bucket 或 capture 失败返回未接纳，让 caller eager；失败 key 记录后不重复 capture。
+- 禁止：把此 padding/bucket/LRU 策略与 encoder_cuda_graph.py 的 exact-shape/无 eviction adapter 混用，或把 vision capture failure 改说成整个 worker terminal failure。
+- 验收：覆盖新内容/不同 grid/count、padding 清零、第三次调用 admission、LRU clear、failed-key eager 与输出所有权；真实 CUDA 数值和 memory lifetime 另验证。 ^[PR #8430]

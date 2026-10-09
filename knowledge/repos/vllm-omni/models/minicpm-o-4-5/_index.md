@@ -73,7 +73,7 @@ Realtime video 不以「每 200 ms append」定义 frame cadence：首个约 103
 - [rules-loader](rules-loader.md) 新增核对：MCPMO-5a2。
 
 - [Whole-Euler 与 resident graph 合同](rules-resident-graphs.md)：MCPMO-GRAPH-1a–1f，涵盖显式 backend、共享 arena、总预算、ragged fallback、ordinary TF32 与 exact continuation 预捕。
-- [输入 encoder graph 合同](rules-encoder-graphs.md)：MCPMO-ENCODER-1a–1e，区分 stateless 与 stage-0 streaming graph，保持 packed batch、buffer 所有权、admission、fbank exactness 与逐行 RNG。
+- [输入 encoder graph 合同](rules-encoder-graphs.md)：MCPMO-ENCODER-1a–1f，区分 stateless exact-shape、streaming audio startup graph 与 packed-vision lazy manager，保持 packed batch、buffer 所有权、admission、fbank exactness 与逐行 RNG。
 - camera tile 与 first-append reservation 查本页已链接的 native duplex 规则 MCPMO-DUPLEX-TILE-1a。
 
 - [MRv2 turn 与输出状态](rules-mrv2-state.md)：MCPMO-MRV2-1a–1d，区分 native V1 duplex、live row ledger、codec sampling、共享 V1 hooks 与显式 cached ISTFT。
