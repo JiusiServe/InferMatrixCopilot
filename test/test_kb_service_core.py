@@ -148,6 +148,19 @@ def test_signing_roundtrip_purpose_binding_and_key_permissions(tmp_path):
         load_private_key(tmp_path / "k.pem")
 
 
+@pytest.mark.parametrize("other_purpose", ["kb-reviewed-event-settlement", "kb-reviewed-reconciliation"])
+def test_orphan_hold_signature_cannot_authorize_other_settlement(tmp_path, other_purpose):
+    key = generate_private_key(tmp_path / "orphan.pem")
+    payload = {"hold": {"id": 22}, "source_receipt": "a" * 64, "active_snapshot": "b" * 40}
+    envelope = sign("kb-reviewed-orphan-hold", payload, key)
+    assert verify("kb-reviewed-orphan-hold", envelope, key.public_key()) == payload
+    with pytest.raises(SignatureError, match="signed for"):
+        verify(other_purpose, envelope, key.public_key())
+    relabelled = {**envelope, "purpose": other_purpose}
+    with pytest.raises(SignatureError, match="does not verify"):
+        verify(other_purpose, relabelled, key.public_key())
+
+
 # -- outbox ----------------------------------------------------------------------
 
 @pytest.fixture
