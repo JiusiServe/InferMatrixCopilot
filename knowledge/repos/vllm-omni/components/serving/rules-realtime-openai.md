@@ -1,10 +1,10 @@
 ---
 title: "OpenAI Realtime 请求与会话规则"
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #7285", "PR #8279", "PR #8287", "PR #8294"]
+sources: ["PR #7285", "PR #8279", "PR #8287", "PR #8294", "PR #8339"]
 confidence: high
 ---
 
@@ -14,29 +14,37 @@ confidence: high
 
 | PR 描述信号 | 规则组 | 第一批源码 |
 |---|---|---|
-| `/v1/realtime`、duplex query、Qwen stages | SERV-RT-1a | `entrypoints/openai/api_server.py::realtime_endpoint` → `entrypoints/duplex/openai.py::dispatch_realtime_websocket` |
+| `/v1/realtime`、duplex query、chat capability admission、旧 Qwen stages | SERV-RT-1a | `entrypoints/openai/api_server.py::realtime_websocket` → `entrypoints/duplex/openai.py::dispatch_realtime_websocket` |
 | PCM16、session.update、turn detection | SERV-RT-1b | `entrypoints/openai/realtime/connection.py` 的 audio-format validation、session update 与 input buffer |
 | response.cancel、max_output_tokens、terminal event | SERV-RT-1c | `OpenAIFullDuplexConnection._run_response`、`ActiveResponse` |
 | history memory、deferred truncate、tools | SERV-RT-1d | `realtime/session.py` 的 history insert/replace → `connection.py` 的 truncate/tool admission |
+| generic Realtime、WAV chat input、stage output kind | SERV-RT-1g | `connection.py::_build_full_prompt/_run_response_inner` → `serving_chat.py::_preprocess_chat` |
+| preflight、sender cache、replacement response | SERV-RT-1h | `connection.py::_handle_response_create/_truncate_prompt_items` → `_build_full_prompt` |
+| resample、audio duration、generic transcript prefix | SERV-RT-1i | `connection.py::_run_response_inner/_truncate_transcript` |
 
 ## SERV-RT-1a — Realtime route 必须保留已配置 native duplex 的优先级
 
 - 触发：修改 `/v1/realtime` 的 query routing、模型 stage 判定或 connection factory。
 - 强制：已配置 native duplex handler 时，无 duplex query 或显式 `1/true/on` 继续进入该
   engine-owned handler；显式启用 duplex 却未配置 handler 时返回 unsupported error。
-  其余请求才进入 OpenAI dispatch：Qwen3-Omni 必须具有 thinker/talker/code2wav 三个 stage，
-  运行期 typed stage 的 architecture 从 `stage.model_config.model_arch` 读取，角色从
-  `stage.model_stage` 读取；不能沿用早期 `stage.engine_args` mapping/object lookup。
-  三个角色必须各一个，非空 model query 必须匹配 served name。
+  `0/false/off` 选择 turn-based OpenAI dispatch，duplex server 上同样可用；它共用 engine
+  stages，不能打开 native duplex session 或消耗其 `max_sessions` 槽位。通用 dispatch
+  以存在 engine client、chat handler 且非 diffusion 为 admission 条件，非空 model query
+  必须匹配 served name。仅在保留 `supports_qwen3_omni_realtime` 的旧 Qwen 专属分支时，
+  才校验恰好一个 thinker/talker/code2wav，architecture 从 typed
+  `stage.model_config.model_arch`、角色从 `stage.model_stage` 读取；不能沿用早期
+  `stage.engine_args` lookup。该旧分支约束不能成为通用 chat-backed handler 的前提。
   OpenAI connection 的 buffered input/`response.create` 生命周期与 native continuous duplex
   各自维持自己的输入与 response ownership。
-- 禁止：按模型名把所有 Qwen 请求强行改走 OpenAI connection；给非 Qwen fallback 塞入
-  Qwen token timing；把 client-driven buffer 宣称为同一 generation 的持续音频输入。
+- 禁止：按模型名把所有 Qwen 请求强行改走 OpenAI connection；因没有旧 Qwen 三 stage
+  拒绝已配置 chat capability 的其他模型；把 client-driven buffer 宣称为同一 generation
+  的持续音频输入，或将 turn-based route 的可用性当作 diffusion 支持。
 - 验收：路由矩阵覆盖 configured/unconfigured handler、缺失/true/false query、完整/缺失
-  Qwen stage、typed pipeline factory config、重复 stage/其他 architecture 与错误 model；
+  chat capability、diffusion 与错误 model；保留旧 Qwen 分支的 checkout 另测 typed topology、
+  缺失/重复 stage 与其他 architecture；
   通过 assembled WebSocket 检查正常 turn server 进入 OpenAI connection，分别检查 native
   与 OpenAI protocol 的生命周期。不要求 OpenAI 标准客户端发送自定义 `playback.ack`
-  才能完成会话。^[PR #7285] ^[PR #8279]
+  才能完成会话。^[PR #7285] ^[PR #8279] ^[PR #8339]
 
 ## SERV-RT-1b — 输入格式、部分 session 更新与 VAD 能力必须显式验证
 
@@ -94,9 +102,61 @@ confidence: high
 - 强制：OpenAI buffered path 按 24 kHz PCM16 算 bytes/ms，session.update 使用 nested
   session 对象；append 后 commit，再 response.create。消费 audio 的 `delta`、transcript
   delta/done 的相应字段，记录 audio.done 后继续读到 response.done，再判定整次 response。
+  shared web UI 的 manual turn 等待 session.updated，跨 turn 保持同一 connection/history，
+  reply 播放期间暂停 mic upload，response.done 与实际 playback drain 后再接收下一 turn；
+  manual 不发送 playback.ack，也不继承 native VAD 的 camera/barge-in 行为。
   native duplex 的输入 fixture 按自身协商/resample 路径处理，不能混用 buffered helper。
-- 禁止：发送旧 final=true commit、用旧 `audio` 字段读 delta、在 audio.done 提前退出；
+- 禁止：发送旧 final=true commit、用旧 `audio` 字段读 delta、在 audio.done 提前退出，
+  或为每个 manual turn 重开 legacy STT connection 丢失历史；
   以一次模型自我介绍的固定措辞当作协议验收或将 native VAD 证明转给 buffered OpenAI path。
 - 验收：至少一个非空且偶数字节 audio delta、audio.done 与 response.done 均观测到，
   sample-rate/chunk duration 与实际输入一致；对 conversation 语义使用合适的 model/task
-  断言，避免偶发同义词误报协议失败。^[PR #8294]
+  断言，避免偶发同义词误报协议失败；manual 至少连续两 turn 共用 socket，分别核对 VAD
+  与 manual 的 query、input rate、camera/ack 和终态处理。^[PR #8294] ^[PR #8339]
+
+## SERV-RT-1g — 通用 Realtime 必须复用 chat preprocessing 与既有模型输出合同
+
+- 触发：修改 turn-based Realtime prompt、chat handler 注入、工具或 generation 参数。
+- 强制：server 维护会话 history；把 instructions、text、function_call/output 与 audio
+  转成普通 chat messages，经共享 `_preprocess_chat` 使用已配置 template、template kwargs
+  与 tools。24 kHz PCM16 input 包装成 mono WAV；generation 使用 renderer 的真实 engine
+  input。复用 chat 的 stage output-kind 修正：MiniCPM-o 4.5 audio 的 llm Stage0 保持
+  FINAL_ONLY，TTS 保持 DELTA，不能被通用 DELTA 默认覆盖。
+- 禁止：重新硬编码 Qwen audio placeholder/token expansion 或增加专属 topology 作为
+  generic admission；把共享路由等同于所有模型都支持 tools、所有 modalities 或 native
+  duplex。工具可用性仍受 parser、enable-auto-tool-choice 与模型自身能力约束。
+- 验收：至少两个不同家族经共享路径连续对话；tools 按模型记录实际验证，不由某模型的
+  成功推断其他模型。核对 WAV header/原始 PCM、configured template/tools 与实际 submitted
+  engine input，并断言 MiniCPM 的 FINAL_ONLY/DELTA。涉及 duplex dispatch/chat plumbing
+  时按 CI source dependencies 补齐 MiniCPM duplex 与 Qwen online guards 的结果或明确缺口，
+  CPU stub 和手动对话不能代替这些端到端证据。^[PR #8339]
+
+## SERV-RT-1h — 预算预检不能污染 sender cache，替换 response 必须在取消后重建输入
+
+- 触发：修改 Realtime prompt budget probe、multimodal cache 或 active response replacement。
+- 强制：所有 speculative sizing renders 使用 `skip_mm_cache=True`，预算按 renderer 的
+  expanded prompt 计；接受后才经正常 sender cache render 最终提交的 engine input。
+  有 active response 时先验证候选，拒绝不取消原 response；接受后 await cancellation，
+  等旧 response 的 history/pending truncate 完成，再重新探测并 render 提交输入。
+  当前 context cursor 与历史保留遵循 [自动截断合同](rules-realtime-truncation.md)。
+- 禁止：向 sender cache 写入从未提交给 receiver 的 speculative audio；复用取消之前
+  的 prompt 丢失已听 transcript prefix；把迭代/后缀探测的 render 数量固定成两次，
+  或恢复旧版通过删除 conversation history 缩短 context 的行为。
+- 验收：记录每次 `_preprocess_chat` 的 skip flag，并用实际 sender/receiver cache 行为
+  覆盖重复 sizing、拒绝后重试与最终提交；检查 submitted prompt 包含取消后截短的历史。
+  单测覆盖 invalid/超预算 replacement 不取消 active response，不能仅凭 fake renderer
+  计数宣称 cache-safe 或最终 prompt 长度无条件有保证。^[PR #8339]
+
+## SERV-RT-1i — 通用音频输出与 transcript truncate 必须使用实际输出时长
+
+- 触发：修改 Realtime audio chunk resampling、duration accounting 或 transcript prefix。
+- 强制：读取实际模型输出 sample rate，用同一 response 的 stateful resampler 转为
+  24 kHz PCM16；正常完成时 flush tail，duration 只累计实际允许发送的 audio samples。
+  generic truncate 用 `int(token_count * audio_end_ms / duration_ms)` 估计 prefix；
+  token IDs 或有效 duration 缺失时返回空 prefix。tool-call markup 不发音，其 raw token
+  stream 不作为已剥离 tool 的 transcript 对齐依据。
+- 禁止：把旧 Qwen 的固定 383 ms/token 换算应用到通用 handler；丢失 resampler tail、
+  给 text-only/tool-call response 发送音频，或把比例 prefix 当作精确词级音频对齐。
+- 验收：覆盖不同源采样率、多 chunk/tail flush、text-only/tool suppression，断言发送
+  sample 数与 history duration 一致；覆盖 0/中间/末尾 truncate、缺 token/duration 与
+  tool responses；已有合法 content_index/audio length 检查先于 history 修改。^[PR #8339]
