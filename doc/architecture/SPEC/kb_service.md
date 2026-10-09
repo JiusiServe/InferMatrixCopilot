@@ -102,6 +102,8 @@ stdlib + PyYAML + `cryptography`（`kb` extra）+ `.adapters` + `.knowledge_serv
   外部引用、protected、熔断（按仓库计算）、任何不确定 → human；L1 失败不调用模型。
 - `runtime`：collect → intake → gate → publish；shadow 只记录；变更集文件存 `changesets/<id>.json`。
 - `calibration`：按仓库的校准集评分（坏样例须全部拦下、好样例误拒 ≤ 20%）。
+  一致性检查沿用生产门禁的 changed-rule 归属，既有冲突单独保留；报告保存逐块原因和一致性详情。
+  CLI 校准模型调用写入 replayable trace，按仓库、case 和 judge/consistency 步骤标记。
 - `runner`：经标准 executor 运行 `kb-*` playbook。CLI 新增 `kb run`、`kb calibrate`。
 
 ## 2026-09-28 合并流程、激活、巡检与调度

@@ -8,8 +8,8 @@ A case is ``cases/<id>.json``::
 ``base``/``head`` hold only the pages involved. The runner derives L1 blocks,
 asks the pinned judge exactly as the gate does, and scores: every ``reject``
 case must end in fail or human (never pass), and at most 20 % of ``pass``
-cases may be rejected. A repository stays in shadow mode until its set passes,
-and the set is re-run whenever the judge model or version changes.
+cases may be rejected. Automatic publication remains blocked until its set
+passes, and the set is re-run whenever the judge model or version changes.
 """
 
 from __future__ import annotations
