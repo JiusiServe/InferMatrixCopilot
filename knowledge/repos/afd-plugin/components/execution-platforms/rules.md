@@ -20,7 +20,7 @@ sources:
 - 触发：修改包含 v0.30 GPU MRV2 DBO 实现的 checkout 的 `validate_gpu_model_runner_v2_config`、共享角色校验或启动说明。
 - 必须：先确认目标 checkout 和 runtime pin，区分升级实现与 v0.26 知识基线。GPU MRV2 只允许同步 `P2pNcclAFDConnector`、`compute_gate_on_attention=false`，开启 DBO/ubatching 时必须恰好两个微批且 Attention DP > 1；FFN 不构建 native ubatch runner，不把 Attention DP 条件错误施加到 FFN。
 - 必须：保留 PP/PCP/DCP 为 1、角色 rank 等于 DP×TP、静态 EP、已注册 AFD 模型和 CUDA eager/`FULL_DECODE_ONLY` 校验。README、启动说明与两个角色共用的校验器必须一致。
-- 禁止：仅因 GPU 限制改变就退休整条 [AFD-I8](../../rules-init.md#afd-i8--readme-和设计文档对-modelrunnerv2-的说法相互矛盾改动-v2-时必须明确对齐)，或放宽 NPU MRV2 的 DBO/ubatching 禁令；升级分支合并不证明已晋升 upstream main，也不证明更宽硬件/模型矩阵。
+- 禁止：仅因 GPU 限制改变就退休整条 [AFD-I8](../../rules-init.md#afd-i8-readme-和设计文档对-modelrunnerv2-的说法相互矛盾改动-v2-时必须明确对齐)，或放宽 NPU MRV2 的 DBO/ubatching 禁令；升级分支合并不证明已晋升 upstream main，也不证明更宽硬件/模型矩阵。
 - 验收：非两微批、Attention DP=1、错误 connector/gate/并行配置的负例失败；合法 FFN DP 不被 Attention-only 条件拒绝；文档保留版本、平台和硬件证据边界。
 
 ^[PR #424]

@@ -78,7 +78,7 @@ sources:
   - PP、PCP、DCP 均为 1；
   - 角色 rank 数等于 DP x TP；
   - 静态 EP；
-  - v0.26 知识基线的 V2 不用 DBO 或 ubatching；包含 v0.30 GPU MRV2 实现的 checkout 按 [平台规则](components/execution-platforms/rules.md#gpu-mrv2-dbo-validation--gpu-mrv2-dbo-限制必须按版本和平台校验) 检查两微批与 Attention DP 限制，不能把升级分支的支持声明反推到 v0.26 或 NPU；
+  - v0.26 知识基线的 V2 不用 DBO 或 ubatching；包含 v0.30 GPU MRV2 实现的 checkout 按 [平台规则](components/execution-platforms/rules.md#gpu-mrv2-dbo-validation-gpu-mrv2-dbo-限制必须按版本和平台校验) 检查两微批与 Attention DP 限制，不能把升级分支的支持声明反推到 v0.26 或 NPU；
 - 图模式有平台差异：CUDA V2 只支持 eager 和 `FULL_DECODE_ONLY`，Ascend V2 还支持 `FULL`。不要把 Ascend 的 `FULL` 放宽到 CUDA。另外 README 的 connector 表把 CAMP2P 写成只支持 `FULL_DECODE_ONLY`，修改时要一并对齐。
 
 ^[PR #424]

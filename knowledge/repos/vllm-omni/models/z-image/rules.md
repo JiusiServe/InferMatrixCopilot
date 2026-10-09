@@ -10,6 +10,12 @@ confidence: high
 
 # Z-Image TeaCache 校准合同
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| Z-Image TeaCache coefficient、threshold、校准域或 cache hook | ZIMAGE-1a | `vllm_omni/diffusion/cache/teacache/config.py` → `coefficient_estimator.py` → `tests/diffusion/cache/test_teacache_config.py` |
+
 ## ZIMAGE-1a — TeaCache 系数只用于已校准 checkpoint 与输入域
 
 - 触发：修改 Z-Image TeaCache polynomial、threshold、adapter registry 或校准 hook。
