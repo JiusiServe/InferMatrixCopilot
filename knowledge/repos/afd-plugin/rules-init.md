@@ -1,10 +1,14 @@
 ---
 title: "AFD plugin 仓库规则"
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-09
 type: rule
 tags: [afd-plugin]
-sources: []
+sources:
+  - "afd-plugin@4c98691501be37f21735725f7429715ae98b603b:afd_plugin/validation.py"
+  - "afd-plugin@4c98691501be37f21735725f7429715ae98b603b:README.md"
+  - "afd-plugin@4c98691501be37f21735725f7429715ae98b603b:.buildkite/cuda/test-ready.yml"
+  - "afd-plugin@4c98691501be37f21735725f7429715ae98b603b:.buildkite/cuda/test-merge.yml"
 ---
 
 # AFD plugin 仓库规则
@@ -74,8 +78,10 @@ sources: []
   - PP、PCP、DCP 均为 1；
   - 角色 rank 数等于 DP x TP；
   - 静态 EP；
-  - 不用 DBO 或 ubatching；
+  - v0.26 知识基线的 V2 不用 DBO 或 ubatching；包含 v0.30 GPU MRV2 实现的 checkout 按 [平台规则](components/execution-platforms/rules.md#gpu-mrv2-dbo-validation-gpu-mrv2-dbo-限制必须按版本和平台校验) 检查两微批与 Attention DP 限制，不能把升级分支的支持声明反推到 v0.26 或 NPU；
 - 图模式有平台差异：CUDA V2 只支持 eager 和 `FULL_DECODE_ONLY`，Ascend V2 还支持 `FULL`。不要把 Ascend 的 `FULL` 放宽到 CUDA。另外 README 的 connector 表把 CAMP2P 写成只支持 `FULL_DECODE_ONLY`，修改时要一并对齐。
+
+^[PR #424]
 
 <!-- kb:rule status=active since=init-9cae2d2ddaae -->
 
@@ -113,11 +119,14 @@ sources: []
 ## AFD-I12 — E2E：分清 PR 门禁、每周门禁和只在本地跑的用例
 
 - PR 门禁用例最多使用 4 个设备，AFD 门禁用例必须是 2A2F。2A1F 用例（包括 README 本地冒烟示例里的 `afd-eager-2a1f`）不能加入 PR 门禁。
+  - 向 `.buildkite/cuda/test-ready.yml` 或 `test-merge.yml` 新增 PR 门禁场景时，必须在另一份选择列表中加入相同 ID，并核对该 ID 在 `tests/e2e` 中存在。只约束新增门禁条目的对称性，不把本地或每周场景自动提升为 PR 门禁。
   - 一处说 2A1F 用例 “run outside CI”；
   - 另一处的每周门禁包含 DeepSeek `afd-graph-dbo-2a1f`，以及 Qwen3 MoE 和 Qwen3.6 的用例，其中 Qwen3.6 套件是 2A1F。
   - 修改 CI 选择时，要同步更新 `docs/design/module/e2e_testing.md` 和 `tests/e2e/README.md`，不要让这处矛盾继续扩大。
 - 按通用规则，harness 升级到 `SIGKILL` 就必须判用例失败。通过 `/proc/*/environ` 标记扫描再发 `SIGKILL` 的例外，只适用于 NPU async CAM 场景（`afd-eager-async-cam`、`afd-dsv4-flash-async-cam-dp2tp4-ep8`）。新场景不能沿用这个例外。
 - CI 不能设置 `AFD_GSM8K_LIMIT`，也不能调低 `AFD_GSM8K_THRESHOLD`。DBO 场景需要 12 路并发、至少 24 个样本，并断言至少记录到一次实际运行的双 ubatch 步骤。
 - 门禁用例不能用 `skip` 或 `xfail`。新行为需要单元测试加真实硬件证据；Ascend V2 目前只有单元测试证据，不能当作先例。
+
+^[PR #424]
 
 <!-- kb:rule status=active since=init-9cae2d2ddaae -->

@@ -19,3 +19,5 @@ confidence: high
 
 共享执行查 [Diffusion owner](../../components/diffusion/_index.md)；
 Speech API 的公共输入与输出查 [Serving owner](../../components/serving/_index.md)。
+
+- [AuK online FP8 量化资格与验证](rules-fp8.md)。

@@ -86,3 +86,5 @@ sources: ["PR #5635", "PR #6664", "PR #6543", "PR #4982", vllm_omni/model_execut
 reference attention 平台 keyword/LSE 与短 Unix socket fixture：MOSS-REF-BACKEND-1a/MOSS-REF-TEST-1a；沿本目录 rules 审查入口核对。
 
 - [Local MRv2slot、逐行seed、ramp、first-chunk与sharedreference生命周期](rules-local-streaming.md)。
+
+- [MOSS-TTS Local MRv2 profile 与输出合同](rules-local-mrv2.md)。

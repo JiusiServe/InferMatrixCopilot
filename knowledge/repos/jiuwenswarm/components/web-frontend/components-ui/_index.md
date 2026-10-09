@@ -1,7 +1,7 @@
 ---
 title: "components-ui"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-09
 type: index
 tags: [jiuwenswarm]
 sources: []
@@ -13,3 +13,5 @@ sources: []
 - [components-ui 源码接口与集成边界 01](source-contracts-01.md)
 - [components-ui 源码接口与集成边界 02](source-contracts-02.md)
 - [components-ui 源码接口与集成边界 03](source-contracts-03.md)
+
+- [components-ui 审查规则](rules.md) — 共享 UI 迁移保持自动化契约，删除组件同步清理测试脚本。

@@ -1,10 +1,10 @@
 ---
 title: "legacy engine args 投影隔离"
 created: 2026-09-05
-updated: 2026-09-22
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["PR #6783", vllm_omni/engine/stage_init_utils.py, tests/engine/test_build_engine_args_no_mutate.py, "PR #5929", "PR #7237", "PR #7390"]
+sources: ["PR #6783", vllm_omni/engine/stage_init_utils.py, tests/engine/test_build_engine_args_no_mutate.py, "PR #5929", "PR #7237", "PR #7390", "PR #7652", "PR #7917"]
 confidence: high
 ---
 
@@ -38,3 +38,17 @@ confidence: high
 - 强制：把字段同时加入 `_ModelEngineOverrides` 与 `OmniStageModelConfig`，类型跟随 vLLM `EngineArgs`，默认 `None`，使 `_project_omni_config_fields` 只投影用户显式值，并经 typed/legacy engine-args 到达各 stage。不得把这些 ModelConfig 输入塞进 `_NON_STAGE_ENGINE_CLI_FIELDS` 来绕过 ownership。
 - 禁止：仅因 legacy `build_stage_runtime_overrides` 仍能透传就让 structured ownership 拒绝文档命令；把尚未归属的非 ModelConfig 开关（如 `enable_lora`/`speculative_config`）一并放行。
 - 验收：对至少两个 pipeline key 参数化断言显式全局值进入每个 stage 的 `model_config`，并用 typed `build_engine_args_dict_from_omni_stage_config` 读回同一集合；字段集合 census 必须包含这些 owner。^[PR #7390]
+
+## CFG-TEXT-ENCODER-TP-1a — text encoder TP 的 library 与 CLI 入口均保留显式值
+
+- 触发：修改 OmniEngineArgs、from_cli_args 字段过滤或 default diffusion parallel config。
+- 强制：text_encoder_tp_size 以 int|None、默认 None 保留在 OmniEngineArgs；显式 library/CLI 值经 from_cli_args 到达默认 diffusion parallel config，未设置值仍走原默认。
+- 禁止：在字段过滤时丢弃显式 text encoder TP，或拿 registered pipeline alias 选择代替 TP 值透传。
+- 验收：构造 library args 与 CLI Namespace，显式 2 读回最终 config 仍为 2，缺省路径保持原值。 ^[PR #7652]
+
+## CFG-CLI-ALIAS-1a — no_guardrails 在 strict diffusion ingress 前规范化
+
+- 触发：修改 --no-guardrails parser、headless overrides 或 diffusion normalize。
+- 强制：将负向 alias 消费为 canonical model config guardrails=False，在 strict diffusion ingress 前移除残余 no_guardrails；普通 serve 与 headless 共用同一效果。
+- 禁止：放宽未知字段校验来接纳 CLI-only alias，或删除 alias 却丢失显式 False。
+- 验收：真实 parser 与 headless 路径都检查 canonical False 和 alias 消失；无关 unknown key 仍被拒绝。 ^[PR #7917]

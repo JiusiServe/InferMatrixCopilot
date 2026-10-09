@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni 配置开发门禁"
 created: 2026-07-16
-updated: 2026-09-22
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["PR #7648", "claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182", "PR #4820", "PR #6619", "PR #6680", "PR #6422", vllm_omni/deploy/higgs_multimodal_qwen3.yaml, "PR #7655"]
+sources: ["PR #7648", "claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py", "PR #5048", "PR #6458", "PR #6102", "PR #6308", "PR #6182", "PR #4820", "PR #6619", "PR #6680", "PR #6422", vllm_omni/deploy/higgs_multimodal_qwen3.yaml, "PR #7655", "PR #7883"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -164,13 +164,18 @@ sources: ["PR #7648", "claude-workflow-starter-private@296ea45", "PR #4281", "PR
 - 触发：CLI、deploy YAML、`base_config` overlay、platform 覆盖、per-stage override
   或 `engine_extras` 各层说法不一致。
 - 强制：以 `resolve_deploy_yaml → load_deploy_config → merge_pipeline_deploy →
-  build_stage_runtime_overrides` 展开后的最终逐 stage 配置为唯一事实，逐字段打印核对。
+  build_stage_runtime_overrides` 展开后的最终逐 stage 配置核对阶段运行时字段。API 进程
+  专属顶层字段不投影到 stage：`speech_cache` 以 `resolve_deploy_yaml → load_deploy_config`
+  得到的 `deploy.speech_cache` 和 API speech serving 的实际 consumer 为准，见
+  [CONF-SPEECH-1a](rules-speech-cache.md)。
   overlay 中的显式 `null` 也是有语义的值：例如 MUSA Qwen3-Omni profile 在 Talker 与
   Code2Wav 用 `hf_overrides.quantization_config: null` 清除 checkpoint root 的 ModelOpt
   metadata，避免 BF16 audio stage 被自动识别为量化；Thinker 与非 MUSA base 保持不变。
 - 禁止：拿某一层 YAML 原文当生效值；用默认值脑补缺失字段。
-- 验收：争议字段在最终逐 stage 对象中可读回，并与第一位 consumer 一致；平台 overlay
-  必须同时断言受影响 stage 和未覆盖 control，不能只验证 YAML 原文。^[PR #5671]
+- 验收：阶段运行时字段在最终逐 stage 对象中可读回，并与第一位 consumer 一致；API
+  专属 section 在最终 deploy 对象和 API consumer 读回，不要求其出现在 stage args。
+  平台 overlay 同时断言受影响 stage 和未覆盖 control，不能只验证 YAML 原文。
+  ^[PR #5671] ^[PR #7883]
 
 ### CONF-3b — 显式 deploy YAML 统一经 `deploy_config` 解析
 

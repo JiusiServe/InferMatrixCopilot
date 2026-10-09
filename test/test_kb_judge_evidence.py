@@ -102,6 +102,25 @@ def test_recorded_pr_evidence_carries_its_merge_commit():
 
 
 
+def test_feature_branch_merge_identity_survives_source_collection_and_drafting():
+    from infermatrix_copilot.kb_service.intake import draft_prompt
+    from infermatrix_copilot.kb_service.sources import GitHubReader
+
+    def fetch(url):
+        if "/files?" in url:
+            return [{"filename": "pkg/feature.py", "patch": "+feature()"}]
+        return {"number": 6926, "merge_commit_sha": "c" * 40,
+                "base": {"ref": "xiaoyi_0.2.4.beta3"},
+                "head": {"ref": "wiretrace", "sha": "d" * 40}}
+
+    evidence = GitHubReader(fetch=fetch, token="").pull_request("org/demo", 6926).evidence()
+    assert evidence["base_ref"] == "xiaoyi_0.2.4.beta3"
+    assert evidence["head_ref"] == "wiretrace" and evidence["head_sha"] == "d" * 40
+    prompt = draft_prompt("demo", evidence, _tree(), "repos/demo")
+    recorded = json.loads(prompt.split("<untrusted_data>\n", 1)[1].split("\n</untrusted_data>", 1)[0])
+    assert recorded == evidence
+
+
 def _git(cwd, *args):
     import subprocess
 

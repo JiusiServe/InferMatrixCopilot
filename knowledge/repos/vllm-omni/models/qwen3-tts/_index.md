@@ -37,3 +37,5 @@ confidence: high
   [Qwen-Omni](../qwen-omni/_index.md)。
 
 - [当前step prompt projection、requestID cache 与speaker embedding](rules-prompt-preprocess.md)。
+
+- [Qwen3-TTS codec tokens 输出合同](rules-codec-output.md)。

@@ -1,10 +1,10 @@
 ---
 title: "Serving session lifecycle 规则"
 created: 2026-09-05
-updated: 2026-09-22
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #6537", "PR #6354", vllm_omni/config/stage_config.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/engine/duplex/adapter.py, vllm_omni/engine/duplex/runtime.py, vllm_omni/experimental/fullduplex/mage_vl/adapter.py, vllm_omni/experimental/fullduplex/mage_vl/serving/backend.py, vllm_omni/experimental/fullduplex/mage_vl/serving/server.py, tests/e2e/features/fullduplex/test_mage_vl_adapter.py, tests/e2e/features/fullduplex/test_mage_vl_serving.py, tests/e2e/online_serving/nemotron_voicechat_realtime_duplex.py, "PR #7363"]
+sources: ["PR #6537", "PR #6354", vllm_omni/config/stage_config.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/engine/duplex/adapter.py, vllm_omni/engine/duplex/runtime.py, vllm_omni/experimental/fullduplex/mage_vl/adapter.py, vllm_omni/experimental/fullduplex/mage_vl/serving/backend.py, vllm_omni/experimental/fullduplex/mage_vl/serving/server.py, tests/e2e/features/fullduplex/test_mage_vl_adapter.py, tests/e2e/features/fullduplex/test_mage_vl_serving.py, tests/e2e/online_serving/nemotron_voicechat_realtime_duplex.py, "PR #7363", "PR #7784"]
 confidence: high
 ---
 
@@ -58,3 +58,10 @@ confidence: high
 - 验收：`max_frames=1` 下延迟 decode 时，被逐出帧的 PIL 在会话仍打开时可被回收；
   `max_frames=2` 时仍缓存到 teardown。中断连续 query 时记录的 sleep 请求为空，且旧
   generator 关闭与 abort 完成发生在下一次 generate 之前。^[PR #7363]
+
+## SERV-CLIENT-DEFAULTS-1a — duplex client 只在 session.updated 后应用默认值
+
+- 触发：修改 duplex client session_info 或 audio format/sample rate/RMS 默认值。
+- 强制：发送 session.update 不预先改本地有效 session；收到 server session.updated 后从确认 payload 更新 flat/nested audio 默认值，失败或 rejected update 保持旧值。
+- 禁止：把未确认 patch 当作有效配置，导致 rejected update 后客户端使用服务器未接受的音频格式。
+- 验收：覆盖 accepted/rejected update、flat/nested payload 与 format/sample-rate/RMS，断言发送后到 ACK 前有效默认不变。 ^[PR #7784]

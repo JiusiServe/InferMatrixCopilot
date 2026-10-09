@@ -1,7 +1,7 @@
 ---
 title: "runtime-agent-adapter"
 created: 2026-10-01
-updated: 2026-10-06
+updated: 2026-10-09
 type: index
 tags: [jiuwenswarm]
 sources: []
@@ -13,4 +13,4 @@ sources: []
 - [runtime-agent-adapter 源码接口与集成边界 01](source-contracts-01.md)
 - [runtime-agent-adapter 源码接口与集成边界 02](source-contracts-02.md)
 
-- [Agent adapter 运行时规则](rules.md) — Code profile 的模型路由 rail 挂载与 session 重建。
+- [Agent adapter 运行时规则](rules.md) — Code profile 的模型路由与后台 memory 初始化、Deep 停止轮提醒、团队群聊载荷及 accepted/回合生命周期。

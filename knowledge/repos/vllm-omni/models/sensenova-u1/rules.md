@@ -1,10 +1,10 @@
 ---
 title: "SenseNova-U1 规则"
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #6516", "Issue #6471", recipes/SenseNova/SenseNova-U1.5.md, vllm_omni/diffusion/models/sensenova_u1/pipeline_sensenova_u1.py, vllm_omni/diffusion/models/sensenova_u1/paged_decode.py, vllm_omni/diffusion/models/sensenova_u1/sensenova_u1_transformer.py, tests/diffusion/models/sensenova_u1/]
+sources: ["PR #6516", "Issue #6471", recipes/SenseNova/SenseNova-U1.5.md, vllm_omni/diffusion/models/sensenova_u1/pipeline_sensenova_u1.py, vllm_omni/diffusion/models/sensenova_u1/paged_decode.py, vllm_omni/diffusion/models/sensenova_u1/sensenova_u1_transformer.py, tests/diffusion/models/sensenova_u1/, "PR #8260"]
 confidence: high
 ---
 
@@ -46,3 +46,10 @@ confidence: high
 - 强制：resolve_component_quant_config使用精确language_model键，再把结果传SenseNovaU1ForCausalLM；两侧understanding/generationparallel linears接受它，vision/embedding/lm_head不因此量化。仅非checkpoint-serialized fp8且lora_backend=distill并有lora_path的组合在model构造前抛明确ValueError；BF16、无LoRA及已serializedFP8不能被此guard误拒。componentmatch/unmatched/default/explicitdisable各保持。
 - 禁止：用全局scalarconfig测试声称验证了component名；漏掉guard直到weight_loader裸assert；把降低显存说成所有硬件更快/qualitybitparity，或把A800/vLLM0.29的Cutlass禁用要求推广所有平台。
 - 验收：真实ComponentQuantizationConfig四种路由、三类guardcontrol和onlineFP8+distill冲突覆盖；按实际kernel/hardware分开测加载、text/image、质量和step/E2Elatency，不能只看启动成功。 ^[PR #7955]
+
+## SENSENOVA-3a — TeaCache extractor 传递与原 forward 相同的三轴 RoPE
+
+- 触发：修改 SenseNova-U1 TeaCache extractor 或 transformer layer 调用签名。
+- 强制：extractor 的 run_transformer_blocks 从 indexes 的三轴分别计算 rotary_emb 与 rotary_emb_hw，给每层传入同一 position_embeddings tuple，保持 indexes、mask、past KV 与 gen/und 角色不变。
+- 禁止：只修 pipeline forward 而让 cache miss/extractor 调用漏新参数；重排 height/width/time 轴或静默忽略 indexes。
+- 验收：对同一输入比较常规 forward 与 extractor 全计算路径的 RoPE/层入参和结果，覆盖三轴与角色组合；stub 签名一致性不代替真实模型 quality。 ^[PR #8260]

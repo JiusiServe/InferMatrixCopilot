@@ -36,3 +36,5 @@ sources: ["PR #5541", "PR #6563", "PR #4048", vllm_omni/diffusion/models/hunyuan
 | 运行 image generation demo | [run image-gen demo](run-image-gen-demo.md) |
 | 调查模型专有错误 | [incidents](incidents/_index.md) |
 | 查询已结束的历史分析 | [history](history/_index.md) |
+
+- [HunyuanImage3 ROCm VAE 与 accuracy 合同](rules-rocm.md)。

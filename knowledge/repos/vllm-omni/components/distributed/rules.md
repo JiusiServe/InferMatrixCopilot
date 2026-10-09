@@ -1,10 +1,10 @@
 ---
 title: "Distributed 传输规则"
 created: 2026-08-05
-updated: 2026-09-26
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", "PR #6834", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626", "PR #6529", "PR #7136", "PR #6889", "PR #6093", "PR #7870", "PR #7166", "PR #8082"]
+sources: ["PR #5744", "PR #5976", "PR #6001", "PR #6089", "PR #6834", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/distributed/omni_connectors/transfer_adapter/base.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6021", "PR #6033", "PR #6360", "PR #6406", "PR #6626", "PR #6529", "PR #7136", "PR #6889", "PR #6093", "PR #7870", "PR #7166", "PR #8082", "PR #7733"]
 confidence: high
 ---
 
@@ -157,12 +157,12 @@ confidence: high
 - 禁止：超时后立刻 deregister 或丢弃仍可能被 DMA 写入的内存；把 vLLM P/D block-table NIXL 接口当作 Omni 任意 payload connector；依赖未声明的固定 `zmq_port` 却不经 resolver。
 - 验收：覆盖超时保留、lease 回收、metadata claim/ack，以及 `OmniChunkRecvHandle.payload_sender_info` 贯通；缺 NIXL 依赖时 lazy import 为 None。^[PR #6093]
 
-## DIST-1l3 — NIXL 所有权测试必须用 reliable_claim_queries 隔离 claim 查询
+## DIST-1l3 — NIXL ownership 与 metadata timeout 使用独立可控路径
 
-- 触发：修改 NIXL connector 中断言 terminal 或 deferred read ownership、`_wait_for_transfer` 或 `entered.wait` 的测试，或改变 metadata claim 的获取方式。
-- 强制：这类所有权用例必须挂上 `reliable_claim_queries`。fixture 仍覆盖 metadata 解析、wire 编解码、claim 生成和 producer claim 状态机，但不得用一次有界（10 ms）真实 ZMQ query 取得 claim。真实 ZMQ discovery 只由同模块 handshake 测试覆盖。
-- 禁止：让所有权断言依赖 CI 下可能超时的短 query，使 `consumer.get()` 在进入 transfer wait 前返回；或放宽 `entered.wait` 来掩盖未挂 fixture。
-- 验收：`direct` 与 `done`/`error`/`timeout`/`unknown` 在 fixture 下重复通过；所有权用例源码不再走有界 claim query。handshake 测试仍覆盖真实 ZMQ discovery。^[PR #7870]
+- 触发：修改 NIXL terminal/deferred ownership 测试、metadata claim/query 或 transfer wait。
+- 强制：ownership 用例使用 reliable_claim_queries 隔离短 ZMQ discovery，保留 metadata 编解码、claim 与 producer 状态机。metadata timeout 单测只对 metadata query socket 注入 zmq.Again，断言 get 返回 None、零 copy 且不登记未获得的 ownership；真实 handshake 仍单独跑 ZMQ roundtrip。
+- 禁止：靠放宽 entered.wait 掩盖短 query 未进入 transfer；让 ownership fixture 悄悄屏蔽 metadata timeout，或删除真实 handshake。
+- 验收：覆盖 direct 与 done/error/timeout/unknown ownership；timeout 与真实 handshake 各有独立断言，roundtrip 比较 tensor/size 和唯一 copy/ownership，清理 socket/thread。CPU core_model 门禁不能证明 NIXL DMA 硬件行为。 ^[PR #7870] ^[PR #7733]
 
 ## DIST-1l4 — 原生 Mooncake AR→DiT KV 必须关 async_chunk 并按物理页序释放
 
@@ -171,9 +171,9 @@ confidence: high
 - 禁止：`async_chunk=True` 搭配原生 KV transfer；把 eviction-priority free 顺序当成无缓存池的物理布局；用含 placeholder 的 token 计数作为 transfer 边界；connector 失败后仍继续拆页当成功。
 - 验收：配置拒绝 async_chunk+kv_transfer；物理序 free；confirmed-token transfer 边界；失败 fail-close。^[PR #7166]
 
-## DIST-1m — SHM producer 只能按 put 的精确 key 回收，并有界 reap 跨进程已消费段
+## DIST-1m — SHM producer 只能按完整 key 回收，并有界 reap 跨进程已消费段
 
 - 触发：修改 `SharedMemoryConnector` 的 `_pending_keys` / `cleanup` / `close` / `reap_consumed`，chunk adapter abort 后的 sender 清理，或 lock-file 与 `/dev/shm` 回收。
-- 强制：`cleanup` 只 unlink `put()` 当时登记的精确 key，不得按 request-id 做 `_` 前缀/后缀模糊匹配。receiver 读到 SHM 字节后即可标 consumed 并删 lock file，即使随后 deserialize 失败。producer 在 `put` 与空闲 save loop 上做有界 round-robin `reap_consumed`（丢弃对端已 unlink 的 key）。abort 后在 in-flight 排空再按 adapter 生成的精确 chunk key 入队清理；成功终态 payload 必须留给下游消费，且清理发生在 external-id 复用之前。receiver 用当前 registration identity 拒 stale work，不得堆积 cancellation tombstone。
+- 强制：`cleanup` 按调用方传入的完整 key 精确 unlink，不得按 request-id 做 `_` 前缀/后缀模糊匹配；即使 key 不在 `_pending_keys` 中仍会尝试 unlink，不能把该记账集合当成所有权拒绝门禁。receiver 读到 SHM 字节后即可标 consumed 并删 lock file，即使随后 deserialize 失败。producer 在 `put` 与空闲 save loop 上做有界 round-robin `reap_consumed`（丢弃对端已 unlink 的 key）。abort 后在 in-flight 排空再按 adapter 生成的精确 chunk key 入队清理；成功终态 payload 必须留给下游消费，且清理发生在 external-id 复用之前。receiver 用当前 registration identity 拒 stale work，不得堆积 cancellation tombstone。
 - 禁止：用 request-id 子串误删无关 SHM；把已跨进程消费的 key 永远留在 `_pending_keys`；deserialize 失败就留下 lock file；用 underscore-prefix 猜测所有权。
 - 验收：覆盖相似 request id、abort-during-put、external-id 复用、无效 payload 后 lock 消失、consumed-key 回收，以及取消后 `/dev/shm` 与 pending keys 归零。^[PR #8082]

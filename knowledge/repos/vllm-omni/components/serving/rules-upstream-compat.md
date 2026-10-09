@@ -1,10 +1,10 @@
 ---
 title: "Serving upstream 兼容规则"
 created: 2026-09-02
-updated: 2026-10-06
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ['PR #8459', 'PR #5976', 'PR #5957', vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, tests/config/test_endpoint_policy.py, 'PR #5036', 'PR #6642', 'PR #6773', 'PR #6707', vllm_omni/config/endpoint_policy.py, 'PR #6051', 'PR #7426', 'PR #5647', 'PR #8518']
+sources: ['PR #8459', 'PR #5976', 'PR #5957', vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, tests/config/test_endpoint_policy.py, 'PR #5036', 'PR #6642', 'PR #6773', 'PR #6707', vllm_omni/config/endpoint_policy.py, 'PR #6051', 'PR #7426', 'PR #5647', 'PR #8518', "PR #7798"]
 confidence: high
 ---
 
@@ -130,3 +130,10 @@ confidence: high
 - 验收：两个真实entrypoint分别核对parsed settings→configure→validate/startup顺序，并用
   显式logging参数检查效果。source的logo观察只支持初始化修复，未解决module入口仍显示
   vLLM logo的既有问题，也不提供其它功能/模型运行资格。^[PR #8518]
+
+## SERV-SPEECH-ERROR-1a — voice route 错误不依赖 tokenization handler
+
+- 触发：修改 stored-voice GET/POST/DELETE 或 Speech create_error_response。
+- 强制：使用 upstream create_error_response helper 构造规范错误，raw Request 与 serving_tokenization 不是错误构造前提；缺 voice handler/nonexistent voice 返回 404，缺必需 audio 返回 400。
+- 禁止：在本可预期的 voice 错误路径访问缺失 tokenization handler 而变 500，或靠初始化无关 handler 规避合同。
+- 验收：无 serving_tokenization 的 app 覆盖三条 voice route、缺 audio 与不存在 voice，核对 status/body，保留成功路径。 ^[PR #7798]

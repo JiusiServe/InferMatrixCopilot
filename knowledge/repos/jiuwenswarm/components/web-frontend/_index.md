@@ -1,7 +1,7 @@
 ---
 title: "web-frontend"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-09
 type: index
 tags: [jiuwenswarm]
 sources: []
@@ -138,3 +138,5 @@ sources: []
 - [Web 前端中英双语 i18n 初始化：实现深读](feature-depth-web-i18n-zh-en.md)
 
 - [Web 通道本机目录/可执行文件选择器（跨平台后端链）：实现深读](feature-depth-web-native-directory-picker.md)
+
+- [web-frontend 审查规则](rules.md) — 配额导航开关必须走完整 HTML 注入链并清理残留导航。

@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5 Whole-Euler 与 resident graph 合同"
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #8007", "PR #8443", vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py]
+sources: ["PR #8007", "PR #8443", vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, "PR #8515"]
 confidence: high
 ---
 
@@ -75,7 +75,7 @@ confidence: high
 ## MCPMO-GRAPH-1e — Code2Wav exact encoder 与 HiFT 预捕必须覆盖真实 continuation shape
 
 - 触发：修改 `cfm_encoder_cuda_graph`、Code2Wav precapture 或 HiFT exact chunk buckets。
-- 强制：Code2Wav flow encoder graph 是默认关闭的 CUDA continuation 优化；仅支持
+- 强制：Code2Wav flow encoder graph 的 API 默认关闭；bundled profile 可显式开启这一 CUDA continuation 优化；仅支持
   具备固定 position-encoding tables 的 CosyVoice2 upsample-Conformer，保留 eager
   onset、final/flush、其他 row/token/cache shape。graph key 覆盖实际 row 数、token
   width 与可达 cache 长度；无额外 padding。输出 views 会被下次 replay 改写，需保留时 clone。
@@ -91,3 +91,10 @@ confidence: high
 
 输入 SigLIP/Whisper graph 见 [encoder graphs](rules-encoder-graphs.md)；legacy step-level
 CFM graph 与 padding 合同见 [CUDA graph 规则](rules-cuda-graphs.md)。
+
+## MCPMO-GRAPH-1f — stock precapture 配置与各 wrapper 的失败策略分别保持
+
+- 触发：修改 MiniCPM-o bundled profile、flow encoder admission 或 HiFT/Whole-Euler precapture。
+- 强制：核对实际 profile 中 flow encoder enable、row/token/cache 资格、capture_after 与 graph 总预算；stock continuation HiFT exact buckets 包括 batch=1 的 4/28 帧。Whole-Euler startup 按剩余预算先捕稳态再捕 lookahead tail buckets。flow encoder 共享 pool 的 capture 失败为 terminal，需重启；Whole-Euler 自身 capture 失败则 disable 并返回未接纳，按其 caller fallback。NPU stage-0 encoder graph 使用自身平台资格。
+- 禁止：把 profile enable 说成 API 全局默认；跨 wrapper 复用失败策略；预算已满仍强制预捕 tail，或从 CPU fake graph 测试推出 CUDA parity。
+- 验收：枚举实际可达 shape 与预捕 key，检查未支持 shape eager、预算不增长、共享 capture failure 不重试；真实 CUDA 比较 replay/eager，HiFT 验证 initial/continuation/final 边界。 ^[PR #8515]

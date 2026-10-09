@@ -503,10 +503,13 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             _generator, judge = roles_from_env()
             from .calibration import case_set_digest
-            from .runtime import record_calibration
+            from ..trace_store import TraceStore, trace_context
+            from .runtime import record_calibration, trace_recorder
 
             case_dir = lifecycle.adapter_dir / lifecycle.calibration_set
-            report = run_calibration(case_dir, gateway=ModelGateway(Settings()), judge=judge)
+            gateway = ModelGateway(Settings(), recorder=trace_recorder(TraceStore(state_dir / "traces")))
+            with trace_context(repo=args.repo):
+                report = run_calibration(case_dir, gateway=gateway, judge=judge)
             # publication under auto_merge requires this record to match the
             # current judge and case set exactly
             record_calibration(ledger, args.repo, judge=judge.label(),

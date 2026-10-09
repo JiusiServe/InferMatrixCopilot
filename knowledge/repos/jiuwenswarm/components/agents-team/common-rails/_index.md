@@ -1,7 +1,7 @@
 ---
 title: "common-rails"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-09
 type: index
 tags: [jiuwenswarm]
 sources: []
@@ -18,3 +18,5 @@ sources: []
 - [common-rails 源码接口与集成边界 06](source-contracts-06.md)
 - [common-rails 源码接口与集成边界 07](source-contracts-07.md)
 - [common-rails 源码接口与集成边界 08](source-contracts-08.md)
+
+- [common-rails 审查规则](rules.md) — ASK 授权不能覆盖 DENY，运行期授权与配置写入必须隔离；扩大授权范围只由服务器派生，网络同步与实际应用分开；产品 shell guard 测试允许明确列举的可选开关。

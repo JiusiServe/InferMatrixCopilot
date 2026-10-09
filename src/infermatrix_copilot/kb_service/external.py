@@ -108,6 +108,39 @@ def _ours(rt, number: int) -> bool:
     return False
 
 
+def settle_closed_holds(rt) -> list[int]:
+    """A closed, unmerged external PR no longer needs a rebase or rule review.
+
+    Require the exact held head and repository identity; closure never turns a
+    rejected candidate into an accepted or merged knowledge change.
+    """
+    if not getattr(rt, "lease_owner", None):
+        return []
+    repository, pulls, rows = knowledge_repository(), {}, []
+    for hold in rt.ledger.human_queue():
+        if not hold["changeset_id"]:
+            continue
+        change = rt.ledger.changeset(hold["changeset_id"])
+        if change["kind"] != KIND or change["status"] not in REJUDGE or not change["pr_number"]:
+            continue
+        number = change["pr_number"]
+        if number not in pulls:
+            pulls[number] = rt.github.get(f"/repos/{repository}/pulls/{number}")
+        pr = pulls[number]
+        if pr.get("number") != number or pr.get("state") != "closed" or pr.get("merged") is not False \
+                or pr.get("merged_at") or not pr.get("closed_at") \
+                or pr.get("head", {}).get("sha") != change["head_sha"] \
+                or pr.get("base", {}).get("repo", {}).get("full_name", "").lower() != repository.lower():
+            continue
+        rows.append({"hold": hold, "resolution": {
+            "kind": "closed_external_pr", "repository": repository, "pr": number,
+            "head_sha": change["head_sha"], "closed_at": pr["closed_at"],
+        }})
+    if rows:
+        rt.ledger.settle_reviewed_holds(rt.lease_owner, rows)
+    return [row["hold"]["id"] for row in rows]
+
+
 # every status an external change set can have; the in-flight ones come from
 # the merge flow itself, so a new merge state can never be judged twice
 _ALL = tuple(dict.fromkeys((

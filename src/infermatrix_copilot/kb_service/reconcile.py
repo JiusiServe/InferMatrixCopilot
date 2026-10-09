@@ -251,6 +251,45 @@ def trusted_commits(rt) -> set[str]:
     return read_receipts(rt.knowledge, rt.state_dir, public)
 
 
+def settle_reconciled_holds(rt) -> list[int]:
+    """Resolve old provenance alerts only after receipt-backed activation.
+
+    Admission already makes these commits trusted; the old queue alerts must
+    also stop asking an operator to revert them. Candidate-rule holds and
+    unadmitted commits remain untouched.
+    """
+    holds = [row for row in rt.ledger.human_queue() if row["changeset_id"] is None]
+    active = rt.ledger.active_snapshot()
+    if not holds or not active or not getattr(rt, "lease_owner", None):
+        return []
+    trusted = trusted_commits(rt)  # re-verifies every receipt and its exact history
+    receipts = {}
+    for path in sorted((rt.state_dir / "reconciliations").glob("*.json")):
+        payload = verify(RECEIPT_PURPOSE, json.loads(path.read_text()), rt.outbox._key.public_key())
+        for commit in payload["commits"]:
+            if commit["sha"] in trusted:
+                receipts[commit["sha"]] = path.name
+    rows = []
+    for hold in holds:
+        match = re.match(r"(?:provenance: )?unrecorded knowledge change ([0-9a-f]{12})\b", hold["reason"])
+        if match is None:
+            continue
+        matches = [sha for sha in trusted if sha.startswith(match[1])]
+        if len(matches) != 1 or not rt.knowledge.is_ancestor(matches[0], active):
+            continue
+        sha = matches[0]
+        rows.append({"hold": hold, "resolution": {
+            "kind": "reconciled_provenance", "commit": sha,
+            "receipt": receipts[sha], "active_snapshot": active,
+        }})
+    if rows:
+        rt.ledger.settle_reviewed_holds(rt.lease_owner, rows)
+        rt.trace("outcome", context={"playbook": "kb-reconcile-reviewed", "repo": "*"},
+                 result={"outcome": "provenance_holds_resolved", "ids": [r["hold"]["id"] for r in rows],
+                         "active_snapshot": active})
+    return [row["hold"]["id"] for row in rows]
+
+
 def read_receipts(knowledge, state_dir: Path, public) -> set[str]:
     directory = state_dir / "reconciliations"
     if directory.is_symlink():

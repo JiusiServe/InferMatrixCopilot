@@ -51,3 +51,5 @@ sources: ["PR #2783", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/mo
 - 审查 accuracy、regional compile、FlashAttention 确定性或 Edit `txt_seq_lens` 时见
 
   [Qwen-Image 规则](rules.md)。 新增核对：QWENIMG-1d。
+
+- [Qwen-Image-2.1 能力与 FP8 证据边界](rules-qwen-image-21.md)。

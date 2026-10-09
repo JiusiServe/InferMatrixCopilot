@@ -1,7 +1,7 @@
 ---
 title: "sandbox-runtime"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-09
 type: index
 tags: [jiuwenswarm]
 sources: []
@@ -25,3 +25,5 @@ sources: []
 | sandbox runtime | 入口 | `jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy.py`、`jiuwenbox/src/jiuwenbox/proxy/inference_privacy_proxy_manager.py`、`jiuwenbox/src/jiuwenbox/server/app.py` |
 
 - [sandbox-runtime（JiuwenBox 服务与推理隐私代理）](knowledge.md)
+
+- [sandbox-runtime 审查规则](rules.md) — 启用 Windows 软删除时，受保护路径失败必须原地保留；软删除注入遵守进程类型与位数边界。

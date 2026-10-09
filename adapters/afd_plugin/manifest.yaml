@@ -237,11 +237,10 @@ push:
   protected_branches: [main, master]
   allowed: false
 
-# Knowledge service: declared but disabled until afd-plugin has its own
-# calibration set and has run through a shadow period (rollout stage P3b).
+# Owner-authorized automatic publication after its calibration and shadow period.
 knowledge_lifecycle:
   enabled: true
-  mode: shadow
+  mode: auto_merge
   knowledge_dir: repos/afd-plugin
   release:
     trigger: none

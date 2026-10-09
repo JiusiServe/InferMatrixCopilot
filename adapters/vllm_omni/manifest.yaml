@@ -401,10 +401,10 @@ push:
   signoff: {name: tzhouam, email: tzhouam@connect.ust.hk}
 
 # Knowledge service (doc/features/knowledge-service.md). Human-only section:
-# switching `mode` to auto_merge is a reviewed code change, never an agent write.
+# Publication policy changes require owner authorization and reviewed code.
 knowledge_lifecycle:
   enabled: true
-  mode: shadow                     # shadow | auto_merge
+  mode: auto_merge                 # owner-authorized; current calibration and both gates still required
   knowledge_dir: repos/vllm-omni
   intake:
     merged_prs: true

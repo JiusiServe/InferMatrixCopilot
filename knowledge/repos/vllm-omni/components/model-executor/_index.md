@@ -57,3 +57,5 @@ sources: []
 - [MRv2 aux tree、narrow sampler、sampled embedding 与 generation输出](rules-mrv2-output-contracts.md)。
 
 - [settled row predicate与preemption replay fallback](rules-settled-preprocess.md)。
+
+- [AutoRound NVFP4 method dispatch 合同](rules-autoround-dispatch.md)。

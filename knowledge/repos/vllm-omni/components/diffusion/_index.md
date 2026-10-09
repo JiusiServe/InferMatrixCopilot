@@ -1,7 +1,7 @@
 ---
 title: "Diffusion"
 created: 2026-07-10
-updated: 2026-10-06
+updated: 2026-10-09
 type: index
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/attention/backends/flashinfer_attn.py]
@@ -47,7 +47,7 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 | 完整图像 batch VAE decode、native tiling、uneven/idle rank 与 gather 顺序 | [Batch VAE decode rules](rules-vae-batch.md) |
 | multi-DiT、dotted `_dit_modules`、loader-to-offloader handoff 与跨 Cache-DiT/compile/LoRA/offload lifecycle、batch sampling-key 的 provided 标志 | [component lifecycle rules](rules-component-lifecycle.md)   新增核对：DIFF-2ag。 |
 
-| PEFT 与 distilled LoRA、startup fusion、delta/key/alpha、Qwen/Wan transformer mapping、PEFT suspend/resume | [LoRA rules](rules-lora.md)   新增核对：DIFF-2ag2、DIFF-2ag3。 |
+| PEFT 与 distilled LoRA、startup fusion、delta/key/alpha、Qwen/Wan transformer mapping、PEFT suspend/resume、零绑定与部分绑定拒绝 | [LoRA rules](rules-lora.md) — DIFF-2ag4 合并并继承 DIFF-2ag2；DIFF-2ag3。 |
 
 | Blackwell FA4、显式/auto CUDA backend、per-role mask/SP pad；local FlashAttention deterministic opt-in、role-aware masked cross-attention、NPU packed mask-free/laser fallback、TRTLLM packed-padding 与 config propagation、equal-rank SP auto-pad fast path、等长 batch padding mask 省略 | [attention rules](rules-attention.md)   新增核对：DIFF-1ai3、DIFF-1aj2、DIFF-1ai4、DIFF-1d2。 |
 
@@ -78,3 +78,7 @@ sources: ["PR #5543", vllm_omni/platforms/cuda/platform.py, vllm_omni/diffusion/
 shared RMSNorm 的empty-input与fused精度边界沿 tensor dtype rules 的DIFF-NORM-1a核对。
 
 - [registered video SHM 与 borrowed mapping ownership](rules-video-transport.md)。
+
+- [SageAttention3 FP4 dispatch 合同](rules-sage-attention.md)。
+
+- [Diffusion request batch 的 pipeline 合同](rules-request-batch.md)。
