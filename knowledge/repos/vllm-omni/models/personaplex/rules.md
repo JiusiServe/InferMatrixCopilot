@@ -1,10 +1,10 @@
 ---
 title: "PersonaPlex 规则"
 created: 2026-09-02
-updated: 2026-10-06
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #4771", "PR #6318", docs/design/fullduplex-personaplex.md, vllm_omni/model_executor/models/personaplex/duplex/serving_adapter.py, vllm_omni/model_executor/stage_input_processors/personaplex.py, tests/e2e/features/fullduplex/, tests/entrypoints/openai_api/test_duplex_handler.py, "PR #7399", "PR #7481"]
+sources: ["PR #4771", "PR #6318", docs/design/fullduplex-personaplex.md, vllm_omni/model_executor/models/personaplex/duplex/serving_adapter.py, vllm_omni/model_executor/stage_input_processors/personaplex.py, tests/e2e/features/fullduplex/, tests/entrypoints/openai_api/test_duplex_handler.py, "PR #7399", "PR #7481", "PR #8670"]
 confidence: high
 ---
 
@@ -113,3 +113,30 @@ confidence: high
   partial/at-end/past-end/empty text、strided/short/absent audio与chunk拼接；拒绝所有scalar read
   时仍只有一次embedding调用。Stage0真实embedding integration证明first append只一次prefill，
   second append只含live frame；组合stack的E2E结果不能单独归因此PR。^[PR #7481]
+
+## VLLM-OMNI-PR8670-AMD-PPLEX-NIGHTLY — PersonaPlex temporal 压力用例只在 AMD nightly 串行承接
+
+- 触发：改动 `.buildkite/amd/test-amd-ready.yml`、`.buildkite/amd/test-amd-merge.yml`、
+  `.buildkite/amd/test-amd-nightly.yml` 的 Model Executor CPU shard 或 “Simple · PersonaPlex
+  Temporal Streaming Test” 步骤；重命名 `tests/model_executor/models/personaplex/
+  test_temporal_streaming_hoist.py` 中的 `*_matches_legacy_end_to_end` 用例；或修改
+  `tests/buildkite/test_amd_pipeline.py` 的 AMD pipeline contract。
+- 强制：AMD READY/MERGE 的 Model Executor 步骤保持 `-m 'core_model and cpu and not omni'`
+  与 `--num-shards=$$BUILDKITE_PARALLEL_JOB_COUNT`/`--shard-id=$$BUILDKITE_PARALLEL_JOB`
+  分片，只允许两条精确到 node 的 `--deselect` 前缀（`test_temporal_streaming_step_matches_
+  legacy_end_to_end` 与 `test_mimi_streaming_step_matches_legacy_end_to_end`），同文件其余
+  快速节点继续留在阻塞 shard。被移出的 stress 用例必须由 nightly 的 PersonaPlex Temporal
+  步骤承接：`mi300_1`、`grade: NonBlocking`、`timeout_in_minutes: 120`，内层用
+  `timeout --signal=TERM --kill-after=2m 110m` 留出 artifact 落盘与 teardown 余量，先
+  `--collect-only` 落盘再串行执行，collection 输出、JUnit XML、完整 pytest log 与 tail
+  summary 全部作为 artifact 上传。
+- 禁止：用 `--ignore` 整文件、slow marker 或改写 marker 表达式替代精确 deselect；为该
+  nightly 步骤引入 retry、xdist、空 collection override 或掩盖失败的 fallback；把该
+  deselection 传播到 CUDA READY/MERGE（CUDA 管线不得过滤该文件的任何节点）；deselect 后
+  不在 nightly 承接，静默丢失 oracle 覆盖。
+- 验收：`tests/buildkite/test_amd_pipeline.py` 的 contract 必须同时锁定 ready/merge（恰一个
+  Model Executor CPU shard、marker 不变、`parallelism == 3`、无 `--ignore`、deselect 恰为
+  两条前缀）与 nightly（选择同样前缀、NonBlocking、120/110 超时结构、预期 artifact 路径）；
+  重命名测试函数时必须同步 deselect 前缀与 contract。^[PR #8670]
+
+<!-- kb:rule status=active since=v0.30.0 -->
