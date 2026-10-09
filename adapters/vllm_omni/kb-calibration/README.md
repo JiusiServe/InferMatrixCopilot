@@ -13,4 +13,15 @@ changes.
   an edit that changes meaning, an invented API) and the historical bot-written
   MMH3-4e that contradicted MMH3-4a (folded by a human in 03b0b62a2).
 
-Evidence is the real upstream PR (title, body, bounded diff excerpt).
+Evidence is the real upstream PR, pinned by merge commit: complete title/body
+and per-file diff, plus exact source-line context where a rule depends on
+unchanged behaviour (runner schema filtering, prefix-cache source planning,
+speech exception handling). Positive and negative mutations of the same PR
+receive identical evidence. The historical MMH3 case retains its original
+evidence. None of the expected labels or scoring thresholds changed.
+
+The 2026-10-09 source audit also corrects two assertions in the good fixtures
+and canonical owner rules: SCHED-1c names `OmniPrefixCacheManager`, and SERV-9d
+preserves engine-exception propagation instead of claiming all engine errors
+are HTTP 400. Its `ValueError` 400 and generic internal-error 500 expectations
+remain intact.
