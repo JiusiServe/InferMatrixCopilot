@@ -1,6 +1,6 @@
 # knowledge_service/ — provider curation components
 
-<!-- verified-against: 2026-10-08 -->
+<!-- verified-against: 2026-10-09 -->
 
 Pinned source identities and depth markers accept full SHA-1 or SHA-256 Git
 commits. Evidence bodies, stored hashes and native approval semantics remain
@@ -52,7 +52,11 @@ outbox item, control record, publisher ack, reconciliation plan, supervised
 reconciliation receipt) never verifies for another. Plans use
 `kb-reconciliation-plan`; only revalidated receipts use the distinct
 `kb-reviewed-reconciliation` purpose, and neither can be replayed as an
-automatic gate verdict or publisher action. It
+automatic gate verdict or publisher action. A separately reviewed historical
+hold uses `kb-reviewed-orphan-hold`, binding its exact queue row, original
+settled sources and active canonical rules without changing model verdicts or
+granting publication trust. Its signature cannot be replayed as an event
+settlement or reconciliation, including by relabelling the envelope. Signing
 needs only `cryptography`.
 
 `containment` implements the opt-in consumer protocol independently of knowledge
