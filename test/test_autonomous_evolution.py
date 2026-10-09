@@ -198,6 +198,42 @@ def test_trace_inputs_are_automatically_frozen_and_clustered(tmp_path):
     with pytest.raises(artifacts.ArtifactError): objectives.rows(st, 'kb-intake.draft')
 
 
+def test_full_kb_replay_larger_than_old_limit_round_trips(tmp_path):
+    from infermatrix_copilot.trace_store import TraceStore
+    st = Settings(_env_file=None, improve_ledger_dir=str(tmp_path / 'ledger'))
+    store = TraceStore(tmp_path / 'trace')
+    payload = {'repo': 'demo', 'files': {'repos/demo/a.md': 'knowledge'},
+               'external_texts': {'adapters/demo/reference.md': '文' * 5_400_000}}
+    assert len(json.dumps(payload, ensure_ascii=False).encode()) > 16_000_000
+    objectives.capture(store, 'kb-intake.draft', 'demo#1', payload)
+    assert objectives.collect(st, store, 'kb-intake.draft') == 1
+    row = objectives.rows(st, 'kb-intake.draft')[0]
+    assert row['payload'] == payload
+
+
+def test_oversized_replay_is_explicit_and_ineligible(tmp_path, monkeypatch):
+    from infermatrix_copilot.trace_store import TraceStore
+    st = Settings(_env_file=None, improve_ledger_dir=str(tmp_path / 'ledger'))
+    store = TraceStore(tmp_path / 'trace')
+    monkeypatch.setattr(objectives, 'REPLAY_INPUT_MAX_BYTES', 80)
+    payload = {'files': {'other.md': '文' * 30}}
+    size = len(json.dumps(payload, ensure_ascii=False).encode())
+    assert len(json.dumps(payload, ensure_ascii=False)) < 80 < size
+    with pytest.raises(objectives.ReplayCaptureLimit) as exc:
+        objectives.capture(store, 'kb-intake.draft', 'demo#1', payload)
+    assert (exc.value.size_bytes, exc.value.limit_bytes) == (size, 80)
+    record, = store.query(workflow='kb-intake.draft')
+    assert record['inputs'] == {}
+    assert record['result'] == {'type': 'replay_capture_deferred', 'reason': 'size_limit',
+                                'input_bytes': size, 'limit_bytes': 80,
+                                'input_sha': artifacts.digest(json.dumps(payload, ensure_ascii=False).encode())}
+    assert objectives.collect(st, store, 'kb-intake.draft') == 0
+    assert objectives.rows(st, 'kb-intake.draft') == []
+    with pytest.raises(artifacts.ArtifactError, match='evaluator material') as exc:
+        objectives.capture(store, 'kb-intake.draft', 'demo#2', {'labels': []})
+    assert not isinstance(exc.value, objectives.ReplayCaptureLimit)
+
+
 def test_empty_kb_is_not_rewarded_as_an_error():
     row = {'payload': {'files': {}, 'repo_dir': 'repos/demo', 'release': 'v1', 'today': '2026-10-04'}}
     assert objectives.score('kb-intake', row, {'operations': [], 'rejected': False}) == 1

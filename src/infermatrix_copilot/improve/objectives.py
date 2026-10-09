@@ -22,6 +22,16 @@ PROTOCOL = 'objective/1'
 ENGINE = 'workflow-improve.improve.forensics'
 DRIVERS = {'pr-review': 'pr-review', 'kb-intake': 'kb-intake', 'meta': 'objective-meta', 'mechanical': 'objective-tests'}
 FAULTS = {'ceiling': ('S4', 'L01'), 'discard': ('S3', 'L09'), 'fallback': ('S7', 'L07')}
+# Complete KB trees and companion texts already exceed 16 MB. TraceStore
+# compresses these envelopes; retain a finite uncompressed memory/disk bound.
+REPLAY_INPUT_MAX_BYTES = 64_000_000
+
+
+class ReplayCaptureLimit(artifacts.ArtifactError):
+    """A complete replay exceeds the storage bound, before candidate execution."""
+    def __init__(self, size_bytes, limit_bytes):
+        self.size_bytes, self.limit_bytes = size_bytes, limit_bytes
+        super().__init__(f'replay input exceeds capture limit ({size_bytes} > {limit_bytes} bytes)')
 
 
 def enabled(settings):
@@ -81,9 +91,17 @@ def capture(store, workflow, item, payload):
     forbidden = {'labels', 'gold', 'scores', 'judgments', 'report'}
     if forbidden & set(payload): raise artifacts.ArtifactError('replay input includes evaluator material')
     raw = json.dumps(payload, ensure_ascii=False)
-    if len(raw.encode()) > 16_000_000: raise artifacts.ArtifactError('replay input exceeds capture limit')
-    store.append('decision', context={'workflow': workflow, 'item': item},
-                 inputs={'evolution_input': raw}, result={'type': 'replay_input', 'input_sha': artifacts.digest(raw.encode())})
+    encoded = raw.encode()
+    context = {'workflow': workflow, 'item': item}
+    input_sha = artifacts.digest(encoded)
+    if len(encoded) > REPLAY_INPUT_MAX_BYTES:
+        # A missing replay is explicit and never eligible for collection. Do
+        # not truncate files or references that affect the executable contract.
+        store.append('decision', context=context, result={'type': 'replay_capture_deferred', 'reason': 'size_limit',
+                     'input_bytes': len(encoded), 'limit_bytes': REPLAY_INPUT_MAX_BYTES, 'input_sha': input_sha})
+        raise ReplayCaptureLimit(len(encoded), REPLAY_INPUT_MAX_BYTES)
+    store.append('decision', context=context,
+                 inputs={'evolution_input': raw}, result={'type': 'replay_input', 'input_sha': input_sha})
 
 
 def collect(settings, store, workflow):
