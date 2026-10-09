@@ -1,7 +1,7 @@
 ---
 title: "Model Executor"
 created: 2026-07-10
-updated: 2026-10-06
+updated: 2026-10-09
 type: index
 tags: [vllm-omni, components, model-executor]
 sources: []
@@ -38,6 +38,7 @@ sources: []
 |---|---|
 | Breeze ROCm RNG fallback、CUDA generator registration或depth-layer Triton autotune | [Breeze平台合同](rules-breeze-rocm.md) |
 | 理解共享职责和阶段边界 | [architecture](architecture.md) |
+| 理解 MRV2 request state、异步输出所有权、delivery fence 与取消/关闭 | [MRV2 共享运行时](mrv2-runtime.md)；固定 PR head 的七维功能说明 |
 | 根据 PR 描述直达 stage config、runner preprocess、stage runtime、bridge/batch 或 loader 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
 | runtime info、跨 stage payload、batch 与 request RNG 合同 | [跨 stage bridge 与 batch 合同](rules-bridge-batch.md) |
 | loader 的 dtype/config 获取、fused shard 与多模块 checkpoint 载入 | [loader 合同](rules-loader-contract.md) |

@@ -39,6 +39,7 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_g
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解调度器继承链、KV transfer 与 prefix cache 语义 | [architecture](architecture.md) |
+| 理解 MRv2 native chunk 的 ready inbox、执行槽、terminal 快照和回归边界 | [native chunk 生命周期](native-chunk-lifecycle.md) |
 | 按 PR 描述直达 prefix cache、token budget、upstream 接口或 side-stream 首批源码 | [rules / Direct 代码快速入口](rules.md#direct-代码快速入口) |
 
 - [rules-shared-lifecycle](rules-shared-lifecycle.md) — SCHED-6a2 共享生命周期；SCHED-1c 核对 `OmniPrefixCacheManager` 的 same-step prefetch version 重规划。

@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni Configuration"
 created: 2026-07-16
-updated: 2026-10-06
+updated: 2026-10-09
 type: index
 tags: [vllm-omni, components, config]
 sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
@@ -54,5 +54,6 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 | composable strategy、并行拓扑、VAE batch mode 的 WORLD→DP 门禁与 load balancing owner | [并行拓扑合同](rules-parallel-topology.md) |
 
 | 冻结 topology、辅助 stage、mixed V1/MRv2 runner、deploy profile 与 `additional_config` 投影 | [topology 与部署 profile](rules-topology-profiles.md) |
+| 查阅 PR #7781 固定快照的 MRv2 opt-in、native capability、legacy/structured 投影与 basic/B2/B4/B8 配置 | [MRv2 部署 profile 七维说明](mrv2-profiles.md) |
 
 - [部署 platform overlay 的最终配置合同](rules-platform-overlays.md)。

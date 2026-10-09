@@ -1,7 +1,7 @@
 ---
 title: "Qwen3-TTS"
 created: 2026-07-20
-updated: 2026-09-22
+updated: 2026-10-09
 type: index
 tags: [vllm-omni, models, serving, qwen-omni]
 sources: ["PR #5157", "PR #5202", "PR #5608", "PR #6001", "PR #6113", "PR #6553", vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/tts_adapters/qwen3_tts.py, vllm_omni/model_executor/models/qwen3_tts/prompt_embeds_builder.py, vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py, vllm_omni/model_executor/models/qwen3_tts/segmented_graph_wrapper.py, vllm_omni/model_executor/stage_input_processors/qwen3_tts.py, vllm_omni/model_executor/stage_input_processors/chunk_size_utils.py, vllm_omni/platforms/npu/models/qwen3_tts_tokenizer_v2.py, vllm_omni/platforms/npu/layers/rotary_embedding.py, tests/entrypoints/openai_api/test_serving_speech.py]
@@ -39,3 +39,6 @@ confidence: high
 - [当前step prompt projection、requestID cache 与speaker embedding](rules-prompt-preprocess.md)。
 
 - [Qwen3-TTS codec tokens 输出合同](rules-codec-output.md)。
+
+- [MRv2 模型流水线的七方面说明](mrv2-pipeline.md)：查询 Talker/Code2Wav hooks、GPU residency、
+  codec validity、批量传输和验证方法；范围为 PR #7781 冻结源码快照，不代表当前默认部署。
