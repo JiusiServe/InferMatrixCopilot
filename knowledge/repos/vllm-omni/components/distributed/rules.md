@@ -171,9 +171,9 @@ confidence: high
 - 禁止：`async_chunk=True` 搭配原生 KV transfer；把 eviction-priority free 顺序当成无缓存池的物理布局；用含 placeholder 的 token 计数作为 transfer 边界；connector 失败后仍继续拆页当成功。
 - 验收：配置拒绝 async_chunk+kv_transfer；物理序 free；confirmed-token transfer 边界；失败 fail-close。^[PR #7166]
 
-## DIST-1m — SHM producer 只能按 put 的精确 key 回收，并有界 reap 跨进程已消费段
+## DIST-1m — SHM producer 只能按完整 key 回收，并有界 reap 跨进程已消费段
 
 - 触发：修改 `SharedMemoryConnector` 的 `_pending_keys` / `cleanup` / `close` / `reap_consumed`，chunk adapter abort 后的 sender 清理，或 lock-file 与 `/dev/shm` 回收。
-- 强制：`cleanup` 只 unlink `put()` 当时登记的精确 key，不得按 request-id 做 `_` 前缀/后缀模糊匹配。receiver 读到 SHM 字节后即可标 consumed 并删 lock file，即使随后 deserialize 失败。producer 在 `put` 与空闲 save loop 上做有界 round-robin `reap_consumed`（丢弃对端已 unlink 的 key）。abort 后在 in-flight 排空再按 adapter 生成的精确 chunk key 入队清理；成功终态 payload 必须留给下游消费，且清理发生在 external-id 复用之前。receiver 用当前 registration identity 拒 stale work，不得堆积 cancellation tombstone。
+- 强制：`cleanup` 按调用方传入的完整 key 精确 unlink，不得按 request-id 做 `_` 前缀/后缀模糊匹配；即使 key 不在 `_pending_keys` 中仍会尝试 unlink，不能把该记账集合当成所有权拒绝门禁。receiver 读到 SHM 字节后即可标 consumed 并删 lock file，即使随后 deserialize 失败。producer 在 `put` 与空闲 save loop 上做有界 round-robin `reap_consumed`（丢弃对端已 unlink 的 key）。abort 后在 in-flight 排空再按 adapter 生成的精确 chunk key 入队清理；成功终态 payload 必须留给下游消费，且清理发生在 external-id 复用之前。receiver 用当前 registration identity 拒 stale work，不得堆积 cancellation tombstone。
 - 禁止：用 request-id 子串误删无关 SHM；把已跨进程消费的 key 永远留在 `_pending_keys`；deserialize 失败就留下 lock file；用 underscore-prefix 猜测所有权。
 - 验收：覆盖相似 request id、abort-during-put、external-id 复用、无效 payload 后 lock 消失、consumed-key 回收，以及取消后 `/dev/shm` 与 pending keys 归零。^[PR #8082]

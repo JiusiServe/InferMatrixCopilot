@@ -472,6 +472,8 @@ def test_calibration_scoring():
             return {"verdict": "consistent", "conflicts": []}
         dims = json.loads(prompt.split("<untrusted_data>\n", 1)[1].rsplit("\n</untrusted_data>", 1)[0])
         text = json.dumps(dims["change"], ensure_ascii=False)
+        if dims["change"]["op"] == "retire" and "reason=superseded" in dims["change"]["after"]:
+            return {"dimensions": {d: "yes" for d in dims["dimensions_to_answer"]}, "reasons": {}}
         bad_markers = ("可选的", "按照 PR", "遵循 PR #8107", "回落到 runner 默认值", "enforce_runner_schema",
                        "无需断言", "run_benchmark.py` 只跑 `is_diffusion", "MMH3-4e", "retire")
         verdict = "no" if any(m in text for m in bad_markers) or dims["change"]["op"] == "retire" else "yes"

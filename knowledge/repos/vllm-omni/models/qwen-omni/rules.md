@@ -1,7 +1,7 @@
 ---
 title: "Qwen-Omni 规则"
 created: 2026-09-04
-updated: 2026-09-26
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, models, qwen-omni]
 sources: ["PR #5687", "PR #6284", "PR #6449", "PR #4322", "PR #6748", "PR #6886", "PR #7019", vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/deploy/qwen3_omni_moe_thinking.yaml, vllm_omni/engine/stage_init_utils.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni.py, vllm_omni/model_executor/models/qwen3_omni/quantization.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/quantization/component_config.py, tests/config/test_config_factory.py, tests/diffusion/quantization/test_component_routing.py, tests/engine/test_stage_engine_args.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_quantization.py, "PR #7228", "PR #7200", "PR #7345", "PR #7340", "PR #7304", "PR #5825"]
@@ -118,7 +118,7 @@ confidence: high
 
 ## QOMNI-1i — thinker→talker 的 accept-hidden 层必须读 config，禁止写死 24
 
-- 触发：修改 `thinker2talker_accync_chunk` / `thinker2talker_full_payload`、pooling layer lookup，或 Qwen3-Omni 变体的 `talker_config.accept_hidden_layer`。
+- 触发：修改 `thinker2talker_async_chunk` / `thinker2talker_full_payload`、pooling layer lookup，或 Qwen3-Omni 变体的 `talker_config.accept_hidden_layer`。
 - 强制：embedding 固定层 0；accept-hidden 从 transfer manager 的 `_get_model_config()` 或 `config.hf_config.talker_config.accept_hidden_layer` 读取。layer dict 同时接受 int/str key；取 tensor 必须用 `is None`，不能对多元素 tensor 做布尔 `or`。full-payload 用 `hidden_states.layer_{idx}` 拼语义键，而不是写死 `layer_24`。
 - 禁止：把 30B 的 `24` 硬编码进共享 processor；用 truthiness 取 tensor；只改 30B 路径却声称任意 `accept_hidden_layer` 已兼容。
-- 验收：mock transfer_manager 分别覆盖 config mixin 与 adapter `config` 字段；断言非 24 的 accept-hidden 能取到对应层，缺失层返回 `None` 且不抛 `RuntimeError`。^[PR #5825]
+- 验收：保留 `_get_model_config()` mock 和非 24 accept-hidden 的 full-payload 回归。PR #5825 所示测试未覆盖 adapter `config` fallback；修改该分支时须另补对应 mock，不得宣称现有回归已证明它。缺失层保持 `None` 判定，禁止 tensor truthiness。^[PR #5825]

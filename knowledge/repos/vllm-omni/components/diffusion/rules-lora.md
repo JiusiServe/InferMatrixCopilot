@@ -1,7 +1,7 @@
 ---
 title: "Diffusion LoRA 规则"
 created: 2026-09-02
-updated: 2026-09-26
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, components, diffusion]
 sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/lora/layers/base_linear.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/diffusion/lora/test_lora_manager.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py", "PR #6070", "PR #6476", "PR #6550", vllm_omni/diffusion/models/minimax_h3/lora.py, "PR #6268", benchmarks/kernels/benchmark_diffusion_lora_expand.py, tests/diffusion/lora/test_base_linear.py, "PR #7195", "PR #7349", "PR #5907", "PR #8008"]
@@ -152,6 +152,8 @@ confidence: high
   active id 仍为 `None` 且无 `set_lora`；有 validator 的模型路径仍覆盖完整 binding
   completeness。^[PR #7349]
 
+<!-- kb:rule status=retired retired_at=r2026-10-09 reason=superseded evidence="PR #8008" superseded_by=DIFF-2ag4 -->
+
 ## DIFF-2ag3 — LoRA/ModelOpt 默认只保留通用组件名与通用 fused 映射
 
 - 触发：修改 `DiffusionLoRAManager` 默认扫描组件、ModelOpt `DEFAULT_PACKED_MODULES_MAPPING`，或 pipeline/model 的 `_lora_components` / `_dit_modules` / `packed_modules_mapping`。
@@ -162,6 +164,8 @@ confidence: high
 ## DIFF-2ag4 — 任一未绑定 module 的 diffusion LoRA adapter 必须失败
 
 - 触发：修改 `DiffusionLoRAManager._bind_adapter_weights` / `_activate_adapter`、fused/packed `lora_b` 切分，或把部分命中当成成功激活。
-- 强制：激活前必须证明 adapter 提供的每个 logical module 都已绑定；`bound_lora_names` 为空、或 `loras` 中仍有未绑定名，一律 `ValueError`，消息含 adapter id、`bound=k/n`、unbound 名和 expected target modules。fused-QKV / packed `output_slices` 对不上 `lora_b` 维度时立即 raise，不得 warning 后 `reset_lora` 并继续。空 adapter（`bound=0/0`）同样失败。稀疏 packed 目标（只供 Q 或 Q/V）在**已提供模块全部绑定**时合法，未提供的 slice 保持 `None`。失败必须走既有 activation cleanup：reset wrapper、清 active/suspended 身份。
+- 强制：无论 pipeline 是否提供 binding validator，都必须无条件记录实际命中的 logical module 名；激活前证明 adapter 提供的每个 logical module 都已绑定；`bound_lora_names` 为空、或 `loras` 中仍有未绑定名，一律 `ValueError`，消息含 adapter id、`bound=k/n`、unbound 名和 expected target modules。fused-QKV / packed `output_slices` 对不上 `lora_b` 维度时立即 raise，不得 warning 后 `reset_lora` 并继续。空 adapter（`bound=0/0`）同样失败。稀疏 packed 目标（只供 Q 或 Q/V）在**已提供模块全部绑定**时合法，未提供的 slice 保持 `None`。失败必须走既有 activation cleanup：reset wrapper、清 active/suspended 身份。
 - 禁止：只拒绝零绑定却放行部分绑定（例如 `attn.to_out` 命中而 `attn.to_out.0` 被忽略）；把 fused 布局失败写成可跳过 warning；在部分 bind 后仍标 adapter active。
 - 验收：CPU 覆盖 unmatched 名、empty adapter、fused shape mismatch，以及从 active/suspended 切失败后的 rollback 与旧 adapter 再激活；packed 路径覆盖 Q、Q/V、Q/K/V 三种 name form。^[PR #8008]
+
+<!-- kb:rule status=active since=r2026-10-09 supersedes=DIFF-2ag2 -->

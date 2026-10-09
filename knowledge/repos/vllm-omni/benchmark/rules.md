@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni Benchmark 规则"
 created: 2026-09-05
-updated: 2026-10-06
+updated: 2026-10-09
 type: rule
 tags: [vllm-omni, benchmark]
 sources: ["PR #7648", "PR #6817", tests/dfx/perf/scripts/run_benchmark.py, tests/benchmarks/test_omniinteract.py, "PR #7130", "PR #7259", "PR #7624", "PR #7504", "PR #8107", "PR #7312", "PR #6538"]
@@ -90,7 +90,7 @@ confidence: high
 ## BENCH-1h — Buildkite perf 步骤必须按 JSON schema 选择 runner
 
 - 触发：修改 `.buildkite/**` 里 `run_benchmark.py` / `run_diffusion_benchmark.py` 的 `--test-config-file`，或把 perf JSON 在 `dataset` 与 `dataset_name` schema 之间迁移。
-- 强制：`run_diffusion_benchmark.py` 只跑 `is_diffusion_perf_config` 为真的 case（`benchmark_params[].dataset`）；`run_benchmark.py` 只跑 omni-bench case（`dataset_name`）。schema 过滤看字段，不看 `mark`。迁移 JSON 后，所有引用该文件的 CUDA/NPU/AMD 步骤必须一起换 runner，并改用对应的 `BENCHMARK_DIR` 与 artifact glob。
+- 强制：按 `is_diffusion_perf_config` 选择 runner：`benchmark_params` 中存在 `dataset` 且无 `dataset_name` 的条目时为真，只有 diffusion runner 保留这些 case；`run_benchmark.py` 过滤掉这些 case，predicate 为假本身不证明 case 含 `dataset_name` 或已通过完整 schema 校验。schema 过滤不看 `mark`。迁移 JSON 后，扫描全部 CUDA/NPU/AMD 引用并核对 runner。PR #8107 的 NPU HunyuanVideo-1.5 步骤同时改为 `BENCHMARK_DIR` 与对应 artifact glob；其他步骤须核对自己的输出目录和 artifact 契约，不得据此假定都采用相同 glob。
 - 禁止：一边已迁 omni-bench、一边仍调 diffusion runner（会 skip 全部 case，pytest 0 selected / exit 5）；把某一平台的 runner 修复外推为其他 pipeline 已对齐。
 - 验收：扫描全部 `.buildkite` 调用，断言 runner 与 JSON schema 一致；HunyuanVideo-1.5 t2v 等已迁 JSON 不得再回到 `run_diffusion_benchmark.py`。^[PR #8107]
 
