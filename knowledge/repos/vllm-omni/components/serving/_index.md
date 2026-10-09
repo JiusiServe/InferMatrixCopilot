@@ -9,8 +9,6 @@ sources: []
 
 # Serving
 
-- [Reference-audio cache 存储与所有权](reference-audio-cache.md) — array/list 边界、payload byte 预算与 artifact readiness。
-
 - Duplex 公共客户端：`vllm_omni/clients/`；HTTP/WS 实现位于 `vllm_omni/entrypoints/duplex/`，模型 adapter 留在各模型的 `duplex/` 子目录。
 - 主要源码入口：`vllm_omni/entrypoints/`（cli、openai、openpi 及 omni/async_omni 入口）和 `vllm_omni/engine/`（orchestrator、stage engine core、stage pool/runtime、output processor）
 - 源码校验：以上路径均已在 `main @ 44d3ae10`（upstream `main` 快照）验证存在
@@ -60,4 +58,4 @@ sources: []
 
 - [Realtime model-context 自动截断合同](rules-realtime-truncation.md)。
 
-- [多模态 processor cache 的 replica identity 合同](rules-multimodal-cache.md)。
+- [多模态缓存身份与存储合同](rules-multimodal-cache.md) — replica UUID 隔离、waveform buffer 所有权与 array/list 复用边界。

@@ -31,14 +31,12 @@ confidence: high
   tokenizer RoPE 的 BNSD/BSND shape fallback。
 - 审查 Qwen3-TTS 的 effective `task_type`、uploaded/precomputed stored voice、
   `tts_model_type`/model-path checkpoint variant 与 Base speaker-embedding mismatch
-  admission 时，直接看 [Q3TTS-1d](rules.md#q3tts-1d-effective-task-必须在-dispatch-前与-checkpoint-variant-对齐)；
-  built-in `supported_speakers` 不属于 stored voice。
+  admission 时，查 [Qwen3-TTS rules](rules.md) 的 Q3TTS-1d；同页 Q3TTS-3a/3f/3g 与 Q3TTS-4a
+  还覆盖 ref publication/重复 callback、processed-token codec validity、stateless mask cache
+  和 MRv2 sampling scope。built-in `supported_speakers` 不属于 stored voice。
 - 其他源码入口与具体不变量见 Qwen3-TTS rules；模型家族结构见
   [Qwen-Omni](../qwen-omni/_index.md)。
 
 - [当前step prompt projection、requestID cache 与speaker embedding](rules-prompt-preprocess.md)。
 
 - [Qwen3-TTS codec tokens 输出合同](rules-codec-output.md)。
-
-- [MRv2 模型流水线的七方面说明](mrv2-pipeline.md)：查询 Talker/Code2Wav hooks、GPU residency、
-  codec validity、批量传输和验证方法；范围为 PR #7781 冻结源码快照，不代表当前默认部署。

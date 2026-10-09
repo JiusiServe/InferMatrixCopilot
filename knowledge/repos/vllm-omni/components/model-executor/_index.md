@@ -38,7 +38,6 @@ sources: []
 |---|---|
 | Breeze ROCm RNG fallback、CUDA generator registration或depth-layer Triton autotune | [Breeze平台合同](rules-breeze-rocm.md) |
 | 理解共享职责和阶段边界 | [architecture](architecture.md) |
-| 理解 MRV2 request state、异步输出所有权、delivery fence 与取消/关闭 | [MRV2 共享运行时](mrv2-runtime.md)；固定 PR head 的七维功能说明 |
 | 根据 PR 描述直达 stage config、runner preprocess、stage runtime、bridge/batch 或 loader 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
 | runtime info、跨 stage payload、batch 与 request RNG 合同 | [跨 stage bridge 与 batch 合同](rules-bridge-batch.md) |
 | loader 的 dtype/config 获取、fused shard 与多模块 checkpoint 载入 | [loader 合同](rules-loader-contract.md) |
@@ -55,7 +54,7 @@ sources: []
 - [显式seed、whole-MTPgraph与NVIDIA/ROCm抽样边界](rules-request-rng.md)。
 - [异步output slab、producer事件与storage所有权](rules-output-snapshots.md)。
 
-- [MRv2 aux tree、narrow sampler、sampled embedding 与 generation输出](rules-mrv2-output-contracts.md)。
+- [MRv2 aux tree、MTP capability、generation 输出与 native delivery 生命周期](rules-mrv2-output-contracts.md) — EXEC-MRV2-1a–1g；native materialization 线程 owner、terminal/abort fence 和 delivery quarantine。
 
 - [settled row predicate与preemption replay fallback](rules-settled-preprocess.md)。
 
