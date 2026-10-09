@@ -1,8 +1,8 @@
 # providers/zcode.py —— 规范
 
-<!-- verified-against: 2026-10-04 -->
+<!-- verified-against: 2026-10-09 -->
 
-`LOC ~400 · harness transport（Z.AI / GLM 订阅） · refactor-status: ok`
+`harness transport（Z.AI / GLM 订阅） · refactor-status: ok`
 
 ## 职责
 在 Z.AI OAuth 订阅认证下，通过 `zcode` CLI 跑完**一整个** agent step。
@@ -34,6 +34,11 @@ argv 单参数上限 128KiB）。
   放入会话临时目录；避免保留下来的 Read 接触宿主自动记忆。工具桥会话同样关闭 memory/use。
 - **失败的运行不能读成空评审。** 非零退出或流里没有 `result` 事件（未超时时）直接抛
   `RuntimeError`，带上 zcode 自己的 stderr。
+- **原生日志的持久化不能截断 CLI 输出。** 原生事件模式将 stdout/stderr 接到每次调用自有的
+  临时普通文件，宿主按独立偏移实时读取并逐事件留痕；不对共享写描述符 seek。
+  ZCode 的退出 watchdog 不等待管道缓冲排空，慢速留痕时普通文件避免丢失已完成回答。
+  进程结束后仍排空所有输出及末尾非换行片段，再严格核验 `result`；超时只约束仍在运行的
+  CLI，已退出进程的日志排空不误判为模型超时。异常／中断仍回收该调用的进程组和临时文件。
 - **模型按次钉死，再断言。** zcode 没有 `--model`；一个会话取其个人 provider 配置里的
   `defaultModelSelection`，且仅当该条目**可选**（0.16.9 的 `resolveInitialModelSelection` 要求
   `options.reasoningLevel` 存在，否则静默回退到目录里第一个模型——这就是过去手写条目"不起作用"的原因），
