@@ -56,13 +56,13 @@ import json
 import logging
 import os
 import re
-import selectors
 import signal
 import time
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from functools import cached_property
 from pathlib import Path
 
@@ -321,12 +321,15 @@ class ZCodeTransport(HarnessTransport):
 
     @staticmethod
     def _stream_run(cmd, session, env, timeout_s, sink):
-        """Drain both native pipes while journaling, including failed runs."""
-        proc = subprocess.Popen(cmd, cwd=str(session), env=env, stdin=subprocess.DEVNULL,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+        """Journal private regular-file spools without backpressuring the CLI.
+
+        ZCode writes stream events without awaiting pipe backpressure, then
+        forces process exit after a short grace period. A durable event sink
+        can therefore lose even a completed result through an output pipe.
+        POSIX regular-file writes are synchronous in Node; anonymous files
+        keep the full output while we journal it at the sink's own pace.
+        """
         events, stderr, buffers = [], [], {"stdout": b"", "stderr": b""}
-        deadline = time.monotonic() + timeout_s
-        timed_out = False
 
         def line(channel, raw):
             text = raw.decode("utf-8", "replace")
@@ -343,54 +346,102 @@ class ZCodeTransport(HarnessTransport):
                 stderr.append(text)
             sink({"type": "native." + channel, "text": text})
 
-        def kill():
-            try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+        # TemporaryFile creates mode-0600 anonymous files in our session;
+        # no named raw-output file persists or enters session attachments.
+        with tempfile.TemporaryFile(mode="w+b", buffering=0, dir=session) as stdout, \
+                tempfile.TemporaryFile(mode="w+b", buffering=0, dir=session) as stderr_file:
+            spools = {"stdout": stdout, "stderr": stderr_file}
+            offsets = {channel: 0 for channel in spools}
+            proc = subprocess.Popen(cmd, cwd=str(session), env=env, stdin=subprocess.DEVNULL,
+                                    stdout=stdout, stderr=stderr_file, start_new_session=True)
+            timed_out = False
+            group_stopped = False
+            stop_lock = threading.Lock()
 
-        try:
-            with selectors.DefaultSelector() as selector:
-                selector.register(proc.stdout, selectors.EVENT_READ, "stdout")
-                selector.register(proc.stderr, selectors.EVENT_READ, "stderr")
-                while selector.get_map():
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0 and not timed_out:
+            def kill(*, at_deadline=False):
+                nonlocal group_stopped, timed_out
+                with stop_lock:
+                    if group_stopped or (at_deadline and proc.poll() is not None):
+                        return
+                    group_stopped = True
+                    if at_deadline:
                         timed_out = True
-                        kill()
-                    for key, _ in selector.select(0.25 if timed_out else min(1, max(0, remaining))):
-                        chunk = os.read(key.fileobj.fileno(), 65536)
-                        channel = key.data
-                        if not chunk:
-                            if buffers[channel]:
-                                line(channel, buffers[channel])
-                            buffers[channel] = b""
-                            selector.unregister(key.fileobj)
-                            continue
-                        buffers[channel] += chunk
-                        while b"\n" in buffers[channel]:
-                            raw, buffers[channel] = buffers[channel].split(b"\n", 1)
-                            line(channel, raw)
-            proc.wait()
-        except BaseException:
-            # A stream interruption can arrive between a pipe read and its
-            # next newline. Preserve every tail we already received, while
-            # retaining the original exception if the journal itself failed.
-            for channel, raw in buffers.items():
-                for tail in raw.splitlines():
                     try:
-                        line(channel, tail)
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+
+            # A slow sink must neither postpone a real producer timeout nor
+            # turn draining an already-exited producer into a false timeout.
+            watchdog = threading.Timer(timeout_s, lambda: kill(at_deadline=True))
+            watchdog.daemon = True
+            watchdog_started = False
+
+            def emit(channel, raw, *, best_effort=False):
+                if not best_effort:
+                    line(channel, raw)
+                    return
+                try:
+                    line(channel, raw)
+                except BaseException:
+                    pass  # retain the original interruption / sink failure
+
+            def drain(channel, *, best_effort=False):
+                # pread must not move the shared child descriptor's offset:
+                # seek/read on it could make the CLI overwrite prior output.
+                chunk = os.pread(spools[channel].fileno(), 65536, offsets[channel])
+                offsets[channel] += len(chunk)
+                buffers[channel] += chunk
+                while b"\n" in buffers[channel]:
+                    raw, buffers[channel] = buffers[channel].split(b"\n", 1)
+                    emit(channel, raw, best_effort=best_effort)
+                return bool(chunk)
+
+            def tails(*, best_effort=False):
+                for channel in buffers:
+                    raw, buffers[channel] = buffers[channel], b""
+                    if raw:
+                        emit(channel, raw, best_effort=best_effort)
+
+            try:
+                watchdog.start()
+                watchdog_started = True
+                while True:
+                    alive = proc.poll() is None
+                    if not alive:
+                        # The leader has finished; no owned descendant may
+                        # keep growing a spool after its completed invocation.
+                        kill()
+                    changed = False
+                    for channel in spools:
+                        changed = drain(channel) or changed
+                    if not alive and not changed:
+                        tails()
+                        break
+                    if not changed:
+                        time.sleep(0.02)
+                proc.wait()
+            except BaseException:
+                # Stop production first, then preserve all bytes already
+                # spooled, including tails lacking a final newline. Sink
+                # failures must never replace the original interruption.
+                kill()
+                proc.wait()
+                for channel in spools:
+                    try:
+                        while drain(channel, best_effort=True):
+                            pass
                     except BaseException:
                         pass
-                buffers[channel] = b""
-            raise
-        finally:
-            # This group belongs only to this invocation, including children
-            # left after its CLI leader exits or our event writer is interrupted.
-            kill()
-            proc.wait()
-            proc.stdout.close()
-            proc.stderr.close()
+                tails(best_effort=True)
+                raise
+            finally:
+                # This process group belongs only to this invocation.
+                watchdog.cancel()
+                if watchdog_started:
+                    watchdog.join()
+                kill()
+                proc.wait()
         if not timed_out and (proc.returncode != 0 or not any(e.get("type") == "result" for e in events)):
             detail = " ".join(stderr[-3:])[:400]
             raise RuntimeError(f"zcode exited {proc.returncode} without a result event"
