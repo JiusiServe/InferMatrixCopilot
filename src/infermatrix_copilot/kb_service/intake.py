@@ -54,6 +54,7 @@ Rules:
   description as a rule.
 - For add or replace, choose a descriptive owner/topic ID under one of
   new_rule_id_namespaces. Do not allocate the next generic sequential ID.
+  Keep the complete rule ID within 41 characters.
   existing_rule_ids includes every occupied or permanently reserved ID across
   the whole tree, including unrelated pages: never reuse one for a new rule.
   Keep the original ID for edit_same_meaning and retire.
