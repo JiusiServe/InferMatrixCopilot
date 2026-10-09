@@ -4,7 +4,7 @@ created: 2026-10-06
 updated: 2026-10-09
 type: rule
 tags: [jiuwenswarm, components]
-sources: ["PR #7689", "PR #7796", "PR #7587"]
+sources: ["PR #7689", "PR #7796", "PR #7587", "PR #7794"]
 confidence: high
 ---
 
@@ -30,3 +30,18 @@ confidence: high
 - 强制：用一个保存的 task 启动冷初始化，不在 before_invoke 等待索引完成；并发调用共享该 task。cron/heartbeat 只读判定来自真实输入，只有 manager 可用且非只读时才预取；uninit 取消未完成初始化并清除 task 引用。
 - 禁止：重复启动冷索引或阻塞用户首条请求；引入没有定义来源的只读属性；把 task 已创建当作 manager 初始化成功；将取消当作正常初始化完成。
 - 验收：阻塞 initializer 时 before_invoke 仍及时返回且只创建一次任务；只读请求不预取，uninit 取消后台 task，取消不置完成标记；失败降级行为同时核对锁定的基类实现。^[PR #7587]
+
+## JW-TEAM-GROUP-1a — 群聊输入先构造并校验结构化载荷，再交给团队运行时
+
+- 触发：修改 `team_helpers.py` 的 `_group_chat_input`、首次团队请求准备或 `_deliverable`。
+- 强制：只有 `params.type=group_chat` 或 `params.query` 中明确的 group_chat dict 进入该分支；重新构造载荷。mentions 必须为 list，dict 项优先取 `leader_member_name`、其次 `member_name`，成员身份必须是非空白字符串并保序去重。body 必须是字符串；client_message_id 缺省或假值时回填 request_id，最终必须是非空白字符串；attachments 必须是 list 且元素为 dict。
+- 强制：首次请求准备保留群聊 dict，跳过文本指令提取；投递时不套 `UserTurn.render()` 或文本成员编址。输入校验的 ValueError 转为 `chat.error` 且 is_complete=True 结束流。
+- 禁止：整包透传未经校验的原始 dict；仅凭 mentions 将普通请求识别为群聊；把 list/dict 类型检查宣称为已验证 JSON 可序列化。
+- 验收：覆盖两种明确入口、普通请求、mention 身份映射与去重、identity 默认和保留，以及非法 body/identity/attachments/mention 的错误终态。^[PR #7794]
+
+## JW-TEAM-GROUP-1b — 群聊 accepted 是否结束请求取决于 mentions 与请求路径
+
+- 触发：修改群聊 round admission、`team.group_message.accepted` 或团队事件流终止。
+- 强制：无 mentions 的群聊跳过交互回合。成功且非首次请求的本地提交分支发带 client_message_id 的 accepted；无 mentions 时再 release_round，补 processing done 和空载荷 complete。事件循环中也只允许无 mentions 且 identity 匹配的 accepted 补 done 并结束流，identity 可来自顶层或 message。
+- 禁止：用其他消息的 accepted 结束流；带 mentions 时把 accepted 当作后续团队回合已经完成；把本地 accepted 的条件扩展到所有首轮或失败提交。
+- 验收：覆盖首轮与活跃 follow-up、空/非空 mentions、匹配/不匹配的 identity，以及失败提交；断言终态和 round 释放符合对应路径。^[PR #7794]
