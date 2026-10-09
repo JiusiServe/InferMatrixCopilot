@@ -1,7 +1,7 @@
 ---
 title: "Agent 运行时与会话"
 created: 2026-09-30
-updated: 2026-10-01
+updated: 2026-10-09
 type: index
 tags: [jiuwenswarm]
 sources: []
@@ -52,3 +52,5 @@ sources: []
 - [声明式 root Agent 定义执行（invoke_agent/stream_agent）：实现深读](feature-depth-runtime-agent-definition-execution.md)
 
 - [Session Input Lane (steer/follow_up) and Execution Binding：实现深读](feature-depth-session-input-steering.md)
+
+- [agent-runtime 审查规则](rules.md) — Process CLI 能力覆盖只作用于本次 run，且不能削弱已安装 deny。

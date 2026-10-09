@@ -1,7 +1,7 @@
 ---
 title: "公共基础模块与配置"
 created: 2026-09-30
-updated: 2026-10-01
+updated: 2026-10-09
 type: index
 tags: [jiuwenswarm]
 sources: []

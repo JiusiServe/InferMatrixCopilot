@@ -1,10 +1,10 @@
 ---
 title: "jiuwenswarm/common 审查规则：配置读写事务、跨仓契约与持久化键稳定性"
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-09
 type: rule
 tags: [jiuwenswarm]
-sources: []
+sources: ["PR #6926", "PR #7788", "PR #7810"]
 ---
 
 # jiuwenswarm/common 审查规则：配置读写事务、跨仓契约与持久化键稳定性
@@ -42,3 +42,24 @@ sources: []
 - `UnsupportedThirdAgent` 的返回形状（`ok` 为 False，带 `error`，`code` 为 UNSUPPORTED）是调用方依赖的约定。`normalize_agent_type` 只对内置的 jiuwenswarm 不区分大小写，registry 里的名称保留原大小写。
 
 <!-- kb:rule status=active since=init-f0a69728c96b -->
+
+## JW-MCP-PREFLIGHT-1a — 启用远程 MCP 的 add/update 在 HTTP 预检失败时不得落库
+
+- 触发：修改含 HTTP MCP 预检的 common/mcp_config 和 AgentServer MCP add/update；当前核对 dev-stable。
+- 强制：启用的远程 HTTP/SSE 配置先连通性/鉴权预检，通过后才保存；SSE 用 GET 读取响应头，streamable-http POST initialize，并传递配置鉴权信息。超时、连接异常、非法 URL、HTTP >=400 或意外探测异常返回明确失败。
+- 禁止：探测失败仍保存配置；为预检进入 MCP SDK 长生命周期任务组；对 stdio 等本地传输 spawn 探测；把 HTTP 探测通过宣称为完整 MCP 协议验证。
+- 验收：失败 add/update 的配置写入口未调用；SSE GET、HTTP POST initialize、401 和正常保存都有定向测试。^[PR #7810]
+
+## JW-QUOTA-1a — 配额关闭时短路门禁，不能同时关闭无关的只读接口
+
+- 触发：修改带 workspace quota 的 common/workspace/quota 或 workspace_quota_rail；当前核对 dev-stable。
+- 强制：统一使用 WORKSPACE_QUOTA_ENABLED，默认 false，按配置布尔语义解析；关闭时 before_tool_call 返回，命令/写盘门禁返回 allowed=True,status=ok，避免继续计算配额。
+- 禁止：关闭开关时仍产生 quota block；将隐藏导航误解为 Gateway list/usage/preview/download 等只读接口不可调用。
+- 验收：默认、false 和 true 分别覆盖门禁路径；关闭时既不计算配额也不阻断写盘，而只读接口保持既有身份校验。^[PR #7788]
+
+## JW-TRACE-1a — 共享 trace 开关必须区分显式通道与旧兼容键
+
+- 触发：修改 xiaoyi_0.2.4.beta3 common/e2a/wire_trace 的 E2A/A2A/session 调试落盘开关。
+- 强制：复用 trace.json 和 JIUWENSWARM_TRACE 系列覆盖；环境变量优先。只有 e2a/a2a/session_history 算显式通道键，显式模式未列出的通道关闭；history_records 留作兼容键。保持文件缓存刷新和 get_dated_logs_dir 下的默认通道目录；落盘异常不能中断业务。
+- 禁止：新造独立开关文件；把 history_records 当作显式通道模式判据；要求改开关后重启或把默认输出另放一套目录。
+- 验收：test_trace_switches 同时覆盖环境覆盖、缓存刷新、显式通道遗漏和旧文件/变量兼容；注入写入异常时业务继续。^[PR #6926]

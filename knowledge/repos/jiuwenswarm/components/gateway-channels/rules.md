@@ -1,10 +1,10 @@
 ---
 title: "Process CLI 频道（jiuwenswarm/channels/process_cli）审查规则"
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-09
 type: rule
 tags: [jiuwenswarm]
-sources: []
+sources: ["PR #7782"]
 ---
 
 # Process CLI 频道（jiuwenswarm/channels/process_cli）审查规则
@@ -47,3 +47,10 @@ sources: []
 - 输入 EOF 时如果还有待答交互，必须以 `INPUT_CLOSED` 按取消处理（退出码 130）。`harness.activate_interaction` 以及没有定位符的交互会被拒绝，报 `INTERACTION_UNSUPPORTED`；待答交互数量上限是 `_MAX_PENDING`。
 
 <!-- kb:rule status=active since=init-f0a69728c96b -->
+
+## JW-PCLI-FLUSH-1a — 持有 session 的单次 CLI 必须在退出前等待两个写入队列
+
+- 触发：修改 `channels/process_cli/machine.py` 的 cleanup 和单次调用完成结果。
+- 强制：runtime_close 之后，只有持有 session_id 的运行追加 session_writes；并发等待 history 与 metadata 独立队列，在 shutdown 期限内留正安全余量。任一返回值不是 True 或发生异常，记录 session_writes 清理失败并以 SHUTDOWN_FAILED 返回。
+- 禁止：持有 session 时跳过 flush；串行消耗两个完整超时窗口；把未落盘的单次调用报告为成功。
+- 验收：测试 runtime-closed → session-writes → asyncio-shutdown 顺序、短期限的正超时、两个队列同时启动和任一队列失败；无 session 允许省略此步骤。^[PR #7782]
