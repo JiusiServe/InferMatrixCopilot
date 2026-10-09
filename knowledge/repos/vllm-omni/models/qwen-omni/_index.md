@@ -68,3 +68,5 @@ sources: ["PR #5073", "PR #5671", "PR #5687", "PR #5976", "PR #6284", "PR #4322"
 - [MRv2 sampled handoff、first audio 与 decoder opt-in](rules-mrv2-audio.md)
 
 - [Qwen3-Omni layer-0 embedding capture 合同](rules-embedding-capture.md)。
+
+- [Qwen2.5-Omni Token2Wav block attention 合同](rules-token2wav-attention.md)。

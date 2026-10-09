@@ -4,7 +4,7 @@ created: 2026-09-05
 updated: 2026-10-09
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234", "PR #6966", "PR #7395", "PR #6978", "PR #7398", "PR #8342", "PR #7935", "PR #7933", "PR #8527", "PR #8189", "PR #8520", "PR #8570"]
+sources: ["PR #6704", "PR #6830", "PR #6884", .buildkite/amd/, tests/helpers/clean.py, tests/helpers/stage_config.py, tests/buildkite/test_amd_pipeline.py, tests/e2e/offline_inference/test_qwen3_omni_colocate_async.py, "PR #7234", "PR #6966", "PR #7395", "PR #6978", "PR #7398", "PR #8342", "PR #7935", "PR #7933", "PR #8527", "PR #8189", "PR #8520", "PR #8570", "PR #8643"]
 confidence: high
 ---
 
@@ -119,3 +119,17 @@ confidence: high
 - 强制：在两个 offloader pytest 命令之前 export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA，使 backend-independent offload 行为不被 AITER attention 构建依赖阻塞；其他 attention 专项 lane 维持自身 backend 目标。
 - 禁止：假定 VLLM_ROCM_USE_AITER 同时控制 diffusion attention；从 YAML 改动推断已获得某个运行时或耗时。
 - 验收：检查 export 顺序及两个命令的有效环境，确认 offload 断言仍保留；实际 lane 结果另报告。 ^[PR #8570]
+
+## OMNI-CI-GPU-BOUNDARY-1a — 冷 GPU 编译不得占用 CPU 分片预算
+
+- 触发：修改 AMD diffusion CPU sharding、JoyImage GPU lane 或 artifact paths。
+- 强制：GPU inference 用例与 CPU 单测分模块和 marker，保留 CUDA 一卡路由；JoyImage default-AITER 完整 GPU suite 由独立 nonblocking AMD nightly 承载，job 隔离 JIT/extensions cache，并保留 JUnit/durations。READY/MERGE CPU 分片配置同步，fail-closed pytest 输出 shard 唯一、checkout 相对的 JUnit。当前 5 分片/60 分钟及 nightly 90/80 分钟为可调整预算，按真实冷启动证据复核。
+- 禁止：让冷 AITER 编译藏在 CPU marker 下；靠扩大 skip 或宽松退出状态掩盖失败，或把 nonblocking 配置当作 runtime 已验证。
+- 验收：pipeline 断言与两 lane YAML 同步，验证 CPU/GPU collection 不串组、artifact 唯一且被收集；冷 run 的耗时和结论单独记录。 ^[PR #8643]
+
+## OMNI-CI-PLATFORM-ORACLE-1a — 平台测试保留实际 dispatch 与有效输出 oracle
+
+- 触发：修改 NVIDIA/ROCm graph eligibility、JoyImage default backend 测试或 VDN float64 reference。
+- 强制：NVIDIA flow-encoder capture 与 ROCm eager fallback 分开断言，保留 shared-arena 测试；JoyImage 用 inference_mode，default backend 与 SDPA 比较所有 image 和有效 text 输出，并扰动 padded text 证明有效输出不变。HIP wheel 缺 CPU LAPACK 时 VDN solve-rule reference 用 ROCm GPU，无 GPU 明确 skip，非 HIP 仍 CPU。
+- 禁止：将 NVIDIA capture 期望施加给 HIP；强制 SDPA 而丢 default-AITER 检验；为测试 LAPACK 缺失改变生产算法，或以 padded-query 差异放弃有效 key-mask 验证。
+- 验收：覆盖平台先验与 dispatch，检查无 GPU skip 范围，保留独立数值 oracle和 padded-text 不变性；单次平台通过不外推其他设备。 ^[PR #8643]
