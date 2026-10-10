@@ -59,3 +59,4 @@ sources: []
 - [settled row predicate与preemption replay fallback](rules-settled-preprocess.md)。
 
 - [AutoRound NVFP4 method dispatch 合同](rules-autoround-dispatch.md)。
+- [数值精确性与平台可移植性规则](rules-numeric-exactness.md)
