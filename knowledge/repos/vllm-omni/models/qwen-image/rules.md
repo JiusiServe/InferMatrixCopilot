@@ -1,10 +1,10 @@
 ---
 title: "Qwen-Image 实现规则"
 created: 2026-09-02
-updated: 2026-09-22
+updated: 2026-10-10
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5887", tests/e2e/accuracy/test_qwen_image.py, "PR #6110", "vllm_omni/diffusion/models/qwen_image/qwen_image_transformer.py", "PR #5586", "PR #7513"]
+sources: ["PR #5887", tests/e2e/accuracy/test_qwen_image.py, "PR #6110", vllm_omni/diffusion/models/qwen_image/qwen_image_transformer.py, "PR #5586", "PR #7513", "PR #8699"]
 confidence: high
 ---
 
@@ -51,3 +51,12 @@ confidence: high
 - 强制：所有设备的 eager 路径在 RMSNorm 之后使用 `RotaryEmbedding`；`cos`/`sin` 由 `torch.real`/`torch.imag` 得到并 cast 到激活 dtype（BF16）。这是 pipeline 对 Diffusers 的路径。fused kernel 可以继续对照 FP32 complex multiply，但那不是 eager CUDA 路径。
 - 禁止：在 eager CUDA 上恢复 `_apply_qwen_image_rotary_emb` 或其它 FP32 复数乘。该 helper 能在单元测试里对齐 Diffusers `apply_rotary_emb_qwen(..., use_real=False)`，但 Inductor 不能 codegen 复数算子，且会把 Omni↔Diffusers pipeline PSNR 打到门限以下。不要用 `--enforce-eager` 掩盖，也不要为迁就 helper 去降 pipeline gate。
 - 验收：`use_fused=False` 对所有设备对照 `RotaryEmbedding`；fused 测试单独对照 FP32 complex reference。eager CUDA 与 fused reference 不得再共用同一个 expected。^[PR #7513]
+
+## VLLM-OMNI-PR8699-QWEN21-SIGMA-GRID — checkpoint 预设 sample_sigmas 必须按请求>模型>回退优先级贯通到步数解析
+
+- 触发：为 native `nn.Module` pipeline（如 `QwenImage21Pipeline`）接入 checkpoint `model_index.json` 中的预设 `sample_sigmas` 网格，或修改 `OmniDiffusionConfig.enrich_config` 的 extras 提取、`prepare_timesteps` 的 sigmas 回退、pre-process hook 的请求级注入、`default_num_inference_steps` 或 `sigmas` 的 extra_body 白名单。
+- 强制：保持与 upstream diffusers #14950 一致的优先级：请求级 `sigmas` > 模型级 `sample_sigmas` > `linspace(1.0, 1/num_inference_steps, num_inference_steps)` 回退；网格生效时总步数由 `len(sigmas)` 决定，显式 `num_inference_steps` 被忽略。`enrich_config` 的提取条件按实现是 `self.extras.get("sample_sigmas") is None`：extras 缺失该键或显式为 `None` 时都会写入 checkpoint 网格，即显式 `None` 同样会被覆盖；只有非 `None` 的显式 extras 值胜出。请求未携带 sigmas 时，pre-process hook 必须把预设网格注入为请求级 `sigmas`，使 `StepScheduler._get_total_steps` 与 cache backends 经既有 `len(sigmas)` 路径解析正确总步数；runner 的 cache-refresh 路径经 `default_num_inference_steps` 解析步数。`sigmas` 只能通过既有多模型 extra_body 白名单机制（同 LTX2）按请求开放，并在 chat 与 images/generations 两条路径生效。
+- 禁止：让 `enrich_config` 覆盖用户显式提供的非 `None` extras 值，或把提取判定改成键存在性/truthiness 检查（现状以 `is None` 判定，显式 `None` 会被 checkpoint 网格覆盖，语义不同）；省略 hook 注入导致 step-wise 执行与缓存按调用方步数（如示例默认 50）而非网格步数（8）解析；网格生效时仍让 `num_inference_steps` 参与步数决定；绕过白名单机制向请求开放调度参数。
+- 验收：CPU 单测覆盖 extras 三种情形（从 model_index 提取、缺失不写入、显式非 `None` extras 不被覆盖）与 `prepare_timesteps` 优先级（请求 sigmas 胜出、config 网格决定步数并压过 `num_inference_steps`、无网格回退 linspace）；断言请求未携带 sigmas 时步数解析等于网格长度；extra_body `sigmas` 在 `/v1/chat/completions` 与 `/v1/images/generations` 均可覆盖默认网格。Turbo 的 CFG=1 用法与 Qwen Research License 属 checkpoint 使用约束，不是本规则的验收对象。^[PR #8699]
+
+<!-- kb:rule status=active since=v0.30.0 -->
