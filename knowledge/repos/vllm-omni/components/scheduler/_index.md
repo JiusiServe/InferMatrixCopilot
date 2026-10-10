@@ -50,3 +50,4 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_g
 - [empty terminal、staged-payloadreceivegate与tail守恒](rules-stream-terminals.md)。
 
 - [native sender-only admission 与 opt-in first-chunk express](rules-first-chunk-express.md)。
+- [Async-chunk prewarm 规则](rules-async-chunk-prewarm.md)
